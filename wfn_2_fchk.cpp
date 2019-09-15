@@ -215,11 +215,11 @@ int main(int argc, char **argv)
 
 		wavy[0].assign_charge(wavy[0].calculate_charge());
 		if (mult == 0) {
-			wavy[0].guess_multiplicity(expert, log_file);
+			wavy[0].guess_multiplicity(log_file,expert);
 		}
 		else
 			wavy[0].assign_multi(mult);
-		free_fchk(outputname,"", wavy[0], debug_main,true, log_file);
+		free_fchk(log_file,outputname,"", wavy[0], debug_main,true);
 	}
 	else if(cif!=""||hkl!=""){
 		if(debug_main)

@@ -6,6 +6,7 @@
 #include <sstream>
 #include <sys/stat.h>
 #include <vector>
+#include <fstream>
 
 class WFN;
 
@@ -39,7 +40,7 @@ std::cout << "| |__| | |____   | |   " << std::endl;
 std::cout << " \\___\\_\\\\_____|  |_|   " << std::endl;
 std::cout << "                       "<< std::endl;
 };
-inline void cuQCT(ofstream &file){
+bool cuQCT(std::ofstream &file){
   file << "             ____   _____ _______ " << std::endl;
   file << "            / __ \\ / ____|__   __|" << std::endl;
   file << "  ___ _   _| |  | | |       | |   " << std::endl;
@@ -47,6 +48,7 @@ inline void cuQCT(ofstream &file){
   file << "| (__| |_| | |__| | |____   | |   " << std::endl;
   file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
   file << "                       "<< std::endl;
+  return true;
 };
 inline void cuQCT(){
 std::cout << "             ____   _____ _______ " << std::endl;
@@ -60,8 +62,9 @@ std::cout << "                       "<< std::endl;
 inline void copyright(){
 	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 }
-inline void copyright(ofstream &file){
+bool copyright(std::ofstream &file){
   file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+  return true;
 }
 inline bool exists(const std::string &name){
   struct stat buffer;   
@@ -77,6 +80,7 @@ std::string get_basename_without_ending(const std::string &input);
 //------------------Functions to handle .wfn files--------------------------------------
 bool writewfn(WFN &wavefunction, const std::string &path, bool &debug, bool occ);
 bool readwfn(WFN &wavefunction, const std::string &path, bool &debug);
+bool readwfn(WFN& wavefunction, const std::string& path, bool& debug, std::ofstream &file);
 //------------------Functions to work with configuration files--------------------------
 void write_template_confi();
 int program_confi(std::string &gaussian_path, std::string &turbomole_path, 

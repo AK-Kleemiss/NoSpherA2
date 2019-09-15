@@ -1516,7 +1516,7 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 	return true;
 };
 
-bool free_fchk(const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, bool force_overwrite, ofstram &file) {
+bool free_fchk(const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, bool force_overwrite, ofstream &file) {
 	if (wave.get_nr_basis_set_loaded() == 0) {
 		file << "No basis set loaded, will load a complete basis set now!" << endl;
 		if (debug) Enter();
