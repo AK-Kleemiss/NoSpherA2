@@ -9,7 +9,6 @@ class MO;
 
 #include <vector>
 #include <string>
-#include <fstream>
 
 class WFN {
 	private:
@@ -62,7 +61,6 @@ class WFN {
 		bool add_primitive(int cent, int type, double e, double * values);
 		bool add_exp(int cent, int type, double e);
 		bool read_wfn(std::string fileName, bool debug);
-		bool read_wfn(std::string fileName, bool debug, std::ofstream &file);
 		bool write_wfn(const std::string &fileName, bool debug, bool occupied);
 		bool set_path(std::string given_path) { path=given_path; return true; };
 		void print_primitive(int nr);
@@ -105,9 +103,9 @@ class WFN {
 		void set_dist_switch(){ distance_switch = true; };
 		void operator=(const WFN &right);
 		int calculate_charge();
-		int calculate_charge(std::ofstream &file);
-		bool guess_multiplicity(bool expert = false);
-		bool guess_multiplicity(std::ofstream& file,bool expert = false);
+		int calculate_charge(ofstream &file);
+		bool guess_multiplicity(bool expert=false);
+		bool guess_multiplicity(bool expert = false, ofstream &file);
 		//-------------------atom handling--------------------------------------------------------------
 		double get_atom_coordinate(int nr, int axis, bool debug);
 		std::string get_atom_label(int nr);
