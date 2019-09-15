@@ -1590,10 +1590,10 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 			);
 		num_points[i] = numgrid_get_num_grid_points(context);
 
-		for(unsigned int n=0; n<3; n++)
-			temp[n][i] = new double[num_points[i]];
-		for(int n=0; n<4; n++)
-			grid[i][n] = new double[num_points[i]];
+		for(unsigned int x=0; x<3; x++)
+			temp[x][i] = new double[num_points[i]];
+		for(int x=0; x<4; x++)
+			grid[i][x] = new double[num_points[i]];
 
 		numgrid_get_grid(context,
 				wave.get_ncen(),
