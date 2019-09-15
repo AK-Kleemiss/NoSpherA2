@@ -217,6 +217,24 @@ bool readwfn(WFN &wavefunction, const string &path, bool &debug){
 	}
 };
 
+bool readwfn(WFN& wavefunction, const string& path, bool& debug, ofstream &file) {
+	try {
+		if (wavefunction.read_wfn(path, debug,file)) {
+			wavefunction.set_path(path);
+			return true;
+		}
+		else {
+			cout << "Sorry, something went wrong, try to look above what i might be..\n";
+			throw (int)1;
+		}
+	}
+	catch (exception& e)
+	{
+		cerr << "Sorry, something went wrong, try to look above what i might be.. the error code is " << e.what() << endl;
+		throw (int)3;
+	}
+};
+
 //---------------------------Configuration files ---------------------------------------------------
 
 string get_home_path(void) {

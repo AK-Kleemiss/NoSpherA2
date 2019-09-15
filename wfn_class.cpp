@@ -2327,7 +2327,7 @@ bool WFN::guess_multiplicity(bool expert){
 	return true;
 };
 
-bool WFN::guess_multiplicity(bool expert, ofstream &file) {
+bool WFN::guess_multiplicity(ofstream& file,bool expert) {
 	bool f = false;
 	if (get_nr_electrons(f) % 2 == 0 && !expert) {
 		bool temp = true;
