@@ -134,7 +134,7 @@ AtomGrid::AtomGrid(const double radial_precision,
     int num_radial = int(log(1.0 + (r_outer / c)) / h);
     for (int irad = 0; irad < num_radial; irad++)
     {
-        double radial_r = c * (exp((irad + 1) * h) - 1.0);
+        double radial_r = c * (exp((irad + int(1)) * h) - 1.0);
         double radial_w = (radial_r + c) * radial_r * radial_r * h;
 
         radial_atom_grid_r_bohr_.push_back(radial_r);
