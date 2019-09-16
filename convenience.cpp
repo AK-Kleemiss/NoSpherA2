@@ -315,9 +315,12 @@ void write_template_confi(){
 	conf.close();
 #ifdef _WIN32
 //	const wchar_t* fileLPCWSTR = programs.c_str();
-	int attr = GetFileAttributes(programs.c_str());
+	const size_t size = programs.length();
+	wchar_t wxtest[size];
+	mbstowcs(wtext, programs.c_str(), programs.length());
+	int attr = GetFileAttributes(wtext);
 	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-		SetFileAttributes(programs.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
+		SetFileAttributes(wxtest, attr | FILE_ATTRIBUTE_HIDDEN);
 	}
 #endif
 	return;
