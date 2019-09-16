@@ -29,6 +29,45 @@
 using namespace std;
 
 //--------------------------General convenience terminal functions---------------------------------
+void QCT(){
+ cout << "  ____   _____ _______ " << std::endl;
+ cout << " / __ \\ / ____|__   __|" << std::endl;
+ cout << "| |  | | |       | |   " << std::endl;
+ cout << "| |  | | |       | |   " << std::endl;
+ cout << "| |__| | |____   | |   " << std::endl;
+ cout << " \\___\\_\\\\_____|  |_|   " << std::endl;
+ cout << "                       "<< std::endl;
+};
+
+bool cuQCT(ofstream& file){
+  file << "             ____   _____ _______ " << std::endl;
+  file << "            / __ \\ / ____|__   __|" << std::endl;
+  file << "  ___ _   _| |  | | |       | |   " << std::endl;
+  file << " / __| | | | |  | | |       | |   " << std::endl;
+  file << "| (__| |_| | |__| | |____   | |   " << std::endl;
+  file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
+  file << "                       "<< std::endl;
+  return true;
+};
+
+void cuQCT(){
+  cout << "             ____   _____ _______ " << std::endl;
+  cout << "            / __ \\ / ____|__   __|" << std::endl;
+  cout << "  ___ _   _| |  | | |       | |   " << std::endl;
+  cout << " / __| | | | |  | | |       | |   " << std::endl;
+  cout << "| (__| |_| | |__| | |____   | |   " << std::endl;
+  cout << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
+  cout << "                       "<< std::endl;
+};
+
+void copyright(){
+	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+};
+
+bool copyright(ofstream& file){
+  file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+  return true;
+};
 
 bool yesno(){
 	bool end=false;

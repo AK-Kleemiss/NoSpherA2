@@ -1,0 +1,6 @@
+#ifndef VERSION_H_INCLUDED
+#define VERSION_H_INCLUDED
+
+const char *PROGRAM_VERSION = "1.1.0";
+
+#endif /* VERSION_H_INCLUDED */

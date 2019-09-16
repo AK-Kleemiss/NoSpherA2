@@ -31,41 +31,14 @@ template<class T> T fromString(const std::string& s)
      stream >> t;
      return t;
 }
-inline void QCT(){
-std::cout << "  ____   _____ _______ " << std::endl;
-std::cout << " / __ \\ / ____|__   __|" << std::endl;
-std::cout << "| |  | | |       | |   " << std::endl;
-std::cout << "| |  | | |       | |   " << std::endl;
-std::cout << "| |__| | |____   | |   " << std::endl;
-std::cout << " \\___\\_\\\\_____|  |_|   " << std::endl;
-std::cout << "                       "<< std::endl;
-};
-bool cuQCT(std::ofstream &file){
-  file << "             ____   _____ _______ " << std::endl;
-  file << "            / __ \\ / ____|__   __|" << std::endl;
-  file << "  ___ _   _| |  | | |       | |   " << std::endl;
-  file << " / __| | | | |  | | |       | |   " << std::endl;
-  file << "| (__| |_| | |__| | |____   | |   " << std::endl;
-  file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-  file << "                       "<< std::endl;
-  return true;
-};
-inline void cuQCT(){
-std::cout << "             ____   _____ _______ " << std::endl;
-std::cout << "            / __ \\ / ____|__   __|" << std::endl;
-std::cout << "  ___ _   _| |  | | |       | |   " << std::endl;
-std::cout << " / __| | | | |  | | |       | |   " << std::endl;
-std::cout << "| (__| |_| | |__| | |____   | |   " << std::endl;
-std::cout << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-std::cout << "                       "<< std::endl;
-};
-inline void copyright(){
-	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-}
-bool copyright(std::ofstream &file){
-  file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-  return true;
-}
+
+inline void QCT();
+inline bool cuQCT(std::ofstream& file);
+inline void cuQCT();
+
+inline void copyright();
+inline bool copyright(std::ofstream& file);
+
 inline bool exists(const std::string &name){
   struct stat buffer;   
   return (stat (name.c_str(), &buffer) == 0); 
