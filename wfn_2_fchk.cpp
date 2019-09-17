@@ -49,8 +49,14 @@ bool expert=false;
 int main(int argc, char **argv)
 {
 	ofstream log_file("wfn_2_fchk.log", ios::out);
-	cuQCT(log_file);
-	copyright(log_file);
+	log_file << "             ____   _____ _______ " << std::endl;
+	log_file << "            / __ \\ / ____|__   __|" << std::endl;
+	log_file << "  ___ _   _| |  | | |       | |   " << std::endl;
+	log_file << " / __| | | | |  | | |       | |   " << std::endl;
+	log_file << "| (__| |_| | |__| | |____   | |   " << std::endl;
+	log_file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
+	log_file << "                       " << std::endl;
+	log_file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 	if(argc>1){
 		string keyword=argv[1];
 		if(keyword.find("--help")!=string::npos){

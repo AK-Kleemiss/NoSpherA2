@@ -7,6 +7,7 @@
 #include <direct.h>
 #include <io.h>
 #include <windows.h>
+#include <Windows.h>
 #define GetCurrentDir _getcwd
 #else
 #include <unistd.h>
@@ -29,7 +30,7 @@
 using namespace std;
 
 //--------------------------General convenience terminal functions---------------------------------
-void QCT(){
+inline void QCT(){
  cout << "  ____   _____ _______ " << std::endl;
  cout << " / __ \\ / ____|__   __|" << std::endl;
  cout << "| |  | | |       | |   " << std::endl;
@@ -39,7 +40,7 @@ void QCT(){
  cout << "                       "<< std::endl;
 };
 
-bool cuQCT(ofstream& file){
+inline bool cuQCT(ofstream& file){
   file << "             ____   _____ _______ " << std::endl;
   file << "            / __ \\ / ____|__   __|" << std::endl;
   file << "  ___ _   _| |  | | |       | |   " << std::endl;
@@ -50,7 +51,7 @@ bool cuQCT(ofstream& file){
   return true;
 };
 
-void cuQCT(){
+inline void cuQCT(){
   cout << "             ____   _____ _______ " << std::endl;
   cout << "            / __ \\ / ____|__   __|" << std::endl;
   cout << "  ___ _   _| |  | | |       | |   " << std::endl;
@@ -60,11 +61,11 @@ void cuQCT(){
   cout << "                       "<< std::endl;
 };
 
-void copyright(){
+inline void copyright(){
 	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 };
 
-bool copyright(ofstream& file){
+inline bool copyright(ofstream& file){
   file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
   return true;
 };
@@ -354,12 +355,10 @@ void write_template_confi(){
 	conf.close();
 #ifdef _WIN32
 //	const wchar_t* fileLPCWSTR = programs.c_str();
-	const size_t size = programs.length();
-	wchar_t wxtest[size];
-	mbstowcs(wtext, programs.c_str(), programs.length());
-	int attr = GetFileAttributes(wtext);
+	wstring stemp = wstring(programs.begin(), programs.end());
+	int attr = GetFileAttributes(stemp.c_str());
 	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-		SetFileAttributes(wxtest, attr | FILE_ATTRIBUTE_HIDDEN);
+		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
 	}
 #endif
 	return;
@@ -643,7 +642,7 @@ bool open_file_dialog(string &path, bool debug, vector <string> filter){
 #ifdef _WIN32
 	char filename[ 1024 ];
 
-	OPENFILENAME ofn;
+	OPENFILENAMEA ofn;
 	    ZeroMemory( &filename, sizeof( filename ) );
 	    ZeroMemory( &ofn,      sizeof( ofn ) );
 	    ofn.lStructSize  = sizeof( ofn );
@@ -651,7 +650,7 @@ bool open_file_dialog(string &path, bool debug, vector <string> filter){
 	    ofn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
 	    ofn.lpstrFile    = filename;
 	    ofn.nMaxFile     = 1024;
-	    ofn.lpstrTitle   = "Select a File, yo!";
+	    ofn.lpstrTitle   = "Select a File";
 	    ofn.Flags        = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
 
 	if (GetOpenFileNameA( &ofn )){
@@ -720,7 +719,7 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings, 
 #ifdef _WIN32
 	char filename[ 1024 ];
 
-	OPENFILENAME sfn;
+	OPENFILENAMEA sfn;
 	 ZeroMemory( &filename, sizeof( filename ) );
 	 ZeroMemory( &sfn,      sizeof( sfn ) );
 	 sfn.lStructSize  = sizeof( sfn );
@@ -814,7 +813,7 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 #ifdef _WIN32
 	char filename[ 1024 ];
 
-	OPENFILENAME sfn;
+	OPENFILENAMEA sfn;
 	 ZeroMemory( &filename, sizeof( filename ) );
 	 ZeroMemory( &sfn,      sizeof( sfn ) );
 	 sfn.lStructSize  = sizeof( sfn );

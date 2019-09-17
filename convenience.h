@@ -43,6 +43,7 @@ inline bool exists(const std::string &name){
   struct stat buffer;   
   return (stat (name.c_str(), &buffer) == 0); 
 };
+
 std::string atnr2letter(const int nr);
 void copy_file(std::string from, std::string to);
 std::string shrink_string(std::string &input);

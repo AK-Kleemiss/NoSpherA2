@@ -3,3 +3,11 @@
 *.lastbuildstate
 *.tlog
 *.pdb
+*.log
+.vs/wfn2fchk/v16/.suo
+*.db
+*.opendb
+*.ipch
+*.exe
+*.iobj
+*.ipdb
