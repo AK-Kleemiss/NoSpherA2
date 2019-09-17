@@ -64,72 +64,72 @@ Wfn_2_Fchk: ${OBJS} ${USER_OBJS}
 
 ./AtomGrid.o: ../AtomGrid.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./basis_set.o: ../basis_set.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./becke_partitioning.o: ../becke_partitioning.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./bragg.o: ../bragg.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./convenience.o: ../convenience.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./cube.o: ../cube.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./fchk.o: ../fchk.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./grid_radial.o: ../grid_radial.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./mo_class.o: ../mo_class.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./sphere_lebedev_rule.o: ../sphere_lebedev_rule.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./structure_factors.o: ../structure_factors.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./version.o: ../version.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./wfn_2_fchk.o: ../wfn_2_fchk.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./wfn_class.o: ../wfn_class.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3 -Wall -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 
