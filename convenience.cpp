@@ -112,7 +112,7 @@ string atnr2letter(const int nr){
 		,"Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"
 		,"Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn"};
 	if(nr>86 || nr <=0 ){
-		cout << "Only yet implemented from H-Xe, ask Florian for improvements or give a reasonable number between 1-86!" << endl;
+		cout << "Only yet implemented from H-Rn, ask Florian for improvements or give a reasonable number between 1-86!" << endl;
 		Enter();
 		return ("PROBLEM");
 	}

@@ -55,8 +55,9 @@ int main(int argc, char **argv)
 	log_file << " / __| | | | |  | | |       | |   " << std::endl;
 	log_file << "| (__| |_| | |__| | |____   | |   " << std::endl;
 	log_file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-	log_file << "                       " << std::endl;
+	log_file << "                                  " << std::endl;
 	log_file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+	log_file.flush();
 	if(argc>1){
 		string keyword=argv[1];
 		if(keyword.find("--help")!=string::npos){
@@ -79,6 +80,7 @@ int main(int argc, char **argv)
 	}
   if(argc<4){
     log_file << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn -b <basis_set>" << endl;
+	log_file.flush();
 	log_file.close();
     return -1;
   }
@@ -92,7 +94,8 @@ int main(int argc, char **argv)
 	known_keywords.push_back("-cif");
 	known_keywords.push_back("-acc");
 	known_keywords.push_back("-mult");
-	if(debug_main) log_file << "argc:"<< argc << endl;
+	if(debug_main) 
+		log_file << "argc:"<< argc << endl;
 	vector<WFN> wavy;
 	string wavename;
 	string gaussian_path;
@@ -106,12 +109,14 @@ int main(int argc, char **argv)
 		log_file << "No .cuQCT.conf found, do you want to continue without the employment of external programs?" << endl;
 		if(!yesno()){
 			log_file << "Then please start again and write a config file or use the template choice." << endl;
+			log_file.flush();
 			log_file.close();
 			return -1;
 		}
 	}
 	else
-		if(config==0) log_file << "The programs file was newly written, please check if everything is correct!" << endl;
+		if(config==0) 
+			log_file << "The programs file was newly written, please check if everything is correct!" << endl;
   string wfn("");
   string fchk("");
   string basis_set("");
@@ -142,6 +147,7 @@ int main(int argc, char **argv)
       debug_main = true;
     }
   }
+  log_file.flush();
   if(debug_main)
   	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << endl;
   if(wfn == ""){
@@ -166,6 +172,7 @@ int main(int argc, char **argv)
       log_file << "Argument to -wfn does not look like wfn or ffn file!" << endl;
       return -1;
   }
+  log_file.flush();
   readwfn(wavy[0], wfn, debug_main, log_file);
 
   if(basis_set!=""||fchk!=""){
