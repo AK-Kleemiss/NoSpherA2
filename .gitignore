@@ -11,3 +11,8 @@
 *.exe
 *.iobj
 *.ipdb
+*.d
+*.o
+*.idb
+*.txt
+Windows/.vs/wfn2fchk/v16/.suo
