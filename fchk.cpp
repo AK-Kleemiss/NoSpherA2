@@ -614,7 +614,7 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 				int iuv=(iu*(iu+1)/2)+iv;
 				if(debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu*(iu+1)/2<< endl;
 				for(int m=0; m < wave.get_nmo(); m++){
-					if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
+					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
 					if(!wave.set_DM(iuv,wave.get_DM(iuv)+2*CMO[iu+(m*nao)]*CMO[iv+(m*nao)])){
 						cout << "Something went wrong while writing the DM! iuv=" << iuv << endl;
 						cout << "accessing CMO elements: " << iu+(m*nao) << " and " << iv+(m*nao) << " while CMO has size: " << CMO.size() << endl;
@@ -623,7 +623,7 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 						Enter();
 						return false;
 					}
-					else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
+					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
 		}
@@ -1156,7 +1156,7 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 				int iuv=(iu*(iu+1)/2)+iv;
 				if(debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu*(iu+1)/2<< endl;
 				for(int m=0; m < wave.get_nmo(); m++){
-					if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
+					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
 					if(!wave.set_DM(iuv,wave.get_DM(iuv)+wave.get_MO_occ(m)*CMO[iu+(m*nao)]*CMO[iv+(m*nao)])){
 						cout << "Something went wrong while writing the DM! iuv=" << iuv << endl;
 						cout << "accessing CMO elements: " << iu+(m*nao) << " and " << iv+(m*nao) << " while CMO has size: " << CMO.size() << endl;
@@ -1165,7 +1165,7 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 						Enter();
 						return false;
 					}
-					else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
+					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
 		}
@@ -1885,7 +1885,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				int iuv = (iu * (iu + 1) / 2) + iv;
 				if (debug) file << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
 				for (int m = 0; m < wave.get_nmo(); m++) {
-					if (debug) file << "DM before: " << wave.get_DM(iuv) << endl;
+					//if (debug) file << "DM before: " << wave.get_DM(iuv) << endl;
 					if (!wave.set_DM(iuv, wave.get_DM(iuv) + wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)])) {
 						file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
 						file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
@@ -1894,7 +1894,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 						Enter();
 						return false;
 					}
-					else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
+					//else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
 		}

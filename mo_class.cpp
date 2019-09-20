@@ -151,7 +151,7 @@ double MO::get_coefficient (int nr, bool debug) const{
 		cout << "Number below zero!" << endl;
 		return -1;
 	}
-	if(debug) cout << "[nr] will return: " << "[" << nr << "] " << coefficients[nr] << endl;
+	//if(debug) cout << "[nr] will return: " << "[" << nr << "] " << coefficients[nr] << endl;
 	return coefficients[nr]; 
 };
 

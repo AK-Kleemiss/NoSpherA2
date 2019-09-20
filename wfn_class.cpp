@@ -2430,12 +2430,14 @@ double * WFN::get_ptr_mo_coefficients(int mo){
 
 unsigned int WFN::get_atom_integer_mass(unsigned int atomnr){
 	vector <unsigned int> masses
-	{1,																	4,
-	 7,  9,												11,12,14,16,19,20,
-	 23,24,												27,28,31,32,35,40,
-	 39,40,		45,48,51,52,55,56,59,58,63,64,			69,74,75,80,79,84};
-	if(get_atom_charge(atomnr)>36){
-		cout << "Sorry, only implemented until Kr yet, ask Florian for increases!" << endl;
+	{ 1,																																																	4,
+	 7,  9,																																												11,12,14,16,19,20,
+	 23,24,																																												27,28,31,32,35,40,
+	 39,40,																																		45,48,51,52,55,56,59,58,63,64,			69,74,75,80,79,84,
+	 85, 87,																																	88, 91, 92, 96, 98, 101, 103, 106, 108, 112, 115, 119, 122, 128, 127, 131,
+	 132,137,139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222 };
+	if(get_atom_charge(atomnr)>86){
+		cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << endl;
 		Enter();
 		return 0;
 	}
