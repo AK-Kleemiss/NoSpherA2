@@ -2245,7 +2245,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				if (m + alpha < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
 				runs++;
-				if ((runs % 5 == 0 && runs != 0) || m + alpha == nao - 1) st_s << endl;
+				if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 			}
 		}
 		s += st_s.str();
