@@ -66,8 +66,9 @@ bool WFN::push_back_atom(string label, double x, double y, double z, int charge)
 
 bool WFN::erase_atom(int nr){
 	if (ncen<1) return false;
+	nr--;
+	atoms.erase(atoms.begin()+nr);
 	ncen--;
-	atoms.erase(atoms.begin()+(nr-1));
 	return true;
 };
 
@@ -98,7 +99,8 @@ bool WFN::push_back_center(int cent){
 };
 
 bool WFN::erase_center(int nr){
-	centers.erase(centers.begin()+(nr-1));
+	nr--;
+	centers.erase(centers.begin()+nr);
 	return true;
 };
 
@@ -135,7 +137,8 @@ bool WFN::push_back_type(int type){
 
 bool WFN::erase_type(int nr){
 	if (nr<1) return false;
-	types.erase(types.begin()+(nr-1));
+	nr--;
+	types.erase(types.begin()+nr);
 	return true;
 };
 
@@ -1805,9 +1808,16 @@ int WFN::check_order(bool debug){
 				break;
 				case 4:
 					for(int i=0; i< get_atom_shell_primitives (a,s); i++){
-						if(types[primcounter]!=11||types[primcounter+1]!=12||types[primcounter+2]!=13
-						   ||types[primcounter+3]!=17||types[primcounter+4]!=14||types[primcounter+5]!=15
-						   ||types[primcounter+6]!=18||types[primcounter+7]!=19||types[primcounter+8]!=16||types[primcounter+9]!=20){
+						if(   types[get_shell_start_in_primitives(a, s) + 0 * get_atom_shell_primitives(a, s) + i]!=11
+							||types[get_shell_start_in_primitives(a, s) + 1 * get_atom_shell_primitives(a, s) + i]!=12
+							||types[get_shell_start_in_primitives(a, s) + 2 * get_atom_shell_primitives(a, s) + i]!=13
+						    ||types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i]!=17
+							||types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i]!=14
+							||types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i]!=15
+						    ||types[get_shell_start_in_primitives(a, s) + 6 * get_atom_shell_primitives(a, s) + i]!=18
+							||types[get_shell_start_in_primitives(a, s) + 7 * get_atom_shell_primitives(a, s) + i]!=19
+							||types[get_shell_start_in_primitives(a, s) + 8 * get_atom_shell_primitives(a, s) + i]!=16
+							||types[get_shell_start_in_primitives(a, s) + 9 * get_atom_shell_primitives(a, s) + i]!=20){
 							if(types[primcounter]!=11||types[primcounter+1]!=12||types[primcounter+2]!=13
 								||types[primcounter+3]!=14||types[primcounter+4]!=15||types[primcounter+5]!=17
 								||types[primcounter+6]!=16||types[primcounter+7]!=18||types[primcounter+8]!=19||types[primcounter+9]!=20){
