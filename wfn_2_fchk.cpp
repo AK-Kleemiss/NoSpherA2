@@ -67,6 +67,7 @@ int main(int argc, char **argv)
 				<< "	-wfn  <FILENAME>.wfn/ffn	Read the following file" << endl
 				<< "	-fchk <FILENAME>.fchk		Write a wavefunction to the given filename" << endl
 				<< "	-b <FILENAME>				Read this basis set" << endl
+				<< "    -d <PATH>                   Path to basis_sets directory with basis_sets in tonto style" << endl
 				<< "	--help 					    print this help" << endl
 				<< "	-v 		    			    Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
 				<< "    -mult                       Input multiplicity of wavefunction" << endl
@@ -235,6 +236,7 @@ int main(int argc, char **argv)
 		free_fchk(log_file,outputname,"", wavy[0], debug_main,true);
 	}
 	else if(cif!=""||hkl!=""){
+		debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
 		if(!calculate_structure_factors(hkl,cif,wavy[0],debug_main,accuracy, log_file))
