@@ -588,7 +588,7 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 			ofstream cmo ("cmo.debug", ofstream::out);
 			for(int p=0; p< CMO.size() ; p++){
 				string temp;
-				for( int i=0; i< 5; i++){
+				for(int i=0; i< 5; i++){
 					stringstream stream;
 					stream << scientific << setw(14) << setprecision(7) << CMO[p+i] << " ";
 					temp += stream.str();
@@ -1932,7 +1932,14 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		fchk << "TITLE\n";
 		fchk.flush();
 
-		fchk << "SP        RHF                                                         Gen\n";
+		if(wave.get_method() == "rhf" && wave.get_multi() == 1)
+			fchk << "SP        RHF                                                         Gen\n";
+		else if (wave.get_method() == "rks" && wave.get_multi() == 1)
+			fchk << "SP        B3LYP                                                       Gen\n";
+		else if (wave.get_method() == "rhf" && wave.get_multi() > 1)
+			fchk << "SP        UHF                                                         Gen\n";
+		else if (wave.get_method() == "rks" && wave.get_multi() > 1)
+			fchk << "SP        UB3LYP                                                      Gen\n";
 		fchk.flush();
 		s = "Number of atoms                            I";
 		st_s << setw(17) << wave.get_ncen();
@@ -1953,16 +1960,28 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		int elcount = 0;
 		elcount -= wave.get_charge();
 		for (int i = 0; i < wave.get_ncen(); i++) elcount += wave.get_atom_charge(i);
+		int alpha = 0, beta = 0, temp=elcount;
+		while (temp > 2) {
+			alpha++;
+			beta++;
+			temp -= 2;
+		}
+		alpha += temp;
+		int diff = wave.get_multi() - 1;
+		while (alpha - beta != diff) {
+			alpha++;
+			beta--;
+		}
 		s += "Number of electrons                        I";
 		st_s << setw(17) << elcount;
 		s += st_s.str();
 		st_s.str("");
 		s += "\nNumber of alpha electrons                  I";
-		st_s << setw(17) << (int)ceil((float)elcount / 2);
+		st_s << setw(17) << alpha;
 		s += st_s.str();
 		st_s.str("");
 		s += "\nNumber of beta electrons                   I";
-		st_s << setw(17) << (int)floor((float)elcount / 2);
+		st_s << setw(17) << beta;
 		s += st_s.str();
 		st_s.str("");
 		s += "\nNumber of basis functions                  I";
@@ -2201,29 +2220,57 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		fchk.flush();
 
 		s = "Alpha Orbital Energies                     R   N=";
-		st_s << setw(12) << nao << endl;
+		st_s << setw(12) << alpha << endl;
 		s += st_s.str();
 		st_s.str("");
 		runs = 0;
-		for (int m = 0; m < nao; m++) {
+		for (int m = 0; m < alpha; m++) {
 			if (m < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
 			else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 		}
+		if(alpha!=beta){
+			s = "Beta Orbital Energies                      R   N=";
+			st_s << setw(12) << beta << endl;
+			s += st_s.str();
+			st_s.str("");
+			runs = 0;
+			for (int m = 0; m < beta; m++) {
+				if (m + alpha < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
+				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m + alpha;
+				runs++;
+				if ((runs % 5 == 0 && runs != 0) || m + alpha == nao - 1) st_s << endl;
+			}
+		}
 		s += st_s.str();
 		st_s.str("");
+
 		s += "Alpha MO coefficients                      R   N=";
-		st_s << setw(12) << nao * nao << endl;
+		st_s << setw(12) << alpha * alpha << endl;
 		s += st_s.str();
 		st_s.str("");
 		runs = 0;
 		for (int i = 0; i < nao * nao; i++) {
-			if (i < CMO.size()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
-			else if (i < nao * nao) st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
+			if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
+			else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
 		}
+		if (alpha != beta) {
+			s += "Beta MO coefficients                       R   N=";
+			st_s << setw(12) << nao * nao << endl;
+			s += st_s.str();
+			st_s.str("");
+			runs = 0;
+			for (int i = 0; i < nao * nao; i++) {
+				if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i+ nao * wave.get_nmo()];
+				else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
+				runs++;
+				if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
+			}
+		}
+
 		s += st_s.str();
 		st_s.str("");
 		s += "Total SCF Density                          R   N=";
