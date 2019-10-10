@@ -2230,6 +2230,9 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 		}
+		s += st_s.str();
+		st_s.str("");
+
 		if(alpha!=beta){
 			s = "Beta Orbital Energies                      R   N=";
 			st_s << setw(12) << nao << endl;
@@ -2257,6 +2260,9 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
 		}
+		s += st_s.str();
+		st_s.str("");
+
 		if (alpha != beta) {
 			s += "Beta MO coefficients                       R   N=";
 			st_s << setw(12) << nao * nao << endl;
@@ -2270,9 +2276,9 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
 			}
 		}
-
 		s += st_s.str();
 		st_s.str("");
+
 		s += "Total SCF Density                          R   N=";
 		st_s << setw(12) << wave.get_DM_size() << endl;
 		s += st_s.str();
