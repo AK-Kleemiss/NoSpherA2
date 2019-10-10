@@ -23,6 +23,7 @@ class WFN {
 		std::string basis_set_name;
 		std::string comment;
 		std::string path;
+		std::string method;
 		
 		std::vector<MO> MOs;
 		std::vector<int> centers;
@@ -85,6 +86,7 @@ class WFN {
 		void set_basis_set_name( std::string input ){basis_set_name=input;};
 		std::string get_path() { return path; };
 		std::string hdr(bool occupied);
+		std::string get_method() { return method; };
 		bool erase_atom(int nr);
 		void list_primitives();
 		void list_centers();
