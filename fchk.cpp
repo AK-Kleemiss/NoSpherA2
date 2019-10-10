@@ -2220,23 +2220,23 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		fchk.flush();
 
 		s = "Alpha Orbital Energies                     R   N=";
-		st_s << setw(12) << alpha << endl;
+		st_s << setw(12) << nao << endl;
 		s += st_s.str();
 		st_s.str("");
 		runs = 0;
-		for (int m = 0; m < alpha; m++) {
-			if (m < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
+		for (int m = 0; m < nao; m++) {
+			if (m < alpha) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
 			else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 		}
 		if(alpha!=beta){
 			s = "Beta Orbital Energies                      R   N=";
-			st_s << setw(12) << beta << endl;
+			st_s << setw(12) << nao << endl;
 			s += st_s.str();
 			st_s.str("");
 			runs = 0;
-			for (int m = 0; m < beta; m++) {
+			for (int m = 0; m < nao; m++) {
 				if (m + alpha < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m + alpha;
 				runs++;
@@ -2247,7 +2247,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		st_s.str("");
 
 		s += "Alpha MO coefficients                      R   N=";
-		st_s << setw(12) << alpha * alpha << endl;
+		st_s << setw(12) << nao * nao << endl;
 		s += st_s.str();
 		st_s.str("");
 		runs = 0;
