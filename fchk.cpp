@@ -2232,6 +2232,8 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		}
 		s += st_s.str();
 		st_s.str("");
+		fchk << s;
+		fchk.flush();
 
 		if(alpha!=beta){
 			s = "Beta Orbital Energies                      R   N=";
@@ -2241,7 +2243,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			runs = 0;
 			for (int m = 0; m < nao; m++) {
 				if (m + alpha < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
-				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m + alpha;
+				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || m + alpha == nao - 1) st_s << endl;
 			}
@@ -2270,7 +2272,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			st_s.str("");
 			runs = 0;
 			for (int i = 0; i < nao * nao; i++) {
-				if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i+ nao * wave.get_nmo()];
+				if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i + nao * wave.get_nmo()];
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
