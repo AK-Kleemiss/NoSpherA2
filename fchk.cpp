@@ -1961,7 +1961,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		elcount -= wave.get_charge();
 		for (int i = 0; i < wave.get_ncen(); i++) elcount += wave.get_atom_charge(i);
 		int alpha = 0, beta = 0, temp=elcount;
-		while (temp > 2) {
+		while (temp > 1) {
 			alpha++;
 			beta++;
 			temp -= 2;
