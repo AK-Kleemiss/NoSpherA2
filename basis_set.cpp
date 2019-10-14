@@ -82,12 +82,8 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug){
 		getline(ifile,line);
 		int file_type=0;
 		//check if we support that type of basis set
-		while ( line.find("keys=")==string::npos && !ifile.eof() ) {
-			if(debug_dens){
-				cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
-			}
+		while ( line.find("keys=")==string::npos && !ifile.eof() ) 
 			getline(ifile,line);
-		}
 		if(debug_dens){
 			cout << "Line after looking for keys=: " << line << endl;
 		}
@@ -335,12 +331,8 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
 		getline(ifile,line);
 		int file_type=0;
 		//check if we support that type of basis set
-		while ( line.find("keys=")==-1 && !ifile.eof() ) {
-			if(debug_dens){
-				cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
-			}
+		while ( line.find("keys=")==-1 && !ifile.eof() ) 
 			getline(ifile,line);
-		}
 		if(debug_dens){
 			cout << "Line after looking for keys=: " << line << endl;
 		}
@@ -433,10 +425,6 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
 					while(temp_label.find(" ")!=-1) {temp_label.erase(temp_label.find(" "),1);}
 					temp_label.append(":");
 					if(elements_list[i].find(temp_label)!=-1){
-						if (debug_dens){
-							cout << "It's a match!" << endl;
-							cout << "element_label: "<< elements_list[i] << " temp_label: " << temp_label << endl;
-						}
 						switch(c_temp){
 							case 's':
 							case 'S':

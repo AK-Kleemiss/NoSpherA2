@@ -87,7 +87,7 @@ bool yesno(){
 };
 
 void Enter(){
-	cout << "press ENTER to continue... " << flush;
+	//cout << "press ENTER to continue... " << flush;
 	//cin.ignore();
 	//cin.get();
 };
