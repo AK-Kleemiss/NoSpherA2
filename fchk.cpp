@@ -2184,7 +2184,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				}
 		s += st_s.str();
 		st_s.str("");
-		s += "Constraint structure                       R   N=";
+		s += "Constraint Structure                       R   N=";
 		st_s << setw(12) << 3 * wave.get_ncen() << endl;
 		s += st_s.str();
 		st_s.str("");
@@ -2247,11 +2247,13 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 			}
+			s += st_s.str();
+			st_s.str("");
+			fchk << s;
+			fchk.flush();
 		}
-		s += st_s.str();
-		st_s.str("");
 
-		s += "Alpha MO coefficients                      R   N=";
+		s = "Alpha MO coefficients                      R   N=";
 		st_s << setw(12) << nao * nao << endl;
 		s += st_s.str();
 		st_s.str("");
@@ -2272,7 +2274,8 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			st_s.str("");
 			runs = 0;
 			for (int i = 0; i < nao * nao; i++) {
-				if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i + nao * wave.get_nmo()];
+				if (i + nao * alpha < nao 
+					* wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i + nao * wave.get_nmo()];
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
