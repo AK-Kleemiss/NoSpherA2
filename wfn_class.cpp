@@ -963,16 +963,16 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					line.replace(20 + i * 14, 1, replace);
 					length = line.copy(tempchar, 13, 11 + 14 * i);
 					tempchar[length] = '\0';
-					if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
+					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
-					if (debug_wfn_deep) file << dum_exp[exnum] << endl;
+					if (debug_wfn_deep) file << dum_exp[exnum];
 					exnum++;
 				}
 				else {
 					line.replace(19 + i * 14, 1, replace);
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
-					if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
+					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum];
 					exnum++;
@@ -987,7 +987,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					line.replace(20 + i * 14, 1, replace);
 					length = line.copy(tempchar, 13, 11 + 14 * i);
 					tempchar[length] = '\0';
-					if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
+					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum];
 					exnum++;
@@ -996,7 +996,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					line.replace(19 + i * 14, 1, replace);
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
-					if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
+					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum];
 					exnum++;
@@ -1060,7 +1060,10 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			sscanf(tempchar, "%lf", &temp_occ);
 		}
 		if (temp_ener == 0) {
-			length = line.copy(tempchar, 12, 61);
+			if(check_order(debug_wfn_deep)%10 == 3)
+				length = line.copy(tempchar, 12, 62);
+			else if (check_order(debug_wfn_deep) % 10 == 1)
+				length = line.copy(tempchar, 12, 61);
 			tempchar[length] = '\0';
 			sscanf(tempchar, "%lf", &temp_ener);
 		}
@@ -1086,11 +1089,11 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 						line.replace(11 + i * 16, 1, replace);
 					length = line.copy(tempchar, 16, 16 * i);
 					tempchar[length] = '\0';
-					if (debug_wfn_deep)
-						file << "	tempchar: " << tempchar << " ";
+					//if (debug_wfn_deep)
+					//	file << "	tempchar: " << tempchar << " ";
 					sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 					if (debug_wfn_deep)
-						file << temp_val[monum][exnum] << endl;
+						file << temp_val[monum][exnum];
 					exnum++;
 				}
 			}
@@ -1101,21 +1104,21 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 						line.replace(12 + i * 16, 1, replace);
 						length = line.copy(tempchar, 15, 1 + 16 * i);
 						tempchar[length] = '\0';
-						if (debug_wfn_deep)
-							file << "	tempchar: " << tempchar << " ";
+						//if (debug_wfn_deep)
+							//file << "	tempchar: " << tempchar << " ";
 						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
-							file << temp_val[monum][exnum] << endl;
+							file << temp_val[monum][exnum];
 					}
 					else {
 						line.replace(11 + i * 16, 1, replace);
 						length = line.copy(tempchar, 16, 16 * i);
 						tempchar[length] = '\0';
-						if (debug_wfn_deep)
-							file << "	tempchar: " << tempchar << " ";
+						//if (debug_wfn_deep)
+							//file << "	tempchar: " << tempchar << " ";
 						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
-							file << temp_val[monum][exnum] << endl;
+							file << temp_val[monum][exnum];
 					}
 					exnum++;
 				}
@@ -1124,6 +1127,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 				getline(rf, line);
 				continue;
 			}
+			if (debug_wfn_deep) file << endl;
 			getline(rf, line);
 			if (linecount * 5 > e_nex + 1) {
 				printf("linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n");
