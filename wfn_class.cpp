@@ -1060,16 +1060,20 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			sscanf(tempchar, "%lf", &temp_occ);
 		}
 		if (temp_ener == 0) {
-			if(check_order(debug_wfn_deep)%10 == 3)
+			if(check_order(debug_wfn_deep) % 10 == 3)
 				length = line.copy(tempchar, 12, 62);
 			else if (check_order(debug_wfn_deep) % 10 == 1)
+				length = line.copy(tempchar, 12, 61);
+			else 
 				length = line.copy(tempchar, 12, 61);
 			tempchar[length] = '\0';
 			sscanf(tempchar, "%lf", &temp_ener);
 		}
+		if (debug_wfn_deep)
+			file << endl << "tempchar: "  tempchar << " tempener: " << tempener << endl;
 		push_back_MO(temp_nr, temp_occ, temp_ener);
 		if (debug_wfn_deep) {
-			file << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
+			file << endl << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
 		}
 		//---------------------------Start reading MO coefficients----------------------- 
 		getline(rf, line);
