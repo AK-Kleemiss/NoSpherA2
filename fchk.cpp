@@ -1616,7 +1616,10 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		//-------------------normalize the basis set shell wise into a copy vector---------
 		vector <vector <double> > basis_coefficients;
 		basis_coefficients.resize(wave.get_ncen());
-		for (int a = 0; a < wave.get_ncen(); a++)
+		vector <vector <double> > contraction_coefficients;
+		contraction_coefficients.resize(wave.get_ncen());
+		for (int a = 0; a < wave.get_ncen(); a++) {
+			contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
 			for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
 				double temp = wave.get_atom_basis_set_exponent(a, p);
 				switch (wave.get_atom_primitive_type(a, p)) {
@@ -1653,6 +1656,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 					break;
 				}
 			}
+		}
 		for (int a = 0; a < wave.get_ncen(); a++) {
 			double aiaj = 0.0;
 			double factor = 0.0;
@@ -1688,6 +1692,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 							file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
 							file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
 						}
+						contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
 						basis_coefficients[a][i] *= factor;
 						norm_const.push_back(basis_coefficients[a][i]);
 					}
@@ -1711,6 +1716,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 							file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
 							file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
 						}
+						contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
 						basis_coefficients[a][i] *= factor;
 						for (int k = 0; k < 3; k++) norm_const.push_back(basis_coefficients[a][i]);
 					}
@@ -1734,6 +1740,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 							file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
 							file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
 						}
+						contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
 						basis_coefficients[a][i] *= factor;
 						for (int k = 0; k < 3; k++) norm_const.push_back(basis_coefficients[a][i]);
 						for (int k = 0; k < 3; k++) norm_const.push_back(sqrt(3) * basis_coefficients[a][i]);
@@ -1758,6 +1765,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 							file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
 							file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
 						}
+						contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
 						basis_coefficients[a][i] *= factor;
 						for (int l = 0; l < 3; l++) 	norm_const.push_back(basis_coefficients[a][i]);
 						for (int l = 0; l < 6; l++) 	norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
@@ -2162,7 +2170,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			int p_run = 0;
 			for (int sh = 0; sh < wave.get_atom_shell_count(a); sh++)
 				for (int p = 0; p < wave.get_atom_shell_primitives(a, sh); p++) {
-					st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_basis_set_coefficient(a, p_run);
+					st_s << uppercase << scientific << setw(16) << setprecision(8) << contraction_coefficients[a][p_run];
 					runs++;
 					p_run++;
 					if ((runs % 5 == 0 && runs != 0) || (a == wave.get_ncen() - 1 && sh == wave.get_atom_shell_count(a) - 1 && p == wave.get_atom_shell_primitives(a, sh) - 1)) st_s << endl;
