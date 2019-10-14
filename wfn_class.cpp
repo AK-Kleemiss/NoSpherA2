@@ -1070,7 +1070,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			sscanf(tempchar, "%lf", &temp_ener);
 		}
 		if (debug_wfn_deep)
-			file << endl << "tempchar: "  tempchar << " tempener: " << tempener << endl;
+			file << endl << "tempchar: " << tempchar << " tempener: " << tempener << endl;
 		push_back_MO(temp_nr, temp_occ, temp_ener);
 		if (debug_wfn_deep) {
 			file << endl << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
