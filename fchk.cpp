@@ -1948,6 +1948,8 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			fchk << "SP        UHF                                                         Gen\n";
 		else if (wave.get_method() == "rks" && wave.get_multi() > 1)
 			fchk << "SP        UB3LYP                                                      Gen\n";
+		else
+			fchk << "SP        B3LYP                                                       Gen\n";
 		fchk.flush();
 		s = "Number of atoms                            I";
 		st_s << setw(17) << wave.get_ncen();
