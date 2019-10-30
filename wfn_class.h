@@ -86,6 +86,7 @@ class WFN {
 		void set_basis_set_name( std::string input ){basis_set_name=input;};
 		std::string get_path() { return path; };
 		std::string hdr(bool occupied);
+		void set_method(std::string input) { method = input; };
 		std::string get_method() { return method; };
 		bool erase_atom(int nr);
 		void list_primitives();

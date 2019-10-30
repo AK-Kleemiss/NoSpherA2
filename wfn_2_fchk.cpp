@@ -95,6 +95,7 @@ int main(int argc, char **argv)
 	known_keywords.push_back("-cif");
 	known_keywords.push_back("-acc");
 	known_keywords.push_back("-mult");
+	known_keywords.push_back("-method");
 	if(debug_main) 
 		log_file << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -123,6 +124,7 @@ int main(int argc, char **argv)
   string basis_set("");
   string hkl("");
   string cif("");
+  string method("rhf");
   string temp;
   int accuracy = 1;
   for (int i=0; i<argc; i++){
@@ -143,6 +145,8 @@ int main(int argc, char **argv)
       accuracy = stoi(argv[i+1]);
 	if (temp.find(known_keywords[8]) != string::npos)
 	  mult = stoi(argv[i + 1]);
+	if (temp.find(known_keywords[9]) != string::npos)
+	  method = argv[i + 1];
     if (temp.find("-v") != string::npos) {
       log_file << "Turning on verbose mode!" << endl;
       debug_main = true;
@@ -175,6 +179,7 @@ int main(int argc, char **argv)
   }
   log_file.flush();
   readwfn(wavy[0], wfn, debug_main, log_file);
+  wavy[0].set_method(method);
 
   if(basis_set!=""||fchk!=""){
     if(basis_set == ""){
