@@ -67,10 +67,10 @@ int main(int argc, char **argv)
 				<< "	-wfn  <FILENAME>.wfn/ffn	Read the following file" << endl
 				<< "	-fchk <FILENAME>.fchk		Write a wavefunction to the given filename" << endl
 				<< "	-b <FILENAME>				Read this basis set" << endl
-				<< "    -d <PATH>                   Path to basis_sets directory with basis_sets in tonto style" << endl
+				<< "	-d <PATH>                   Path to basis_sets directory with basis_sets in tonto style" << endl
 				<< "	--help 					    print this help" << endl
 				<< "	-v 		    			    Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
-				<< "    -mult                       Input multiplicity of wavefunction" << endl
+				<< "	-mult                       Input multiplicity of wavefunction" << endl
 //				<< "    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
 				<< "*****************************************************************************************************" << endl
 				<< "	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals" << endl
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 	int ncpus=0;
 	float mem=0.0;
 	int mult = 0;
-	int config=program_confi(gaussian_path, turbomole_path, basis_set_path, ncpus, mem, debug_main, expert);
+	/*int config=program_confi(gaussian_path, turbomole_path, basis_set_path, ncpus, mem, debug_main, expert);
 	if(config==-1){
 		log_file << "No .cuQCT.conf found, do you want to continue without the employment of external programs?" << endl;
 		if(!yesno()){
@@ -119,6 +119,7 @@ int main(int argc, char **argv)
 	else
 		if(config==0) 
 			log_file << "The programs file was newly written, please check if everything is correct!" << endl;
+	*/
   string wfn("");
   string fchk("");
   string basis_set("");
