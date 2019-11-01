@@ -34,6 +34,7 @@
 #include "structure_factors.h"
 #include "wfn_class.h"
 using namespace std;
+# define M_PI           3.14159265358979323846  /* pi */
 
 #include "numgrid.h"
 
@@ -3438,7 +3439,15 @@ double compute_Hirshfeld(
 	return Atom_Rho/Rho; //radial Y(lm) unimportant, since it will cross out
 }
 
-bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, bool debug, int accuracy, ofstream &file){
+bool calculate_structure_factors(
+	string &hkl_filename, 
+	string &cif, 
+	string &symm,
+	WFN &wave, 
+	bool debug, 
+	int accuracy, 
+	ofstream &file
+){
 	int* atom_z = new int[wave.get_ncen()];
 	double* x = new double[wave.get_ncen()];
 	double* y = new double[wave.get_ncen()];
@@ -3572,13 +3581,9 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 	if(debug){
 		file << "RCM done, now labels and asym atoms!" << endl;
 		for (int i = 0; i < 3; ++i)
-		    {
 		        for (int j = 0; j < 3; ++j)
-		        {
 		            file << rcm[i][j] << ' ';
-		        }
 		        file << endl;
-		    }
 	}
 	cif_input.clear();
 	cif_input.seekg(0,cif_input.beg);
@@ -3592,10 +3597,10 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 		getline(cif_input,line);
 		//if(debug) file << "line: "<< line << endl;
 		if (line.find("loop_")!=string::npos) {
-			if(debug) file << "found loop!" << endl;
+			//if(debug) file << "found loop!" << endl;
 			while(line.find("_")!=string::npos){
 				getline(cif_input,line);
-				if(debug) file << "line in loop field definition: " << line << endl;
+				//if(debug) file << "line in loop field definition: " << line << endl;
 				if(line.find("label")!=string::npos)
 					label_field=count_fields;
 				else if(line.find("fract_x")!=string::npos)
@@ -3622,7 +3627,7 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 				pos[0]=(a*stod(fields[position_field[0]])+b*cg*stod(fields[position_field[1]])+c*cb*stod(fields[position_field[2]]))/0.529177249;
 				pos[1]=(b*sg*stod(fields[position_field[1]])+c*(ca-cb*cg)/sg*stod(fields[position_field[2]]))/0.529177249;
 				pos[2]=V/(a*b*sg)*stod(fields[position_field[2]])/0.529177249;
-				if (debug) file << "position: " << pos[0] << " " << pos[1] << " " << pos[2] << endl;
+				//if (debug) file << "position: " << pos[0] << " " << pos[1] << " " << pos[2] << endl;
 				for (int a=0; a<wave.get_ncen(); a++){
 					if(	pos[0]/wave.atoms[a].x<0.95 || 
 						pos[0]/wave.atoms[a].x>1.05 || 
@@ -3632,7 +3637,7 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 						pos[2]/wave.atoms[a].z>1.05)
 						continue;
 					else{
-						if(debug) file << "Found an atom: " << fields[label_field] << endl;
+						//if(debug) file << "Found an atom: " << fields[label_field] << endl;
 						labels.push_back(fields[label_field]);
 						asym_atom_list.push_back(a);
 					}
@@ -3688,7 +3693,7 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 					max_l_overall = l;
 			}
 		}
-		if(debug) file << "atom " << i << " max_alpha:" << alpha_max[i] << endl;
+		//if(debug) file << "atom " << i << " max_alpha:" << alpha_max[i] << endl;
 	}
 
 	if(debug)
@@ -3722,19 +3727,17 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 				l = 5;
 			if(wave.get_exponent(b) < alpha_min[i][l])
 				alpha_min[i][l-1] = wave.get_exponent(b);
-			if(debug && i == wave.get_ncen()-1)
-				file << "l= " << l << " alpha_min= " << alpha_min[i][l-1] << endl;
+			/*if(debug && i == wave.get_ncen()-1)
+				file << "l= " << l << " alpha_min= " << alpha_min[i][l-1] << endl;*/
 		}
-		if(debug){
+		/*if(debug){
 			file << "atom: " << i << " min_alpha:" << endl;
 			for (int l=0; l<max_l_overall; l++) file << "   " << alpha_min[i][l] << endl;
-		}
+		}*/
 	}
 
-	if(debug){
+	if(debug)
 		file << "Made it through second parallel block! alpha_min is there! Nr of asym atoms: " << asym_atom_list.size() << " Number of all atoms: " << wave.get_ncen() <<endl;
-		//Enter();
-	}
 
 	double* sum = new double[asym_atom_list.size()];
 	vector < vector < vector<double> > > max_weight;
@@ -3759,7 +3762,7 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 			min_angular=50;
 			max_angular=146;
 		}
-		context_t *context = numgrid_new_atom_grid(1e-8,
+		context_t *context = numgrid_new_atom_grid(1e-6,
 				min_angular*accuracy,
 				max_angular*accuracy,
 				atom_z[asym_atom_list[i]],
@@ -3812,10 +3815,10 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 				max_weight[i][s][1] = grid[i][3][p];
 			temp[0][i][p] = grid[i][3][p];
 			double * pos = new double[3]{grid[i][0][p],grid[i][1][p],grid[i][2][p]};
-			temp[1][i][p]=compute_dens(wave,pos);
-			sum[i]+=temp[1][i][p] *grid[i][3][p];
+			temp[1][i][p] = compute_dens(wave,pos);
 			temp[2][i][p] = compute_Hirshfeld(atom_z,asym_atom_list[i],wave,pos);
-			grid[i][3][p] = temp[0][i][p] * temp[1][i][p] * temp[2][i][p];
+			sum[i] += temp[1][i][p] * grid[i][3][p];// *temp[2][i][p];
+			grid[i][3][p] = temp[0][i][p] * temp[1][i][p];// *temp[2][i][p];
 		}
 		file << "Summed density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(6) << setprecision(2) << sum[i] << " electrons" << endl;
 	}
@@ -3831,11 +3834,31 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 	if(debug)
 		file << "Becke grid with hirshfeld weights done!"<<endl;
 
+	//Still need to read the sym matrices
+	ifstream symm_input(symm.c_str(), ios::in);
+	string liny;
+	vector < vector < vector <int> > > sym;
+	sym.resize(3);
+	int temp_int;
+	while (!symm_input.eof()) {
+		getline(symm_input, liny);
+		stringstream streamy(liny);
+		for (int i = 0; i < 3; i++) {
+			sym[i].resize(3);
+			for (int j = 0; j < 3; j++) {
+				streamy >> temp_int;
+				sym[i][j].push_back(temp_int);
+			}
+		}
+	}
+
+	if (debug) file << "Read " << sym[0][0].size() << " symmetry elements! Size of sym: " << sym[0][0].size() << endl;
+	
 	vector< vector <double> > k_pt;
 	k_pt.resize(3);
 #pragma omp parallel for
 	for (int i = 0; i < 3; i++) {
-		k_pt[i].resize(hkl[0].size()*2);
+		k_pt[i].resize(hkl[0].size()* sym[0][0].size());
 		for (int j = 0; j < hkl[0].size(); j++)
 			k_pt[i][j] = 0.0;
 	}
@@ -3852,23 +3875,9 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 	if(debug)
 		file << "Initialized FFs" << endl;
 
-	//Still need to read the sym matrices
-	int*** sym = new int**[3];
-	for (int i = 0; i < 3; i++) {
-		sym[i] = new int*[3];
-		for (int j = 0; j < 3; j++) {
-			sym[i][j] = new int[2];
-			i == j ? sym[i][j][0] = 1 : sym[i][j][0] = 0;
-			if (i == 1)
-				i == j ? sym[i][j][1] = 1 : sym[i][j][1] = 0;
-			else
-				i == j ? sym[i][j][1] = -1 : sym[i][j][1] = 0;
-		}
-	}
-
-	for (int s = 0; s < 2; s++) {
-		if (debug) {
-			file << "symmetry element: " << s << " Matrix:" << endl;
+	for (int s = 0; s < sym[0][0].size(); s++) {
+		/*if (debug) {
+			file << "symmetry element: " << s+1  << "/" << sym[0][0].size() << " Matrix:" << endl;
 			for (int i = 0; i < 3; i++) {
 				for (int j = 0; j < 3; j++)
 					file << sym[i][j][s] << " ";
@@ -3880,43 +3889,37 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 					file << rcm[i][j] << " ";
 				file << endl;
 			}
-		}
-		
-		//#pragma omp parallel for
+		}*/		
+		#pragma omp parallel for
 		for (int ref = 0; ref < hkl[0].size(); ref++) {
-
 			double d[3] = { 0.0,0.0,0.0 };
-			if (debug)
-				file << "RCM_SYMM: " << endl;
 			for (int x = 0; x < 3; x++) {
 				for (int h = 0; h < 3; h++) {
 					double rcm_sym=0.0;
 					for (int j = 0; j < 3; j++) 
 						rcm_sym += rcm[x][j] * sym[j][h][s];
-					if (debug) file << rcm_sym << " ";
-					k_pt[x][ref+s*hkl[0].size()] += 2 * 3.141592653589793 * rcm_sym * hkl[h][ref] * 0.529177249;
+					k_pt[x][ref+s*hkl[0].size()] += 2 * M_PI * rcm_sym * hkl[h][ref] * 0.529177249;
 				}
-				if (debug) file << endl;
 			}
-			if (debug) {
+			/*if (debug) {
 				file << "k_point: " << setprecision(6) << k_pt[0][ref+s*hkl[0].size()] << " ";
 				file << setprecision(6) << k_pt[1][ref+s*hkl[0].size()] << " ";
 				file << setprecision(6) << k_pt[2][ref+s*hkl[0].size()] << " hkl: ";
 				for (int h = 0; h < 3; h++)
 					file << setw(4) << hkl[h][ref];
 				file << endl;
-			}
+			}*/
 			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-				/*if (debug) {
+				/*if (debug && ref == 0) {
 					file << "Atom: " << labels[i] << endl;
-					file << "Nr of Points: " << num_points[i] << endl;
+					//file << "Nr of Points: " << num_points[i] << endl;
 				}*/
 				for (unsigned int p = 0; p < num_points[i]; p++) {
-					d[0] = grid[i][0][p] - wave.atoms[asym_atom_list[i]].x;
-					d[1] = grid[i][1][p] - wave.atoms[asym_atom_list[i]].y;
-					d[2] = grid[i][2][p] - wave.atoms[asym_atom_list[i]].z;
+					d[0] = (grid[i][0][p] - wave.atoms[asym_atom_list[i]].x);
+					d[1] = (grid[i][1][p] - wave.atoms[asym_atom_list[i]].y);
+					d[2] = (grid[i][2][p] - wave.atoms[asym_atom_list[i]].z);
 					double dist = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
-					int shell = 0;
+					/*int shell = 0;
 					for (unsigned int n = 0; n < max_weight[i].size(); n++) {
 						//file << "s: " << s << " n: " << n << " max_weight: " << max_weight[i][n][0] << " dist: " << dist << endl;
 						if (!is_similar(max_weight[i][n][0], dist, 0.05))
@@ -3925,20 +3928,19 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 							break;
 					}
 					if (temp[0][i][p] < 0.001 * max_weight[i][shell][1])
-						continue;
+						continue;*/
 					complex<double> work(0.0, k_pt[0][ref+s*hkl[0].size()] * d[0] + k_pt[1][ref+s*hkl[0].size()] * d[1] + k_pt[2][ref+s*hkl[0].size()] * d[2]);
-					if (debug&&ref == 0 && i == 0) {
+					if ( debug && ref == 0 && i == 0 && p == 0 && s == 0 ) {
+						file << "Point:" << endl << setprecision(8) << setw(16) << grid[i][0][p] 
+							<< setprecision(8) << setw(16) << grid[i][1][p] 
+							<< setprecision(8) << setw(16) << grid[i][2][p] << endl;
+						file << "Atom position:" << endl << setw(16) << wave.atoms[asym_atom_list[i]].x << wave.atoms[asym_atom_list[i]].y << wave.atoms[asym_atom_list[i]].z << endl;
 						file << "d: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2)) << " bw: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << temp[0][i][p] << " rho: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << temp[1][i][p] << " hw: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << temp[2][i][p] << " work: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << imag(work) << " grid: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << grid[i][3][p] << " exp(work): ";
+						file << scientific << showpoint << setprecision(8) << setw(16) << sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2)) << endl << " rho: ";
+						file << scientific << showpoint << setprecision(8) << setw(16) << temp[1][i][p] << " work: ";
+						file << scientific << showpoint << setprecision(8) << setw(16) << imag(work) << " exp(work): ";
 						file << scientific << showpoint << setprecision(8) << setw(16) << real(exp(work)) << ",";
-						file << scientific << showpoint << setprecision(8) << setw(16) << imag(exp(work)) << " sf: ";
-						file << scientific << showpoint << setprecision(8) << setw(16) << real(complex<double>(grid[i][3][p], 0.0)*exp(work)) << ",";
-						file << scientific << showpoint << setprecision(8) << setw(16) << imag(complex<double>(grid[i][3][p], 0.0)*exp(work)) << endl;
+						file << scientific << showpoint << setprecision(8) << setw(16) << imag(exp(work)) << endl;
 					}
 					sf[i][ref+s*hkl[0].size()] += complex<double>(complex<double>(grid[i][3][p], 0.0)*exp(work));
 				}
@@ -3949,7 +3951,7 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 	if(debug)
 		file << "SFs are made, now just write them!"<<endl;
 
-	ofstream hkl_file("SFs_key.tsc_part",ios::out);
+	/*ofstream hkl_file("SFs_key.tsc_part",ios::out);
 	for(unsigned int p=0; p<hkl[0].size(); p++){
 		hkl_file << setw(4) << hkl[0][p] << " ";
 		hkl_file << setw(4) << hkl[1][p] << " ";
@@ -3964,25 +3966,36 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 			sf_file << fixed << setprecision(5) << imag(sf[i][p]) << endl;
 		}
 		sf_file.close();
-	}
+	}*/
 
 
 	ofstream tsc_file("experimental.tsc", ios::out);
 
-	tsc_file << "SYMM: 1 0 0 0 1 0 0 0 1" << endl;
-	tsc_file << "atoms: ";
+	tsc_file << "TITLE: " << cif.substr(0,cif.find(".cif")) << endl << "SYMM:";
+
+	for (int s = 0; s < sym[0][0].size(); s++) {
+		for (int i = 0; i < 3; i++)
+			for (int j = 0; j < 3; j++) 
+				tsc_file << " " << sym[i][j][s];
+		if(s!= sym[0][0].size()-1)
+			tsc_file << ";";
+	}
+	tsc_file << endl << "AD ACCOUNTED: false" << endl << "SCATTERERS:";
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
-		tsc_file << labels[i] << " ";
+		tsc_file << " " << labels[i];
 	tsc_file << endl << "data:" << endl;
 
-	for (unsigned int p = 0; p < hkl[0].size(); p++) {
-		tsc_file << setw(4) << hkl[0][p] << " "
-			<< setw(4) << hkl[1][p] << " "
-			<< setw(4) << hkl[2][p] << " ";
-		for(unsigned int i=0; i < asym_atom_list.size(); i++)
-			tsc_file << fixed << setw(8) << setprecision(5) << real(sf[i][p]) << ","
-				<< fixed << setprecision(5) << imag(sf[i][p]) << " ";
-		tsc_file << endl;
+	for (unsigned int s = 0; s < sym[0][0].size(); s++) {
+		if (debug) file << "writing symmetry: " << s << endl;
+		for (unsigned int p = 0; p < hkl[0].size(); p++) {
+			tsc_file << hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s] << " "
+				<< hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s] << " "
+				<< hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s] << " ";
+			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+				tsc_file << fixed << setprecision(5) << real(sf[i][p + hkl[0].size() * s]) << ","
+				<< fixed << setprecision(5) << imag(sf[i][p + hkl[0].size() * s]) << " ";
+			tsc_file << endl;
+		}
 	}
 	tsc_file.close();
 
@@ -3991,9 +4004,9 @@ bool calculate_structure_factors(string &hkl_filename, string &cif, WFN &wave, b
 
 	//	int diff = end - start;
 
-	if (end - start < 60) printf("Time to calculate: %10lld s\n", end - start);
-	else if (end - start < 3600) printf("Time to calculate: %10lld m\n", (end - start) / 60);
-	else printf("Time to calculate: %10lld h\n", (end - start) / 3600);
+	if (end - start < 60) file << "Time to calculate: "<< end - start << " s\n";
+	else if (end - start < 3600) file << "Time to calculate: " << (end - start)/60 << " m\n";
+	else file << "Time to calculate: " << (end - start)/3600 << " h\n";
 #else
 	gettimeofday(&t2, 0);
 

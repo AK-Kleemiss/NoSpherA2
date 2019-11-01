@@ -96,6 +96,7 @@ int main(int argc, char **argv)
 	known_keywords.push_back("-acc");
 	known_keywords.push_back("-mult");
 	known_keywords.push_back("-method");
+	known_keywords.push_back("-symm");
 	if(debug_main) 
 		log_file << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -125,6 +126,7 @@ int main(int argc, char **argv)
   string basis_set("");
   string hkl("");
   string cif("");
+  string symm("");
   string method("rhf");
   string temp;
   int accuracy = 1;
@@ -148,6 +150,8 @@ int main(int argc, char **argv)
 	  mult = stoi(argv[i + 1]);
 	if (temp.find(known_keywords[9]) != string::npos)
 	  method = argv[i + 1];
+	if (temp.find(known_keywords[10]) != string::npos)
+	  symm = argv[i + 1];
     if (temp.find("-v") != string::npos) {
       log_file << "Turning on verbose mode!" << endl;
       debug_main = true;
@@ -241,11 +245,11 @@ int main(int argc, char **argv)
 			wavy[0].assign_multi(mult);
 		free_fchk(log_file,outputname,"", wavy[0], debug_main,true);
 	}
-	else if(cif!=""||hkl!=""){
+	if(cif!=""||hkl!=""){
 		debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
-		if(!calculate_structure_factors(hkl,cif,wavy[0],debug_main,accuracy, log_file))
+		if(!calculate_structure_factors(hkl,cif,symm,wavy[0],debug_main,accuracy, log_file))
 			log_file << "Error during FF Calculation!" << endl;
 	}
 	return 0;
