@@ -1862,8 +1862,6 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			if (nshell != run_2) nshell = run_2;
 		}
 		if (debug) {
-			Enter();
-			Enter();
 			ofstream cmo("cmo.debug", ofstream::out);
 			for (int p = 0; p < CMO.size(); p++) {
 				string temp;
