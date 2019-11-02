@@ -39,32 +39,32 @@ using namespace std;
 #include "numgrid.h"
 
 const unsigned int Thakkar_nex[86] = { 1, 5, 
-8, 8, 15, 15, 15, 15, 15, 15,
+ 8,  8, 15, 15, 15, 15, 15, 15,
 17, 17, 20, 20, 20, 20, 20, 20,
 22, 22, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31,
 33, 33, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38,
 30, 30, 32, 38, 36, 36, 36, 36, 36, 38, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 40, 40, 40, 40, 40, 40};
 const unsigned int Thakkar_ns[86] =  { 1, 5,
-8, 8,  8,  8,  8,  8,  8,  8,
+ 8,  8,  8,  8,  8,  8,  8,  8,
 10, 10, 10, 10, 10, 10, 10, 10,
 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
 const unsigned int Thakkar_np[86] = { 0, 0,
-0, 0,  7,  7,  7,  7,  7,  7,
-7,  7,  10, 10, 10, 10, 10, 10,
+ 0,  0,  7,  7,  7,  7,  7,  7,
+ 7,  7, 10, 10, 10, 10, 10, 10,
 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11,
 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 13, 13, 13, 13, 13, 13,
 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 12, 12, 12, 12, 12, 12};
 const unsigned int Thakkar_nd[86] =  { 0, 0, 
-0, 0,  0,  0,  0,  0,  0,  0,
-0,  0,  0,  0,  0,  0,  0,  0,
+ 0,  0,  0,  0,  0,  0,  0,  0,
+ 0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
  8,  8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
  7,  7,  9,  9,  7,  7,  7,  7,  7,  9,  7,  7,  7,  7,  7,  7,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9};
 const unsigned int Thakkar_nf[86] =  { 0, 0, 
-0, 0,  0,  0,  0,  0,  0,  0,
-0,  0,  0,  0,  0,  0,  0,  0,
+ 0,  0,  0,  0,  0,  0,  0,  0,
+ 0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6};
@@ -3354,16 +3354,16 @@ double compute_dens(
 	return Rho;
 }
 
-double compute_Hirshfeld(
+void compute_Hirshfeld(
 	int * TypeAtoms,
-	int selected,
+	vector <unsigned int> asym_atoms,
 	WFN &wave,
-	double * PosGrid
+	double * PosGrid,
+	double * results
 	)
 {
 	double r;
 	double Rho = 0.0;
-	double Atom_Rho = 0.0;
 
 	for (int j = 0; j<wave.get_ncen(); j++)
 	{
@@ -3374,19 +3374,26 @@ double compute_Hirshfeld(
 			);
 		if (r == 0) continue;
 
+		double new_rho = 0.0;
+
 		//Speedup things for H
 		if(TypeAtoms[j]==1){
-			Rho+= pow(exp(-1*r)*2,2);
-			if(j==selected)
-				Atom_Rho = pow(exp(-1*r)*2,2);
+			new_rho = pow(exp(-1*r)*2,2);
+			Rho += new_rho;
+			for (int s = 0; s < asym_atoms.size(); s++)
+				if (j == asym_atoms[s]) {
+					results[j] = new_rho;
+					break;
+				}
 			continue;
 		}
 		int nr_ex=first_ex_SF(TypeAtoms[j]-2)+1;
 		int nr_coef=first_coef_SF((TypeAtoms[j]-2))+1;
 		double Orb[15] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+		int offset = (TypeAtoms[j]-1) * 15;
 		for (unsigned int ex=0; ex<Thakkar_ns[TypeAtoms[j]-1]; ex++){
 			for(int m=0; m<6; m++){
-				if(Thakkar_occ[TypeAtoms[j] * 15 + m]==0) continue;
+				if(Thakkar_occ[offset + m]==0) continue;
 				if(Thakkar_n[nr_ex]==1)
 					Orb[m] += Thakkar_c[nr_coef] *exp(-Thakkar_z[nr_ex]*r);
 				else
@@ -3397,10 +3404,9 @@ double compute_Hirshfeld(
 		}
 		for (unsigned int ex=0; ex<Thakkar_np[TypeAtoms[j]-1]; ex++){
 			for(int m=0; m<5; m++){
-				if(Thakkar_occ[TypeAtoms[j] * 15 + m + 6]==0) continue;
+				if(Thakkar_occ[offset + m + 6]==0) continue;
 				if(Thakkar_n[nr_ex]==1)
 					Orb[m+6] += Thakkar_c[nr_coef] *exp(-Thakkar_z[nr_ex]*r);
-
 				else
 					Orb[m+6] += Thakkar_c[nr_coef] * pow(r,Thakkar_n[nr_ex]-1) *exp(-Thakkar_z[nr_ex]*r);
 				nr_coef++;
@@ -3409,7 +3415,7 @@ double compute_Hirshfeld(
 		}
 		for (unsigned int ex=0; ex<Thakkar_nd[TypeAtoms[j]-1]; ex++){
 			for (int m = 0; m < 3; m++) {
-				if (Thakkar_occ[TypeAtoms[j] * 15 + m + 11] == 0) continue;
+				if (Thakkar_occ[offset + m + 11] == 0) continue;
 				if (Thakkar_n[nr_ex] == 1)
 					Orb[m+11] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * r);
 				else
@@ -3419,7 +3425,7 @@ double compute_Hirshfeld(
 			nr_ex++;
 		}
 		for (unsigned int ex = 0; ex < Thakkar_nf[TypeAtoms[j] - 1]; ex++) {
-			if (Thakkar_occ[TypeAtoms[j] * 15 + 14] == 0) continue;
+			if (Thakkar_occ[offset + 14] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
 				Orb[14] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * r);
 			else
@@ -3427,16 +3433,21 @@ double compute_Hirshfeld(
 			nr_coef++;
 			nr_ex++;
 		}
-		for(int m=0; m<15; m++){
-			Rho+=Thakkar_occ[(TypeAtoms[j]-1)*15+m]*pow(Orb[m],2);
-			if(j==selected)
-				Atom_Rho+=Thakkar_occ[(TypeAtoms[j]-1)*15+m]*pow(Orb[m],2);
+		
+		for(unsigned int m=0; m<15; m++){
+			if (Orb[m] == 0 || Thakkar_occ[(TypeAtoms[j] - 1) * 15 + m] == 0)
+				continue;
+			new_rho+= Thakkar_occ[(TypeAtoms[j] - 1) * 15 + m] * pow(Orb[m], 2);
 		}
+		Rho += new_rho;
+		for (int s = 0; s < asym_atoms.size(); s++)
+			if (j == asym_atoms[s])
+				results[j] = new_rho;
 		//	    RHO = BESETZUNG * (N*C*R^(n-1)*e^(-Z*R))^2
 
 	}
-
-	return Atom_Rho/Rho; //radial Y(lm) unimportant, since it will cross out
+	for (int s = 0; s < asym_atoms.size(); s++)
+		results[s] /= Rho; //radial Y(lm) unimportant, since it will cross out
 }
 
 bool calculate_structure_factors(
@@ -3737,21 +3748,33 @@ bool calculate_structure_factors(
 	}
 
 	if(debug)
-		file << "Made it through second parallel block! alpha_min is there! Nr of asym atoms: " << asym_atom_list.size() << " Number of all atoms: " << wave.get_ncen() <<endl;
+		file << "Made it through second parallel block! alpha_min is there!" << endl 
+			<< "Nr of asym atoms: " << asym_atom_list.size() << " Number of all atoms: " << wave.get_ncen() <<endl;
 
 	double* sum = new double[asym_atom_list.size()];
-	vector < vector < vector<double> > > max_weight;
-	max_weight.resize(asym_atom_list.size());
+	//vector < vector < vector<double> > > max_weight;
+	//max_weight.resize(asym_atom_list.size());
+	vector < vector <  double > > total_grid;
+	// Total grid as a sum of all atomic grids.
+	// Dimensions: [c] [p]
+	// p = the number of gridpoint
+	// c = coordinate, which is 0=x, 1=y, 2=z, 3=becke weighted density
+	vector < vector < double > > hirshfeld_weights;
+	// Hirshfeld weights for the grid
+	// Dimensions: [a] [p]
+	// a = atom number for which the weight is calcualted
+	// p = number of gridpoint
+	hirshfeld_weights.resize(asym_atom_list.size());
 	int nr_points=0;
-	double*** temp = new double**[3];
+	/*double*** temp = new double**[3];
 		
 	for (unsigned int i = 0; i < 3; i++)
-		temp[i] = new double*[asym_atom_list.size()];
+		temp[i] = new double*[asym_atom_list.size()];*/
 
-	debug = true;
 #pragma omp parallel for schedule(dynamic)
 	for (int i=0; i< asym_atom_list.size(); i++){
 		sum[i]=0;
+		total_grid.resize(4);
 		int min_angular=0;
 		int max_angular=0;
 		if(max_l[asym_atom_list[i]]<=3){
@@ -3772,8 +3795,8 @@ bool calculate_structure_factors(
 			);
 		num_points[i] = numgrid_get_num_grid_points(context);
 
-		for(unsigned int n=0; n<3; n++)
-			temp[n][i] = new double[num_points[i]];
+		/*for(unsigned int n=0; n<3; n++)
+			temp[n][i] = new double[num_points[i]];*/
 		for(int n=0; n<4; n++)
 			grid[i][n] = new double[num_points[i]];
 
@@ -3790,46 +3813,77 @@ bool calculate_structure_factors(
 				grid[i][3]);
 
 		numgrid_free_atom_grid(context);
-		double d[3] = { grid[i][0][0] - wave.atoms[asym_atom_list[i]].x,grid[i][1][0] - wave.atoms[asym_atom_list[i]].y,grid[i][2][0] - wave.atoms[asym_atom_list[i]].z };
+		//double d[3] = { grid[i][0][0] - wave.atoms[asym_atom_list[i]].x,grid[i][1][0] - wave.atoms[asym_atom_list[i]].y,grid[i][2][0] - wave.atoms[asym_atom_list[i]].z };
 
-		max_weight[i].resize(1);
-		max_weight[i][0].resize(2);
-		max_weight[i][0][0] = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
-		int s = 0;
+		//max_weight[i].resize(1);
+		//max_weight[i][0].resize(2);
+		//max_weight[i][0][0] = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
+		//int s = 0;
 		for(unsigned int p=0; p<num_points[i]; p++){
-			/*if (debug)
-				file << "p: " << p << endl;*/
-			d[0] = grid[i][0][p] - wave.atoms[asym_atom_list[i]].x;
+			/*d[0] = grid[i][0][p] - wave.atoms[asym_atom_list[i]].x;
 			d[1] = grid[i][1][p] - wave.atoms[asym_atom_list[i]].y;
 			d[2] = grid[i][2][p] - wave.atoms[asym_atom_list[i]].z;
 			double dist = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
 			if (!is_similar(dist,max_weight[i][s][0],0.05)) {
-				/*if (debug)
-					file << "Adding one shell" << endl;*/
+				if (debug)
+					file << "Adding one shell" << endl;
 				s++;
 				max_weight[i].resize(size_t(s) + 1);
 				max_weight[i][s].resize(2);
 				max_weight[i][s][0] = dist;
 			}
 			if (grid[i][3][p] > max_weight[i][s][1])
-				max_weight[i][s][1] = grid[i][3][p];
-			temp[0][i][p] = grid[i][3][p];
-			double * pos = new double[3]{grid[i][0][p],grid[i][1][p],grid[i][2][p]};
+				max_weight[i][s][1] = grid[i][3][p];*/
+			//double* pos = new double[3]{ grid[i][0][p],grid[i][1][p],grid[i][2][p] };
+			grid[i][3][p] *= compute_dens(wave, new double[3]{grid[i][0][p],grid[i][1][p],grid[i][2][p]});
+			sum[i] += grid[i][3][p];
+			/*temp[0][i][p] = grid[i][3][p];
 			temp[1][i][p] = compute_dens(wave,pos);
 			temp[2][i][p] = compute_Hirshfeld(atom_z,asym_atom_list[i],wave,pos);
 			sum[i] += temp[1][i][p] * grid[i][3][p];// *temp[2][i][p];
-			grid[i][3][p] = temp[0][i][p] * temp[1][i][p];// *temp[2][i][p];
+			grid[i][3][p] = temp[0][i][p] * temp[1][i][p];// *temp[2][i][p];*/
 		}
-		file << "Summed density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(6) << setprecision(2) << sum[i] << " electrons" << endl;
+		file << "Summed Becke density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(6) << setprecision(2) << sum[i] << " electrons" << endl;
 	}
 
-	double el_sum=0;
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++) 
+		for (unsigned int p = 0; p < num_points[i]; p++)
+			for (unsigned int k = 0; k < 4; k++)
+				total_grid[k].push_back(grid[i][k][p]);
+	delete[](grid);
+
+	double el_sum_becke = 0.0;
+	double el_sum_hirshfeld = 0.0;
+	vector <double> hirshfeld_sum;
+
 	for (unsigned int i=0; i<asym_atom_list.size(); i++){
+		hirshfeld_weights[i].resize(total_grid[0].size());
 		nr_points+=num_points[i];
-		el_sum+=sum[i];
+		el_sum_becke+=sum[i];
 	}
+#pragma omp parallel for reduction (+:el_sum_hirshfeld) schedule(dynamic)
+	for (int p = 0; p < total_grid[0].size(); p++) {
+		double* results = new double[asym_atom_list.size()];
+		compute_Hirshfeld(atom_z, asym_atom_list, wave, new double[3]{ total_grid[0][p], total_grid[1][p], total_grid[2][p] }, results);
+		for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+			hirshfeld_weights[i][p] = results[i];
+			el_sum_hirshfeld += total_grid[3][p] * hirshfeld_weights[i][p];
+		}
+	}
+	if (debug) {
+		hirshfeld_sum.resize(total_grid[0].size());
+		for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+			for (int p = 0; p < total_grid[0].size(); p++)
+				hirshfeld_sum[p] += hirshfeld_weights[i][p];
+		for (int p = 0; p < total_grid[0].size(); p++)
+			if(hirshfeld_sum[p]<0.999 || hirshfeld_sum[p] > 1.001)
+				file << "point: " << p << " hirshfeld sum: " << fixed << setw(7) << setprecision(3) << hirshfeld_sum[p] << endl;
+	}
+		
 	delete[](sum);
-	file << "Number of points to evaluate: " << nr_points  << " with " << el_sum << " electrons in total." << endl;
+	file << "Number of points evaluated: " << nr_points << "(" << total_grid[0].size() << ")" 
+		<< " with " << el_sum_becke << " electrons in Becke Grid and " 
+		<< el_sum_hirshfeld << " electrons in Hirshfeld Grid in total." << endl;
 
 	if(debug)
 		file << "Becke grid with hirshfeld weights done!"<<endl;
@@ -3914,11 +3968,11 @@ bool calculate_structure_factors(
 					file << "Atom: " << labels[i] << endl;
 					//file << "Nr of Points: " << num_points[i] << endl;
 				}*/
-				for (unsigned int p = 0; p < num_points[i]; p++) {
-					d[0] = (grid[i][0][p] - wave.atoms[asym_atom_list[i]].x);
-					d[1] = (grid[i][1][p] - wave.atoms[asym_atom_list[i]].y);
-					d[2] = (grid[i][2][p] - wave.atoms[asym_atom_list[i]].z);
-					double dist = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
+				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
+					d[0] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+					d[1] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+					d[2] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+					//double dist = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
 					/*int shell = 0;
 					for (unsigned int n = 0; n < max_weight[i].size(); n++) {
 						//file << "s: " << s << " n: " << n << " max_weight: " << max_weight[i][n][0] << " dist: " << dist << endl;
@@ -3930,19 +3984,21 @@ bool calculate_structure_factors(
 					if (temp[0][i][p] < 0.001 * max_weight[i][shell][1])
 						continue;*/
 					complex<double> work(0.0, k_pt[0][ref+s*hkl[0].size()] * d[0] + k_pt[1][ref+s*hkl[0].size()] * d[1] + k_pt[2][ref+s*hkl[0].size()] * d[2]);
-					if ( debug && ref == 0 && i == 0 && p == 0 && s == 0 ) {
+					/*if ( debug && ref == 0 && i == 0 && p == 0 && s == 0 ) {
 						file << "Point:" << endl << setprecision(8) << setw(16) << grid[i][0][p] 
 							<< setprecision(8) << setw(16) << grid[i][1][p] 
 							<< setprecision(8) << setw(16) << grid[i][2][p] << endl;
-						file << "Atom position:" << endl << setw(16) << wave.atoms[asym_atom_list[i]].x << wave.atoms[asym_atom_list[i]].y << wave.atoms[asym_atom_list[i]].z << endl;
+						file << "Atom position:" << endl << setprecision(8) << setw(16) << wave.atoms[asym_atom_list[i]].x 
+							<< setprecision(8) << setw(16) << wave.atoms[asym_atom_list[i]].y 
+							<< setprecision(8) << setw(16) << wave.atoms[asym_atom_list[i]].z << endl;
 						file << "d: ";
 						file << scientific << showpoint << setprecision(8) << setw(16) << sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2)) << endl << " rho: ";
 						file << scientific << showpoint << setprecision(8) << setw(16) << temp[1][i][p] << " work: ";
 						file << scientific << showpoint << setprecision(8) << setw(16) << imag(work) << " exp(work): ";
 						file << scientific << showpoint << setprecision(8) << setw(16) << real(exp(work)) << ",";
 						file << scientific << showpoint << setprecision(8) << setw(16) << imag(exp(work)) << endl;
-					}
-					sf[i][ref+s*hkl[0].size()] += complex<double>(complex<double>(grid[i][3][p], 0.0)*exp(work));
+					}*/
+					sf[i][ref+s*hkl[0].size()] += complex<double>(complex<double>(total_grid[3][p]*hirshfeld_weights[i][p], 0.0)*exp(work));
 				}
 			}
 		}
