@@ -1517,6 +1517,21 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 };
 
 bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, bool force_overwrite) {
+	int elcount = 0;
+	elcount -= wave.get_charge();
+	for (int i = 0; i < wave.get_ncen(); i++) elcount += wave.get_atom_charge(i);
+	int alpha = 0, beta = 0, temp = elcount;
+	while (temp > 1) {
+		alpha++;
+		beta++;
+		temp -= 2;
+	}
+	alpha += temp;
+	int diff = wave.get_multi() - 1;
+	while (alpha - beta != diff) {
+		alpha++;
+		beta--;
+	}
 	if (wave.get_nr_basis_set_loaded() == 0) {
 		file << "No basis set loaded, will load a complete basis set now!" << endl;
 		if (debug) Enter();
@@ -1585,7 +1600,8 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 	}
 	//wave.set_modified();
 	if (debug) debug_fchk = true;
-	vector<double> CMO;
+	vector < double > CMO;
+	vector < double > CMO_beta;
 	int nao = 0;
 	int nshell = 0;
 	int naotr = 0;
@@ -1817,7 +1833,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			Enter();
 		}
 		//--------------Build CMO of alessandro from the first elements of each shell-------------
-		for (int m = 0; m < wave.get_nmo(); m++) {
+		for (int m = 0; m < alpha; m++) {
 			int run_2 = 0;
 			for (int a = 0; a < wave.get_ncen(); a++) {
 				for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
@@ -1861,6 +1877,53 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			if (debug) file << "finished with MO!" << endl;
 			if (nshell != run_2) nshell = run_2;
 		}
+		if (alpha != beta) {
+			for (int m = alpha; m < alpha+beta; m++) {
+				int run_2 = 0;
+				for (int a = 0; a < wave.get_ncen(); a++) {
+					for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
+						if (debug) file << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value" << endl;
+						switch (wave.get_shell_type(a, s)) {
+						case 1:
+							CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s)]);
+							if (m == 0) nao++;
+							if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+								file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
+							break;
+						case 2:
+							for (int i = 0; i < 3; i++) CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
+							if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+								file << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+							if (m == 0) nao += 3;
+							break;
+						case 3:
+							for (int i = 0; i < 6; i++) CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
+							if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+								file << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+							if (m == 0) nao += 6;
+							break;
+						case 4:
+							//this hardcoded piece is due to the order of f-type functions in the fchk
+							for (int i = 0; i < 3; i++) 	CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
+							CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
+							for (int i = 0; i < 2; i++) 	CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
+							for (int i = 0; i < 2; i++) 	CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
+							CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
+							CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
+							if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+								file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+							if (m == 0) nao += 10;
+							break;
+						}
+						run_2++;
+					}
+					if (debug) file << "finished with atom!" << endl;
+				}
+				if (debug) file << "finished with MO!" << endl;
+				if (nshell != run_2) nshell = run_2;
+			}
+		}
+
 		if (debug) {
 			ofstream cmo("cmo.debug", ofstream::out);
 			for (int p = 0; p < CMO.size(); p++) {
@@ -1884,41 +1947,113 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		//------------------ make the DM -----------------------------
 		naotr = nao * (nao + 1) / 2;
 		vector<double> kp;
-		for (int i = 0; i < naotr; i++) wave.push_back_DM(0.0);
+		for (int i = 0; i < naotr; i++) {
+			wave.push_back_DM(0.0);
+			if (alpha != beta)
+				wave.push_back_SDM(0.0);
+		}
 		if (debug) file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
+		if (debug) cout << "Making DM now!" << endl;
 		for (int iu = 0; iu < nao; iu++) {
 			for (int iv = 0; iv <= iu; iv++) {
 				int iuv = (iu * (iu + 1) / 2) + iv;
 				if (debug) file << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
+				double temp;
+				if (debug) file << "Working on MO: ";
 				for (int m = 0; m < wave.get_nmo(); m++) {
-					//if (debug) file << "DM before: " << wave.get_DM(iuv) << endl;
-					if (!wave.set_DM(iuv, wave.get_DM(iuv) + wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)])) {
-						file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-						file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-						file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
-						file << "DM_size: " << wave.get_DM_size() << endl;
-						Enter();
-						return false;
+					if (debug) file << m << " ";
+					if (alpha != beta) {
+						if (m < alpha) {
+							temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
+							if (!wave.set_SDM(iuv, wave.get_SDM(iuv) + temp)) {
+								file << "Something went wrong while writing the SDM! iuv=" << iuv << endl;
+								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
+								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_SDM(iuv) << endl;
+								file << "SDM_size: " << wave.get_SDM_size() << endl;
+								return false;
+							}
+							if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
+								file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
+								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
+								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
+								file << "DM_size: " << wave.get_DM_size() << endl;
+								//Enter();
+								return false;
+							}
+						}
+						else {
+							temp = wave.get_MO_occ(m) * CMO_beta[iu + ((m-alpha) * nao)] * CMO_beta[iv + ((m-alpha) * nao)];
+							if (!wave.set_SDM(iuv, wave.get_SDM(iuv) - temp)) {
+								file << "Something went wrong while writing the SDM! iuv=" << iuv << endl;
+								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
+								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_SDM(iuv) << endl;
+								file << "SDM_size: " << wave.get_SDM_size() << endl;
+								return false;
+							}
+							if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
+								file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
+								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
+								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
+								file << "DM_size: " << wave.get_DM_size() << endl;
+								//Enter();
+								return false;
+							}
+						}
+					}
+					else {
+						temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
+						if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
+							file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
+							file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
+							file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
+							file << "DM_size: " << wave.get_DM_size() << endl;
+							//Enter();
+							return false;
+						}
 					}
 					//else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
 				}
+				if (debug) file << endl;
 			}
 		}
 		if (debug) {
-			file << "DM is:" << endl;
+			cout << "Done with DM!" << endl;
+			ofstream dm("dm.debug", ofstream::out);
+			file << "DM is in dm.debug" << endl;
 			for (int p = 0; p < wave.get_DM_size(); p++) {
 				string temp;
 				for (int i = 0; i < 5; i++) {
+					if (i + p >= wave.get_DM_size()) continue;
 					stringstream stream;
 					stream << scientific << setw(14) << setprecision(7) << wave.get_DM(i + p) << " ";
 					temp += stream.str();
 				}
 				p += 4;
-				file << temp << endl;
+				dm << temp << endl;
 			}
 			file << wave.get_DM_size() << " Elements in DM" << endl;
-			Enter();
+			dm.flush();
+			dm.close();
+			if (alpha != beta) {
+				ofstream sdm("sdm.debug", ofstream::out);
+				file << "SDM is in sdm.debug" << endl;
+				for (int p = 0; p < wave.get_SDM_size(); p++) {
+					string temp;
+					for (int i = 0; i < 5; i++) {
+						if (i + p >= wave.get_DM_size()) continue;
+						stringstream stream;
+						stream << scientific << setw(14) << setprecision(7) << wave.get_SDM(i + p) << " ";
+						temp += stream.str();
+					}
+					p += 4;
+					sdm << temp << endl;
+				}
+				file << wave.get_SDM_size() << " Elements in SDM" << endl;
+				sdm.flush();
+				sdm.close();
+			}
 		}
+		if (debug) file << "Starting to write fchk now!" << endl;
 		// open fchk for writing
 		string temp_fchk = fchk_name;
 		temp_fchk.append("fchk");
@@ -1965,21 +2100,6 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		st_s << setw(17) << wave.get_multi() << endl;
 		s += st_s.str();
 		st_s.str("");
-		int elcount = 0;
-		elcount -= wave.get_charge();
-		for (int i = 0; i < wave.get_ncen(); i++) elcount += wave.get_atom_charge(i);
-		int alpha = 0, beta = 0, temp=elcount;
-		while (temp > 1) {
-			alpha++;
-			beta++;
-			temp -= 2;
-		}
-		alpha += temp;
-		int diff = wave.get_multi() - 1;
-		while (alpha - beta != diff) {
-			alpha++;
-			beta--;
-		}
 		s += "Number of electrons                        I";
 		st_s << setw(17) << elcount;
 		s += st_s.str();
@@ -2234,7 +2354,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		runs = 0;
 		for (int m = 0; m < nao; m++) {
 			if (m < alpha) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
-			else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
+			else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(alpha - 1) + m;
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
 		}
@@ -2250,7 +2370,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			st_s.str("");
 			runs = 0;
 			for (int m = 0; m < nao; m++) {
-				if (m + alpha < wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
+				if (m < beta) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
@@ -2267,7 +2387,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		st_s.str("");
 		runs = 0;
 		for (int i = 0; i < nao * nao; i++) {
-			if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
+			if (i < nao * alpha) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
 			else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
 			runs++;
 			if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
@@ -2282,8 +2402,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			st_s.str("");
 			runs = 0;
 			for (int i = 0; i < nao * nao; i++) {
-				if (i + nao * alpha < nao 
-					* wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i + nao * wave.get_nmo()];
+				if (i < nao * beta) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO_beta[i];
 				else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
 				runs++;
 				if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
@@ -2304,9 +2423,24 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		}
 		s += st_s.str();
 		st_s.str("");
+		if (alpha != beta) {
+			s += "Spin SCF Density                           R   N=";
+			st_s << setw(12) << wave.get_SDM_size() << endl;
+			s += st_s.str();
+			st_s.str("");
+			runs = 0;
+			for (int i = 0; i < wave.get_SDM_size(); i++) {
+				st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_SDM(i);
+				runs++;
+				if ((runs % 5 == 0 && runs != 0) || i == wave.get_SDM_size() - 1) st_s << endl;
+			}
+			s += st_s.str();
+			st_s.str("");
+		}
 		fchk << s;
 		fchk.flush();
 		fchk.close();
 	}
+	if (debug) file << "Finished writing fchk!" << endl;
 	return true;
 };
