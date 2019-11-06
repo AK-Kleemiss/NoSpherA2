@@ -93,8 +93,10 @@ void Enter(){
 };
 
 bool is_similar(double first, double second, double tolerance) {
-	if (first < second * (1 - tolerance) || first > second * (1 + tolerance)) return false;
-	else return true;
+	if (first < second * (1 - tolerance) || first > second * (1 + tolerance)) 
+		return false;
+	else 
+		return true;
 };
 
 void cls(){
