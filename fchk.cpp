@@ -1533,8 +1533,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		beta--;
 	}
 	if (wave.get_nr_basis_set_loaded() == 0) {
-		file << "No basis set loaded, will load a complete basis set now!" << endl;
-		if (debug) Enter();
+		if (debug) file << "No basis set loaded, will load a complete basis set now!" << endl;
 		if (!read_basis_set_vanilla(basis_set_path, wave, debug, false)) {
 			file << "Problem during reading of the basis set!" << endl;
 			return "WRONG";
