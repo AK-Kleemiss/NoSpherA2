@@ -13,6 +13,7 @@
 #include <iomanip>
 #include <string>
 #include <fstream>
+#include <regex>
 #ifdef _WIN32
 #include <windows.h>
 #include <io.h>
@@ -3576,12 +3577,20 @@ bool calculate_structure_factors(
 	vector< vector <int> > hkl;
 	string line;
 	hkl.resize(3);
+	if (!exists(hkl_filename))
+		file << "HKL file does not exists!" << endl;
 	ifstream hkl_input(hkl_filename.c_str(),ios::in);
     hkl_input.seekg(0,hkl_input.beg);
+	regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
     while (!hkl_input.eof()){
         getline(hkl_input,line);
         if(hkl_input.eof())
-        	break;
+			break;
+		if (line.size() < 2)
+			continue;
+		cmatch result;
+		if (regex_search(line.c_str(), result, r))
+			continue;
         for(int i=0; i<3; i++){
         	string temp=line.substr(4*size_t(i)+1,3);
         	temp.erase(remove_if(temp.begin(),temp.end(), ::isspace),temp.end());
@@ -3594,6 +3603,12 @@ bool calculate_structure_factors(
         }
     }
     hkl_input.close();
+	// Remove duplicate reflections
+	for (unsigned int i = 0; i < hkl[0].size(); i++)
+		for (unsigned int j = i+1; j < hkl[0].size(); j++)
+			if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
+				for (unsigned int x = 0; x < 3; x++)
+					hkl[x].erase(hkl[x].begin() + j);
 
     if(debug)
     	file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
@@ -3601,6 +3616,8 @@ bool calculate_structure_factors(
 	double rcm[3][3];
 	if(debug)
 		file << "starting to read cif!" << endl;
+	if (!exists(cif))
+		file << "HKL file does not exists!" << endl;
 	ifstream cif_input(cif.c_str(),ios::in);
 	vector<bool> found;
 	found.resize(7);
@@ -3696,6 +3713,8 @@ bool calculate_structure_factors(
 	cif_input.clear();
 	cif_input.seekg(0,cif_input.beg);
 	vector <string> labels;
+	vector <unsigned int> atom_type_list;
+	vector <unsigned int> asym_atom_to_type_list;
 	unsigned int count_fields=0;
 	unsigned int position_field[3]={0,0,0};
 	unsigned int label_field=1000;
@@ -3748,6 +3767,16 @@ bool calculate_structure_factors(
 						//if(debug) file << "Found an atom: " << fields[label_field] << endl;
 						labels.push_back(fields[label_field]);
 						asym_atom_list.push_back(a);
+						bool already_there = false;
+						for (int i = 0; i < atom_type_list.size(); i++)
+							if (atom_type_list[i] == wave.atoms[a].charge) {
+								already_there = true;
+								asym_atom_to_type_list.push_back(i);
+							}
+						if (already_there == false) {
+							asym_atom_to_type_list.push_back(atom_type_list.size());
+							atom_type_list.push_back(wave.atoms[a].charge);
+						}
 					}
 				}
 				getline(cif_input,line);
@@ -3755,6 +3784,9 @@ bool calculate_structure_factors(
 		}
 	}
 	cif_input.close();
+
+	if (debug)
+		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
 	if(asym_atom_list.size()==0){
 		file << "0 asym atoms is imposible! something is wrong with reading the CIF!" << endl;
@@ -3856,7 +3888,7 @@ bool calculate_structure_factors(
 	vector < vector < double > > spherical_density;
 	// density of spherical atom at each 
 	// Dimensions: [a] [d]
-	// a = atom number for which the weight is calcualted
+	// a = atom number in atom type list for which the weight is calcualted
 	// d = distance to look at obtained from point_to_distance_map
 	vector < vector < double > > distances;
 	// vector of distances for calculation of hirshfeld weights
@@ -3869,8 +3901,8 @@ bool calculate_structure_factors(
 	// a = atom number
 	// p = point number
 	sum.resize(asym_atom_list.size());
-	spherical_density.resize(asym_atom_list.size());
-	distances.resize(asym_atom_list.size());
+	spherical_density.resize(atom_type_list.size());
+	distances.resize(atom_type_list.size());
 	point_distance_map.resize(asym_atom_list.size());
 
 #pragma omp parallel for schedule(dynamic)
@@ -3933,27 +3965,26 @@ bool calculate_structure_factors(
 
 	if(debug) file << " Becke Grid exists, with total number of points: " << total_grid[0].size() << endl << "Calculating densities now!" << endl;
 
-#pragma omp parallel for
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		for (int p = 0; p < total_grid[0].size(); p++) {
 			double dist = sqrt(pow(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x, 2)
 				+ pow(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y, 2)
 				+ pow(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z, 2))/ 0.529177249;
 			bool exists = false;
-			for (int j = 0; j < distances[i].size(); j++)
-				if (is_similar(dist, distances[i][j], 0.02)) {
+			for (int j = 0; j < distances[asym_atom_to_type_list[i]].size(); j++)
+				if (is_similar(dist, distances[asym_atom_to_type_list[i]][j], 0.02)) {
 					exists = true;
 					point_distance_map[i].push_back(j);
 					break;
 				}
 			if (!exists) {
-				if(debug && i==1) file << "New distance added: " << scientific << setw(12) << setprecision(6) << dist << " as the " << distances[i].size() << ". distance."<< endl;
-				point_distance_map[i].push_back(distances[i].size());
-				distances[i].push_back(dist);
+				if(debug && i==1) file << "New distance added: " << scientific << setw(12) << setprecision(6) << dist << " as the " << distances[asym_atom_to_type_list[i]].size() << ". distance."<< endl;
+				point_distance_map[i].push_back(distances[asym_atom_to_type_list[i]].size());
+				distances[asym_atom_to_type_list[i]].push_back(dist);
 			}
 		}
 		if (debug && i == 1) {
-			file << "There are " << distances[i].size() << " distances to be evaluated for atom " << labels[i] << endl;
+			file << "There are " << distances[asym_atom_to_type_list[i]].size() << " distances to be evaluated for atom " << labels[i] << endl;
 			file << "These map a total of " << point_distance_map[i].size() << " points." << endl;
 		}
 	}
@@ -3961,7 +3992,7 @@ bool calculate_structure_factors(
 	double el_sum_becke = 0.0;
 	double el_sum_spherical = 0.0;
 
-	for (unsigned int i=0; i<asym_atom_list.size(); i++)
+	for (unsigned int i=0; i<atom_type_list.size(); i++)
 		spherical_density[i].resize(distances[i].size());
 
 	vector < vector <double> > atom_els;
@@ -3971,19 +4002,14 @@ bool calculate_structure_factors(
 			atom_els[n].push_back(0.0);
 
 #pragma omp parallel for
-	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-		if (debug) file << "Calculating densities for atom " << labels[i] << endl;
-		for (int dist = 0; dist < distances[i].size(); dist++) {
-			spherical_density[i][dist] = compute_spherical_density(wave.atoms[i].charge, distances[i][dist]);
-			if (debug && i == 1) file << "distance: " << distances[i][dist] << " density: " << spherical_density[i][dist] << endl;
-		}
+	for (unsigned int i = 0; i < atom_type_list.size(); i++) {
+		if (debug) file << "Calculating densities for atom PSE number " << atom_type_list[i] << endl;
+		for (int dist = 0; dist < distances[i].size(); dist++) 
+			spherical_density[i][dist] = compute_spherical_density(wave.atoms[asym_atom_to_type_list[i]].charge, distances[i][dist]);
 	}
 	if (debug) {
-		file << "First elements of distance mapping:" << endl;
-		for (int i = 0; i < 2000; i++)
-			file << point_distance_map[1][i] << " " << distances[1][point_distance_map[1][i]] << endl;
 		file << "Real distance, Mapped Distance, mapped corersponding density and accurate spherical, as well as aspherical density for each atom " << labels[1] << endl;
-		for (int i = 0; i < 2000; i++) {
+		for (int i = 0; i < 200; i++) {
 			file << sqrt(pow(total_grid[0][i] - wave.atoms[asym_atom_list[1]].x, 2) + pow(total_grid[1][i] - wave.atoms[asym_atom_list[1]].y, 2) + pow(total_grid[2][i] - wave.atoms[asym_atom_list[1]].z, 2)) / 0.529177249
 				<< " " << distances[1][point_distance_map[1][i]] << " " << spherical_density[1][point_distance_map[1][i]] << " "
 				<< compute_spherical_density(wave.atoms[1].charge, sqrt(pow(total_grid[0][i] - wave.atoms[asym_atom_list[1]].x, 2) + pow(total_grid[1][i] - wave.atoms[asym_atom_list[1]].y, 2) + pow(total_grid[2][i] - wave.atoms[asym_atom_list[1]].z, 2))/ 0.529177249)
@@ -3999,7 +4025,7 @@ bool calculate_structure_factors(
 
 #pragma omp parallel for
 		for (int p = 0; p < total_grid[0].size(); p++)
-			total_grid[4][p] += spherical_density[i][point_distance_map[i][p]];
+			total_grid[4][p] += spherical_density[asym_atom_to_type_list[i]][point_distance_map[i][p]];
 
 		for (int p = 0; p < num_points[i]; p++) {
 			atom_els[0][i] += total_grid[3][counter_p] * total_grid[5][counter_p];
@@ -4119,13 +4145,13 @@ bool calculate_structure_factors(
 						file << scientific << showpoint << setprecision(8) << setw(16) << imag(exp(work)) << endl;
 					}*/
 								//   BECKE WEIGHT  * Wavefunction Density   * Atomic spherical density                 / total spherical density
-					double dens = total_grid[3][p] * total_grid[5][p] * spherical_density[i][point_distance_map[i][p]] / total_grid[4][p];
+					double dens = total_grid[3][p] * total_grid[5][p] * spherical_density[asym_atom_to_type_list[i]][point_distance_map[i][p]] / total_grid[4][p];
 					if (s == 0 && ref == 0)
 						atom_els[2][i] += dens;
 					sf[i][ref+s*hkl[0].size()] += complex<double>( complex<double>( dens , 0.0) * exp(work) );
 				}
 				if (s == 0 && ref == 0) {
-					file << "Summed Hirshfeld density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(7) << setprecision(3) << atom_els[2][i] << " electrons" << endl;
+					file << "Summed Hirshfeld density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(7) << setprecision(3) << atom_els[2][i] - wave.atoms[i].charge << " electrons" << endl;
 					el_sum_hirshfeld += atom_els[2][i];
 				}
 			}
@@ -4160,8 +4186,8 @@ bool calculate_structure_factors(
 				<< hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s] << " "
 				<< hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s] << " ";
 			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
-				tsc_file << fixed << setprecision(5) << real(sf[i][p + hkl[0].size() * s]) << ","
-				<< fixed << setprecision(5) << imag(sf[i][p + hkl[0].size() * s]) << " ";
+				tsc_file << scientific << setprecision(8) << real(sf[i][p + hkl[0].size() * s]) << ","
+				<< scientific << setprecision(8) << imag(sf[i][p + hkl[0].size() * s]) << " ";
 			tsc_file << endl;
 		}
 	}
@@ -4173,8 +4199,8 @@ bool calculate_structure_factors(
 	//	int diff = end - start;
 
 	if (end - start < 60) file << "Time to calculate: "<< end - start << " s\n";
-	else if (end - start < 3600) file << "Time to calculate: " << (end - start)/60 << " m\n";
-	else file << "Time to calculate: " << (end - start)/3600 << " h\n";
+	else if (end - start < 3600) file << "Time to calculate: " << (end - start)/60 << " m " << (end - start) % 60 << " s\n";
+	else file << "Time to calculate: " << (end - start)/3600 << " h " << (end - start) % 3600 << " m\n";
 #else
 	gettimeofday(&t2, 0);
 
