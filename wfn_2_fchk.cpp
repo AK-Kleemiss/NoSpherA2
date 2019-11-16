@@ -246,7 +246,7 @@ int main(int argc, char **argv)
 		free_fchk(log_file,outputname,"", wavy[0], debug_main,true);
 	}
 	if(cif!=""||hkl!=""){
-		//debug_main = true;
+		debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
 		if(!calculate_structure_factors(hkl,cif,symm,wavy[0],debug_main,accuracy, log_file))

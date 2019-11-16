@@ -3611,7 +3611,7 @@ bool calculate_structure_factors(
 			//if(debug) file << "found loop!" << endl;
 			while(line.find("_")!=string::npos){
 				getline(cif_input,line);
-				//if(debug) file << "line in loop field definition: " << line << endl;
+				if(debug) file << "line in loop field definition: " << line << endl;
 				if(line.find("label")!=string::npos)
 					label_field=count_fields;
 				else if(line.find("fract_x")!=string::npos)
@@ -3657,6 +3657,168 @@ bool calculate_structure_factors(
 			}
 		}
 	}
+
+	bool symm_read = false;
+	//Still need to read the sym matrices
+	if (symm == "") {
+		if(debug) file << "No Symmetry file specified, tyring to read from the CIF!" << endl;
+		symm_read = true;
+	}
+	else if (!exists(symm) && symm_read==true) 
+		return false;
+
+	vector < vector < vector <int> > > sym;
+	sym.resize(3);
+	for (int i = 0; i < 3; i++)
+		sym[i].resize(3);
+	if (!symm_read) {
+		ifstream symm_input(symm.c_str(), ios::in);
+		string liny;
+		int temp_int;
+		while (!symm_input.eof()) {
+			getline(symm_input, liny);
+			stringstream streamy(liny);
+			for (int i = 0; i < 3; i++) 
+				for (int j = 0; j < 3; j++) {
+					streamy >> temp_int;
+					sym[i][j].push_back(temp_int);
+				}
+		}
+	}
+	else {
+		cif_input.clear();
+		cif_input.seekg(0, cif_input.beg);
+		bool symm_found = false;
+		int operation_field = 200;
+		count_fields = 0;
+		while (!cif_input.eof() && !symm_found) {
+			getline(cif_input, line);
+			if (line.find("loop_") != string::npos) {
+				//if(debug) file << "found loop!" << endl;
+				while (line.find("_") != string::npos) {
+					getline(cif_input, line);
+					if(debug) file << "line in loop field definition: " << line << endl;
+					if (line.find("space_group_symop_operation_xyz") != string::npos)
+						operation_field = count_fields;
+					else if (count_fields == 3) {
+						if (debug) file << "I don't think this is the symmetry block.. moving on!" << endl;
+						count_fields = 0;
+						break;
+					}
+					count_fields++;
+				}
+				while (line.find("_") == string::npos && line.length() > 3) {
+					if (debug) file << "Reading operation!" << line << endl;
+					symm_found = true;
+					stringstream s(line);
+					vector <string> fields;
+					fields.resize(count_fields);
+					int sym_from_cif[3][3];
+					for (int x = 0; x < 3; x++)
+						for (int y = 0; y < 3; y++)
+							sym_from_cif[x][y] = 0;
+					for (unsigned int i = 0; i < count_fields; i++)
+						s >> fields[i];
+					vector<string> vectors;
+					vectors.resize(3);
+					unsigned int column = 0;
+					for (int c = 0; c < fields[operation_field].length(); c++) {
+						if (fields[operation_field][c] != ',')
+							vectors[column].push_back(fields[operation_field][c]);
+						else column++;
+					}
+
+					for (int x = 0; x < 3; x++) {
+						if (vectors[x].find("X") != string::npos || vectors[x].find("x") != string::npos) {
+							char sign = ' ';
+							if (vectors[x].find("X") != string::npos && vectors[x].find("X") != 0)
+								sign = vectors[x].at(vectors[x].find("X") - 1);
+							else if (vectors[x].find("X") == 0)
+								sign = '+';
+							if (vectors[x].find("x") != string::npos && vectors[x].find("x") != 0)
+								sign = vectors[x].at(vectors[x].find("x") - 1);
+							else if (vectors[x].find("x") == 0)
+								sign = '+';
+							if (sign == '-')
+								sym_from_cif[x][0] = -1;
+							if (sign == '+')
+								sym_from_cif[x][0] = 1;
+						}
+						if (vectors[x].find("Y") != string::npos || vectors[x].find("y") != string::npos) {
+							char sign = ' ';
+							if (vectors[x].find("Y") != string::npos && vectors[x].find("Y") != 0)
+								sign = vectors[x].at(vectors[x].find("Y") - 1);
+							else if (vectors[x].find("Y") == 0)
+								sign = '+';
+							if (vectors[x].find("y") != string::npos && vectors[x].find("y") != 0)
+								sign = vectors[x].at(vectors[x].find("y") - 1);
+							else if (vectors[x].find("y") == 0)
+								sign = '+';
+							if (sign == '-')
+								sym_from_cif[x][1] = -1;
+							if (sign == '+')
+								sym_from_cif[x][1] = 1;
+						}
+						if (vectors[x].find("Z") != string::npos || vectors[x].find("z") != string::npos) {
+							char sign = ' ';
+							if (vectors[x].find("Z") != string::npos && vectors[x].find("Z") != 0)
+								sign = vectors[x].at(vectors[x].find("Z") - 1);
+							else if (vectors[x].find("Z") == 0)
+								sign = '+';
+							if (vectors[x].find("z") != string::npos && vectors[x].find("z") != 0)
+								sign = vectors[x].at(vectors[x].find("z") - 1);
+							else if (vectors[x].find("z") == 0)
+								sign = '+';
+							if (sign == '-')
+								sym_from_cif[x][2] = -1;
+							if (sign == '+')
+								sym_from_cif[x][2] = 1;
+						}
+					}
+					if (debug) {
+						file << "Comparing ";
+						for (int x = 0; x < 3; x++)
+							for (int y = 0; y < 3; y++)
+								file << sym_from_cif[x][y] << " ";
+						file << endl;
+					}
+					bool already_known = false;
+					for (int s = 0; s < sym[0][0].size(); s++) {
+						bool identical = true;
+						bool inverse = true;
+						for (int x = 0; x < 3; x++)
+							for (int y = 0; y < 3; y++)
+								if (sym[x][y][s] != sym_from_cif[x][y])
+									identical = false;
+						if (!identical)
+							for (int x = 0; x < 3; x++)
+								for (int y = 0; y < 3; y++)
+									if (sym[x][y][s] != sym_from_cif[x][y] * -1)
+										inverse = false;
+						if (debug) {
+							file << "Comparison with ";
+							for (int x = 0; x < 3; x++)
+								for (int y = 0; y < 3; y++)
+									file << sym[x][y][s] << " ";
+							file << "resulted in ";
+							file << identical << " " << inverse << endl;
+						}
+						if (identical || inverse){
+							already_known = true;
+							break;
+						}
+					}
+					if (!already_known)
+						for (int x = 0; x < 3; x++)
+							for (int y = 0; y < 3; y++)
+								sym[x][y].push_back(sym_from_cif[x][y]);
+					getline(cif_input, line);
+				}
+			}
+		}
+	}
+
+	if (debug) file << "Read " << sym[0][0].size() << " symmetry elements! Size of sym: " << sym[0][0].size() << endl;
 	cif_input.close();
 
 	if(asym_atom_list.size()==0){
@@ -3887,26 +4049,6 @@ bool calculate_structure_factors(
 
 	if(debug)
 		file << "Becke grid with hirshfeld weights done!"<<endl;
-
-	//Still need to read the sym matrices
-	ifstream symm_input(symm.c_str(), ios::in);
-	string liny;
-	vector < vector < vector <int> > > sym;
-	sym.resize(3);
-	int temp_int;
-	while (!symm_input.eof()) {
-		getline(symm_input, liny);
-		stringstream streamy(liny);
-		for (int i = 0; i < 3; i++) {
-			sym[i].resize(3);
-			for (int j = 0; j < 3; j++) {
-				streamy >> temp_int;
-				sym[i][j].push_back(temp_int);
-			}
-		}
-	}
-
-	if (debug) file << "Read " << sym[0][0].size() << " symmetry elements! Size of sym: " << sym[0][0].size() << endl;
 	
 	vector< vector <double> > k_pt;
 	k_pt.resize(3);
@@ -3943,7 +4085,7 @@ bool calculate_structure_factors(
 					file << rcm[i][j] << " ";
 				file << endl;
 			}
-		}*/		
+		}*/
 		#pragma omp parallel for
 		for (int ref = 0; ref < hkl[0].size(); ref++) {
 			double d[3] = { 0.0,0.0,0.0 };
