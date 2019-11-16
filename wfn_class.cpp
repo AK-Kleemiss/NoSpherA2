@@ -1628,6 +1628,30 @@ bool WFN::set_DM(int nr, double value){
 	}
 };
 
+void WFN::push_back_SDM(double value) {
+	SpinDensityMatrix.push_back(value);
+};
+
+double WFN::get_SDM(int nr) {
+	if (nr >= 0 && nr < SpinDensityMatrix.size()) return SpinDensityMatrix[nr];
+	else {
+		cout << "Requested nr out of range! Size: " << SpinDensityMatrix.size() << " nr: " << nr << endl;
+		Enter();
+		return -1;
+	}
+};
+
+bool WFN::set_SDM(int nr, double value) {
+	if (nr >= 0 && nr < SpinDensityMatrix.size()) {
+		SpinDensityMatrix[nr] = value;
+		return true;
+	}
+	else {
+		cout << "invalid arguments for set_SDM! Input was: " << nr << ";" << value << endl;
+		return false;
+	}
+};
+
 int WFN::check_order(bool debug){
 	for(int i=0; i< ncen; i++){
 		if(!get_atom_basis_set_loaded (i)){

@@ -30,6 +30,7 @@ class WFN {
 		std::vector<int> types;
 		std::vector<double> exponents;
 		std::vector<double> DensityMatrix;
+		std::vector<double> SpinDensityMatrix;
 
 		bool erase_center(int nr);
 		bool erase_type(int nr);
@@ -148,6 +149,11 @@ class WFN {
 		bool set_DM(int nr, double value);
 		double get_DM(int nr);
 		int get_DM_size() { return DensityMatrix.size(); };
+		//----------S_DM Handling--------------------------------
+		void push_back_SDM(double value);
+		bool set_SDM(int nr, double value);
+		double get_SDM(int nr);
+		int get_SDM_size() { return SpinDensityMatrix.size(); };
 		//-----------Cube handling-------------------------
 		bool push_back_cube(std::string filepath, bool full, bool expert = false);
 		void push_back_cube(cube given) {cub.push_back(given);};
