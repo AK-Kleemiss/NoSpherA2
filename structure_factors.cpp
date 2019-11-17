@@ -3483,17 +3483,25 @@ void compute_Hirshfeld(
 
 double compute_spherical_density(
 	int atom_number,
-	double dist
+	double dist,
+	bool debug = false
 )
 {
 	double Rho = 0.0;
+	if (debug) cout << "Calculating for atomic number: " << atom_number << endl;
 
 	//Speedup things for H
 	if (atom_number == 1)
-		return pow(exp(-1 * dist) * 2, 2);
+		return pow(exp(-1.24 * dist)*2, 2)/(4*M_PI);
+
+	if (debug) cout << "Decided its non hydrogen!" << endl;
 
 	int nr_ex = first_ex_SF(atom_number);
-	int nr_coef = first_coef_SF(atom_number);
+	int nr_coef = first_coef_SF(atom_number-1)+1;
+
+	if (debug)
+		cout << "Using nr_ex and nr_coef: " << nr_ex << " " << nr_coef
+		<< " Values (n/c/z): " << Thakkar_n[nr_ex] << " " << Thakkar_c[nr_coef] << " " << Thakkar_z[nr_ex] << endl;
 	double Orb[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	int offset = (atom_number - 1) * 15;
 	for (unsigned int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
@@ -3783,6 +3791,12 @@ bool calculate_structure_factors(
 			}
 		}
 	}
+	if (debug) {
+		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
+		for (int i = 0; i < atom_type_list.size(); i++)
+			file << " " << atom_type_list[i];
+		file << endl;
+	}
 
 	bool symm_read = false;
 	//Still need to read the sym matrices
@@ -4063,12 +4077,13 @@ bool calculate_structure_factors(
 	// a = atom number
 	// p = point number
 	sum.resize(asym_atom_list.size());
-	spherical_density.resize(atom_type_list.size());
+	spherical_density.resize(asym_atom_list.size());
 	distances.resize(atom_type_list.size());
 	point_distance_map.resize(asym_atom_list.size());
 
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for
 	for (int i=0; i< asym_atom_list.size(); i++){
+		if(debug) file << "Atom " << i << endl;
 		sum[i]=0;
 		total_grid.resize(6);
 		int min_angular=0;
@@ -4109,6 +4124,7 @@ bool calculate_structure_factors(
 		numgrid_free_atom_grid(context);
 
 	}
+	if (debug) file << " Becke Grid exists";
 
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 		for (unsigned int p = 0; p < num_points[i]; p++) {
@@ -4125,22 +4141,22 @@ bool calculate_structure_factors(
 		total_grid[5][i] = compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] });
 	}
 
-	if(debug) file << " Becke Grid exists, with total number of points: " << total_grid[0].size() << endl << "Calculating densities now!" << endl;
+	if(debug) file << ", with total number of points: " << total_grid[0].size() << endl << "Calculating densities now!" << endl;
 
-	for (int i = 0; i < asym_atom_list.size(); i++) {
+	/*for (int i = 0; i < asym_atom_list.size(); i++) {
 		for (int p = 0; p < total_grid[0].size(); p++) {
 			double dist = sqrt(pow(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x, 2)
 				+ pow(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y, 2)
-				+ pow(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z, 2))/ 0.529177249;
+				+ pow(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z, 2));
 			bool exists = false;
 			for (int j = 0; j < distances[asym_atom_to_type_list[i]].size(); j++)
-				if (is_similar(dist, distances[asym_atom_to_type_list[i]][j], 0.02)) {
+				if (is_similar(dist, distances[asym_atom_to_type_list[i]][j], 0.05)) {
 					exists = true;
 					point_distance_map[i].push_back(j);
 					break;
 				}
 			if (!exists) {
-				if(debug && i==1) file << "New distance added: " << scientific << setw(12) << setprecision(6) << dist << " as the " << distances[asym_atom_to_type_list[i]].size() << ". distance."<< endl;
+				if(debug) file << "New distance added: " << scientific << setw(12) << setprecision(6) << dist << " as the " << distances[asym_atom_to_type_list[i]].size() << ". distance."<< endl;
 				point_distance_map[i].push_back(distances[asym_atom_to_type_list[i]].size());
 				distances[asym_atom_to_type_list[i]].push_back(dist);
 			}
@@ -4149,13 +4165,13 @@ bool calculate_structure_factors(
 			file << "There are " << distances[asym_atom_to_type_list[i]].size() << " distances to be evaluated for atom " << labels[i] << endl;
 			file << "These map a total of " << point_distance_map[i].size() << " points." << endl;
 		}
-	}
+	}*/
 
 	double el_sum_becke = 0.0;
 	double el_sum_spherical = 0.0;
 
-	for (unsigned int i=0; i<atom_type_list.size(); i++)
-		spherical_density[i].resize(distances[i].size());
+	for (unsigned int i=0; i<asym_atom_list.size(); i++)
+		spherical_density[i].resize(total_grid[0].size());
 
 	vector < vector <double> > atom_els;
 	atom_els.resize(3);
@@ -4164,17 +4180,16 @@ bool calculate_structure_factors(
 			atom_els[n].push_back(0.0);
 
 #pragma omp parallel for
-	for (unsigned int i = 0; i < atom_type_list.size(); i++) {
-		if (debug) file << "Calculating densities for atom PSE number " << atom_type_list[i] << endl;
-		for (int dist = 0; dist < distances[i].size(); dist++)
-			spherical_density[i][dist] = compute_spherical_density(wave.atoms[asym_atom_to_type_list[i]].charge, distances[i][dist]);
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+		//if (debug) file << "Calculating densities for atom PSE number " << atom_type_list[i] << endl;
+		for (int p = 0; p < total_grid[0].size(); p++)
+			spherical_density[i][p] = compute_spherical_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)));
 	}
 	if (debug) {
-		file << "Real distance, Mapped Distance, mapped corersponding density and accurate spherical, as well as aspherical density for each atom " << labels[1] << endl;
-		for (int i = 0; i < 200; i++) {
-			file << sqrt(pow(total_grid[0][i] - wave.atoms[asym_atom_list[1]].x, 2) + pow(total_grid[1][i] - wave.atoms[asym_atom_list[1]].y, 2) + pow(total_grid[2][i] - wave.atoms[asym_atom_list[1]].z, 2)) / 0.529177249
-				<< " " << distances[1][point_distance_map[1][i]] << " " << spherical_density[1][point_distance_map[1][i]] << " "
-				<< compute_spherical_density(wave.atoms[1].charge, sqrt(pow(total_grid[0][i] - wave.atoms[asym_atom_list[1]].x, 2) + pow(total_grid[1][i] - wave.atoms[asym_atom_list[1]].y, 2) + pow(total_grid[2][i] - wave.atoms[asym_atom_list[1]].z, 2))/ 0.529177249)
+		file << "distance, accurate spherical, as well as aspherical density for each atom " << labels[1] << endl;
+		for (int i = 0; i < total_grid[0].size(); i++) {
+			file << sqrt(pow(total_grid[0][i] - wave.atoms[0].x, 2) + pow(total_grid[1][i] - wave.atoms[0].y, 2) + pow(total_grid[2][i] - wave.atoms[0].z, 2))
+				<< " " << compute_spherical_density(wave.atoms[0].charge, sqrt(pow(total_grid[0][i] - wave.atoms[0].x, 2) + pow(total_grid[1][i] - wave.atoms[0].y, 2) + pow(total_grid[2][i] - wave.atoms[0].z, 2)),i==3)
 				<< " ";
 			for (int j = 0; j < asym_atom_list.size(); j++)
 				file << compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] }, j) << " ";
@@ -4187,8 +4202,11 @@ bool calculate_structure_factors(
 
 #pragma omp parallel for
 		for (int p = 0; p < total_grid[0].size(); p++)
-			total_grid[4][p] += spherical_density[asym_atom_to_type_list[i]][point_distance_map[i][p]];
+			total_grid[4][p] += compute_spherical_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)));
+			//spherical_density[asym_atom_to_type_list[i]][point_distance_map[i][p]];
+	}
 
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 		for (int p = 0; p < num_points[i]; p++) {
 			atom_els[0][i] += total_grid[3][counter_p] * total_grid[5][counter_p];
 			atom_els[1][i] += total_grid[3][counter_p] * total_grid[4][counter_p];
@@ -4287,14 +4305,16 @@ bool calculate_structure_factors(
 						file << scientific << showpoint << setprecision(8) << setw(16) << real(exp(work)) << ",";
 						file << scientific << showpoint << setprecision(8) << setw(16) << imag(exp(work)) << endl;
 					}*/
-								//   BECKE WEIGHT  * Wavefunction Density   * Atomic spherical density                 / total spherical density
-					double dens = total_grid[3][p] * total_grid[5][p] * spherical_density[asym_atom_to_type_list[i]][point_distance_map[i][p]] / total_grid[4][p];
+					//              BECKE WEIGHT   *    Wfn Density   *  Atomic spherical density / total spherical density
+					double dens = total_grid[3][p] * total_grid[5][p] * spherical_density[i][p]   / total_grid[4][p];
 					if (s == 0 && ref == 0)
 						atom_els[2][i] += dens;
 					sf[i][ref+s*hkl[0].size()] += complex<double>( complex<double>( dens , 0.0) * exp(work) );
 				}
 				if (s == 0 && ref == 0) {
-					file << "Summed Hirshfeld density for atom: " << setw(6) << labels[i] << " is: " << fixed << setw(7) << setprecision(3) << atom_els[2][i] - wave.atoms[i].charge << " electrons" << endl;
+					file << "Summed Hirshfeld density for atom: " << setw(6) << labels[i] 
+						<< " is: " << fixed << setw(7) << setprecision(3) << wave.atoms[i].charge - atom_els[2][i] 
+						<< " electrons" << endl;
 					el_sum_hirshfeld += atom_els[2][i];
 				}
 			}
