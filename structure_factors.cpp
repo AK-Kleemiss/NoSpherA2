@@ -4124,7 +4124,7 @@ bool calculate_structure_factors(
 			min_angular=50;
 			max_angular=146;
 		}
-		context_t *context = numgrid_new_atom_grid(1e-8,
+		context_t *context = numgrid_new_atom_grid(1e-6,
 				min_angular*accuracy,
 				max_angular*accuracy,
 				atom_z[asym_atom_list[i]],
@@ -4260,6 +4260,38 @@ bool calculate_structure_factors(
 	if(debug)
 		file << "Initialized FFs" << endl;
 
+	int progress_hkl[20];
+	const int nr_hkl = sym[0][0].size() * hkl[0].size();
+	for (int i = 0; i < 20; i++) 
+		progress_hkl[i] = floor(nr_hkl / 20 * i);
+
+	double el_sum_hirshfeld = 0.0;
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+		for (unsigned int p = 0; p < total_grid[0].size(); p++) {
+			double dens = total_grid[5][p] * spherical_density[i][p];
+			atom_els[2][i] += dens;
+		}
+		file << "Summed Hirshfeld density for atom: " << setw(5) << labels[i]
+			<< " is: " << fixed << setw(7) << setprecision(3) << wave.atoms[i].charge - atom_els[2][i]
+			<< " electrons" << endl;
+		el_sum_hirshfeld += atom_els[2][i];
+	}
+	file << "Total Hirshfeld number of electrons: " << el_sum_hirshfeld << endl;
+	vector < vector < vector <double> > > d;
+	d.resize(3);
+	for (int x = 0; x < 3; x++) {
+		d[x].resize(asym_atom_list.size());
+		for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+			d[x][i].resize(total_grid[0].size());
+	}
+#pragma omp parallel for 
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+		for (unsigned int p = 0; p < total_grid[0].size(); p++) {
+			d[0][i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
+			d[1][i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
+			d[2][i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
+		}
+
 #ifdef _WIN64
 	time_t end1 = time(NULL);
 
@@ -4279,28 +4311,9 @@ bool calculate_structure_factors(
 
 #endif
 
-	int progress_hkl[20];
-	const int nr_hkl = sym[0][0].size() * hkl[0].size();
-	for (int i = 0; i < 20; i++) 
-		progress_hkl[i] = floor(nr_hkl / 20 * i);
-
-	double el_sum_hirshfeld = 0.0;
-	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-		for (unsigned int p = 0; p < total_grid[0].size(); p++) {
-			double dens = total_grid[5][p] * spherical_density[i][p];
-			atom_els[2][i] += dens;
-			file << "Summed Hirshfeld density for atom: " << setw(5) << labels[i]
-				<< " is: " << fixed << setw(7) << setprecision(3) << wave.atoms[i].charge - atom_els[2][i]
-				<< " electrons" << endl;
-			el_sum_hirshfeld += atom_els[2][i];
-		}
-	}
-	file << "Total Hirshfeld number of electrons: " << el_sum_hirshfeld << endl;
-
 	for (int s = 0; s < sym[0][0].size(); s++) {
-		#pragma omp parallel for schedule(dynamic) nowait
+		#pragma omp parallel for schedule(dynamic)
 		for (int ref = 0; ref < hkl[0].size(); ref++) {
-			double d[3] { 0.0,0.0,0.0 };
 			double k_pt[3] { 0.0,0.0,0.0 };
 			for (int x = 0; x < 3; x++) {
 				for (int h = 0; h < 3; h++) {
@@ -4314,13 +4327,16 @@ bool calculate_structure_factors(
 				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
 					if (spherical_density[i][p] <= 1E-10) 
 						continue;
-					d[0] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-					d[1] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-					d[2] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
 					//complex<double> work(0.0, k_pt[0] * d[0] + k_pt[1] * d[1] + k_pt[2] * d[2]);
 					//        BECKE WEIGHT * Wfn Density / total spherical density  * Atomic spherical density 
 					//double dens =              total_grid[5][p]                     * spherical_density[i][p];
-					sf[i][ref+s*hkl[0].size()] += complex<double>( complex<double>(total_grid[5][p] * spherical_density[i][p], 0.0) * exp(complex<double> (0.0, k_pt[0] * d[0] + k_pt[1] * d[1] + k_pt[2] * d[2])) );
+					sf[i][ref+s*hkl[0].size()] += complex<double>( 
+						complex<double>(
+							total_grid[5][p] 
+							* spherical_density[i][p], 0.0) 
+							* exp(complex<double> (0.0, k_pt[0] * d[0][i][p] + k_pt[1] * d[1][i][p] + k_pt[2] * d[2][i][p])
+							) 
+						);
 				}
 			}
 			for (int i = 0; i < 20; i++)
