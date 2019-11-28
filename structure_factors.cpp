@@ -3756,12 +3756,14 @@ bool calculate_structure_factors(
 		for (int j = 0; j < 3; j++)
 			if (rcm[i][j] < 10e-10)
 				rcm[i][j] = 0.0;
+			else
+				rcm[i][j] *= 0.529177249;
 
 	if(debug){
 		file << "RCM done, now labels and asym atoms!" << endl;
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j)
-				file << setw(10) << fixed << rcm[i][j] << ' ';
+				file << setw(10) << fixed << rcm[i][j] / 2 / M_PI / 0.529177249 << ' ';
 			file << endl;
 		}
 	}
@@ -3985,14 +3987,14 @@ bool calculate_structure_factors(
 								for (int y = 0; y < 3; y++)
 									if (sym[x][y][s] != sym_from_cif[x][y] * -1)
 										inverse = false;
-						if (debug) {
+						/*if (debug) {
 							file << "Comparison with ";
 							for (int x = 0; x < 3; x++)
 								for (int y = 0; y < 3; y++)
 									file << sym[x][y][s] << " ";
 							file << "resulted in ";
 							file << identical << " " << inverse << endl;
-						}
+						}*/
 						if (identical || inverse){
 							already_known = true;
 							break;
@@ -4110,9 +4112,13 @@ bool calculate_structure_factors(
 	// a = atom number in atom type list for which the weight is calcualted
 	// d = distance to look at obtained from point_to_distance_map
 
+	if (debug)
+		file << "Making Becke Grid for" << endl;
+
 #pragma omp parallel for schedule(dynamic)
 	for (int i=0; i< asym_atom_list.size(); i++){
-		if(debug) file << "Atom " << i << ": " << asym_atom_list[i] << endl;
+		if (debug && i == 0) file << "Atom " << i;
+		else if (debug) file << " " << i;
 		total_grid.resize(6);
 		int min_angular=0;
 		int max_angular=0;
@@ -4155,10 +4161,9 @@ bool calculate_structure_factors(
 	if (debug) file << " Becke Grid exists";
 
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-		for (unsigned int p = 0; p < num_points[i]; p++) {
+		for (unsigned int p = 0; p < num_points[i]; p++) 
 			for (unsigned int k = 0; k < 4; k++)
 				total_grid[k].push_back(grid[i][k][p]);
-		}
 		delete[](grid[i]);
 		if (debug) file << endl << "number of points for atom " << i << " " << num_points[i];
 	}
@@ -4170,7 +4175,7 @@ bool calculate_structure_factors(
 		total_grid[5][i] = compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] });
 	}
 
-	if(debug) file << ", with total number of points: " << total_grid[0].size() << endl;
+	if(debug) file << endl << ", with total number of points: " << total_grid[0].size() << endl;
 
 	double el_sum_becke = 0.0;
 	double el_sum_spherical = 0.0;
@@ -4189,7 +4194,7 @@ bool calculate_structure_factors(
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
 		spherical_density[i].resize(total_grid[0].size());
 
-	double incr = 1.025;
+	double incr = 1.05;
 	for (unsigned int i = 0; i < atom_type_list.size(); i++) {
 		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
 		double current = 1;
@@ -4260,11 +4265,6 @@ bool calculate_structure_factors(
 	if(debug)
 		file << "Initialized FFs" << endl;
 
-	int progress_hkl[20];
-	const int nr_hkl = sym[0][0].size() * hkl[0].size();
-	for (int i = 0; i < 20; i++) 
-		progress_hkl[i] = floor(nr_hkl / 20 * i);
-
 	double el_sum_hirshfeld = 0.0;
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 		for (unsigned int p = 0; p < total_grid[0].size(); p++) {
@@ -4278,7 +4278,11 @@ bool calculate_structure_factors(
 	}
 	file << "Total Hirshfeld number of electrons: " << el_sum_hirshfeld << endl;
 	vector < vector < vector <double> > > d;
+	vector < vector <double> > dens;
 	d.resize(3);
+	dens.resize(asym_atom_list.size());
+	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+		dens[i].resize(total_grid[0].size());
 	for (int x = 0; x < 3; x++) {
 		d[x].resize(asym_atom_list.size());
 		for (unsigned int i = 0; i < asym_atom_list.size(); i++)
@@ -4290,6 +4294,8 @@ bool calculate_structure_factors(
 			d[0][i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
 			d[1][i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
 			d[2][i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
+			//        BECKE WEIGHT * Wfn Density / total spherical density  * Atomic spherical density 
+			dens[i][p] = total_grid[5][p] * spherical_density[i][p];
 		}
 
 #ifdef _WIN64
@@ -4311,42 +4317,51 @@ bool calculate_structure_factors(
 
 #endif
 
+	file << flush;
+
 	for (int s = 0; s < sym[0][0].size(); s++) {
-		#pragma omp parallel for schedule(dynamic)
+		#pragma omp parallel for
 		for (int ref = 0; ref < hkl[0].size(); ref++) {
+			unsigned int index = ref + s * hkl[0].size();
 			double k_pt[3] { 0.0,0.0,0.0 };
 			for (int x = 0; x < 3; x++) {
 				for (int h = 0; h < 3; h++) {
 					double rcm_sym=0.0;
 					for (int j = 0; j < 3; j++)
 						rcm_sym += rcm[x][j] * sym[j][h][s];
-					k_pt[x] += rcm_sym * hkl[h][ref] *0.529177249;
+					k_pt[x] += rcm_sym * hkl[h][ref];
 				}
 			}
+			double work;
 			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
-					if (spherical_density[i][p] <= 1E-10) 
-						continue;
-					//complex<double> work(0.0, k_pt[0] * d[0] + k_pt[1] * d[1] + k_pt[2] * d[2]);
-					//        BECKE WEIGHT * Wfn Density / total spherical density  * Atomic spherical density 
-					//double dens =              total_grid[5][p]                     * spherical_density[i][p];
-					sf[i][ref+s*hkl[0].size()] += complex<double>( 
-						complex<double>(
-							total_grid[5][p] 
-							* spherical_density[i][p], 0.0) 
-							* exp(complex<double> (0.0, k_pt[0] * d[0][i][p] + k_pt[1] * d[1][i][p] + k_pt[2] * d[2][i][p])
-							) 
-						);
+					/*if (spherical_density[i][p] < 1E-8 || dens[i][p] < 1E-10)
+						continue;*/
+					work = k_pt[0] * d[0][i][p] + k_pt[1] * d[1][i][p] + k_pt[2] * d[2][i][p];
+					sf[i][index] += complex<double>( dens[i][p] * cos(work) , dens[i][p] * sin(work) );
 				}
 			}
-			for (int i = 0; i < 20; i++)
-				if (s * hkl[0].size() + ref == progress_hkl[i]) {
-					file << "-";
-					if (i != 0) file << 5 * i << "%-";
-					else file << " " << 5 * i << "%-";
-				}
 		}
 	}
+
+#ifdef _WIN64
+	time_t end2 = time(NULL);
+
+	//	int diff = end - start;
+
+	if (end2 - end1 < 60) file << "Time to calc tsc: " << end2 - end1 << " s\n";
+	else if (end2 - end1 < 3600) file << "Time to calc tsc: " << setprecision(0) << floor((end2 - end1) / 60) << " m " << (end2 - end1) % 60 << " s\n";
+	else file << "Time to calc tsc: " << setprecision(0) << floor((end2 - end1) / 3600) << " h " << ((end2 - end1) % 3600) / 60 << " m\n";
+#else
+	gettimeofday(&t2, 0);
+
+	double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+
+	if (time3 < 60) printf("Time to calculate: %4.1lf s\n", time3);
+	else if (time3 < 3600) printf("Time to calculate: %10.1lf m\n", time3 / 60);
+	else printf("Time to calculate: %10.1lf h\n", time3 / 3600);
+
+#endif
 
 	if(debug)
 		file << endl << "SFs are made, now just write them!"<<endl;
