@@ -12,6 +12,7 @@ class WFN;
 
 //------------------general functions for easy use of terminal input--------------------
 bool yesno();
+bool is_similar_rel(double first, double second, double tolerance);
 bool is_similar(double first, double second, double tolerance);
 void Enter();
 void cls();

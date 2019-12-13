@@ -17,3 +17,9 @@
 *.txt
 Windows/.vs/wfn2fchk/v16/.suo
 Windows/x64/Debug/wfn2fchk.ilk
+*.cif
+*.hkl
+*.wfn
+*.tsc
+Windows/wfn2fchk.vcxproj
+Windows/wfn2fchk.vcxproj.user
