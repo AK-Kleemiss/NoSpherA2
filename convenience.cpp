@@ -92,10 +92,19 @@ void Enter(){
 	//cin.get();
 };
 
-bool is_similar(double first, double second, double tolerance) {
-	if (first < second * (1 - tolerance) || first > second * (1 + tolerance)) 
+bool is_similar_rel(double first, double second, double tolerance) {
+	double diff = abs(first - second);
+	if ( diff > abs((first + second+0.01) * tolerance/2)) 
 		return false;
 	else 
+		return true;
+};
+
+bool is_similar(double first, double second, double tolerance) {
+	double diff = abs(first - second);
+	if (diff > pow(10,tolerance))
+		return false;
+	else
 		return true;
 };
 

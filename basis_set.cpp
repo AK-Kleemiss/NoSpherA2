@@ -363,10 +363,9 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
 				<< "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like" << endl;
 			return false;
 		}
-		while ( !(line.find(elements_list[i])<line.size()) && !ifile.eof() ) {
+		while ( !(line.find(elements_list[i])<line.size()) && !ifile.eof() )
 			getline(ifile,line);
-			if(debug_dens) cout << "line while search for "<< elements_list[i] << " :" << line << endl;
-		}
+		if (debug_dens) cout << "line while search for " << elements_list[i] << " :" << line << endl;
 		if( debug_dens && line.find(elements_list[i])!=-1 ) {
 			cout << "I found an entry i know from the element list!" <<endl;
 			cout << "The line is: " << line << endl;
@@ -422,7 +421,8 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
 				for(int h=0; h<wave.get_ncen(); h++){
 					string temp_label;
 					temp_label=wave.get_atom_label(h);
-					while(temp_label.find(" ")!=-1) {temp_label.erase(temp_label.find(" "),1);}
+					while(temp_label.find(" ")!=-1) 
+						temp_label.erase(temp_label.find(" "),1);
 					temp_label.append(":");
 					if(elements_list[i].find(temp_label)!=-1){
 						switch(c_temp){

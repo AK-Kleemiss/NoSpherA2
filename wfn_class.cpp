@@ -543,7 +543,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					tempchar[length]='\0';
 					if(debug_wfn_deep) cout << "	tempchar: " << tempchar << " ";
 					sscanf(tempchar,"%lG",&dum_exp[exnum]);
-					if(debug_wfn_deep) cout << dum_exp[exnum] << endl;
+					if(debug_wfn_deep) cout << dum_exp[exnum] << " " << endl;
 					exnum++;
 				}
 				else {
@@ -965,7 +965,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
-					if (debug_wfn_deep) file << dum_exp[exnum];
+					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
 				else {
@@ -974,7 +974,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
-					if (debug_wfn_deep) file << dum_exp[exnum];
+					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
 			}
@@ -989,7 +989,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
-					if (debug_wfn_deep) file << dum_exp[exnum];
+					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
 				else {
@@ -998,7 +998,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
 					sscanf(tempchar, "%lG", &dum_exp[exnum]);
-					if (debug_wfn_deep) file << dum_exp[exnum];
+					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
 			}
@@ -1027,10 +1027,12 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 	int monum = 0;
 	vector< vector<double> > temp_val;
 	temp_val.resize(e_nmo);
-	for (int i = 0; i < e_nmo; i++) temp_val[i].resize(e_nex);
+	for (int i = 0; i < e_nmo; i++) 
+		temp_val[i].resize(e_nex);
 	//-------------------------------- Read MOs --------------------------------------
 	bool orca_switch;
-	if (check_order(debug_wfn) % 10 == 3)
+	int temp_orca = check_order(debug_wfn);
+	if (temp_orca % 10 == 3)
 		orca_switch = true;
 	while (!line.compare(0, 3, "END") == 0 && !rf.eof()) {
 		bool b = 0;
@@ -1060,9 +1062,9 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			sscanf(tempchar, "%lf", &temp_occ);
 		}
 		if (temp_ener == 0) {
-			if(check_order(debug_wfn_deep) % 10 == 3)
+			if(temp_orca % 10 == 3)
 				length = line.copy(tempchar, 12, 63);
-			else if (check_order(debug_wfn_deep) % 10 == 1)
+			else if (temp_orca % 10 == 1)
 				length = line.copy(tempchar, 12, 62);
 			else 
 				length = line.copy(tempchar, 12, 62);
@@ -1501,25 +1503,24 @@ int WFN::get_atom_shell_primitives(int nr_atom, int nr_shell){
 int WFN::get_shell_type(int nr_atom, int nr_shell){
 	if( nr_atom<=ncen && nr_atom>=0 && nr_shell<=atoms[nr_atom].shellcount.size() && nr_shell>=0 ) {
 		int primitive_counter=0;
-		while (atoms[nr_atom].basis_set[primitive_counter].shell!=nr_shell)	primitive_counter++;
+		while (atoms[nr_atom].basis_set[primitive_counter].shell!=nr_shell)	
+			primitive_counter++;
 		return atoms[nr_atom].basis_set[primitive_counter].type;
 	}
 	else return -1;
 };
 
 int WFN::get_shell_center(int nr_atom, int nr_shell){
-	if( nr_atom<=ncen && nr_atom>=0 && nr_shell<=atoms[nr_atom].shellcount.size() && nr_shell>=0 ) {
-		int primitive_counter=0;
-		while (atoms[nr_atom].basis_set[primitive_counter].shell!=nr_shell)	primitive_counter++;
-		return centers[get_shell_start_in_primitives(nr_atom,nr_shell)];
-	}
+	if( nr_atom<=ncen && nr_atom>=0 && nr_shell<=atoms[nr_atom].shellcount.size() && nr_shell>=0 ) 
+		return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
 	else return -1;
 };
 
 int WFN::get_shell_start (int nr_atom, int nr_shell, bool debug){
 	if( nr_atom<=ncen && nr_atom>=0 && nr_shell<=atoms[nr_atom].shellcount.size()-1 && nr_shell>=0 ) {
 		int primitive_counter=0;
-		for (int s=0; s<nr_shell; s++) primitive_counter+=atoms[nr_atom].shellcount[s];
+		for (int s=0; s<nr_shell; s++) 
+			primitive_counter+=atoms[nr_atom].shellcount[s];
 		return primitive_counter;
 	}
 	else return -1;
