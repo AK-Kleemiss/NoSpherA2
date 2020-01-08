@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <iomanip>
 #include <vector>
+#include <omp.h>
 
 #include "convenience.h"
 #include "fchk.h"
@@ -132,6 +133,7 @@ int main(int argc, char **argv)
   string method("rhf");
   string temp;
   int accuracy = 1;
+  int threads = -1;
   bool becke = false;
   for (int i=0; i<argc; i++){
     temp = argv[i];
@@ -157,6 +159,8 @@ int main(int argc, char **argv)
 	  symm = argv[i + 1];
 	if (temp.find(known_keywords[11]) != string::npos)
 	  asym_cif = argv[i + 1];
+	if (temp.find("-cpus") != string::npos)
+	  threads = stoi(argv[i + 1]);
 	if (temp.find("-2") != string::npos)
 	  becke = true;
     if (temp.find("-v") != string::npos) {
@@ -164,6 +168,11 @@ int main(int argc, char **argv)
       debug_main = true;
     }
   }
+  if (threads != -1) {
+	  omp_set_num_threads(threads);
+	  omp_set_dynamic(0);
+  }
+
   log_file.flush();
   if(debug_main)
   	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << endl;
@@ -256,7 +265,7 @@ int main(int argc, char **argv)
 		//debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
-		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke))
+		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads))
 			log_file << "Error during FF Calculation!" << endl;
 	}
 	return 0;
