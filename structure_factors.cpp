@@ -3174,7 +3174,7 @@ const double Thakkar_c[] {
 			1.355354125
 };
 
- constexpr unsigned int first_ex_SF(unsigned int atomic_number) {
+unsigned int first_ex_SF(unsigned int atomic_number) {
 	if (atomic_number == 1) return 0;
 	else if (atomic_number > 86) return 200000000;
 	unsigned int ex = 0;
@@ -3183,7 +3183,7 @@ const double Thakkar_c[] {
 	return ex;
 };
 
-constexpr unsigned int first_coef_SF(unsigned int atomic_number) {
+unsigned int first_coef_SF(unsigned int atomic_number) {
 	if (atomic_number == 1) return 0;
 	unsigned int counter = 0;
 	unsigned int temp = atomic_number - 1;
@@ -3201,7 +3201,7 @@ constexpr unsigned int first_coef_SF(unsigned int atomic_number) {
 	return first_coef_SF(temp) + counter;
 };
 
-constexpr double get_radial_density(int atom_number, double dist) {
+double get_radial_density(int atom_number, double dist) {
 	double Rho = 0.0;
 
 	//Speedup things for H
@@ -3448,102 +3448,6 @@ double compute_dens(
 		Rho += wave.get_MO_occ(mo) * pow(phi[mo], 2);
 	return Rho;
 }
-
-/*void compute_Hirshfeld(
-	int * TypeAtoms,
-	vector <unsigned int> asym_atoms,
-	WFN &wave,
-	double * PosGrid,
-	double * results
-	)
-{
-	double r;
-	double Rho = 0.0;
-
-	for (int j = 0; j<wave.get_ncen(); j++)
-	{
-		r = sqrt(
-			(PosGrid[0] - wave.atoms[j].x)*(PosGrid[0] - wave.atoms[j].x) +
-			(PosGrid[1] - wave.atoms[j].y)*(PosGrid[1] - wave.atoms[j].y) +
-			(PosGrid[2] - wave.atoms[j].z)*(PosGrid[2] - wave.atoms[j].z)
-			);
-		if (r == 0) continue;
-
-		double new_rho = 0.0;
-
-		//Speedup things for H
-		if(TypeAtoms[j]==1){
-			new_rho = pow(exp(-1*r)*2,2);
-			Rho += new_rho;
-			for (int s = 0; s < asym_atoms.size(); s++)
-				if (j == asym_atoms[s]) {
-					results[j] = new_rho;
-					break;
-				}
-			continue;
-		}
-		int nr_ex=first_ex_SF(TypeAtoms[j]);
-		int nr_coef=first_coef_SF(TypeAtoms[j]);
-		double Orb[15] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-		int offset = (TypeAtoms[j]-1) * 15;
-		for (unsigned int ex=0; ex<Thakkar_ns[TypeAtoms[j]-1]; ex++){
-			for(int m=0; m<6; m++){
-				if(Thakkar_occ[offset + m]==0) continue;
-				if(Thakkar_n[nr_ex]==1)
-					Orb[m] += Thakkar_c[nr_coef] *exp(-Thakkar_z[nr_ex]*r);
-				else
-					Orb[m] += Thakkar_c[nr_coef] * pow(r,Thakkar_n[nr_ex]-1) *exp(-Thakkar_z[nr_ex]*r);
-				nr_coef++;
-			}
-			nr_ex++;
-		}
-		for (unsigned int ex=0; ex<Thakkar_np[TypeAtoms[j]-1]; ex++){
-			for(int m=0; m<5; m++){
-				if(Thakkar_occ[offset + m + 6]==0) continue;
-				if(Thakkar_n[nr_ex]==1)
-					Orb[m+6] += Thakkar_c[nr_coef] *exp(-Thakkar_z[nr_ex]*r);
-				else
-					Orb[m+6] += Thakkar_c[nr_coef] * pow(r,Thakkar_n[nr_ex]-1) *exp(-Thakkar_z[nr_ex]*r);
-				nr_coef++;
-			}
-			nr_ex++;
-		}
-		for (unsigned int ex=0; ex<Thakkar_nd[TypeAtoms[j]-1]; ex++){
-			for (int m = 0; m < 3; m++) {
-				if (Thakkar_occ[offset + m + 11] == 0) continue;
-				if (Thakkar_n[nr_ex] == 1)
-					Orb[m+11] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * r);
-				else
-					Orb[m+11] += Thakkar_c[nr_coef] * pow(r, Thakkar_n[nr_ex] - 1) * exp(-Thakkar_z[nr_ex] * r);
-				nr_coef++;
-			}
-			nr_ex++;
-		}
-		for (unsigned int ex = 0; ex < Thakkar_nf[TypeAtoms[j] - 1]; ex++) {
-			if (Thakkar_occ[offset + 14] == 0) continue;
-			if (Thakkar_n[nr_ex] == 1)
-				Orb[14] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * r);
-			else
-				Orb[14] += Thakkar_c[nr_coef] * pow(r, Thakkar_n[nr_ex] - 1) * exp(-Thakkar_z[nr_ex] * r);
-			nr_coef++;
-			nr_ex++;
-		}
-
-		for(unsigned int m=0; m<15; m++){
-			if (Orb[m] == 0 || Thakkar_occ[offset + m] == 0)
-				continue;
-			new_rho+= Thakkar_occ[offset + m] * pow(Orb[m], 2);
-		}
-		Rho += new_rho;
-		for (int s = 0; s < asym_atoms.size(); s++)
-			if (j == asym_atoms[s])
-				results[j] = new_rho;
-		//	    RHO = BESETZUNG * (N*C*R^(n-1)*e^(-Z*R))^2
-
-	}
-	for (int s = 0; s < asym_atoms.size(); s++)
-		results[s] /= Rho; //radial Y(lm) unimportant, since it will cross out
-}*/
 
 double compute_spherical_density(
 	int atom_number,
