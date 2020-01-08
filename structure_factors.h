@@ -16,7 +16,8 @@ bool calculate_structure_factors(
 	bool debug, 
 	int accuracy, 
 	std::ofstream &file, 
-	bool becke = false);
+	bool becke = false,
+	int cpus = -1);
 
 #include "wfn_class.h"
 
