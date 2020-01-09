@@ -4410,7 +4410,6 @@ bool calculate_structure_factors(
 				}
 		}
 		else {
-#pragma omp parallel for
 			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
 				for (unsigned int p = 0; p < total_grid[0].size(); p++)
 					if (spherical_density[i][p] != 0 && total_grid[4][p]!= 0)
@@ -4457,8 +4456,8 @@ bool calculate_structure_factors(
 		sf[i].resize(sym[0][0].size() * hkl[0].size());
 
 	if (debug)
-		file << "Initialized FFs" << endl;
-
+		file << "Initialized FFs" << endl
+			<< "asym atom list size: " << asym_atom_list.size() << " total grid size: " << total_grid[0].size() << endl;
 
 	vector < vector <double> > d1,d2,d3;
 	vector < vector <double> > dens;
@@ -4468,12 +4467,15 @@ bool calculate_structure_factors(
 	d1.resize(asym_atom_list.size());
 	d2.resize(asym_atom_list.size());
 	d3.resize(asym_atom_list.size());
-#pragma omp parallel for
+//#pragma omp parallel for
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 		d1[i].resize(total_grid[0].size());
 		d2[i].resize(total_grid[0].size());
 		d3[i].resize(total_grid[0].size());
 	}
+
+	if (debug)
+		file << "Resized vectors" << endl;
 
 	if (!becke) {
 //#pragma omp parallel for 
@@ -4517,6 +4519,9 @@ bool calculate_structure_factors(
 	k_pt.resize(3);
 	for (int i = 0; i < 3; i++)
 		k_pt[i].resize(sym[0][0].size()* hkl[0].size());
+
+	if (debug)
+		file << "K_point_vector is here" << endl;
 
 	for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
