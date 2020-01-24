@@ -99,6 +99,7 @@ int main(int argc, char **argv)
 	known_keywords.push_back("-method");
 	known_keywords.push_back("-symm");
 	known_keywords.push_back("-asym_cif");
+	known_keywords.push_back("-asym-cif");
 	if(debug_main) 
 		log_file << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -135,6 +136,7 @@ int main(int argc, char **argv)
   int accuracy = 1;
   int threads = -1;
   bool becke = false;
+  bool electron_diffraction = false;
   for (int i=0; i<argc; i++){
     temp = argv[i];
     if(temp.find(known_keywords[0]) != string::npos)
@@ -159,10 +161,14 @@ int main(int argc, char **argv)
 	  symm = argv[i + 1];
 	if (temp.find(known_keywords[11]) != string::npos)
 	  asym_cif = argv[i + 1];
+	if(temp.find(known_keywords[12]) != string::npos)
+	  asym_cif = argv[i + 1];
 	if (temp.find("-cpus") != string::npos)
 	  threads = stoi(argv[i + 1]);
 	if (temp.find("-2") != string::npos)
 	  becke = true;
+	if (temp.find("-ED") != string::npos)
+	  electron_diffraction = true;
     if (temp.find("-v") != string::npos) {
       log_file << "Turning on verbose mode!" << endl;
       debug_main = true;
@@ -201,6 +207,8 @@ int main(int argc, char **argv)
   log_file.flush();
   readwfn(wavy[0], wfn, debug_main, log_file);
   wavy[0].set_method(method);
+  if (electron_diffraction)
+	  log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
   if(basis_set!=""||fchk!=""){
     if(basis_set == ""){
@@ -265,7 +273,7 @@ int main(int argc, char **argv)
 		//debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
-		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads))
+		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads, electron_diffraction))
 			log_file << "Error during FF Calculation!" << endl;
 	}
 	return 0;

@@ -20,6 +20,8 @@
 #define AS_TYPE(Type, Obj) reinterpret_cast<Type *>(Obj)
 #define AS_CTYPE(Type, Obj) reinterpret_cast<const Type *>(Obj)
 
+//                       3,     5     7,    9,    11,   13,   15,   17
+//                      19,    21
 int lebedev_table[33] = {6,    14,   26,   38,   50,   74,   86,   110,
                          146,  170,  194,  230,  266,  302,  350,  434,
                          590,  770,  974,  1202, 1454, 1730, 2030, 2354,
@@ -233,10 +235,10 @@ void AtomGrid::get_grid(const int num_centers,
                         double grid_z_bohr[],
                         double grid_w[]) const
 {
-    std::fill_n(&grid_x_bohr[0], num_grid_points_, 0.0);
-    std::fill_n(&grid_y_bohr[0], num_grid_points_, 0.0);
-    std::fill_n(&grid_z_bohr[0], num_grid_points_, 0.0);
-    std::fill_n(&grid_w[0], num_grid_points_, 0.0);
+    //std::fill_n(&grid_x_bohr[0], num_grid_points_, 0.0);
+    //std::fill_n(&grid_y_bohr[0], num_grid_points_, 0.0);
+    //std::fill_n(&grid_z_bohr[0], num_grid_points_, 0.0);
+    //std::fill_n(&grid_w[0], num_grid_points_, 0.0);
 
     for (size_t ipoint = 0; ipoint < num_grid_points_; ipoint++)
     {

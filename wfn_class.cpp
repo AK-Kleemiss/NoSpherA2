@@ -359,10 +359,10 @@ bool WFN::read_wfn(string fileName, bool debug){
 	string header_tmp;
 	int e_nmo, e_nex, e_nuc=0; //number of expected MOs, Exponents and nuclei
 	stream >> header_tmp >> e_nmo >> header_tmp >> header_tmp >> e_nex >> header_tmp >> e_nuc;
-	if(debug){
+	/*if(debug){
 		printf("e_nmo: %d, e_nex: %d, e_nuc: %d\n",e_nmo,e_nex,e_nuc);
 		Enter();
-	}
+	}*/
 	//----------------------------- Read Atoms ------------------------------------------------------------
 	vector<unsigned int> dum_nr,dum_ch;
 	dum_nr.resize(e_nuc); dum_ch.resize(e_nuc);
@@ -466,7 +466,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 		printf("We have a problem adding center assignements!\n");
 		return false;
 	}
-	if (debug_wfn) printf("finished with centers, moving to types...\n");
+	//if (debug_wfn) printf("finished with centers, moving to types...\n");
 	//------------------------------------ Read Types ---------------------------------------------------------
 	vector<unsigned int> dum_type;
 	dum_type.resize(e_nex);
@@ -512,7 +512,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 		printf("We have a problem adding type assignements!\n");
 		return false;
 	}
-	if(debug_wfn) printf("finished with types, reading exponents now...\n");
+	//if(debug_wfn) printf("finished with types, reading exponents now...\n");
 	//----------------------------- Read exponents -------------------------------
 	vector<double> dum_exp;
 	dum_exp.resize(e_nex);
@@ -597,8 +597,8 @@ bool WFN::read_wfn(string fileName, bool debug){
 		return false;
 	}
 	if(debug_wfn){
-		printf("finished with exponents, reading MOs now...\n");
-		cout << "line: " << line << endl;
+		//printf("finished with exponents, reading MOs now...\n");
+		//cout << "line: " << line << endl;
 	}
 	int linecount=0;
 	exnum=0;
@@ -719,7 +719,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 		return false;
 	}
 	//---------------------Start writing everything from the temp arrays into wave ---------------------
-	if(debug_wfn) printf("finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n");
+	//if(debug_wfn) printf("finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n");
 
 	for(int i=0; i<e_nuc; i++) if(!push_back_atom(dum_label[i],dum_x[i],dum_y[i],dum_z[i],dum_ch[i])) cout << "Error while making atoms!!\n";
 	if(debug){
@@ -1886,10 +1886,10 @@ int WFN::check_order(bool debug){
 			}
 		}
 	}
-	if(debug){
+	/*if(debug){
 		cout << "Going to return " << f_order*10+order << endl;
 		Enter();
-	}
+	}*/
 	return (f_order*10+order);
 };
 
@@ -2501,7 +2501,7 @@ double WFN::get_atom_real_mass(int atomnr){
 	 132.91,	137.33,		139.91, 140.12, 140.91, 144.24, 144.9, 150.36, 151.96, 157.25, 158.93, 162.5, 164.93, 167.26, 168.93, 173.05, 174.97,			178.49, 180.95, 183.84, 186.21, 190.23, 192.22, 195.08, 196.97, 200.59,		204.38, 207.2,	208.98, 208.9,	209.9,	222.0  };
 //---1.&2. Group--------------------------------------------------------------------Lanthanoides and Actinoides--------------------------------------------------Transition metals----------------------------------------------------p-block elements
 	if(get_atom_charge(atomnr)>86){
-		cout << "Sorry, only implemented until Kr yet, ask Florian for increases!" << endl;
+		cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << endl;
 		Enter();
 		return 0;
 	}

@@ -34,8 +34,8 @@ class AtomGrid
 
   private:
     // TODO move to public section, use C++11, use delete
-    AtomGrid(const AtomGrid &rhs);            // not implemented
-    AtomGrid &operator=(const AtomGrid &rhs); // not implemented
+    //AtomGrid(const AtomGrid &rhs);            // not implemented
+    //AtomGrid &operator=(const AtomGrid &rhs); // not implemented
 
     std::size_t num_grid_points_;
 
