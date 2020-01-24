@@ -17,7 +17,8 @@ bool calculate_structure_factors(
 	int accuracy, 
 	std::ofstream &file, 
 	bool becke = false,
-	int cpus = -1);
+	int cpus = -1,
+	bool electron_diffraction = false);
 
 #include "wfn_class.h"
 
