@@ -38,8 +38,8 @@
 using namespace std;
 # define M_PI           3.14159265358979323846  /* pi */
 
-#include "numgrid.h"
-#include "becke_partitioning.h"
+//#include "numgrid.h"
+//#include "becke_partitioning.h"
 #include "AtomGrid.h"
 
 const unsigned int Thakkar_nex[86] = { 1, 5,

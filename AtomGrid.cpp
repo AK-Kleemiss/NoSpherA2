@@ -3,7 +3,7 @@
 
 #include "AtomGrid.h"
 #include "becke_partitioning.h"
-#include "bragg.h"
+//#include "bragg.h"
 #include "error_handling.h"
 #include "grid_radial.h"
 # define M_PI           3.14159265358979323846  /* pi */
@@ -13,12 +13,12 @@
 #include <io.h>
 #include <Windows.h>
 #endif
-#include "numgrid.h"
+//#include "numgrid.h"
 #include "parameters.h"
 #include "sphere_lebedev_rule.h"
 
-#define AS_TYPE(Type, Obj) reinterpret_cast<Type *>(Obj)
-#define AS_CTYPE(Type, Obj) reinterpret_cast<const Type *>(Obj)
+//#define AS_TYPE(Type, Obj) reinterpret_cast<Type *>(Obj)
+//#define AS_CTYPE(Type, Obj) reinterpret_cast<const Type *>(Obj)
 
 //                       3,     5     7,    9,    11,   13,   15,   17
 //                      19,    21
@@ -58,7 +58,7 @@ int get_angular_order(int n)
     return -1;
 }
 
-context_t *numgrid_new_atom_grid(const double radial_precision,
+/*context_t *numgrid_new_atom_grid(const double radial_precision,
                                  const int min_num_angular_points,
                                  const int max_num_angular_points,
                                  const int proton_charge,
@@ -74,7 +74,15 @@ context_t *numgrid_new_atom_grid(const double radial_precision,
                                 alpha_max,
                                 max_l_quantum_number,
                                 alpha_min));
-}
+}*/
+const double bragg_angstrom[87]{
+	0.00, 0.35, 0.35, 1.45, 1.05, 0.85, 0.70, 0.65, 0.60, 0.50, 0.45, 1.80, 1.50, 1.25, 1.10, 1.00, 1.00, 1.00, 1.00, 2.20, 1.80,
+	1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10, 2.35, 2.00, 1.80, 1.55, 1.45,
+	1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40, 2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85,
+	1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60,
+	1.90, 1.50, 1.50
+};
+
 AtomGrid::AtomGrid(const double radial_precision,
                    const int min_num_angular_points,
                    const int max_num_angular_points,
@@ -119,7 +127,7 @@ AtomGrid::AtomGrid(const double radial_precision,
                          get_r_outer(radial_precision,
                                      alpha_min[l],
                                      l,
-                                     4.0 * get_bragg_angstrom(proton_charge)));
+                                     4.0 * bragg_angstrom[proton_charge]));
             NUMGRID_ASSERT(r_outer > r_inner);
             h = (std::min)(h,
                          get_h(radial_precision, l, 0.1 * (r_outer - r_inner)));
@@ -130,7 +138,7 @@ AtomGrid::AtomGrid(const double radial_precision,
     num_grid_points_ = 0;
     num_radial_grid_points_ = 0;
 
-    double rb = get_bragg_angstrom(proton_charge) /
+    double rb = bragg_angstrom[proton_charge] /
                 (5.0 * 0.529177249); // factors match DIRAC code
     double c = r_inner / (exp(h) - 1.0);
     int num_radial = int(log(1.0 + (r_outer / c)) / h);
@@ -177,30 +185,30 @@ AtomGrid::AtomGrid(const double radial_precision,
     delete[] angular_w;
 }
 
-void numgrid_free_atom_grid(context_t *context)
+/*void numgrid_free_atom_grid(context_t *context)
 {
     if (!context)
         return;
     delete AS_TYPE(AtomGrid, context);
-}
+}*/
 AtomGrid::~AtomGrid() {}
 
-int numgrid_get_num_grid_points(const context_t *context)
+/*int numgrid_get_num_grid_points(const context_t *context)
 {
     return AS_CTYPE(AtomGrid, context)->get_num_grid_points();
-}
+}*/
 int AtomGrid::get_num_grid_points() const { return num_grid_points_; }
 
-int numgrid_get_num_radial_grid_points(const context_t *context)
+/*int numgrid_get_num_radial_grid_points(const context_t *context)
 {
     return AS_CTYPE(AtomGrid, context)->get_num_radial_grid_points();
-}
+}*/
 int AtomGrid::get_num_radial_grid_points() const
 {
     return num_radial_grid_points_;
 }
 
-void numgrid_get_grid(const context_t *context,
+/*void numgrid_get_grid(const context_t *context,
                       const int num_centers,
                       const int center_index,
                       const double x_coordinates_bohr[],
@@ -223,7 +231,7 @@ void numgrid_get_grid(const context_t *context,
                    grid_y_bohr,
                    grid_z_bohr,
                    grid_w);
-}
+}*/
 void AtomGrid::get_grid(const int num_centers,
                         const int center_index,
                         const double x_coordinates_bohr[],
@@ -270,12 +278,12 @@ void AtomGrid::get_grid(const int num_centers,
     }
 }
 
-void numgrid_get_radial_grid(const context_t *context,
+/*void numgrid_get_radial_grid(const context_t *context,
                              double grid_r_bohr[],
                              double grid_w[])
 {
     return AS_CTYPE(AtomGrid, context)->get_radial_grid(grid_r_bohr, grid_w);
-}
+}*/
 void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
 {
     for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
@@ -286,7 +294,7 @@ void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
 }
 
 // TODO this implementation should move to separate file
-void numgrid_get_angular_grid(const int num_angular_grid_points,
+/*void numgrid_get_angular_grid(const int num_angular_grid_points,
                               double grid_x_bohr[],
                               double grid_y_bohr[],
                               double grid_z_bohr[],
@@ -295,4 +303,4 @@ void numgrid_get_angular_grid(const int num_angular_grid_points,
     int i = get_angular_order(num_angular_grid_points);
     ld_by_order(
         lebedev_table[i], grid_x_bohr, grid_y_bohr, grid_z_bohr, grid_w);
-}
+}*/

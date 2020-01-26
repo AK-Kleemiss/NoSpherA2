@@ -6,7 +6,7 @@
 
 #include "becke_partitioning.h"
 //#include "bragg.h"
-#include "error_handling.h"
+//#include "error_handling.h"
 #include "parameters.h"
 
 const double bragg_angstrom[87]{
