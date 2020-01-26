@@ -881,41 +881,37 @@ cube cube::operator/(cube &right) const{
 
 bool cube::operator+=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
-	for(int x=0; x<size[0]; x++){
-		for(int y=0; y<size[1]; y++){
-			for(int z=0; z<size[2]; z++) values[x][y][z]+=right.get_value(x,y,z);
-		}
-	}
+	for(int x=0; x<size[0]; x++)
+		for(int y=0; y<size[1]; y++)
+			for(int z=0; z<size[2]; z++) 
+				values[x][y][z]+=right.get_value(x,y,z);
 	return (true);
 };
 
 bool cube::operator-=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
-	for(int x=0; x<size[0]; x++){
-		for(int y=0; y<size[1]; y++){
-			for(int z=0; z<size[2]; z++) values[x][y][z]-=right.get_value(x,y,z);
-		}
-	}
+	for(int x=0; x<size[0]; x++)
+		for(int y=0; y<size[1]; y++)
+			for(int z=0; z<size[2]; z++) 
+				values[x][y][z]-=right.get_value(x,y,z);
 	return (true);
 };
 
 bool cube::operator*=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
-	for(int x=0; x<size[0]; x++){
-		for(int y=0; y<size[1]; y++){
-			for(int z=0; z<size[2]; z++) values[x][y][z]=values[x][y][z]*right.get_value(x,y,z);
-		}
-	}
+	for(int x=0; x<size[0]; x++)
+		for(int y=0; y<size[1]; y++)
+			for(int z=0; z<size[2]; z++) 
+				values[x][y][z]=values[x][y][z]*right.get_value(x,y,z);
 	return (true);
 };
 
 bool cube::operator/=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
-	for(int x=0; x<size[0]; x++){
-		for(int y=0; y<size[1]; y++){
-			for(int z=0; z<size[2]; z++) values[x][y][z]=values[x][y][z]/right.get_value(x,y,z);
-		}
-	}
+	for(int x=0; x<size[0]; x++)
+		for(int y=0; y<size[1]; y++)
+			for(int z=0; z<size[2]; z++) 
+				values[x][y][z]=values[x][y][z]/right.get_value(x,y,z);
 	return (true);
 };
 
@@ -924,7 +920,8 @@ bool cube::mask (cube &right){
 	for (int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
-				if(right.get_value(x,y,z)==0.0) values[x][y][z]=0.0;
+				if(right.get_value(x,y,z)==0.0) 
+					values[x][y][z]=0.0;
 	return (true);
 };
 
@@ -933,7 +930,8 @@ bool cube::mask (cube &right, double thresh){
 	for (int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
-				if(right.get_value(x,y,z)<thresh) values[x][y][z]=0.0;
+				if(right.get_value(x,y,z)<thresh) 
+					values[x][y][z]=0.0;
 	return (true);
 };
 
@@ -950,14 +948,12 @@ double cube::rrs(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (-1);
 	double diff_pos=0.0;
 	double diff_neg=0.0;
-	for(int x=0; x<size[0]; x++){
-		for(int y=0; y<size[1]; y++){
+	for(int x=0; x<size[0]; x++)
+		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++){
 				diff_pos+=abs((values[x][y][z]+right.get_value(x,y,z)));
 				diff_neg+=abs((values[x][y][z]-right.get_value(x,y,z)));
 			}
-		}
-	}
 	return (diff_neg/diff_pos); //RETURN Real Space R-value between this cube and the given one
 };
 
