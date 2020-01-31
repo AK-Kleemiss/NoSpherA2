@@ -4370,11 +4370,11 @@ bool calculate_structure_factors(
 #else
 	gettimeofday(&t2, 0);
 
-	double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+	double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-	if (time3 < 60) printf("Time to prepare: %4.1lf s\n", time3);
-	else if (time3 < 3600) printf("Time to prepare: %10.1lf m\n", time3 / 60);
-	else printf("Time to prepare: %10.1lf h\n", time3 / 3600);
+	if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
+	else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
+	else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
 
 #endif
 
@@ -4699,11 +4699,11 @@ bool calculate_structure_factors(
 #else
 	gettimeofday(&t2, 0);
 
-	double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+	double timea = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-	if (time3 < 60) printf("Time to prepare: %4.1lf s\n", time3);
-	else if (time3 < 3600) printf("Time to prepare: %10.1lf m\n", time3 / 60);
-	else printf("Time to prepare: %10.1lf h\n", time3 / 3600);
+	if (timea < 60) printf("Time to prepare: %4.1lf s\n", timea);
+	else if (timea < 3600) printf("Time to prepare: %10.1lf m\n", timea / 60);
+	else printf("Time to prepare: %10.1lf h\n", timea / 3600);
 
 #endif
 
