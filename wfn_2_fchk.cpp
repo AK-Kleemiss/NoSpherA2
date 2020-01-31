@@ -133,7 +133,7 @@ int main(int argc, char **argv)
   string asym_cif("");
   string method("rhf");
   string temp;
-  int accuracy = 1;
+  int accuracy = 2;
   int threads = -1;
   bool becke = false;
   bool electron_diffraction = false;

@@ -4220,23 +4220,47 @@ bool calculate_structure_factors(
 			}
 		}
 
-		int lebedev_high = (max_l_temp < 3) ? 86 : 110;
-		int lebedev_low = (max_l_temp < 3) ? 26 : 38;
-		/*int lebedev_high = (max_l_temp < 3) ? 110 : 146;
-		int lebedev_low = (max_l_temp < 3) ? 38 : 50;*/
+		if (accuracy == 1) {
+			int lebedev_high = (max_l_temp < 3) ? 86 : 110;
+			int lebedev_low = (max_l_temp < 3) ? 26 : 38;
 
-		Prototype_grids.push_back(AtomGrid(1e-5,
-			lebedev_low,
-			lebedev_high,
-			atom_type_list[i],
-			alpha_max_temp,
-			max_l_temp,
-			alpha_min_temp));
+			Prototype_grids.push_back(AtomGrid(1e-5,
+				lebedev_low,
+				lebedev_high,
+				atom_type_list[i],
+				alpha_max_temp,
+				max_l_temp,
+				alpha_min_temp));
+		}
+		else if (accuracy == 2) {
+			int lebedev_high = (max_l_temp < 3) ? 110 : 146;
+			int lebedev_low = (max_l_temp < 3) ? 38 : 50;
+
+			Prototype_grids.push_back(AtomGrid(1e-7,
+				lebedev_low,
+				lebedev_high,
+				atom_type_list[i],
+				alpha_max_temp,
+				max_l_temp,
+				alpha_min_temp));
+		}
+		else if (accuracy == 3) {
+			int lebedev_high = (max_l_temp < 3) ? 170 : 194;
+			int lebedev_low = (max_l_temp < 3) ? 86 : 74;
+
+			Prototype_grids.push_back(AtomGrid(1e-9,
+				lebedev_low,
+				lebedev_high,
+				atom_type_list[i],
+				alpha_max_temp,
+				max_l_temp,
+				alpha_min_temp));
+		}
 
 	}
 
 #ifdef _WIN64
-	//if (debug) {
+	if (debug) {
 		time_t end_prototype = time(NULL);
 
 		//	int diff = end - start;
@@ -4244,7 +4268,7 @@ bool calculate_structure_factors(
 		else if (end_prototype - start < 60) file << "Time until prototypes are done: " << fixed << setprecision(0) << end_prototype - start << " s" << endl;
 		else if (end_prototype - start < 3600) file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototype - start) / 60) << " m " << (end_prototype - start) % 60 << " s" << endl;
 		else file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototype - start) / 3600) << " h " << ((end_prototype - start) % 3600) / 60 << " m" << endl;
-	//}
+	}
 #else
 	gettimeofday(&t2, 0);
 
@@ -4330,7 +4354,7 @@ bool calculate_structure_factors(
 	if (debug) file << " Becke Grid exists" << endl;
 
 #ifdef _WIN64
-	//if (debug) {
+	if (debug) {
 		time_t end_becke = time(NULL);
 		double points = 0;
 		for (int i = 0; i < wave.get_ncen(); i++)
@@ -4342,7 +4366,7 @@ bool calculate_structure_factors(
 		if (end_becke - start < 60) file << "Time until becke done: " << fixed << setprecision(0) << end_becke - start << " s" << endl;
 		else if (end_becke - start < 3600) file << "Time until becke done: " << fixed << setprecision(0) << floor((end_becke - start) / 60) << " m " << (end_becke - start) % 60 << " s" << endl;
 		else file << "Time until becke done: " << fixed << setprecision(0) << floor((end_becke - start) / 3600) << " h " << ((end_becke - start) % 3600) / 60 << " m" << endl;
-	//}
+	}
 #else
 	gettimeofday(&t2, 0);
 
@@ -4669,8 +4693,6 @@ bool calculate_structure_factors(
 #ifdef _WIN64
 	time_t end1 = time(NULL);
 
-	//	int diff = end - start;
-
 	if (end1 - start < 60) file << "Time to prepare: " << fixed << setprecision(0) << end1 - start << " s" << endl;
 	else if (end1 - start < 3600) file << "Time to prepare: " << fixed << setprecision(0) << floor((end1 - start) / 60) << " m " << (end1 - start) % 60 << " s" << endl;
 	else file << "Time to prepare: " << fixed << setprecision(0) << floor((end1 - start) / 3600) << " h " << ((end1 - start) % 3600) / 60 << " m" << endl;
@@ -4685,8 +4707,9 @@ bool calculate_structure_factors(
 
 #endif
 
-	file << endl << "Calculating scattering factors..." << endl;
-
+	//file << endl << "Calculating scattering factors..." << endl;
+	progress_bar progress{ file, 75u, "Calculating scattering factors" };
+	const int step = floor(k_pt[0].size() / 100);
 	if (!becke) {
 #pragma omp parallel for schedule(dynamic)
 		for (int s = 0; s < k_pt[0].size(); s++) {
@@ -4707,6 +4730,8 @@ bool calculate_structure_factors(
 				}
 				sf[i][s] = temp;
 			}
+			if (s % step == 0) 
+				progress.write(s / double(k_pt[0].size()));
 		}
 	}
 	else {
@@ -4742,11 +4767,9 @@ bool calculate_structure_factors(
 #ifdef _WIN64
 	time_t end2 = time(NULL);
 
-	//	int diff = end - start;
-
-	if (end2 - end1 < 60) file << "Time to calc tsc: " << fixed << setprecision(0) << end2 - end1 << " s\n";
-	else if (end2 - end1 < 3600) file << "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 60) << " m " << (end2 - end1) % 60 << " s\n";
-	else file << "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 3600) << " h " << ((end2 - end1) % 3600) / 60 << " m\n";
+	if (end2 - end1 < 60) file << endl << "Time to calc tsc: " << fixed << setprecision(0) << end2 - end1 << " s\n";
+	else if (end2 - end1 < 3600) file << endl <<  "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 60) << " m " << (end2 - end1) % 60 << " s\n";
+	else file << endl << "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 3600) << " h " << ((end2 - end1) % 3600) / 60 << " m\n";
 #else
 	gettimeofday(&t2, 0);
 
@@ -4776,7 +4799,7 @@ bool calculate_structure_factors(
 		if(s!= sym[0][0].size()-1)
 			tsc_file << ";";
 	}
-	tsc_file << endl << "AD ACCOUNTED: false" << endl << "SCATTERERS:";
+	tsc_file << endl << "AD: false" << endl << "SCATTERERS:";
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
 		tsc_file << " " << labels[i];
 	tsc_file << endl << "data:" << endl;
@@ -4798,8 +4821,6 @@ bool calculate_structure_factors(
 
 #ifdef _WIN64
 	time_t end = time(NULL);
-
-	//	int diff = end - start;
 
 	if (end - start < 60) file << "Total Time: "<< fixed << setprecision(0) << end - start << " s\n";
 	else if (end - start < 3600) file << "Total Time: " << fixed << setprecision(0) << floor((end - start)/60) << " m " << (end - start) % 60 << " s\n";
