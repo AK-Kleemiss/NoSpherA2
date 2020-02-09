@@ -18,7 +18,8 @@ bool calculate_structure_factors(
 	std::ofstream &file, 
 	bool becke = false,
 	int cpus = -1,
-	bool electron_diffraction = false);
+	bool electron_diffraction = false,
+	bool pbc = false);
 
 #include "wfn_class.h"
 
