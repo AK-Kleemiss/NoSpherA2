@@ -3572,7 +3572,8 @@ bool calculate_structure_factors(
 	ofstream& file,
 	bool becke,
 	int cpus,
-	bool electron_diffraction
+	bool electron_diffraction,
+	bool pbc
 ) {
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
@@ -3643,6 +3644,7 @@ bool calculate_structure_factors(
 		file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
 
 	double rcm[3][3];
+	double cm[3][3];
 	if (debug)
 		file << "starting to read cif!" << endl;
 	if (!exists(cif)) {
@@ -3734,6 +3736,18 @@ bool calculate_structure_factors(
 	rcm[2][0] = a_star*c_star*cb_star;
 	rcm[2][1] = b_star*c_star*ca_star;
 	rcm[2][2] = c_star*c_star;*/
+
+	cm[0][0] = a;
+	cm[0][1] = sqrt(a * b * cg);
+	cm[0][2] = sqrt(a * c * cb);
+
+	cm[1][0] = sqrt(a * b * cg);
+	cm[1][1] = b;
+	cm[1][2] = sqrt(b * c * cb);
+
+	cm[2][0] = sqrt(a * c * cg);
+	cm[2][1] = sqrt(b * c * cb);
+	cm[2][2] = c;
 
 	rcm[0][0] = 2 * M_PI / a;
 	rcm[0][1] = 0;
@@ -4411,6 +4425,20 @@ bool calculate_structure_factors(
 			total_grid[4][i] = 0.0;
 			total_grid[5][i] = compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] });
 		}
+		if (pbc) {
+			for (int x = -1; x < 2; x++)
+				for (int y = -1; y < 2; y++)
+					for (int z = -1; z < 2; z++) {
+						if (x == 0 && y == 0 && z == 0)
+							continue;
+#pragma omp parallel for
+						for (int i = 0; i < total_grid[0].size(); i++)
+							total_grid[5][i] += compute_dens(wave, new double[3]{
+								total_grid[0][i] + x * cm[0][0] + y * cm[0][1] + z * cm[0][2],
+								total_grid[1][i] + x * cm[1][0] + y * cm[1][1] + z * cm[1][2],
+								total_grid[2][i] + x * cm[2][0] + y * cm[2][1] + z * cm[2][2] });
+					}
+		}
 	}
 
 	if (debug) file << endl << ", with total number of points: " << total_grid[0].size() << endl;
@@ -4491,6 +4519,37 @@ bool calculate_structure_factors(
 						);
 				}
 			}
+			if (pbc) {
+				for (int x = -1; x < 2; x++)
+					for (int y = -1; y < 2; y++)
+						for (int z = -1; z < 2; z++) {
+							if (x == 0 && y == 0 && z == 0)
+								continue;
+							for (int i = 0; i < wave.get_ncen(); i++) {
+								int type_list_number = -1;
+								int nr = all_atom_list[i];
+								for (int j = 0; j < atom_type_list.size(); j++)
+									if (wave.atoms[nr].charge == atom_type_list[j])
+										type_list_number = j;
+								if (type_list_number == -1) {
+									file << "ERROR IN TYPE ASSIGNMENT FOR SPHERICAL DENSITIES IN PBC!" << endl;
+									return false;
+								}
+								file << "atom nr " << i << " in all atom list: " << nr << " Type: " << type_list_number << " no dens save" << endl;
+#pragma omp parallel for
+								for (int p = 0; p < total_grid[0].size(); p++)
+									total_grid[4][p] += linear_interpolate_spherical_density(
+										radial_density[type_list_number],
+										radial_dist[type_list_number],
+										sqrt(
+											pow(total_grid[0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
+											+ pow(total_grid[1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
+											+ pow(total_grid[2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
+										)
+									);
+							}
+						}
+			}
 		}
 		else {
 			for (int i = 0; i < wave.get_ncen(); i++) {
@@ -4516,6 +4575,32 @@ bool calculate_structure_factors(
 							sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) + pow(total_grid[1][p] - wave.atoms[nr].y, 2) + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
 						);
 				}
+			}
+			if (pbc) {
+				for (int x = -1; x < 2; x++)
+					for (int y = -1; y < 2; y++)
+						for (int z = -1; z < 2; z++) {
+							if (x == 0 && y == 0 && z == 0)
+								continue;
+							for (int i = 0; i < wave.get_ncen(); i++) {
+								int type_list_number = -1;
+								int nr = all_atom_list[i];
+								for (int j = 0; j < atom_type_list.size(); j++)
+									if (wave.atoms[nr].charge == atom_type_list[j])
+										type_list_number = j;
+#pragma omp parallel for
+								for (int p = 0; p < total_grid[0].size(); p++)
+									total_grid[4][p] += linear_interpolate_spherical_density(
+										radial_density[type_list_number],
+										radial_dist[type_list_number],
+										sqrt(
+											  pow(total_grid[0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
+											+ pow(total_grid[1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
+											+ pow(total_grid[2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
+										)
+									);
+							}
+						}
 			}
 		}
 //#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical)
@@ -4613,13 +4698,17 @@ bool calculate_structure_factors(
 	vector < vector <double> > d1,d2,d3;
 	vector < vector <double> > dens;
 	dens.resize(asym_atom_list.size());
-#pragma omp parallel for
+	if (debug)
+		file << "resized outer dens" << endl;
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
 		dens[i].resize(total_grid[0].size());
+	if (debug)
+		file << "resized inner dens" << endl;
 	d1.resize(asym_atom_list.size());
 	d2.resize(asym_atom_list.size());
 	d3.resize(asym_atom_list.size());
-#pragma omp parallel for
+	if (debug)
+		file << "resized outer d1-3" << endl;
 	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 		d1[i].resize(total_grid[0].size());
 		d2[i].resize(total_grid[0].size());

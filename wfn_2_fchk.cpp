@@ -137,6 +137,7 @@ int main(int argc, char **argv)
   int threads = -1;
   bool becke = false;
   bool electron_diffraction = false;
+  bool pbc = false;
   for (int i=0; i<argc; i++){
     temp = argv[i];
     if(temp.find(known_keywords[0]) != string::npos)
@@ -165,6 +166,8 @@ int main(int argc, char **argv)
 	  asym_cif = argv[i + 1];
 	if (temp.find("-cpus") != string::npos)
 	  threads = stoi(argv[i + 1]);
+	if (temp.find("-pbc") != string::npos)
+	  pbc = true;
 	if (temp.find("-2") != string::npos)
 	  becke = true;
 	if (temp.find("-ED") != string::npos)
@@ -273,7 +276,7 @@ int main(int argc, char **argv)
 		//debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
-		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads, electron_diffraction))
+		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads, electron_diffraction, pbc))
 			log_file << "Error during FF Calculation!" << endl;
 	}
 	return 0;
