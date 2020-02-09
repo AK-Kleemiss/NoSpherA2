@@ -4709,7 +4709,7 @@ bool calculate_structure_factors(
 
 	//file << endl << "Calculating scattering factors..." << endl;
 	progress_bar progress{ file, 75u, "Calculating scattering factors" };
-	const int step = floor(k_pt[0].size() / 100);
+	const int step = floor(k_pt[0].size() / 20);
 	if (!becke) {
 #pragma omp parallel for schedule(dynamic)
 		for (int s = 0; s < k_pt[0].size(); s++) {
@@ -4730,7 +4730,7 @@ bool calculate_structure_factors(
 				}
 				sf[i][s] = temp;
 			}
-			if (s % step == 0) 
+			if (s != 0 && s % step == 0)
 				progress.write(s / double(k_pt[0].size()));
 		}
 	}
