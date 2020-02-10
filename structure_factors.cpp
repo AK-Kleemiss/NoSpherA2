@@ -3573,16 +3573,18 @@ bool calculate_structure_factors(
 	bool becke,
 	int cpus,
 	bool electron_diffraction,
-	bool pbc
+	int pbc
 ) {
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
 	}
-	int* atom_z = new int[wave.get_ncen()];
-	double* x = new double[wave.get_ncen()];
-	double* y = new double[wave.get_ncen()];
-	double* z = new double[wave.get_ncen()];
+	int* atom_z;
+	double *x,*y,*z;
+	atom_z = new int[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
+	x = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
+	y = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
+	z = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
 	double* alpha_max = new double[wave.get_ncen()];
 	int* max_l = new int[wave.get_ncen()];
 	unsigned int* num_points = new unsigned int[wave.get_ncen()];
@@ -4120,7 +4122,7 @@ bool calculate_structure_factors(
 
 	double*** grid = new double** [all_atom_list.size()];
 	for (unsigned int i = 0; i < all_atom_list.size(); i++)
-		grid[i] = new double* [5 ];
+		grid[i] = new double* [5];
 	// GRID COORDINATES for [a][c][p] a = atom [0,ncen],
 	// c = coordinate [0=x, 1=y, 2=z, 3=becke and hirshfeld weighted density],
 	// p = point in this grid
@@ -4131,6 +4133,20 @@ bool calculate_structure_factors(
 		x[i] = wave.atoms[i].x;
 		y[i] = wave.atoms[i].y;
 		z[i] = wave.atoms[i].z;
+		if (pbc != 0) {
+			int j = 0;
+			for (int pbc_x = -pbc; pbc_x < pbc + 1; pbc_x++)
+				for (int pbc_y = -pbc; pbc_y < pbc + 1; pbc_y++)
+					for (int pbc_z = -pbc; pbc_z < pbc + 1; pbc_z++) {
+						j++;
+						if (x == 0 && y == 0 && z == 0)
+							continue;
+						atom_z[i + j * wave.get_ncen()] = wave.atoms[i].charge;
+						x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * cm[0][0] + pbc_y * cm[0][1] + pbc_z * cm[0][2];
+						y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * cm[1][0] + pbc_y * cm[1][1] + pbc_z * cm[1][2];
+						z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * cm[2][0] + pbc_y * cm[2][1] + pbc_z * cm[2][2];
+					}
+		}
 		alpha_max[i] = 0.0;
 		max_l[i] = 0;
 		for (int b = 0; b < wave.get_nex(); b++) {
@@ -4307,7 +4323,7 @@ bool calculate_structure_factors(
 		for (int n = 0; n < 4; n++)
 			grid[nr][n] = new double[num_points[nr]];
 
-		Prototype_grids[type].get_grid(wave.get_ncen(),
+		Prototype_grids[type].get_grid(wave.get_ncen()*pow(pbc*2+1,3),
 			nr,
 			x,
 			y,
@@ -4320,6 +4336,10 @@ bool calculate_structure_factors(
 	}
 
 	Prototype_grids.clear();
+	free(atom_z);
+	free(x);
+	free(y);
+	free(z);
 
 
 /*#pragma omp parallel for schedule(dynamic)
@@ -4425,10 +4445,10 @@ bool calculate_structure_factors(
 			total_grid[4][i] = 0.0;
 			total_grid[5][i] = compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] });
 		}
-		if (pbc) {
-			for (int x = -1; x < 2; x++)
-				for (int y = -1; y < 2; y++)
-					for (int z = -1; z < 2; z++) {
+		if (pbc != 0) {
+			for (int x = -pbc; x < pbc+1; x++)
+				for (int y = -pbc; y < pbc+1; y++)
+					for (int z = -pbc; z < pbc+1; z++) {
 						if (x == 0 && y == 0 && z == 0)
 							continue;
 #pragma omp parallel for
@@ -4519,10 +4539,10 @@ bool calculate_structure_factors(
 						);
 				}
 			}
-			if (pbc) {
-				for (int x = -1; x < 2; x++)
-					for (int y = -1; y < 2; y++)
-						for (int z = -1; z < 2; z++) {
+			if (pbc != 0) {
+				for (int x = -pbc; x < pbc + 1; x++)
+					for (int y = -pbc; y < pbc + 1; y++)
+						for (int z = -pbc; z < pbc + 1; z++) {
 							if (x == 0 && y == 0 && z == 0)
 								continue;
 							for (int i = 0; i < wave.get_ncen(); i++) {
@@ -4576,10 +4596,10 @@ bool calculate_structure_factors(
 						);
 				}
 			}
-			if (pbc) {
-				for (int x = -1; x < 2; x++)
-					for (int y = -1; y < 2; y++)
-						for (int z = -1; z < 2; z++) {
+			if (pbc != 0) {
+				for (int x = -pbc; x < pbc + 1; x++)
+					for (int y = -pbc; y < pbc + 1; y++)
+						for (int z = -pbc; z < pbc + 1; z++) {
 							if (x == 0 && y == 0 && z == 0)
 								continue;
 							for (int i = 0; i < wave.get_ncen(); i++) {
