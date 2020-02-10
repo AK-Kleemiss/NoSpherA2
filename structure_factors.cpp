@@ -4287,14 +4287,15 @@ bool calculate_structure_factors(
 		else file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototype - start) / 3600) << " h " << ((end_prototype - start) % 3600) / 60 << " m" << endl;
 	}
 #else
-	gettimeofday(&t2, 0);
+	if (debug) {
+		gettimeofday(&t2, 0);
 
-	double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+		double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-	if (time3 < 60) printf("Time to prepare: %4.1lf s\n", time3);
-	else if (time3 < 3600) printf("Time to prepare: %10.1lf m\n", time3 / 60);
-	else printf("Time to prepare: %10.1lf h\n", time3 / 3600);
-
+		if (time3 < 60) printf("Time to prepare: %4.1lf s\n", time3);
+		else if (time3 < 3600) printf("Time to prepare: %10.1lf m\n", time3 / 60);
+		else printf("Time to prepare: %10.1lf h\n", time3 / 3600);
+	}
 #endif
 
 #pragma omp parallel for schedule(dynamic)
@@ -4323,10 +4324,6 @@ bool calculate_structure_factors(
 	}
 
 	Prototype_grids.clear();
-	free(atom_z);
-	free(x);
-	free(y);
-	free(z);
 
 
 /*#pragma omp parallel for schedule(dynamic)
@@ -4389,14 +4386,15 @@ bool calculate_structure_factors(
 		else file << "Time until becke done: " << fixed << setprecision(0) << floor((end_becke - start) / 3600) << " h " << ((end_becke - start) % 3600) / 60 << " m" << endl;
 	}
 #else
-	gettimeofday(&t2, 0);
+	if (debug) {
+		gettimeofday(&t2, 0);
 
-	double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+		double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-	if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
-	else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
-	else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
-
+		if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
+		else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
+		else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
+	}
 #endif
 
 	for (unsigned int i = 0; i < wave.get_ncen(); i++) {
