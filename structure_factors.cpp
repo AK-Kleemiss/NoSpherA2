@@ -3579,12 +3579,11 @@ bool calculate_structure_factors(
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
 	}
-	int* atom_z;
+	int* atom_z = new int[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
 	double *x,*y,*z;
-	atom_z = new int[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
-	x = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
-	y = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
-	z = new double[wave.get_ncen() * pow(pbc * 2 + 1, 3)];
+	x = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
+	y = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
+	z = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
 	double* alpha_max = new double[wave.get_ncen()];
 	int* max_l = new int[wave.get_ncen()];
 	unsigned int* num_points = new unsigned int[wave.get_ncen()];
@@ -3726,18 +3725,6 @@ bool calculate_structure_factors(
 	double ca_star = (cb * cg - ca) / (sb * sg);
 	double cb_star = (cg * ca - cb) / (sg * sa);
 	double cg_star = (ca * cb - cg) / (sa * sb);
-
-	/*rcm[0][0] = a_star*a_star;
-	rcm[0][1] = a_star*b_star*cg_star;
-	rcm[0][2] = a_star*c_star*cb_star;
-
-	rcm[1][0] = a_star*b_star*cg_star;
-	rcm[1][1] = b_star*b_star;
-	rcm[1][2] = b_star*c_star*ca_star;
-
-	rcm[2][0] = a_star*c_star*cb_star;
-	rcm[2][1] = b_star*c_star*ca_star;
-	rcm[2][2] = c_star*c_star;*/
 
 	cm[0][0] = a;
 	cm[0][1] = sqrt(a * b * cg);
@@ -4540,6 +4527,7 @@ bool calculate_structure_factors(
 				}
 			}
 			if (pbc != 0) {
+				file << "Entering PBC loops!" << endl;
 				for (int x = -pbc; x < pbc + 1; x++)
 					for (int y = -pbc; y < pbc + 1; y++)
 						for (int z = -pbc; z < pbc + 1; z++) {
