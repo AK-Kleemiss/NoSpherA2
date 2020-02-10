@@ -4735,12 +4735,13 @@ bool calculate_structure_factors(
 				
 				if (debug) {
 					total_grid[3][p] += spherical_density[i][p] / total_grid[4][p];
-					if (i == asym_atom_list.size() - 1 && total_grid[3][p] < 0.999) {
-						file << "weight sum != 1: " << setw(6) << p << fixed << setw(10) << total_grid[3][p] << scientific << setw(12) << total_grid[4][p] << endl;
-						for (int i = 0; i < asym_atom_list.size(); i++)
-							file << labels[asym_atom_list[i]] << scientific << setw(10) << spherical_density[i][p] << " ";
-						file << endl;
-					}
+					if(asym_atom_list.size() == all_atom_list.size() && pbc == 0)
+						if (i == asym_atom_list.size() - 1 && total_grid[3][p] < 0.999) {
+							file << "weight sum != 1: " << setw(6) << p << fixed << setw(10) << total_grid[3][p] << scientific << setw(12) << total_grid[4][p] << endl;
+							for (int i = 0; i < asym_atom_list.size(); i++)
+								file << labels[asym_atom_list[i]] << scientific << setw(10) << spherical_density[i][p] << " ";
+							file << endl;
+						}
 				}
 				//        BECKE WEIGHT * Wfn Density * Atomic spherical density / total spherical density  
 				if (spherical_density[i][p] != 0 && total_grid[4][p] != 0)

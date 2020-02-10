@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 	  threads = stoi(argv[i + 1]);
 	if (temp.find("-pbc") != string::npos)
 	  pbc = stoi(argv[i + 1]);
-	if (temp.find("-2") != string::npos)
+	if (temp.find("-mode-2") != string::npos)
 	  becke = true;
 	if (temp.find("-ED") != string::npos)
 	  electron_diffraction = true;
