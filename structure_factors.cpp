@@ -4382,7 +4382,7 @@ bool calculate_structure_factors(
 		total_grid[4].resize(total_grid[0].size());
 		total_grid[5].resize(total_grid[0].size());
 		vector < double > backup;
-		backup.resize(total_grid[5].size())
+		backup.resize(total_grid[5].size());
 #pragma omp parallel for
 		for (int i = 0; i < total_grid[0].size(); i++) {
 			total_grid[4][i] = 0.0;
