@@ -58,23 +58,6 @@ int get_angular_order(int n)
     return -1;
 }
 
-/*context_t *numgrid_new_atom_grid(const double radial_precision,
-                                 const int min_num_angular_points,
-                                 const int max_num_angular_points,
-                                 const int proton_charge,
-                                 const double alpha_max,
-                                 const int max_l_quantum_number,
-                                 const double alpha_min[])
-{
-    return AS_TYPE(context_t,
-                   new AtomGrid(radial_precision,
-                                min_num_angular_points,
-                                max_num_angular_points,
-                                proton_charge,
-                                alpha_max,
-                                max_l_quantum_number,
-                                alpha_min));
-}*/
 const double bragg_angstrom[87]{
 	0.00, 0.35, 0.35, 1.45, 1.05, 0.85, 0.70, 0.65, 0.60, 0.50, 0.45, 1.80, 1.50, 1.25, 1.10, 1.00, 1.00, 1.00, 1.00, 2.20, 1.80,
 	1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10, 2.35, 2.00, 1.80, 1.55, 1.45,
@@ -185,53 +168,15 @@ AtomGrid::AtomGrid(const double radial_precision,
     delete[] angular_w;
 }
 
-/*void numgrid_free_atom_grid(context_t *context)
-{
-    if (!context)
-        return;
-    delete AS_TYPE(AtomGrid, context);
-}*/
 AtomGrid::~AtomGrid() {}
 
-/*int numgrid_get_num_grid_points(const context_t *context)
-{
-    return AS_CTYPE(AtomGrid, context)->get_num_grid_points();
-}*/
 int AtomGrid::get_num_grid_points() const { return num_grid_points_; }
 
-/*int numgrid_get_num_radial_grid_points(const context_t *context)
-{
-    return AS_CTYPE(AtomGrid, context)->get_num_radial_grid_points();
-}*/
 int AtomGrid::get_num_radial_grid_points() const
 {
     return num_radial_grid_points_;
 }
 
-/*void numgrid_get_grid(const context_t *context,
-                      const int num_centers,
-                      const int center_index,
-                      const double x_coordinates_bohr[],
-                      const double y_coordinates_bohr[],
-                      const double z_coordinates_bohr[],
-                      const int proton_charges[],
-                      double grid_x_bohr[],
-                      double grid_y_bohr[],
-                      double grid_z_bohr[],
-                      double grid_w[])
-{
-    return AS_CTYPE(AtomGrid, context)
-        ->get_grid(num_centers,
-                   center_index,
-                   x_coordinates_bohr,
-                   y_coordinates_bohr,
-                   z_coordinates_bohr,
-                   proton_charges,
-                   grid_x_bohr,
-                   grid_y_bohr,
-                   grid_z_bohr,
-                   grid_w);
-}*/
 void AtomGrid::get_grid(const int num_centers,
                         const int center_index,
                         const double x_coordinates_bohr[],
@@ -278,12 +223,6 @@ void AtomGrid::get_grid(const int num_centers,
     }
 }
 
-/*void numgrid_get_radial_grid(const context_t *context,
-                             double grid_r_bohr[],
-                             double grid_w[])
-{
-    return AS_CTYPE(AtomGrid, context)->get_radial_grid(grid_r_bohr, grid_w);
-}*/
 void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
 {
     for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
@@ -292,15 +231,3 @@ void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
         grid_w[ipoint] = radial_atom_grid_w_[ipoint];
     }
 }
-
-// TODO this implementation should move to separate file
-/*void numgrid_get_angular_grid(const int num_angular_grid_points,
-                              double grid_x_bohr[],
-                              double grid_y_bohr[],
-                              double grid_z_bohr[],
-                              double grid_w[])
-{
-    int i = get_angular_order(num_angular_grid_points);
-    ld_by_order(
-        lebedev_table[i], grid_x_bohr, grid_y_bohr, grid_z_bohr, grid_w);
-}*/

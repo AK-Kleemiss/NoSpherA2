@@ -4325,50 +4325,6 @@ bool calculate_structure_factors(
 
 	Prototype_grids.clear();
 
-
-/*#pragma omp parallel for schedule(dynamic)
-	for (int i = 0; i < wave.get_ncen(); i++) {
-		if (debug && i == 0) file << "Atom " << i << flush;
-		else if (debug) file << " " << i << flush;
-		int min_angular = 0;
-		int max_angular = 0;
-		int nr = all_atom_list[i];
-		if (max_l[nr] <= 3) {
-			min_angular = 50;
-			max_angular = 110;
-		}
-		else if (max_l[nr] > 3) {
-			min_angular = 50;
-			max_angular = 146;
-		}
-		context_t* context = numgrid_new_atom_grid(1e-7,
-			min_angular * accuracy,
-			max_angular * accuracy,
-			atom_z[nr],
-			alpha_max[nr],
-			max_l[nr],
-			alpha_min[nr]
-		);
-		num_points[nr] = numgrid_get_num_grid_points(context);
-
-		for (int n = 0; n < 4; n++)
-			grid[nr][n] = new double[num_points[nr]];
-
-		numgrid_get_grid(context,
-			wave.get_ncen(),
-			nr,
-			x,
-			y,
-			z,
-			atom_z,
-			grid[nr][0],
-			grid[nr][1],
-			grid[nr][2],
-			grid[nr][3]);
-
-		numgrid_free_atom_grid(context);
-
-	}*/
 	if (debug) file << " Becke Grid exists" << endl;
 
 #ifdef _WIN64
@@ -4425,10 +4381,14 @@ bool calculate_structure_factors(
 	if (!becke) {
 		total_grid[4].resize(total_grid[0].size());
 		total_grid[5].resize(total_grid[0].size());
+		vector < double > backup;
+		backup.resize(total_grid[5].size())
 #pragma omp parallel for
 		for (int i = 0; i < total_grid[0].size(); i++) {
 			total_grid[4][i] = 0.0;
 			total_grid[5][i] = compute_dens(wave, new double[3]{ total_grid[0][i], total_grid[1][i], total_grid[2][i] });
+			if(debug)
+				backup[i] = total_grid[5][i]
 		}
 		if (pbc != 0) {
 			for (int x = -pbc; x < pbc+1; x++)
@@ -4443,6 +4403,9 @@ bool calculate_structure_factors(
 								total_grid[1][i] + x * cm[1][0] + y * cm[1][1] + z * cm[1][2],
 								total_grid[2][i] + x * cm[2][0] + y * cm[2][1] + z * cm[2][2] });
 					}
+			if (debug)
+				for (int i = 0; i < total_grid[0].size(); i++)
+					file << "Old dens: " << backup[i] << " new density: " << total_grid[5][i] << endl;
 		}
 	}
 
