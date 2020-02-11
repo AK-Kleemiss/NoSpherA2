@@ -208,7 +208,9 @@ int main(int argc, char **argv)
       return -1;
   }
   log_file.flush();
-  readwfn(wavy[0], wfn, debug_main, log_file);
+  //readwfn(wavy[0], wfn, debug_main, log_file);
+  bool temp_debug = false;
+  readwfn(wavy[0], wfn, temp_debug, log_file);
   wavy[0].set_method(method);
   if (electron_diffraction)
 	  log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
