@@ -11,7 +11,6 @@ CPP_SRCS += \
 ../AtomGrid.cpp \
 ../basis_set.cpp \
 ../becke_partitioning.cpp \
-../bragg.cpp \
 ../convenience.cpp \
 ../cube.cpp \
 ../fchk.cpp \
@@ -19,7 +18,6 @@ CPP_SRCS += \
 ../mo_class.cpp \
 ../sphere_lebedev_rule.cpp \
 ../structure_factors.cpp \
-../version.cpp \
 ../wfn_2_fchk.cpp \
 ../wfn_class.cpp
 
@@ -27,7 +25,6 @@ OBJS += \
 ./AtomGrid.o \
 ./basis_set.o \
 ./becke_partitioning.o \
-./bragg.o \
 ./convenience.o \
 ./cube.o \
 ./fchk.o \
@@ -35,7 +32,6 @@ OBJS += \
 ./mo_class.o \
 ./sphere_lebedev_rule.o \
 ./structure_factors.o \
-./version.o \
 ./wfn_2_fchk.o \
 ./wfn_class.o
 
@@ -43,7 +39,6 @@ CPP_DEPS += \
 ./AtomGrid.d \
 ./basis_set.d \
 ./becke_partitioning.d \
-./bragg.d \
 ./convenience.d \
 ./cube.d \
 ./fchk.d \
@@ -51,7 +46,6 @@ CPP_DEPS += \
 ./mo_class.d \
 ./sphere_lebedev_rule.d \
 ./structure_factors.d \
-./version.d \
 ./wfn_2_fchk.d \
 ./wfn_class.d
 
@@ -73,11 +67,6 @@ Wfn_2_Fchk: ${OBJS} ${USER_OBJS}
 	@echo 'Finished building: $<'
 
 ./becke_partitioning.o: ../becke_partitioning.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./bragg.o: ../bragg.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
@@ -113,11 +102,6 @@ Wfn_2_Fchk: ${OBJS} ${USER_OBJS}
 	@echo 'Finished building: $<'
 
 ./structure_factors.o: ../structure_factors.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./version.o: ../version.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

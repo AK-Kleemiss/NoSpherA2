@@ -19,7 +19,7 @@ bool calculate_structure_factors(
 	bool becke = false,
 	int cpus = -1,
 	bool electron_diffraction = false,
-	bool pbc = false);
+	int pbc = 0);
 
 #include "wfn_class.h"
 
