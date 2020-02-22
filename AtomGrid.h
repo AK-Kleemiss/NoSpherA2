@@ -12,6 +12,15 @@ class AtomGrid
              const double alpha_max,
              const int max_l_quantum_number,
              const double alpha_min[]);
+    AtomGrid(const double radial_precision,
+        const int min_num_angular_points,
+        const int max_num_angular_points,
+        const int proton_charge,
+        const double alpha_max,
+        const int max_l_quantum_number,
+        const double alpha_min[],
+        const bool debug,
+        std::ofstream& file);
 
     ~AtomGrid();
 

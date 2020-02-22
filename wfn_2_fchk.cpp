@@ -210,7 +210,7 @@ int main(int argc, char **argv)
   log_file.flush();
   //readwfn(wavy[0], wfn, debug_main, log_file);
   bool temp_debug = false;
-  readwfn(wavy[0], wfn, temp_debug, log_file);
+  readwfn(wavy[0], wfn, debug_main, log_file);
   wavy[0].set_method(method);
   if (electron_diffraction)
 	  log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
@@ -279,7 +279,7 @@ int main(int argc, char **argv)
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
 		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads, electron_diffraction, pbc))
-			log_file << "Error during FF Calculation!" << endl;
+			log_file << "Error during SF Calculation!" << endl;
 	}
 	return 0;
 }
