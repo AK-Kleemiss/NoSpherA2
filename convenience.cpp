@@ -220,6 +220,32 @@ else 	if (strcmp(tmp, "Rn") == 0)  return 85;
 else                                 return -1;
 }
 
+
+
+cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
+	resize(100);
+}
+
+void cosinus_annaeherung::resize(size_t size)
+{
+	mSize = size;
+	if (mBase_values) delete[] mBase_values;
+	mBase_values = new double[mSize + 1];
+#pragma omp parallel for
+	for (auto i = 0; i < mSize + 1; i++)  // Fuer einen Werte mehr die Stueststellen speichern
+	{
+		double y = cos((MPI2 * i) / mSize);
+		// cout << "resize: i="<<i<<" y=" << y << endl;
+		mBase_values[i] = y;
+	}
+	mStepwidth = MPI2 / size;
+}
+
+double cosinus_annaeherung::calculate_error_at(double x) const
+{
+	return cos(x) - get(x);
+}
+
 void copy_file(string from, string to){
     ifstream source(from.c_str(), ios::binary);
     ofstream dest(to.c_str(), ios::binary);

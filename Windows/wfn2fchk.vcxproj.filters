@@ -24,9 +24,6 @@
     <ClCompile Include="../becke_partitioning.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../bragg.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../convenience.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -68,9 +65,6 @@
     <ClInclude Include="../becke_partitioning.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../bragg.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../convenience.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -83,19 +77,10 @@
     <ClInclude Include="../fchk.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../general.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../grid_radial.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../mo_class.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="../numgrid.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="../numgrid_export.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../parameters.h">
