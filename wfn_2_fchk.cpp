@@ -137,7 +137,7 @@ int main(int argc, char **argv)
   int threads = -1;
   bool becke = false;
   bool electron_diffraction = false;
-  bool pbc = false;
+  int pbc = 0;
   for (int i=0; i<argc; i++){
     temp = argv[i];
     if(temp.find(known_keywords[0]) != string::npos)
@@ -167,8 +167,8 @@ int main(int argc, char **argv)
 	if (temp.find("-cpus") != string::npos)
 	  threads = stoi(argv[i + 1]);
 	if (temp.find("-pbc") != string::npos)
-	  pbc = true;
-	if (temp.find("-2") != string::npos)
+	  pbc = stoi(argv[i + 1]);
+	if (temp.find("-mode-2") != string::npos)
 	  becke = true;
 	if (temp.find("-ED") != string::npos)
 	  electron_diffraction = true;
@@ -208,7 +208,9 @@ int main(int argc, char **argv)
       return -1;
   }
   log_file.flush();
-  readwfn(wavy[0], wfn, debug_main, log_file);
+  //readwfn(wavy[0], wfn, debug_main, log_file);
+  bool temp_debug = false;
+  readwfn(wavy[0], wfn, temp_debug, log_file);
   wavy[0].set_method(method);
   if (electron_diffraction)
 	  log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
