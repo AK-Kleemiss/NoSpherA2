@@ -4646,8 +4646,8 @@ bool calculate_structure_factors(
 		}
 		else {
 #pragma omp parallel for
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
-				for (unsigned int p = 0; p < total_grid[0].size(); p++)
+			for (int i = 0; i < asym_atom_list.size(); i++)
+				for (int p = 0; p < total_grid[0].size(); p++)
 					if (spherical_density[i][p] != 0 && total_grid[4][p]!= 0)
 						atom_els[2][i] += total_grid[5][p] * spherical_density[i][p] / total_grid[4][p];
 		}
@@ -4720,8 +4720,8 @@ bool calculate_structure_factors(
 
 	if (!becke) {
 #pragma omp parallel for 
-		for (unsigned int p = 0; p < total_grid[0].size(); p++)
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+		for (int p = 0; p < total_grid[0].size(); p++)
+			for (int i = 0; i < asym_atom_list.size(); i++) {
 				d1[i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
 				d2[i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
 				d3[i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
@@ -4745,7 +4745,7 @@ bool calculate_structure_factors(
 	}
 	else
 #pragma omp parallel for
-		for (unsigned int i = 0; i < asym_atom_list.size(); i++) 
+		for (int i = 0; i < asym_atom_list.size(); i++) 
 			for (int p = 0; p < total_grid[0].size(); p++) {
 				d1[i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
 				d2[i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
@@ -4776,6 +4776,12 @@ bool calculate_structure_factors(
 					k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
 				}
 	}
+
+	/*cosinus_annaeherung cosinus_helper;
+	cosinus_helper.resize(100000);
+	sinus sins(cosinus_helper);
+	cosinus cosins(cosinus_helper);*/
+	
 
 	file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << total_grid[0].size() << " gridpoints." << endl;
 
@@ -4808,12 +4814,16 @@ bool calculate_structure_factors(
 			double work;
 			complex<double> temp;
 			double rho;
+//			double cos_v;
+//			double sin_v;
 			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
 				temp = complex < double > (0.0,0.0);
 				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
 					rho = dens[i][p];
 					if (rho != 0) {
 						work = k1 * d1[i][p] + k2 * d2[i][p] + k3 * d3[i][p];
+//						cos_v = cosins.get(work);
+//						sin_v = sins.get(work);
 						temp += complex<double>(rho * cos(work), rho * sin(work));
 					}
 				}
@@ -4842,7 +4852,7 @@ bool calculate_structure_factors(
 		double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
 		for (unsigned int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
-			for (unsigned int p = 0; p < hkl[0].size(); p++) {
+			for (int p = 0; p < hkl[0].size(); p++) {
 				double h2 = pow(hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s], 2)
 					+ pow(hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s], 2)
 					+ pow(hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s], 2);
