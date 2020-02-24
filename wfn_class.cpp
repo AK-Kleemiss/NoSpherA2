@@ -765,7 +765,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		debug_wfn_deep = true;
 	}
 	if (exists(fileName)) {
-		if (debug_wfn) printf("File is valid, continuing...\n");
+		if (debug_wfn) file << "File is valid, continuing...\n";
 	}
 	else {
 		file << "couldn't open or find " << fileName << ", leaving" << endl;
@@ -782,7 +782,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 	int e_nmo, e_nex, e_nuc = 0; //number of expected MOs, Exponents and nuclei
 	stream >> header_tmp >> e_nmo >> header_tmp >> header_tmp >> e_nex >> header_tmp >> e_nuc;
 	if (debug) {
-		printf("e_nmo: %d, e_nex: %d, e_nuc: %d\n", e_nmo, e_nex, e_nuc);
+		file << "e_nmo: %d, e_nex: %d, e_nuc: %d\n", e_nmo, e_nex, e_nuc;
 		Enter();
 	}
 	//----------------------------- Read Atoms ------------------------------------------------------------
@@ -862,7 +862,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					sscanf(tempchar, "%d", &dum_center[exnum]);
 					if (debug) file << dum_center[exnum] << endl;
 					if (dum_center[exnum] > e_nuc) {
-						printf("this center doesn't exist.. some weird problem!\n");
+						file << "this center doesn't exist.. some weird problem!\n";
 						return false;
 					}
 					exnum++;
@@ -875,7 +875,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		}
 		getline(rf, line);
 		if (exnum > e_nex) {
-			printf("run went higher than expected values in center reading, thats suspicius, lets stop here...\n");
+			file << "run went higher than expected values in center reading, thats suspicius, lets stop here...\n";
 			return false;
 		}
 		run++;
@@ -885,10 +885,10 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		Enter();
 	}
 	if (exnum < e_nex) {
-		printf("We have a problem adding center assignements!\n");
+		file << "We have a problem adding center assignements!\n";
 		return false;
 	}
-	if (debug_wfn) printf("finished with centers, moving to types...\n");
+	if (debug_wfn) file << "finished with centers, moving to types...\n";
 	//------------------------------------ Read Types ---------------------------------------------------------
 	vector<unsigned int> dum_type;
 	dum_type.resize(e_nex);
@@ -925,16 +925,16 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		}
 		getline(rf, line);
 		if (exnum > e_nex) {
-			printf("exnum went higher than expected values in type reading, thats suspicius, lets stop here...\n");
+			file << "exnum went higher than expected values in type reading, thats suspicius, lets stop here...\n";
 			return false;
 		}
 		run++;
 	}
 	if (exnum < e_nex) {
-		printf("We have a problem adding type assignements!\n");
+		file << "We have a problem adding type assignements!\n";
 		return false;
 	}
-	if (debug_wfn) printf("finished with types, reading exponents now...\n");
+	if (debug_wfn) file << "finished with types, reading exponents now...\n";
 	//----------------------------- Read exponents -------------------------------
 	vector<double> dum_exp;
 	dum_exp.resize(e_nex);
@@ -1009,17 +1009,17 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		}
 		getline(rf, line);
 		if (exnum > e_nex) {
-			printf("exnum went higher than expected values in exponent reading, thats suspicius, lets stop here...\n");
+			file << "exnum went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
 			return false;
 		}
 		run++;
 	}
 	if (exnum < e_nex) {
-		printf("We have a problem adding exponents!\n");
+		file << "We have a problem adding exponents!\n";
 		return false;
 	}
 	if (debug_wfn) {
-		printf("finished with exponents, reading MOs now...\n");
+		file << "finished with exponents, reading MOs now...\n";
 		file << "line: " << line << endl;
 	}
 	int linecount = 0;
@@ -1136,7 +1136,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			if (debug_wfn_deep) file << endl;
 			getline(rf, line);
 			if (linecount * 5 > e_nex + 1) {
-				printf("linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n");
+				file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
 				return false;
 			}
 			run++;
@@ -1146,12 +1146,12 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		if (b == true) break;
 	}
 	if (monum + 1 < e_nmo) {
-		printf("less MOs than expected, quitting...\n");
+		file << "less MOs than expected, quitting...\n";
 		if (debug_wfn_deep) file << "monum: " << monum << " e_nmo: " << e_nmo << endl;
 		return false;
 	}
 	//---------------------Start writing everything from the temp arrays into wave ---------------------
-	if (debug_wfn) printf("finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n");
+	if (debug_wfn) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
 
 	for (int i = 0; i < e_nuc; i++) if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
 	if (debug) {
