@@ -1960,7 +1960,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				double temp;
 				if (debug) file << "Working on MO: ";
 				for (int m = 0; m < wave.get_nmo(); m++) {
-					if (debug) file << m << " ";
+					if (debug) file << m << " " << flush;
 					if (alpha != beta) {
 						if (m < alpha) {
 							temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
