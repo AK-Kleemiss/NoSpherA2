@@ -100,6 +100,8 @@ int main(int argc, char **argv)
 	known_keywords.push_back("-symm");
 	known_keywords.push_back("-asym_cif");
 	known_keywords.push_back("-asym-cif");
+	known_keywords.push_back("-wfn-cif");
+	known_keywords.push_back("-wfn_cif");
 	if(debug_main) 
 		log_file << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -162,7 +164,11 @@ int main(int argc, char **argv)
 	  symm = argv[i + 1];
 	if (temp.find(known_keywords[11]) != string::npos)
 	  asym_cif = argv[i + 1];
-	if(temp.find(known_keywords[12]) != string::npos)
+	if (temp.find(known_keywords[12]) != string::npos)
+	  asym_cif = argv[i + 1];
+	if (temp.find(known_keywords[13]) != string::npos)
+	  asym_cif = argv[i + 1];
+	if (temp.find(known_keywords[14]) != string::npos)
 	  asym_cif = argv[i + 1];
 	if (temp.find("-cpus") != string::npos)
 	  threads = stoi(argv[i + 1]);
