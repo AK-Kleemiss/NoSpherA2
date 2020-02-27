@@ -4659,8 +4659,8 @@ bool calculate_structure_factors(
 		for (int p = 0; p < total_grid[0].size(); p++)
 				total_grid[5][p] *= total_grid[3][p];
 		if (debug)
-#pragma omp parallel for
-			for (int p = 0; p < total_grid[0].size(); p++)
+//#pragma omp parallel for
+			for (int p = 0, pmax = total_grid[0].size(); p < pmax; p++)
 				total_grid[3][p] = 0;
 
         /*double factor = 1.0;
@@ -4806,7 +4806,7 @@ bool calculate_structure_factors(
 	else
 #pragma omp parallel for
 		for (int i = 0; i < asym_atom_list.size(); i++) 
-			for (int p = 0; p < total_grid[0].size(); p++) {
+			for (int p = 0, pmax = total_grid[0].size(); p < pmax; p++) {
 				d1[i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
 				d2[i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
 				d3[i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
@@ -4864,33 +4864,26 @@ bool calculate_structure_factors(
 
 	//file << endl << "Calculating scattering factors..." << endl;
 	progress_bar progress{ file, 75u, "Calculating scattering factors" };
-	const int step = floor(k_pt[0].size() / 20);
+	const int step = floor(total_grid[0].size() / 20);
 	if (!becke) {
+		int smax = k_pt[0].size();
+		int imax = asym_atom_list.size();
+		int pmax = total_grid[0].size();
 #pragma omp parallel for schedule(dynamic)
-		for (int s = 0; s < k_pt[0].size(); s++) {
-			const double k1 = k_pt[0][s];
-			const double k2 = k_pt[1][s];
-			const double k3 = k_pt[2][s];
-			double work;
-			complex<double> temp;
-			double rho;
-//			double cos_v;
-//			double sin_v;
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-				temp = complex < double > (0.0,0.0);
-				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
-					rho = dens[i][p];
-					if (rho != 0) {
-						work = k1 * d1[i][p] + k2 * d2[i][p] + k3 * d3[i][p];
+		for (int p = 0; p < pmax; p++) {
+#pragma omp simd collapse(2)
+			for (int i = 0; i < imax; i++) {
+				for (int s = 0; s < smax; s++) {
+					if (dens[i][p] != 0) {
+						double work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
 //						cos_v = cosins.get(work);
 //						sin_v = sins.get(work);
-						temp += complex<double>(rho * cos(work), rho * sin(work));
+						sf[i][s] += complex<double>(dens[i][p] * cos(work), dens[i][p] * sin(work));
 					}
 				}
-				sf[i][s] = temp;
 			}
-			if (s != 0 && s % step == 0)
-				progress.write(s / double(k_pt[0].size()));
+			if (p != 0 && p % step == 0)
+				progress.write(p / double(pmax));
 		}
 	}
 	else {
@@ -4916,7 +4909,7 @@ bool calculate_structure_factors(
 				double h2 = pow(hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s], 2)
 					+ pow(hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s], 2)
 					+ pow(hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s], 2);
-				for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+				for (unsigned int i = 0, imax = asym_atom_list.size(); i < imax; i++)
 					sf[i][p + hkl[0].size() * s] = fact * ((double) wave.atoms[asym_atom_list[i]].charge - sf[i][p + hkl[0].size() * s]) / h2;
 			}
 		}
