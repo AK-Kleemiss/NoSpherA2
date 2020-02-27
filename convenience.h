@@ -63,9 +63,9 @@ int program_confi(std::string &gaussian_path, std::string &turbomole_path,
 bool check_bohr(WFN &wave, bool interactive, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
 
-bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
+/*bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
 bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given);
-bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings);
+bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings);*/
 void select_cubes(std::vector <std::vector <unsigned int> > &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes=1, bool wfnonly=false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char * tmp);

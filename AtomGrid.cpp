@@ -12,7 +12,7 @@
 #define NOMIMAX
 #include <algorithm>
 #include <io.h>
-#include <Windows.h>
+//#include <Windows.h>
 #endif
 //#include "numgrid.h"
 #include "parameters.h"
