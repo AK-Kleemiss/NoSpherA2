@@ -192,18 +192,8 @@ int main(int argc, char **argv)
   if(debug_main)
   	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << endl;
   if(wfn == ""){
-  	string filename;
-  	vector <string> temp;
-  	temp.resize(2);
-  	temp[0]="Wavefunction files (wfn,ffn) | *.wfn *.ffn";
-  	temp[1]="All filetypes | *";
-  	if(!open_file_dialog(filename,debug_main,temp))
-  		log_file << "Error encountered!" << endl;
-  	else{
-  		int origin=filetype_identifier(filename, debug_main);
-  		if (debug_main) log_file << "Origin: " << origin << endl;
-  		wavy.push_back(WFN(origin));
-    }
+	log_file << "Error, no wfn file specified!";
+	return -1;
   }
   else{
   	if(wfn.find(".wfn")!=string::npos) wavy.push_back(WFN(2));
@@ -227,9 +217,9 @@ int main(int argc, char **argv)
       vector <string> temp;
       temp.resize(1);
       temp[0]="All filetypes | *";
-      if(!open_file_dialog(filename,debug_main,temp))
+  /*    if(!open_file_dialog(filename,debug_main,temp))
         log_file << "Error encountered!" << endl;
-      else
+      else*/
         basis_set_path = filename;
     }
 		else
@@ -254,9 +244,9 @@ int main(int argc, char **argv)
 			if(wavy[0].get_origin()==2) where = outputname.find("wfn");
 			else where = outputname.find("ffn");
 			if(where>=outputname.length()&&where!=string::npos){
-				if(!expert)
+				/*if(!expert)
 					save_file_dialog(outputname,debug_main,endings);
-				else {
+				else {*/
 					log_file << "Enter filename: ";
 					cin >> outputname;
 					while(exists(outputname)){
@@ -266,7 +256,7 @@ int main(int argc, char **argv)
 							cin >> outputname;
 						}
 					}
-   				}
+   				//}
 			}
 			else
 				outputname.erase(where,3);

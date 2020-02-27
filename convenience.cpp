@@ -6,8 +6,8 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
-#include <windows.h>
-#include <Windows.h>
+//#include <windows.h>
+//#include <Windows.h>
 #define GetCurrentDir _getcwd
 #else
 #include <unistd.h>
@@ -392,11 +392,11 @@ void write_template_confi(){
 	conf.close();
 #ifdef _WIN32
 //	const wchar_t* fileLPCWSTR = programs.c_str();
-	wstring stemp = wstring(programs.begin(), programs.end());
-	int attr = GetFileAttributes(stemp.c_str());
-	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
-	}
+//	wstring stemp = wstring(programs.begin(), programs.end());
+//	int attr = GetFileAttributes(stemp.c_str());
+//	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
+//		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
+//	}
 #endif
 	return;
 };
@@ -672,7 +672,7 @@ string shrink_string_to_atom(string &input, const int atom_number){
 	return input;
 };
 
-bool open_file_dialog(string &path, bool debug, vector <string> filter){
+/*bool open_file_dialog(string &path, bool debug, vector <string> filter){
 	char pwd[1024];
 	if(GetCurrentDir( pwd, 1024)==NULL) return false;
 	string current_path(pwd);
@@ -935,7 +935,7 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 #endif
 	return true;
 };
-
+*/
 void select_cubes(vector <vector <unsigned int> > &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug){
 	//asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
 	//Returns values in selection[0][i] for iths selection of wavefunction and
