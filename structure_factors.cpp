@@ -3537,9 +3537,9 @@ double linear_interpolate_spherical_density(
 		return radial_dens[0];
 	for (int i = 0; i < spherical_dist.size()-1; i++) {
 		double prev_dist = spherical_dist[i];
-		double current_dist = spherical_dist[i + (unsigned __int64)1];
+		double current_dist = spherical_dist[i + 1];
 		if (prev_dist < dist && current_dist > dist) 
-			i == 0 ? result = radial_dens[0] : result = radial_dens[i - (unsigned __int64)1] + (radial_dens[i] - radial_dens[i - (unsigned __int64)1]) / (current_dist - prev_dist) * (dist - prev_dist);
+			i == 0 ? result = radial_dens[0] : result = radial_dens[i - 1] + (radial_dens[i] - radial_dens[i - 1]) / (current_dist - prev_dist) * (dist - prev_dist);
 	}
 	if (result < 1E-10) result =  0;
 	return result;
@@ -3555,7 +3555,7 @@ double logarithmic_interpolate_spherical_density(
 		double prev_dist = 0.000001 * pow(incr, i - 1);
 		double current_dist = prev_dist * incr;
 		if (prev_dist < dist && current_dist > dist)
-			i == 0 ? result = radial_dens[i] : result = radial_dens[i - (unsigned __int64)1] * exp((dist - prev_dist) * (log(radial_dens[i]) - log(radial_dens[i - (unsigned __int64)1])) / (current_dist - prev_dist));
+			i == 0 ? result = radial_dens[i] : result = radial_dens[i - 1] * exp((dist - prev_dist) * (log(radial_dens[i]) - log(radial_dens[i - 1])) / (current_dist - prev_dist));
 	}
 	if (result < 1E-15) result = 0;
 	return result;
@@ -4253,7 +4253,7 @@ bool calculate_structure_factors(
 		for (int j = 0; j < wave.get_ncen(); j++) {
 			if (wave.atoms[j].charge == atom_type_list[i]) {
 				alpha_max_temp = alpha_max[j];
-				max_l_temp = max_l[j] - (unsigned __int64)1;
+				max_l_temp = max_l[j] - 1;
 				for (unsigned int l = 0; l <= max_l_temp; l++)
 					alpha_min_temp[l] = alpha_min[j][l];
 				break;
@@ -4641,11 +4641,11 @@ bool calculate_structure_factors(
 		//}
 
 		//Generate Electron sums
-		for (__int64 i = 0; i < wave.get_ncen(); i++) {
-			__int64 start_p = 0;
+		for (int i = 0; i < wave.get_ncen(); i++) {
+			int start_p = 0;
 			for (unsigned int a = 0; a < i; a++)
 				start_p += num_points[all_atom_list[a]];
-			for (__int64 p = 0; p < num_points[all_atom_list[i]]; p++) {
+			for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
 				atom_els[0][i] += total_grid[3][start_p + p] * total_grid[5][start_p + p];
 				if (!becke) atom_els[1][i] += total_grid[3][start_p + p] * total_grid[4][start_p + p];
 			}
