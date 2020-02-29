@@ -4871,7 +4871,7 @@ bool calculate_structure_factors(
 		int pmax = total_grid[0].size();
 #pragma omp parallel for schedule(dynamic)
 		for (int p = 0; p < pmax; p++) {
-#pragma omp simd collapse(2)
+//#pragma omp simd collapse(2)
 			for (int i = 0; i < imax; i++) {
 				for (int s = 0; s < smax; s++) {
 					if (dens[i][p] != 0) {

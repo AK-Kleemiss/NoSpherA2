@@ -172,7 +172,7 @@
       <AdditionalDependencies>Comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy D:\shared_guest\wfn2fchk\Windows\x64\Release\wfn2fchk.exe D:\Dropbox\olex2_svn\olex2-gui\Wfn_2_Fchk.exe</Command>
+      <Command>copy D:\git\wfn2fchk\Windows\x64\Release\wfn2fchk.exe D:\Dropbox\olex2_svn\olex2-gui\Wfn_2_Fchk.exe</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
