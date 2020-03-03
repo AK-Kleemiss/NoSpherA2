@@ -1041,6 +1041,6 @@ void progress_bar::write(double fraction)
 
 	os << '\n' << message;
 	os.write(full_bar.data() + offset, width);
-	os << " [" << std::setw(3) << static_cast<int>(100 * fraction) << "%] " << std::flush;
+	os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction*20)*0.05) << "%] " << std::flush;
 }
 

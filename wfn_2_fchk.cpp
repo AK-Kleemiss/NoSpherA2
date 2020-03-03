@@ -190,7 +190,7 @@ int main(int argc, char **argv)
 
   log_file.flush();
   if(debug_main)
-  	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << endl;
+  	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << asym_cif <<  endl;
   if(wfn == ""){
 	log_file << "Error, no wfn file specified!";
 	return -1;
