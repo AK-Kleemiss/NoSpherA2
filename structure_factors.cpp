@@ -42,37 +42,37 @@ using namespace std;
 //#include "becke_partitioning.h"
 #include "AtomGrid.h"
 
-const unsigned int Thakkar_nex[86] = { 1, 5,
+const int Thakkar_nex[86] = { 1, 5,
  8,  8, 15, 15, 15, 15, 15, 15,
 17, 17, 20, 20, 20, 20, 20, 20,
 22, 22, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31,
 33, 33, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38,
 30, 30, 32, 38, 36, 36, 36, 36, 36, 38, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 40, 40, 40, 40, 40, 40};
-const unsigned int Thakkar_ns[86] =  { 1, 5,
+const int Thakkar_ns[86] =  { 1, 5,
  8,  8,  8,  8,  8,  8,  8,  8,
 10, 10, 10, 10, 10, 10, 10, 10,
 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13};
-const unsigned int Thakkar_np[86] = { 0, 0,
+const int Thakkar_np[86] = { 0, 0,
  0,  0,  7,  7,  7,  7,  7,  7,
  7,  7, 10, 10, 10, 10, 10, 10,
 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11,
 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 13, 13, 13, 13, 13, 13,
 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 12, 12, 12, 12, 12, 12};
-const unsigned int Thakkar_nd[86] =  { 0, 0,
+const int Thakkar_nd[86] =  { 0, 0,
  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
  8,  8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
  7,  7,  9,  9,  7,  7,  7,  7,  7,  9,  7,  7,  7,  7,  7,  7,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9};
-const unsigned int Thakkar_nf[86] =  { 0, 0,
+const int Thakkar_nf[86] =  { 0, 0,
  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6};
-const unsigned int Thakkar_occ[1290] = {
+const int Thakkar_occ[1290] = {
 	//	1s,2s,3s,4s,5s,6s,2p,3p,4p,5p,6p,3d,4d,5d,4f,
 		1, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //H
 		2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, //He
@@ -166,7 +166,7 @@ const unsigned int Thakkar_occ[1290] = {
 		2, 2, 2, 2, 2, 2, 6, 6, 6, 6, 5,10,10,10,14, //At
 		2, 2, 2, 2, 2, 2, 6, 6, 6, 6, 6,10,10,10,14, //Rn
 };
-const unsigned int Thakkar_n[] = {
+const int Thakkar_n[] = {
 		1,																					//H
 		2,1,1,1,2,																			//He
 
@@ -3175,19 +3175,19 @@ const double Thakkar_c[] {
 			1.355354125
 };
 
-unsigned int first_ex_SF(unsigned int atomic_number) {
+int first_ex_SF(int atomic_number) {
 	if (atomic_number == 1) return 0;
 	else if (atomic_number > 86) return 200000000;
-	unsigned int ex = 0;
+	int ex = 0;
 	for (int i = 0; i < atomic_number - 1; i++)
 		ex += Thakkar_nex[i];
 	return ex;
 };
 
-unsigned int first_coef_SF(unsigned int atomic_number) {
+int first_coef_SF(int atomic_number) {
 	if (atomic_number == 1) return 0;
-	unsigned int counter = 0;
-	unsigned int temp = atomic_number - 1;
+	int counter = 0;
+	int temp = atomic_number - 1;
 	for (int m = 0; m < 6; m++)
 		if (Thakkar_occ[temp * 15 + m] != 0)
 			counter += Thakkar_ns[temp];
@@ -3214,7 +3214,7 @@ double get_radial_density(int atom_number, double dist) {
 
 	double Orb[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	int offset = (atom_number - 1) * 15;
-	for (unsigned int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
 		for (int m = 0; m < 6; m++) {
 			if (Thakkar_occ[offset + m] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3225,7 +3225,7 @@ double get_radial_density(int atom_number, double dist) {
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_np[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_np[atom_number - 1]; ex++) {
 		for (int m = 0; m < 5; m++) {
 			if (Thakkar_occ[offset + m + 6] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3236,7 +3236,7 @@ double get_radial_density(int atom_number, double dist) {
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
 		for (int m = 0; m < 3; m++) {
 			if (Thakkar_occ[offset + m + 11] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3247,7 +3247,7 @@ double get_radial_density(int atom_number, double dist) {
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_nf[atom_number]; ex++) {
+	for (int ex = 0; ex < Thakkar_nf[atom_number]; ex++) {
 		if (Thakkar_occ[offset + 14] == 0) continue;
 		if (Thakkar_n[nr_ex] == 1)
 			Orb[14] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * dist);
@@ -3257,7 +3257,7 @@ double get_radial_density(int atom_number, double dist) {
 		nr_ex++;
 	}
 
-	for (unsigned int m = 0; m < 15; m++) {
+	for (int m = 0; m < 15; m++) {
 		if (Orb[m] == 0 || Thakkar_occ[offset + m] == 0)
 			continue;
 		Rho += Thakkar_occ[offset + m] * pow(Orb[m], 2);
@@ -3387,7 +3387,7 @@ double compute_dens(
 	int atom = -1
 	)
 {
-	const unsigned int nmo = wave.get_nmo();
+	const int nmo = wave.get_nmo();
 	vector<double> phi;
 	phi.resize(nmo);
 	double Rho=0.0;
@@ -3473,7 +3473,7 @@ double compute_spherical_density(
 		<< " Values (n/c/z): " << Thakkar_n[nr_ex] << " " << Thakkar_c[nr_coef] << " " << Thakkar_z[nr_ex] << endl;
 	double Orb[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	int offset = (atom_number - 1) * 15;
-	for (unsigned int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
 		for (int m = 0; m < 6; m++) {
 			if (Thakkar_occ[offset + m] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3484,7 +3484,7 @@ double compute_spherical_density(
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_np[atom_number- 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_np[atom_number- 1]; ex++) {
 		for (int m = 0; m < 5; m++) {
 			if (Thakkar_occ[offset + m + 6] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3495,7 +3495,7 @@ double compute_spherical_density(
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
 		for (int m = 0; m < 3; m++) {
 			if (Thakkar_occ[offset + m + 11] == 0) continue;
 			if (Thakkar_n[nr_ex] == 1)
@@ -3506,7 +3506,7 @@ double compute_spherical_density(
 		}
 		nr_ex++;
 	}
-	for (unsigned int ex = 0; ex < Thakkar_nf[atom_number]; ex++) {
+	for (int ex = 0; ex < Thakkar_nf[atom_number]; ex++) {
 		if (Thakkar_occ[offset + 14] == 0) continue;
 		if (Thakkar_n[nr_ex] == 1)
 			Orb[14] += Thakkar_c[nr_coef] * exp(-Thakkar_z[nr_ex] * dist);
@@ -3516,7 +3516,7 @@ double compute_spherical_density(
 		nr_ex++;
 	}
 
-	for (unsigned int m = 0; m < 15; m++) {
+	for (int m = 0; m < 15; m++) {
 		if (Orb[m] == 0 || Thakkar_occ[offset + m] == 0)
 			continue;
 		Rho += Thakkar_occ[offset + m] * pow(Orb[m], 2);
@@ -3526,20 +3526,24 @@ double compute_spherical_density(
 }
 
 double linear_interpolate_spherical_density(
-	vector <double> radial_dens,
-	vector <double> spherical_dist,
+	vector <double> & radial_dens,
+	vector <double> & spherical_dist,
 	double dist) {
-
 	double result = 0;
 	if (dist > spherical_dist[spherical_dist.size() - 1])
 		return 0;
 	else if (dist < spherical_dist[0])
 		return radial_dens[0];
-	for (int i = 0; i < spherical_dist.size()-1; i++) {
+	int end = spherical_dist.size() - 1;
+	for (int i = 0; i < end; i++) {
 		double prev_dist = spherical_dist[i];
 		double current_dist = spherical_dist[i + 1];
-		if (prev_dist < dist && current_dist > dist) 
-			i == 0 ? result = radial_dens[0] : result = radial_dens[i - 1] + (radial_dens[i] - radial_dens[i - 1]) / (current_dist - prev_dist) * (dist - prev_dist);
+		if (prev_dist < dist && current_dist > dist) {
+			if (i == 0)
+				result = radial_dens[0];
+			else
+				result = radial_dens[i - 1] + (radial_dens[i] - radial_dens[i - 1]) / (current_dist - prev_dist) * (dist - prev_dist);
+		}
 	}
 	if (result < 1E-10) result =  0;
 	return result;
@@ -3586,7 +3590,7 @@ bool calculate_structure_factors(
 	z = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
 	double* alpha_max = new double[wave.get_ncen()];
 	int* max_l = new int[wave.get_ncen()];
-	unsigned int* num_points = new unsigned int[wave.get_ncen()];
+	int* num_points = new int[wave.get_ncen()];
 	int max_l_overall = 0;
 
 #ifdef _WIN64
@@ -3635,10 +3639,10 @@ bool calculate_structure_factors(
 	}
 	hkl_input.close();
 	// Remove duplicate reflections
-	for (unsigned int i = 0; i < hkl[0].size(); i++)
-		for (unsigned int j = i + 1; j < hkl[0].size(); j++)
+	for (int i = 0; i < hkl[0].size(); i++)
+		for (int j = i + 1; j < hkl[0].size(); j++)
 			if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
-				for (unsigned int x = 0; x < 3; x++)
+				for (int x = 0; x < 3; x++)
 					hkl[x].erase(hkl[x].begin() + j);
 
 	if (debug)
@@ -3661,6 +3665,8 @@ bool calculate_structure_factors(
 	ifstream asym_cif_input(asym_cif.c_str(), ios::in);
 	vector<bool> found;
 	found.resize(7);
+	for (int k = 0; k < 7; k++) 
+		found[k] = false;
 	double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
 	double alpha = 0.0, beta = 0.0, gamma = 0.0;
 	vector <string> cell_keywords;
@@ -3671,10 +3677,20 @@ bool calculate_structure_factors(
 	cell_keywords.push_back("_cell_angle_beta");
 	cell_keywords.push_back("_cell_angle_gamma");
 	cell_keywords.push_back("_cell_volume");
+	if (debug)
+		file << "Starting while !.eof()" << endl;
 	while (!cif_input.eof()) {
+		if (debug) 
+			file << "While line! " << setw(80) << line 
+			<< setw(10) << a << found[0] 
+			<< setw(10) << b << found[1] 
+			<< setw(10) << c << found[2] 
+			<< setw(10) << alpha << found[3] 
+			<< setw(10) << beta << found[4] 
+			<< setw(10) << gamma << found[5] 
+			<< setw(10) << v << found[6] <<  endl;
 		getline(cif_input, line);
-		for (unsigned int k = 0; k < cell_keywords.size(); k++) {
-			found[k] = false;
+		for (int k = 0; k < cell_keywords.size(); k++) {
 			if (line.find(cell_keywords[k]) != string::npos) {
 				switch (k) {
 				case 0:
@@ -3726,6 +3742,11 @@ bool calculate_structure_factors(
 	double cb_star = (cg * ca - cb) / (sg * sa);
 	double cg_star = (ca * cb - cg) / (sa * sb);
 
+	if (debug)
+		file << "Making cm and rcm" << endl
+		<< ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << endl
+		<< a_star << " " << b_star << " " << c_star << " " << ca_star << " " << cb_star << " " << cg_star << endl;
+
 	cm[0][0] = a/ 0.529177249;
 	cm[0][1] = sqrt(a * b * cg)/ 0.529177249;
 	cm[0][2] = sqrt(a * c * cb)/ 0.529177249;
@@ -3752,7 +3773,7 @@ bool calculate_structure_factors(
 
 	for (int i = 0; i < 3; i++)
 		for (int j = 0; j < 3; j++)
-			if (rcm[i][j] < 10e-10){
+			if (abs(rcm[i][j]) < 10e-10){
 				rcm[i][j] = 0.0;
                 //cm[i][j] = 0.0;
             }
@@ -3778,13 +3799,13 @@ bool calculate_structure_factors(
 	cif_input.clear();
 	cif_input.seekg(0, cif_input.beg);
 	vector <string> labels;
-	vector <unsigned int> atom_type_list;
-	vector <unsigned int> asym_atom_to_type_list;
-	unsigned int count_fields = 0;
-	unsigned int position_field[3] = { 0,0,0 };
-	unsigned int label_field = 1000;
-	vector <unsigned int> asym_atom_list;
-	vector <unsigned int> all_atom_list;
+	vector <int> atom_type_list;
+	vector <int> asym_atom_to_type_list;
+	int count_fields = 0;
+	int position_field[3] = { 0,0,0 };
+	int label_field = 1000;
+	vector <int> asym_atom_list;
+	vector <int> all_atom_list;
 	vector < bool > is_asym;
 	vector < vector <double > > positions;
 	positions.resize(wave.get_ncen());
@@ -3822,7 +3843,7 @@ bool calculate_structure_factors(
 				stringstream s(line);
 				vector <string> fields;
 				fields.resize(count_fields);
-				for (unsigned int i = 0; i < count_fields; i++)
+				for (int i = 0; i < count_fields; i++)
 					s >> fields[i];
 				positions[labels.size()][0] = (a * stod(fields[position_field[0]]) + b * cg * stod(fields[position_field[1]]) + c * cb * stod(fields[position_field[2]])) / 0.529177249;
 				positions[labels.size()][1] = (b * sg * stod(fields[position_field[1]]) + c * (ca - cb * cg) / sg * stod(fields[position_field[2]])) / 0.529177249;
@@ -3878,7 +3899,7 @@ bool calculate_structure_factors(
 				stringstream s(line);
 				vector <string> fields;
 				fields.resize(count_fields);
-				for (unsigned int i = 0; i < count_fields; i++)
+				for (int i = 0; i < count_fields; i++)
 					s >> fields[i];
 				for (int atom = 0; atom < wave.get_ncen(); atom++) {
 					if (debug) file << "Comparing atoms: " << fields[label_field] << " / " << labels[atom] << endl;
@@ -3989,11 +4010,11 @@ bool calculate_structure_factors(
 					for (int x = 0; x < 3; x++)
 						for (int y = 0; y < 3; y++)
 							sym_from_cif[x][y] = 0;
-					for (unsigned int i = 0; i < count_fields; i++)
+					for (int i = 0; i < count_fields; i++)
 						s >> fields[i];
 					vector<string> vectors;
 					vectors.resize(3);
-					unsigned int column = 0;
+					int column = 0;
 					for (int c = 0; c < fields[operation_field].length(); c++) {
 						if (fields[operation_field][c] != ',')
 							vectors[column].push_back(fields[operation_field][c]);
@@ -4118,7 +4139,7 @@ bool calculate_structure_factors(
 		file << "made it post CIF, now make grids!" << endl;
 
 	double*** grid = new double** [all_atom_list.size()];
-	for (unsigned int i = 0; i < all_atom_list.size(); i++)
+	for (int i = 0; i < all_atom_list.size(); i++)
 		grid[i] = new double* [5];
 	// GRID COORDINATES for [a][c][p] a = atom [0,ncen],
 	// c = coordinate [0=x, 1=y, 2=z, 3=becke and hirshfeld weighted density],
@@ -4159,11 +4180,11 @@ bool calculate_structure_factors(
 				alpha_max[i] = wave.get_exponent(b);
 			if (wave.get_type(b) > max_l[i]) {
 				int l = wave.get_type(b);
-				if (l == 0)
+				if (l == 1)
 					l = 1;
-				else if (l >= 1 && l <= 3)
+				else if (l >= 2 && l <= 4)
 					l = 2;
-				else if (l >= 4 && l <= 10)
+				else if (l >= 5 && l <= 10)
 					l = 3;
 				else if (l >= 11 && l <= 20)
 					l = 4;
@@ -4180,7 +4201,7 @@ bool calculate_structure_factors(
 		file << "Atoms are there!" << endl;
 
 	double** alpha_min = new double* [wave.get_ncen()];
-	for (unsigned int i = 0; i < wave.get_ncen(); i++)
+	for (int i = 0; i < wave.get_ncen(); i++)
 		alpha_min[i] = new double[max_l_overall];
 
 #pragma omp parallel for
@@ -4191,7 +4212,6 @@ bool calculate_structure_factors(
 
 #pragma omp parallel for
 	for (int i = 0; i < wave.get_ncen(); i++) {
-		if (debug) file << "Atom: " << i << endl;
 		for (int b = 0; b < wave.get_nex(); b++) {
 			if (wave.get_center(b) != i + 1)
 				continue;
@@ -4246,15 +4266,23 @@ bool calculate_structure_factors(
 
 	//Make Prototype grids with only single atom weights for all elements
 	vector <AtomGrid> Prototype_grids;
+	if (debug) file << "max_l_overall: " << max_l_overall << endl;
 	for (int i = 0; i < atom_type_list.size(); i++) {
+		if (debug) file << "Atom " << i << endl;
 		double alpha_max_temp;
 		double max_l_temp;
 		double* alpha_min_temp = new double[max_l_overall];
 		for (int j = 0; j < wave.get_ncen(); j++) {
 			if (wave.atoms[j].charge == atom_type_list[i]) {
+				if (debug) {
+					file << alpha_max[j] << " " << max_l[j] - 1 << " ";
+					for (int l = 0; l < max_l_overall; l++)
+						file << alpha_min[j][l] << " ";
+					file << endl;
+				}
 				alpha_max_temp = alpha_max[j];
 				max_l_temp = max_l[j] - 1;
-				for (unsigned int l = 0; l <= max_l_temp; l++)
+				for (int l = 0; l <= max_l_temp; l++)
 					alpha_min_temp[l] = alpha_min[j][l];
 				break;
 			}
@@ -4347,6 +4375,8 @@ bool calculate_structure_factors(
 
 		num_points[nr] = Prototype_grids[type].get_num_grid_points();
 
+		if (debug) file << "Number of points for atom " << i << ": " << num_points[nr] << endl;
+
 		for (int n = 0; n < 4; n++)
 			grid[nr][n] = new double[num_points[nr]];
 
@@ -4369,8 +4399,9 @@ bool calculate_structure_factors(
 
 #ifdef _WIN64
 	if (debug) {
+		file << "Taking time..." << endl;
 		time_t end_becke = time(NULL);
-		double points = 0;
+		int points = 0;
 		for (int i = 0; i < wave.get_ncen(); i++)
 			points += num_points[i];
 		file << "Number of gridpoints before pruning: " << defaultfloat << points << endl;
@@ -4393,18 +4424,18 @@ bool calculate_structure_factors(
 	}
 #endif
 
-	for (unsigned int i = 0; i < wave.get_ncen(); i++) {
+	for (int i = 0; i < wave.get_ncen(); i++) {
 		int nr = all_atom_list[i];
 		//if (debug) file << endl << "Grid for atom " << labels[i] << endl;
 		int reduction = 0;
-		for (unsigned int p = 0; p < num_points[nr]; p++) {
+		for (int p = 0; p < num_points[nr]; p++) {
 			/*if (debug)
 				file << scientific << setw(14) << grid[nr][0][p] - wave.atoms[nr].x
 				<< scientific << setw(14) << grid[nr][1][p] - wave.atoms[nr].y
 				<< scientific << setw(14) << grid[nr][2][p] - wave.atoms[nr].z
 				<< scientific << setw(16) << grid[nr][3][p] << endl;*/
 			if (abs(grid[nr][3][p]) > 1E-14)
-				for (unsigned int k = 0; k < 4; k++)
+				for (int k = 0; k < 4; k++)
 					total_grid[k].push_back(grid[nr][k][p]);
 			else
 				reduction++;
@@ -4471,7 +4502,7 @@ bool calculate_structure_factors(
 
 	vector < vector <double> > atom_els;
 	atom_els.resize(3);
-	for (unsigned int i = 0; i < all_atom_list.size(); i++)
+	for (int i = 0; i < all_atom_list.size(); i++)
 		for (int n = 0; n < 3; n++)
 			atom_els[n].push_back(0.0);
 
@@ -4484,11 +4515,11 @@ bool calculate_structure_factors(
 		radial_density.resize(atom_type_list.size());
 		spherical_density.resize(asym_atom_list.size());
 		radial_dist.resize(asym_atom_list.size());
-		for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+		for (int i = 0; i < asym_atom_list.size(); i++)
 			spherical_density[i].resize(total_grid[0].size());
 
 		double incr = 1.005;
-		for (unsigned int i = 0; i < atom_type_list.size(); i++) {
+		for (int i = 0; i < atom_type_list.size(); i++) {
 			if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
 			double current = 1;
 			double dist = 0.000001;
@@ -4501,7 +4532,7 @@ bool calculate_structure_factors(
 			if (debug)
 				file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
 		}
-		/*if (debug) {
+		if (debug) {
 			for (int i = 0; i < wave.get_ncen(); i++) {
 				if (is_asym[i]) {
 					int nr = all_atom_list[i];
@@ -4519,7 +4550,7 @@ bool calculate_structure_factors(
 							<< " m. dens: " << spherical_density[i][p]
 							//<< " real dens: " << compute_spherical_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)))
 							<< " constexpr: " << get_radial_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)))
-							<< " as. dens: " << compute_dens(wave, new double[3]{ total_grid[0][p], total_grid[1][p], total_grid[2][p] }, i) << endl;/
+							<< " as. dens: " << compute_dens(wave, new double[3]{ total_grid[0][p], total_grid[1][p], total_grid[2][p] }, i) << endl;*/
 					}
 					file << "Done with atom " << i << endl;
 				}
@@ -4581,7 +4612,7 @@ bool calculate_structure_factors(
 						}
 			}
 		}
-		else {*/
+		else {
 			for (int i = 0; i < wave.get_ncen(); i++) {
 				int nr = all_atom_list[i];
 				if (is_asym[i]) {
@@ -4638,12 +4669,12 @@ bool calculate_structure_factors(
 							}
 						}
 			}
-		//}
+		}
 
 		//Generate Electron sums
 		for (int i = 0; i < wave.get_ncen(); i++) {
 			int start_p = 0;
-			for (unsigned int a = 0; a < i; a++)
+			for (int a = 0; a < i; a++)
 				start_p += num_points[all_atom_list[a]];
 			for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
 				atom_els[0][i] += total_grid[3][start_p + p] * total_grid[5][start_p + p];
@@ -4689,8 +4720,8 @@ bool calculate_structure_factors(
 			file << "Becke grid with hirshfeld weights done!" << endl;
 		double el_sum_hirshfeld = 0.0;
 		if (debug) {
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
-				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
+			for (int i = 0; i < asym_atom_list.size(); i++)
+				for (int p = 0; p < total_grid[0].size(); p++) {
 					if (isnan(spherical_density[i][p]))
 						file << "spherical density is NaN! " << i << " " << p << endl;
 					if (isnan(total_grid[5][p]))
@@ -4711,7 +4742,7 @@ bool calculate_structure_factors(
 
 		if (debug) {
 			file << "atom_els[2]: ";
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+			for (int i = 0; i < asym_atom_list.size(); i++) {
 				if (isnan(atom_els[2][i]))
 					file << "!!!";
 				file << atom_els[2][i] << " ";
@@ -4726,7 +4757,7 @@ bool calculate_structure_factors(
         file << " Hirshfeld" << endl;
 
 		int counter = 0;
-		for (unsigned int i = 0; i < wave.get_ncen(); i++) {
+		for (int i = 0; i < wave.get_ncen(); i++) {
 			file << setw(6) << labels[i]
 				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][i]
 				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][i];
@@ -4759,7 +4790,7 @@ bool calculate_structure_factors(
 	dens.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer dens" << endl;
-	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+	for (int i = 0; i < asym_atom_list.size(); i++)
 		dens[i].resize(total_grid[0].size());
 	if (debug)
 		file << "resized inner dens" << endl;
@@ -4768,7 +4799,7 @@ bool calculate_structure_factors(
 	d3.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer d1-3" << endl;
-	for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
+	for (int i = 0; i < asym_atom_list.size(); i++) {
 		d1[i].resize(total_grid[0].size());
 		d2[i].resize(total_grid[0].size());
 		d3[i].resize(total_grid[0].size());
@@ -4836,6 +4867,11 @@ bool calculate_structure_factors(
 					k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
 				}
 	}
+	if (debug) {
+		file << "k_pts: " << endl;
+		for (int i = 0; i < k_pt[0].size(); i++)
+			file << setw(14) << scientific << k_pt[0][i] << setw(14) << scientific << k_pt[1][i] << setw(14) << scientific << k_pt[2][i] << endl;
+	}
 
 	/*cosinus_annaeherung cosinus_helper;
 	cosinus_helper.resize(100000);
@@ -4863,7 +4899,7 @@ bool calculate_structure_factors(
 #endif
 
 	//file << endl << "Calculating scattering factors..." << endl;
-	progress_bar progress{ file, 75u, "Calculating scattering factors" };
+	progress_bar progress{ file, 60u, "Calculating scattering factors" };
 	const int step = floor(total_grid[0].size() / 20);
 	if (!becke) {
 		int smax = k_pt[0].size();
@@ -4890,8 +4926,8 @@ bool calculate_structure_factors(
 #pragma omp parallel for
 		for (int s = 0; s < k_pt[0].size(); s++) {
 			double work;
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++) {
-				for (unsigned int p = 0; p < total_grid[0].size(); p++) {
+			for (int i = 0; i < asym_atom_list.size(); i++) {
+				for (int p = 0; p < total_grid[0].size(); p++) {
 					work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
 					sf[i][s] += complex<double>(dens[i][p] * cos(work), dens[i][p] * sin(work));
 				}
@@ -4903,13 +4939,13 @@ bool calculate_structure_factors(
 
 	if (electron_diffraction) {
 		double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
-		for (unsigned int s = 0; s < sym[0][0].size(); s++) {
+		for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
 			for (int p = 0; p < hkl[0].size(); p++) {
 				double h2 = pow(hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s], 2)
 					+ pow(hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s], 2)
 					+ pow(hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s], 2);
-				for (unsigned int i = 0, imax = asym_atom_list.size(); i < imax; i++)
+				for (int i = 0, imax = asym_atom_list.size(); i < imax; i++)
 					sf[i][p + hkl[0].size() * s] = fact * ((double) wave.atoms[asym_atom_list[i]].charge - sf[i][p + hkl[0].size() * s]) / h2;
 			}
 		}
@@ -4952,19 +4988,19 @@ bool calculate_structure_factors(
 			tsc_file << ";";
 	}
 	tsc_file << endl << "AD: false" << endl << "SCATTERERS:";
-	for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+	for (int i = 0; i < asym_atom_list.size(); i++)
 		tsc_file << " " << labels[i];
 	tsc_file << endl << "data:" << endl;
 
     if(debug) file << "Writing a total of " << sym[0][0].size() << " symmetry generated sets of hkls!" << endl;
-	for (unsigned int s = 0; s < sym[0][0].size(); s++) {
+	for (int s = 0; s < sym[0][0].size(); s++) {
 		//if (debug) file << "writing symmetry: " << s << endl;
-		for (unsigned int p = 0; p < hkl[0].size(); p++) {
+		for (int p = 0; p < hkl[0].size(); p++) {
 			tsc_file 
 				<< hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s] << " "
 				<< hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s] << " "
 				<< hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s] << " ";
-			for (unsigned int i = 0; i < asym_atom_list.size(); i++)
+			for (int i = 0; i < asym_atom_list.size(); i++)
 				tsc_file << scientific << setprecision(8) << real(sf[i][p + hkl[0].size() * s]) << ","
 				<< scientific << setprecision(8) << imag(sf[i][p + hkl[0].size() * s]) << " ";
 			tsc_file << endl;
