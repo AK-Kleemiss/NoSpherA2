@@ -120,13 +120,13 @@ public:
 	cosinus_annaeherung();
 	inline double get(double x) const
 	{
-		double xa = abs(x);
-		size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
-		double dx = xa - pos * mStepwidth;
-		pos = pos % mSize; // Modulo, da sinus periodisch ist.
-		double y1 = mBase_values[pos];
-		double y2 = mBase_values[pos + 1];
-		return y1 + dx * (y2 - y1) / mStepwidth;
+////////////////double xa = abs(x);
+////////////////size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
+////////////////double dx = xa - pos * mStepwidth;
+////////////////pos = pos % mSize; // Modulo, da sinus periodisch ist.
+////////////////double y1 = mBase_values[pos];
+////////////////double y2 = mBase_values[pos + 1];
+////////////////return y1 + dx * (y2 - y1) / mStepwidth;
 	}
 
 	void   resize(size_t size);
