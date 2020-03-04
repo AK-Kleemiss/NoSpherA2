@@ -4690,8 +4690,8 @@ bool calculate_structure_factors(
 		for (int p = 0; p < total_grid[0].size(); p++)
 				total_grid[5][p] *= total_grid[3][p];
 		if (debug)
-//#pragma omp parallel for
-			for (int p = 0, pmax = total_grid[0].size(); p < pmax; p++)
+#pragma omp parallel for
+			for (int p = 0; p < total_grid[0].size(); p++)
 				total_grid[3][p] = 0;
 
         /*double factor = 1.0;
@@ -4774,52 +4774,25 @@ bool calculate_structure_factors(
 		file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
 	}
 
-	vector< vector < complex<double> > > sf;
-	sf.resize(asym_atom_list.size());
-
-#pragma omp parallel for
-	for (int i = 0; i < asym_atom_list.size(); i++) 
-		sf[i].resize(sym[0][0].size() * hkl[0].size());
-
-	if (debug)
-		file << "Initialized FFs" << endl
-			<< "asym atom list size: " << asym_atom_list.size() << " total grid size: " << total_grid[0].size() << endl;
-
 	vector < vector <double> > d1,d2,d3;
 	vector < vector <double> > dens;
+	int points = 0;
 	dens.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer dens" << endl;
-	for (int i = 0; i < asym_atom_list.size(); i++)
-		dens[i].resize(total_grid[0].size());
-	if (debug)
-		file << "resized inner dens" << endl;
 	d1.resize(asym_atom_list.size());
 	d2.resize(asym_atom_list.size());
 	d3.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer d1-3" << endl;
-	for (int i = 0; i < asym_atom_list.size(); i++) {
-		d1[i].resize(total_grid[0].size());
-		d2[i].resize(total_grid[0].size());
-		d3[i].resize(total_grid[0].size());
-	}
-
-	if (debug)
-		file << "Resized vectors" << endl;
 
 	if (!becke) {
-#pragma omp parallel for 
-		for (int p = 0; p < total_grid[0].size(); p++)
-			for (int i = 0; i < asym_atom_list.size(); i++) {
-				d1[i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
-				d2[i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
-				d3[i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
-
-				
+#pragma omp parallel for reduction(+:points)
+		for (int i = 0; i < asym_atom_list.size(); i++) {
+			for (int p = 0; p < total_grid[0].size(); p++) {
 				if (debug) {
 					total_grid[3][p] += spherical_density[i][p] / total_grid[4][p];
-					if(asym_atom_list.size() == all_atom_list.size() && pbc == 0)
+					if (asym_atom_list.size() == all_atom_list.size() && pbc == 0)
 						if (i == asym_atom_list.size() - 1 && total_grid[3][p] < 0.999) {
 							file << "weight sum != 1: " << setw(6) << p << fixed << setw(10) << total_grid[3][p] << scientific << setw(12) << total_grid[4][p] << endl;
 							for (int i = 0; i < asym_atom_list.size(); i++)
@@ -4828,22 +4801,30 @@ bool calculate_structure_factors(
 						}
 				}
 				//        BECKE WEIGHT * Wfn Density * Atomic spherical density / total spherical density  
-				if (spherical_density[i][p] != 0 && total_grid[4][p] != 0)
-					dens[i][p] = total_grid[5][p] * spherical_density[i][p] / total_grid[4][p];
-				else
-					dens[i][p] = 0.0;
+				if (spherical_density[i][p] != 0 && total_grid[4][p] != 0) {
+					dens[i].push_back(total_grid[5][p] * spherical_density[i][p] / total_grid[4][p]);
+					d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+					d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+					d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+				}
 			}
+			points += dens[i].size();
+		}
+		
+		for (int grid = 0; grid < total_grid.size(); grid++)
+			total_grid[grid].resize(0);
+		total_grid.resize(0);
 	}
 	else
 #pragma omp parallel for
 		for (int i = 0; i < asym_atom_list.size(); i++) 
 			for (int p = 0, pmax = total_grid[0].size(); p < pmax; p++) {
-				d1[i][p] = total_grid[0][p] - wave.atoms[asym_atom_list[i]].x;
-				d2[i][p] = total_grid[1][p] - wave.atoms[asym_atom_list[i]].y;
-				d3[i][p] = total_grid[2][p] - wave.atoms[asym_atom_list[i]].z;
+				d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+				d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+				d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
 
 				//        BECKE WEIGHT * Wfn Density
-				dens[i][p] = compute_dens(wave, new double[3]{ total_grid[0][p] , total_grid[1][p] , total_grid[2][p] }, asym_atom_list[i]) * total_grid[3][p];
+				dens[i].push_back(compute_dens(wave, new double[3]{ total_grid[0][p] , total_grid[1][p] , total_grid[2][p] }, asym_atom_list[i]) * total_grid[3][p]);
 			}
 
 
@@ -4879,7 +4860,18 @@ bool calculate_structure_factors(
 	cosinus cosins(cosinus_helper);*/
 	
 
-	file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << total_grid[0].size() << " gridpoints." << endl;
+	file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
+
+	vector< vector < complex<double> > > sf;
+	sf.resize(asym_atom_list.size());
+
+#pragma omp parallel for
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		sf[i].resize(sym[0][0].size() * hkl[0].size());
+
+	if (debug)
+		file << "Initialized FFs" << endl
+		<< "asym atom list size: " << asym_atom_list.size() << " total grid size: " << points << endl;
 
 #ifdef _WIN64
 	time_t end1 = time(NULL);
@@ -4898,28 +4890,27 @@ bool calculate_structure_factors(
 
 #endif
 
-	//file << endl << "Calculating scattering factors..." << endl;
 	progress_bar progress{ file, 60u, "Calculating scattering factors" };
-	const int step = floor(total_grid[0].size() / 20);
+	const int step = max(floor(asym_atom_list.size() / 20),1);
 	if (!becke) {
 		int smax = k_pt[0].size();
 		int imax = asym_atom_list.size();
-		int pmax = total_grid[0].size();
-#pragma omp parallel for schedule(dynamic)
-		for (int p = 0; p < pmax; p++) {
-//#pragma omp simd collapse(2)
-			for (int i = 0; i < imax; i++) {
-				for (int s = 0; s < smax; s++) {
-					if (dens[i][p] != 0) {
-						double work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
-//						cos_v = cosins.get(work);
-//						sin_v = sins.get(work);
-						sf[i][s] += complex<double>(dens[i][p] * cos(work), dens[i][p] * sin(work));
-					}
+		for (int i = 0; i < imax; i++) {
+			int pmax = dens[i].size();
+#pragma omp parallel for
+			for (int s = 0; s < smax; s++) {
+				double work;
+				double rho;
+				for (int p = 0; p < pmax; p++) {
+					rho = dens[i][p];
+					work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
+//					cos_v = cosins.get(work);
+//					sin_v = sins.get(work);
+					sf[i][s] += complex<double>(rho * cos(work), rho * sin(work));
 				}
 			}
-			if (p != 0 && p % step == 0)
-				progress.write(p / double(pmax));
+			if (i != 0 && i % step == 0)
+				progress.write(i / double(imax));
 		}
 	}
 	else {

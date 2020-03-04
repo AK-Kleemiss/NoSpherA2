@@ -50,13 +50,12 @@ bool expert=false;
 int main(int argc, char **argv)
 {
 	ofstream log_file("wfn_2_fchk.log", ios::out);
-	log_file << "             ____   _____ _______ " << std::endl;
-	log_file << "            / __ \\ / ____|__   __|" << std::endl;
-	log_file << "  ___ _   _| |  | | |       | |   " << std::endl;
-	log_file << " / __| | | | |  | | |       | |   " << std::endl;
-	log_file << "| (__| |_| | |__| | |____   | |   " << std::endl;
-	log_file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-	log_file << "                                  " << std::endl;
+	log_file << "    _   __     _____       __              ___   ___\n";
+	log_file << "   / | / /___ / ___ /____ / /_  ___  _____/   | |__ \\\n";
+	log_file << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
+	log_file << " / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
+	log_file << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
+	log_file << "                /_/\n" << flush;
 	log_file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 	log_file.flush();
 	if(argc>1){
