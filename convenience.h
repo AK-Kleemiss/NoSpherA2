@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <vector>
 #include <fstream>
+#include <algorithm>
 
 class WFN;
 
