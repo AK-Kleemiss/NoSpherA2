@@ -41,13 +41,12 @@ inline void QCT(){
 };
 
 inline bool cuQCT(ofstream& file){
-  file << "             ____   _____ _______ " << std::endl;
-  file << "            / __ \\ / ____|__   __|" << std::endl;
-  file << "  ___ _   _| |  | | |       | |   " << std::endl;
-  file << " / __| | | | |  | | |       | |   " << std::endl;
-  file << "| (__| |_| | |__| | |____   | |   " << std::endl;
-  file << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-  file << "                       "<< std::endl;
+	file << "     _   __     _____       __              ___   ___\n";
+	file << "    / | / /___ / ___ / ____  / /_  ___  _____/   | |__ \\\n";
+	file << "   /  |/ / __ \\\\__ \\ / __ \\ / __ \\ / _ \\ / ___/ /| | __//\n";
+	file << "  / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
+	file << " /_/ |_ / \\____ / ____ / .___ / _/ /_ / \\___ / _/  /_/  |_ / ____/\n";
+	file << "       /_ /\n" << flush;
   return true;
 };
 
@@ -1037,7 +1036,7 @@ void progress_bar::write(double fraction)
 		fraction = 1;
 
 	auto width = bar_width - message.size();
-	auto offset = bar_width - static_cast<unsigned>(width * fraction);
+	auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
 
 	os << '\n' << message;
 	os.write(full_bar.data() + offset, width);
