@@ -290,6 +290,50 @@ int AtomGrid::get_num_radial_grid_points() const
 }
 
 void AtomGrid::get_grid(const int num_centers,
+    const int center_index,
+    const double x_coordinates_bohr[],
+    const double y_coordinates_bohr[],
+    const double z_coordinates_bohr[],
+    const int proton_charges[],
+    double grid_x_bohr[],
+    double grid_y_bohr[],
+    double grid_z_bohr[],
+    double grid_aw[],
+    double grid_mw[]) const
+{
+
+    for (size_t ipoint = 0; ipoint < num_grid_points_; ipoint++)
+    {
+        grid_x_bohr[ipoint] =
+            atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+        grid_y_bohr[ipoint] =
+            atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+        grid_z_bohr[ipoint] =
+            atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+
+        double becke_w = 1.0;
+
+        // if there are no other centers
+        // no point in partitioning the space
+        if (num_centers > 1)
+        {
+            becke_w = get_becke_w(num_centers,
+                proton_charges,
+                x_coordinates_bohr,
+                y_coordinates_bohr,
+                z_coordinates_bohr,
+                center_index,
+                grid_x_bohr[ipoint],
+                grid_y_bohr[ipoint],
+                grid_z_bohr[ipoint]);
+        }
+
+        grid_mw[ipoint] = atom_grid_w_[ipoint] * becke_w;
+        grid_aw[ipoint] = atom_grid_w_[ipoint];
+    }
+}
+
+void AtomGrid::get_grid(const int num_centers,
                         const int center_index,
                         const double x_coordinates_bohr[],
                         const double y_coordinates_bohr[],
