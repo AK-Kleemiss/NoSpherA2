@@ -4868,7 +4868,7 @@ bool calculate_structure_factors(
 #endif
 
 	progress_bar progress{ file, 60u, "Calculating scattering factors" };
-	const int step = max(floor(asym_atom_list.size() / 20),1);
+	const int step = max(floor(asym_atom_list.size() / 20),1.0);
 	int smax = k_pt[0].size();
 	int imax = asym_atom_list.size();
 	for (int i = 0; i < imax; i++) {
