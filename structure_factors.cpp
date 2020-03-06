@@ -3482,7 +3482,7 @@ double compute_dens(
 			d[1] = PosGrid[1] - wave.atoms[iat].y;
 			d[2] = PosGrid[2] - wave.atoms[iat].z;
 			ex = exp(-wave.get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]));
-			if (ex < pow(10, -30))	continue;
+			if (ex < pow(10, -15))	continue;
 			float xl[3] = { 0.0,0.0,0.0 };
 			for (int k = 0; k < 3; k++) {
 				if (l[k] == 0)		xl[k] = 1.0;
@@ -3624,7 +3624,6 @@ bool calculate_structure_factors(
 	bool debug,
 	int accuracy,
 	ofstream& file,
-	bool becke,
 	int cpus,
 	bool electron_diffraction,
 	int pbc
@@ -3788,25 +3787,22 @@ bool calculate_structure_factors(
 	double a_star = b * c * sa / V;
 	double b_star = a * c * sb / V;
 	double c_star = a * b * sg / V;
-	double ca_star = (cb * cg - ca) / (sb * sg);
-	double cb_star = (cg * ca - cb) / (sg * sa);
-	double cg_star = (ca * cb - cg) / (sa * sb);
 
 	if (debug)
 		file << "Making cm and rcm" << endl
 		<< ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << endl
-		<< a_star << " " << b_star << " " << c_star << " " << ca_star << " " << cb_star << " " << cg_star << endl;
+		<< a_star << " " << b_star << " " << c_star << endl;
 
 	cm[0][0] = a/ 0.529177249;
-	cm[0][1] = sqrt(a * b * cg)/ 0.529177249;
-	cm[0][2] = sqrt(a * c * cb)/ 0.529177249;
+	cm[0][1] = sqrt(abs(a * b * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
+	cm[0][2] = sqrt(abs(a * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
 
-	cm[1][0] = sqrt(a * b * cg)/ 0.529177249;
+	cm[1][0] = sqrt(abs(a * b * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
 	cm[1][1] = b/ 0.529177249;
-	cm[1][2] = sqrt(b * c * cb)/ 0.529177249;
+	cm[1][2] = sqrt(abs(b * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
 
-	cm[2][0] = sqrt(a * c * cg)/ 0.529177249;
-	cm[2][1] = sqrt(b * c * cb)/ 0.529177249;
+	cm[2][0] = sqrt(abs(a * c * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
+	cm[2][1] = sqrt(abs(b * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
 	cm[2][2] = c/ 0.529177249;
 
 	rcm[0][0] = 2 * M_PI / a;
@@ -3901,9 +3897,9 @@ bool calculate_structure_factors(
 				bool found_this_one = false;
 				if (debug) file << "label: " << fields[label_field] << " position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
-					if (is_similar(positions[labels.size()][0], wave.atoms[i].x, -2)
-						&& is_similar(positions[labels.size()][1], wave.atoms[i].y, -2)
-						&& is_similar(positions[labels.size()][2], wave.atoms[i].z, -2)) {
+					if (is_similar(positions[labels.size()][0], wave.atoms[i].x, -1)
+						&& is_similar(positions[labels.size()][1], wave.atoms[i].y, -1)
+						&& is_similar(positions[labels.size()][2], wave.atoms[i].z, -1)) {
 						if (debug) file << "WFN position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl
 							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 						all_atom_list.push_back(i);
@@ -3912,10 +3908,7 @@ bool calculate_structure_factors(
 					}
 				}
 				if (!found_this_one && debug)
-					file << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl
-					<< "tolerance was: +/-" << positions[labels.size()][0] * 0.05 << " +/-"
-					<< positions[labels.size()][1] * 0.05 << " +/-"
-					<< positions[labels.size()][2] * 0.05 << endl;
+					file << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
 				labels.push_back(fields[label_field]);
 				getline(asym_cif_input, line);
 			}
@@ -3951,14 +3944,15 @@ bool calculate_structure_factors(
 				fields.resize(count_fields);
 				for (int i = 0; i < count_fields; i++)
 					s >> fields[i];
+				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
 				for (int atom = 0; atom < wave.get_ncen(); atom++) {
 					if (debug) file << "Comparing atoms: " << fields[label_field] << " / " << labels[atom] << endl;
 					if (fields[label_field] == labels[atom]) {
 						int nr = -1;
 						for (int i = 0; i < wave.get_ncen(); i++) {
-							if (is_similar(positions[atom][0], wave.atoms[i].x, -2)
-								&& is_similar(positions[atom][1], wave.atoms[i].y, -2)
-								&& is_similar(positions[atom][2], wave.atoms[i].z, -2)) {
+							if (is_similar(positions[atom][0], wave.atoms[i].x, -1)
+								&& is_similar(positions[atom][1], wave.atoms[i].y, -1)
+								&& is_similar(positions[atom][2], wave.atoms[i].z, -1)) {
 								if (debug) file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 								nr = i;
 								asym_atom_list.push_back(i);
@@ -4505,49 +4499,47 @@ bool calculate_structure_factors(
 	file << "Calculating aspherical densities..." << flush;
     vector < vector < double > > periodic_grid;
 
-	if (!becke) {
-		total_grid[4].resize(total_grid[0].size());
-		total_grid[5].resize(total_grid[0].size());
+	total_grid[4].resize(total_grid[0].size());
+	total_grid[5].resize(total_grid[0].size());
 #pragma omp parallel for
-		for (int i = 0; i < total_grid[0].size(); i++) {
-			total_grid[4][i] = 0.0;
-			total_grid[5][i] = compute_dens(wave, new double[3]{ 
-                total_grid[0][i], 
-                total_grid[1][i], 
-                total_grid[2][i] });
-		}
-		if (pbc != 0) {
-            periodic_grid.resize(pow(pbc*2+1,3));
-            int j=0;
-            for(int d=0; d<pow(pbc*2+1,3); d++)
-                periodic_grid[d].resize(total_grid[5].size());
-			for (int x = -pbc; x < pbc+1; x++)
-				for (int y = -pbc; y < pbc+1; y++)
-					for (int z = -pbc; z < pbc+1; z++) {
-						if (x == 0 && y == 0 && z == 0)
-							continue;
+	for (int i = 0; i < total_grid[0].size(); i++) {
+		total_grid[4][i] = 0.0;
+		total_grid[5][i] = compute_dens(wave, new double[3]{ 
+            total_grid[0][i], 
+            total_grid[1][i], 
+            total_grid[2][i] });
+	}
+	if (pbc != 0) {
+        periodic_grid.resize(pow(pbc*2+1,3));
+        int j=0;
+        for(int d=0; d<pow(pbc*2+1,3); d++)
+            periodic_grid[d].resize(total_grid[5].size());
+		for (int x = -pbc; x < pbc+1; x++)
+			for (int y = -pbc; y < pbc+1; y++)
+				for (int z = -pbc; z < pbc+1; z++) {
+					if (x == 0 && y == 0 && z == 0)
+						continue;
 #pragma omp parallel for
-						for (int i = 0; i < total_grid[0].size(); i++)
-							periodic_grid[j][i] = compute_dens(wave, new double[3]{
-								total_grid[0][i] + x * cm[0][0] + y * cm[0][1] + z * cm[0][2],
-								total_grid[1][i] + x * cm[1][0] + y * cm[1][1] + z * cm[1][2],
-								total_grid[2][i] + x * cm[2][0] + y * cm[2][1] + z * cm[2][2] });
-                        j++;
-					}
-			if (debug){
-				for (int i = 0; i < total_grid[0].size(); i++){
+					for (int i = 0; i < total_grid[0].size(); i++)
+						periodic_grid[j][i] = compute_dens(wave, new double[3]{
+							total_grid[0][i] + x * cm[0][0] + y * cm[0][1] + z * cm[0][2],
+							total_grid[1][i] + x * cm[1][0] + y * cm[1][1] + z * cm[1][2],
+							total_grid[2][i] + x * cm[2][0] + y * cm[2][1] + z * cm[2][2] });
+                    j++;
+				}
+		if (debug){
+			for (int i = 0; i < total_grid[0].size(); i++){
+                if (i%1000==0)
+                    file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:"; 
+                for (int j=0; j<pow(pbc*2+1,3)-1; j++){
                     if (i%1000==0)
-                        file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:"; 
-                    for (int j=0; j<pow(pbc*2+1,3)-1; j++){
-                        if (i%1000==0)
-                            file << " " << periodic_grid[j][i];
-                        total_grid[5][i] += periodic_grid[j][i];
-                    }
-                    if (i%1000==0)
-					    file << endl;
+                        file << " " << periodic_grid[j][i];
+                    total_grid[5][i] += periodic_grid[j][i];
                 }
+                if (i%1000==0)
+				    file << endl;
             }
-		}
+        }
 	}
 
 	if (debug) file << endl << "with total number of points: " << total_grid[0].size() << endl;
@@ -4568,282 +4560,199 @@ bool calculate_structure_factors(
 	vector < vector < double > > radial_density;
 	vector < vector < double > > radial_dist;
 
-	if (!becke) {
-		radial_density.resize(atom_type_list.size());
-		spherical_density.resize(asym_atom_list.size());
-		radial_dist.resize(asym_atom_list.size());
-		for (int i = 0; i < asym_atom_list.size(); i++)
-			spherical_density[i].resize(total_grid[0].size());
+	radial_density.resize(atom_type_list.size());
+	spherical_density.resize(asym_atom_list.size());
+	radial_dist.resize(asym_atom_list.size());
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		spherical_density[i].resize(total_grid[0].size());
 
-		double incr = 1.005;
-		for (int i = 0; i < atom_type_list.size(); i++) {
-			if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
-			double current = 1;
-			double dist = 0.000001;
-			while (current > 1E-12) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-			if (debug)
-				file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+	double incr = 1.005;
+	//Make radial grids
+	for (int i = 0; i < atom_type_list.size(); i++) {
+		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
+		double current = 1;
+		double dist = 0.000001;
+		while (current > 1E-12) {
+			radial_dist[i].push_back(dist);
+			current = get_radial_density(atom_type_list[i], dist);
+			radial_density[i].push_back(current);
+			dist *= incr;
 		}
-		if (debug) {
-			for (int i = 0; i < wave.get_ncen(); i++) {
-				if (is_asym[i]) {
-					int nr = all_atom_list[i];
-					file << "atom nr " << i << " in all atom list: " << nr << " in type list nr: " << asym_atom_to_type_list[i] << " Type: " << atom_type_list[asym_atom_to_type_list[i]] << endl;
-					for (int p = 0; p < total_grid[0].size(); p++) {
-						spherical_density[i][p] =
-							linear_interpolate_spherical_density(
-								radial_density[asym_atom_to_type_list[i]],
-								radial_dist[asym_atom_to_type_list[i]],
-								sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) + pow(total_grid[1][p] - wave.atoms[nr].y, 2) + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
-							);
-						total_grid[4][p] += spherical_density[i][p];
-						/*if (i == 0)
-							file << "d = " << scientific << sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2))
-							<< " m. dens: " << spherical_density[i][p]
-							//<< " real dens: " << compute_spherical_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)))
-							<< " constexpr: " << get_radial_density(wave.atoms[i].charge, sqrt(pow(total_grid[0][p] - wave.atoms[i].x, 2) + pow(total_grid[1][p] - wave.atoms[i].y, 2) + pow(total_grid[2][p] - wave.atoms[i].z, 2)))
-							<< " as. dens: " << compute_dens(wave, new double[3]{ total_grid[0][p], total_grid[1][p], total_grid[2][p] }, i) << endl;*/
-					}
-					file << "Done with atom " << i << endl;
-				}
-				else {
-					int type_list_number = -1;
-					int nr = all_atom_list[i];
-					for (int j = 0; j < atom_type_list.size(); j++)
-						if (wave.atoms[nr].charge == atom_type_list[j])
-							type_list_number = j;
-					if (type_list_number == -1) {
-						file << "ERROR IN TYPE ASSIGNMENT FOR SPHERICAL DENSITIES!" << endl;
-						return false;
-					}
-					file << "atom nr " << i << " in all atom list: " << nr << " Type: " << type_list_number << " no dens save" << endl;
-					for (int p = 0; p < total_grid[0].size(); p++)
-						total_grid[4][p] += linear_interpolate_spherical_density(
-							radial_density[type_list_number],
-							radial_dist[type_list_number],
-							sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) + pow(total_grid[1][p] - wave.atoms[nr].y, 2) + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
-						);
-				}
-			}
-			if (pbc != 0) {
-				file << "Entering PBC loops!" << endl;
-				for (int x = -pbc; x < pbc + 1; x++)
-					for (int y = -pbc; y < pbc + 1; y++)
-						for (int z = -pbc; z < pbc + 1; z++) {
-							if (x == 0 && y == 0 && z == 0)
-								continue;
-							for (int i = 0; i < wave.get_ncen(); i++) {
-								int type_list_number = -1;
-								int nr = all_atom_list[i];
-								for (int j = 0; j < atom_type_list.size(); j++)
-									if (wave.atoms[nr].charge == atom_type_list[j])
-										type_list_number = j;
-								if (type_list_number == -1) {
-									file << "ERROR IN TYPE ASSIGNMENT FOR SPHERICAL DENSITIES IN PBC!" << endl;
-									return false;
-								}
-								file << "atom nr " << i << " in all atom list: " << nr << " Type: " << type_list_number << " no dens save" << endl;
+		if (debug)
+			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+	}
+	//apply to the becke grid
+	for (int i = 0; i < wave.get_ncen(); i++) {
+		int nr = all_atom_list[i];
+		if (is_asym[i]) {
 #pragma omp parallel for
-								for (int p = 0; p < total_grid[0].size(); p++){
-                                    double temp;
-                                    temp = linear_interpolate_spherical_density(
-                                        radial_density[type_list_number],
-                                        radial_dist[type_list_number],
-                                        sqrt(
-                                            pow(total_grid[0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
-                                            + pow(total_grid[1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
-                                            + pow(total_grid[2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
-                                        )
-                                    );
-
-				                    if (is_asym[i])
-                                        spherical_density[i][p] += temp;
-									total_grid[4][p] += temp;
-                                }
-							}
-						}
+			for (int p = 0; p < total_grid[0].size(); p++) {
+				spherical_density[i][p] =
+					linear_interpolate_spherical_density(radial_density[asym_atom_to_type_list[i]]
+                    , radial_dist[asym_atom_to_type_list[i]]
+                    , sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) 
+                         + pow(total_grid[1][p] - wave.atoms[nr].y, 2) 
+                         + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
+					);
+				total_grid[4][p] += spherical_density[i][p];
 			}
 		}
 		else {
-			for (int i = 0; i < wave.get_ncen(); i++) {
-				int nr = all_atom_list[i];
-				if (is_asym[i]) {
+			int type_list_number = -1;
+			for (int j = 0; j < atom_type_list.size(); j++)
+				if (wave.atoms[nr].charge == atom_type_list[j])
+					type_list_number = j;
 #pragma omp parallel for
-					for (int p = 0; p < total_grid[0].size(); p++) {
-						spherical_density[i][p] =
-							linear_interpolate_spherical_density(radial_density[asym_atom_to_type_list[i]]
-                            , radial_dist[asym_atom_to_type_list[i]]
-                            , sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) 
-                                 + pow(total_grid[1][p] - wave.atoms[nr].y, 2) 
-                                 + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
+			for (int p = 0; p < total_grid[0].size(); p++)
+				total_grid[4][p] += linear_interpolate_spherical_density(radial_density[type_list_number]
+                    , radial_dist[type_list_number]
+                    , sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) 
+                         + pow(total_grid[1][p] - wave.atoms[nr].y, 2) 
+                         + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
+				);
+		}
+	}
+	//fill out with priodic information
+	if (pbc != 0) {
+		for (int x = -pbc; x < pbc + 1; x++)
+			for (int y = -pbc; y < pbc + 1; y++)
+				for (int z = -pbc; z < pbc + 1; z++) {
+					if (x == 0 && y == 0 && z == 0)
+						continue;
+					for (int i = 0; i < wave.get_ncen(); i++) {
+						int type_list_number = -1;
+						int nr = all_atom_list[i];
+						for (int j = 0; j < atom_type_list.size(); j++)
+							if (wave.atoms[nr].charge == atom_type_list[j])
+								type_list_number = j;
+#pragma omp parallel for
+						for (int p = 0; p < total_grid[0].size(); p++)
+							total_grid[4][p] += linear_interpolate_spherical_density(
+								radial_density[type_list_number],
+								radial_dist[type_list_number],
+								sqrt(
+									  pow(total_grid[0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
+									+ pow(total_grid[1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
+									+ pow(total_grid[2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
+								)
 							);
-						total_grid[4][p] += spherical_density[i][p];
 					}
 				}
-				else {
-					int type_list_number = -1;
-					for (int j = 0; j < atom_type_list.size(); j++)
-						if (wave.atoms[nr].charge == atom_type_list[j])
-							type_list_number = j;
-#pragma omp parallel for
-					for (int p = 0; p < total_grid[0].size(); p++)
-						total_grid[4][p] += linear_interpolate_spherical_density(radial_density[type_list_number]
-                            , radial_dist[type_list_number]
-                            , sqrt(pow(total_grid[0][p] - wave.atoms[nr].x, 2) 
-                                 + pow(total_grid[1][p] - wave.atoms[nr].y, 2) 
-                                 + pow(total_grid[2][p] - wave.atoms[nr].z, 2))
-						);
-				}
-			}
-			if (pbc != 0) {
-				for (int x = -pbc; x < pbc + 1; x++)
-					for (int y = -pbc; y < pbc + 1; y++)
-						for (int z = -pbc; z < pbc + 1; z++) {
-							if (x == 0 && y == 0 && z == 0)
-								continue;
-							for (int i = 0; i < wave.get_ncen(); i++) {
-								int type_list_number = -1;
-								int nr = all_atom_list[i];
-								for (int j = 0; j < atom_type_list.size(); j++)
-									if (wave.atoms[nr].charge == atom_type_list[j])
-										type_list_number = j;
-#pragma omp parallel for
-								for (int p = 0; p < total_grid[0].size(); p++)
-									total_grid[4][p] += linear_interpolate_spherical_density(
-										radial_density[type_list_number],
-										radial_dist[type_list_number],
-										sqrt(
-											  pow(total_grid[0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
-											+ pow(total_grid[1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
-											+ pow(total_grid[2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
-										)
-									);
-							}
-						}
-			}
+	}
+
+	file << " done!" << endl;
+
+	//Generate Electron sums
+	for (int i = 0; i < wave.get_ncen(); i++) {
+		int start_p = 0;
+		for (int a = 0; a < i; a++)
+			start_p += num_points[all_atom_list[a]];
+		for (int p = start_p; p < start_p + num_points[all_atom_list[i]]; p++) {
+			atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
+			atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
 		}
+		el_sum_becke += atom_els[0][i];
+		el_sum_spherical += atom_els[1][i];
+	}
+    
 
-		file << " done!" << endl;
+	file << "Applying hirshfeld weights..." << endl;
+#pragma omp parallel for
+	for (int p = 0; p < total_grid[0].size(); p++)
+			total_grid[5][p] *= total_grid[3][p];
+/*	if (debug)
+#pragma omp parallel for
+		for (int p = 0; p < total_grid[0].size(); p++)
+			total_grid[3][p] = 0;*/
 
-		//Generate Electron sums
-		for (int i = 0; i < wave.get_ncen(); i++) {
+    /*double factor = 1.0;
+    if(pbc != 0){
+        double sum_wfn=0.0;
+        double sum_cell=0.0;
+        for (int i=0; i< wave.get_ncen(); i++) {
+            sum_wfn += atom_els[0][i];
+            sum_cell += wave.atoms[i].charge;
+        }
+        if(sum_wfn < 0.99 * sum_cell){
+            file << "Summed densities smaller than cell, rescaling aspherical density!" << endl;
+            factor = sum_cell/sum_wfn;
+        }
+        el_sum_becke *= factor;
+        for (int i=0; i< wave.get_ncen(); i++)
+            atom_els[0][i] *= factor;
+#pragma omp parallel for
+        for (int p = 0; p < total_grid[0].size(); p++)
+            total_grid[5][p] *= factor;
+    }*/
+
+	file << "Number of points evaluated: " << total_grid[0].size() << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
+
+	if (debug)
+		file << "Becke grid with hirshfeld weights done!" << endl;
+	double el_sum_hirshfeld = 0.0;
+	if (debug) {
+		for (int i = 0; i < asym_atom_list.size(); i++) {
 			int start_p = 0;
 			for (int a = 0; a < i; a++)
 				start_p += num_points[all_atom_list[a]];
-			for (int p = start_p; p < start_p + num_points[all_atom_list[i]]; p++) {
-				atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
-				if (!becke) atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
-			}
-			el_sum_becke += atom_els[0][i];
-			if (!becke) el_sum_spherical += atom_els[1][i];
-		}
-        
-
-		file << "Applying hirshfeld weights..." << endl;
-#pragma omp parallel for
-		for (int p = 0; p < total_grid[0].size(); p++)
-				total_grid[5][p] *= total_grid[3][p];
-/*		if (debug)
-#pragma omp parallel for
-			for (int p = 0; p < total_grid[0].size(); p++)
-				total_grid[3][p] = 0;*/
-
-        /*double factor = 1.0;
-        if(pbc != 0){
-            double sum_wfn=0.0;
-            double sum_cell=0.0;
-            for (int i=0; i< wave.get_ncen(); i++) {
-                sum_wfn += atom_els[0][i];
-                sum_cell += wave.atoms[i].charge;
-            }
-            if(sum_wfn < 0.99 * sum_cell){
-                file << "Summed densities smaller than cell, rescaling aspherical density!" << endl;
-                factor = sum_cell/sum_wfn;
-            }
-            el_sum_becke *= factor;
-            for (int i=0; i< wave.get_ncen(); i++)
-                atom_els[0][i] *= factor;
-#pragma omp parallel for
-            for (int p = 0; p < total_grid[0].size(); p++)
-                total_grid[5][p] *= factor;
-        }*/
-
-		file << "Number of points evaluated: " << total_grid[0].size() << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
-
-		if (debug)
-			file << "Becke grid with hirshfeld weights done!" << endl;
-		double el_sum_hirshfeld = 0.0;
-		if (debug) {
-			for (int i = 0; i < asym_atom_list.size(); i++) {
-				int start_p = 0;
-				for (int a = 0; a < i; a++)
-					start_p += num_points[all_atom_list[a]];
-				for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
-					//for (int p = 0; p < total_grid[0].size(); p++) {
-					if (isnan(spherical_density[i][start_p + p]))
-						file << "spherical density is NaN! " << i << " " << start_p + p << endl;
-					if (isnan(total_grid[5][start_p + p]))
-						file << "total density is NaN! " << i << " " << p << endl;
-					if (isnan(total_grid[5][start_p + p] * spherical_density[i][start_p + p]))
-						file << "total_grid*spherical_density is NaN! " << i << " " << start_p + p << " " << total_grid[5][start_p + p] << " " << spherical_density[i][start_p + p] << endl;
-					if (spherical_density[i][start_p + p] != 0 && total_grid[4][start_p + p] != 0)
-						atom_els[2][i] += total_grid[5][start_p + p] * spherical_density[i][start_p + p] / total_grid[4][start_p + p];
-				}
+			for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
+				//for (int p = 0; p < total_grid[0].size(); p++) {
+				if (isnan(spherical_density[i][start_p + p]))
+					file << "spherical density is NaN! " << i << " " << start_p + p << endl;
+				if (isnan(total_grid[5][start_p + p]))
+					file << "total density is NaN! " << i << " " << p << endl;
+				if (isnan(total_grid[5][start_p + p] * spherical_density[i][start_p + p]))
+					file << "total_grid*spherical_density is NaN! " << i << " " << start_p + p << " " << total_grid[5][start_p + p] << " " << spherical_density[i][start_p + p] << endl;
+				if (spherical_density[i][start_p + p] != 0 && total_grid[4][start_p + p] != 0)
+					atom_els[2][i] += total_grid[5][start_p + p] * spherical_density[i][start_p + p] / total_grid[4][start_p + p];
 			}
 		}
-		else {
-#pragma omp parallel for
-			for (int i = 0; i < asym_atom_list.size(); i++)
-			{
-				int start_p = 0;
-				for (int a = 0; a < i; a++)
-					start_p += num_points[all_atom_list[a]];
-				for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
-					//for (int p = 0; p < total_grid[0].size(); p++)
-					if (spherical_density[i][start_p + p] != 0 && total_grid[4][start_p + p] != 0)
-						atom_els[2][i] += total_grid[5][start_p + p] * spherical_density[i][start_p + p] / total_grid[4][start_p + p];
-				}
-			}
-		}
-
-		if (debug) {
-			file << "atom_els[2]: ";
-			for (int i = 0; i < asym_atom_list.size(); i++) {
-				if (isnan(atom_els[2][i]))
-					file << "!!!";
-				file << atom_els[2][i] << " ";
-				if (isnan(atom_els[2][i]))
-					file << "!!!";
-			}
-			file << endl;
-		}
-
-		file << "Table of Charges in electrons" << endl << endl << "Atom       Becke";
-        if(!becke) file << "   Spherical";
-        file << " Hirshfeld" << endl;
-
-		int counter = 0;
-		for (int i = 0; i < wave.get_ncen(); i++) {
-			file << setw(6) << labels[i]
-				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][i]
-				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][i];
-			if (is_asym[i]) {
-				file << fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[2][counter];
-				el_sum_hirshfeld += atom_els[2][counter];
-				counter++;
-			}
-			else
-				file << setw(10) << "    --- ";
-			file << endl;
-		}
-
-		file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
 	}
+	else {
+#pragma omp parallel for
+		for (int i = 0; i < asym_atom_list.size(); i++)
+		{
+			int start_p = 0;
+			for (int a = 0; a < i; a++)
+				start_p += num_points[all_atom_list[a]];
+			for (int p = 0; p < num_points[all_atom_list[i]]; p++) {
+				//for (int p = 0; p < total_grid[0].size(); p++)
+				if (spherical_density[i][start_p + p] != 0 && total_grid[4][start_p + p] != 0)
+					atom_els[2][i] += total_grid[5][start_p + p] * spherical_density[i][start_p + p] / total_grid[4][start_p + p];
+			}
+		}
+	}
+
+	if (debug) {
+		file << "atom_els[2]: ";
+		for (int i = 0; i < asym_atom_list.size(); i++) {
+			if (isnan(atom_els[2][i]))
+				file << "!!!";
+			file << atom_els[2][i] << " ";
+			if (isnan(atom_els[2][i]))
+				file << "!!!";
+		}
+		file << endl;
+	}
+
+	file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
+
+	int counter = 0;
+	for (int i = 0; i < wave.get_ncen(); i++) {
+		file << setw(6) << labels[i]
+			<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][i]
+			<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][i];
+		if (is_asym[i]) {
+			file << fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[2][counter];
+			el_sum_hirshfeld += atom_els[2][counter];
+			counter++;
+		}
+		else
+			file << setw(10) << "    --- ";
+		file << endl;
+	}
+
+	file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
 
 	vector < vector <double> > d1,d2,d3;
 	vector < vector <double> > dens;
@@ -4857,58 +4766,44 @@ bool calculate_structure_factors(
 	if (debug)
 		file << "resized outer d1-3" << endl;
 
-	if (!becke) {
 #pragma omp parallel for reduction(+:points)
-		for (int i = 0; i < asym_atom_list.size(); i++) {
-			int start_p = 0;
-			for (int a = 0; a < i; a++)
-				start_p += num_points[all_atom_list[a]];
-			for (int p = start_p; p < start_p + num_points[all_atom_list[i]]; p++) {
-//			for (int p = 0; p < total_grid[0].size(); p++) {
-/*				if (debug) {
-					total_grid[3][p] += spherical_density[i][p] / total_grid[4][p];
-					if (asym_atom_list.size() == all_atom_list.size() && pbc == 0)
-						if (i == asym_atom_list.size() - 1 && total_grid[3][p] < 0.999) {
-							file << "weight sum != 1: " << setw(6) << p << fixed << setw(10) << total_grid[3][p] << scientific << setw(12) << total_grid[4][p] << endl;
-							for (int i = 0; i < asym_atom_list.size(); i++)
-								file << labels[asym_atom_list[i]] << scientific << setw(10) << spherical_density[i][p] << " ";
-							file << endl;
-						}
-				}*/
-				//        BECKE WEIGHT * Wfn Density * Atomic spherical density / total spherical density  
-				if (spherical_density[i][p] != 0 && total_grid[4][p] != 0)
-					if (abs(total_grid[3][p] * spherical_density[i][p] / total_grid[4][p]) > 1E-10) {
-						dens[i].push_back(total_grid[5][p] * spherical_density[i][p] / total_grid[4][p]);
-						d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-						d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-						d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		int start_p = 0;
+		for (int a = 0; a < i; a++)
+			start_p += num_points[all_atom_list[a]];
+		for (int p = start_p; p < start_p + num_points[all_atom_list[i]]; p++) {
+//		for (int p = 0; p < total_grid[0].size(); p++) {
+/*			if (debug) {
+				total_grid[3][p] += spherical_density[i][p] / total_grid[4][p];
+				if (asym_atom_list.size() == all_atom_list.size() && pbc == 0)
+					if (i == asym_atom_list.size() - 1 && total_grid[3][p] < 0.999) {
+						file << "weight sum != 1: " << setw(6) << p << fixed << setw(10) << total_grid[3][p] << scientific << setw(12) << total_grid[4][p] << endl;
+						for (int i = 0; i < asym_atom_list.size(); i++)
+							file << labels[asym_atom_list[i]] << scientific << setw(10) << spherical_density[i][p] << " ";
+						file << endl;
 					}
+			}*/
+			//        BECKE WEIGHT * Wfn Density * Atomic spherical density / total spherical density  
+			if (spherical_density[i][p] != 0 && total_grid[4][p] != 0)
+				if (abs(total_grid[3][p] * spherical_density[i][p] / total_grid[4][p]) > 1E-10) {
+					dens[i].push_back(total_grid[5][p] * spherical_density[i][p] / total_grid[4][p]);
+					d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+					d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+					d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+				}
 
-			}
-			/*auto permutation = sort_permutation(d1[i], d2[i], d3[i]);
-			apply_permutation_in_place(dens[i], permutation);
-			apply_permutation_in_place(d1[i], permutation);
-			apply_permutation_in_place(d2[i], permutation);
-			apply_permutation_in_place(d3[i], permutation);*/
-			points += dens[i].size();
 		}
-		
-		for (int grid = 0; grid < total_grid.size(); grid++)
-			total_grid[grid].resize(0);
-		total_grid.resize(0);
+		/*auto permutation = sort_permutation(d1[i], d2[i], d3[i]);
+		apply_permutation_in_place(dens[i], permutation);
+		apply_permutation_in_place(d1[i], permutation);
+		apply_permutation_in_place(d2[i], permutation);
+		apply_permutation_in_place(d3[i], permutation);*/
+		points += dens[i].size();
 	}
-	else
-#pragma omp parallel for
-		for (int i = 0; i < asym_atom_list.size(); i++) 
-			for (int p = 0, pmax = total_grid[0].size(); p < pmax; p++) {
-				d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-				d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-				d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
-
-				//        BECKE WEIGHT * Wfn Density
-				dens[i].push_back(compute_dens(wave, new double[3]{ total_grid[0][p] , total_grid[1][p] , total_grid[2][p] }, asym_atom_list[i]) * total_grid[3][p]);
-			}
-
+	
+	for (int grid = 0; grid < total_grid.size(); grid++)
+		total_grid[grid].resize(0);
+	total_grid.resize(0);
 
 	vector < vector <double> > k_pt;
 	k_pt.resize(3);
@@ -4974,41 +4869,25 @@ bool calculate_structure_factors(
 
 	progress_bar progress{ file, 60u, "Calculating scattering factors" };
 	const int step = max(floor(asym_atom_list.size() / 20),1);
-	if (!becke) {
-		int smax = k_pt[0].size();
-		int imax = asym_atom_list.size();
-		for (int i = 0; i < imax; i++) {
-			int pmax = dens[i].size();
+	int smax = k_pt[0].size();
+	int imax = asym_atom_list.size();
+	for (int i = 0; i < imax; i++) {
+		int pmax = dens[i].size();
 #pragma omp parallel for
-			for (int s = 0; s < smax; s++) {
-				double work;
-				double rho;
-				for (int p = 0; p < pmax; p++) {
-					rho = dens[i][p];
-					work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
-//					cos_v = cosins.get(work);
-//					sin_v = sins.get(work);
-					sf[i][s] += complex<double>(rho * cos(work), rho * sin(work));
-				}
-			}
-			if (i != 0 && i % step == 0)
-				progress.write(i / double(imax));
-		}
-	}
-	else {
-#pragma omp parallel for
-		for (int s = 0; s < k_pt[0].size(); s++) {
+		for (int s = 0; s < smax; s++) {
 			double work;
-			for (int i = 0; i < asym_atom_list.size(); i++) {
-				for (int p = 0; p < total_grid[0].size(); p++) {
-					work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
-					sf[i][s] += complex<double>(dens[i][p] * cos(work), dens[i][p] * sin(work));
-				}
+			double rho;
+			for (int p = 0; p < pmax; p++) {
+				rho = dens[i][p];
+				work = k_pt[0][s] * d1[i][p] + k_pt[1][s] * d2[i][p] + k_pt[2][s] * d3[i][p];
+//				cos_v = cosins.get(work);
+//				sin_v = sins.get(work);
+				sf[i][s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
 		}
+		if (i != 0 && i % step == 0)
+			progress.write(i / double(imax));
 	}
-
-	
 
 	if (electron_diffraction) {
 		double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
@@ -5063,7 +4942,7 @@ bool calculate_structure_factors(
 	tsc_file << endl << "AD: false" << endl << "SCATTERERS:";
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		tsc_file << " " << labels[i];
-	tsc_file << endl << "data:" << endl;
+	tsc_file << endl << "DATA:" << endl;
 
     if(debug) file << "Writing a total of " << sym[0][0].size() << " symmetry generated sets of hkls!" << endl;
 	for (int s = 0; s < sym[0][0].size(); s++) {
