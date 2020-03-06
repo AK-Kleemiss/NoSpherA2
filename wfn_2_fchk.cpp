@@ -173,8 +173,6 @@ int main(int argc, char **argv)
 	  threads = stoi(argv[i + 1]);
 	if (temp.find("-pbc") != string::npos)
 	  pbc = stoi(argv[i + 1]);
-	if (temp.find("-mode-2") != string::npos)
-	  becke = true;
 	if (temp.find("-ED") != string::npos)
 	  electron_diffraction = true;
     if (temp.find("-v") != string::npos) {
@@ -273,7 +271,7 @@ int main(int argc, char **argv)
 		//debug_main = true;
 		if(debug_main)
 			log_file << "Entering Structure Factor Calculation!" << endl;
-		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, becke, threads, electron_diffraction, pbc))
+		if(!calculate_structure_factors(hkl,cif,asym_cif,symm,wavy[0],debug_main,accuracy, log_file, threads, electron_diffraction, pbc))
 			log_file << "Error during SF Calculation!" << endl;
 	}
 	return 0;
