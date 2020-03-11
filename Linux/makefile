@@ -3,7 +3,7 @@ RM := rm
 #LIBS := -lgomp -static-libgcc -static-libstdc++
 LIBS := -lgomp
 
-LIBOMP := $(shell locate 'libgomp.a')
+LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/7/libgomp.a
 
 all: Wfn_2_Fchk
 
