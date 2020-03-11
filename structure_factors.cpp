@@ -3643,6 +3643,7 @@ bool calculate_structure_factors(
 
 #ifdef _WIN64
 	time_t start = time(NULL);
+	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end_tsc;
 #else
 	struct timeval t1, t2;
 
@@ -4394,21 +4395,35 @@ bool calculate_structure_factors(
 				debug,
 				file));
 		}
+		else if (accuracy > 3) {
+			int lebedev_high = (max_l_temp < 3) ? 590 : 5810;
+			int lebedev_low = (max_l_temp < 3) ? 350 : 4802;
+
+			Prototype_grids.push_back(AtomGrid(1e-20,
+				lebedev_low,
+				lebedev_high,
+				atom_type_list[i],
+				alpha_max_temp,
+				max_l_temp,
+				alpha_min_temp,
+				debug,
+				file));
+		}
 
 	}
 
 #ifdef _WIN64
+	end_prototypes = time(NULL);
 	if (debug) {
-		time_t end_prototype = time(NULL);
-
+		
 		for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
 			file << "Number of gridpoints for atom type " << atom_type_list[prototype] << " :" << Prototype_grids[prototype].get_num_grid_points() << endl;
 
 		//	int diff = end - start;
-		if (end_prototype - start < 1) file << "Time until prototypes are done: <1 s" << endl;
-		else if (end_prototype - start < 60) file << "Time until prototypes are done: " << fixed << setprecision(0) << end_prototype - start << " s" << endl;
-		else if (end_prototype - start < 3600) file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototype - start) / 60) << " m " << (end_prototype - start) % 60 << " s" << endl;
-		else file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototype - start) / 3600) << " h " << ((end_prototype - start) % 3600) / 60 << " m" << endl;
+		if (end_prototypes - start < 1) file << "Time until prototypes are done: <1 s" << endl;
+		else if (end_prototypes - start < 60) file << "Time until prototypes are done: " << fixed << setprecision(0) << end_prototypes - start << " s" << endl;
+		else if (end_prototypes - start < 3600) file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototypes - start) / 60) << " m " << (end_prototypes - start) % 60 << " s" << endl;
+		else file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototypes - start) / 3600) << " h " << ((end_prototypes - start) % 3600) / 60 << " m" << endl;
 	}
 #else
 	if (debug) {
@@ -4462,15 +4477,9 @@ bool calculate_structure_factors(
 #ifdef _WIN64
 	if (debug) {
 		file << "Taking time..." << endl;
-		time_t end_becke = time(NULL);
-		file << "Number of gridpoints before pruning: " << defaultfloat << points << endl;
-
-		//	int diff = end - start;
-
-		if (end_becke - start < 60) file << "Time until becke done: " << fixed << setprecision(0) << end_becke - start << " s" << endl;
-		else if (end_becke - start < 3600) file << "Time until becke done: " << fixed << setprecision(0) << floor((end_becke - start) / 60) << " m " << (end_becke - start) % 60 << " s" << endl;
-		else file << "Time until becke done: " << fixed << setprecision(0) << floor((end_becke - start) / 3600) << " h " << ((end_becke - start) % 3600) / 60 << " m" << endl;
 	}
+	end_becke = time(NULL);
+
 #else
 	if (debug) {
 		gettimeofday(&t2, 0);
@@ -4500,12 +4509,20 @@ bool calculate_structure_factors(
 		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
 		double current = 1;
 		double dist = 0.000001;
-		while (current > 1E-10) {
-			radial_dist[i].push_back(dist);
-			current = get_radial_density(atom_type_list[i], dist);
-			radial_density[i].push_back(current);
-			dist *= incr;
-		}
+		if(accuracy > 3)
+			while (current > 1E-10) {
+				radial_dist[i].push_back(dist);
+				current = get_radial_density(atom_type_list[i], dist);
+				radial_density[i].push_back(current);
+				dist *= incr;
+			}
+		else
+			while (current > 1E-12) {
+				radial_dist[i].push_back(dist);
+				current = get_radial_density(atom_type_list[i], dist);
+				radial_density[i].push_back(current);
+				dist *= incr;
+			}
 		if (debug)
 			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
 	}
@@ -4574,21 +4591,45 @@ bool calculate_structure_factors(
 
 	file << " done!" << endl;
 	if (debug) for (int i = 0; i < asym_atom_list.size(); i++) file << endl << "number of points for atom " << i << " " << num_points[i] << " " << spherical_density[i].size() << endl;
+#ifdef _WIN64
+	if (debug) {
+		file << "Taking time..." << endl;
+	}
+	end_spherical = time(NULL);
+
+#else
+	if (debug) {
+		gettimeofday(&t2, 0);
+
+		double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+
+		if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
+		else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
+		else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
+	}
+#endif
 
 	file << "Pruning Grid..." << flush;
+	double cutoff;
+	if (accuracy < 3)
+		cutoff = 1E-10;
+	else if (accuracy == 3)
+		cutoff = 1E-14;
+	else
+		cutoff = 1E-30;
 
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int reduction = 0;
 		for (int p = 0; p < num_points[i]; p++) {
 
-			if (abs(grid[i][3][p]*spherical_density[i][p-reduction]/grid[i][4][p]) > 1E-10) {
+			if (abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > cutoff) {
 				for (int k = 0; k < 5; k++)
 					total_grid[k].push_back(grid[i][k][p]);
 				total_grid[6].push_back(grid[i][5][p]);
 			}
 
-			else{
-				spherical_density[i].erase(spherical_density[i].begin() + p-reduction);
+			else {
+				spherical_density[i].erase(spherical_density[i].begin() + p - reduction);
 				reduction++;
 			}
 
@@ -4597,17 +4638,6 @@ bool calculate_structure_factors(
 		delete[](grid[i]);
 		if (debug) file << endl << "number of points for atom " << i << " " << num_points[i] << " " << spherical_density[i].size() << endl;
 	}
-	if (debug) {
-		int count = 0;
-		for (int i = 0; i < asym_atom_list.size(); i++) {
-			for (int p = 0; p < num_points[i]; p++) {
-				if (debug)
-					file << count << " " << p << " " << setw(12) << scientific << total_grid[3][count] << " " << spherical_density[i][p] << " " << total_grid[4][p] << endl;
-				count++;
-			}
-			file << endl;
-		}
-	}
 
 	if (debug) file << endl;
 	points = 0;
@@ -4615,6 +4645,24 @@ bool calculate_structure_factors(
 		points += num_points[i];
 	if (debug) file << "sphericals done!" << endl;
 	else file << " done!                     Number of gridpoints: " << defaultfloat << points << endl;
+
+#ifdef _WIN64
+	if (debug) {
+		file << "Taking time..." << endl;
+	}
+	end_prune = time(NULL);
+
+#else
+	if (debug) {
+		gettimeofday(&t2, 0);
+
+		double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+
+		if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
+		else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
+		else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
+	}
+#endif
 
 	file << "Calculating aspherical densities..." << flush;
     vector < vector < double > > periodic_grid;
@@ -4662,6 +4710,8 @@ bool calculate_structure_factors(
 
 	if (debug) file << endl << "with total number of points: " << total_grid[0].size() << endl;
 	else file << " done!" << endl;
+
+	file << "Applying hirshfeld weights and integrating charges..." << flush;
 	double el_sum_becke = 0.0;
 	double el_sum_spherical = 0.0;
 	double el_sum_hirshfeld = 0.0;
@@ -4675,13 +4725,12 @@ bool calculate_structure_factors(
 			atom_els[n].push_back(0.0);
 
 	//Generate Electron sums
-	if (debug) file << "p mw aw sd tsd ad bsd hdaw hdmw" << endl;
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int start_p = 0;
 		for (int a = 0; a < i; a++)
 			start_p += num_points[a];
 		for (int p = start_p; p < start_p + num_points[i]; p++) {
-			if (abs(total_grid[6][p]) > 1E-10) {
+			if (abs(total_grid[6][p]) > cutoff) {
 				atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
 				atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
 			}
@@ -4695,6 +4744,24 @@ bool calculate_structure_factors(
 	if (debug)
 		file << "Becke grid with hirshfeld weights done!" << endl;
 
+#ifdef _WIN64
+	if (debug) {
+		file << "Taking time..." << endl;
+	}
+	end_aspherical = time(NULL);
+
+#else
+	if (debug) {
+		gettimeofday(&t2, 0);
+
+		double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+
+		if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
+		else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
+		else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
+	}
+#endif
+
 	if (debug) {
 		file << "atom_els[2]: ";
 		for (int i = 0; i < asym_atom_list.size(); i++) {
@@ -4706,37 +4773,12 @@ bool calculate_structure_factors(
 		}
 		file << endl;
 	}
-    
 
-	file << "Applying hirshfeld weights..." << endl;
 #pragma omp parallel for
 	for (int p = 0; p < total_grid[0].size(); p++)
 			total_grid[5][p] *= total_grid[3][p];
-/*	if (debug)
-#pragma omp parallel for
-		for (int p = 0; p < total_grid[0].size(); p++)
-			total_grid[3][p] = 0;*/
 
-    /*double factor = 1.0;
-    if(pbc != 0){
-        double sum_wfn=0.0;
-        double sum_cell=0.0;
-        for (int i=0; i< wave.get_ncen(); i++) {
-            sum_wfn += atom_els[0][i];
-            sum_cell += wave.atoms[i].charge;
-        }
-        if(sum_wfn < 0.99 * sum_cell){
-            file << "Summed densities smaller than cell, rescaling aspherical density!" << endl;
-            factor = sum_cell/sum_wfn;
-        }
-        el_sum_becke *= factor;
-        for (int i=0; i< wave.get_ncen(); i++)
-            atom_els[0][i] *= factor;
-#pragma omp parallel for
-        for (int p = 0; p < total_grid[0].size(); p++)
-            total_grid[5][p] *= factor;
-    }*/
-
+	file << " done!" << endl;
 	file << "Number of points evaluated: " << total_grid[0].size() << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
 
 	file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
@@ -4877,11 +4919,8 @@ bool calculate_structure_factors(
 
 
 #ifdef _WIN64
-	time_t end2 = time(NULL);
+	end_tsc = time(NULL);
 
-	if (end2 - end1 < 60) file << endl << "Time to calc tsc: " << fixed << setprecision(0) << end2 - end1 << " s\n";
-	else if (end2 - end1 < 3600) file << endl <<  "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 60) << " m " << (end2 - end1) % 60 << " s\n";
-	else file << endl << "Time to calc tsc: " << fixed << setprecision(0) << floor((end2 - end1) / 3600) << " h " << ((end2 - end1) % 3600) / 60 << " m\n";
 #else
 	gettimeofday(&t2, 0);
 
@@ -4938,6 +4977,15 @@ bool calculate_structure_factors(
 	if (end - start < 60) file << "Total Time: "<< fixed << setprecision(0) << end - start << " s\n";
 	else if (end - start < 3600) file << "Total Time: " << fixed << setprecision(0) << floor((end - start)/60) << " m " << (end - start) % 60 << " s\n";
 	else file << "Total Time: " << fixed << setprecision(0) << floor((end - start)/3600) << " h " << ((end - start) % 3600)/60 << " m\n";
+	file << endl;
+	file << "Time Breakdown:" << endl;
+	file << " ... for Prototype Grid setup:" << setw(6) << end_prototypes - start << " s" << endl;
+	file << " ... for Becke Grid setup:    " << setw(6) << end_becke - end_prototypes << " s" << endl;
+	file << " ... for spherical density:   " << setw(6) << end_spherical - end_becke << " s" << endl;
+	file << " ... for Grid Pruning:        " << setw(6) << end_prune - end_spherical << " s" << endl;
+	file << " ... for aspherical density:  " << setw(6) << end_aspherical - end_prune << " s" << endl;
+	file << " ... for final preparation:   " << setw(6) << end1 - end_aspherical << " s" << endl;
+	file << " ... for tsc calculation:     " << setw(6) << end - end1 << " s" << endl;
 #else
 	gettimeofday(&t2, 0);
 

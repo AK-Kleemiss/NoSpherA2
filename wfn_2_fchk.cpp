@@ -45,13 +45,13 @@
 #include "structure_factors.h"
 
 using namespace std;
-bool debug_main=false;
-bool expert=false;
-int main(int argc, char **argv)
-{
+bool debug_main = false;
+bool debug_all = false;
+bool expert = false;
+int main(int argc, char **argv){
 	ofstream log_file("wfn_2_fchk.log", ios::out);
 	log_file << "    _   __     _____       __              ___   ___\n";
-	log_file << "   / | / /___ / ___ /____ / /_  ___  _____/   | |__ \\\n";
+	log_file << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
 	log_file << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
 	log_file << " / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
 	log_file << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
@@ -79,12 +79,12 @@ int main(int argc, char **argv)
 			return 0;
 		}
 	}
-  if(argc<4){
-    log_file << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn -b <basis_set>" << endl;
-	log_file.flush();
-	log_file.close();
-    return -1;
-  }
+	if(argc<4){
+	  log_file << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn -b <basis_set>" << endl;
+		log_file.flush();
+		log_file.close();
+	  return -1;
+	}
 	vector <string> known_keywords;
 	known_keywords.push_back("-wfn");
 	known_keywords.push_back("-fchk");
@@ -125,100 +125,102 @@ int main(int argc, char **argv)
 		if(config==0) 
 			log_file << "The programs file was newly written, please check if everything is correct!" << endl;
 	*/
-  string wfn("");
-  string fchk("");
-  string basis_set("");
-  string hkl("");
-  string cif("");
-  string symm("");
-  string asym_cif("");
-  string method("rhf");
-  string temp;
-  int accuracy = 2;
-  int threads = -1;
-  bool becke = false;
-  bool electron_diffraction = false;
-  int pbc = 0;
-  for (int i=0; i<argc; i++){
-    temp = argv[i];
-    if(temp.find(known_keywords[0]) != string::npos)
-      wfn = argv[i+1];
-    if(temp.find(known_keywords[1]) != string::npos)
-      fchk = argv[i+1];
-    if(temp.find(known_keywords[2]) != string::npos)
-      basis_set = argv[i+1];
-    if (temp.find(known_keywords[3]) != string::npos)
-      basis_set_path = argv[i + 1];
-    if (temp.find(known_keywords[5]) != string::npos)
-      hkl = argv[i+1];
-    if (temp.find(known_keywords[6]) != string::npos)
-      cif = argv[i+1];
-    if (temp.find(known_keywords[7]) != string::npos)
-      accuracy = stoi(argv[i+1]);
-	if (temp.find(known_keywords[8]) != string::npos)
-	  mult = stoi(argv[i + 1]);
-	if (temp.find(known_keywords[9]) != string::npos)
-	  method = argv[i + 1];
-	if (temp.find(known_keywords[10]) != string::npos)
-	  symm = argv[i + 1];
-	if (temp.find(known_keywords[11]) != string::npos)
-	  asym_cif = argv[i + 1];
-	if (temp.find(known_keywords[12]) != string::npos)
-	  asym_cif = argv[i + 1];
-	if (temp.find(known_keywords[13]) != string::npos)
-	  asym_cif = argv[i + 1];
-	if (temp.find(known_keywords[14]) != string::npos)
-	  asym_cif = argv[i + 1];
-	if (temp.find("-cpus") != string::npos)
-	  threads = stoi(argv[i + 1]);
-	if (temp.find("-pbc") != string::npos)
-	  pbc = stoi(argv[i + 1]);
-	if (temp.find("-ED") != string::npos)
-	  electron_diffraction = true;
-    if (temp.find("-v") != string::npos) {
-      log_file << "Turning on verbose mode!" << endl;
-      debug_main = true;
-    }
-  }
-  if (threads != -1) {
-	  omp_set_num_threads(threads);
-	  omp_set_dynamic(0);
-  }
-
-  log_file.flush();
-  if(debug_main)
-  	log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << asym_cif <<  endl;
-  if(wfn == ""){
-	log_file << "Error, no wfn file specified!";
-	return -1;
-  }
-  else{
-  	if(wfn.find(".wfn")!=string::npos) wavy.push_back(WFN(2));
-  	else wavy.push_back(WFN(4));
-  }
-  if(wfn.find(".wfn")==string::npos&&wfn.find(".ffn")==string::npos){
-      log_file << "Argument to -wfn does not look like wfn or ffn file!" << endl;
-      return -1;
-  }
-  log_file.flush();
-  //readwfn(wavy[0], wfn, debug_main, log_file);
-  bool temp_debug = false;
-  readwfn(wavy[0], wfn, debug_main, log_file);
-  wavy[0].set_method(method);
-  if (electron_diffraction)
+	string wfn("");
+	string fchk("");
+	string basis_set("");
+	string hkl("");
+	string cif("");
+	string symm("");
+	string asym_cif("");
+	string method("rhf");
+	string temp;
+	int accuracy = 2;
+	int threads = -1;
+	bool becke = false;
+	bool electron_diffraction = false;
+	int pbc = 0;
+	for (int i=0; i<argc; i++){
+		temp = argv[i];
+		if(temp.find(known_keywords[0]) != string::npos)
+			wfn = argv[i+1];
+		if(temp.find(known_keywords[1]) != string::npos)
+			fchk = argv[i+1];
+		if(temp.find(known_keywords[2]) != string::npos)
+			basis_set = argv[i+1];
+		if (temp.find(known_keywords[3]) != string::npos)
+			basis_set_path = argv[i + 1];
+		if (temp.find(known_keywords[5]) != string::npos)
+			hkl = argv[i+1];
+		if (temp.find(known_keywords[6]) != string::npos)
+			cif = argv[i+1];
+		if (temp.find(known_keywords[7]) != string::npos)
+			accuracy = stoi(argv[i+1]);
+		if (temp.find(known_keywords[8]) != string::npos)
+			mult = stoi(argv[i + 1]);
+		if (temp.find(known_keywords[9]) != string::npos)
+			method = argv[i + 1];
+		if (temp.find(known_keywords[10]) != string::npos)
+			symm = argv[i + 1];
+		if (temp.find(known_keywords[11]) != string::npos)
+			asym_cif = argv[i + 1];
+		if (temp.find(known_keywords[12]) != string::npos)
+			asym_cif = argv[i + 1];
+		if (temp.find(known_keywords[13]) != string::npos)
+			asym_cif = argv[i + 1];
+		if (temp.find(known_keywords[14]) != string::npos)
+			asym_cif = argv[i + 1];
+		if (temp.find("-cpus") != string::npos)
+			threads = stoi(argv[i + 1]);
+		if (temp.find("-pbc") != string::npos)
+			pbc = stoi(argv[i + 1]);
+		if (temp.find("-ED") != string::npos)
+			electron_diffraction = true;
+		if (temp.find("-v") != string::npos) {
+			log_file << "Turning on verbose mode!" << endl;
+			debug_main = true;
+		}
+		if (temp.find("-v2") != string::npos) {
+			log_file << "Turning on verbose mode 2!" << endl;
+			debug_all = true;
+		}
+	}
+	if (threads != -1) {
+		omp_set_num_threads(threads);
+		omp_set_dynamic(0);
+	}
+	
+	log_file.flush();
+	if(debug_main)
+		log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << asym_cif <<  endl;
+	if(wfn == ""){
+		log_file << "Error, no wfn file specified!";
+		return -1;
+	}
+	else{
+		if(wfn.find(".wfn")!=string::npos) wavy.push_back(WFN(2));
+		else wavy.push_back(WFN(4));
+	}
+	if(wfn.find(".wfn")==string::npos&&wfn.find(".ffn")==string::npos){
+	    log_file << "Argument to -wfn does not look like wfn or ffn file!" << endl;
+	    return -1;
+	}
+	log_file.flush();
+	readwfn(wavy[0], wfn, debug_all, log_file);
+	wavy[0].set_method(method);
+	if (electron_diffraction)
 	  log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-
-  if(basis_set!=""||fchk!=""){
-    if(basis_set == ""){
-      string filename;
-      vector <string> temp;
-      temp.resize(1);
-      temp[0]="All filetypes | *";
-  /*    if(!open_file_dialog(filename,debug_main,temp))
-        log_file << "Error encountered!" << endl;
-      else*/
-        basis_set_path = filename;
-    }
+	
+	if(basis_set!=""||fchk!=""){
+	  if(basis_set == ""){
+	    string filename;
+	    vector <string> temp;
+	    temp.resize(1);
+	    temp[0]="All filetypes | *";
+	/*    if(!open_file_dialog(filename,debug_main,temp))
+	      log_file << "Error encountered!" << endl;
+	    else*/
+	      basis_set_path = filename;
+	  }
 		else
 			join_path(basis_set_path,basis_set);
 		if(!exists(basis_set_path)){
@@ -226,7 +228,7 @@ int main(int argc, char **argv)
 			return -1;
 		}
 		wavy[0].set_basis_set_name(basis_set_path);
-
+	
 		vector<string> endings;
 		endings.push_back(".fchk");
 		endings.push_back(".Fchk");
@@ -253,12 +255,12 @@ int main(int argc, char **argv)
 							cin >> outputname;
 						}
 					}
-   				//}
+	 				//}
 			}
 			else
 				outputname.erase(where,3);
 		}
-
+	
 		wavy[0].assign_charge(wavy[0].calculate_charge());
 		if (mult == 0) {
 			wavy[0].guess_multiplicity(log_file,expert);
