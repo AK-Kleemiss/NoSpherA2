@@ -4950,7 +4950,7 @@ bool calculate_structure_factors(
 		if(s!= sym[0][0].size()-1)
 			tsc_file << ";";
 	}
-	tsc_file << endl << "AD: false" << endl << "SCATTERERS:";
+	tsc_file << endl << "SCATTERERS:";
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		tsc_file << " " << labels[i];
 	tsc_file << endl << "DATA:" << endl;
