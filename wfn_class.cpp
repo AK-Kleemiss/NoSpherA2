@@ -372,6 +372,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 	char tempchar[200];
 	size_t length;
 	for(int i=0; i<e_nuc; i++){
+		int dump;
 		getline(rf,line);
 		if(debug) cout << i << ".run, line:" << line << endl;
 		length = line.copy(tempchar,4,0);
@@ -381,19 +382,19 @@ bool WFN::read_wfn(string fileName, bool debug){
 		temp=tempchar;
 		length = line.copy(tempchar,4,5);
 		tempchar[length]='\0';
-		sscanf(tempchar,"%d",&dum_nr[i]);
+		dump = sscanf(tempchar,"%d",&dum_nr[i]);
 		length = line.copy(tempchar,12,24);
 		tempchar[length]='\0';
-		sscanf(tempchar,"%lf",&dum_x[i]);
+		dump = sscanf(tempchar,"%lf",&dum_x[i]);
 		length = line.copy(tempchar,12,36);
 		tempchar[length]='\0';
-		sscanf(tempchar,"%lf",&dum_y[i]);
+		dump = sscanf(tempchar,"%lf",&dum_y[i]);
 		length = line.copy(tempchar,12,48);
 		tempchar[length]='\0';
-		sscanf(tempchar,"%lf",&dum_z[i]);
+		dump = sscanf(tempchar,"%lf",&dum_z[i]);
 		length = line.copy(tempchar,3,70);
 		tempchar[length]='\0';
-		sscanf(tempchar,"%d",&dum_ch[i]);
+		dump = sscanf(tempchar,"%d",&dum_ch[i]);
 		dum_label.push_back(shrink_string_to_atom (temp,dum_ch[i]));
 		if(debug){
 			cout << "label:" << dum_label[i] 
@@ -411,6 +412,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 	if(debug) for( int i=0; i< e_nex; i++) dum_center[i]=99;
 	int run=0;
 	int exnum=0;
+	int dump;
 	getline(rf,line);
 	while (line.compare(0,6,"CENTRE")==0&&!rf.eof()) {
 		if(debug) cout << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
@@ -420,7 +422,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 				length = line.copy(tempchar,3,20+3*i);
 				tempchar[length]='\0';
 //				if(debug) cout << "tempchar: " << tempchar << endl; 
-				sscanf(tempchar,"%d",&dum_center[exnum]);
+				dump = sscanf(tempchar,"%d",&dum_center[exnum]);
 				if(debug) cout << dum_center[exnum] << " ";
 				if (dum_center[exnum]>e_nuc){ 
 					printf("this center doesn't exist.. some weird problem!\n");
@@ -437,7 +439,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					length = line.copy(tempchar,3,20+3*i);
 					tempchar[length]='\0';
 //					if(debug) cout << "tempchar: " << tempchar << endl; 
-					sscanf(tempchar,"%d",&dum_center[exnum]);
+					dump = sscanf(tempchar,"%d",&dum_center[exnum]);
 					if(debug) cout << dum_center[exnum] << endl;
 					if (dum_center[exnum]>e_nuc){ 
 						printf("this center doesn't exist.. some weird problem!\n");
@@ -483,7 +485,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 				length = line.copy(tempchar,2,21+3*i);
 				tempchar[length]='\0';
 //				if(debug_wfn_deep) cout << "tempchar: " << tempchar << endl; 
-				sscanf(tempchar,"%d",&dum_type[exnum]);
+				dump = sscanf(tempchar,"%d",&dum_type[exnum]);
 				if(debug_wfn_deep) cout << dum_type[exnum] << " ";
 				exnum++;
 			}
@@ -493,7 +495,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 			for(int i=0; i<e_nex%20;i++){
 				length = line.copy(tempchar,2,21+3*i);
 				tempchar[length]='\0';
-				sscanf(tempchar,"%d",&dum_type[exnum]);
+				dump = sscanf(tempchar,"%d",&dum_type[exnum]);
 				exnum++;
 			}
 		}
@@ -542,7 +544,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					length = line.copy(tempchar,13,11+14*i);
 					tempchar[length]='\0';
 					if(debug_wfn_deep) cout << "	tempchar: " << tempchar << " ";
-					sscanf(tempchar,"%lG",&dum_exp[exnum]);
+					dump = sscanf(tempchar,"%lG",&dum_exp[exnum]);
 					if(debug_wfn_deep) cout << dum_exp[exnum] << " " << endl;
 					exnum++;
 				}
@@ -551,7 +553,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
 					if (debug_wfn_deep) cout << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) cout << dum_exp[exnum];
 					exnum++;
 				}
@@ -566,7 +568,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					length = line.copy(tempchar, 13, 11 + 14 * i);
 					tempchar[length] = '\0';
 					if (debug_wfn_deep) cout << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) cout << dum_exp[exnum];
 					exnum++;
 				}
@@ -575,7 +577,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
 					if (debug_wfn_deep) cout << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) cout << dum_exp[exnum];
 					exnum++;
 				}
@@ -630,17 +632,17 @@ bool WFN::read_wfn(string fileName, bool debug){
 		if(temp_nr==0){
 			length = line.copy(tempchar,6,2);
 			tempchar[length]='\0';
-			sscanf(tempchar,"%d",&temp_nr);
+			dump = sscanf(tempchar,"%d",&temp_nr);
 		}
 		if(temp_occ==-1.0){
 			length = line.copy(tempchar,12,36);
 			tempchar[length]='\0';
-			sscanf(tempchar,"%lf",&temp_occ);
+			dump = sscanf(tempchar,"%lf",&temp_occ);
 		}
 		if(temp_ener==0) {
 			length = line.copy(tempchar,12,61);
 			tempchar[length]='\0';
-			sscanf(tempchar,"%lf",&temp_ener);
+			dump = sscanf(tempchar,"%lf",&temp_ener);
 		}
 		push_back_MO(temp_nr,temp_occ,temp_ener);
 		if(debug_wfn_deep){
@@ -666,7 +668,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 					tempchar[length] = '\0';
 					if (debug_wfn_deep)
 						cout << "	tempchar: " << tempchar << " ";
-					sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+					dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 					if (debug_wfn_deep)
 						cout << temp_val[monum][exnum] << endl;
 					exnum++;
@@ -681,7 +683,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 						tempchar[length] = '\0';
 						if (debug_wfn_deep)
 							cout << "	tempchar: " << tempchar << " ";
-						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+						dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
 							cout << temp_val[monum][exnum] << endl;
 					}
@@ -691,7 +693,7 @@ bool WFN::read_wfn(string fileName, bool debug){
 						tempchar[length] = '\0';
 						if (debug_wfn_deep)
 							cout << "	tempchar: " << tempchar << " ";
-						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+						dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
 							cout << temp_val[monum][exnum] << endl;
 					}
@@ -794,6 +796,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 	char tempchar[200];
 	size_t length;
 	for (int i = 0; i < e_nuc; i++) {
+		int dump;
 		getline(rf, line);
 		if (debug) file << i << ".run, line:" << line << endl;
 		length = line.copy(tempchar, 4, 0);
@@ -803,19 +806,19 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		temp = tempchar;
 		length = line.copy(tempchar, 4, 5);
 		tempchar[length] = '\0';
-		sscanf(tempchar, "%d", &dum_nr[i]);
+		dump = sscanf(tempchar, "%d", &dum_nr[i]);
 		length = line.copy(tempchar, 12, 24);
 		tempchar[length] = '\0';
-		sscanf(tempchar, "%lf", &dum_x[i]);
+		dump = sscanf(tempchar, "%lf", &dum_x[i]);
 		length = line.copy(tempchar, 12, 36);
 		tempchar[length] = '\0';
-		sscanf(tempchar, "%lf", &dum_y[i]);
+		dump = sscanf(tempchar, "%lf", &dum_y[i]);
 		length = line.copy(tempchar, 12, 48);
 		tempchar[length] = '\0';
-		sscanf(tempchar, "%lf", &dum_z[i]);
+		dump = sscanf(tempchar, "%lf", &dum_z[i]);
 		length = line.copy(tempchar, 3, 70);
 		tempchar[length] = '\0';
-		sscanf(tempchar, "%d", &dum_ch[i]);
+		dump = sscanf(tempchar, "%d", &dum_ch[i]);
 		dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
 		if (debug) {
 			file << "label:" << dum_label[i]
@@ -833,6 +836,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 	if (debug) for (int i = 0; i < e_nex; i++) dum_center[i] = 99;
 	int run = 0;
 	int exnum = 0;
+	int dump;
 	getline(rf, line);
 	while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof()) {
 		if (debug) file << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
@@ -842,7 +846,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 				length = line.copy(tempchar, 3, 20 + 3 * i);
 				tempchar[length] = '\0';
 				//				if(debug) file << "tempchar: " << tempchar << endl; 
-				sscanf(tempchar, "%d", &dum_center[exnum]);
+				dump = sscanf(tempchar, "%d", &dum_center[exnum]);
 				if (debug) file << dum_center[exnum] << " ";
 				if (dum_center[exnum] > e_nuc) {
 					printf("this center doesn't exist.. some weird problem!\n");
@@ -859,7 +863,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					length = line.copy(tempchar, 3, 20 + 3 * i);
 					tempchar[length] = '\0';
 					//					if(debug) file << "tempchar: " << tempchar << endl; 
-					sscanf(tempchar, "%d", &dum_center[exnum]);
+					dump = sscanf(tempchar, "%d", &dum_center[exnum]);
 					if (debug) file << dum_center[exnum] << endl;
 					if (dum_center[exnum] > e_nuc) {
 						file << "this center doesn't exist.. some weird problem!\n";
@@ -902,10 +906,10 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		if (exnum + 20 <= e_nex) {
 			if (debug_wfn_deep) file << "dum_type: ";
 			for (int i = 0; i < 20; i++) {
-				length = line.copy(tempchar, 2, 21 + 3 * i);
+				length = line.copy(tempchar, 2, size_t(21 + 3 * i));
 				tempchar[length] = '\0';
 				//				if(debug_wfn_deep) file << "tempchar: " << tempchar << endl; 
-				sscanf(tempchar, "%d", &dum_type[exnum]);
+				dump = sscanf(tempchar, "%d", &dum_type[exnum]);
 				if (debug_wfn_deep) file << dum_type[exnum] << " ";
 				exnum++;
 			}
@@ -915,7 +919,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			for (int i = 0; i < e_nex % 20; i++) {
 				length = line.copy(tempchar, 2, 21 + 3 * i);
 				tempchar[length] = '\0';
-				sscanf(tempchar, "%d", &dum_type[exnum]);
+				dump = sscanf(tempchar, "%d", &dum_type[exnum]);
 				exnum++;
 			}
 		}
@@ -964,7 +968,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					length = line.copy(tempchar, 13, 11 + 14 * i);
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
@@ -973,7 +977,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
@@ -988,7 +992,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					length = line.copy(tempchar, 13, 11 + 14 * i);
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
@@ -997,7 +1001,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					length = line.copy(tempchar, 14, 10 + 14 * i);
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-					sscanf(tempchar, "%lG", &dum_exp[exnum]);
+					dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
 					if (debug_wfn_deep) file << dum_exp[exnum] << " ";
 					exnum++;
 				}
@@ -1054,12 +1058,12 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		if (temp_nr == 0) {
 			length = line.copy(tempchar, 6, 2);
 			tempchar[length] = '\0';
-			sscanf(tempchar, "%d", &temp_nr);
+			dump = sscanf(tempchar, "%d", &temp_nr);
 		}
 		if (temp_occ == -1.0) {
 			length = line.copy(tempchar, 12, 36);
 			tempchar[length] = '\0';
-			sscanf(tempchar, "%lf", &temp_occ);
+			dump = sscanf(tempchar, "%lf", &temp_occ);
 		}
 		if (temp_ener == 0) {
 			if(temp_orca % 10 == 3)
@@ -1069,7 +1073,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 			else 
 				length = line.copy(tempchar, 12, 62);
 			tempchar[length] = '\0';
-			sscanf(tempchar, "%lf", &temp_ener);
+			dump = sscanf(tempchar, "%lf", &temp_ener);
 		}
 		if (debug_wfn_deep)
 			file << endl << "tempchar: " << tempchar << " temp_ener: " << temp_ener << endl;
@@ -1097,7 +1101,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 					tempchar[length] = '\0';
 					//if (debug_wfn_deep)
 					//	file << "	tempchar: " << tempchar << " ";
-					sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+					dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 					if (debug_wfn_deep)
 						file << temp_val[monum][exnum];
 					exnum++;
@@ -1112,7 +1116,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 						tempchar[length] = '\0';
 						//if (debug_wfn_deep)
 							//file << "	tempchar: " << tempchar << " ";
-						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+						dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
 							file << temp_val[monum][exnum];
 					}
@@ -1122,7 +1126,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 						tempchar[length] = '\0';
 						//if (debug_wfn_deep)
 							//file << "	tempchar: " << tempchar << " ";
-						sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+						dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
 						if (debug_wfn_deep)
 							file << temp_val[monum][exnum];
 					}
@@ -1519,6 +1523,7 @@ int WFN::get_shell_center(int nr_atom, int nr_shell){
 int WFN::get_shell_start (int nr_atom, int nr_shell, bool debug){
 	if( nr_atom<=ncen && nr_atom>=0 && nr_shell<=atoms[nr_atom].shellcount.size()-1 && nr_shell>=0 ) {
 		int primitive_counter=0;
+#pragma loop(no_vector)
 		for (int s=0; s<nr_shell; s++) 
 			primitive_counter+=atoms[nr_atom].shellcount[s];
 		return primitive_counter;

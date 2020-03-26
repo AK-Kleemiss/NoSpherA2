@@ -56,17 +56,18 @@ class cube
 		bool set_value(int x, int y, int z, double value);
 		bool read_file(bool full, bool header, WFN &wave, bool expert = false);
 		bool read_file(bool full, bool header, bool expert = false);
-		bool write_file(WFN &wave);
+		bool write_file(WFN &wave, bool force = false, bool absolute = false);
 		bool write_file(WFN &wave, std::string &given_path, bool debug);
 		bool write_xdgraph(WFN &wave, std::string &given_path, bool debug);
 		double get_vector(int i, int j) const;
 		bool set_vector(int i, int j, double value);
 		double get_origin(unsigned int i) const;
+		bool set_origin(unsigned int i, double value);
 		int get_na() const {return na;};
 		void set_na(int g_na) {na=g_na;};
 		std::string super_cube(WFN &wave);
 		void set_comment1 (std::string input) {comment1=input;};
-		void set_comment2 (std::string input) {comment1=input;};
+		void set_comment2 (std::string input) {comment2=input;};
 		std::string get_comment1 () const {return comment1;};
 		std::string get_comment2 () const {return comment2;};
 	private:
@@ -74,10 +75,10 @@ class cube
 		bool loaded;
 		std::string comment1;
 		std::string comment2;
-		std::vector<int> size;
-		std::vector<double> origin;
-		std::vector<std::vector<double> > vectors;
-		std::vector<std::vector<std::vector<double> > > values;
+		std::vector <int> size;
+		std::vector <double> origin;
+		std::vector < std::vector <double> > vectors;
+		std::vector < std::vector < std::vector <double> > > values;
 };
 
 #include "wfn_class.h"

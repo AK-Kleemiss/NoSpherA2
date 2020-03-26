@@ -23,3 +23,10 @@ Windows/x64/Debug/wfn2fchk.ilk
 *.tsc
 Windows/wfn2fchk.vcxproj
 Windows/wfn2fchk.vcxproj.user
+*.sarif
+*.xml
+Windows/x64/Release/unity_HTQH29WLQ7KZK2CJ.cpp
+Windows/x64/Release/unity_MMLYOUP5XI85U4AQ.cpp
+Windows/x64/Release/unity_QBUS8MVG8DO8ANP9.cpp
+Windows/x64/Release/unity_ER3SXB5O3191F1GP.cpp
+Windows/x64/Release/unity_3PSXM7ZMJ0H95VZ5.cpp
