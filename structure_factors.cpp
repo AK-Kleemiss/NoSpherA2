@@ -3229,6 +3229,7 @@ int first_ex_SF(int atomic_number) {
 	if (atomic_number == 1) return 0;
 	else if (atomic_number > 86) return 200000000;
 	int ex = 0;
+#pragma loop(no_vector)
 	for (int i = 0; i < atomic_number - 1; i++)
 		ex += Thakkar_nex[i];
 	return ex;
@@ -3315,122 +3316,6 @@ double get_radial_density(int atom_number, double dist) {
 	return Rho / (4 * M_PI);
 };
 
-
-void type2vector_SF(
-		const int index,
-		int * vector){
-	switch(index){
-		case 1:
-			vector[0]=0; vector[1]=0; vector[2]=0;
-			break;
-		case 2:
-			vector[0]=1; vector[1]=0; vector[2]=0;
-			break;
-		case 3:
-			vector[0]=0; vector[1]=1; vector[2]=0;
-			break;
-		case 4:
-			vector[0]=0; vector[1]=0; vector[2]=1;
-			break;
-		case 5:
-			vector[0]=2; vector[1]=0; vector[2]=0;
-			break;
-		case 6:
-			vector[0]=0; vector[1]=2; vector[2]=0;
-			break;
-		case 7:
-			vector[0]=0; vector[1]=0; vector[2]=2;
-			break;
-		case 8:
-			vector[0]=1; vector[1]=1; vector[2]=0;
-			break;
-		case 9:
-			vector[0]=1; vector[1]=0; vector[2]=1;
-			break;
-		case 10:
-			vector[0]=0; vector[1]=1; vector[2]=1;
-			break;
-		case 11:
-			vector[0]=3; vector[1]=0; vector[2]=0;
-			break;
-		case 12:
-			vector[0]=0; vector[1]=3; vector[2]=0;
-			break;
-		case 13:
-			vector[0]=0; vector[1]=0; vector[2]=3;
-			break;
-		case 14:
-			vector[0]=2; vector[1]=1; vector[2]=0;
-			break;
-		case 15:
-			vector[0]=2; vector[1]=0; vector[2]=1;
-			break;
-		case 16:
-			vector[0]=0; vector[1]=2; vector[2]=1;
-			break;
-		case 17:
-			vector[0]=1; vector[1]=2; vector[2]=0;
-			break;
-		case 18:
-			vector[0]=1; vector[1]=0; vector[2]=2;
-			break;
-		case 19:
-			vector[0]=0; vector[1]=1; vector[2]=2;
-			break;
-		case 20:
-			vector[0]=1; vector[1]=1; vector[2]=1;
-			break;
-		case 21:
-			vector[0]=0; vector[1]=0; vector[2]=4;
-			break;
-		case 22:
-			vector[0]=0; vector[1]=1; vector[2]=3;
-			break;
-		case 23:
-			vector[0]=0; vector[1]=2; vector[2]=2;
-			break;
-		case 24:
-			vector[0]=0; vector[1]=3; vector[2]=1;
-			break;
-		case 25:
-			vector[0]=0; vector[1]=4; vector[2]=0;
-			break;
-		case 26:
-			vector[0]=1; vector[1]=0; vector[2]=3;
-			break;
-		case 27:
-			vector[0]=1; vector[1]=1; vector[2]=2;
-			break;
-		case 28:
-			vector[0]=1; vector[1]=2; vector[2]=1;
-			break;
-		case 29:
-			vector[0]=1; vector[1]=3; vector[2]=0;
-			break;
-		case 30:
-			vector[0]=2; vector[1]=0; vector[2]=2;
-			break;
-		case 31:
-			vector[0]=2; vector[1]=1; vector[2]=1;
-			break;
-		case 32:
-			vector[0]=2; vector[1]=2; vector[2]=0;
-			break;
-		case 33:
-			vector[0]=3; vector[1]=0; vector[2]=1;
-			break;
-		case 34:
-			vector[0]=3; vector[1]=1; vector[2]=0;
-			break;
-		case 35:
-			vector[0]=4; vector[1]=0; vector[2]=0;
-			break;
-		default:
-			vector[0]=-1; vector[1]=-1; vector[2]=-1;
-			break;
-	}
-}
-
 double compute_dens(
 	WFN &wave,
 	double * PosGrid,			// [3] array with current position on the grid
@@ -3476,7 +3361,7 @@ double compute_dens(
 		for (int j = 0; j < wave.get_nex(); j++) {
 			iat = wave.get_center(j) - 1;
 //			if (iat != atom) continue;
-			type2vector_SF(wave.get_type(j), l);
+			type2vector(wave.get_type(j), l);
 
 			d[0] = PosGrid[0] - wave.atoms[iat].x;
 			d[1] = PosGrid[1] - wave.atoms[iat].y;
@@ -4472,7 +4357,7 @@ bool calculate_structure_factors(
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		points += num_points[i];
 	if (debug) file << "Becke Grid exists" << endl;
-	else file << " done!               Number of gridpoints: " << defaultfloat << points << endl;
+	else file << "                                 done! Number of gridpoints: " << defaultfloat << points << endl;
 
 #ifdef _WIN64
 	if (debug) {
@@ -4589,7 +4474,7 @@ bool calculate_structure_factors(
 				}
 	}
 
-	file << " done!" << endl;
+	file << "                    done!" << endl;
 	if (debug) for (int i = 0; i < asym_atom_list.size(); i++) file << endl << "number of points for atom " << i << " " << num_points[i] << " " << spherical_density[i].size() << endl;
 #ifdef _WIN64
 	if (debug) {
@@ -4644,7 +4529,7 @@ bool calculate_structure_factors(
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		points += num_points[i];
 	if (debug) file << "sphericals done!" << endl;
-	else file << " done!                     Number of gridpoints: " << defaultfloat << points << endl;
+	else file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
 #ifdef _WIN64
 	if (debug) {
@@ -4709,7 +4594,7 @@ bool calculate_structure_factors(
 	}
 
 	if (debug) file << endl << "with total number of points: " << total_grid[0].size() << endl;
-	else file << " done!" << endl;
+	else file << "                   done!" << endl;
 
 	file << "Applying hirshfeld weights and integrating charges..." << flush;
 	double el_sum_becke = 0.0;
@@ -4727,6 +4612,7 @@ bool calculate_structure_factors(
 	//Generate Electron sums
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int start_p = 0;
+#pragma loop(no_vector)
 		for (int a = 0; a < i; a++)
 			start_p += num_points[a];
 		for (int p = start_p; p < start_p + num_points[i]; p++) {
@@ -4815,6 +4701,7 @@ bool calculate_structure_factors(
 #pragma omp parallel for reduction(+:points)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int start_p = 0;
+#pragma loop(no_vector)
 		for (int a = 0; a < i; a++)
 			start_p += num_points[a];
 		for (int p = start_p; p < start_p + num_points[i]; p++) {
@@ -4883,7 +4770,7 @@ bool calculate_structure_factors(
 
 #endif
 
-	progress_bar progress{ file, 60u, "Calculating scattering factors" };
+	progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
 	const int step = max(floor(asym_atom_list.size() / 20),1.0);
 	int smax = k_pt[0].size();
 	int imax = asym_atom_list.size();
@@ -4900,8 +4787,9 @@ bool calculate_structure_factors(
 			}
 		}
 		if (i != 0 && i % step == 0)
-			progress.write(i / double(imax));
+			progress->write(i / double(imax));
 	}
+	delete(progress);
 
 	if (electron_diffraction) {
 		double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);

@@ -51,6 +51,9 @@
     <ClCompile Include="../wfn_class.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\properties.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../AtomGrid.h">
@@ -93,6 +96,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../wfn_class.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\properties.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

@@ -3,11 +3,10 @@
 #include <string>
 #include <string.h>
 #include <sstream>
+#include <iostream>
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
-//#include <windows.h>
-//#include <Windows.h>
 #define GetCurrentDir _getcwd
 #else
 #include <unistd.h>
@@ -28,37 +27,9 @@
 #include "convenience.h"
 
 using namespace std;
+const double c_pi = 3.141592653589793;
 
 //--------------------------General convenience terminal functions---------------------------------
-inline void QCT(){
- cout << "  ____   _____ _______ " << std::endl;
- cout << " / __ \\ / ____|__   __|" << std::endl;
- cout << "| |  | | |       | |   " << std::endl;
- cout << "| |  | | |       | |   " << std::endl;
- cout << "| |__| | |____   | |   " << std::endl;
- cout << " \\___\\_\\\\_____|  |_|   " << std::endl;
- cout << "                       "<< std::endl;
-};
-
-inline bool cuQCT(ofstream& file){
-	file << "     _   __     _____       __              ___   ___\n";
-	file << "    / | / /___ / ___ / ____  / /_  ___  _____/   | |__ \\\n";
-	file << "   /  |/ / __ \\\\__ \\ / __ \\ / __ \\ / _ \\ / ___/ /| | __//\n";
-	file << "  / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
-	file << " /_/ |_ / \\____ / ____ / .___ / _/ /_ / \\___ / _/  /_/  |_ / ____/\n";
-	file << "       /_ /\n" << flush;
-  return true;
-};
-
-inline void cuQCT(){
-  cout << "             ____   _____ _______ " << std::endl;
-  cout << "            / __ \\ / ____|__   __|" << std::endl;
-  cout << "  ___ _   _| |  | | |       | |   " << std::endl;
-  cout << " / __| | | | |  | | |       | |   " << std::endl;
-  cout << "| (__| |_| | |__| | |____   | |   " << std::endl;
-  cout << " \\___|\\__,_|\\___\\_\\\\_____|  |_|   " << std::endl;
-  cout << "                       "<< std::endl;
-};
 
 inline void copyright(){
 	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
@@ -437,6 +408,7 @@ int program_confi(string &gaussian_path, string &turbomole_path, string &basis, 
 	size_t length;
 	char tempchar[200];
 	int run=0;
+	int dump;
 	while(!conf.eof()){
 		switch(run){
 			case 0:
@@ -456,11 +428,11 @@ int program_confi(string &gaussian_path, string &turbomole_path, string &basis, 
 				break;
 			case 3: length = line.copy(tempchar,line.size()-3,4);
 				tempchar[length]='\0';
-				sscanf(tempchar, "%d", &ncpus);
+				dump = sscanf(tempchar, "%d", &ncpus);
 				break;
 			case 4: length = line.copy(tempchar,line.size()-3,4);
 				tempchar[length]='\0';
-				sscanf(tempchar, "%f", &mem);
+				dump = sscanf(tempchar, "%f", &mem);
 				break;
 			default:
 				if(debug) cout << "found everything i was looking for, if you miss something check the switch" << endl;
@@ -935,6 +907,7 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 	return true;
 };
 */
+
 void select_cubes(vector <vector <unsigned int> > &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug){
 	//asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
 	//Returns values in selection[0][i] for iths selection of wavefunction and
@@ -1038,8 +1011,317 @@ void progress_bar::write(double fraction)
 	auto width = bar_width - message.size();
 	auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
 
-	os << '\n' << message;
+	os << '\r' << message;
 	os.write(full_bar.data() + offset, width);
 	os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction*20)*0.05) << "%] " << std::flush;
+}
+
+void readxyzMinMax_fromWFN(
+	WFN& wavy,
+	double* CoordMinMax,
+	double* NbSteps,
+	double Radius,
+	double Increments
+)
+{
+	const double bohrtoa = 0.52917720859;
+	int iAtoms, j;
+	int NbAtoms = wavy.atoms.size();
+
+	vector < vector <double > > PosAtoms;
+	PosAtoms.resize(wavy.get_ncen());
+	for (int i = 0; i < wavy.get_ncen(); i++)
+		PosAtoms[i].resize(3);
+	bool bohrang = !check_bohr(wavy, false, false);
+	j = 0;
+	for (iAtoms = 0; iAtoms < wavy.get_ncen(); iAtoms++)
+	{
+
+		PosAtoms[j][0] = wavy.atoms[iAtoms].x;
+		PosAtoms[j][1] = wavy.atoms[iAtoms].y;
+		PosAtoms[j][2] = wavy.atoms[iAtoms].z;
+		if (!bohrang) {
+			cout << "Dividing atom positions!" << endl;
+			PosAtoms[j][0] /= bohrtoa;
+			PosAtoms[j][1] /= bohrtoa;
+			PosAtoms[j][2] /= bohrtoa;
+		}
+		if (iAtoms == 0)
+		{
+			CoordMinMax[0] = PosAtoms[j][0];
+			CoordMinMax[3] = PosAtoms[j][0];
+			CoordMinMax[1] = PosAtoms[j][1];
+			CoordMinMax[4] = PosAtoms[j][1];
+			CoordMinMax[2] = PosAtoms[j][2];
+			CoordMinMax[5] = PosAtoms[j][2];
+		}
+
+		else
+		{
+			if (CoordMinMax[0] > PosAtoms[j][0])
+				CoordMinMax[0] = PosAtoms[j][0];
+			if (CoordMinMax[3] < PosAtoms[j][0])
+				CoordMinMax[3] = PosAtoms[j][0];
+
+			if (CoordMinMax[1] > PosAtoms[j][1])
+				CoordMinMax[1] = PosAtoms[j][1];
+			if (CoordMinMax[4] < PosAtoms[j][1])
+				CoordMinMax[4] = PosAtoms[j][1];
+
+			if (CoordMinMax[2] > PosAtoms[j][2])
+				CoordMinMax[2] = PosAtoms[j][2];
+			if (CoordMinMax[5] < PosAtoms[j][2])
+				CoordMinMax[5] = PosAtoms[j][2];
+		}
+		j++;
+	}
+
+	CoordMinMax[0] -= Radius/bohrtoa;
+	CoordMinMax[3] += Radius/bohrtoa;
+	CoordMinMax[1] -= Radius/bohrtoa;
+	CoordMinMax[4] += Radius/bohrtoa;
+	CoordMinMax[2] -= Radius/bohrtoa;
+	CoordMinMax[5] += Radius/bohrtoa;
+
+	NbSteps[0] = ceil((CoordMinMax[3] - CoordMinMax[0]) / Increments * bohrtoa);
+	NbSteps[1] = ceil((CoordMinMax[4] - CoordMinMax[1]) / Increments * bohrtoa);
+	NbSteps[2] = ceil((CoordMinMax[5] - CoordMinMax[2]) / Increments * bohrtoa);
+}
+
+void readxyzMinMax_fromCIF(
+	string cif,
+	double* CoordMinMax,
+	double* NbSteps,
+	vector < vector < double > > &cm,
+	double Resolution,
+	bool debug
+)
+{
+	if (debug)
+		cout << "starting to read cif!" << endl;
+	if (!exists(cif)) {
+		cout << "CIF does not exists!" << endl;
+		return;
+	}
+	ifstream cif_input(cif.c_str(), ios::in);
+	vector<bool> found;
+	string line;
+	found.resize(7);
+	for (int k = 0; k < 7; k++)
+		found[k] = false;
+	double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
+	double alpha = 0.0, beta = 0.0, gamma = 0.0;
+	vector <string> cell_keywords;
+	cell_keywords.push_back("_cell_length_a");
+	cell_keywords.push_back("_cell_length_b");
+	cell_keywords.push_back("_cell_length_c");
+	cell_keywords.push_back("_cell_angle_alpha");
+	cell_keywords.push_back("_cell_angle_beta");
+	cell_keywords.push_back("_cell_angle_gamma");
+	cell_keywords.push_back("_cell_volume");
+	if (debug)
+		cout << "Starting while !.eof()" << endl;
+	while (!cif_input.eof()) {
+		if (debug)
+			cout << "While line! " << setw(80) << line
+			<< setw(10) << a << found[0]
+			<< setw(10) << b << found[1]
+			<< setw(10) << c << found[2]
+			<< setw(10) << alpha << found[3]
+			<< setw(10) << beta << found[4]
+			<< setw(10) << gamma << found[5]
+			<< setw(10) << v << found[6] << endl;
+		getline(cif_input, line);
+		for (int k = 0; k < cell_keywords.size(); k++) {
+			if (line.find(cell_keywords[k]) != string::npos) {
+				switch (k) {
+				case 0:
+					a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 1:
+					b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 2:
+					c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 3:
+					alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 4:
+					beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 5:
+					gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				case 6:
+					v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
+					break;
+				default:
+					cout << "This is weird... should never get here... aborting!" << endl;
+					return;
+				}
+				found[k] = true;
+			}
+		}
+		if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
+			break;
+	}
+	double ca = cos(0.0174532925199432944444444444444 * alpha);
+	double cb = cos(0.0174532925199432944444444444444 * beta);
+	double cg = cos(0.0174532925199432944444444444444 * gamma);
+	double sa = sin(0.0174532925199432944444444444444 * alpha);
+	double sb = sin(0.0174532925199432944444444444444 * beta);
+	double sg = sin(0.0174532925199432944444444444444 * gamma);
+	double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
+	double V = a * b * c * Vp;
+
+	if (debug)
+		cout << "Making cm" << endl
+		<< a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V  << " vs. " << v << endl;
+
+	cm[0][0] = a / 0.529177249;
+	cm[1][0] = 0.0;
+	cm[2][0] = 0.0;
+
+	cm[0][1] = b * cg / 0.529177249;
+	cm[1][1] = b * sg / 0.529177249;
+	cm[2][1] = 0.0;
+
+	cm[0][2] = c * cb / 0.529177249;
+	cm[1][2] = (c * (ca - cb * cg) / sg) / 0.529177249;
+	cm[2][2] = V / (a * b * sg) / 0.529177249;
+
+	CoordMinMax[0] = 0.0;
+	CoordMinMax[1] = 0.0;
+	CoordMinMax[2] = 0.0;
+
+	CoordMinMax[3] = (a + b * cg + c * cb) / 0.529177249;
+	CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
+	CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
+
+	NbSteps[0] = ceil(a / Resolution);
+	NbSteps[1] = ceil(b / Resolution);
+	NbSteps[2] = ceil(c / Resolution);
+
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			cm[i][j] /= NbSteps[j];
+
+	cif_input.close();
+}
+
+void type2vector(
+	const int index,
+	int* vector) {
+	switch (index) {
+	case 1:
+		vector[0] = 0; vector[1] = 0; vector[2] = 0;
+		break;
+	case 2:
+		vector[0] = 1; vector[1] = 0; vector[2] = 0;
+		break;
+	case 3:
+		vector[0] = 0; vector[1] = 1; vector[2] = 0;
+		break;
+	case 4:
+		vector[0] = 0; vector[1] = 0; vector[2] = 1;
+		break;
+	case 5:
+		vector[0] = 2; vector[1] = 0; vector[2] = 0;
+		break;
+	case 6:
+		vector[0] = 0; vector[1] = 2; vector[2] = 0;
+		break;
+	case 7:
+		vector[0] = 0; vector[1] = 0; vector[2] = 2;
+		break;
+	case 8:
+		vector[0] = 1; vector[1] = 1; vector[2] = 0;
+		break;
+	case 9:
+		vector[0] = 1; vector[1] = 0; vector[2] = 1;
+		break;
+	case 10:
+		vector[0] = 0; vector[1] = 1; vector[2] = 1;
+		break;
+	case 11:
+		vector[0] = 3; vector[1] = 0; vector[2] = 0;
+		break;
+	case 12:
+		vector[0] = 0; vector[1] = 3; vector[2] = 0;
+		break;
+	case 13:
+		vector[0] = 0; vector[1] = 0; vector[2] = 3;
+		break;
+	case 14:
+		vector[0] = 2; vector[1] = 1; vector[2] = 0;
+		break;
+	case 15:
+		vector[0] = 2; vector[1] = 0; vector[2] = 1;
+		break;
+	case 16:
+		vector[0] = 0; vector[1] = 2; vector[2] = 1;
+		break;
+	case 17:
+		vector[0] = 1; vector[1] = 2; vector[2] = 0;
+		break;
+	case 18:
+		vector[0] = 1; vector[1] = 0; vector[2] = 2;
+		break;
+	case 19:
+		vector[0] = 0; vector[1] = 1; vector[2] = 2;
+		break;
+	case 20:
+		vector[0] = 1; vector[1] = 1; vector[2] = 1;
+		break;
+	case 21:
+		vector[0] = 0; vector[1] = 0; vector[2] = 4;
+		break;
+	case 22:
+		vector[0] = 0; vector[1] = 1; vector[2] = 3;
+		break;
+	case 23:
+		vector[0] = 0; vector[1] = 2; vector[2] = 2;
+		break;
+	case 24:
+		vector[0] = 0; vector[1] = 3; vector[2] = 1;
+		break;
+	case 25:
+		vector[0] = 0; vector[1] = 4; vector[2] = 0;
+		break;
+	case 26:
+		vector[0] = 1; vector[1] = 0; vector[2] = 3;
+		break;
+	case 27:
+		vector[0] = 1; vector[1] = 1; vector[2] = 2;
+		break;
+	case 28:
+		vector[0] = 1; vector[1] = 2; vector[2] = 1;
+		break;
+	case 29:
+		vector[0] = 1; vector[1] = 3; vector[2] = 0;
+		break;
+	case 30:
+		vector[0] = 2; vector[1] = 0; vector[2] = 2;
+		break;
+	case 31:
+		vector[0] = 2; vector[1] = 1; vector[2] = 1;
+		break;
+	case 32:
+		vector[0] = 2; vector[1] = 2; vector[2] = 0;
+		break;
+	case 33:
+		vector[0] = 3; vector[1] = 0; vector[2] = 1;
+		break;
+	case 34:
+		vector[0] = 3; vector[1] = 1; vector[2] = 0;
+		break;
+	case 35:
+		vector[0] = 4; vector[1] = 0; vector[2] = 0;
+		break;
+	default:
+		vector[0] = -1; vector[1] = -1; vector[2] = -1;
+		break;
+	}
 }
 

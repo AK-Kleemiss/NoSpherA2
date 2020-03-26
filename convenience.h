@@ -12,6 +12,13 @@
 class WFN;
 
 //------------------general functions for easy use of terminal input--------------------
+const double bragg_angstrom[87]{
+	0.00, 0.35, 0.35, 1.45, 1.05, 0.85, 0.70, 0.65, 0.60, 0.50, 0.45, 1.80, 1.50, 1.25, 1.10, 1.00, 1.00, 1.00, 1.00, 2.20, 1.80,
+	1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10, 2.35, 2.00, 1.80, 1.55, 1.45,
+	1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40, 2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85,
+	1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60,
+	1.90, 1.50, 1.50
+};
 bool yesno();
 bool is_similar_rel(double first, double second, double tolerance);
 bool is_similar(double first, double second, double tolerance);
@@ -128,6 +135,7 @@ public:
 ////////////////double y1 = mBase_values[pos];
 ////////////////double y2 = mBase_values[pos + 1];
 ////////////////return y1 + dx * (y2 - y1) / mStepwidth;
+		return 0.0;
 	}
 
 	void   resize(size_t size);
@@ -150,6 +158,24 @@ struct cosinus
 	double get(double x) { return helper.get(x); }
 	cosinus_annaeherung& helper;
 };
+
+void readxyzMinMax_fromWFN(
+	WFN& wavy,
+	double* CoordMinMax,
+	double* NbSteps,
+	double Radius,
+	double Increments);
+void readxyzMinMax_fromCIF(
+	std::string cif,
+	double* CoordMinMax,
+	double* NbSteps,
+	std::vector < std::vector < double > > &cm,
+	double Resolution,
+	bool debug = false);
+void type2vector(
+	const int index,
+	int* vector);
+
 
 #include "wfn_class.h"
 

@@ -49,7 +49,8 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 	size.push_back(z);
 	origin.resize(3);
 	vectors.resize(3);
-	for(int i=0; i<3; i++) vectors[i].resize(3);
+	for(int i=0; i<3; i++) 
+		vectors[i].resize(3);
 	loaded=grow_values;
 	if(grow_values){
 		values.resize(x);
@@ -77,6 +78,7 @@ cube::cube(string filepath, bool read, WFN &wave, bool &return_value, bool exper
 		return;
 	}
 	loaded=read;
+	na = wave.get_ncen();
 	return_value=true;
 };
 
@@ -149,22 +151,23 @@ cube::cube(const cube &given){
 bool cube::read_file(bool full, bool header, WFN &wave, bool expert){
 	ifstream file(path.c_str());
 	string line;
+	int dump;
 	if(header){
 		getline(file,comment1);
 		getline(file,comment2);
 		getline(file,line);
 		origin.resize(3);
-		sscanf(line.c_str(),"%d %lf %lf %lf",&na,&origin[0],&origin[1],&origin[2]); //na=number of atoms in the cube file
+		dump = sscanf(line.c_str(),"%d %lf %lf %lf",&na,&origin[0],&origin[1],&origin[2]); //na=number of atoms in the cube file
 		double spat[9];
 		size.resize(3);
 		vectors.resize(3);
 		for(int i=0; i<3; i++) vectors[i].resize(3);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[0],&vectors[0][0],&vectors[0][1],&vectors[0][2]);
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[0],&vectors[0][0],&vectors[0][1],&vectors[0][2]);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[1],&vectors[1][0],&vectors[1][1],&vectors[1][2]); 
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[1],&vectors[1][0],&vectors[1][1],&vectors[1][2]);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[2],&vectors[2][0],&vectors[2][1],&vectors[2][2]); 
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[2],&vectors[2][0],&vectors[2][1],&vectors[2][2]);
 		int atnr;
 		double atp[3];
 		bool read_atoms=true;
@@ -182,7 +185,7 @@ bool cube::read_file(bool full, bool header, WFN &wave, bool expert){
 			for (int i=0; i<na; i++){//loop of the positions of the atoms to get to the start of the values
 				getline(file,line);
 				double dum;
-				sscanf(line.c_str(),"%d %lf %lf %lf %lf",&atnr,&dum,&atp[0],&atp[1],&atp[2]);
+				dump = sscanf(line.c_str(),"%d %lf %lf %lf %lf",&atnr,&dum,&atp[0],&atp[1],&atp[2]);
 				wave.push_back_atom (atnr2letter (atnr),atp[0],atp[1],atp[2],atnr);
 			}
 	}
@@ -197,7 +200,7 @@ bool cube::read_file(bool full, bool header, WFN &wave, bool expert){
 				values[i][j].resize(size[2]);
 		}
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -262,22 +265,23 @@ bool cube::read_file(bool full, bool header, bool expert){
 // Mostly to be used when reading again a wavefunction, since no comparison for atoms etc. is done.
 	ifstream file(path.c_str());
 	string line;
+	int dump;
 	if(header){
 		getline(file,comment1);
 		getline(file,comment2);
 		getline(file,line);
 		origin.resize(3);
-		sscanf(line.c_str(),"%d %lf %lf %lf",&na,&origin[0],&origin[1],&origin[2]); //na=number of atoms in the cube file
+		dump = sscanf(line.c_str(),"%d %lf %lf %lf",&na,&origin[0],&origin[1],&origin[2]); //na=number of atoms in the cube file
 		double spat[9];
 		size.resize(3);
 		vectors.resize(3);
 		for(int i=0; i<3; i++) vectors[i].resize(3);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[0],&vectors[0][0],&vectors[0][1],&vectors[0][2]);
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[0],&vectors[0][0],&vectors[0][1],&vectors[0][2]);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[1],&vectors[1][0],&vectors[1][1],&vectors[1][2]);
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[1],&vectors[1][0],&vectors[1][1],&vectors[1][2]);
 		getline(file,line);
-		sscanf(line.c_str(),"%d%lf%lf%lf",&size[2],&vectors[2][0],&vectors[2][1],&vectors[2][2]);
+		dump = sscanf(line.c_str(),"%d%lf%lf%lf",&size[2],&vectors[2][0],&vectors[2][1],&vectors[2][2]);
 		int atnr;
 		double atp[3];
 	}
@@ -292,7 +296,7 @@ bool cube::read_file(bool full, bool header, bool expert){
 				values[i][j].resize(size[2]);
 		}
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -352,51 +356,63 @@ bool cube::read_file(bool full, bool header, bool expert){
 	return (true);
 }
 
-bool cube::write_file(WFN &wave){
+bool cube::write_file(WFN &wave, bool force, bool absolute){
 	bool end=false;
-	while(exists(path)&&!end){
-		cout << "File already exists, do you want to overwrite it? ";
-		if(!yesno()){
-			cout << "Do you want to give a new name? "; 
-			if(yesno()){
-				cout << "Please give the new path where it should be saved: ";
-				cin >> path;
+	if (!force) {
+		while (exists(path) && !end) {
+			cout << "File already exists, do you want to overwrite it? ";
+			if (!yesno()) {
+				cout << "Do you want to give a new name? ";
+				if (yesno()) {
+					cout << "Please give the new path where it should be saved: ";
+					cin >> path;
+				}
+				else {
+					cout << "okay, canceling!" << endl;
+					return (false);
+				}
 			}
-			else{
-				cout << "okay, canceling!" << endl;
-				return (false);
-			}
+			else end = true;
 		}
-		else end=true;
+	}
+	else {
+		if (exists(path))
+			remove(path.c_str());
 	}
 	stringstream stream;
 	string temp;
 	ofstream of(path.c_str(),ios::out);
 	of << comment1 << endl;
 	of << comment2 << endl;
-	of << "   " << na << " " << origin[0] << " " << origin[1] << " " << origin[2] << endl;
+	of << setw(6) << na << fixed << setw(12) << origin[0] << fixed << setw(12) << origin[1] << fixed << setw(12) << origin[2] << endl;
 	for(int i=0; i<3; i++){
 		stream << setw(6) << size[i];
 		for(int j=0; j<3; j++)  stream << fixed << setw(12) << setprecision (6)<< vectors[i][j];
 		stream << endl;
 	}
 	of << stream.str();
+	stream.str("");
 	for(int i=0; i<na ; i++){
-		of << "  " << wave.get_atom_charge(i) << " " << wave.get_atom_charge (i) << ".000000";
-		for(int j=0; j<3; j++) of << " " << wave.get_atom_coordinate (i,j,false);
+		of << setw(6) << wave.get_atom_charge(i) << setw(6) << wave.get_atom_charge (i) << ".00000";
+		for(int j=0; j<3; j++) 
+			of << fixed << setw(12) << wave.get_atom_coordinate (i,j,false);
 		of << endl;
 	}
 	for(int run_x=0; run_x<size[0]; run_x++){
 		for(int run_y=0; run_y<size[1]; run_y++){
 			int temp_write=0;
 			while(temp_write<size[2]){
-				stream << uppercase << scientific << setw(15) << setprecision(7) << values[run_x][run_y][temp_write];
+				if(absolute)
+					stream << uppercase << scientific << setw(15) << setprecision(7) << abs(values[run_x][run_y][temp_write]);
+				else
+					stream << uppercase << scientific << setw(15) << setprecision(7) << values[run_x][run_y][temp_write];
 				temp_write++;
 				if(temp_write%6==0) stream << endl;
 			}
 			if(temp_write%6!=0) stream << endl;
 		}
 		of << stream.str();
+		stream.str("");
 	}
 	return (true);
 };
@@ -556,7 +572,7 @@ cube cube::operator+(cube &right) const{
 					res_cube.set_value(x,y,z,res_cube.get_value(x,y,z)+right.get_value(x,y,z));
 	else{
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -641,7 +657,7 @@ cube cube::operator-(cube &right) const{
 					res_cube.set_value(x,y,z,res_cube.get_value(x,y,z)+right.get_value(x,y,z));
 	else{
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -726,7 +742,7 @@ cube cube::operator*(cube &right) const{
 					res_cube.set_value(x,y,z,res_cube.get_value(x,y,z)+right.get_value(x,y,z));
 	else{
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -811,7 +827,7 @@ cube cube::operator/(cube &right) const{
 					res_cube.set_value(x,y,z,res_cube.get_value(x,y,z)+right.get_value(x,y,z));
 	else{
 		int reads2=0;
-		int reads1;
+		int reads1=0;
 		int rest2=0;
 		int run_x=0;
 		int run_y=0;
@@ -1003,6 +1019,12 @@ double cube::get_origin(unsigned int i) const{
 	case 2: return (origin[2]); break;
 	default: return (-1);
 	}
+};
+
+bool cube::set_origin(unsigned int i, double value) {
+	if (i < 3 && i >= 0) origin[i] = value;
+	else return (false);
+	return (true);
 };
 
 string cube::super_cube(WFN &wave){
