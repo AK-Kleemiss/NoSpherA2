@@ -5,121 +5,63 @@ RM := rm
 
 LIBOMP := /usr/local/lib/libomp.a
 
-all: Wfn_2_Fchk
+all: NoSpherA2
 
 CPP_SRCS += \
-../AtomGrid.cpp \
-../basis_set.cpp \
-../becke_partitioning.cpp \
-../convenience.cpp \
-../cube.cpp \
-../fchk.cpp \
-../grid_radial.cpp \
-../mo_class.cpp \
-../sphere_lebedev_rule.cpp \
-../structure_factors.cpp \
-../wfn_2_fchk.cpp \
-../wfn_class.cpp
+./unity1.cpp \
+./unity2.cpp \
+./unity3.cpp \
+./unity4.cpp \
+./unity5.cpp
 
 OBJS += \
-./AtomGrid.o \
-./basis_set.o \
-./becke_partitioning.o \
-./convenience.o \
-./cube.o \
-./fchk.o \
-./grid_radial.o \
-./mo_class.o \
-./sphere_lebedev_rule.o \
-./structure_factors.o \
-./wfn_2_fchk.o \
-./wfn_class.o
+./unity1.o \
+./unity2.o \
+./unity3.o \
+./unity4.o \
+./unity5.o
 
 CPP_DEPS += \
-./AtomGrid.d \
-./basis_set.d \
-./becke_partitioning.d \
-./convenience.d \
-./cube.d \
-./fchk.d \
-./grid_radial.d \
-./mo_class.d \
-./sphere_lebedev_rule.d \
-./structure_factors.d \
-./wfn_2_fchk.d \
-./wfn_class.d
+./unity1.d \
+./unity2.d \
+./unity3.d \
+./unity4.d \
+./unity5.d
 
 -include ${CPP_DEPS}
 
-Wfn_2_Fchk: ${OBJS} ${USER_OBJS}
+NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "Wfn_2_Fchk" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
+	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
 	@echo 'Finished building target: $@'
 
-./AtomGrid.o: ../AtomGrid.cpp
+./unity1.o: ./unity1.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-./basis_set.o: ../basis_set.cpp
+./unity2.o: ./unity2.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-./becke_partitioning.o: ../becke_partitioning.cpp
+./unity3.o: ./unity3.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-./convenience.o: ../convenience.cpp
+./unity4.o: ./unity4.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-./cube.o: ../cube.cpp
+./unity5.o: ./unity5.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
-
-./fchk.o: ../fchk.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./grid_radial.o: ../grid_radial.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./mo_class.o: ../mo_class.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./sphere_lebedev_rule.o: ../sphere_lebedev_rule.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./structure_factors.o: ../structure_factors.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./wfn_2_fchk.o: ../wfn_2_fchk.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./wfn_class.o: ../wfn_class.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-
 
 clean:
-	-${RM} ${CC_DEPS}${C++_DEPS}${EXECUTABLES} Wfn_2_Fchk
+	-${RM} ${CC_DEPS}${C++_DEPS}${EXECUTABLES} NoSpherA2
 	-@echo ' '
 
 .PHONY: all clean dependents
