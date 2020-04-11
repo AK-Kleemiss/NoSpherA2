@@ -29,7 +29,7 @@ MO::MO(){
 	ener=0.0;
 };
 
-MO::MO(int number, float occupation, double energy){
+MO::MO(int number, double occupation, double energy){
 	nr=number;
 	occ=occupation;
 	ener=energy;
