@@ -52,12 +52,12 @@ class WFN {
 		bool change_MO_coef(int nr_mo, int nr_primitive, double value, bool debug);
 		double get_MO_coef(int nr_mo, int nr_primtive, bool debug) const; 
 		int get_MO_primitive_count(int nr_mo) const; 
-		bool push_back_MO(int nr, float occ, double ener);
+		bool push_back_MO(int nr, double occ, double ener);
 		bool push_back_MO_coef(int nr, double value, int nr2);
 		double get_MO_energy(int mo) const;
 		int get_center(int nr) const {return centers[nr];};
 		int get_type(int nr) const {return types[nr];};
-		int get_MO_occ(int nr);
+		double get_MO_occ(int nr);
 		
 		//--------------------in and output----------------------------------------
 		void change_basis_set_name(std::string name) {basis_set_name=name;};

@@ -72,7 +72,7 @@ bool WFN::erase_atom(int nr){
 	return true;
 };
 
-bool WFN::push_back_MO(int nr, float occ, double ener){
+bool WFN::push_back_MO(int nr, double occ, double ener){
 	nmo++;
 	//hier fehlen noch sinnhaftigkeitsfragen
 	MOs.push_back(MO(nr,occ,ener));
@@ -2517,7 +2517,7 @@ double WFN::get_atom_real_mass(int atomnr){
 	return masses[get_atom_charge(atomnr)-1];
 }
 
-int WFN::get_MO_occ(int nr){
+double WFN::get_MO_occ(int nr){
 	if(nr >= nmo || nr < 0){
 		cout << "WRONG INPUT! No Negative or bigger number than available MOs" << endl;
 		return -1;

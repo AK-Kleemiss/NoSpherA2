@@ -114,6 +114,8 @@ int main(int argc, char **argv){
 	bool rdg = false;
 	double MinMax[6];
 	double NbSteps[3];
+	vector <int> MOs;
+	bool all_mos = false;
 	for (int i=0; i<argc; i++){
 		temp = argv[i];
 		if(temp.find(known_keywords[0]) != string::npos)
@@ -181,6 +183,13 @@ int main(int argc, char **argv){
 		if (temp.find("-resolution") != string::npos) {
 			resolution = stod(argv[i + 1]);
 		}
+		if (temp.find("-MO") != string::npos) {
+			if (string(argv[i + 1]) != "all") 
+				MOs.push_back(stoi(argv[i + 1]));
+			else
+				all_mos = true;
+			calc = true;
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
@@ -188,6 +197,10 @@ int main(int argc, char **argv){
 	}
 	if (hkl != "" || basis_set != "" || fchk != "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
+		if (debug_main)
+			for (int i = 0; i < argc; i++)
+				log_file << argv[i] << endl;
+
 		log_file << "    _   __     _____       __              ___   ___\n";
 		log_file << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
 		log_file << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
@@ -312,6 +325,9 @@ int main(int argc, char **argv){
 	}
 	if (calc) {
 		ofstream log2("NoSpherA2_cube.log", ios::out);
+		if (debug_main)
+			for (int i = 0; i < argc; i++)
+				log2 << argv[i] << endl;
 		log2 << "    _   __     _____       __              ___   ___\n";
 		log2 << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
 		log2 << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
@@ -336,12 +352,18 @@ int main(int argc, char **argv){
 		readwfn(wavy[0], wfn, debug_all, log2);
 		if (debug_main)
 			log2 << "Starting calcualtion of properties" << endl;
+		if (all_mos)
+			for (int mo = 0; mo < wavy[0].get_nmo(); mo++)
+				MOs.push_back(mo);
+		if (debug_main)
+			log2 << "Size of MOs: " << MOs.size() << endl;
 
 		vector < vector < double > > cell_matrix;
 		cell_matrix.resize(3);
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i].resize(3);
-
+		if (debug_main)
+			log2 << cif << " " << resolution << endl;
 		readxyzMinMax_fromCIF(cif, MinMax, NbSteps, cell_matrix, resolution, debug_main);
 		if (debug_main) {
 			log2 << "Resolution: " << resolution << endl;
@@ -378,6 +400,10 @@ int main(int argc, char **argv){
 		cube ESP(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), esp);
 		if (debug_main)
 			log2 << "ESP is there" << endl;
+		cube MO(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), true);
+		if (debug_main)
+			log2 << "MO is there" << endl;
+
 		for (int i = 0; i < 3; i++) {
 			Rho.set_origin(i, MinMax[i]);
 			RDG.set_origin(i, MinMax[i]);
@@ -385,6 +411,7 @@ int main(int argc, char **argv){
 			Eli.set_origin(i, MinMax[i]);
 			Lap.set_origin(i, MinMax[i]);
 			ESP.set_origin(i, MinMax[i]);
+			MO.set_origin(i, MinMax[i]);
 			for (int j = 0; j < 3; j++) {
 				Rho.set_vector(i, j, cell_matrix[i][j]);
 				RDG.set_vector(i, j, cell_matrix[i][j]);
@@ -392,20 +419,25 @@ int main(int argc, char **argv){
 				Eli.set_vector(i, j, cell_matrix[i][j]);
 				Lap.set_vector(i, j, cell_matrix[i][j]);
 				ESP.set_vector(i, j, cell_matrix[i][j]);
+				MO.set_vector(i, j, cell_matrix[i][j]);
 			}
 		}
+		if (debug_main)
+			log2 << "Origins etc are set up" << endl;
 		Rho.set_comment1("Calculated density using NoSpherA2");
 		RDG.set_comment1("Calculated reduced density gradient using NoSpherA2");
 		Elf.set_comment1("Calculated electron localization function using NoSpherA2");
 		Eli.set_comment1("Calculated same-spin electron localizability indicator using NoSpherA2");
 		Lap.set_comment1("Calculated laplacian of electron density using NoSpherA2");
 		ESP.set_comment1("Calculated electrostatic potential using NoSpherA2");
+		MO.set_comment1("Calcualted MO values using NoSpherA2");
 		Rho.set_comment2("from " + wavy[0].get_path());
 		RDG.set_comment2("from " + wavy[0].get_path());
 		Elf.set_comment2("from " + wavy[0].get_path());
 		Eli.set_comment2("from " + wavy[0].get_path());
 		Lap.set_comment2("from " + wavy[0].get_path());
 		ESP.set_comment2("from " + wavy[0].get_path());
+		MO.set_comment2("from" + wavy[0].get_path());
 		Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
 		RDG.path = get_basename_without_ending(wavy[0].get_path()) + "_rdg.cube";
 		Elf.path = get_basename_without_ending(wavy[0].get_path()) + "_elf.cube";
@@ -417,6 +449,14 @@ int main(int argc, char **argv){
 			log2 << "Everything is set up; starting calculation..." << endl;
 
 		log2 << "Calculating for " << fixed << setprecision(0) << NbSteps[0] * NbSteps[1] * NbSteps[2] << " Gridpoints." << endl;
+
+		if (MOs.size() != 0)
+			for (int i = 0; i < MOs.size(); i++) {
+				log2 << "Calcualting MO: " << MOs[i] << endl;
+				MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_"+to_string(MOs[i])+".cube";
+				Calc_MO(MO, MOs[i], wavy[0], ncpus, log2);
+				MO.write_file(wavy[0], true);
+			}
 
 		if (lap || eli || elf || rdg)
 			Calc_Prop(Rho, RDG, Elf, Eli, Lap, wavy[0], ncpus, log2);
@@ -433,6 +473,7 @@ int main(int argc, char **argv){
 		if (lap) Lap.write_file(wavy[0], true);
 		if (elf) Elf.write_file(wavy[0], true);
 		if (eli) Eli.write_file(wavy[0], true);
+				
 
 		log2 << " done!" << endl;
 

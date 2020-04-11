@@ -1210,118 +1210,55 @@ void readxyzMinMax_fromCIF(
 	cif_input.close();
 }
 
+const int type_vector[105]{ 
+	0, 0, 0,
+	1, 0, 0,
+	0, 1, 0,
+	0, 0, 1,
+	2, 0, 0,
+	0, 2, 0,
+	0, 0, 2,
+	1, 1, 0,
+	1, 0, 1,
+	0, 1, 1,
+	3, 0, 0,
+	0, 3, 0,
+	0, 0, 3,
+	2, 1, 0,
+	2, 0, 1,
+	0, 2, 1,
+	1, 2, 0,
+	1, 0, 2,
+	0, 1, 2,
+	1, 1, 1,
+	0, 0, 4,
+	0, 1, 3,
+	0, 2, 2,
+	0, 3, 1,
+	0, 4, 0,
+	1, 0, 3,
+	1, 1, 2,
+	1, 2, 1,
+	1, 3, 0,
+	2, 0, 2,
+	2, 1, 1,
+	2, 2, 0,
+	3, 0, 1,
+	3, 1, 0,
+	4, 0, 0 };
+
 void type2vector(
 	const int index,
 	int* vector) {
-	switch (index) {
-	case 1:
-		vector[0] = 0; vector[1] = 0; vector[2] = 0;
-		break;
-	case 2:
-		vector[0] = 1; vector[1] = 0; vector[2] = 0;
-		break;
-	case 3:
-		vector[0] = 0; vector[1] = 1; vector[2] = 0;
-		break;
-	case 4:
-		vector[0] = 0; vector[1] = 0; vector[2] = 1;
-		break;
-	case 5:
-		vector[0] = 2; vector[1] = 0; vector[2] = 0;
-		break;
-	case 6:
-		vector[0] = 0; vector[1] = 2; vector[2] = 0;
-		break;
-	case 7:
-		vector[0] = 0; vector[1] = 0; vector[2] = 2;
-		break;
-	case 8:
-		vector[0] = 1; vector[1] = 1; vector[2] = 0;
-		break;
-	case 9:
-		vector[0] = 1; vector[1] = 0; vector[2] = 1;
-		break;
-	case 10:
-		vector[0] = 0; vector[1] = 1; vector[2] = 1;
-		break;
-	case 11:
-		vector[0] = 3; vector[1] = 0; vector[2] = 0;
-		break;
-	case 12:
-		vector[0] = 0; vector[1] = 3; vector[2] = 0;
-		break;
-	case 13:
-		vector[0] = 0; vector[1] = 0; vector[2] = 3;
-		break;
-	case 14:
-		vector[0] = 2; vector[1] = 1; vector[2] = 0;
-		break;
-	case 15:
-		vector[0] = 2; vector[1] = 0; vector[2] = 1;
-		break;
-	case 16:
-		vector[0] = 0; vector[1] = 2; vector[2] = 1;
-		break;
-	case 17:
-		vector[0] = 1; vector[1] = 2; vector[2] = 0;
-		break;
-	case 18:
-		vector[0] = 1; vector[1] = 0; vector[2] = 2;
-		break;
-	case 19:
-		vector[0] = 0; vector[1] = 1; vector[2] = 2;
-		break;
-	case 20:
-		vector[0] = 1; vector[1] = 1; vector[2] = 1;
-		break;
-	case 21:
-		vector[0] = 0; vector[1] = 0; vector[2] = 4;
-		break;
-	case 22:
-		vector[0] = 0; vector[1] = 1; vector[2] = 3;
-		break;
-	case 23:
-		vector[0] = 0; vector[1] = 2; vector[2] = 2;
-		break;
-	case 24:
-		vector[0] = 0; vector[1] = 3; vector[2] = 1;
-		break;
-	case 25:
-		vector[0] = 0; vector[1] = 4; vector[2] = 0;
-		break;
-	case 26:
-		vector[0] = 1; vector[1] = 0; vector[2] = 3;
-		break;
-	case 27:
-		vector[0] = 1; vector[1] = 1; vector[2] = 2;
-		break;
-	case 28:
-		vector[0] = 1; vector[1] = 2; vector[2] = 1;
-		break;
-	case 29:
-		vector[0] = 1; vector[1] = 3; vector[2] = 0;
-		break;
-	case 30:
-		vector[0] = 2; vector[1] = 0; vector[2] = 2;
-		break;
-	case 31:
-		vector[0] = 2; vector[1] = 1; vector[2] = 1;
-		break;
-	case 32:
-		vector[0] = 2; vector[1] = 2; vector[2] = 0;
-		break;
-	case 33:
-		vector[0] = 3; vector[1] = 0; vector[2] = 1;
-		break;
-	case 34:
-		vector[0] = 3; vector[1] = 1; vector[2] = 0;
-		break;
-	case 35:
-		vector[0] = 4; vector[1] = 0; vector[2] = 0;
-		break;
-	default:
-		vector[0] = -1; vector[1] = -1; vector[2] = -1;
-		break;
+	if (index < 1 || index > 35) {
+		vector[0] = -1;
+		vector[1] = -1;
+		vector[2] = -1;
+		return;
 	}
+	int temp = index - 1;
+	vector[0] = type_vector[temp * 3]; 
+	vector[1] = type_vector[temp * 3 + 1]; 
+	vector[2] = type_vector[temp * 3 + 2];
 }
 
