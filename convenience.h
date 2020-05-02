@@ -171,6 +171,7 @@ void readxyzMinMax_fromCIF(
 	double* NbSteps,
 	std::vector < std::vector < double > > &cm,
 	double Resolution,
+	std::ofstream& file,
 	bool debug = false);
 void type2vector(
 	const int index,

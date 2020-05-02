@@ -1094,13 +1094,14 @@ void readxyzMinMax_fromCIF(
 	double* NbSteps,
 	vector < vector < double > > &cm,
 	double Resolution,
+	ofstream& file,
 	bool debug
 )
 {
 	if (debug)
-		cout << "starting to read cif!" << endl;
+		file << "starting to read cif!" << endl;
 	if (!exists(cif)) {
-		cout << "CIF does not exists!" << endl;
+		file << "CIF does not exists!" << endl;
 		return;
 	}
 	ifstream cif_input(cif.c_str(), ios::in);
@@ -1120,10 +1121,10 @@ void readxyzMinMax_fromCIF(
 	cell_keywords.push_back("_cell_angle_gamma");
 	cell_keywords.push_back("_cell_volume");
 	if (debug)
-		cout << "Starting while !.eof()" << endl;
+		file << "Starting while !.eof()" << endl;
 	while (!cif_input.eof()) {
 		if (debug)
-			cout << "While line! " << setw(80) << line
+			file << "While line! " << setw(80) << line
 			<< setw(10) << a << found[0]
 			<< setw(10) << b << found[1]
 			<< setw(10) << c << found[2]
@@ -1157,7 +1158,7 @@ void readxyzMinMax_fromCIF(
 					v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
 					break;
 				default:
-					cout << "This is weird... should never get here... aborting!" << endl;
+					file << "This is weird... should never get here... aborting!" << endl;
 					return;
 				}
 				found[k] = true;
@@ -1176,7 +1177,7 @@ void readxyzMinMax_fromCIF(
 	double V = a * b * c * Vp;
 
 	if (debug)
-		cout << "Making cm" << endl
+		file << "Making cm" << endl
 		<< a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V  << " vs. " << v << endl;
 
 	cm[0][0] = a / 0.529177249;
