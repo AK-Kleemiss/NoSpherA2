@@ -106,6 +106,7 @@ int main(int argc, char **argv){
 	bool electron_diffraction = false;
 	int pbc = 0;
 	double resolution = 0.1;
+	double radius = 2.0;
 	bool calc = false;
 	bool eli = false;
 	bool esp = false;
@@ -182,6 +183,9 @@ int main(int argc, char **argv){
 		}
 		if (temp.find("-resolution") != string::npos) {
 			resolution = stod(argv[i + 1]);
+		}
+		if (temp.find("-radius") != string::npos) {
+			radius = stod(argv[i + 1]);
 		}
 		if (temp.find("-MO") != string::npos) {
 			if (string(argv[i + 1]) != "all") 
@@ -363,8 +367,8 @@ int main(int argc, char **argv){
 		for (int i = 0; i < 3; i++)
 			cell_matrix[i].resize(3);
 		if (debug_main)
-			log2 << cif << " " << resolution << endl;
-		readxyzMinMax_fromCIF(cif, MinMax, NbSteps, cell_matrix, resolution, debug_main);
+			log2 << cif << " " << resolution << " " << radius << endl;
+		readxyzMinMax_fromCIF(cif, MinMax, NbSteps, cell_matrix, resolution, log2, debug_main);
 		if (debug_main) {
 			log2 << "Resolution: " << resolution << endl;
 			log2 << "MinMax:" << endl;
@@ -454,12 +458,12 @@ int main(int argc, char **argv){
 			for (int i = 0; i < MOs.size(); i++) {
 				log2 << "Calcualting MO: " << MOs[i] << endl;
 				MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_"+to_string(MOs[i])+".cube";
-				Calc_MO(MO, MOs[i], wavy[0], ncpus, log2);
+				Calc_MO(MO, MOs[i], wavy[0], ncpus, radius, log2);
 				MO.write_file(wavy[0], true);
 			}
 
 		if (lap || eli || elf || rdg)
-			Calc_Prop(Rho, RDG, Elf, Eli, Lap, wavy[0], ncpus, log2);
+			Calc_Prop(Rho, RDG, Elf, Eli, Lap, wavy[0], ncpus, radius, log2);
 
 		log2 << "Writing cubes to Disk..." << flush;
 		if (rdg) {
@@ -478,7 +482,7 @@ int main(int argc, char **argv){
 		log2 << " done!" << endl;
 
 		if (esp) {
-			Calc_ESP(ESP, wavy[0], ncpus, log2);
+			Calc_ESP(ESP, wavy[0], ncpus, radius, log2);
 			log2 << "Writing cube to Disk..." << flush;
 			ESP.write_file(wavy[0], true);
 			log2 << "  done!" << endl;

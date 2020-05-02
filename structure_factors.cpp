@@ -3253,7 +3253,11 @@ int first_coef_SF(int atomic_number) {
 	return first_coef_SF(temp) + counter;
 };
 
-double get_radial_density(int atom_number, double dist) {
+double get_radial_density(
+	int atom_number, 
+	double dist
+	)
+{
 	double Rho = 0.0;
 
 	//Speedup things for H
@@ -3389,7 +3393,7 @@ double compute_spherical_density(
 	int atom_number,
 	double dist,
 	bool debug = false
-)
+	)
 {
 	double Rho = 0.0;
 	if (debug) cout << "Calculating for atomic number: " << atom_number << endl;
@@ -3463,7 +3467,9 @@ double compute_spherical_density(
 double linear_interpolate_spherical_density(
 	vector <double> & radial_dens,
 	vector <double> & spherical_dist,
-	double dist) {
+	double dist
+	)
+{
 	double result = 0;
 	if (dist > spherical_dist[spherical_dist.size() - 1])
 		return 0;
@@ -3487,7 +3493,9 @@ double logarithmic_interpolate_spherical_density(
 	vector <double> radial_dens,
 	double dist,
 	int size,
-	double incr) {
+	double incr
+)
+{
 
 	double result = 0;
 	for (int i = 1; i < size; i++) {
@@ -3512,7 +3520,8 @@ bool calculate_structure_factors(
 	int cpus,
 	bool electron_diffraction,
 	int pbc
-) {
+	)
+{
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
