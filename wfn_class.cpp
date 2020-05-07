@@ -266,11 +266,15 @@ bool WFN::add_exp(int cent, int type, double e){
 };
 
 double WFN::get_MO_coef(int nr_mo, int nr_primitive, bool debug) const{
-	if(nr_mo < MOs.size() && nr_mo>=0) return MOs[nr_mo].get_coefficient(nr_primitive, debug); 
-	else {
-		if(debug) cout << "WRONG INPUT TO get_MO_coef!" << endl;
-		return -1;
+	if (debug) {
+		if (nr_mo < MOs.size() && nr_mo >= 0) return MOs[nr_mo].get_coefficient(nr_primitive, debug);
+		else {
+			if (debug) cout << "WRONG INPUT TO get_MO_coef!" << endl;
+			return -1;
+		}
 	}
+	else
+		return MOs[nr_mo].get_coefficient(nr_primitive, debug);
 };
 
 int WFN::get_MO_primitive_count(int nr_mo) const{
@@ -2518,6 +2522,7 @@ double WFN::get_atom_real_mass(int atomnr){
 }
 
 double WFN::get_MO_occ(int nr){
+	return MOs[nr].get_occ();
 	if(nr >= nmo || nr < 0){
 		cout << "WRONG INPUT! No Negative or bigger number than available MOs" << endl;
 		return -1;

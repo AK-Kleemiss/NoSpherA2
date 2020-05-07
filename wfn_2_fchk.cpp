@@ -462,8 +462,8 @@ int main(int argc, char **argv){
 				MO.write_file(wavy[0], true);
 			}
 
-		if (lap || eli || elf || rdg)
-			Calc_Prop(Rho, RDG, Elf, Eli, Lap, wavy[0], ncpus, radius, log2);
+		if (lap || eli || elf || rdg || esp)
+			Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], ncpus, radius, log2);
 
 		log2 << "Writing cubes to Disk..." << flush;
 		if (rdg) {
