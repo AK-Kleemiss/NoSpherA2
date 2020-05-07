@@ -143,15 +143,16 @@ string MO::hdr(){
 }
 
 double MO::get_coefficient (int nr, bool debug) const{ 
-	if(nr>=coefficients.size()){
-		cout << "Requested element outside of range!" << endl;
-		return -1;
+	if (debug) {
+		if (nr >= coefficients.size()) {
+			cout << "Requested element outside of range!" << endl;
+			return -1;
+		}
+		if (nr < 0) {
+			cout << "Number below zero!" << endl;
+			return -1;
+		}
 	}
-	if(nr<0){
-		cout << "Number below zero!" << endl;
-		return -1;
-	}
-	//if(debug) cout << "[nr] will return: " << "[" << nr << "] " << coefficients[nr] << endl;
 	return coefficients[nr]; 
 };
 
