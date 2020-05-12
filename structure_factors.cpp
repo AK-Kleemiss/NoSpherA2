@@ -3339,6 +3339,8 @@ double compute_dens(
 	double d[3];
 	int l[3];
 	double ex;
+	int mo;
+	double xl;
 
 /*	if(atom == -1)
 		for (int j = 0; j < wave.get_nex(); j++) {
@@ -3372,19 +3374,19 @@ double compute_dens(
 			d[2] = PosGrid[2] - wave.atoms[iat].z;
 			ex = exp(-wave.get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]));
 			if (ex < pow(10, -15))	continue;
-			float xl[3] = { 0.0,0.0,0.0 };
+			xl = 1.0;
 			for (int k = 0; k < 3; k++) {
-				if (l[k] == 0)		xl[k] = 1.0;
-				else if (l[k] == 1)	xl[k] = d[k];
-				else if (l[k] == 2)	xl[k] = d[k] * d[k];
-				else if (l[k] == 3)	xl[k] = pow(d[k], 3);
-				else if (l[k] == 4)	xl[k] = pow(d[k], 4);
+				if (l[k] == 0)		continue;
+				else if (l[k] == 1)	xl *= d[k];
+				else if (l[k] == 2)	xl *= d[k] * d[k];
+				else if (l[k] == 3)	xl *= pow(d[k], 3);
+				else if (l[k] == 4)	xl *= pow(d[k], 4);
 			}
-			for (int mo = 0; mo < wave.get_nmo(); mo++)
-				phi[mo] += wave.get_MO_coef(mo, j, false) * xl[0] * xl[1] * xl[2] * ex;      //build MO values at this point
+			for (mo = 0; mo < wave.get_nmo(); mo++)
+				phi[mo] += wave.get_MO_coef(mo, j, false) * xl * ex;      //build MO values at this point
 		}
 
-	for (int mo = 0; mo < wave.get_nmo(); mo++)
+	for (mo = 0; mo < wave.get_nmo(); mo++)
 		Rho += wave.get_MO_occ(mo) * pow(phi[mo], 2);
 	return Rho;
 }
@@ -4180,10 +4182,9 @@ bool calculate_structure_factors(
 		file << "alpha_min is there!" << endl
 		<< "Nr of asym atoms: " << asym_atom_list.size() << " Number of all atoms: " << all_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << endl;
 	else
-		file << "There are " << wave.get_ncen() << " atoms read from the wavefunction, of which "
-		<< all_atom_list.size() << " will be used for grid setup and "
-		<< asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl
-		<< "If this is incorrect olex2.refine will not work. You can then already close this window and start again, maybe refining the previous step once more." << endl;
+		file << "There are:\n" << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
+		//<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
+		<< setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
 	// Total grid as a sum of all atomic grids.
 	// Dimensions: [c] [p]
 	// p = the number of gridpoint
