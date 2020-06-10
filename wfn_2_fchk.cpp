@@ -472,7 +472,7 @@ int main(int argc, char **argv){
 			Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
 			Rho.write_file(wavy[0], true, true);
 		}
-		else if (lap || eli || elf) Rho.write_file(wavy[0], true);
+		else if (lap || eli || elf || esp) Rho.write_file(wavy[0], true);
 		if (rdg) RDG.write_file(wavy[0], true);
 		if (lap) Lap.write_file(wavy[0], true);
 		if (elf) Elf.write_file(wavy[0], true);
