@@ -4524,7 +4524,7 @@ bool calculate_structure_factors(
 			}
 
 			else {
-				spherical_density[i].erase(spherical_density[i].begin() + p - reduction);
+				spherical_density[i].erase(spherical_density[i].begin() + (p - reduction) );
 				reduction++;
 			}
 

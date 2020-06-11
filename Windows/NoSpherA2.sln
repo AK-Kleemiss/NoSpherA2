@@ -3,10 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29306.81
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wfn2fchk", "wfn2fchk.vcxproj", "{2AB57786-36D2-4490-82E3-032F9A65CF10}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NoSpherA2", "wfn2fchk.vcxproj", "{2AB57786-36D2-4490-82E3-032F9A65CF10}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_SF|x64 = Debug_SF|x64
+		Debug_SF|x86 = Debug_SF|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
 		Publish|x64 = Publish|x64
@@ -15,6 +17,10 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x64.ActiveCfg = Debug_SF|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x64.Build.0 = Debug_SF|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x86.ActiveCfg = Debug_SF|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x86.Build.0 = Debug_SF|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x64.ActiveCfg = Debug|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x64.Build.0 = Debug|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x86.ActiveCfg = Debug|Win32

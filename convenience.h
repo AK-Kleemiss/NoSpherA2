@@ -8,6 +8,7 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
+#include <cctype>
 
 class WFN;
 
@@ -46,11 +47,38 @@ inline bool cuQCT(std::ofstream& file);
 inline void cuQCT();
 
 inline void copyright();
+
+inline int CountWords(const char* str)
+{
+	if (str == NULL)
+		return -1;
+
+	bool inSpaces = true;
+	int numWords = 0;
+
+	while (*str != '\0')
+	{
+		if (std::isspace(*str))
+		{
+			inSpaces = true;
+		}
+		else if (inSpaces)
+		{
+			numWords++;
+			inSpaces = false;
+		}
+
+		++str;
+	}
+
+	return numWords;
+};
+
 inline bool copyright(std::ofstream& file);
 
 inline bool exists(const std::string &name){
-  struct stat buffer;   
-  return (stat (name.c_str(), &buffer) == 0); 
+	std::ifstream f(name.c_str());
+	return f.good();
 };
 
 std::string atnr2letter(const int nr);
@@ -77,6 +105,7 @@ bool save_file_dialog(std::string &path, bool debug, const std::vector<std::stri
 void select_cubes(std::vector <std::vector <unsigned int> > &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes=1, bool wfnonly=false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char * tmp);
+
 
 //-------------------------Progress_bar--------------------------------------------------
 

@@ -30,31 +30,34 @@ bool debug_wfn_deep=false;
 
 
 WFN::WFN(){
-	ncen=0;
-	nfunc=0;
-	nmo=0;
-	nex=0;
-	charge=0;
-	multi=0;
-	origin=0;
-	d_f_switch=false;
-	modified=false;
-	distance_switch=false;
+	ncen = 0;
+	nfunc = 0;
+	nmo = 0;
+	nex = 0;
+	charge = 0;
+	multi = 0;
+	origin = 0;
+	total_energy = 0.0;
+	virial_ratio = 0.0;
+	d_f_switch = false;
+	modified = false;
+	distance_switch = false;
 };
 
 WFN::WFN(int given_origin){
-	ncen=0;
-	nfunc=0;
-	nmo=0;
-	nex=0;
-	charge=0;
-	multi=0;
-	origin=given_origin;
-	d_f_switch=false;
-	modified=false;
-	distance_switch=false;
-	basis_set_name=" ";
-	comment="Test";
+	ncen = 0;
+	nfunc = 0;
+	nmo = 0;
+	nex = 0;
+	charge = 0;
+	multi = 0;
+	total_energy = 0.0;
+	origin = given_origin;
+	d_f_switch = false;
+	modified = false;
+	distance_switch = false;
+	basis_set_name = " ";
+	comment = "Test";
 };
 
 bool WFN::push_back_atom(string label, double x, double y, double z, int charge){
@@ -84,7 +87,7 @@ bool WFN::push_back_MO_coef(int nr, double value, int nr2){
 		cout << "not enough MOs" << endl;
 		return false;
 	}
-       	return MOs[nr].push_back_coef(value,nr2); 
+	return MOs[nr].push_back_coef(value,nr2); 
 };
 
 double WFN::get_MO_energy(int mo)const {
@@ -1191,6 +1194,242 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		//if(debug_wfn_deep) file << endl << endl;
 	}
 	if (debug) Enter();
+	return true;
+};
+
+bool WFN::read_wfx(string fileName, bool debug, ofstream& file) {
+	debug = true;
+	if (exists(fileName)) {
+		if (debug)
+			file << "File is valid, continuing...\n";
+	}
+	else {
+		file << "couldn't open or find " << fileName << ", leaving" << endl;
+		return false;
+	}
+	ifstream rf(fileName.c_str());
+	path = fileName;
+	string line;
+	rf.seekg(0);
+	getline(rf, line);
+	while (line.find("<Title>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "comment line " << line << endl;
+	comment = line;
+	rf.seekg(0);
+	while (line.find("<Number of Nuclei>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << line << endl;
+	int temp_ncen = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Number of Primitives>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "nex line: " << line << endl;
+	int temp_nex = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Number of Occupied Molecular Orbitals>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "nmo line: " << line << endl;
+	int temp_nmo = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Atomic Numbers>") == string::npos)
+		getline(rf, line);
+	vector <int> nrs;
+	while (true) {
+		getline(rf, line);
+		if (debug) file << "atom number line: " << line << endl;
+		if (line.find("</Atomic Numbers>") != string::npos)
+			break;
+		nrs.push_back(stoi(line));
+	}
+	if (nrs.size() != temp_ncen)
+		return false;
+	rf.seekg(0);
+	while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
+		getline(rf, line);
+	vector < vector <double> > pos;
+	pos.resize(3);
+	double temp[3];
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
+			break;
+		istringstream is(line);
+		is >> temp[0] >> temp[1] >> temp[2];
+		for (int i = 0; i < 3; i++)
+			pos[i].push_back(temp[i]);
+	}
+	if (pos[0].size() != temp_ncen)
+		return false;
+	for (int i = 0; i < temp_ncen; i++)
+		push_back_atom(atnr2letter(nrs[i]) + to_string(i), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
+	if (ncen != temp_ncen)
+		return false;
+	for (int i = 0; i < 3; i++)
+		pos[i].resize(0);
+	pos.resize(0);
+	rf.seekg(0);
+	while (line.find("<Net Charge>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	charge = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Electronic Spin Multiplicity>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	multi = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Primitive Centers>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Primitive Centers>") != string::npos)
+			break;
+		int number=CountWords(line.c_str());
+		istringstream is(line);
+		int temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			centers.push_back(temp);
+		}
+	}
+	rf.seekg(0);
+	while (line.find("<Primitive Types>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Primitive Types>") != string::npos)
+			break;
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		int temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			types.push_back(temp);
+		}
+	}
+	rf.seekg(0);
+	while (line.find("<Primitive Exponents>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Primitive Exponents>") != string::npos) {
+			if (CountWords(line.c_str()) != 2)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		if (please_break)
+			number -= 2;
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			exponents.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	if (exponents.size() == temp_nex && centers.size() == temp_nex && types.size() == temp_nex)
+		nex = temp_nex;
+	else
+		return false;
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
+		getline(rf, line);
+	vector <double> occ;
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Molecular Orbital Occupation Numbers>") != string::npos) {
+			if (CountWords(line.c_str()) != 4)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			occ.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Energies>") == string::npos)
+		getline(rf, line);
+	vector <double> ener;
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Molecular Orbital Energies>") != string::npos) {
+			if (CountWords(line.c_str()) != 3)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			ener.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	for (int i = 0; i < temp_nmo; i++)
+		if (!push_back_MO(i+1, occ[i], ener[i]))
+			return false;
+	occ.resize(0);
+	ener.resize(0);
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
+		getline(rf, line);
+	vector <double> coef;
+	while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos) {
+		while (line.find("<MO Number>") == string::npos)
+			getline(rf, line);
+		getline(rf, line);
+		if (debug) file << "mo Nr line: " << line << endl;
+		int nr = stoi(line);
+		while (line.find("</MO Number>") == string::npos)
+			getline(rf, line);
+		while (coef.size() != nex) {
+			getline(rf, line);
+			if (nr==1 && debug) file << "first MO Coef lines: " << line << endl;
+			int number = CountWords(line.c_str());
+			istringstream is(line);
+			double temp;
+			for (int i = 0; i < number; i++) {
+				is >> temp;
+				coef.push_back(temp);
+			}
+			if (coef.size() > nex)
+				return false;
+		}
+		for (int i = 0; i < nex; i++)
+			MOs[nr-1].push_back_coef(coef[i], nex);
+		coef.resize(0);
+		getline(rf, line);
+	}
+	while (line.find("<Energy =") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	total_energy = stod(line);
+	while (line.find("<Virial Ratio") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	virial_ratio = stod(line);
+	rf.close();
 	return true;
 };
 
