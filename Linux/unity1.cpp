@@ -1,2 +1,2 @@
-#include "/home/florian/wfn2fchk/properties.cpp"
+#include "../properties.cpp"
 
