@@ -1,7 +1,7 @@
-#include "/home/florian/wfn2fchk/structure_factors.cpp"
+#include "../structure_factors.cpp"
 
 
-#include "/home/florian/wfn2fchk/wfn_2_fchk.cpp"
+#include "../NoSpherA2.cpp"
 
 
-#include "/home/florian/wfn2fchk/wfn_class.cpp"
+#include "../wfn_class.cpp"
