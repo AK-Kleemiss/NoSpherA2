@@ -45,13 +45,13 @@
     <ClCompile Include="../structure_factors.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../wfn_2_fchk.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../wfn_class.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="..\properties.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\NoSpherA2.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>

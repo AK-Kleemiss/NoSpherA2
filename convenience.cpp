@@ -190,8 +190,6 @@ else 	if (strcmp(tmp, "Rn") == 0)  return 85;
 else                                 return -1;
 }
 
-
-
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
 	resize(100);
 }

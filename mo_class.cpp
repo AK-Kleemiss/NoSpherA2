@@ -38,40 +38,38 @@ MO::MO(int number, double occupation, double energy){
 bool debug_mo=true;
 
 bool MO::push_back_coef(double val, const int nex){
-    coefficients.push_back(val);
-
-    // consistencycheck with WFN
-	
-    if( nex < coefficients.size()||coefficients.size()>nex ){
-		if(debug_mo) cout << nex << " vs. " << coefficients.size() << endl; 
+	// consistencycheck with WFN
+	if( nex < coefficients.size() ){
+		if(debug_mo) 
+			cout << nex << " vs. " << coefficients.size() << endl; 
 		return false;
 	}
+	coefficients.push_back(val);
 	return true;
 };
 
 bool MO::erase_coef(int nr, const int nex){
-        // Check, if Element (nr) is a valid Vector-Entry
-	if (nr-1 <0) return false;
-	if (nr-1 >= coefficients.size() ) return false;
-        
+	// Check, if Element (nr) is a valid Vector-Entry
+	if (nr - 1 < 0)
+		return false;
+	if (nr - 1 >= coefficients.size())
+		return false;
 
-        // consistencycheck with WFN
-        if( nex != coefficients.size()-1 ) return false;
-        
+	// consistencycheck with WFN
+	if( nex != coefficients.size()-1 ) return false;
 
-        // delete Vector-Entry and rearrange
-        coefficients.erase(coefficients.begin()+(nr-1));
+	// delete Vector-Entry and rearrange
+	coefficients.erase(coefficients.begin()+(nr-1));
         
 	return true;
 };
 
 void MO::change_coefficient(int nr){
-
-
-        // Check, if Element (nr) is a valid Vector-Entry
-	if (nr-1 <0) return ;
-	if (nr-1 >= coefficients.size() ) return ;
-
+	// Check, if Element (nr) is a valid Vector-Entry
+	if (nr - 1 < 0)
+		return;
+	if (nr - 1 >= coefficients.size())
+		return;
 
 	bool end=false;
 	while (!end){

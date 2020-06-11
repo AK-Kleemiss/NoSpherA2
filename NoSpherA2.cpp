@@ -235,7 +235,7 @@ int main(int argc, char **argv){
 			}
 		}
 		if (argc < 4) {
-			cout << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn -b <basis_set>" << endl;
+			cout << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>" << endl;
 			return -1;
 		}
 
@@ -248,31 +248,25 @@ int main(int argc, char **argv){
 		}
 		else {
 			if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-			else wavy.push_back(WFN(4));
-		}
-		if (wfn.find(".wfn") == string::npos && wfn.find(".ffn") == string::npos) {
-			log_file << "Argument to -wfn does not look like wfn or ffn file!" << endl;
-			return -1;
+			else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
+			else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
+			else {
+				log_file << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
+				return -1;
+			}
 		}
 		log_file.flush();
-		readwfn(wavy[0], wfn, debug_all, log_file);
+		if (wfn.find(".wfx") == string::npos)
+			readwfn(wavy[0], wfn, debug_all, log_file);
+		else
+			wavy[0].read_wfx(wfn, debug_all, log_file);
 		wavy[0].set_method(method);
+		wavy[0].write_wfn("test.wfn", false, true);
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
 		if (basis_set != "" || fchk != "") {
-			if (basis_set == "") {
-				string filename;
-				vector <string> temp;
-				temp.resize(1);
-				temp[0] = "All filetypes | *";
-				/*    if(!open_file_dialog(filename,debug_main,temp))
-					  log_file << "Error encountered!" << endl;
-					else*/
-				basis_set_path = filename;
-			}
-			else
-				join_path(basis_set_path, basis_set);
+			join_path(basis_set_path, basis_set);
 			if (!exists(basis_set_path)) {
 				log_file << "Basis set file does not exist!" << endl;
 				return -1;
@@ -291,21 +285,11 @@ int main(int argc, char **argv){
 				if (debug_main) log_file << "Loaded path..." << endl;
 				size_t where;
 				if (wavy[0].get_origin() == 2) where = outputname.find("wfn");
-				else where = outputname.find("ffn");
+				else if (wavy[0].get_origin() == 4) where = outputname.find("ffn");
+				else if (wavy[0].get_origin() == 4) where = outputname.find(".wfx");
 				if (where >= outputname.length() && where != string::npos) {
-					/*if(!expert)
-						save_file_dialog(outputname,debug_main,endings);
-					else {*/
-					log_file << "Enter filename: ";
-					cin >> outputname;
-					while (exists(outputname)) {
-						log_file << outputname << " exists, do you want to overwrite it? ";
-						if (!yesno()) {
-							log_file << "Then try again: ";
-							cin >> outputname;
-						}
-					}
-					//}
+					log_file << "Cannot make output file name!";
+					return -1;
 				}
 				else
 					outputname.erase(where, 3);
@@ -320,7 +304,6 @@ int main(int argc, char **argv){
 			free_fchk(log_file, outputname, "", wavy[0], debug_main, true);
 		}
 		if (cif != "" || hkl != "") {
-			//debug_main = true;
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
 			if (!calculate_structure_factors(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, threads, electron_diffraction, pbc))
@@ -346,14 +329,18 @@ int main(int argc, char **argv){
 		}
 		else {
 			if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-			else wavy.push_back(WFN(4));
-		}
-		if (wfn.find(".wfn") == string::npos && wfn.find(".ffn") == string::npos) {
-			log2 << "Argument to -wfn does not look like wfn or ffn file!" << endl;
-			return -1;
+			else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
+			else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
+			else {
+				log2 << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
+				return -1;
+			}
 		}
 		log2.flush();
-		readwfn(wavy[0], wfn, debug_all, log2);
+		if (wfn.find(".wfx") == string::npos)
+			readwfn(wavy[0], wfn, debug_all, log2);
+		else
+			wavy[0].read_wfx(wfn, debug_all, log2);
 		if (debug_main)
 			log2 << "Starting calcualtion of properties" << endl;
 		if (all_mos)

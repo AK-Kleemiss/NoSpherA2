@@ -19,7 +19,9 @@ class WFN {
 		int nex;
 		int charge;
 		unsigned int multi;
-		int origin; //1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK
+		int origin; //1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX
+		double total_energy;
+		double virial_ratio;
 		std::string basis_set_name;
 		std::string comment;
 		std::string path;
@@ -65,6 +67,7 @@ class WFN {
 		bool add_exp(int cent, int type, double e);
 		bool read_wfn(std::string fileName, bool debug);
 		bool read_wfn(std::string fileName, bool debug, std::ofstream &file);
+		bool read_wfx(std::string fileName, bool debug, std::ofstream& file);
 		bool write_wfn(const std::string &fileName, bool debug, bool occupied);
 		bool set_path(std::string given_path) { path=given_path; return true; };
 		void print_primitive(int nr);
