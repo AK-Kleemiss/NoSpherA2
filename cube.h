@@ -68,6 +68,7 @@ class cube
 		std::string super_cube(WFN &wave);
 		void set_comment1 (std::string input) {comment1=input;};
 		void set_comment2 (std::string input) {comment2=input;};
+		void set_zero();
 		std::string get_comment1 () const {return comment1;};
 		std::string get_comment2 () const {return comment2;};
 	private:

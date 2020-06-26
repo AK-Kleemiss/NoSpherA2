@@ -38,6 +38,9 @@
 #include <iomanip>
 #include <vector>
 #include <omp.h>
+#include <limits>
+#include <cstddef>
+#include <thread>
 
 #include "convenience.h"
 #include "fchk.h"
@@ -45,6 +48,8 @@
 #include "basis_set.h"
 #include "structure_factors.h"
 #include "properties.h"
+
+unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
 
 using namespace std;
 bool debug_main = false;
@@ -113,6 +118,8 @@ int main(int argc, char **argv){
 	bool elf = false;
 	bool lap = false;
 	bool rdg = false;
+	bool hdef = false;
+	bool def = false;
 	double MinMax[6];
 	double NbSteps[3];
 	vector <int> MOs;
@@ -194,6 +201,14 @@ int main(int argc, char **argv){
 				all_mos = true;
 			calc = true;
 		}
+		if (temp.find("-HDEF") != string::npos) {
+			hdef = true;
+			calc = true;
+		}
+		if (temp.find("-def") != string::npos) {
+			def = true;
+			calc = true;
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
@@ -257,11 +272,11 @@ int main(int argc, char **argv){
 		}
 		log_file.flush();
 		if (wfn.find(".wfx") == string::npos)
-			readwfn(wavy[0], wfn, debug_all, log_file);
+			wavy[0].read_wfn(wfn, debug_all, log_file);
 		else
 			wavy[0].read_wfx(wfn, debug_all, log_file);
 		wavy[0].set_method(method);
-		wavy[0].write_wfn("test.wfn", false, true);
+		//wavy[0].write_wfn("test.wfn", false, true);
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
@@ -323,6 +338,23 @@ int main(int argc, char **argv){
 		log2 << "                /_/\n" << flush;
 		log2 << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 
+		if(debug_main){
+			log2 << "float min: " << dec << FLT_MIN << endl;
+			log2 << "float max: " << dec << FLT_MAX << endl;
+			log2 << "float Min_exp: " << dec << FLT_MIN_EXP << endl;
+			log2 << "float Max_exp: " << dec << FLT_MAX_EXP << endl;
+
+			log2 << "double min: " << dec << DBL_MIN << endl;
+			log2 << "double max: " << dec << DBL_MAX << endl;
+			log2 << "double Min_exp: " << dec << DBL_MIN_EXP << endl;
+			log2 << "double Max_exp: " << dec << DBL_MAX_EXP << endl;
+
+			log2 << "long double min: " << dec << LDBL_MIN << endl;
+			log2 << "long double max: " << dec << LDBL_MAX << endl;
+			log2 << "long double Min_exp: " << dec << LDBL_MIN_EXP << endl;
+			log2 << "long double Max_exp: " << dec << LDBL_MAX_EXP << endl;
+		}
+
 		if (wfn == "") {
 			log2 << "Error, no wfn file specified!";
 			return -1;
@@ -338,7 +370,7 @@ int main(int argc, char **argv){
 		}
 		log2.flush();
 		if (wfn.find(".wfx") == string::npos)
-			readwfn(wavy[0], wfn, debug_all, log2);
+			wavy[0].read_wfn(wfn, debug_all, log2);
 		else
 			wavy[0].read_wfx(wfn, debug_all, log2);
 		if (debug_main)
@@ -374,26 +406,14 @@ int main(int argc, char **argv){
 			}
 		}
 		cube Rho(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), true);
-		if (debug_main)
-			log2 << "Rho is there" << endl;
 		cube RDG(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), rdg);
-		if (debug_main)
-			log2 << "RDG is there" << endl;
 		cube Elf(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), elf);
-		if (debug_main)
-			log2 << "Elf is there" << endl;
 		cube Eli(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), eli);
-		if (debug_main)
-			log2 << "Eli is there" << endl;
 		cube Lap(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), lap);
-		if (debug_main)
-			log2 << "Lap is there" << endl;
 		cube ESP(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), esp);
-		if (debug_main)
-			log2 << "ESP is there" << endl;
 		cube MO(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), true);
-		if (debug_main)
-			log2 << "MO is there" << endl;
+		cube HDEF(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hdef);
+		cube DEF(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), def);
 
 		for (int i = 0; i < 3; i++) {
 			Rho.set_origin(i, MinMax[i]);
@@ -403,6 +423,8 @@ int main(int argc, char **argv){
 			Lap.set_origin(i, MinMax[i]);
 			ESP.set_origin(i, MinMax[i]);
 			MO.set_origin(i, MinMax[i]);
+			HDEF.set_origin(i, MinMax[i]);
+			DEF.set_origin(i, MinMax[i]);
 			for (int j = 0; j < 3; j++) {
 				Rho.set_vector(i, j, cell_matrix[i][j]);
 				RDG.set_vector(i, j, cell_matrix[i][j]);
@@ -411,6 +433,8 @@ int main(int argc, char **argv){
 				Lap.set_vector(i, j, cell_matrix[i][j]);
 				ESP.set_vector(i, j, cell_matrix[i][j]);
 				MO.set_vector(i, j, cell_matrix[i][j]);
+				HDEF.set_vector(i, j, cell_matrix[i][j]);
+				DEF.set_vector(i, j, cell_matrix[i][j]);
 			}
 		}
 		if (debug_main)
@@ -422,6 +446,8 @@ int main(int argc, char **argv){
 		Lap.set_comment1("Calculated laplacian of electron density using NoSpherA2");
 		ESP.set_comment1("Calculated electrostatic potential using NoSpherA2");
 		MO.set_comment1("Calcualted MO values using NoSpherA2");
+		HDEF.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+		HDEF.set_comment1("Calculated static deformation density values using NoSpherA2");
 		Rho.set_comment2("from " + wavy[0].get_path());
 		RDG.set_comment2("from " + wavy[0].get_path());
 		Elf.set_comment2("from " + wavy[0].get_path());
@@ -429,12 +455,15 @@ int main(int argc, char **argv){
 		Lap.set_comment2("from " + wavy[0].get_path());
 		ESP.set_comment2("from " + wavy[0].get_path());
 		MO.set_comment2("from" + wavy[0].get_path());
+		HDEF.set_comment2("from" + wavy[0].get_path());
+		DEF.set_comment2("from" + wavy[0].get_path());
 		Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
 		RDG.path = get_basename_without_ending(wavy[0].get_path()) + "_rdg.cube";
 		Elf.path = get_basename_without_ending(wavy[0].get_path()) + "_elf.cube";
 		Eli.path = get_basename_without_ending(wavy[0].get_path()) + "_eli.cube";
 		Lap.path = get_basename_without_ending(wavy[0].get_path()) + "_lap.cube";
 		ESP.path = get_basename_without_ending(wavy[0].get_path()) + "_esp.cube";
+		DEF.path = get_basename_without_ending(wavy[0].get_path()) + "_def.cube";
 
 		if (debug_main)
 			log2 << "Everything is set up; starting calculation..." << endl;
@@ -444,10 +473,42 @@ int main(int argc, char **argv){
 		if (MOs.size() != 0)
 			for (int i = 0; i < MOs.size(); i++) {
 				log2 << "Calcualting MO: " << MOs[i] << endl;
-				MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_"+to_string(MOs[i])+".cube";
+				MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(MOs[i]) + ".cube";
 				Calc_MO(MO, MOs[i], wavy[0], ncpus, radius, log2);
 				MO.write_file(wavy[0], true);
 			}
+
+		if (hdef || def) {
+			log2 << "Calcualting Rho...";
+			Calc_Rho(Rho, wavy[0], ncpus, radius, log2);
+			log2 << " ...done!" << endl;
+			cube temp(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hdef);
+			for (int i = 0; i < 3; i++) {
+				temp.set_origin(i, MinMax[i]);
+				for (int j = 0; j < 3; j++)
+					temp.set_vector(i, j, cell_matrix[i][j]);
+			}
+			if (hdef)
+				Calc_Spherical_Dens(temp, wavy[0], ncpus, radius, log2);
+				
+			if (def) {
+				log2 << "Calculating static deformation density...";
+				if (hdef)
+					Calc_Static_Def(DEF, Rho, temp, wavy[0], ncpus, radius, log2);
+				else
+					Calc_Static_Def(DEF, Rho, wavy[0], ncpus, radius, log2);
+				log2 << " ...done!" << endl;
+			}
+
+			if(hdef)
+				for (int a = 0; a < wavy[0].get_ncen(); a++) {
+					log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
+					HDEF.path = get_basename_without_ending(wavy[0].get_path()) + "_HDEF_" + to_string(a) + ".cube";
+					Calc_Hirshfeld(HDEF, Rho, temp, wavy[0], ncpus, radius, a, log2);
+					HDEF.write_file(wavy[0], true);
+					HDEF.set_zero();
+				}
+		}
 
 		if (lap || eli || elf || rdg || esp)
 			Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], ncpus, radius, log2);
@@ -464,7 +525,10 @@ int main(int argc, char **argv){
 		if (lap) Lap.write_file(wavy[0], true);
 		if (elf) Elf.write_file(wavy[0], true);
 		if (eli) Eli.write_file(wavy[0], true);
-				
+		if (def) {
+			DEF.write_file(wavy[0], true);
+			Rho.write_file(wavy[0], true);
+		}
 
 		log2 << " done!" << endl;
 
