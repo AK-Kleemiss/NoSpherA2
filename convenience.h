@@ -42,10 +42,6 @@ template<class T> T fromString(const std::string& s)
      return t;
 }
 
-inline void QCT();
-inline bool cuQCT(std::ofstream& file);
-inline void cuQCT();
-
 inline void copyright();
 
 inline int CountWords(const char* str)

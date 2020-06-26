@@ -3,9 +3,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include <cmath>
+#include <iostream>
 
 #include "grid_radial.h"
 # define M_PI           3.14159265358979323846  /* pi */
+# define C0             4.0 * std::sqrt(2.0) * M_PI  /* C0 */
+# define M_PI2          pow(M_PI,2)  /* pi^2 */
+# define TG32           tgamma(3.0 / 2.0)
 #include "parameters.h"
 
 // TCA 106, 178 (2001), eq. 25
@@ -29,7 +33,7 @@ double get_r_outer(const double max_error,
                    const int l,
                    const double guess)
 {
-    int m = 2 * l;
+    const int m = 2 * l;
     double r = guess;
     double r_old = 1.0e50;
     double c, a, e;
@@ -39,7 +43,7 @@ double get_r_outer(const double max_error,
 
     (f > max_error) ? (sign = 1.0) : (sign = -1.0);
 
-    while (std::fabs(r_old - r) > SMALL)
+    while (std::abs(r_old - r) > SMALL)
     {
         c = tgamma((m + 3.0) / 2.0);
         a = std::pow(alpha_outer * r * r, (m + 1.0) / 2.0);
@@ -63,24 +67,22 @@ double get_r_outer(const double max_error,
 // TCA 106, 178 (2001), eqs. 17 and 18
 double get_h(const double max_error, const int l, const double guess)
 {
-    int m = 2 * l;
+    const int m = 2 * l;
     double h = guess;
-    double h_old = 1.0e50;
+    double h_old = h*2;
     double step = 0.1 * guess;
     double sign, sign_old;
     double f = 1.0e50;
-    double c0, cm, p0, e0, pm, rd0;
+    double cm, pm, rd0, e0;
 
     (f > max_error) ? (sign = -1.0) : (sign = 1.0);
 
-    while (std::fabs(h_old - h) > SMALL)
+    while (std::abs(h_old - h) > SMALL)
     {
-        c0 = 4.0 * std::sqrt(2.0) * M_PI;
-        cm = tgamma(3.0 / 2.0) / tgamma((m + 3.0) / 2.0);
-        p0 = 1.0 / h;
-        e0 = std::exp(-M_PI * M_PI / (2.0 * h));
+        cm = TG32 / tgamma((m + 3.0) / 2.0);
+        e0 = std::exp(-M_PI2 / (2.0 * h));
         pm = std::pow(M_PI / h, m / 2.0);
-        rd0 = c0 * p0 * e0;
+        rd0 = C0 / h * e0;
         f = cm * pm * rd0;
 
         sign_old = sign;
@@ -92,6 +94,7 @@ double get_h(const double max_error, const int l, const double guess)
 
         h_old = h;
         h += sign * step;
+        if (h < 0.007) h = 0.007;
     }
 
     return h;

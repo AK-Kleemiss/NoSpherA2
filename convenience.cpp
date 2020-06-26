@@ -31,6 +31,7 @@ const double c_pi = 3.141592653589793;
 
 //--------------------------General convenience terminal functions---------------------------------
 
+
 inline void copyright(){
 	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
 };
@@ -1209,7 +1210,7 @@ void readxyzMinMax_fromCIF(
 	cif_input.close();
 }
 
-const int type_vector[105]{ 
+const int type_vector[168]{ 
 	0, 0, 0,
 	1, 0, 0,
 	0, 1, 0,
@@ -1244,7 +1245,28 @@ const int type_vector[105]{
 	2, 2, 0,
 	3, 0, 1,
 	3, 1, 0,
-	4, 0, 0 };
+	4, 0, 0,
+	0, 0, 5,
+	0, 1, 5,
+	0, 2, 3,
+	0, 3, 2,
+	0, 4, 1,
+	0, 5, 0,
+	1, 0, 4,
+	1, 1, 3,
+	1, 2, 2,
+	1, 3, 1,
+	1, 4, 0,
+	2, 0, 3,
+	2, 1, 2,
+	2, 2, 1,
+	2, 3, 0,
+	3, 0, 2,
+	3, 1, 1,
+	3, 2, 0,
+	4, 0, 1,
+	4, 1, 0,
+	5, 0, 0};
 
 void type2vector(
 	const int index,

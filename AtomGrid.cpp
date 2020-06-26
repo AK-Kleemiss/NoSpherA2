@@ -4,23 +4,18 @@
 
 #include "AtomGrid.h"
 #include "becke_partitioning.h"
-//#include "bragg.h"
 #include "error_handling.h"
 #include "grid_radial.h"
 #include "convenience.h"
-# define M_PI           3.14159265358979323846  /* pi */
-#ifdef _WIN32
-#define NOMIMAX
-#include <algorithm>
-#include <io.h>
-//#include <Windows.h>
-#endif
-//#include "numgrid.h"
 #include "parameters.h"
 #include "sphere_lebedev_rule.h"
 
-//#define AS_TYPE(Type, Obj) reinterpret_cast<Type *>(Obj)
-//#define AS_CTYPE(Type, Obj) reinterpret_cast<const Type *>(Obj)
+#ifdef _WIN32
+    #define NOMIMAX
+    #include <algorithm>
+    #include <io.h>
+#endif
+const double PI = 3.14159265358979323846;   /* pi */
 
 //                       3,     5     7,    9,    11,   13,   15,   17
 //                      19,    21
@@ -59,14 +54,6 @@ int get_angular_order(int n)
     // this statement is unreachable and only here to not see a compiler warning
     return -1;
 }
-
-/*const double bragg_angstrom[87]{
-	0.00, 0.35, 0.35, 1.45, 1.05, 0.85, 0.70, 0.65, 0.60, 0.50, 0.45, 1.80, 1.50, 1.25, 1.10, 1.00, 1.00, 1.00, 1.00, 2.20, 1.80,
-	1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10, 2.35, 2.00, 1.80, 1.55, 1.45,
-	1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40, 2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85,
-	1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60,
-	1.90, 1.50, 1.50
-};*/
 
 AtomGrid::AtomGrid(const double radial_precision,
                    const int min_num_angular_points,
@@ -150,15 +137,11 @@ AtomGrid::AtomGrid(const double radial_precision,
 
         for (int iang = 0; iang < num_angular; iang++)
         {
-            atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] *
-                                        radial_r);
-            atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] *
-                                        radial_r);
-            atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] *
-                                        radial_r);
+            atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] * radial_r);
+            atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] * radial_r);
+            atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] * radial_r);
 
-            atom_grid_w_.push_back(4.0 * M_PI * angular_w[angular_off + iang] *
-                                   radial_w);
+            atom_grid_w_.push_back(4.0 * PI * angular_w[angular_off + iang] * radial_w);
 
             num_grid_points_++;
         }
@@ -261,15 +244,11 @@ AtomGrid::AtomGrid(const double radial_precision,
 
          for (int iang = 0; iang < num_angular; iang++)
          {
-             atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] *
-                 radial_r);
-             atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] *
-                 radial_r);
-             atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] *
-                 radial_r);
+             atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] * radial_r);
+             atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] * radial_r);
+             atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] * radial_r);
 
-             atom_grid_w_.push_back(4.0 * M_PI * angular_w[angular_off + iang] *
-                 radial_w);
+             atom_grid_w_.push_back(4.0 * PI * angular_w[angular_off + iang] * radial_w);
 
              num_grid_points_++;
          }
@@ -345,10 +324,6 @@ void AtomGrid::get_grid(const int num_centers,
                         double grid_z_bohr[],
                         double grid_w[]) const
 {
-    //std::fill_n(&grid_x_bohr[0], num_grid_points_, 0.0);
-    //std::fill_n(&grid_y_bohr[0], num_grid_points_, 0.0);
-    //std::fill_n(&grid_z_bohr[0], num_grid_points_, 0.0);
-    //std::fill_n(&grid_w[0], num_grid_points_, 0.0);
 
     for (size_t ipoint = 0; ipoint < num_grid_points_; ipoint++)
     {
