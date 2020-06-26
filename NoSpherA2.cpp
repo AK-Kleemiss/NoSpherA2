@@ -49,8 +49,6 @@
 #include "structure_factors.h"
 #include "properties.h"
 
-unsigned int fp_control_state = _controlfp(_EM_INEXACT, _MCW_EM);
-
 using namespace std;
 bool debug_main = false;
 bool debug_all = false;
@@ -337,7 +335,7 @@ int main(int argc, char **argv){
 		log2 << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
 		log2 << "                /_/\n" << flush;
 		log2 << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-
+#ifdef _WIN32
 		if(debug_main){
 			log2 << "float min: " << dec << FLT_MIN << endl;
 			log2 << "float max: " << dec << FLT_MAX << endl;
@@ -354,6 +352,7 @@ int main(int argc, char **argv){
 			log2 << "long double Min_exp: " << dec << LDBL_MIN_EXP << endl;
 			log2 << "long double Max_exp: " << dec << LDBL_MAX_EXP << endl;
 		}
+#endif
 
 		if (wfn == "") {
 			log2 << "Error, no wfn file specified!";
