@@ -33,6 +33,7 @@ CPP_DEPS += \
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
+	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
 ./unity1.o: ./unity1.cpp
