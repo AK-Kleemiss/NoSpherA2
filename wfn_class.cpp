@@ -781,6 +781,8 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 		return false;
 	}
 	ifstream rf(fileName.c_str());
+	if (rf.good())
+		path = fileName;
 	string line;
 	rf.seekg(0);
 	getline(rf, line);

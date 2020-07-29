@@ -92,9 +92,11 @@ string atnr2letter(const int nr){
 	vector <string> Labels{"DM","H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca"
 		,"Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr"
 		,"Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"
-		,"Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn"};
-	if(nr>86 || nr <=0 ){
-		cout << "Only yet implemented from H-Rn, ask Florian for improvements or give a reasonable number between 1-86!" << endl;
+		,"Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn"
+		,"Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"
+		};
+	if(nr>113 || nr <=0 ){
+		cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-86!" << endl;
 		Enter();
 		return ("PROBLEM");
 	}

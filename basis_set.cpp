@@ -15,7 +15,7 @@ bool debug_dens=false;
 
 //-------------Reading basis sets and determining the density matrix from the wfn coefficients -----------------------
 
-
+//test
 //read the basis set and give the info to the atoms of the wavefunction
 bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug){
 	if(debug) debug_dens=true;
