@@ -121,6 +121,7 @@ int main(int argc, char **argv){
 	double MinMax[6];
 	double NbSteps[3];
 	vector <int> MOs;
+	vector <int> groups;
 	bool all_mos = false;
 	for (int i=0; i<argc; i++){
 		temp = argv[i];
@@ -206,6 +207,11 @@ int main(int argc, char **argv){
 		if (temp.find("-def") != string::npos) {
 			def = true;
 			calc = true;
+		}
+		if (temp.find("-group") != string::npos) {
+			while (string(argv[i + 1]).find("-") != string::npos) {
+				groups.push_back(stoi(argv[i + 1]));
+			}
 		}
 	}
 	if (threads != -1) {
@@ -319,7 +325,7 @@ int main(int argc, char **argv){
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!calculate_structure_factors(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, threads, electron_diffraction, pbc))
+			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, threads, electron_diffraction, pbc))
 				log_file << "Error during SF Calculation!" << endl;
 		}
 	}
