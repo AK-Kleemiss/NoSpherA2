@@ -52,14 +52,16 @@ class WFN {
 		//--------------------MO handling--------------------------------------------
 		void change_MO_coef(int nr);
 		bool change_MO_coef(int nr_mo, int nr_primitive, double value, bool debug);
-		double get_MO_coef(int nr_mo, int nr_primtive, bool debug) const; 
-		int get_MO_primitive_count(int nr_mo) const; 
+		double get_MO_coef(const int nr_mo, const int nr_primtive, const bool debug) const; 
+		double get_MO_coef_f(const int nr_mo, const int nr_primtive) const;
+		double* get_MO_coef_ptr(const int nr_mo);
+		int get_MO_primitive_count(const int nr_mo) const; 
 		bool push_back_MO(int nr, double occ, double ener);
 		bool push_back_MO_coef(int nr, double value, int nr2);
-		double get_MO_energy(int mo) const;
-		int get_center(int nr) const {return centers[nr];};
-		int get_type(int nr) const {return types[nr];};
-		double get_MO_occ(int nr);
+		double get_MO_energy(const int mo) const;
+		int get_center(const int nr) const {return centers[nr];};
+		int get_type(const int nr) const {return types[nr];};
+		double get_MO_occ(const int nr);
 		
 		//--------------------in and output----------------------------------------
 		void change_basis_set_name(std::string name) {basis_set_name=name;};
@@ -166,7 +168,6 @@ class WFN {
 		int * get_ptr_types() {return &types[0];};
 		int * get_ptr_centers() {return &centers[0];};
 		double * get_ptr_exponents() {return &exponents[0];};
-		double * get_ptr_mo_coefficients(int mo);
 
 };
 

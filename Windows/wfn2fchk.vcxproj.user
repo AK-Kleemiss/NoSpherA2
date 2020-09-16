@@ -6,14 +6,20 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
-    <LocalDebuggerCommandArguments>-wfn olex2/Wfn_job/Pau100m71.wfn -cif Pau100m71.cif -asym_cif olex2/Wfn_job/Pau100m71.cif -hkl olex2/Wfn_job/Pau100m71.hkl -acc 3 -v</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>E:\temp\co2</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Co110_SF|x64'">
+    <LocalDebuggerCommandArguments>-wfn Co110.wfn -cif Co110.cif -asym_cif olex2/Wfn_job/Co110.cif -hkl olex2/Wfn_job/Co110.hkl -acc 2 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>F:\debug2\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>E:\temp</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-wfn epoxide.wfn -eli -lap -esp -v -resolution 0.2 -cpus 7 -cif epoxide.cif</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
   </PropertyGroup>
 </Project>
