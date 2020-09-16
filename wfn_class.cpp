@@ -90,7 +90,7 @@ bool WFN::push_back_MO_coef(int nr, double value, int nr2){
 	return MOs[nr].push_back_coef(value,nr2); 
 };
 
-double WFN::get_MO_energy(int mo)const {
+double WFN::get_MO_energy(const int mo)const {
 	if(mo > nmo) return -1;
 	else return MOs[mo].get_energy ();
 }
@@ -268,7 +268,7 @@ bool WFN::add_exp(int cent, int type, double e){
 	else return true;
 };
 
-double WFN::get_MO_coef(int nr_mo, int nr_primitive, bool debug) const{
+double WFN::get_MO_coef(const int nr_mo, const int nr_primitive, const bool debug) const{
 	if (debug) {
 		if (nr_mo < MOs.size() && nr_mo >= 0) return MOs[nr_mo].get_coefficient(nr_primitive, debug);
 		else {
@@ -280,7 +280,15 @@ double WFN::get_MO_coef(int nr_mo, int nr_primitive, bool debug) const{
 		return MOs[nr_mo].get_coefficient(nr_primitive, debug);
 };
 
-int WFN::get_MO_primitive_count(int nr_mo) const{
+double WFN::get_MO_coef_f(const int nr_mo, const int nr_primitive) const {
+	return MOs[nr_mo].get_coefficient_f(nr_primitive);
+};
+
+double* WFN::get_MO_coef_ptr(const int nr_mo) {
+	return MOs[nr_mo].get_coefficient_ptr();
+};
+
+int WFN::get_MO_primitive_count(const int nr_mo) const{
 	if(nr_mo <= MOs.size() && nr_mo>=0) return MOs[nr_mo].get_primitive_count();
 	else return -1;
 };
@@ -1200,7 +1208,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 };
 
 bool WFN::read_wfx(string fileName, bool debug, ofstream& file) {
-	debug = true;
 	if (exists(fileName)) {
 		if (debug)
 			file << "File is valid, continuing...\n";
@@ -2717,10 +2724,6 @@ void WFN::pop_back_cube(){
 	cub.pop_back();
 }
 
-double * WFN::get_ptr_mo_coefficients(int mo){
-	return MOs[mo].get_ptr_coefficients();
-};
-
 unsigned int WFN::get_atom_integer_mass(unsigned int atomnr){
 	vector <unsigned int> masses
 	{ 1,																																																	4,
@@ -2762,7 +2765,7 @@ double WFN::get_atom_real_mass(int atomnr){
 	return masses[get_atom_charge(atomnr)-1];
 }
 
-double WFN::get_MO_occ(int nr){
+double WFN::get_MO_occ(const int nr){
 	return MOs[nr].get_occ();
 	if(nr >= nmo || nr < 0){
 		cout << "WRONG INPUT! No Negative or bigger number than available MOs" << endl;

@@ -140,7 +140,7 @@ string MO::hdr(){
 	return temp;	
 }
 
-double MO::get_coefficient (int nr, bool debug) const{ 
+double MO::get_coefficient (const int nr, const bool debug) const{ 
 	if (debug) {
 		if (nr >= coefficients.size()) {
 			cout << "Requested element outside of range!" << endl;
@@ -152,6 +152,14 @@ double MO::get_coefficient (int nr, bool debug) const{
 		}
 	}
 	return coefficients[nr]; 
+};
+
+double MO::get_coefficient_f(const int nr) const {
+	return coefficients[nr];
+};
+
+double* MO::get_coefficient_ptr() {
+	return coefficients.data();
 };
 
 double MO::get_energy () const{ 

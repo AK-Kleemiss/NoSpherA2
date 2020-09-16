@@ -96,7 +96,7 @@ string atnr2letter(const int nr){
 		,"Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"
 		};
 	if(nr>113 || nr <=0 ){
-		cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-86!" << endl;
+		cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-113!" << endl;
 		Enter();
 		return ("PROBLEM");
 	}
@@ -1279,7 +1279,7 @@ void type2vector(
 		vector[2] = -1;
 		return;
 	}
-	int temp = index - 1;
+	const int temp = index - 1;
 	vector[0] = type_vector[temp * 3]; 
 	vector[1] = type_vector[temp * 3 + 1]; 
 	vector[2] = type_vector[temp * 3 + 2];
