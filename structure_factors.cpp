@@ -98,7 +98,7 @@ double compute_dens(
 	int atom = -1
 	)
 {
-	const int nmo = wave.get_nmo();
+	const int nmo = wave.get_nmo(true);
 	double* phi = new double[nmo];
 	double Rho=0.0;
 
