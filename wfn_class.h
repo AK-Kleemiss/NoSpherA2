@@ -80,7 +80,7 @@ class WFN {
 		int get_nex() const { return nex; };
 		int get_ncen() const { return ncen; };
 		int get_nmo() const { return nmo; };
-		int get_nmo(bool only_occ);
+		int get_nmo(const bool only_occ) const;
 		int get_origin() const { return origin; };
 		double get_exponent(int nr) const {return exponents[nr];};
 		unsigned int get_nr_electrons(bool &debug);
