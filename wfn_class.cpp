@@ -1674,7 +1674,7 @@ void WFN::print_primitive(int nr){
 		}
 };
 
-int WFN::get_nmo(bool only_occ){
+int WFN::get_nmo(const bool only_occ) const{
 	if(!only_occ) return nmo;
 	else {
 		int count=0;
