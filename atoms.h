@@ -53,11 +53,18 @@ struct atom {
 	bool push_back_basis_set(double coefficient, double exponent, int type, int shell);
 	void print_values_long();
 	bool get_basis_set_loaded();
+	void assign_ADPs(std::vector<double> second, std::vector<double> third, std::vector<double> fourth);
 	std::vector<basis_set_entry> basis_set;
 	std::vector<unsigned int> shellcount;
-};
+	//The Order is:
+	//[0] = second order (U11, U22, U33, U12, U13, U23)
+	//[1] = third order  (C111, C112, C113, C122, C123, C133, C222, C223, C233, C333)
+	//[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
+	std::vector<std::vector<double>> ADPs;
+};						  
 
-inline atom::atom(){
+inline atom::atom() {
+	
     label='?';
 	nr=0;
 	x=0.0;
@@ -124,6 +131,35 @@ inline bool atom::push_back_basis_set(double exponent, double coefficient, int t
 inline bool atom::get_basis_set_loaded(){
 	if(basis_set.size()>0) return true;
 	else return false;
+};
+
+inline void atom::assign_ADPs(std::vector<double> second, std::vector<double> third, std::vector<double> fourth) {
+	if (second.size() != 6) {
+		std::cout << "Wrong size of second order ADP!" << std::endl;
+		return;
+	}
+	if (third.size() == 0 && second.size() != 0) {
+		ADPs.resize(1);
+		for (int i = 0; i < 6; i++)
+			ADPs[0][i] = second[i];
+	}
+	else if (third.size() != 0 && second.size() != 0) {
+		if (third.size() != 10) {
+			std::cout << "Wrong size of third order ADP!" << std::endl;
+			return;
+		}
+		if (fourth.size() != 6) {
+			std::cout << "Wrong size of fourth order ADP!" << std::endl;
+			return;
+		}
+		ADPs.resize(3);
+		for (int i = 0; i < 6; i++)
+			ADPs[0][i] = second[i];
+		for (int i = 0; i < 10; i++)
+			ADPs[1][i] = third[i];
+		for (int i = 0; i < 15; i++)
+			ADPs[1][i] = fourth[i];
+	}
 };
 
 #endif

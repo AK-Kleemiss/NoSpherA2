@@ -107,5 +107,8 @@
     <ClInclude Include="..\spherical_density.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\cell.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
