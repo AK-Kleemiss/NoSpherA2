@@ -35,6 +35,7 @@
 #include <complex>
 #include <algorithm>
 
+#include "cell.h"
 #include "convenience.h"
 #include "structure_factors.h"
 #include "wfn_class.h"
@@ -272,8 +273,6 @@ bool calculate_structure_factors_HF(
 	if (debug)
 		file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
 
-	double rcm[3][3];
-	double cm[3][3];
 	if (debug)
 		file << "starting to read cif!" << endl;
 	if (!exists(cif)) {
@@ -285,138 +284,26 @@ bool calculate_structure_factors_HF(
 			<< asym_cif << endl;
 		return false;
 	}
-	ifstream cif_input(cif.c_str(), ios::in);
-	ifstream asym_cif_input(asym_cif.c_str(), ios::in);
-	vector<bool> found;
-	found.resize(7);
-	for (int k = 0; k < 7; k++) 
-		found[k] = false;
-	double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
-	double alpha = 0.0, beta = 0.0, gamma = 0.0;
-	vector <string> cell_keywords;
-	cell_keywords.push_back("_cell_length_a");
-	cell_keywords.push_back("_cell_length_b");
-	cell_keywords.push_back("_cell_length_c");
-	cell_keywords.push_back("_cell_angle_alpha");
-	cell_keywords.push_back("_cell_angle_beta");
-	cell_keywords.push_back("_cell_angle_gamma");
-	cell_keywords.push_back("_cell_volume");
-	if (debug)
-		file << "Starting while !.eof()" << endl;
-	while (!cif_input.eof()) {
-		if (debug) 
-			file << "While line! " << setw(80) << line 
-			<< setw(10) << a << found[0] 
-			<< setw(10) << b << found[1] 
-			<< setw(10) << c << found[2] 
-			<< setw(10) << alpha << found[3] 
-			<< setw(10) << beta << found[4] 
-			<< setw(10) << gamma << found[5] 
-			<< setw(10) << v << found[6] <<  endl;
-		getline(cif_input, line);
-		for (int k = 0; k < cell_keywords.size(); k++) {
-			if (line.find(cell_keywords[k]) != string::npos) {
-				switch (k) {
-				case 0:
-					a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 1:
-					b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 2:
-					c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 3:
-					alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 4:
-					beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 5:
-					gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				case 6:
-					v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-					break;
-				default:
-					file << "This is weird... should never get here... aborting!" << endl;
-					return false;
-				}
-				found[k] = true;
-			}
-		}
-		if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
-			break;
-	}
-	double ca = cos(0.0174532925199432944444444444444 * alpha);
-	double cb = cos(0.0174532925199432944444444444444 * beta);
-	double cg = cos(0.0174532925199432944444444444444 * gamma);
-	double sa = sin(0.0174532925199432944444444444444 * alpha);
-	double sb = sin(0.0174532925199432944444444444444 * beta);
-	double sg = sin(0.0174532925199432944444444444444 * gamma);
-	double V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
-	if (V / v > 1.1 || V / v < 0.9) {
-		file << "Volume computed is more than 10% off, please check!" << endl;
-		return false;
-	}
-	double a_star = b * c * sa / V;
-	double b_star = a * c * sb / V;
-	double c_star = a * b * sg / V;
 
-	if (debug)
-		file << "Making cm and rcm" << endl
-		<< ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << endl
-		<< a_star << " " << b_star << " " << c_star << endl;
-
-	cm[0][0] = a/ 0.529177249;
-	cm[0][1] = sqrt(abs(a * b * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
-	cm[0][2] = sqrt(abs(a * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
-
-	cm[1][0] = sqrt(abs(a * b * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
-	cm[1][1] = b/ 0.529177249;
-	cm[1][2] = sqrt(abs(b * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
-
-	cm[2][0] = sqrt(abs(a * c * cg))/ 0.529177249 * pow(-1, 1 + (cg > 0));
-	cm[2][1] = sqrt(abs(b * c * cb))/ 0.529177249 * pow(-1, 1 + (cb > 0));
-	cm[2][2] = c/ 0.529177249;
-
-	rcm[0][0] = 2 * M_PI / a;
-	rcm[0][1] = 0;
-	rcm[0][2] = 0;
-
-	rcm[1][0] = 2 * M_PI * -cg / (a * sg);
-	rcm[1][1] = 2 * M_PI * 1 / (b * sg);
-	rcm[1][2] = 0;
-
-	rcm[2][0] = 2 * M_PI * b * c * (ca * cg - cb) / V / sg;
-	rcm[2][1] = 2 * M_PI * a * c * (cb * cg - ca) / V / sg;
-	rcm[2][2] = 2 * M_PI * a * b * sg / V;
-
-	for (int i = 0; i < 3; i++)
-		for (int j = 0; j < 3; j++)
-			if (abs(rcm[i][j]) < 10e-10){
-				rcm[i][j] = 0.0;
-                //cm[i][j] = 0.0;
-            }
-			else{
-				rcm[i][j] *= 0.529177249;
-                //cm[i][j] *= 0.529177249;
-            }
+	cell unit_cell(cif, file, debug);
 
 	if (debug) {
 		file << "RCM done, now labels and asym atoms!" << endl;
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j)
-				file << setw(10) << fixed << rcm[i][j] / 2 / M_PI / 0.529177249 << ' ';
+				file << setw(10) << fixed << unit_cell.get_rcm(i,j) / 2 / M_PI / 0.529177249 << ' ';
 			file << endl;
 		}
-        file << "CM in bohr:" << endl;
+		file << "CM in bohr:" << endl;
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j)
-				file << setw(10) << fixed << cm[i][j] << ' ';
+				file << setw(10) << fixed << unit_cell.get_cm(i, j) << ' ';
 			file << endl;
 		}
 	}
+
+	ifstream cif_input(cif.c_str(), std::ios::in);
+	ifstream asym_cif_input(asym_cif.c_str(), std::ios::in);
 	cif_input.clear();
 	cif_input.seekg(0, cif_input.beg);
 	vector <string> labels;
@@ -467,9 +354,8 @@ bool calculate_structure_factors_HF(
 				fields.resize(count_fields);
 				for (int i = 0; i < count_fields; i++)
 					s >> fields[i];
-				positions[labels.size()][0] = (a * stod(fields[position_field[0]]) + b * cg * stod(fields[position_field[1]]) + c * cb * stod(fields[position_field[2]])) / 0.529177249;
-				positions[labels.size()][1] = (b * sg * stod(fields[position_field[1]]) + c * (ca - cb * cg) / sg * stod(fields[position_field[2]])) / 0.529177249;
-				positions[labels.size()][2] = V / (a * b * sg) * stod(fields[position_field[2]]) / 0.529177249;
+				if (debug) file << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+				positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
 				bool found_this_one = false;
 				if (debug) file << "label: " << fields[label_field] << " position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
@@ -478,6 +364,7 @@ bool calculate_structure_factors_HF(
 						&& is_similar(positions[labels.size()][2], wave.atoms[i].z, -1)) {
 						if (debug) file << "WFN position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl
 							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
+						wave.atoms[i].label = fields[label_field];
 						all_atom_list.push_back(i);
 						found_this_one = true;
 						break;
@@ -612,138 +499,7 @@ bool calculate_structure_factors_HF(
 		}
 	}
 	else {
-		cif_input.clear();
-		cif_input.seekg(0, cif_input.beg);
-		bool symm_found = false;
-		int operation_field = 200;
-		count_fields = 0;
-		while (!cif_input.eof() && !symm_found) {
-			getline(cif_input, line);
-			if (line.find("loop_") != string::npos) {
-				//if(debug) file << "found loop!" << endl;
-				while (line.find("_") != string::npos) {
-					getline(cif_input, line);
-					if (debug) file << "line in loop field definition: " << line << endl;
-					if (line.find("space_group_symop_operation_xyz") != string::npos)
-						operation_field = count_fields;
-					else if (count_fields > 2 || (operation_field == 200 && count_fields != 0)) {
-						if (debug) file << "I don't think this is the symmetry block.. moving on!" << endl;
-						count_fields = 0;
-						break;
-					}
-					count_fields++;
-				}
-				while (line.find("_") == string::npos && line.length() > 3 && count_fields != 0) {
-					if (debug) file << "Reading operation!" << line << endl;
-					symm_found = true;
-					stringstream s(line);
-					vector <string> fields;
-					fields.resize(count_fields);
-					int sym_from_cif[3][3];
-					for (int x = 0; x < 3; x++)
-						for (int y = 0; y < 3; y++)
-							sym_from_cif[x][y] = 0;
-					for (int i = 0; i < count_fields; i++)
-						s >> fields[i];
-					vector<string> vectors;
-					vectors.resize(3);
-					int column = 0;
-					for (int c = 0; c < fields[operation_field].length(); c++) {
-						if (fields[operation_field][c] != ',')
-							vectors[column].push_back(fields[operation_field][c]);
-						else column++;
-					}
-
-					for (int x = 0; x < 3; x++) {
-						if (vectors[x].find("X") != string::npos || vectors[x].find("x") != string::npos) {
-							char sign = ' ';
-							if (vectors[x].find("X") != string::npos && vectors[x].find("X") != 0)
-								sign = vectors[x].at(vectors[x].find("X") - 1);
-							else if (vectors[x].find("X") == 0)
-								sign = '+';
-							if (vectors[x].find("x") != string::npos && vectors[x].find("x") != 0)
-								sign = vectors[x].at(vectors[x].find("x") - 1);
-							else if (vectors[x].find("x") == 0)
-								sign = '+';
-							if (sign == '-')
-								sym_from_cif[x][0] = -1;
-							if (sign == '+')
-								sym_from_cif[x][0] = 1;
-						}
-						if (vectors[x].find("Y") != string::npos || vectors[x].find("y") != string::npos) {
-							char sign = ' ';
-							if (vectors[x].find("Y") != string::npos && vectors[x].find("Y") != 0)
-								sign = vectors[x].at(vectors[x].find("Y") - 1);
-							else if (vectors[x].find("Y") == 0)
-								sign = '+';
-							if (vectors[x].find("y") != string::npos && vectors[x].find("y") != 0)
-								sign = vectors[x].at(vectors[x].find("y") - 1);
-							else if (vectors[x].find("y") == 0)
-								sign = '+';
-							if (sign == '-')
-								sym_from_cif[x][1] = -1;
-							if (sign == '+')
-								sym_from_cif[x][1] = 1;
-						}
-						if (vectors[x].find("Z") != string::npos || vectors[x].find("z") != string::npos) {
-							char sign = ' ';
-							if (vectors[x].find("Z") != string::npos && vectors[x].find("Z") != 0)
-								sign = vectors[x].at(vectors[x].find("Z") - 1);
-							else if (vectors[x].find("Z") == 0)
-								sign = '+';
-							if (vectors[x].find("z") != string::npos && vectors[x].find("z") != 0)
-								sign = vectors[x].at(vectors[x].find("z") - 1);
-							else if (vectors[x].find("z") == 0)
-								sign = '+';
-							if (sign == '-')
-								sym_from_cif[x][2] = -1;
-							if (sign == '+')
-								sym_from_cif[x][2] = 1;
-						}
-					}
-					if (debug) {
-						file << "Comparing ";
-						for (int x = 0; x < 3; x++)
-							for (int y = 0; y < 3; y++)
-								file << sym_from_cif[x][y] << " ";
-						file << endl;
-					}
-					bool already_known = false;
-					for (int s = 0; s < sym[0][0].size(); s++) {
-						bool identical = true;
-						bool inverse = true;
-						for (int x = 0; x < 3; x++)
-							for (int y = 0; y < 3; y++)
-								if (sym[y][x][s] != sym_from_cif[x][y])
-									identical = false;
-						if (!identical)
-							for (int x = 0; x < 3; x++)
-								for (int y = 0; y < 3; y++)
-									if (sym[y][x][s] != sym_from_cif[x][y] * -1)
-										inverse = false;
-						/*if (debug) {
-							file << "Comparison with ";
-							for (int x = 0; x < 3; x++)
-								for (int y = 0; y < 3; y++)
-									file << sym[x][y][s] << " ";
-							file << "resulted in ";
-							file << identical << " " << inverse << endl;
-						}*/
-						if (identical || inverse) {
-							already_known = true;
-							break;
-						}
-					}
-					if (!already_known) {
-						if (debug) file << "This is a new symmetry operation!" << endl;
-						for (int x = 0; x < 3; x++)
-							for (int y = 0; y < 3; y++)
-								sym[y][x].push_back(sym_from_cif[x][y]);
-					}
-					getline(cif_input, line);
-				}
-			}
-		}
+		sym = unit_cell.get_sym();
 	}
 
 	if (debug) {
@@ -797,9 +553,9 @@ bool calculate_structure_factors_HF(
                         else{
 						    j++;
     						atom_z[i + j * wave.get_ncen()] = wave.atoms[i].charge;
-    						x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * cm[0][0] + pbc_y * cm[0][1] + pbc_z * cm[0][2];
-    						y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * cm[1][0] + pbc_y * cm[1][1] + pbc_z * cm[1][2];
-    						z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * cm[2][0] + pbc_y * cm[2][1] + pbc_z * cm[2][2];
+    						x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
+							y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
+							z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
                             if(debug) 
                                 file << "xyz= " << pbc_x << pbc_y << pbc_z << " j = " << j << " position: " << x[i + j * wave.get_ncen()] << " " << y[i + j * wave.get_ncen()] << " " << z[i + j * wave.get_ncen()] << " Charge: " << atom_z[i + j * wave.get_ncen()] << endl;
                         }
@@ -1088,27 +844,27 @@ bool calculate_structure_factors_HF(
 		if (debug)
 			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
 	}
-	if (debug) {
-		file << "Asym atom list: ";
-		for (int g = 0; g < asym_atom_list.size(); g++)
-			file << setw(4) << asym_atom_list[g];
-		file << endl;
-		file << "All atom list: ";
-		for (int g = 0; g < all_atom_list.size(); g++)
-			file << setw(4) << all_atom_list[g];
-		file << endl;
-		file << "spherical radial density:" << endl;
-		for (int i = 0; i < atom_type_list.size(); i++)
-		{
-			file << "-------------------------------" << endl;
-			file << "atom: " << atom_type_list[i] << endl;
-			for (int d = 0; d < radial_density[i].size(); d++)
-				file << "d: " << setw(12) << setprecision(6) << scientific <<  radial_dist[i][d]
-				<< " rho: " << setw(12) << setprecision(6) << scientific << radial_density[i][d] << endl;
-			file << endl;
-			file << "-------------------------------" << endl;
-		}
-	}
+	//if (debug) {
+	//	file << "Asym atom list: ";
+	//	for (int g = 0; g < asym_atom_list.size(); g++)
+	//		file << setw(4) << asym_atom_list[g];
+	//	file << endl;
+	//	file << "All atom list: ";
+	//	for (int g = 0; g < all_atom_list.size(); g++)
+	//		file << setw(4) << all_atom_list[g];
+	//	file << endl;
+	//	file << "spherical radial density:" << endl;
+	//	for (int i = 0; i < atom_type_list.size(); i++)
+	//	{
+	//		file << "-------------------------------" << endl;
+	//		file << "atom: " << atom_type_list[i] << endl;
+	//		for (int d = 0; d < radial_density[i].size(); d++)
+	//			file << "d: " << setw(12) << setprecision(6) << scientific <<  radial_dist[i][d]
+	//			<< " rho: " << setw(12) << setprecision(6) << scientific << radial_density[i][d] << endl;
+	//		file << endl;
+	//		file << "-------------------------------" << endl;
+	//	}
+	//}
 	//apply to the becke grid
 	for (int i = 0; i < wave.get_ncen(); i++) {
 		int nr = all_atom_list[i];
@@ -1154,9 +910,9 @@ bool calculate_structure_factors_HF(
 									radial_density[type_list_number],
 									radial_dist[type_list_number],
 									sqrt(
-										pow(grid[g][0][p] - (wave.atoms[nr].x + x * cm[0][0] + y * cm[0][1] + z * cm[0][2]), 2)
-										+ pow(grid[g][1][p] - (wave.atoms[nr].y + x * cm[1][0] + y * cm[1][1] + z * cm[1][2]), 2)
-										+ pow(grid[g][2][p] - (wave.atoms[nr].z + x * cm[2][0] + y * cm[2][1] + z * cm[2][2]), 2)
+										  pow(grid[g][0][p] - (wave.atoms[nr].x + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2)), 2)
+										+ pow(grid[g][1][p] - (wave.atoms[nr].y + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2)), 2)
+										+ pow(grid[g][2][p] - (wave.atoms[nr].z + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2)), 2)
 									),
 									lincr,
 									min_dist
@@ -1282,9 +1038,9 @@ bool calculate_structure_factors_HF(
 #pragma omp parallel for
 					for (int i = 0; i < total_grid[0].size(); i++)
 						periodic_grid[j][i] = compute_dens(wave, new double[3]{
-							total_grid[0][i] + x * cm[0][0] + y * cm[0][1] + z * cm[0][2],
-							total_grid[1][i] + x * cm[1][0] + y * cm[1][1] + z * cm[1][2],
-							total_grid[2][i] + x * cm[2][0] + y * cm[2][1] + z * cm[2][2] },
+							total_grid[0][i] + x * unit_cell.get_cm(0,0) + y * unit_cell.get_cm(0,1) + z * unit_cell.get_cm(0,2),
+							total_grid[1][i] + x * unit_cell.get_cm(1,0) + y * unit_cell.get_cm(1,1) + z * unit_cell.get_cm(1,2),
+							total_grid[2][i] + x * unit_cell.get_cm(2,0) + y * unit_cell.get_cm(2,1) + z * unit_cell.get_cm(2,2) },
 							mo_coef);
                     j++;
 				}
@@ -1444,7 +1200,19 @@ bool calculate_structure_factors_HF(
 		k_pt[i].resize(sym[0][0].size()* hkl[0].size());
 
 	if (debug)
-		file << "K_point_vector is here" << endl;
+		file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+
+	bool shrink = false;
+	vector < vector<double> > k_pt_unique;
+	vector < vector<int> > hkl_unique;
+	if (shrink) {
+		k_pt_unique.resize(3);
+		hkl_unique.resize(3);
+		for (int s = 0; s < sym[0][0].size(); s++)
+			for (int ref = 0; ref < hkl[0].size(); ref++)
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
+	}
 
 	for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
@@ -1453,19 +1221,49 @@ bool calculate_structure_factors_HF(
 				for (int h = 0; h < 3; h++) {
 					double rcm_sym = 0.0;
 					for (int j = 0; j < 3; j++)
-						rcm_sym += rcm[x][j] * sym[j][h][s];
+						rcm_sym += unit_cell.get_rcm(x,j) * sym[j][h][s];
 					k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
 				}
+	}
+
+	
+	if (shrink) {
+		vector <bool> mask;
+		mask.resize(k_pt[0].size());
+		mask.assign(k_pt[0].size(), true);
+		for (int i = 0; i < k_pt[0].size(); i++)
+			for (int j = i + 1; j < k_pt[0].size(); j++) {
+				if (!mask[j])
+					continue;
+				if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
+					mask[j] = false;
+			}
+		if (debug)  file << "Mask done!" << endl;
+		for (int i = k_pt[0].size() - 1; i >= 0; i--) {
+			if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
+			if (mask[i])
+				for (int h = 0; h < 3; h++)
+					k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
+			else
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].erase(hkl_unique[h].begin() + i);
+		}
+		if (debug)
+			file << "K-pt_unique size: " << k_pt_unique[0].size() << endl;
 	}
 
 	file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
 
 	vector< vector < complex<double> > > sf;
 	sf.resize(asym_atom_list.size());
-
+	if (shrink)
 #pragma omp parallel for
-	for (int i = 0; i < asym_atom_list.size(); i++)
-		sf[i].resize(sym[0][0].size() * hkl[0].size());
+		for (int i = 0; i < asym_atom_list.size(); i++)
+			sf[i].resize(hkl_unique[0].size());
+	else
+#pragma omp parallel for
+		for (int i = 0; i < asym_atom_list.size(); i++)
+			sf[i].resize(sym[0][0].size() * hkl[0].size());
 
 	if (debug)
 		file << "Initialized FFs" << endl
@@ -1490,14 +1288,14 @@ bool calculate_structure_factors_HF(
 
 	progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
 	const int step = max(floor(asym_atom_list.size() / 20),1.0);
-	const int smax = k_pt[0].size();
+	const int smax = shrink ? k_pt_unique[0].size() : k_pt[0].size();
 	const int imax = asym_atom_list.size();
 	int pmax;
 	double* dens_local, * d1_local, * d2_local, * d3_local;
 	complex<double>* sf_local;
-	const double* k1_local = k_pt[0].data();
-	const double* k2_local = k_pt[1].data();
-	const double* k3_local = k_pt[2].data();
+	const double* k1_local = shrink ? k_pt_unique[0].data() : k_pt[0].data();
+	const double* k2_local = shrink ? k_pt_unique[1].data() : k_pt[1].data();
+	const double* k3_local = shrink ? k_pt_unique[2].data() : k_pt[2].data();
 	for (int i = 0; i < imax; i++) {
 		pmax = dens[i].size();
 		dens_local = dens[i].data();
@@ -1512,7 +1310,7 @@ bool calculate_structure_factors_HF(
 			for (int p = pmax-1; p >= 0; p--) {
 				rho = dens_local[p];
 				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
+				sf_local[s] += complex<double>(rho * cos(work) + rho * sin(work));
 			}
 		}
 		if (i != 0 && i % step == 0)
@@ -1521,7 +1319,7 @@ bool calculate_structure_factors_HF(
 	delete(progress);
 
 	if (electron_diffraction) {
-		double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
+		const double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
 		for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
 			for (int p = 0; p < hkl[0].size(); p++) {
@@ -1558,32 +1356,48 @@ bool calculate_structure_factors_HF(
 
 	tsc_file << "TITLE: " << get_filename_from_path(cif).substr(0,cif.find(".cif")) << endl << "SYMM: ";
 
-	for (int s = 0; s < sym[0][0].size(); s++) {
-		for (int i = 0; i < 3; i++)
-			for (int j = 0; j < 3; j++) {
-				if (i != 0 || j != 0) tsc_file << " ";
-				tsc_file << sym[j][i][s];
-			}
-		if(s!= sym[0][0].size()-1)
-			tsc_file << ";";
-	}
+	if (shrink)
+		tsc_file << "expanded";
+	else
+		for (int s = 0; s < sym[0][0].size(); s++) {
+			for (int i = 0; i < 3; i++)
+				for (int j = 0; j < 3; j++) {
+					if (i != 0 || j != 0) tsc_file << " ";
+					tsc_file << sym[j][i][s];
+				}
+			if (s != sym[0][0].size() - 1)
+				tsc_file << ";";
+		}
+
 	tsc_file << endl << "SCATTERERS:";
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		tsc_file << " " << labels[i];
 	tsc_file << endl << "DATA:" << endl;
 
-    if(debug) file << "Writing a total of " << sym[0][0].size() << " symmetry generated sets of hkls!" << endl;
-	for (int s = 0; s < sym[0][0].size(); s++) {
-		//if (debug) file << "writing symmetry: " << s << endl;
-		for (int p = 0; p < hkl[0].size(); p++) {
-			tsc_file 
-				<< hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s] << " "
-				<< hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s] << " "
-				<< hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s] << " ";
+	if (shrink)
+		for (int r = 0; r < hkl_unique[0].size(); r++) {
+			for (int h = 0; h < 3; h++)
+				tsc_file << hkl_unique[h][r] << " ";
 			for (int i = 0; i < asym_atom_list.size(); i++)
-				tsc_file << scientific << setprecision(8) << real(sf[i][p + hkl[0].size() * s]) << ","
-				<< scientific << setprecision(8) << imag(sf[i][p + hkl[0].size() * s]) << " ";
+				tsc_file << scientific << setprecision(8) << real(sf[i][r]) << ","
+				<< scientific << setprecision(8) << imag(sf[i][r]) << " ";
 			tsc_file << endl;
+		}
+
+	else {
+		if (debug) file << "Writing a total of " << sym[0][0].size() << " symmetry generated sets of hkls!" << endl;
+		for (int s = 0; s < sym[0][0].size(); s++) {
+			//if (debug) file << "writing symmetry: " << s << endl;
+			for (int p = 0; p < hkl[0].size(); p++) {
+				tsc_file
+					<< hkl[0][p] * sym[0][0][s] + hkl[1][p] * sym[0][1][s] + hkl[2][p] * sym[0][2][s] << " "
+					<< hkl[0][p] * sym[1][0][s] + hkl[1][p] * sym[1][1][s] + hkl[2][p] * sym[1][2][s] << " "
+					<< hkl[0][p] * sym[2][0][s] + hkl[1][p] * sym[2][1][s] + hkl[2][p] * sym[2][2][s] << " ";
+				for (int i = 0; i < asym_atom_list.size(); i++)
+					tsc_file << scientific << setprecision(8) << real(sf[i][p + hkl[0].size() * s]) << ","
+					<< scientific << setprecision(8) << imag(sf[i][p + hkl[0].size() * s]) << " ";
+				tsc_file << endl;
+			}
 		}
 	}
 	tsc_file.close();
