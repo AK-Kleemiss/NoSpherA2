@@ -425,18 +425,18 @@ bool cube::write_file(WFN &wave, string &given_path, bool debug){
 	ofstream of(given_path.c_str(),ios::out);
 	of << comment1 << '\n';
 	of << comment2 << '\n';
-	of << "   " << na << " " << origin[0] << " " << origin[1] << " " << origin[2] << '\n';
-	for(int i=0; i<3; i++){
-		of << setw(6) << size[i];
-		for(int j=0; j<3; j++)  
-			of  << fixed << setw(12) << setprecision (6)<< vectors[i][j];
-		of << '\n';
+	of << setw(6) << na << fixed << setw(12) << origin[0] << fixed << setw(12) << origin[1] << fixed << setw(12) << origin[2] << '\n';
+	for (int i = 0; i < 3; i++) {
+		stream << setw(6) << size[i];
+		for (int j = 0; j < 3; j++)  stream << fixed << setw(12) << setprecision(6) << vectors[i][j];
+		stream << '\n';
 	}
-	//of << stream.str();
-	//stream.str("");
+	of << stream.str();
+	stream.str("");
 	for(int i=0; i<na ; i++){
-		of << "  " << wave.get_atom_charge(i) << " " << wave.get_atom_charge (i) << ".000000";
-		for(int j=0; j<3; j++) of << " " << wave.get_atom_coordinate (i,j,false);
+		of << setw(6) << wave.get_atom_charge(i) << setw(6) << wave.get_atom_charge(i) << ".000000";
+		for (int j = 0; j < 3; j++)
+			of << fixed << setw(12) << wave.get_atom_coordinate(i, j, false);
 		of << '\n';
 	}
 	if(debug) cout << "Finished atoms!" << endl;

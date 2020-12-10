@@ -41,11 +41,9 @@ inline basis_set_entry basis_set_entry::operator=(const basis_set_entry &rhs){
 
 struct atom {
 	std::string label;
-	int nr;
-	double x;
-	double y;
-	double z;
-	int charge;
+	int nr, charge;
+	double x, y, z;
+	std::vector<double> frac_coords;
 	atom();
 	atom(std::string l, int n, double c1, double c2, double c3, int ch);
 	atom operator=(const atom &rhs);
@@ -53,7 +51,10 @@ struct atom {
 	bool push_back_basis_set(double coefficient, double exponent, int type, int shell);
 	void print_values_long();
 	bool get_basis_set_loaded();
-	void assign_ADPs(std::vector<double> second, std::vector<double> third, std::vector<double> fourth);
+	bool is_anharm();
+	void assign_ADPs(std::vector<double> &second, std::vector<double> &third, std::vector<double> &fourth);
+	void assign_ADPs(std::vector<double>& second);
+	void assign_ADPs(double& Uiso);
 	std::vector<basis_set_entry> basis_set;
 	std::vector<unsigned int> shellcount;
 	//The Order is:
@@ -71,6 +72,8 @@ inline atom::atom() {
 	y=0.0;
 	z=0.0;
 	charge=0;
+	frac_coords.resize(3);
+	frac_coords = { 0,0,0 };
 };
 
 inline atom::atom (std::string l, int n, double c1, double c2, double c3, int ch){
@@ -80,6 +83,8 @@ inline atom::atom (std::string l, int n, double c1, double c2, double c3, int ch
 	y=c2;
 	z=c3;
 	charge=ch;
+	frac_coords.resize(3);
+	frac_coords = { 0,0,0 };
 };
 
 inline atom atom::operator= (const atom &rhs){
@@ -96,6 +101,10 @@ inline atom atom::operator= (const atom &rhs){
 
 inline void atom::print_values(){
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
+};
+
+inline bool atom::is_anharm() {
+	return ADPs.size() > 1;
 };
 
 inline void atom::print_values_long(){
@@ -133,32 +142,50 @@ inline bool atom::get_basis_set_loaded(){
 	else return false;
 };
 
-inline void atom::assign_ADPs(std::vector<double> second, std::vector<double> third, std::vector<double> fourth) {
+inline void atom::assign_ADPs(double& Uiso) {
+	ADPs.resize(1);
+	ADPs[0].resize(6);
+	ADPs[0][0] = ADPs[0][1] = ADPs[0][2] = Uiso;
+};
+
+inline void atom::assign_ADPs(std::vector<double>& second) {
+	if (second.size() != 6) {
+		std::cout << "Wrong size of second order ADP!" << std::endl;
+		return;
+	}
+	else {
+		ADPs.resize(1);
+		ADPs[0].resize(6);
+		ADPs[0] = second;
+	}
+};
+
+inline void atom::assign_ADPs(std::vector<double> &second, std::vector<double> &third, std::vector<double> &fourth) {
 	if (second.size() != 6) {
 		std::cout << "Wrong size of second order ADP!" << std::endl;
 		return;
 	}
 	if (third.size() == 0 && second.size() != 0) {
 		ADPs.resize(1);
-		for (int i = 0; i < 6; i++)
-			ADPs[0][i] = second[i];
+		ADPs[0].resize(6);
+		ADPs[0] = second;
 	}
 	else if (third.size() != 0 && second.size() != 0) {
 		if (third.size() != 10) {
 			std::cout << "Wrong size of third order ADP!" << std::endl;
 			return;
 		}
-		if (fourth.size() != 6) {
+		if (fourth.size() != 15) {
 			std::cout << "Wrong size of fourth order ADP!" << std::endl;
 			return;
 		}
 		ADPs.resize(3);
-		for (int i = 0; i < 6; i++)
-			ADPs[0][i] = second[i];
-		for (int i = 0; i < 10; i++)
-			ADPs[1][i] = third[i];
-		for (int i = 0; i < 15; i++)
-			ADPs[1][i] = fourth[i];
+		ADPs[0].resize(6);
+		ADPs[1].resize(10);
+		ADPs[2].resize(15);
+		ADPs[0] = second;
+		ADPs[1] = third;
+		ADPs[2] = fourth;
 	}
 };
 

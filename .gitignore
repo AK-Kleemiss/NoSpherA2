@@ -22,3 +22,11 @@
 *.xml
 Windows/*unity*.cpp
 
+/fftw3.h
+/libfftw3-3.def
+/libfftw3-3.dll
+/Windows/x64/Debug_PDF
+NoSpherA2_linux/bin/x64/Release/NoSpherA2
+NoSpherA2_linux/bin/x64/Release/NoSpherA2_linux
+NoSpherA2_linux/bin/x64/Release/NoSpherA2_linux.out
+Windows/.vs/NoSpherA2/v16/.suo
