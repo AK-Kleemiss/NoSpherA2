@@ -157,17 +157,7 @@ double linear_interpolate_spherical_density(
 	else if (dist < spherical_dist[0])
 		return radial_dens[0];
 	int nr = floor(log(dist / start) / lincr);
-	//int end = spherical_dist.size() - 1;
-	//for (int i = 0; i < end; i++) {
-	//	double prev_dist = spherical_dist[i];
-	//	double current_dist = spherical_dist[i + 1];
-	//	if (prev_dist < dist && current_dist > dist) {
-	//		if (i == 0)
-	//			result = radial_dens[0];
-	//		else
-				result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
-	//	}
-	//}
+	result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
 	if (result < 1E-10) result =  0;
 	return result;
 }
@@ -640,7 +630,7 @@ bool calculate_structure_factors_HF(
 	// Dimensions: [c] [p]
 	// p = the number of gridpoint
 	// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-	vector < vector <  double > > total_grid;
+	vector < vector < double > > total_grid;
 	// density of spherical atom at each
 	// Dimensions: [a] [d]
 	// a = atom number in atom type list for which the weight is calcualted
@@ -1123,7 +1113,7 @@ bool calculate_structure_factors_HF(
 		for (int i = 0; i < asym_atom_list.size(); i++) {
 			if (isnan(atom_els[2][i]))
 				file << "!!!";
-			file << atom_els[2][i] << " ";
+			file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
 			if (isnan(atom_els[2][i]))
 				file << "!!!";
 		}
@@ -1202,7 +1192,7 @@ bool calculate_structure_factors_HF(
 	if (debug)
 		file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 
-	bool shrink = false;
+	const bool shrink = true;
 	vector < vector<double> > k_pt_unique;
 	vector < vector<int> > hkl_unique;
 	if (shrink) {
@@ -1232,6 +1222,7 @@ bool calculate_structure_factors_HF(
 		mask.resize(k_pt[0].size());
 		mask.assign(k_pt[0].size(), true);
 		for (int i = 0; i < k_pt[0].size(); i++)
+#pragma omp parallel for schedule(dynamic)
 			for (int j = i + 1; j < k_pt[0].size(); j++) {
 				if (!mask[j])
 					continue;
@@ -1240,7 +1231,7 @@ bool calculate_structure_factors_HF(
 			}
 		if (debug)  file << "Mask done!" << endl;
 		for (int i = k_pt[0].size() - 1; i >= 0; i--) {
-			if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
+			//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
 			if (mask[i])
 				for (int h = 0; h < 3; h++)
 					k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
@@ -1310,7 +1301,7 @@ bool calculate_structure_factors_HF(
 			for (int p = pmax-1; p >= 0; p--) {
 				rho = dens_local[p];
 				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-				sf_local[s] += complex<double>(rho * cos(work) + rho * sin(work));
+				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
 		}
 		if (i != 0 && i % step == 0)
@@ -1319,7 +1310,7 @@ bool calculate_structure_factors_HF(
 	delete(progress);
 
 	if (electron_diffraction) {
-		const double fact = 2*M_PI*9.1093837015E-31 * pow(1.602176634E-19, 2) / (pow(6.62607015E-34, 2) * 8.8541878128E-12);
+		const double fact = 0.023934;
 		for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
 			for (int p = 0; p < hkl[0].size(); p++) {

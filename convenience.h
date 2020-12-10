@@ -11,6 +11,7 @@
 #include <cctype>
 
 class WFN;
+class cell;
 
 //------------------general functions for easy use of terminal input--------------------
 const double bragg_angstrom[114]{
@@ -204,6 +205,14 @@ void type2vector(
 	const int index,
 	int* vector);
 
+bool read_fracs_ADPs_from_CIF(std::string cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
+
+inline double double_from_string_with_esd(std::string in) {
+	if (in.find('(') == std::string::npos)
+		return stod(in);
+	else
+		return stod(in.substr(0, in.find('(')));
+}
 
 #include "wfn_class.h"
 

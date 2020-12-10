@@ -25,6 +25,7 @@
 #endif
 
 #include "convenience.h"
+#include "cell.h"
 
 using namespace std;
 const double c_pi = 3.141592653589793;
@@ -1284,4 +1285,277 @@ void type2vector(
 	vector[1] = type_vector[temp * 3 + 1]; 
 	vector[2] = type_vector[temp * 3 + 2];
 }
+
+bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell &unit_cell, ofstream &log3, bool debug) {
+	vector<vector<double>> Uij, Cijk, Dijkl;
+	ifstream asym_cif_input(cif.c_str(), std::ios::in);
+	asym_cif_input.clear();
+	asym_cif_input.seekg(0, asym_cif_input.beg);
+	string line;
+	vector <string> labels;
+	int count_fields = 0;
+	int position_field[3] = { 0,0,0 };
+	int label_field = 100;
+	vector < vector <double > > positions;
+	positions.resize(wavy.get_ncen());
+
+#pragma omp parallel for schedule(dynamic)
+	for (int i = 0; i < wavy.get_ncen(); i++) {
+		positions[i].resize(3);
+	}
+	bool atoms_read = false;
+	while (!asym_cif_input.eof() && !atoms_read) {
+		getline(asym_cif_input, line);
+		if (line.find("loop_") != string::npos) {
+			while (line.find("_") != string::npos) {
+				getline(asym_cif_input, line);
+				if (debug) log3 << "line in loop field definition: " << line << endl;
+				if (line.find("label") != string::npos)
+					label_field = count_fields;
+				else if (line.find("fract_x") != string::npos)
+					position_field[0] = count_fields;
+				else if (line.find("fract_y") != string::npos)
+					position_field[1] = count_fields;
+				else if (line.find("fract_z") != string::npos)
+					position_field[2] = count_fields;
+				else if (label_field == 100) {
+					if (debug) log3 << "I don't think this is the atom block.. moving on!" << endl;
+					break;
+				}
+				count_fields++;
+			}
+			while (line.find("_") == string::npos && line.length() > 3) {
+				atoms_read = true;
+				stringstream s(line);
+				vector <string> fields;
+				fields.resize(count_fields);
+				for (int i = 0; i < count_fields; i++)
+					s >> fields[i];
+				if (debug) log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+				positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
+				bool found_this_one = false;
+				if (debug) log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
+				for (int i = 0; i < wavy.get_ncen(); i++) {
+					if (is_similar(positions[labels.size()][0], wavy.atoms[i].x, -1)
+						&& is_similar(positions[labels.size()][1], wavy.atoms[i].y, -1)
+						&& is_similar(positions[labels.size()][2], wavy.atoms[i].z, -1)) {
+						if (debug) log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
+							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
+						wavy.atoms[i].label = fields[label_field];
+						wavy.atoms[i].frac_coords = { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) };
+						found_this_one = true;
+						break;
+					}
+				}
+				if (!found_this_one && debug)
+					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
+				labels.push_back(fields[label_field]);
+				getline(asym_cif_input, line);
+			}
+		}
+	}
+
+	asym_cif_input.clear();
+	asym_cif_input.seekg(0, asym_cif_input.beg);
+	count_fields = 0;
+	int ADP_field[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+	label_field = 100;
+	atoms_read = false;
+	Uij.resize(wavy.get_ncen());
+	while (!asym_cif_input.eof() && !atoms_read) {
+		getline(asym_cif_input, line);
+		if (line.find("loop_") != string::npos) {
+			while (line.find("_") != string::npos) {
+				getline(asym_cif_input, line);
+				if (debug) log3 << "line in loop field definition: " << line << endl;
+				if (line.find("aniso_label") != string::npos)
+					label_field = count_fields;
+				else if (line.find("aniso_U_11") != string::npos)
+					ADP_field[0] = count_fields;
+				else if (line.find("aniso_U_22") != string::npos)
+					ADP_field[1] = count_fields;
+				else if (line.find("aniso_U_33") != string::npos)
+					ADP_field[2] = count_fields;
+				else if (line.find("aniso_U_12") != string::npos)
+					ADP_field[3] = count_fields;
+				else if (line.find("aniso_U_13") != string::npos)
+					ADP_field[4] = count_fields;
+				else if (line.find("aniso_U_23") != string::npos)
+					ADP_field[5] = count_fields;
+				else if (label_field == 100) {
+					if (debug) log3 << "I don't think this is the Uij block.. moving on!" << endl;
+					break;
+				}
+				count_fields++;
+			}
+			while (line.find("_") == string::npos && line.length() > 3) {
+				atoms_read = true;
+				stringstream s(line);
+				vector <string> fields;
+				fields.resize(count_fields);
+				for (int i = 0; i < count_fields; i++)
+					s >> fields[i];
+				if (debug) log3 << "label: " << fields[label_field] << endl;
+				bool found_this_one = false;
+				for (int i = 0; i < wavy.get_ncen(); i++) {
+					if (fields[label_field] == wavy.atoms[i].label) {
+						Uij[i].resize(6);
+						for (int j = 0; j < 6; j++)
+							Uij[i][j] = stod(fields[ADP_field[j]]);
+						found_this_one = true;
+						break;
+					}
+				}
+				if (!found_this_one && debug)
+					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
+				getline(asym_cif_input, line);
+			}
+		}
+	}
+
+	asym_cif_input.clear();
+	asym_cif_input.seekg(0, asym_cif_input.beg);
+	count_fields = 0;
+	label_field = 100;
+	atoms_read = false;
+	Cijk.resize(wavy.get_ncen());
+	while (!asym_cif_input.eof() && !atoms_read) {
+		getline(asym_cif_input, line);
+		if (line.find("loop_") != string::npos) {
+			while (line.find("_") != string::npos) {
+				getline(asym_cif_input, line);
+				if (debug) log3 << "line in loop field definition: " << line << endl;
+				if (line.find("C_label") != string::npos)
+					label_field = count_fields;
+				else if (line.find("C_111") != string::npos)
+					ADP_field[0] = count_fields;
+				else if (line.find("C_112") != string::npos)
+					ADP_field[1] = count_fields;
+				else if (line.find("C_113") != string::npos)
+					ADP_field[2] = count_fields;
+				else if (line.find("C_122") != string::npos)
+					ADP_field[3] = count_fields;
+				else if (line.find("C_123") != string::npos)
+					ADP_field[4] = count_fields;
+				else if (line.find("C_133") != string::npos)
+					ADP_field[5] = count_fields;
+				else if (line.find("C_222") != string::npos)
+					ADP_field[6] = count_fields;
+				else if (line.find("C_223") != string::npos)
+					ADP_field[7] = count_fields;
+				else if (line.find("C_233") != string::npos)
+					ADP_field[8] = count_fields;
+				else if (line.find("C_333") != string::npos)
+					ADP_field[9] = count_fields;
+				else if (label_field == 100) {
+					if (debug) log3 << "I don't think this is the Cijk block.. moving on!" << endl;
+					break;
+				}
+				count_fields++;
+			}
+			while (line.find("_") == string::npos && line.length() > 3) {
+				atoms_read = true;
+				stringstream s(line);
+				vector <string> fields;
+				fields.resize(count_fields);
+				for (int i = 0; i < count_fields; i++)
+					s >> fields[i];
+				if (debug) log3 << "label: " << fields[label_field] << endl;
+				bool found_this_one = false;
+				for (int i = 0; i < wavy.get_ncen(); i++) {
+					if (fields[label_field] == wavy.atoms[i].label) {
+						Cijk[i].resize(10);
+						for (int j = 0; j < 6; j++)
+							Cijk[i][j] = stod(fields[ADP_field[j]]);
+						found_this_one = true;
+						break;
+					}
+				}
+				if (!found_this_one && debug)
+					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
+				getline(asym_cif_input, line);
+			}
+		}
+	}
+
+	asym_cif_input.clear();
+	asym_cif_input.seekg(0, asym_cif_input.beg);
+	count_fields = 0;
+	label_field = 100;
+	atoms_read = false;
+	Dijkl.resize(wavy.get_ncen());
+	while (!asym_cif_input.eof() && !atoms_read) {
+		getline(asym_cif_input, line);
+		if (line.find("loop_") != string::npos) {
+			while (line.find("_") != string::npos) {
+				getline(asym_cif_input, line);
+				if (debug) log3 << "line in loop field definition: " << line << endl;
+				if (line.find("D_label") != string::npos)
+					label_field = count_fields;
+				else if (line.find("D_1111") != string::npos)
+					ADP_field[0] = count_fields;
+				else if (line.find("D_1112") != string::npos)
+					ADP_field[1] = count_fields;
+				else if (line.find("D_1113") != string::npos)
+					ADP_field[2] = count_fields;
+				else if (line.find("D_1122") != string::npos)
+					ADP_field[3] = count_fields;
+				else if (line.find("D_1123") != string::npos)
+					ADP_field[4] = count_fields;
+				else if (line.find("D_1133") != string::npos)
+					ADP_field[5] = count_fields;
+				else if (line.find("D_1222") != string::npos)
+					ADP_field[6] = count_fields;
+				else if (line.find("D_1223") != string::npos)
+					ADP_field[7] = count_fields;
+				else if (line.find("D_1233") != string::npos)
+					ADP_field[8] = count_fields;
+				else if (line.find("D_1333") != string::npos)
+					ADP_field[9] = count_fields;
+				else if (line.find("D_2222") != string::npos)
+					ADP_field[10] = count_fields;
+				else if (line.find("D_2223") != string::npos)
+					ADP_field[11] = count_fields;
+				else if (line.find("D_2233") != string::npos)
+					ADP_field[12] = count_fields;
+				else if (line.find("D_2333") != string::npos)
+					ADP_field[13] = count_fields;
+				else if (line.find("D_3333") != string::npos)
+					ADP_field[14] = count_fields;
+				else if (label_field == 100) {
+					if (debug) log3 << "I don't think this is the Dijk block.. moving on!" << endl;
+					break;
+				}
+				count_fields++;
+			}
+			while (line.find("_") == string::npos && line.length() > 3) {
+				atoms_read = true;
+				stringstream s(line);
+				vector <string> fields;
+				fields.resize(count_fields);
+				for (int i = 0; i < count_fields; i++)
+					s >> fields[i];
+				if (debug) log3 << "label: " << fields[label_field] << endl;
+				bool found_this_one = false;
+				for (int i = 0; i < wavy.get_ncen(); i++) {
+					if (fields[label_field] == wavy.atoms[i].label) {
+						Dijkl[i].resize(15);
+						for (int j = 0; j < 6; j++)
+							Dijkl[i][j] = stod(fields[ADP_field[j]]);
+						found_this_one = true;
+						break;
+					}
+				}
+				if (!found_this_one && debug)
+					log3 << "I DID NOT FIND THIS ATOM IN THE CIF?! WTF?!" << endl;
+				getline(asym_cif_input, line);
+			}
+		}
+	}
+
+	for (int i = 0; i < wavy.get_ncen(); i++) 
+		wavy.atoms[i].assign_ADPs(Uij[i], Cijk[i], Dijkl[i]);
+
+	return true;
+};
 

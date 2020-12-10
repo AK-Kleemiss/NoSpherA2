@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <iomanip>
+#include <math.h>
 
 class cell {
 private:
@@ -96,6 +97,7 @@ public:
 			break;
 		default:
 			std::cout << "Wrong length!" << std::endl;
+			return -1;
 			break;
 		}
 	}

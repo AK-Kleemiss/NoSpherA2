@@ -11,15 +11,21 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PDF|x64'">
+    <LocalDebuggerCommandArguments>-wfn alanine.wfn -cif alanine.cif -v -pdf 2 3 4 -resolution 0.3</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>D:\temp\Ala\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Co110_SF|x64'">
-    <LocalDebuggerCommandArguments>-wfn Co110.wfn -cif Co110.cif -asym_cif olex2/Wfn_job/Co110.cif -hkl olex2/Wfn_job/Co110.hkl -acc 2 -v</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>F:\debug2\</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-wfn ND_Ni2.wfn -cif ND_Ni2.cif -asym_cif olex2/Wfn_job/ND_Ni2.cif -hkl olex2/Wfn_job/ND_Ni2.hkl -acc 1 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>E:\temp\John\ND</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>E:\temp\John\ND\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn ND_Ni2.wfn -cif ND_Ni2.cif -asym_cif olex2/Wfn_job/ND_Ni2.cif -hkl olex2/Wfn_job/ND_Ni2.hkl -acc 1 -v</LocalDebuggerCommandArguments>
   </PropertyGroup>
 </Project>
