@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <RemoteTarget>-110680903;130.92.106.71 (username=, port=2244, authentication=Password)</RemoteTarget>
+    <RemoteTarget>333968761;127.0.0.1 (username=, port=2244, authentication=Password)</RemoteTarget>
   </PropertyGroup>
 </Project>

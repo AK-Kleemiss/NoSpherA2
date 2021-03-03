@@ -107,7 +107,6 @@ AtomGrid::AtomGrid(const double radial_precision,
     }
     NUMGRID_ASSERT(r_outer > h);
 
-    num_grid_points_ = 0;
     num_radial_grid_points_ = 0;
 
     double rb = bragg_angstrom[proton_charge] /
@@ -142,8 +141,6 @@ AtomGrid::AtomGrid(const double radial_precision,
             atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] * radial_r);
 
             atom_grid_w_.push_back(4.0 * PI * angular_w[angular_off + iang] * radial_w);
-
-            num_grid_points_++;
         }
     }
 
@@ -220,7 +217,6 @@ AtomGrid::AtomGrid(const double radial_precision,
             << " h: " << h 
             << " r_outer: " << r_outer << endl;
 
-     num_grid_points_ = 0;
      num_radial_grid_points_ = 0;
 
      double rb = bragg_angstrom[proton_charge] / (5.0 * 0.529177249); // factors match DIRAC code
@@ -261,8 +257,6 @@ AtomGrid::AtomGrid(const double radial_precision,
              atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] * radial_r);
 
              atom_grid_w_.push_back(4.0 * PI * angular_w[angular_off + iang] * radial_w);
-
-             num_grid_points_++;
          }
      }
 
@@ -274,7 +268,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 
 AtomGrid::~AtomGrid() {}
 
-int AtomGrid::get_num_grid_points() const { return num_grid_points_; }
+int AtomGrid::get_num_grid_points() const { return atom_grid_x_bohr_.size(); }
 
 int AtomGrid::get_num_radial_grid_points() const
 {
@@ -283,10 +277,10 @@ int AtomGrid::get_num_radial_grid_points() const
 
 void AtomGrid::get_grid(const int num_centers,
     const int center_index,
-    const double x_coordinates_bohr[],
-    const double y_coordinates_bohr[],
-    const double z_coordinates_bohr[],
-    const int proton_charges[],
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int* proton_charges,
     double grid_x_bohr[],
     double grid_y_bohr[],
     double grid_z_bohr[],
@@ -294,7 +288,7 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_mw[]) const
 {
 
-    for (size_t ipoint = 0; ipoint < num_grid_points_; ipoint++)
+    for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
     {
         grid_x_bohr[ipoint] =
             atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
@@ -327,17 +321,17 @@ void AtomGrid::get_grid(const int num_centers,
 
 void AtomGrid::get_grid(const int num_centers,
                         const int center_index,
-                        const double x_coordinates_bohr[],
-                        const double y_coordinates_bohr[],
-                        const double z_coordinates_bohr[],
-                        const int proton_charges[],
+                        const double* x_coordinates_bohr,
+                        const double* y_coordinates_bohr,
+                        const double* z_coordinates_bohr,
+                        const int* proton_charges,
                         double grid_x_bohr[],
                         double grid_y_bohr[],
                         double grid_z_bohr[],
                         double grid_w[]) const
 {
 
-    for (size_t ipoint = 0; ipoint < num_grid_points_; ipoint++)
+    for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
     {
         grid_x_bohr[ipoint] =
             atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];

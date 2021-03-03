@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif .\6anm.cif -asym_cif .\6anm.cif -wfn .\6anm.wfx -hkl .\6anm.hkl -v</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>E:\Dropbox\ELMO\INPUTS\6ANM\olex2\Wfn_job</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-cif .\olex2\Wfn_job\sucrose.cif -asym_cif .\olex2\Wfn_job\sucrose.cif -wfn .\olex2\Wfn_job\sucrose.wfn -hkl .\olex2\Wfn_job\sucrose.hkl</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>C:\Users\Florian\AppData\Roaming\Olex2Data\6bac1c4f8a3ec59d1b189b7d537b5c2c\samples\sucrose</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
@@ -32,6 +32,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LocalDebuggerWorkingDirectory>E:\Dropbox\ELMO\INPUTS\6ANM\olex2\Wfn_job</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-cif .\6anm.cif -asym_cif .\6anm.cif -wfn .\6anm.wfx -hkl .\6anm.hkl -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif .\6anm.cif -asym_cif .\6anm.cif -wfx .\6anm.wfx -hkl .\6anm.hkl</LocalDebuggerCommandArguments>
+    <LocalDebuggerEnvironment>CUDA_VISIBLE_DEVICES=0</LocalDebuggerEnvironment>
   </PropertyGroup>
 </Project>

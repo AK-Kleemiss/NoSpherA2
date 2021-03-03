@@ -60,11 +60,13 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{2AB57786-36D2-4490-82E3-032F9A65CF10}</ProjectGuid>
+    <ProjectGuid>{E8C28545-BF28-4EC6-BD08-F3131327FF86}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>wfn2fchk</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>NoSpherA2</ProjectName>
+    <ProjectName>NoSpherA2CUDA</ProjectName>
+    <CudaToolkitCustomDir>
+    </CudaToolkitCustomDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -163,7 +165,7 @@
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>Static</UseOfMfc>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
-    <EnableUnitySupport>true</EnableUnitySupport>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Publish|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -177,6 +179,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.props" />
   </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
@@ -352,7 +355,7 @@
       <WarningLevel>Level1</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;PEOJECT_NAME</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -361,14 +364,30 @@
       <FloatingPointModel>Strict</FloatingPointModel>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <EnableEnhancedInstructionSet>NotSet</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions512</EnableEnhancedInstructionSet>
       <FloatingPointExceptions>true</FloatingPointExceptions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <IntelJCCErratum>true</IntelJCCErratum>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <CudaCompile>
+      <CodeGeneration>compute_75,sm_75</CodeGeneration>
+      <Defines>
+      </Defines>
+      <AdditionalCompilerOptions>/openmp</AdditionalCompilerOptions>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <Optimization>O2</Optimization>
+      <FastMath>true</FastMath>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <HostDebugInfo>false</HostDebugInfo>
+    </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
     <ClCompile>
@@ -517,8 +536,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;PEOJECT_NAME</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -528,15 +547,16 @@
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
       <AdditionalOptions>/Zc:twoPhase- /Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
-      <EnableEnhancedInstructionSet>
-      </EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
-      <SupportJustMyCode>false</SupportJustMyCode>
-      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <SupportJustMyCode>true</SupportJustMyCode>
+      <DebugInformationFormat>None</DebugInformationFormat>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -547,8 +567,33 @@
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
-      <Command>copy D:\git\wfn2fchk\Windows\x64\Release\NoSpherA2.exe D:\Dropbox\olex2_svn\olex2-gui\NoSpherA2.exe</Command>
+      <Command>copy D:\git\wfn2fchk\Windows\x64\Release\NoSpherA2CUDA.exe D:\Dropbox\olex2_svn\olex2-gui\NoSpherA2_CUDA.exe</Command>
     </PostBuildEvent>
+    <CudaCompile>
+      <Keep>false</Keep>
+    </CudaCompile>
+    <CudaCompile>
+      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
+    </CudaCompile>
+    <CudaCompile>
+      <ExtensibleWholeProgramCompilation>true</ExtensibleWholeProgramCompilation>
+    </CudaCompile>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <CodeGeneration>compute_75,sm_75</CodeGeneration>
+      <FastMath>false</FastMath>
+      <Optimization>O2</Optimization>
+      <AdditionalOptions>-Xcompiler /openmp %(AdditionalOptions)</AdditionalOptions>
+      <GPUDebugInfo>false</GPUDebugInfo>
+      <GenerateLineInfo>false</GenerateLineInfo>
+      <PtxAsOptionV>false</PtxAsOptionV>
+      <AdditionalCompilerOptions>/openmp</AdditionalCompilerOptions>
+      <HostDebugInfo>false</HostDebugInfo>
+      <DebugInformationFormat>None</DebugInformationFormat>
+    </CudaCompile>
+    <CudaLink>
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
+    </CudaLink>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">
     <ClCompile>
@@ -593,7 +638,9 @@
     <ClCompile Include="../grid_radial.cpp" />
     <ClCompile Include="../mo_class.cpp" />
     <ClCompile Include="../sphere_lebedev_rule.cpp" />
-    <ClCompile Include="../structure_factors.cpp" />
+    <CudaCompile Include="../structure_factors.cpp">
+      <GenerateLineInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateLineInfo>
+    </CudaCompile>
     <ClCompile Include="..\NoSpherA2.cpp" />
     <ClCompile Include="../wfn_class.cpp" />
     <ClCompile Include="..\properties.cpp" />
@@ -620,5 +667,6 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 11.2.targets" />
   </ImportGroup>
 </Project>

@@ -44,53 +44,563 @@ using namespace std;
 # define M_PI           3.14159265358979323846  /* pi */
 
 #include "AtomGrid.h"
-/*
-std::vector<std::size_t> sort_permutation(
-	const std::vector<double>& vec,
-	const std::vector<double>& vec1, 
-	const std::vector<double>& vec2)
-{
-	std::vector<std::size_t> p(vec.size());
-	std::iota(p.begin(), p.end(), 0);
-	std::sort(p.begin(), p.end(),
-		[&](std::size_t i, std::size_t j) { return pow(vec[i],2) + pow(vec1[i],2) + pow(vec2[i],2) > pow(vec[j], 2) + pow(vec1[j], 2) + pow(vec2[j], 2); });
-	return p;
-}
+#ifdef PEOJECT_NAME
+#define FLO_CUDA
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#endif
 
-std::vector<std::size_t> sort_permutation(
-	const std::vector<double>& vec)
-{
-	std::vector<std::size_t> p(vec.size());
-	std::iota(p.begin(), p.end(), 0);
-	std::sort(p.begin(), p.end(),
-		[&](std::size_t i, std::size_t j) { return vec[i] > vec[j]; });
-	return p;
-}
+bool merge_tscs(
+	const string& mode,
+	const vector<string>& files
+) {
+	if (files.size() == 0)
+		return false;
+	ofstream of("total.tsc", ios::out);
+	vector <string> labels;
+	vector <int> indices;
+	vector <vector <vector <double>>> form_fact;   //[i] real or imaginary, [j] scatterer, [k] reflection correpsonding to indices
 
-template <typename T>
-void apply_permutation_in_place(
-	std::vector<T>& vec,
-	const std::vector<std::size_t>& p)
-{
-	std::vector<bool> done(vec.size());
-	for (std::size_t i = 0; i < vec.size(); ++i)
-	{
-		if (done[i])
-		{
-			continue;
+	form_fact.resize(2);
+	for (int f = 0; f < files.size(); f++) {
+		ifstream inf(files[f].c_str(), ios::in);
+		string line;
+		string header("");
+		bool data = false;
+		while (!data) {
+			getline(inf, line);
+			header += line;
+			if (line.find("SCATTERERS:") != string::npos)
+				string temp_labels = line.substr(11, line.size());
 		}
-		done[i] = true;
-		std::size_t prev_j = i;
-		std::size_t j = p[i];
-		while (i != j)
-		{
-			std::swap(vec[prev_j], vec[j]);
-			done[j] = true;
-			prev_j = j;
-			j = p[j];
+		
+		// unfinished function!!!!
+	}
+	return true;
+}
+
+#ifdef FLO_CUDA
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
+{
+	if (code != cudaSuccess)
+	{
+		fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+		if (abort) exit(code);
+	}
+}
+
+__constant__ int gpu_nex[1];
+__constant__ int gpu_nmo[1];
+__constant__ int gpu_ncen[1];
+__constant__ int gpu_MaxGrid[1];
+__constant__ double gpu_log_incr[1];
+__constant__ double gpu_start_radial_dens[1];
+__constant__ double gpu_bragg_angstrom[114]{
+0.00,
+	0.35, 0.35,
+	1.45, 1.05,																																					0.85, 0.70, 0.65, 0.60, 0.50, 0.45,
+	1.80, 1.50,																																					1.25, 1.10, 1.00, 1.00, 1.00, 1.00,
+	2.20, 1.80,																						1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10,
+	2.35, 2.00,																						1.80, 1.55, 1.45, 1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40,
+	2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60, 1.90, 1.50, 1.50,
+	2.80, 2.35, 2.15, 2.05, 2.05, 2.05, 2.05, 2.05, 2.05, 2.00, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95 };
+
+__device__ void gpu_ptype(
+	int* vector,
+	int l) {
+	if (l == 2)
+		vector[0] = 1, vector[1] = 0, vector[2] = 0;
+	else if (l == 3)
+		vector[0] = 0, vector[1] = 1, vector[2] = 0;
+	else if (l == 4)
+		vector[0] = 0, vector[1] = 0, vector[2] = 1;
+}
+
+__device__ void gpu_dtype(
+	int* vector,
+	const int l) {
+	if (l == 5)
+		vector[0] = 2, vector[1] = 0, vector[2] = 0;
+	else if (l == 6)
+		vector[0] = 0, vector[1] = 2, vector[2] = 0;
+	else if (l == 7)
+		vector[0] = 0, vector[1] = 0, vector[2] = 2;
+	else if (l == 8)
+		vector[0] = 1, vector[1] = 1, vector[2] = 0;
+	else if (l == 9)
+		vector[0] = 1, vector[1] = 0, vector[2] = 1;
+	else if (l == 10)
+		vector[0] = 0, vector[1] = 1, vector[2] = 1;
+}
+
+__device__ void gpu_ftype(
+	int* vector,
+	const int l) {
+	if (l == 11)
+		vector[0] = 3, vector[1] = 0, vector[2] = 0;
+	else if (l == 12)
+		vector[0] = 0, vector[1] = 3, vector[2] = 0;
+	else if (l == 13)
+		vector[0] = 0, vector[1] = 0, vector[2] = 3;
+	else if (l == 14)
+		vector[0] = 2, vector[1] = 1, vector[2] = 0;
+	else if (l == 15)
+		vector[0] = 2, vector[1] = 0, vector[2] = 1;
+	else if (l == 16)
+		vector[0] = 0, vector[1] = 2, vector[2] = 1;
+	else if (l == 17)
+		vector[0] = 1, vector[1] = 2, vector[2] = 0;
+	else if (l == 18)
+		vector[0] = 1, vector[1] = 0, vector[2] = 2;
+	else if (l == 19)
+		vector[0] = 0, vector[1] = 1, vector[2] = 1;
+	else if (l == 20)
+		vector[0] = 1, vector[1] = 1, vector[2] = 1;
+}
+
+__device__ void gpu_gtype(
+	int* vector,
+	const int l) {
+	if (l == 21)
+		vector[0] = 0, vector[1] = 0, vector[2] = 4;
+	else if (l == 22)
+		vector[0] = 0, vector[1] = 1, vector[2] = 3;
+	else if (l == 23)
+		vector[0] = 0, vector[1] = 2, vector[2] = 2;
+	else if (l == 24)
+		vector[0] = 0, vector[1] = 3, vector[2] = 1;
+	else if (l == 25)
+		vector[0] = 0, vector[1] = 4, vector[2] = 0;
+	else if (l == 26)
+		vector[0] = 1, vector[1] = 0, vector[2] = 3;
+	else if (l == 27)
+		vector[0] = 1, vector[1] = 1, vector[2] = 2;
+	else if (l == 28)
+		vector[0] = 1, vector[1] = 2, vector[2] = 1;
+	else if (l == 29)
+		vector[0] = 1, vector[1] = 3, vector[2] = 0;
+	else if (l == 30)
+		vector[0] = 2, vector[1] = 0, vector[2] = 2;
+	else if (l == 31)
+		vector[0] = 2, vector[1] = 1, vector[2] = 1;
+	else if (l == 32)
+		vector[0] = 2, vector[1] = 2, vector[2] = 0;
+	else if (l == 33)
+		vector[0] = 3, vector[1] = 0, vector[2] = 1;
+	else if (l == 34)
+		vector[0] = 3, vector[1] = 1, vector[2] = 0;
+	else if (l == 35)
+		vector[0] = 4, vector[1] = 0, vector[2] = 0;
+}
+
+__device__ void gpu_htype(
+	int* vector,
+	const int l) {
+	if (l == 36)
+		vector[0] = 0, vector[1] = 0, vector[2] = 5;
+	else if (l == 37)
+		vector[0] = 0, vector[1] = 1, vector[2] = 4;
+	else if (l == 38)
+		vector[0] = 0, vector[1] = 2, vector[2] = 3;
+	else if (l == 39)
+		vector[0] = 0, vector[1] = 3, vector[2] = 2;
+	else if (l == 40)
+		vector[0] = 0, vector[1] = 4, vector[2] = 1;
+	else if (l == 41)
+		vector[0] = 0, vector[1] = 5, vector[2] = 0;
+	else if (l == 42)
+		vector[0] = 1, vector[1] = 0, vector[2] = 4;
+	else if (l == 43)
+		vector[0] = 1, vector[1] = 1, vector[2] = 3;
+	else if (l == 44)
+		vector[0] = 1, vector[1] = 2, vector[2] = 2;
+	else if (l == 45)
+		vector[0] = 1, vector[1] = 3, vector[2] = 1;
+	else if (l == 46)
+		vector[0] = 1, vector[1] = 4, vector[2] = 0;
+	else if (l == 47)
+		vector[0] = 2, vector[1] = 0, vector[2] = 3;
+	else if (l == 48)
+		vector[0] = 2, vector[1] = 1, vector[2] = 2;
+	else if (l == 49)
+		vector[0] = 2, vector[1] = 2, vector[2] = 1;
+	else if (l == 50)
+		vector[0] = 2, vector[1] = 3, vector[2] = 0;
+	else if (l == 51)
+		vector[0] = 3, vector[1] = 0, vector[2] = 2;
+	else if (l == 52)
+		vector[0] = 3, vector[1] = 1, vector[2] = 1;
+	else if (l == 53)
+		vector[0] = 3, vector[1] = 2, vector[2] = 0;
+	else if (l == 54)
+		vector[0] = 4, vector[1] = 0, vector[2] = 1;
+	else if (l == 55)
+		vector[0] = 4, vector[1] = 1, vector[2] = 0;
+	else if (l == 56)
+		vector[0] = 5, vector[1] = 0, vector[2] = 0;
+}
+
+__device__ void gpu_type2vector(
+	const int index,
+	int* vector) {
+	if (index < 1 || index > 35) {
+		vector[0] = -1;
+		vector[1] = -1;
+		vector[2] = -1;
+	}
+	else if (index == 1) {
+		vector[0] = 0;
+		vector[1] = 0;
+		vector[2] = 0;
+	}
+	else if (index < 5)
+		gpu_ptype(vector, index);
+	else if (index < 11)
+		gpu_dtype(vector, index);
+	else if (index < 21)
+		gpu_ftype(vector, index);
+	else if (index < 36)
+		gpu_gtype(vector, index);
+	else
+		gpu_htype(vector, index);
+
+}
+
+// JCP 88, 2547 (1988), eq. 20
+__device__ double gpu_f3(const double x)
+{
+	double f = x;
+	for (int i = 0; i < 3; i++) {
+		f *= (1.5 - 0.5 * f * f);
+	}
+	return f;
+}
+
+__device__ double get_becke_w(const int num_centers,
+	const int* proton_charges,
+	const double* x_atoms,
+	const double* y_atoms,
+	const double* z_atoms,
+	const int center_index,
+	const double x,
+	const double y,
+	const double z)
+{
+	double R_a, R_b;
+	double u_ab, a_ab, mu_ab, nu_ab;
+	double f, chi;
+	double dist_a, dist_b, dist_ab;
+	double vx, vy, vz;
+
+	double* pa = (double*)malloc(sizeof(double) * num_centers);
+
+	for (int a = 0; a < num_centers; a++)
+		pa[a] = 1.0;
+
+	for (int a = 0; a < num_centers; a++)
+	{
+		vx = x_atoms[a] - x;
+		vy = y_atoms[a] - y;
+		vz = z_atoms[a] - z;
+		dist_a = vx * vx + vy * vy + vz * vz;
+		dist_a = sqrt(dist_a);
+
+		R_a = gpu_bragg_angstrom[proton_charges[a]];
+
+		for (int b = 0; b < a; b++) {
+			vx = x_atoms[b] - x;
+			vy = y_atoms[b] - y;
+			vz = z_atoms[b] - z;
+			dist_b = vx * vx + vy * vy + vz * vz;
+			dist_b = sqrt(dist_b);
+
+			R_b = gpu_bragg_angstrom[proton_charges[b]];
+
+			vx = x_atoms[b] - x_atoms[a];
+			vy = y_atoms[b] - y_atoms[a];
+			vz = z_atoms[b] - z_atoms[a];
+			dist_ab = vx * vx + vy * vy + vz * vz;
+			dist_ab = sqrt(dist_ab);
+
+			// JCP 88, 2547 (1988), eq. 11
+			mu_ab = (dist_a - dist_b) / dist_ab;
+
+			if (abs(R_a - R_b) > 1.0e-14) {
+				chi = R_a / R_b;
+				u_ab = (chi - 1) / (chi + 1);
+				a_ab = u_ab / (u_ab * u_ab - 1.0);
+
+				// JCP 88, 2547 (1988), eq. A3
+				if (a_ab > 0.5)
+					a_ab = 0.5;
+				if (a_ab < -0.5)
+					a_ab = -0.5;
+
+				nu_ab = mu_ab + a_ab * (1.0 - mu_ab * mu_ab);
+			}
+			else
+				nu_ab = mu_ab;
+
+			f = gpu_f3(nu_ab);
+
+			if (abs(1.0 - f) < 1.0e-14)
+				// if f == 1.0 we need to take care
+				// otherwise we can get numerical problems
+				pa[a] = 0.0;
+			else {
+				if (pa[a] > 1E-250 || pa[a] < -1E-250)
+					pa[a] *= 0.5 * (1.0 - f);
+				else
+					pa[a] = 0.0;
+				if (pa[b] > 1E-250 || pa[b] < -1E-250)
+					pa[b] *= 0.5 * (1.0 + f);
+				else
+					pa[b] = 0.0;
+			}
 		}
 	}
-}*/
+
+	double w = 0.0;
+	for (int a = 0; a < num_centers; a++)
+		w += pa[a];
+
+	double res = 1.0;
+	if (abs(w) > 1.0e-14)
+		res = pa[center_index] / w;
+
+	free(pa);
+
+	return res;
+}
+
+__global__ void gpu_make_grid(
+	const int center_index,
+	const double* x,
+	const double* y,
+	const double* z,
+	const double* atom_grid_x_bohr_,
+	const double* atom_grid_y_bohr_,
+	const double* atom_grid_z_bohr_,
+	const double* atom_grid_w,
+	const int* proton_charges,
+	const int* asym_atom_list,
+	const int* num_points,
+	const int offset,
+	double* grid_x_bohr,
+	double* grid_y_bohr,
+	double* grid_z_bohr,
+	double* grid_aw,
+	double* grid_mw)
+{
+	const int ipoint = blockIdx.x * blockDim.x + threadIdx.x;
+	if (ipoint >= num_points[center_index]) return;
+	if (ipoint + offset >= gpu_MaxGrid[0])
+		return;
+	const double x_bohr = atom_grid_x_bohr_[ipoint] + x[center_index];
+	const double y_bohr = atom_grid_y_bohr_[ipoint] + y[center_index];
+	const double z_bohr = atom_grid_z_bohr_[ipoint] + z[center_index];
+	const double w = atom_grid_w[ipoint];
+
+	grid_mw[ipoint + offset] = w * get_becke_w(gpu_ncen[0],
+		proton_charges,
+		x,
+		y,
+		z,
+		asym_atom_list[center_index],
+		x_bohr,
+		y_bohr,
+		z_bohr);
+	grid_aw[ipoint + offset] = w;
+	grid_x_bohr[ipoint + offset] = x_bohr;
+	grid_y_bohr[ipoint + offset] = y_bohr;
+	grid_z_bohr[ipoint + offset] = z_bohr;
+}
+
+__global__ void gpu_linear_interpolate_spherical_density(
+	const int atom,
+	const double* radial_dens,
+	const double* spherical_dist,
+	const int size,
+	const bool match,
+	const int offset,
+	const double* gridx,
+	const double* gridy,
+	const double* gridz,
+	const int* num_points,
+	double* spherical_density,
+	double* Grids,
+	const double* posx,
+	const double* posy,
+	const double* posz
+)
+{
+	const int indice = blockIdx.x * blockDim.x + threadIdx.x;
+	if (indice >= num_points[atom]) return;
+	if (indice + offset >= gpu_MaxGrid[0]) return;
+	double dist[3] = { gridx[indice + offset] - posx[atom], gridy[indice + offset] - posy[atom], gridz[indice + offset] - posz[atom] };
+	dist[0] = sqrt(dist[0] * dist[0] + dist[1] * dist[1] + dist[2] * dist[2]);
+	double result;
+	if (dist[0] > spherical_dist[size - 1])
+		result = 0;
+	else if (dist[0] < spherical_dist[0])
+		result = radial_dens[0];
+	else {
+		double step0 = dist[0] / gpu_start_radial_dens[0];
+		step0 = log(step0);
+		step0 /= gpu_log_incr[0];
+		if (!isfinite(step0)) printf("INFINITE STEP SIZE!\n");
+		int step = floor(step0);
+		if (step > size)
+			result = spherical_dist[size - 1];
+		else{
+			result = radial_dens[step] + (radial_dens[step + 1] - radial_dens[step]) / (spherical_dist[step] - spherical_dist[step - 1]) * (dist[0] - spherical_dist[step - 1]);
+			if (result < 1E-10) result = 0;
+		}
+	}
+	if (match) spherical_density[indice] = result;
+	Grids[indice + offset] += result;
+}
+
+__global__ void gpu_apply_weights(
+	const int offset,
+	const double* GridRho,
+	const double* Grids,
+	double* Grid_spherical_atom,
+	const double* grid_aw,
+	const int number_of_points)
+{
+	const int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= number_of_points) return;
+	const int j = i + offset;
+	if (j >= gpu_MaxGrid[0])
+		return;
+	if (Grid_spherical_atom[i] != 0) {
+		if (Grids[j] != 0)
+			Grid_spherical_atom[i] *= GridRho[j] * grid_aw[j] / Grids[j];
+		else
+			Grid_spherical_atom[i] = 0;
+	}
+}
+
+__global__ void gpu_count_non_zero(
+	const int len,
+	const double* Array,
+	int* result)
+{
+	int counter = 0;
+	for (int i = 0; i < len; i++)
+		if (Array[i] != 0) counter++;
+	result[0] = counter;
+}
+
+__global__ void gpu_calc_charges(
+	const double* GridRho,
+	const double* Gridaw,
+	const double* Gridmw,
+	const double* Grids,
+	const double* spherical_density,
+	const int num_points,
+	const int offset,
+	const double cutoff,
+	double* result)
+{
+	// Vector containing integrated numbers of electrons
+	// dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
+	double atom_els[3] = { 0.0, 0.0, 0.0 };
+
+	//Generate Electron sums
+	for (int p = 0; p < num_points; p++) {
+		int big_p = p + offset;
+		if (Grids[big_p] > cutoff) {
+			atom_els[0] += Gridmw[big_p] * GridRho[big_p];
+			atom_els[1] += Gridmw[big_p] * Grids[big_p];
+			if (Grids[big_p] != 0)
+				atom_els[2] += GridRho[big_p] * Gridaw[p] * spherical_density[p] / Grids[big_p];
+		}
+	}
+	for (int i = 0; i < 3; i++)
+		result[i] = atom_els[i];
+}
+
+__global__ void gpu_calc_dens(
+	double* GridRho,
+	const double* Gridx,
+	const double* Gridy,
+	const double* Gridz,
+	const double* x,
+	const double* y,
+	const double* z,
+	const int* types,
+	const int* centers,
+	const double* exponents,
+	const double* coefficients,
+	const double* occ)
+{
+	const int indice = blockIdx.x * blockDim.x + threadIdx.x;
+	if (indice >= gpu_MaxGrid[0])
+		return;
+	int iat;
+	float d[3];
+	int l[3];
+	float ex, temp;
+	int i, k;
+	const int max_mo = gpu_nmo[0];
+	float* phi = (float*)malloc(sizeof(float) * max_mo);
+	int max_moi;
+	for (i = 0; i < max_mo; i++) phi[i] = 0.0;
+
+	for (i = 0; i < gpu_nex[0]; i++) {
+		iat = centers[i];
+		d[0] = Gridx[indice] - x[iat - 1];
+		d[1] = Gridy[indice] - y[iat - 1];
+		d[2] = Gridz[indice] - z[iat - 1];
+		ex = -exponents[i] * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+		if (ex < -46.0517)
+			continue;
+		ex = exp(ex);
+		gpu_type2vector(types[i], l);
+		for (k = 0; k < 3; k++) {
+			if (l[k] == 0)		continue;
+			else if (l[k] == 1)	ex *= d[k];
+			else if (l[k] == 2)	ex *= d[k] * d[k];
+			else if (l[k] == 3)	ex *= pow(d[k], 3);
+			else if (l[k] == 4)	ex *= pow(d[k], 4);
+			else if (l[k] == 5)	ex *= pow(d[k], 5);
+		}
+		max_moi = max_mo * i;
+		for (int mo = 0; mo < max_mo; mo++) {
+			temp = coefficients[mo + max_moi] * ex;
+			phi[mo] += temp;      //build MO values at this point
+		}
+			
+	}
+	double Rho = 0;
+
+	for (int mo = 0; mo < max_mo; mo++)
+		Rho += occ[mo] * phi[mo] * phi[mo];
+
+	GridRho[indice] = Rho;
+	free(phi);
+}
+
+void printCUDA(const cudaDeviceProp* prop, const int nDevices, ofstream& file)
+{
+	file << endl << "Number of CUDA-capable devices : " << nDevices << endl;
+	/*table with the properties of the devices*/
+
+	for (int dev = 0; dev < nDevices; dev++) {
+		file << "Device Number: " << dev << endl;
+		file << "- Device name: " << (prop[dev]).name << endl;
+		file << "- Max global memory   = " << prop[dev].totalGlobalMem / 1048576.0f << " MBytes" << endl;
+		file << "- Max constant memory = " << prop[dev].totalConstMem / 1048576.0f << " MBytes" << endl;
+		file << "- Capability : " << prop[dev].major << "." << prop[dev].minor << endl;
+		file << "- Total global memory: "<< (float)prop[dev].totalGlobalMem / 1048576.0f << " MByte" << endl;
+		file << "_____________________________________________________" << endl;
+	}
+}
+
+#else
 
 double compute_dens(
 	WFN &wave,
@@ -144,12 +654,12 @@ double compute_dens(
 }
 
 double linear_interpolate_spherical_density(
-	vector <double> & radial_dens,
-	vector <double> & spherical_dist,
+	vector <double>& radial_dens,
+	vector <double>& spherical_dist,
 	const double dist,
 	const double lincr,
 	const double start
-	)
+)
 {
 	double result = 0;
 	if (dist > spherical_dist[spherical_dist.size() - 1])
@@ -158,26 +668,10 @@ double linear_interpolate_spherical_density(
 		return radial_dens[0];
 	int nr = floor(log(dist / start) / lincr);
 	result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
-	if (result < 1E-10) result =  0;
+	if (result < 1E-10) result = 0;
 	return result;
 }
-/*double logarithmic_interpolate_spherical_density(
-	vector <double> radial_dens,
-	double dist,
-	int size,
-	double incr
-)
-{
-	double result = 0;
-	for (int i = 1; i < size; i++) {
-		double prev_dist = 0.000001 * pow(incr, i - 1);
-		double current_dist = prev_dist * incr;
-		if (prev_dist < dist && current_dist > dist)
-			i == 0 ? result = radial_dens[i] : result = radial_dens[i - 1] * exp((dist - prev_dist) * (log(radial_dens[i]) - log(radial_dens[i - 1])) / (current_dist - prev_dist));
-	}
-	if (result < 1E-15) result = 0;
-	return result;
-}*/
+#endif
 
 bool calculate_structure_factors_HF(
 	string& hkl_filename,
@@ -188,28 +682,33 @@ bool calculate_structure_factors_HF(
 	bool debug,
 	int accuracy,
 	ofstream& file,
-	vector <int> &input_groups,
+	vector <int>& input_groups,
+	vector < vector <double> >& twin_law,
 	int cpus,
 	bool electron_diffraction,
 	int pbc
-	)
+)
 {
+#ifdef FLO_CUDA
+	if (pbc != 0) {
+		file << "PERIODIC CALCULATIONS NOT IMPLEMENTED WITH CUDA YET!" << endl;
+		exit(false);
+	}
+#endif
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
 	}
-	int* atom_z = new int[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
-	double *x,*y,*z;
-	x = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
-	y = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
-	z = new double[int(wave.get_ncen() * pow(pbc * 2 + 1, 3))];
+	vector<double> x, y, z;
+	vector<int> atom_z;
+	x.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), y.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), z.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), atom_z.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3));
 	double* alpha_max = new double[wave.get_ncen()];
 	int* max_l = new int[wave.get_ncen()];
 	int max_l_overall = 0;
 
 #ifdef _WIN64
 	time_t start = time(NULL);
-	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end_tsc;
+	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
 #else
 	struct timeval t1, t2;
 
@@ -253,6 +752,16 @@ bool calculate_structure_factors_HF(
 		}
 	}
 	hkl_input.close();
+	int refl_size = hkl[0].size();
+	if (debug)
+		file << "Number of reflections before twin: " << hkl[0].size() << endl;
+	for (int len = 0; len < refl_size; len++)
+		for (int i = 0; i < twin_law.size(); i++)
+			for (int h = 0; h < 3; h++)
+				hkl[h].push_back(int(twin_law[i][0 + 3 * h] * hkl[0][len] + twin_law[i][1 + 3 * h] * hkl[1][len] + twin_law[i][2 + 3 * h] * hkl[2][len]));
+	if (debug)
+		file << "Number of reflections after twin: " << hkl[0].size() << endl;
+
 	// Remove duplicate reflections
 	for (int i = 0; i < hkl[0].size(); i++)
 		for (int j = i + 1; j < hkl[0].size(); j++)
@@ -281,7 +790,7 @@ bool calculate_structure_factors_HF(
 		file << "RCM done, now labels and asym atoms!" << endl;
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j)
-				file << setw(10) << fixed << unit_cell.get_rcm(i,j) / 2 / M_PI / 0.529177249 << ' ';
+				file << setw(10) << fixed << unit_cell.get_rcm(i, j) / 2 / M_PI / 0.529177249 << ' ';
 			file << endl;
 		}
 		file << "CM in bohr:" << endl;
@@ -316,12 +825,14 @@ bool calculate_structure_factors_HF(
 	bool atoms_read = false;
 	while (!asym_cif_input.eof() && !atoms_read) {
 		getline(asym_cif_input, line);
-		//if(debug) file << "line: "<< line << endl;
+		if(debug) file << "line: "<< line << endl;
 		if (line.find("loop_") != string::npos) {
 			//if(debug) file << "found loop!" << endl;
-			while (line.find("_") != string::npos) {
-				getline(asym_cif_input, line);
-				if (debug) file << "line in loop field definition: " << line << endl;
+			if(debug) file << trim(line).find("_") << endl;
+			getline(asym_cif_input, line);
+			while (trim(line).find("_") == 0) {
+				if (debug) file << "line in loop field definition: " << trim(line) << endl;
+				if (debug) file << trim(line).find("_") << endl;
 				if (line.find("label") != string::npos)
 					label_field = count_fields;
 				else if (line.find("fract_x") != string::npos)
@@ -334,9 +845,11 @@ bool calculate_structure_factors_HF(
 					if (debug) file << "I don't think this is the atom block.. moving on!" << endl;
 					break;
 				}
+				getline(asym_cif_input, line);
 				count_fields++;
 			}
-			while (line.find("_") == string::npos && line.length() > 3) {
+			if (label_field == 1000) continue;
+			while (trim(line).find("_") > 0 && line.length() > 3) {
 				//if(debug) file << "Reading atom!"<< endl;
 				atoms_read = true;
 				stringstream s(line);
@@ -352,8 +865,8 @@ bool calculate_structure_factors_HF(
 					if (is_similar(positions[labels.size()][0], wave.atoms[i].x, -1)
 						&& is_similar(positions[labels.size()][1], wave.atoms[i].y, -1)
 						&& is_similar(positions[labels.size()][2], wave.atoms[i].z, -1)) {
-						if (debug) file << "WFN position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl
-							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
+						if (debug) file << "WFN position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z
+							<< " Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 						wave.atoms[i].label = fields[label_field];
 						all_atom_list.push_back(i);
 						found_this_one = true;
@@ -376,12 +889,13 @@ bool calculate_structure_factors_HF(
 	count_fields = 0;
 	while (!cif_input.eof() && !atoms_read) {
 		getline(cif_input, line);
-		//if(debug) file << "line: "<< line << endl;
+		if(debug) file << "line: "<< line << endl;
 		if (line.find("loop_") != string::npos) {
 			//if(debug) file << "found loop!" << endl;
-			while (line.find("_") != string::npos) {
-				getline(cif_input, line);
-				if (debug) file << "line in loop field definition: " << line << endl;
+			getline(cif_input, line);
+			if (debug) file << "line in loop field definition: " << trim(line) << endl;
+			while (trim(line).find("_") == 0) {
+				if (debug) file << "line in loop field definition: " << trim(line) << endl;
 				if (line.find("label") != string::npos)
 					label_field = count_fields;
 				else if (line.find("disorder_group") != string::npos)
@@ -390,9 +904,10 @@ bool calculate_structure_factors_HF(
 					if (debug) file << "I don't think this is the atom block.. moving on!" << endl;
 					break;
 				}
+				getline(cif_input, line);
 				count_fields++;
 			}
-			while (line.find("_") == string::npos && line.length() > 3) {
+			while (trim(line).find("_") > 0 && line.length() > 3) {
 				atoms_read = true;
 				stringstream s(line);
 				vector <string> fields;
@@ -419,7 +934,7 @@ bool calculate_structure_factors_HF(
 								for (int g = 0; g < input_groups.size(); g++)
 									if (stod(fields[group_field]) == input_groups[g])
 										yep = true;
-								if (!yep && input_groups.size()>0) continue;
+								if (!yep && input_groups.size() > 0) continue;
 								nr = i;
 								asym_atom_list.push_back(i);
 								break;
@@ -518,11 +1033,12 @@ bool calculate_structure_factors_HF(
 		file << "made it post CIF, now make grids!" << endl;
 
 	double*** grid = new double** [asym_atom_list.size()];
-	int* num_points = new int[asym_atom_list.size()];
+	vector<int> num_points;
+	num_points.resize(asym_atom_list.size());
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		grid[i] = new double* [6];
 	// GRID COORDINATES for [a][c][p] a = atom [0,ncen],
-	// c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight and molecular becke weight, 5=total spherical density],
+	// c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4= molecular becke weight, 5=total spherical density],
 	// p = point in this grid
 
 #pragma omp parallel for
@@ -531,24 +1047,24 @@ bool calculate_structure_factors_HF(
 		x[i] = wave.atoms[i].x;
 		y[i] = wave.atoms[i].y;
 		z[i] = wave.atoms[i].z;
-        //if(debug)
-        //    file << "xyz= 000 position: " << x[i] << " " << y[i] << " " << z[i] << " Charge: " << atom_z[i] << endl;
+		//if(debug)
+		//    file << "xyz= 000 position: " << x[i] << " " << y[i] << " " << z[i] << " Charge: " << atom_z[i] << endl;
 		if (pbc != 0) {
 			int j = 0;
 			for (int pbc_x = -pbc; pbc_x < pbc + 1; pbc_x++)
 				for (int pbc_y = -pbc; pbc_y < pbc + 1; pbc_y++)
 					for (int pbc_z = -pbc; pbc_z < pbc + 1; pbc_z++) {
 						if (pbc_x == 0 && pbc_y == 0 && pbc_z == 0)
-                            continue;
-                        else{
-						    j++;
-    						atom_z[i + j * wave.get_ncen()] = wave.atoms[i].charge;
-    						x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
+							continue;
+						else {
+							j++;
+							atom_z[i + j * wave.get_ncen()] = wave.atoms[i].charge;
+							x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
 							y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
 							z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
-                            if(debug) 
-                                file << "xyz= " << pbc_x << pbc_y << pbc_z << " j = " << j << " position: " << x[i + j * wave.get_ncen()] << " " << y[i + j * wave.get_ncen()] << " " << z[i + j * wave.get_ncen()] << " Charge: " << atom_z[i + j * wave.get_ncen()] << endl;
-                        }
+							if (debug)
+								file << "xyz= " << pbc_x << pbc_y << pbc_z << " j = " << j << " position: " << x[i + j * wave.get_ncen()] << " " << y[i + j * wave.get_ncen()] << " " << z[i + j * wave.get_ncen()] << " Charge: " << atom_z[i + j * wave.get_ncen()] << endl;
+						}
 					}
 		}
 		alpha_max[i] = 0.0;
@@ -626,6 +1142,22 @@ bool calculate_structure_factors_HF(
 		file << "There are:\n" << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
 		//<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
 		<< setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
+#ifdef FLO_CUDA
+	int nDevices;/*Number of devices available (running time)*/
+	cudaGetDeviceCount(&nDevices);/*Get the number of devices*/
+	int dev = 0;
+	cudaDeviceProp* prop = NULL;
+	cudaDeviceProp deviceProp;
+	prop = (cudaDeviceProp*)malloc(sizeof(cudaDeviceProp) * nDevices);
+	for (int devl = 0; devl < nDevices; devl++) { // Make CUDA information available in prop
+		cudaGetDeviceProperties(&(deviceProp), devl);
+		prop[devl] = deviceProp;
+	}
+	cudaSetDevice(dev);
+	printCUDA(prop, nDevices, file);
+	gpuErrchk(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
+#endif
+
 	// Total grid as a sum of all atomic grids.
 	// Dimensions: [c] [p]
 	// p = the number of gridpoint
@@ -636,7 +1168,6 @@ bool calculate_structure_factors_HF(
 	// a = atom number in atom type list for which the weight is calcualted
 	// d = distance to look at obtained from point_to_distance_map
 	vector < vector < double > > spherical_density;
-	
 
 	if (debug)
 		file << "Making Becke Grid for" << endl;
@@ -717,7 +1248,7 @@ bool calculate_structure_factors_HF(
 #ifdef _WIN64
 	end_prototypes = time(NULL);
 	if (debug) {
-		
+
 		for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
 			file << "Number of gridpoints for atom type " << atom_type_list[prototype] << " :" << Prototype_grids[prototype].get_num_grid_points() << endl;
 
@@ -739,13 +1270,260 @@ bool calculate_structure_factors_HF(
 	}
 #endif
 
+	vector < vector < double > > radial_density;
+	vector < vector < double > > radial_dist;
+
+	radial_density.resize(atom_type_list.size());
+	radial_dist.resize(atom_type_list.size());
+	spherical_density.resize(asym_atom_list.size());
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		spherical_density[i].resize(num_points[i]);
+
+	const double incr = pow(1.005, max(1, accuracy - 1));
+	const double lincr = log(incr);
+	const double min_dist = 0.0000001;
+	//Make radial grids
+	for (int i = 0; i < atom_type_list.size(); i++) {
+		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
+		double current = 1;
+		double dist = min_dist;
+		if (accuracy > 3)
+			while (current > 1E-10) {
+				radial_dist[i].push_back(dist);
+				current = get_radial_density(atom_type_list[i], dist);
+				if (current == -20)
+					return false;
+				radial_density[i].push_back(current);
+				dist *= incr;
+			}
+		else
+			while (current > 1E-12) {
+				radial_dist[i].push_back(dist);
+				current = get_radial_density(atom_type_list[i], dist);
+				if (current == -20)
+					return false;
+				radial_density[i].push_back(current);
+				dist *= incr;
+			}
+		if (debug)
+			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+	}
+
+#ifdef FLO_CUDA
+	double** gpu_PosAtomsx = NULL,
+		** gpu_PosAtomsy = NULL,
+		** gpu_PosAtomsz = NULL,
+		** gpu_GridRho = NULL,
+		** gpu_Gridx = NULL,
+		** gpu_Gridy = NULL,
+		** gpu_Gridz = NULL,
+		** gpu_Gridaw = NULL,
+		** gpu_Gridmw = NULL,
+		** gpu_exponents = NULL,
+		** gpu_coefficients = NULL,
+		** gpu_occ = NULL,
+		*** gpu_atomgrid_x = NULL,
+		*** gpu_atomgrid_y = NULL,
+		*** gpu_atomgrid_z = NULL,
+		*** gpu_atomgrid_w = NULL;
+	int** gpu_types = NULL,
+		** gpu_centers = NULL,
+		** gpu_asym_atom_list = NULL,
+		** gpu_atom_type_list = NULL,
+		** gpu_numpoints = NULL,
+		** gpu_atom_z = NULL;
+	vector<vector<double>> PosAtoms;
+	PosAtoms.resize(3);
+	for (int i = 0; i < 3; i++)
+		PosAtoms[i].resize(wave.get_ncen());
+	for (int a = 0; a < wave.get_ncen(); a++) {
+		PosAtoms[0][a] = wave.atoms[a].x;
+		PosAtoms[1][a] = wave.atoms[a].y;
+		PosAtoms[2][a] = wave.atoms[a].z;
+	}
+	/*Allocation GPU Pointer*/
+	gpu_PosAtomsx = (double**)malloc(sizeof(double*));
+	gpu_PosAtomsy = (double**)malloc(sizeof(double*));
+	gpu_PosAtomsz = (double**)malloc(sizeof(double*));
+	gpu_atom_z = (int**)malloc(sizeof(int*));
+	gpu_types = (int**)malloc(sizeof(int*));
+	gpu_centers = (int**)malloc(sizeof(int*));
+	gpu_asym_atom_list = (int**)malloc(sizeof(int*));
+	gpu_atom_type_list = (int**)malloc(sizeof(int*));
+	gpu_numpoints = (int**)malloc(sizeof(int*));
+	gpu_exponents = (double**)malloc(sizeof(double*));
+	gpu_occ = (double**)malloc(sizeof(double*));
+	gpu_coefficients = (double**)malloc(sizeof(double*));
+	gpu_GridRho = (double**)malloc(sizeof(double*));
+	gpu_Gridx = (double**)malloc(sizeof(double*));
+	gpu_Gridy = (double**)malloc(sizeof(double*));
+	gpu_Gridz = (double**)malloc(sizeof(double*));
+	gpu_Gridaw = (double**)malloc(sizeof(double*));
+	gpu_Gridmw = (double**)malloc(sizeof(double*));
+	gpu_atomgrid_x = (double***)malloc(sizeof(double**));
+	gpu_atomgrid_y = (double***)malloc(sizeof(double**));
+	gpu_atomgrid_z = (double***)malloc(sizeof(double**));
+	gpu_atomgrid_w = (double***)malloc(sizeof(double**));
+	gpu_atomgrid_x[0] = (double**)malloc(sizeof(double*) * asym_atom_list.size());
+	gpu_atomgrid_y[0] = (double**)malloc(sizeof(double*) * asym_atom_list.size());
+	gpu_atomgrid_z[0] = (double**)malloc(sizeof(double*) * asym_atom_list.size());
+	gpu_atomgrid_w[0] = (double**)malloc(sizeof(double*) * asym_atom_list.size());
+
+	int nex_temp = wave.get_nex();
+	int nmo_temp = wave.get_nmo(true);
+	int ncen_temp = wave.get_ncen();
+	for (int i = 0; i < wave.get_ncen(); i++)
+		atom_z[i] = wave.atoms[i].charge;
+	int MaxGrid = 0;
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		int nr = asym_atom_list[i];
+		int type;
+		for (int j = 0; j < atom_type_list.size(); j++)
+			if (atom_type_list[j] == wave.atoms[nr].charge)
+				type = j;
+
+		num_points[i] = Prototype_grids[type].get_num_grid_points();
+		MaxGrid += num_points[i];
+	}
+	int numBlocks, blocks, gridSize;
+
+	gpuErrchk(cudaOccupancyMaxPotentialBlockSize(
+		&numBlocks,
+		&blocks,
+		(void*)gpu_calc_dens,
+		0,
+		MaxGrid));
+
+	gridSize = (MaxGrid + blocks - 1) / blocks;
+	//file << "\nblocks: " << blocks << " threads: " << gridSize << endl;
+
+	size_t size;
+	gpuErrchk(cudaDeviceGetLimit(&size, cudaLimitMallocHeapSize));
+	file << "\nold Heapsize: " << size / 1024 / 1024 << endl;
+	//double result = ((sizeof(int) * 10 + sizeof(double) * (nmo_temp + 6)) * gridSize * prop[dev].multiProcessorCount * prop[dev].warpSize) / 1024 / 1024;
+	//file << "result: " << result << endl;
+	//gpuErrchk(
+	//	cudaDeviceSetLimit(
+	//		cudaLimitMallocHeapSize,
+	//		(
+	//			(sizeof(int) * 10 + sizeof(double) * (nmo_temp + 6)) * gridSize * prop[dev].multiProcessorCount * prop[dev].warpSize * 1.1
+	//			)
+	//	)
+	//);
+
+	double result = ((sizeof(int) * 10 + sizeof(double) * (nmo_temp + 6)) * gridSize) / 1024 / 1024;
+	file << "result: " << defaultfloat << result << " MB for " << gridSize << endl;
+	file << "sizeof double: " << sizeof(double) << " B" << endl;
+	if (result < size)
+		gpuErrchk(
+			cudaDeviceSetLimit(
+				cudaLimitMallocHeapSize,
+				(
+					(sizeof(int) * 10 + sizeof(double) * (nmo_temp + 6)) * gridSize * 1.1
+					)
+			)
+		);
+	gpuErrchk(cudaDeviceGetLimit(&size, cudaLimitMallocHeapSize));
+	file << "new Heapsize: " << size / 1024 / 1024 << " MB" << endl;
+
+	//Allocate and copy vectors to device for WFN
+	if (debug) file << "Copying WFN to devices now!" << endl;
+	gpuErrchk(cudaMalloc((void**)&gpu_PosAtomsx[0],    sizeof(double) * ncen_temp           ));
+	gpuErrchk(cudaMalloc((void**)&gpu_PosAtomsy[0],    sizeof(double) * ncen_temp           ));
+	gpuErrchk(cudaMalloc((void**)&gpu_PosAtomsz[0],    sizeof(double) * ncen_temp           ));
+	gpuErrchk(cudaMalloc((void**)&gpu_atom_z[0],       sizeof(int)    * ncen_temp           ));
+	gpuErrchk(cudaMalloc((void**)&gpu_Gridx[0],        sizeof(double) * MaxGrid             ));
+	gpuErrchk(cudaMalloc((void**)&gpu_Gridy[0],        sizeof(double) * MaxGrid             ));
+	gpuErrchk(cudaMalloc((void**)&gpu_Gridz[0],        sizeof(double) * MaxGrid             ));
+	gpuErrchk(cudaMalloc((void**)&gpu_Gridaw[0],       sizeof(double) * MaxGrid             ));
+	gpuErrchk(cudaMalloc((void**)&gpu_Gridmw[0],       sizeof(double) * MaxGrid             ));
+	gpuErrchk(cudaMalloc((void**)&gpu_asym_atom_list[0], sizeof(int) * asym_atom_list.size()));
+	gpuErrchk(cudaMalloc((void**)&gpu_atom_type_list[0], sizeof(int) * atom_type_list.size()));
+	gpuErrchk(cudaMalloc((void**)&gpu_numpoints[0],    sizeof(int) * asym_atom_list.size()  ));
+	if (debug) file << "Mallocs done!" << endl;
+	gpuErrchk(cudaMemcpyToSymbol(gpu_nex, &nex_temp, sizeof(int)));
+	gpuErrchk(cudaMemcpyToSymbol(gpu_nmo, &nmo_temp, sizeof(int)));
+	gpuErrchk(cudaMemcpyToSymbol(gpu_ncen, &ncen_temp, sizeof(int)));
+	gpuErrchk(cudaMemcpyToSymbol(gpu_MaxGrid, &MaxGrid, sizeof(int)));
+	gpuErrchk(cudaMemcpyToSymbol(gpu_start_radial_dens, &min_dist, sizeof(double)));
+	gpuErrchk(cudaMemcpyToSymbol(gpu_log_incr, &lincr, sizeof(double)));
+	gpuErrchk(cudaMemcpy(gpu_PosAtomsx[0],	    PosAtoms[0].data(),       sizeof(double) * wave.get_ncen(),     cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_PosAtomsy[0],	    PosAtoms[1].data(),       sizeof(double) * wave.get_ncen(),     cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_PosAtomsz[0],	    PosAtoms[2].data(),       sizeof(double) * wave.get_ncen(),     cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_asym_atom_list[0], asym_atom_list.data(),    sizeof(int) * asym_atom_list.size(),  cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_atom_type_list[0], atom_type_list.data(),    sizeof(int) * atom_type_list.size(),  cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_numpoints[0],      num_points.data(),        sizeof(int) * asym_atom_list.size(),  cudaMemcpyHostToDevice));
+	//if(debug)
+	gpuErrchk(cudaPeekAtLastError());
+	file << "All copying done!" << endl;
+
+	vector <cudaStream_t> streams;
+	streams.resize(asym_atom_list.size());
+	int offset = 0;
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		gpuErrchk(cudaOccupancyMaxPotentialBlockSize(
+			&numBlocks,
+			&blocks,
+			(void*)gpu_make_grid,
+			0,
+			num_points[i]));
+
+		gridSize = (MaxGrid + blocks - 1) / blocks;
+		//file << i << ": num points: " << num_points[i] << " blocks: " << gridSize << " threads: " << blocks << " grid > points? " << (blocks*gridSize > num_points[i]) << endl;
+		int type;
+		for (int j = 0; j < atom_type_list.size(); j++)
+			if (atom_type_list[j] == wave.atoms[asym_atom_list[i]].charge)
+				type = j;
+		gpuErrchk(cudaStreamCreate(&streams[i]));
+		gpuErrchk(cudaMalloc((void**)&gpu_atomgrid_x[0][i], sizeof(double) * num_points[i]));
+		gpuErrchk(cudaMalloc((void**)&gpu_atomgrid_y[0][i], sizeof(double) * num_points[i]));
+		gpuErrchk(cudaMalloc((void**)&gpu_atomgrid_z[0][i], sizeof(double) * num_points[i]));
+		gpuErrchk(cudaMalloc((void**)&gpu_atomgrid_w[0][i], sizeof(double) * num_points[i]));
+		gpuErrchk(cudaMemcpyAsync(gpu_atomgrid_x[0][i], Prototype_grids[type].get_gridx_ptr(), sizeof(double) * num_points[i], cudaMemcpyHostToDevice, streams[i]));
+		gpuErrchk(cudaMemcpyAsync(gpu_atomgrid_y[0][i], Prototype_grids[type].get_gridy_ptr(), sizeof(double) * num_points[i], cudaMemcpyHostToDevice, streams[i]));
+		gpuErrchk(cudaMemcpyAsync(gpu_atomgrid_z[0][i], Prototype_grids[type].get_gridz_ptr(), sizeof(double) * num_points[i], cudaMemcpyHostToDevice, streams[i]));
+		gpuErrchk(cudaMemcpyAsync(gpu_atomgrid_w[0][i], Prototype_grids[type].get_gridw_ptr(), sizeof(double) * num_points[i], cudaMemcpyHostToDevice, streams[i]));
+
+		gpu_make_grid <<< gridSize, blocks, 0, streams[i] >>> (
+			i,
+			gpu_PosAtomsx[0],
+			gpu_PosAtomsy[0],
+			gpu_PosAtomsz[0],
+			gpu_atomgrid_x[0][i],
+			gpu_atomgrid_y[0][i],
+			gpu_atomgrid_z[0][i],
+			gpu_atomgrid_w[0][i],
+			gpu_atom_z[0],
+			gpu_asym_atom_list[0],
+			gpu_numpoints[0],
+			offset,
+			gpu_Gridx[0],
+			gpu_Gridy[0],
+			gpu_Gridz[0],
+			gpu_Gridaw[0],
+			gpu_Gridmw[0]);
+
+		offset += num_points[i];
+	}
+	//for (int n = 0; n < 6; n++)
+	//	total_grid[n].resize(MaxGrid);
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaPeekAtLastError());
+	
+	for (int i = 0; i < atom_type_list.size(); i++) {
+		//cudaFree(gpu_atomgrid_x[0][i]);
+		//cudaFree(gpu_atomgrid_y[0][i]);
+		//cudaFree(gpu_atomgrid_z[0][i]);
+		gpuErrchk(cudaFree(gpu_atomgrid_w[0][i]));
+	}
+#else
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int nr = asym_atom_list[i];
 		int type;
-		for (int i = 0; i < atom_type_list.size(); i++)
-			if (atom_type_list[i] == wave.atoms[nr].charge) 
-				type=i;
+		for (int j = 0; j < atom_type_list.size(); j++)
+			if (atom_type_list[j] == wave.atoms[nr].charge)
+				type = j;
 
 		num_points[i] = Prototype_grids[type].get_num_grid_points();
 
@@ -756,20 +1534,21 @@ bool calculate_structure_factors_HF(
 		for (int p = 0; p < num_points[i]; p++)
 			grid[i][4][p] = 0.0;
 
-		Prototype_grids[type].get_grid(wave.get_ncen()*pow(pbc*2+1,3),
+		Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
 			nr,
-			x,
-			y,
-			z,
-			atom_z,
+			&x[0],
+			&y[0],
+			&z[0],
+			&atom_z[0],
 			grid[i][0],
 			grid[i][1],
 			grid[i][2],
 			grid[i][3],
 			grid[i][5]);
 	}
-
 	Prototype_grids.clear();
+#endif
+
 	int points = 0;
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		points += num_points[i];
@@ -796,44 +1575,6 @@ bool calculate_structure_factors_HF(
 
 	file << "Calculating spherical densities..." << flush;
 
-	vector < vector < double > > radial_density;
-	vector < vector < double > > radial_dist;
-
-	radial_density.resize(atom_type_list.size());
-	radial_dist.resize(atom_type_list.size());
-	spherical_density.resize(asym_atom_list.size());
-	for (int i = 0; i < asym_atom_list.size(); i++)
-		spherical_density[i].resize(num_points[i]);
-
-	double incr = pow(1.005,max(1,accuracy-1));
-	const double lincr = log(incr);
-	const double min_dist = 0.0000001;
-	//Make radial grids
-	for (int i = 0; i < atom_type_list.size(); i++) {
-		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
-		double current = 1;
-		double dist = min_dist;
-		if(accuracy > 3)
-			while (current > 1E-10) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		else
-			while (current > 1E-12) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		if (debug)
-			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
-	}
 	//if (debug) {
 	//	file << "Asym atom list: ";
 	//	for (int g = 0; g < asym_atom_list.size(); g++)
@@ -856,6 +1597,87 @@ bool calculate_structure_factors_HF(
 	//	}
 	//}
 	//apply to the becke grid
+
+#ifdef FLO_CUDA
+	double*** gpu_spherical_density = NULL,
+		*** gpu_radial_density = NULL,
+		*** gpu_radial_dist = NULL,
+		** gpu_Grids = NULL;
+	gpu_radial_density = (double***)malloc(sizeof(double**));
+	gpu_radial_dist = (double***)malloc(sizeof(double**));
+	gpu_spherical_density = (double***)malloc(sizeof(double**));
+
+	gpu_radial_density[0] = (double**)malloc(sizeof(double*) * atom_type_list.size());
+	gpu_radial_dist[0] = (double**)malloc(sizeof(double*) * atom_type_list.size());
+	gpu_spherical_density[0] = (double**)malloc(sizeof(double*) * asym_atom_list.size());
+	gpu_Grids = (double**)malloc(sizeof(double*));
+
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		gpuErrchk(cudaMalloc((void**)&(gpu_spherical_density[0][i]), sizeof(double) * num_points[i]));
+
+	gpuErrchk(cudaMalloc((void**)&gpu_Grids[0], sizeof(double) * MaxGrid));
+
+	for (int i = 0; i < atom_type_list.size(); i++) {
+		gpuErrchk(cudaMalloc((void**)&gpu_radial_density[0][i], sizeof(double) * radial_density[i].size()));
+		gpuErrchk(cudaMalloc((void**)&gpu_radial_dist[0][i], sizeof(double) * radial_dist[i].size()));
+		gpuErrchk(cudaMemcpy(gpu_radial_density[0][i], radial_density[i].data(), sizeof(double) * radial_density[i].size(), cudaMemcpyHostToDevice));
+		gpuErrchk(cudaMemcpy(gpu_radial_dist[0][i], radial_dist[i].data(), sizeof(double) * radial_dist[i].size(), cudaMemcpyHostToDevice));
+	}
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaPeekAtLastError());
+	vector <cudaStream_t> streams2;
+	streams2.resize(wave.get_ncen());
+	for (int i = 0; i < wave.get_ncen(); i++) {
+		int nr = all_atom_list[i];
+		int type_list_number = -1;
+		for (int j = 0; j < atom_type_list.size(); j++)
+			if (wave.atoms[nr].charge == atom_type_list[j])
+				type_list_number = j;
+		offset = 0;
+		for (int g = 0; g < asym_atom_list.size(); g++) {
+			if (g == 0) {
+				gpuErrchk(cudaOccupancyMaxPotentialBlockSize(
+					&numBlocks,
+					&blocks,
+					(void*)gpu_linear_interpolate_spherical_density,
+					0,
+					num_points[i]));
+
+				gridSize = (MaxGrid + blocks - 1) / blocks;
+				//file << i << "/" << g << ": blocks: " << gridSize << " threads: " << blocks << endl;
+			}
+			bool match = (all_atom_list[i] == asym_atom_list[g]);
+			gpu_linear_interpolate_spherical_density <<< gridSize, blocks >>> (
+				i,
+				gpu_radial_density[0][type_list_number],
+				gpu_radial_dist[0][type_list_number],
+				radial_density[type_list_number].size(),
+				match,
+				offset,
+				gpu_Gridx[0],
+				gpu_Gridy[0],
+				gpu_Gridz[0],
+				gpu_numpoints[0],
+				gpu_spherical_density[0][g],
+				gpu_Grids[0],
+				gpu_PosAtomsx[0],
+				gpu_PosAtomsy[0],
+				gpu_PosAtomsz[0]);
+
+			offset += num_points[i];
+		}
+	}
+
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaPeekAtLastError());
+
+	for(int i=0; i< atom_type_list.size(); i++){
+		gpuErrchk(cudaFree(gpu_radial_density[0][i]));
+		gpuErrchk(cudaFree(gpu_radial_dist[0][i]));
+	}
+
+#else
+
 	for (int i = 0; i < wave.get_ncen(); i++) {
 		int nr = all_atom_list[i];
 		int type_list_number = -1;
@@ -863,6 +1685,7 @@ bool calculate_structure_factors_HF(
 			if (wave.atoms[nr].charge == atom_type_list[j])
 				type_list_number = j;
 		for (int g = 0; g < asym_atom_list.size(); g++) {
+			if (i == 0) spherical_density[g].resize(num_points[g]);
 #pragma omp parallel for
 			for (int p = 0; p < num_points[g]; p++) {
 				double temp =
@@ -910,11 +1733,12 @@ bool calculate_structure_factors_HF(
 					}
 				}
 	}
+#endif
 
 	file << "                    done!" << endl;
 	if (debug)
 		for (int i = 0; i < asym_atom_list.size(); i++)
-			file << endl << "number of points for atom " << i << " " << num_points[i] << " " << spherical_density[i].size() << endl;
+			file << "number of points for atom " << i << " " << num_points[i] << " " << spherical_density[i].size() << endl;
 
 
 	radial_density.clear();
@@ -938,7 +1762,6 @@ bool calculate_structure_factors_HF(
 	}
 #endif
 
-	file << "Pruning Grid..." << flush;
 	double cutoff;
 	if (accuracy < 3)
 		cutoff = 1E-10;
@@ -946,7 +1769,8 @@ bool calculate_structure_factors_HF(
 		cutoff = 1E-14;
 	else
 		cutoff = 1E-30;
-
+#ifndef FLO_CUDA
+	file << "Pruning Grid..." << flush;
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int reduction = 0;
 		for (int p = 0; p < num_points[i]; p++) {
@@ -976,8 +1800,11 @@ bool calculate_structure_factors_HF(
 	points = 0;
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		points += num_points[i];
+
+	total_grid[5].resize(total_grid[0].size());
 	if (debug) file << "sphericals done!" << endl;
 	else file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
+#endif
 
 #ifdef _WIN64
 	if (debug) {
@@ -1000,13 +1827,196 @@ bool calculate_structure_factors_HF(
 	file << "Calculating aspherical densities..." << flush;
     vector < vector < double > > periodic_grid;
 
-	total_grid[5].resize(total_grid[0].size());
+#ifdef FLO_CUDA
+	// Vector containing integrated numbers of electrons
+	// dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
+	// dimension 1: atoms of asym_atom_list
+	vector < vector <double> > atom_els;
+	atom_els.resize(3);
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		for (int n = 0; n < 3; n++)
+			atom_els[n].push_back(0.0);
 
+	gpuErrchk(cudaOccupancyMaxPotentialBlockSize(
+		&numBlocks,
+		&blocks,
+		(void*)gpu_calc_dens,
+		0,
+		MaxGrid));
+
+	gridSize = (MaxGrid + blocks - 1) / blocks;
+	//file << "\nblocks: " << gridSize << " threads: " << blocks << endl;
+	//const int phisize = gridSize * blocks;
+	//double** gpu_phi = (double**)malloc(sizeof(double*));
+	//gpuErrchk(cudaMalloc((void**)&gpu_phi[0], sizeof(double)* nmo_temp * phisize));
+	//gpuErrchk(cudaMemset(gpu_phi[0], 0.0, sizeof(double) * nmo_temp * phisize));
+	//gpuErrchk(cudaPeekAtLastError());
+
+	vector <double> occ;
+	for (int i = 0; i < wave.get_nmo(false); i++) {
+		occ.push_back(wave.get_MO_occ(i));
+		if (occ[occ.size() - 1] == 0) occ.pop_back();
+	}
+	vector <double> coef;
+	for (int i = 0; i < nex_temp; i++) {
+		for (int mo = 0; mo < wave.get_nmo(false); mo++)
+			if (wave.get_MO_occ(mo) != 0)
+				coef.push_back(wave.get_MO_coef(mo, i, debug));
+	}
+
+	gpuErrchk(cudaMalloc((void**)&gpu_types[0], sizeof(int)* nex_temp));
+	gpuErrchk(cudaMalloc((void**)&gpu_centers[0], sizeof(int)* nex_temp));
+	gpuErrchk(cudaMalloc((void**)&gpu_exponents[0], sizeof(double)* nex_temp));
+	gpuErrchk(cudaMalloc((void**)&gpu_occ[0], sizeof(double)* nmo_temp));
+	gpuErrchk(cudaMalloc((void**)&gpu_coefficients[0], sizeof(double)* nex_temp* nmo_temp));
+	gpuErrchk(cudaMalloc((void**)&gpu_GridRho[0], sizeof(double)* MaxGrid));
+	gpuErrchk(cudaMemcpy(gpu_occ[0], &occ[0], sizeof(double)* occ.size(), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_coefficients[0], coef.data(), sizeof(double)* nex_temp* nmo_temp, cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_types[0], wave.get_ptr_types(), sizeof(int)* nex_temp, cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_centers[0], wave.get_ptr_centers(), sizeof(int)* nex_temp, cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(gpu_exponents[0], wave.get_ptr_exponents(), sizeof(double)* nex_temp, cudaMemcpyHostToDevice));
+
+	occ.clear();
+	coef.clear();
+
+	gpu_calc_dens <<<gridSize, blocks>>> (
+		gpu_GridRho[0],
+		gpu_Gridx[0],
+		gpu_Gridy[0],
+		gpu_Gridz[0],
+		gpu_PosAtomsx[0],
+		gpu_PosAtomsy[0],
+		gpu_PosAtomsz[0],
+		gpu_types[0],
+		gpu_centers[0],
+		gpu_exponents[0],
+		gpu_coefficients[0],
+		gpu_occ[0]);
+
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaPeekAtLastError());
+	gpuErrchk(cudaFree(gpu_types[0]));
+	gpuErrchk(cudaFree(gpu_centers[0]));
+	gpuErrchk(cudaFree(gpu_exponents[0]));
+	gpuErrchk(cudaFree(gpu_coefficients[0]));
+	gpuErrchk(cudaFree(gpu_occ[0]));
+	//gpuErrchk(cudaFree(gpu_phi[0]));
+	free(gpu_types);
+	free(gpu_centers);
+	free(gpu_exponents);
+	free(gpu_coefficients);
+	free(gpu_occ);
+
+	offset = 0;
+	double el_sum_becke = 0.0;
+	double el_sum_spherical = 0.0;
+	double el_sum_hirshfeld = 0.0;
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		double charges[3];
+		double* result = (double*)malloc(sizeof(double));
+		gpuErrchk(cudaMalloc((void**)&(result), sizeof(double)*3));
+		gpu_calc_charges <<<1, 1 >>> (
+			gpu_GridRho[0],
+			gpu_Gridaw[0],
+			gpu_Gridmw[0],
+			gpu_Grids[0],
+			gpu_spherical_density[0][i],
+			num_points[i],
+			offset,
+			cutoff,
+			result
+			);
+		gpuErrchk(cudaMemcpy(&charges[0], result, sizeof(double) * 3, cudaMemcpyDeviceToHost));
+		gpuErrchk(cudaDeviceSynchronize());
+		gpuErrchk(cudaPeekAtLastError());
+		offset += num_points[i];
+		el_sum_becke += charges[0];
+		el_sum_spherical += charges[1];
+		el_sum_hirshfeld += charges[2];
+		for (int j = 0; j < 3; j++)
+			atom_els[j][i] = charges[j];
+	}
+	
+	offset = 0;
+
+	//vector<int> non_zeros;
+	//non_zeros.resize(1);
+	//file << endl;
+	//for (int i = 0; i < 1; i++) {
+	//	int* counter = (int*)malloc(sizeof(int));
+	//	gpuErrchk(cudaMalloc((void**)&(counter), sizeof(int)));
+	//	gpu_count_non_zero <<<1, 1 >>> (
+	//		MaxGrid,
+	//		gpu_Grids[0],
+	//		counter);
+	//	gpuErrchk(cudaMemcpy(&non_zeros[i], counter, sizeof(int), cudaMemcpyDeviceToHost));
+	//	file << "GridS: " << non_zeros[i] << endl;
+	//}
+
+	//file << "spherical_density: ";
+	//non_zeros.resize(asym_atom_list.size());
+	//for (int i = 0; i < asym_atom_list.size(); i++) {
+	//	int* counter = (int*)malloc(sizeof(int));
+	//	gpuErrchk(cudaMalloc((void**)&(counter), sizeof(int)));
+	//
+	//	gpu_count_non_zero <<<1, 1 >>> (
+	//		num_points[i],
+	//		gpu_spherical_density[0][i],
+	//		counter);
+	//
+	//	gpuErrchk(cudaMemcpy(&non_zeros[i], counter, sizeof(int), cudaMemcpyDeviceToHost));
+	//	file << " " << non_zeros[i];
+	//}
+	//file << endl;
+
+	file << "Applying weights..." << endl;
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		cudaOccupancyMaxPotentialBlockSize(
+			&numBlocks,
+			&blocks,
+			(void*)gpu_apply_weights,
+			0,
+			num_points[i]);
+
+		gridSize = (MaxGrid + blocks - 1) / blocks;
+		//file << i << ": blocks: " << gridSize << " threads: " << blocks << endl;
+
+		gpu_apply_weights <<< gridSize, blocks, 0, streams[i] >>> (
+			offset,
+			gpu_GridRho[0],
+			gpu_Grids[0],
+			gpu_spherical_density[0][i],
+			gpu_Gridaw[0],
+			num_points[i]
+			);
+
+		offset += num_points[i];
+	}
+	gpuErrchk(cudaDeviceSynchronize());
+	gpuErrchk(cudaPeekAtLastError());
+	file << "After Applying!" << endl;
+
+	//vector < vector<int> > non_zeros;
+	//for (int i = 0; i < asym_atom_list.size(); i++) {
+	//	int* counter = (int*)malloc(sizeof(int));
+	//	gpuErrchk(cudaMalloc((void**)&(counter), sizeof(int)));
+	//
+	//	gpu_count_non_zero <<<1,1>>> (
+	//		num_points[i],
+	//		gpu_spherical_density[0][i],
+	//		counter);
+	//
+	//	gpuErrchk(cudaMemcpy(&non_zeros[i], counter, sizeof(int), cudaMemcpyDeviceToHost));
+	//	file << " " << non_zeros[i];
+	//}
+	file << endl;
+	file << " done!" << endl;
+	file << "Number of points evaluated: " << MaxGrid;
+#else
 	double** mo_coef;
 	mo_coef = new double* [wave.get_nmo()];
 	for (int i = 0; i < wave.get_nmo(); i++)
 		mo_coef[i] = wave.get_MO_coef_ptr(i);
-
 #pragma omp parallel for
 	for (int i = 0; i < total_grid[0].size(); i++) {
 		total_grid[5][i] = compute_dens(wave, new double[3]{ 
@@ -1070,6 +2080,7 @@ bool calculate_structure_factors_HF(
 			atom_els[n].push_back(0.0);
 
 	//Generate Electron sums
+#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int start_p = 0;
 #pragma loop(no_vector)
@@ -1087,8 +2098,47 @@ bool calculate_structure_factors_HF(
 		el_sum_hirshfeld += atom_els[2][i];
 	}
 
-	if (debug)
+	if (debug) {
 		file << "Becke grid with hirshfeld weights done!" << endl;
+		file << "atom_els[2]: ";
+		for (int i = 0; i < asym_atom_list.size(); i++) {
+			if (isnan(atom_els[2][i]))
+				file << "!!!";
+			file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
+			if (isnan(atom_els[2][i]))
+				file << "!!!";
+		}
+		file << endl;
+	}
+
+#pragma omp parallel for
+	for (int p = 0; p < total_grid[0].size(); p++)
+		total_grid[5][p] *= total_grid[3][p];
+	file << " done!" << endl;
+	file << "Number of points evaluated: " << total_grid[0].size();
+#endif
+	
+	file << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
+
+	file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
+
+	int counter = 0;
+	for (int i = 0; i < wave.get_ncen(); i++) {
+		if (is_asym[i]) {
+			file << setw(6) << labels[i]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][counter]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[2][counter];
+			if (debug) file << " " << setw(4) << wave.atoms[all_atom_list[i]].charge << " " << fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
+				<< fixed << setw(10) << setprecision(3) << atom_els[1][counter]
+				<< fixed << setw(10) << setprecision(3) << atom_els[2][counter];
+			counter++;
+			file << endl;
+		}
+	}
+
+	file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
+
 
 #ifdef _WIN64
 	if (debug) {
@@ -1107,48 +2157,8 @@ bool calculate_structure_factors_HF(
 		else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
 	}
 #endif
-
-	if (debug) {
-		file << "atom_els[2]: ";
-		for (int i = 0; i < asym_atom_list.size(); i++) {
-			if (isnan(atom_els[2][i]))
-				file << "!!!";
-			file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
-			if (isnan(atom_els[2][i]))
-				file << "!!!";
-		}
-		file << endl;
-	}
-
-#pragma omp parallel for
-	for (int p = 0; p < total_grid[0].size(); p++)
-			total_grid[5][p] *= total_grid[3][p];
-
-	file << " done!" << endl;
-	file << "Number of points evaluated: " << total_grid[0].size() << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
-
-	file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
-
-	int counter = 0;
-	for (int i = 0; i < wave.get_ncen(); i++) {
-		if (is_asym[i]) {
-			file << setw(6) << labels[i]
-			<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
-			<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][counter]
-			<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[2][counter];
-			if (debug) file << " " << setw(4) << wave.atoms[all_atom_list[i]].charge << " " << fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
-				<< fixed << setw(10) << setprecision(3) << atom_els[1][counter]
-				<< fixed << setw(10) << setprecision(3) << atom_els[2][counter];
-			counter++;
-			file << endl;
-		}
-	}
-
-	file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
-
-	vector < vector <double> > d1,d2,d3;
+	vector < vector <double> > d1, d2, d3;
 	vector < vector <double> > dens;
-	points = 0;
 	dens.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer dens" << endl;
@@ -1157,20 +2167,90 @@ bool calculate_structure_factors_HF(
 	d3.resize(asym_atom_list.size());
 	if (debug)
 		file << "resized outer d1-3" << endl;
+#ifdef FLO_CUDA
+	points = 0;
+#pragma omp parallel for
+	for (int i = 0; i < asym_atom_list.size(); i++) {
+		int type;
+		for (int j = 0; j < atom_type_list.size(); j++)
+			if (atom_type_list[j] == wave.atoms[asym_atom_list[i]].charge)
+				type = j;
+		vector<double> temp_dens;
+		temp_dens.resize(num_points[i]);
+		//file << "At atom: " << i;
+		gpuErrchk(cudaMemcpy(temp_dens.data(), gpu_spherical_density[0][i], sizeof(double) * num_points[i], cudaMemcpyDeviceToHost));
+		for (int p = 0; p < 0 + num_points[i]; p++) {
+			if (abs(temp_dens[p]) > cutoff) {
+				dens[i].push_back(temp_dens[p]);
+				d1[i].push_back(Prototype_grids[type].get_gridx(p));
+				d2[i].push_back(Prototype_grids[type].get_gridy(p));
+				d3[i].push_back(Prototype_grids[type].get_gridz(p));
+			}
+		}
+		//file << " dens size: " << dens[i].size() << " num_points[i]: " << num_points[i] << endl;
+	}
+	for (int i = 0; i < asym_atom_list.size(); i++) points += dens[i].size();
 
+	//gpuErrchk(cudaFree(gpu_Grids[0]));
+	//gpuErrchk(cudaFree(gpu_PosAtomsx[0]));
+	//gpuErrchk(cudaFree(gpu_PosAtomsy[0]));
+	//gpuErrchk(cudaFree(gpu_PosAtomsz[0]));
+	//gpuErrchk(cudaFree(gpu_GridRho[0]));
+	//gpuErrchk(cudaFree(gpu_Gridx[0]));
+	//gpuErrchk(cudaFree(gpu_Gridy[0]));
+	//gpuErrchk(cudaFree(gpu_Gridz[0]));
+	//gpuErrchk(cudaFree(gpu_Gridaw[0]));
+	//gpuErrchk(cudaFree(gpu_Gridmw[0]));
+	//gpuErrchk(cudaFree(gpu_asym_atom_list[0]));
+	//gpuErrchk(cudaFree(gpu_atom_type_list[0]));
+	//gpuErrchk(cudaFree(gpu_numpoints[0]));
+	//gpuErrchk(cudaFree(gpu_atom_z[0]));
+	//for (int i = 0; i < asym_atom_list.size(); i++) {
+	//	gpuErrchk(cudaFree(gpu_spherical_density[0][i]));
+	//	gpuErrchk(cudaFree(gpu_atomgrid_x[0][i]));
+	//	gpuErrchk(cudaFree(gpu_atomgrid_y[0][i]));
+	//	gpuErrchk(cudaFree(gpu_atomgrid_z[0][i]));
+	//}
+	free(gpu_Grids);
+	free(gpu_PosAtomsx);
+	free(gpu_PosAtomsy);
+	free(gpu_PosAtomsz);
+	free(gpu_GridRho);
+	free(gpu_Gridx);
+	free(gpu_Gridy);
+	free(gpu_Gridz);
+	free(gpu_Gridaw);
+	free(gpu_Gridmw);
+	free(gpu_asym_atom_list);
+	free(gpu_atom_type_list);
+	free(gpu_numpoints);
+	free(gpu_atom_z);
+	free(gpu_radial_density);
+	free(gpu_radial_dist);
+	free(gpu_spherical_density);
+	free(gpu_atomgrid_x);
+	free(gpu_atomgrid_y);
+	free(gpu_atomgrid_z);
+	free(gpu_atomgrid_w);
+	cudaDeviceReset();
+	file << "CUDA device resetted!" << endl;
+#else
+	points = 0;
 #pragma omp parallel for reduction(+:points)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int start_p = 0;
+		double res;
 #pragma loop(no_vector)
 		for (int a = 0; a < i; a++)
 			start_p += num_points[a];
 		for (int p = start_p; p < start_p + num_points[i]; p++) {
-
-			dens[i].push_back(total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p]);
-			d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-			d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-			d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
-
+			res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+			if (abs(res) > cutoff) {
+				dens[i].push_back(res);
+				d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+				d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+				d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+			}
 		}
 		points += dens[i].size();
 	}
@@ -1182,6 +2262,7 @@ bool calculate_structure_factors_HF(
 	for (int grid = 0; grid < total_grid.size(); grid++)
 		total_grid[grid].resize(0);
 	total_grid.resize(0);
+#endif
 
 	vector < vector <double> > k_pt;
 	k_pt.resize(3);
@@ -1241,9 +2322,10 @@ bool calculate_structure_factors_HF(
 		}
 		if (debug)
 			file << "K-pt_unique size: " << k_pt_unique[0].size() << endl;
+		file << endl << "Number of k points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 	}
-
-	file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
+	else
+		file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
 
 	vector< vector < complex<double> > > sf;
 	sf.resize(asym_atom_list.size());
@@ -1277,7 +2359,35 @@ bool calculate_structure_factors_HF(
 
 #endif
 
-	progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
+//#ifdef FLO_CUDA
+//	double** gpu_k_pt = NULL,
+//		** gpu_sf_r = NULL,
+//		** gpu_sf_i = NULL;
+//	vector <double> long_kpt;
+//	long_kpt.resize(3 * k_pt_unique[0].size());
+//	for (int i = 0; i < k_pt_unique[0].size(); i++) {
+//		long_kpt[3 * i + 0] = k_pt_unique[0][i];
+//		long_kpt[3 * i + 1] = k_pt_unique[1][i];
+//		long_kpt[3 * i + 2] = k_pt_unique[2][i];
+//	}
+//	gpu_k_pt = (double**)malloc(sizeof(double*));
+//	gpu_sf_r = (double**)malloc(sizeof(double*));
+//	gpu_sf_i = (double**)malloc(sizeof(double*));
+//	cudaMalloc((void**)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
+//	cudaMalloc((void**)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+//	cudaMalloc((void**)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+//	cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
+//
+//	dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
+//	gpu_make_sf <<<blocks, 1>>> (
+//		gpu_sf_r[0],
+//		gpu_sf_i[0],
+//		gpu_k_pt[0],
+//
+//		);
+//#else
+
+	//progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
 	const int step = max(floor(asym_atom_list.size() / 20),1.0);
 	const int smax = shrink ? k_pt_unique[0].size() : k_pt[0].size();
 	const int imax = asym_atom_list.size();
@@ -1304,10 +2414,10 @@ bool calculate_structure_factors_HF(
 				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
 		}
-		if (i != 0 && i % step == 0)
-			progress->write(i / double(imax));
+		//if (i != 0 && i % step == 0)
+		//	progress->write(i / double(imax));
 	}
-	delete(progress);
+	//delete(progress);
 
 	if (electron_diffraction) {
 		const double fact = 0.023934;
@@ -1323,9 +2433,9 @@ bool calculate_structure_factors_HF(
 		}
 	}
 
+//#endif
 
 #ifdef _WIN64
-	end_tsc = time(NULL);
 
 #else
 	gettimeofday(&t2, 0);
@@ -1417,6 +2527,10 @@ bool calculate_structure_factors_HF(
 	else if (time2 < 3600) printf("Total Time: %10.1lf m\n", time2 / 60);
 	else printf("Total Time: %10.1lf h\n", time2 / 3600);
 
+#endif
+
+#ifdef PEOJECT_NAME
+#undef FLO_CUDA
 #endif
 
 	return true;
