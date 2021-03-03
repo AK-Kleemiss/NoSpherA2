@@ -511,6 +511,72 @@ bool cube::write_xdgraph(WFN &wave, string &given_path, bool debug){
 	return (true);
 };
 
+bool cube::fractal_dimension(const double stepsize) {
+	double min=100, max=-100;
+	for(int i=0; i<size[0]; i++)
+		for(int j=0; j<size[1]; j++)
+			for (int k = 0; k < size[2]; k++) {
+				if (values[i][j][k] < min) min = values[i][j][k];
+				if (values[i][j][k] > max) max = values[i][j][k];
+			}
+	min -= 2 * stepsize, max += 2 * stepsize;
+	const int steps = int((max - min) / stepsize) + 2;
+	vector<int> bins;
+	vector<double> df;
+	vector<double> iso;
+	bins.resize(steps), df.resize(steps), iso.resize(steps);
+	for (int i = 0; i < steps; i++)
+		iso[i] = round((min + i * stepsize) * 1000) / 1000;
+	const int comparisons = size[0] * size[1] * (size[2] - 1) + size[0] * size[2] * (size[1] - 1) + size[2] * size[1] * (size[0] - 1);
+	double lv1, lv2;
+	for (int x = 0; x < size[0]; x++)
+		for (int y = 0; y < size[1]; y++)
+			for (int z = 0; z < size[2] - 1; z++) {
+				lv1 = values[x][y][z];
+				lv2 = values[x][y][z + 1];
+#pragma omp parallel for
+				for (int i = 0; i < steps; i++)
+					if ((lv1 < iso[i] and lv2 > iso[i]) || (lv1 > iso[i] and lv2 < iso[i]))
+						bins[i]++;
+			}
+	for (int z = 0; z < size[2]; z++)
+		for (int x = 0; x < size[0]; x++)
+			for (int y = 0; y < size[1] - 1; y++) {
+				lv1 = values[x][y][z];
+				lv2 = values[x][y + 1][z];
+#pragma omp parallel for
+				for (int i = 0; i < steps; i++)
+					if ((lv1 < iso[i] and lv2 > iso[i]) || (lv1 > iso[i] and lv2 < iso[i]))
+						bins[i]++;
+			}
+	for (int y = 0; y < size[1]; y++)
+		for (int z = 0; z < size[2]; z++) 
+			for (int x = 0; x < size[0] - 1; x++) {
+				lv1 = values[x][y][z];
+				lv2 = values[x + 1][y][z];
+#pragma omp parallel for
+				for (int i = 0; i < steps; i++)
+					if ((lv1 < iso[i] and lv2 > iso[i]) || (lv1 > iso[i] and lv2 < iso[i]))
+						bins[i]++;
+			}
+	const double third = -1.0 / 3.0;
+	const double epsilon = log(1 / (pow(comparisons, third)));
+	for (int i = 0; i < steps; i++) {
+		if (bins[i] == 0)
+			df[i] = 0.0;
+		else
+			df[i] = log(bins[i]) / epsilon;
+	}
+	string output(path + "_fractal_plot");
+	ofstream of(output.c_str(), ios::out);
+	of << setw(8) << scientific << setprecision(8) << steps << setw(16) << scientific << setprecision(8) << min << setw(16) << scientific << setprecision(8) << max << "\n";
+	for (int i = 0; i < steps; i++)
+		of << setw(16) << scientific << setprecision(8) << iso[i] << setw(16) << scientific << setprecision(8) << df[i] << "\n";
+	of.flush();
+	of.close();
+	return true;
+}
+
 int cube::get_size(int direction) const{
 	if(direction < size.size() && direction >= 0) return (size[direction]);
 	else return (-1);

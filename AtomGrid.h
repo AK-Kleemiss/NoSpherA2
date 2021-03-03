@@ -30,10 +30,10 @@ class AtomGrid
 
     void get_grid(const int num_centers,
         const int center_index,
-        const double x_coordinates_bohr[],
-        const double y_coordinates_bohr[],
-        const double z_coordinates_bohr[],
-        const int proton_charges[],
+        const double* x_coordinates_bohr,
+        const double* y_coordinates_bohr,
+        const double* z_coordinates_bohr,
+        const int* proton_charges,
         double grid_x_bohr[],
         double grid_y_bohr[],
         double grid_z_bohr[],
@@ -53,10 +53,19 @@ class AtomGrid
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
 
+    double* get_gridx_ptr(void) { return atom_grid_x_bohr_.data(); };
+    double* get_gridy_ptr(void) { return atom_grid_y_bohr_.data(); };
+    double* get_gridz_ptr(void) { return atom_grid_z_bohr_.data(); };
+    double* get_gridw_ptr(void) { return atom_grid_w_.data(); };
+
+    double get_gridx(const int& i) { return atom_grid_x_bohr_[i]; };
+    double get_gridy(const int& i) { return atom_grid_y_bohr_[i]; };
+    double get_gridz(const int& i) { return atom_grid_z_bohr_[i]; };
+
   private:
     // TODO move to public section, use C++11, use delete
 
-    std::size_t num_grid_points_;
+    //std::size_t num_grid_points_;
 
     std::vector<double> atom_grid_x_bohr_;
     std::vector<double> atom_grid_y_bohr_;

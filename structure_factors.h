@@ -7,6 +7,11 @@
 
 class WFN;
 
+bool merge_tscs(
+	const std::string &mode,
+	const std::vector<std::string> &files
+	);
+
 bool calculate_structure_factors_HF(
 	std::string &hkl_filename, 
 	std::string &cif_file, 
@@ -17,6 +22,7 @@ bool calculate_structure_factors_HF(
 	int accuracy, 
 	std::ofstream &file, 
 	std::vector <int> &input_groups,
+	std::vector <std::vector <double> > &twin_law,
 	int cpus = -1,
 	bool electron_diffraction = false,
 	int pbc = 0);

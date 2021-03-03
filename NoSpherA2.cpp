@@ -104,13 +104,14 @@ int main(int argc, char **argv){
 	string asym_cif("");
 	string method("rhf");
 	string temp;
+	string fract_name("");
 	int accuracy = 2;
 	int threads = -1;
-	bool becke = false;
-	bool electron_diffraction = false;
 	int pbc = 0;
 	double resolution = 0.1;
 	double radius = 2.0;
+	bool becke = false;
+	bool electron_diffraction = false;
 	bool calc = false;
 	bool eli = false;
 	bool esp = false;
@@ -120,11 +121,13 @@ int main(int argc, char **argv){
 	bool hdef = false;
 	bool def = false;
 	bool pdf = false;
+	bool fract = false;
 	bool scnd = true, thrd = true, frth = true;
 	double MinMax[6];
 	double NbSteps[3];
 	vector <int> MOs;
 	vector <int> groups;
+	vector < vector <double> > twin_law;
 	bool all_mos = false;
 	for (int i=0; i<argc; i++){
 		temp = argv[i];
@@ -220,6 +223,10 @@ int main(int argc, char **argv){
 				all_mos = true;
 			calc = true;
 		}
+		if (temp.find("-fractal") != string::npos) {
+			fract = true;
+			fract_name = argv[i + 1];
+		}
 		if (temp.find("-HDEF") != string::npos) {
 			hdef = true;
 			calc = true;
@@ -233,10 +240,54 @@ int main(int argc, char **argv){
 				groups.push_back(stoi(argv[i + 1]));
 			}
 		}
+		if (temp.find("-twin") != string::npos) {
+			twin_law.resize(twin_law.size() + 1);
+			twin_law[twin_law.size() - 1].resize(9);
+			for (int twl = 0; twl < 9; twl++) {
+				twin_law[twin_law.size() - 1][twl] = stod(argv[i + 1 + twl]);
+			}
+			if (debug_main) {
+				cout << "twin_law: ";
+				for (int twl = 0; twl < 9; twl++)
+					cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
+				cout << endl;
+			}
+			i += 9;
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
 		omp_set_dynamic(0);
+	}
+	if (argc > 1) {
+		string keyword = argv[1];
+		if (keyword.find("--help") != string::npos) {
+			cout << "----------------------------------------------------------------------------" << endl
+				<< "		These commands and arguments are known by wfn2fchk:" << endl
+				<< "----------------------------------------------------------------------------" << endl << endl
+				<< "	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file" << endl
+				<< "	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename" << endl
+				<< "	-b    <FILENAME>				Read this basis set" << endl
+				<< "	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style" << endl
+				<< "	--help 							print this help" << endl
+				<< "	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
+				<< "    -v2                             Even more stuff"
+				<< "	-mult	<NUMBER>				Input multiplicity of wavefunction" << endl
+				<< "    -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF" << endl
+				<< "    -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors" << endl
+				<< "    -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from" << endl
+				<< "    -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors" << endl
+				<< "    -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use " << endl
+				<< "              If there is more than a single twin law to be used use the twin command multiple times."
+				//				<< "    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
+				<< "*****************************************************************************************************" << endl
+				<< "	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals" << endl
+				<< "*****************************************************************************************************" << endl;
+		}
+	}
+	if (fract) {
+		cube residual(fract_name,true,debug_all);
+		residual.fractal_dimension(0.01);
 	}
 	if (hkl != "" || basis_set != "" || fchk != "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
@@ -258,13 +309,20 @@ int main(int argc, char **argv){
 				log_file << "----------------------------------------------------------------------------" << endl
 					<< "		These commands and arguments are known by wfn2fchk:" << endl
 					<< "----------------------------------------------------------------------------" << endl << endl
-					<< "	-wfn  <FILENAME>.wfn/ffn	Read the following file" << endl
-					<< "	-fchk <FILENAME>.fchk		Write a wavefunction to the given filename" << endl
-					<< "	-b <FILENAME>				Read this basis set" << endl
-					<< "	-d <PATH>                   Path to basis_sets directory with basis_sets in tonto style" << endl
-					<< "	--help 					    print this help" << endl
-					<< "	-v 		    			    Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
-					<< "	-mult                       Input multiplicity of wavefunction" << endl
+					<< "	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file" << endl
+					<< "	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename" << endl
+					<< "	-b    <FILENAME>				Read this basis set" << endl
+					<< "	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style" << endl
+					<< "	--help 							print this help" << endl
+					<< "	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
+					<< "    -v2                             Even more stuff"
+					<< "	-mult	<NUMBER>				Input multiplicity of wavefunction" << endl
+					<< "    -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF" << endl
+					<< "    -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors" << endl
+					<< "    -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from" << endl
+					<< "    -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors" << endl
+					<< "    -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use " << endl
+					<< "              If there is more than a single twin law to be used use the twin command multiple times."
 					//				<< "    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
 					<< "*****************************************************************************************************" << endl
 					<< "	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals" << endl
@@ -345,7 +403,7 @@ int main(int argc, char **argv){
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, threads, electron_diffraction, pbc))
+			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, twin_law, threads, electron_diffraction, pbc))
 				log_file << "Error during SF Calculation!" << endl;
 		}
 	}

@@ -29,6 +29,7 @@ class MO {
 		int get_primitive_count() const {return coefficients.size();};
 		std::string hdr();
 		double get_energy() const;
+		double* get_ptr_coefficients() { return &coefficients[0]; };
 };
 
 #endif

@@ -2724,6 +2724,10 @@ void WFN::pop_back_cube(){
 	cub.pop_back();
 }
 
+double* WFN::get_ptr_mo_coefficients(int mo) {
+	return MOs[mo].get_ptr_coefficients();
+};
+
 unsigned int WFN::get_atom_integer_mass(unsigned int atomnr){
 	vector <unsigned int> masses
 	{ 1,																																																	4,

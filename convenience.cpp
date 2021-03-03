@@ -1013,7 +1013,7 @@ void progress_bar::write(double fraction)
 	auto width = bar_width - message.size();
 	auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
 
-	os << '\r' << message;
+	os << message;
 	os.write(full_bar.data() + offset, width);
 	os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction*20)*0.05) << "%] " << std::flush;
 }
@@ -1250,7 +1250,7 @@ const int type_vector[168]{
 	3, 1, 0,
 	4, 0, 0,
 	0, 0, 5,
-	0, 1, 5,
+	0, 1, 4,
 	0, 2, 3,
 	0, 3, 2,
 	0, 4, 1,

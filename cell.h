@@ -81,6 +81,7 @@ public:
 			break;
 		default:
 			std::cout << "Wrong angle!" << std::endl;
+			return -400;
 			break;
 		}
 	}
@@ -119,9 +120,6 @@ public:
 		if (in_bohr)
 			for (int i = 0; i < 3; i++)
 				positions_cart[i] /= 0.529177249;
-		for (int i = 0; i < 3; i++)
-			std::cout << positions_cart[i] << " ";
-		std::cout << std::endl;
 		return positions_cart;
 	}
 

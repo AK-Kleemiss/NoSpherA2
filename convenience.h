@@ -105,6 +105,22 @@ void select_cubes(std::vector <std::vector <unsigned int> > &selection, std::vec
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char * tmp);
 
+inline std::string trim(const std::string& s)
+{
+	if (s == "") return "";
+	auto start = s.begin();
+	while (start != s.end() && std::isspace(*start)) {
+		start++;
+	}
+
+	auto end = s.end();
+	do {
+		end--;
+	} while (std::distance(start, end) > 0 && std::isspace(*end));
+
+	return std::string(start, end + 1);
+}
+
 
 //-------------------------Progress_bar--------------------------------------------------
 

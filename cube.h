@@ -59,6 +59,7 @@ class cube
 		bool write_file(WFN &wave, bool force = false, bool absolute = false);
 		bool write_file(WFN &wave, std::string &given_path, bool debug);
 		bool write_xdgraph(WFN &wave, std::string &given_path, bool debug);
+		bool fractal_dimension(const double stepsize);
 		double get_vector(int i, int j) const;
 		bool set_vector(int i, int j, double value);
 		double get_origin(unsigned int i) const;
