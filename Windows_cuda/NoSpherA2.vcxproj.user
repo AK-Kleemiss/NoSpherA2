@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif .\olex2\Wfn_job\sucrose.cif -asym_cif .\olex2\Wfn_job\sucrose.cif -wfn .\olex2\Wfn_job\sucrose.wfn -hkl .\olex2\Wfn_job\sucrose.hkl</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>C:\Users\Florian\AppData\Roaming\Olex2Data\6bac1c4f8a3ec59d1b189b7d537b5c2c\samples\sucrose</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-cif .\olex2\Wfn_job\epoxide.cif -asym_cif .\olex2\Wfn_job\epoxide.cif -wfn .\olex2\Wfn_job\epoxide.wfn -hkl .\olex2\Wfn_job\epoxide.hkl -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>E:\temp\epoxide</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
