@@ -1013,7 +1013,7 @@ void progress_bar::write(double fraction)
 	auto width = bar_width - message.size();
 	auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
 
-	os << message;
+	os << '\r';// << message.c_str();
 	os.write(full_bar.data() + offset, width);
 	os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction*20)*0.05) << "%] " << std::flush;
 }

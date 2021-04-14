@@ -128,13 +128,13 @@ class progress_bar
 {
 	static const auto overhead = sizeof " [100%]";
 
-	std::ostream& os;
+	std::ofstream& os;
 	const std::size_t bar_width;
 	std::string message;
 	const std::string full_bar;
 
 public:
-	progress_bar(std::ostream& os, std::size_t line_width,
+	progress_bar(std::ofstream& os, std::size_t line_width,
 		std::string message_, const char symbol = '=')
 		: os{ os },
 		bar_width{ line_width - overhead },

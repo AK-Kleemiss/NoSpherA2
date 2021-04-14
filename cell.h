@@ -16,6 +16,7 @@ private:
 	double ca, cb, cg, sa, sb, sg;
 	double rcm[3][3];
 	double cm[3][3];
+	std::string crystal_system;
 	std::vector < std::vector < std::vector <int> > > sym;
 	const double PI = 3.14159265358979323846;
 public:
@@ -27,6 +28,7 @@ public:
 				cm[i][j] = 0.0;
 			}
 		sym.resize(3); 
+		crystal_system = "triclinic";
 		for (int i = 0; i < 3; i++)
 			sym[i].resize(3);
 	};
@@ -101,6 +103,34 @@ public:
 			return -1;
 			break;
 		}
+	}
+	
+	void set_system(){
+		if (beta != 90.0){
+			crystal_system = "triclinic";
+			return;
+		}
+		else{
+			if(alpha == beta && alpha == 90.0)
+				crystal_system = "monoclinic";
+		}
+	}
+	
+	std::string get_crystal_system(){
+		return crystal_system;
+	}
+	
+	double get_d_of_hkl(const std::vector<int> hkl, std::ofstream& file, bool debug = false){
+		double d, upper, lower;
+		// d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
+		upper = pow(hkl[0],2) * pow(sa,2) / pow(a,2) + pow(hkl[1],2) * pow(sb,2) / pow(b,2) + pow(hkl[2],2) * pow(sg,2) / pow(c,2) + 2 * hkl[1] * hkl[2] / (b*c) * (cb*cg-ca) + 2 * hkl[0] * hkl[2] / (a*c) * (cg*ca-cb) + 2 * hkl[0] * hkl[1] / (a*b) * (ca*cb-cg);
+		lower = 1 - pow(ca,2) - pow(cb,2) - pow(cg,2) + 2*ca*cb*cg;
+		d = sqrt(lower/upper);
+		return d;
+	}
+	
+	double get_stl_of_hkl(const std::vector<int> hkl, std::ofstream& file, bool debug = false){
+		return 1.0/(2*get_d_of_hkl(hkl,file,debug));
 	}
 
 	void make_coords_cartesian(double* positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) {

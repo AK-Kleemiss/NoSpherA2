@@ -385,8 +385,8 @@
       <Optimization>O2</Optimization>
       <FastMath>true</FastMath>
       <DebugInformationFormat>None</DebugInformationFormat>
-      <GPUDebugInfo>false</GPUDebugInfo>
-      <HostDebugInfo>false</HostDebugInfo>
+      <GPUDebugInfo>true</GPUDebugInfo>
+      <HostDebugInfo>true</HostDebugInfo>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
@@ -640,6 +640,7 @@
     <ClCompile Include="../sphere_lebedev_rule.cpp" />
     <CudaCompile Include="../structure_factors.cpp">
       <GenerateLineInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateLineInfo>
+      <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Release|x64'">compute_75,sm_75;compute_61,sm_61</CodeGeneration>
     </CudaCompile>
     <ClCompile Include="..\NoSpherA2.cpp" />
     <ClCompile Include="../wfn_class.cpp" />
