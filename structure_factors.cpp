@@ -52,30 +52,101 @@ using namespace std;
 
 bool merge_tscs(
 	const string& mode,
-	const vector<string>& files
+	const vector<string>& files,
+	const bool debug
 ) {
+	//Currently only for Mode "pure merge"
 	if (files.size() == 0)
 		return false;
-	ofstream of("total.tsc", ios::out);
 	vector <string> labels;
-	vector <int> indices;
-	vector <vector <vector <double>>> form_fact;   //[i] real or imaginary, [j] scatterer, [k] reflection correpsonding to indices
+	vector <vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
+	vector <vector <complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
 
-	form_fact.resize(2);
+	vector<string> header;
+
+	size_t offset = 0;
+	indices.resize(3);
 	for (int f = 0; f < files.size(); f++) {
+		cout << "Reading file number: " << f + 1 << endl;
 		ifstream inf(files[f].c_str(), ios::in);
 		string line;
-		string header("");
 		bool data = false;
+		vector<bool> is_a_new_scatterer;
+		int nr_scatterers = 0;
 		while (!data) {
 			getline(inf, line);
-			header += line;
-			if (line.find("SCATTERERS:") != string::npos)
-				string temp_labels = line.substr(11, line.size());
+			if (line.find("SCATTERERS:") != string::npos) {
+				string temp_labels = line.substr(12, line.size()) + " ";
+				const string delimiter = " ";
+				size_t pos = 0;
+				string new_label;
+				while ((pos = temp_labels.find(delimiter)) != std::string::npos) {
+					nr_scatterers++;
+					new_label = temp_labels.substr(0, pos);
+					bool is_new = true;
+					for (int i = 0; i < labels.size(); i++)
+						if (labels[i] == new_label)	is_new = false;
+					is_a_new_scatterer.push_back(is_new);
+					if(is_new) labels.push_back(new_label);
+					temp_labels.erase(0, pos + delimiter.length());
+				}
+				cout << "Read " << nr_scatterers << " atoms, " << sum_of_bools(is_a_new_scatterer) << " are new." << endl;
+				form_fact.resize(labels.size());
+				form_fact.resize(labels.size());
+			}
+			else if (line.find("DATA:") != string::npos)
+				data = true;
+			else if (f == 0) header.push_back(line);
 		}
-		
-		// unfinished function!!!!
+		cout << "Reading Data Block..." << endl;
+		while (!inf.eof()) {
+			getline(inf, line);
+			vector<string> digest = split_string(line, " ");
+			if (digest.size() == 1 && digest[0] == "")
+				continue;
+			if (f==0)
+				for (int i = 0; i < 3; i++)
+					indices[i].push_back(stoi(digest[i]));
+#pragma omp parallel for
+			for (int i = 0; i < nr_scatterers; i++) {
+				if (!is_a_new_scatterer[i]) continue;
+				size_t nr_in_new_scats = 0;
+				for (int p = 0; p < i; p++)
+					if(is_a_new_scatterer[p]) nr_in_new_scats++;
+				vector<string> re_im = split_string(digest[i + 3], ",");
+				form_fact[offset+nr_in_new_scats].push_back(complex<double>(stod(re_im[0]),stod(re_im[1])));
+			}
+		}
+		if (form_fact[form_fact.size() - 1].size() != form_fact[0].size()) {
+			cout << "ERROR! Incorrect number of reflections among files! Aborting!" << endl;
+			return false;
+		}
+		cout << "Data for " << form_fact[0].size() << " indices read." << endl;
+		offset = labels.size();
 	}
+	cout << "Writing combined file..." << endl;
+	ofstream tsc_file("combined.tsc", ios::out);
+
+	for (size_t h = 0; h < header.size(); h++)
+		tsc_file << header[h] << endl;
+	tsc_file << "    PARTS: " << files.size() << endl;
+	tsc_file << "SCATTERERS:";
+	for (int i = 0; i < labels.size(); i++)
+		tsc_file << " " << labels[i];
+	tsc_file << endl << "DATA:" << endl;
+
+	for (int r = 0; r < indices[0].size(); r++) {
+		for (int h = 0; h < 3; h++)
+			tsc_file << indices[h][r] << " ";
+		for (int i = 0; i < labels.size(); i++)
+			tsc_file << scientific << setprecision(8) << real(form_fact[i][r]) << ","
+			<< scientific << setprecision(8) << imag(form_fact[i][r]) << " ";
+		tsc_file << endl;
+	}
+	tsc_file.flush();
+	tsc_file.close();
+	cout << "Done!" << endl;
+
 	return true;
 }
 
@@ -1000,6 +1071,68 @@ double linear_interpolate_spherical_density(
 }
 #endif
 
+bool thakkar_sfac(
+	const int atom_number,
+	const double radial_acc,
+	const int angular_level
+) {
+	Thakkar atom(atom_number);
+	double alpha_max = atom.get_max_alpha();
+	vector<double> alpha_min = atom.get_min_alpha();
+	const int max_l = atom.get_max_l();
+	int lebedev_high, lebedev_low;
+	if (angular_level == 0) {
+		lebedev_high = (max_l < 3) ? 0 : 10;
+		lebedev_low = (max_l < 3) ? 0 : 10;
+	}
+	else if (angular_level == 1) {
+		lebedev_high = (max_l < 3) ? 110 : 146;
+		lebedev_low = (max_l < 3) ? 38 : 50;
+	}
+	else if (angular_level == 2) {
+		lebedev_high = (max_l < 3) ? 230 : 266;
+		lebedev_low = (max_l < 3) ? 110 : 146;
+	}
+	else if (angular_level == 3) {
+		lebedev_high = (max_l < 3) ? 350 : 590;
+		lebedev_low = (max_l < 3) ? 266 : 350;
+	}
+	else if (angular_level > 3) {
+		lebedev_high = (max_l < 3) ? 590 : 5810;
+		lebedev_low = (max_l < 3) ? 350 : 4802;
+	}
+	AtomGrid Prototype_grid(radial_acc,
+		lebedev_low,
+		lebedev_high,
+		atom_number,
+		alpha_max,
+		max_l,
+		alpha_min.data());
+
+	int num_points = Prototype_grid.get_num_grid_points();
+
+	cout << "Number of points for atom: " << num_points << endl;
+
+	double **grid = new double*[4];
+	for (int n = 0; n < 6; n++)
+		grid[n] = new double[num_points];
+
+	double pos = 0.0;
+
+	Prototype_grid.get_grid_omp(1,
+		0,
+		&pos,
+		&pos,
+		&pos,
+		&atom_number,
+		grid[0],
+		grid[1],
+		grid[2],
+		grid[3]);
+
+	return true;
+}
+
 bool calculate_structure_factors_HF(
 	string& hkl_filename,
 	string& cif,
@@ -1839,32 +1972,76 @@ bool calculate_structure_factors_HF(
 	const double incr = pow(1.005, max(1, accuracy - 1));
 	const double lincr = log(incr);
 	const double min_dist = 0.0000001;
+	vector<Thakkar> sphericals;
+	for (int i = 0; i < atom_type_list.size(); i++)
+		sphericals.push_back(Thakkar(atom_type_list[i]));
 	//Make radial grids
-	for (int i = 0; i < atom_type_list.size(); i++) {
-		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
-		double current = 1;
-		double dist = min_dist;
-		if (accuracy > 3)
-			while (current > 1E-10) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		else
-			while (current > 1E-12) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		if (debug)
+	if (debug) {
+		for (int i = 0; i < atom_type_list.size(); i++) {
+			file << "Calculating for atomic number " << atom_type_list[i] << endl;
+			double current = 1;
+			double dist = min_dist;
+			if (accuracy > 3)
+				while (current > 1E-10) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+			else
+				while (current > 1E-12) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
 			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+			for (int j = 0; j < radial_density[i].size(); j++) {
+				if (radial_density[i][j] < 0.1)
+					break;
+				file << radial_density[i][j] << endl;
+			}
+		}
 	}
+	else {
+#pragma omp parallel for
+		for (int i = 0; i < atom_type_list.size(); i++) {
+			if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
+			double current = 1;
+			double dist = min_dist;
+			if (accuracy > 3)
+				while (current > 1E-10) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+			else
+				while (current > 1E-12) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+			if (debug) {
+				file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+				for (int j = 0; j < radial_density[i].size(); j++) {
+					if (radial_density[i][j] < 0.1)
+						break;
+					file << radial_density[i][j] << endl;
+				}
+			}
+		}
+	}
+	sphericals.clear();
 
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
@@ -2806,7 +2983,7 @@ bool calculate_structure_factors_HF(
 //		);
 //#else
 
-	//progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
+	progress_bar * progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
 	const int step = max(floor(asym_atom_list.size() / 20),1.0);
 	const int smax = shrink ? k_pt_unique[0].size() : k_pt[0].size();
 	const int imax = asym_atom_list.size();
@@ -2831,10 +3008,10 @@ bool calculate_structure_factors_HF(
 				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
 				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
-		//if (i != 0 && i % step == 0)
-		//	progress->write(i / double(imax));
+		if (i != 0 && i % step == 0)
+			progress->write(i / double(imax));
 	}
-	//delete(progress);
+	delete(progress);
 
 	if (electron_diffraction) {
 		const double fact = 0.023934;

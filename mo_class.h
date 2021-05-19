@@ -16,6 +16,7 @@ class MO {
 		MO();
 		MO (int number,double occupation,double energy);
 		bool push_back_coef(double val, const int nex);
+		void push_back_coef(double val);
 		bool erase_coef(int nr, const int nex);
 		double get_coefficient(const int nr, const bool debug) const;
 		double get_coefficient_f(const int nr) const;
@@ -30,6 +31,7 @@ class MO {
 		std::string hdr();
 		double get_energy() const;
 		double* get_ptr_coefficients() { return &coefficients[0]; };
+		void assign_coefs(std::vector<double>& values) { coefficients.resize(values.size()); coefficients = values; }
 };
 
 #endif

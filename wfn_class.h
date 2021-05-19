@@ -40,6 +40,8 @@ class WFN {
 		bool push_back_center(int cent);
 		bool push_back_type(int type);
 		bool push_back_exponent(double e);
+		void push_back_MO_coef(int nr, double value);
+		void assign_MO_coefs(int nr, std::vector<double> &values);
 		bool modified;
 		bool d_f_switch;
 		bool distance_switch;
@@ -70,6 +72,7 @@ class WFN {
 		bool read_wfn(std::string fileName, bool debug);
 		bool read_wfn(std::string fileName, bool debug, std::ofstream &file);
 		bool read_wfx(std::string fileName, bool debug, std::ofstream& file);
+		bool read_fchk(std::string& filename, std::ofstream& log, bool debug = false);
 		bool write_wfn(const std::string &fileName, bool debug, bool occupied);
 		bool set_path(std::string given_path) { path=given_path; return true; };
 		void print_primitive(int nr);

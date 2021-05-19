@@ -9,8 +9,14 @@ class WFN;
 
 bool merge_tscs(
 	const std::string &mode,
-	const std::vector<std::string> &files
+	const std::vector<std::string> &files,
+	const bool debug = false
 	);
+
+bool thakkar_sfac(
+	const int atom_number,
+	const double radial_acc = 1E-25,
+	const int angular_level = 3);
 
 bool calculate_structure_factors_HF(
 	std::string &hkl_filename, 

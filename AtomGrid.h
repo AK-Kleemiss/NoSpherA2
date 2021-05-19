@@ -12,6 +12,7 @@ class AtomGrid
              const double alpha_max,
              const int max_l_quantum_number,
              const double alpha_min[]);
+
     AtomGrid(const double radial_precision,
         const int min_num_angular_points,
         const int max_num_angular_points,
@@ -42,14 +43,25 @@ class AtomGrid
 
     void get_grid(const int num_centers,
                   const int center_index,
-                  const double x_coordinates_bohr[],
-                  const double y_coordinates_bohr[],
-                  const double z_coordinates_bohr[],
-                  const int proton_charges[],
+                  const double* x_coordinates_bohr,
+                  const double* y_coordinates_bohr,
+                  const double* z_coordinates_bohr,
+                  const int* proton_charges,
                   double grid_x_bohr[],
                   double grid_y_bohr[],
                   double grid_z_bohr[],
                   double grid_w[]) const;
+
+    void get_grid_omp(const int num_centers,
+        const int center_index,
+        const double* x_coordinates_bohr,
+        const double* y_coordinates_bohr,
+        const double* z_coordinates_bohr,
+        const int* proton_charges,
+        double grid_x_bohr[],
+        double grid_y_bohr[],
+        double grid_z_bohr[],
+        double grid_w[]) const;
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
 

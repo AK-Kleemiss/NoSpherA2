@@ -254,79 +254,109 @@ int main(int argc, char **argv){
 			}
 			i += 9;
 		}
+		if (temp.find("-sfac") != string::npos) {
+			int atom_numbers;
+			int n = 1;
+			while (argv[i + n][0] != '-' && i + n < argc) {
+				atom_numbers = stoi(string(argv[i + 1]));
+
+			}
+		}
+		if (temp.find("-merge") != string::npos) {
+			vector<string> filenames;
+			int n = 1;
+			while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+				filenames.push_back(argv[i + n]);
+				n++;
+			}
+			merge_tscs("combine", filenames, debug_all);
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
 		omp_set_dynamic(0);
 	}
+	string help_message = "----------------------------------------------------------------------------\n";
+	help_message.append("		These commands and arguments are known by wfn2fchk:\n");
+	help_message.append("----------------------------------------------------------------------------\n\n");
+	help_message.append("	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file\n");
+	help_message.append("	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename\n");
+	help_message.append("	-b    <FILENAME>				Read this basis set\n");
+	help_message.append("	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style\n");
+	help_message.append("	--help 							print this help\n");
+	help_message.append("	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
+	help_message.append("   -v2                             Even more stuff\n");
+	help_message.append("	-mult	<NUMBER>				Input multiplicity of wavefunction\n");
+	help_message.append("   -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF\n");
+	help_message.append("   -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors\n");
+	help_message.append("   -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from\n");
+	help_message.append("   -sfac     <ATOMIC NUMBERS>      Make scattering factors based on Thakkar functions for elements given\n");
+	help_message.append("   -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors\n");
+	help_message.append("   -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use\n");
+	help_message.append("              If there is more than a single twin law to be used use the twin command multiple times.\n");
+	help_message.append("   -merge    <List of .tsc files>  Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
+	//"    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
+	help_message.append("*****************************************************************************************************\n");
+	help_message.append("	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals\n");
+	help_message.append("*****************************************************************************************************\n");
+	string NoSpherA2_message = "    _   __     _____       __              ___   ___\n";
+	NoSpherA2_message.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
+	NoSpherA2_message.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
+	NoSpherA2_message.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
+	NoSpherA2_message.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
+	NoSpherA2_message.append("                /_/\n");
+	NoSpherA2_message.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
+	NoSpherA2_message.append("Please give credit and cite corresponding pieces!\n");
+	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al.Chem.Sci., 2021, 12, 1675 - 1692\n");
 	if (argc > 1) {
 		string keyword = argv[1];
-		if (keyword.find("--help") != string::npos) {
-			cout << "----------------------------------------------------------------------------" << endl
-				<< "		These commands and arguments are known by wfn2fchk:" << endl
-				<< "----------------------------------------------------------------------------" << endl << endl
-				<< "	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file" << endl
-				<< "	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename" << endl
-				<< "	-b    <FILENAME>				Read this basis set" << endl
-				<< "	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style" << endl
-				<< "	--help 							print this help" << endl
-				<< "	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
-				<< "    -v2                             Even more stuff"
-				<< "	-mult	<NUMBER>				Input multiplicity of wavefunction" << endl
-				<< "    -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF" << endl
-				<< "    -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors" << endl
-				<< "    -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from" << endl
-				<< "    -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors" << endl
-				<< "    -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use " << endl
-				<< "              If there is more than a single twin law to be used use the twin command multiple times."
-				//				<< "    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
-				<< "*****************************************************************************************************" << endl
-				<< "	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals" << endl
-				<< "*****************************************************************************************************" << endl;
-		}
+		if (keyword.find("--help") != string::npos)
+			cout << help_message << endl;
 	}
 	if (fract) {
 		cube residual(fract_name,true,debug_all);
 		residual.fractal_dimension(0.01);
 	}
+	if (!calc && wfn != "" && hkl == "") {
+		ofstream log_file("NoSpherA2.log", ios::out);
+		if (debug_main)
+			for (int i = 0; i < argc; i++)
+				log_file << argv[i] << endl;
+
+		log_file << NoSpherA2_message;
+		log_file.flush();
+		if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
+		else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
+		else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
+		else if (wfn.find(".fch") != string::npos) wavy.push_back(WFN(4));
+		else {
+			log_file << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
+			return -1;
+		}
+		log_file.flush();
+		if (wfn.find(".wfx") != string::npos)
+			wavy[0].read_wfx(wfn, debug_all, log_file);
+		else if (wfn.find(".fchk") != string::npos) {
+			if (debug_all) log_file << "Reading FCHK" << endl;
+			wavy[0].read_fchk(wfn, log_file, debug_all);
+			if (debug_all) wavy[0].write_wfn(wfn+"_test.wfn", false, false);
+		}
+		else
+			wavy[0].read_wfn(wfn, debug_all, log_file);
+	}
+
 	if (hkl != "" || basis_set != "" || fchk != "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
 				log_file << argv[i] << endl;
 
-		log_file << "    _   __     _____       __              ___   ___\n";
-		log_file << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
-		log_file << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
-		log_file << " / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
-		log_file << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
-		log_file << "                /_/\n" << flush;
-		log_file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+		log_file << NoSpherA2_message;
 		log_file.flush();
 		if (argc > 1) {
 			string keyword = argv[1];
 			if (keyword.find("--help") != string::npos) {
-				log_file << "----------------------------------------------------------------------------" << endl
-					<< "		These commands and arguments are known by wfn2fchk:" << endl
-					<< "----------------------------------------------------------------------------" << endl << endl
-					<< "	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file" << endl
-					<< "	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename" << endl
-					<< "	-b    <FILENAME>				Read this basis set" << endl
-					<< "	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style" << endl
-					<< "	--help 							print this help" << endl
-					<< "	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)" << endl
-					<< "    -v2                             Even more stuff"
-					<< "	-mult	<NUMBER>				Input multiplicity of wavefunction" << endl
-					<< "    -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF" << endl
-					<< "    -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors" << endl
-					<< "    -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from" << endl
-					<< "    -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors" << endl
-					<< "    -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use " << endl
-					<< "              If there is more than a single twin law to be used use the twin command multiple times."
-					//				<< "    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
-					<< "*****************************************************************************************************" << endl
-					<< "	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals" << endl
-					<< "*****************************************************************************************************" << endl;
+				log_file << help_message << endl;
 				log_file.close();
 				return 0;
 			}
@@ -347,18 +377,23 @@ int main(int argc, char **argv){
 			if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
 			else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
 			else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
+			else if (wfn.find(".fch") != string::npos) wavy.push_back(WFN(4));
 			else {
 				log_file << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
 				return -1;
 			}
 		}
+		log_file << "Reading: " << wfn << endl;
 		log_file.flush();
-		if (wfn.find(".wfx") == string::npos)
-			wavy[0].read_wfn(wfn, debug_all, log_file);
-		else
+		if (wfn.find(".wfx") != string::npos)
 			wavy[0].read_wfx(wfn, debug_all, log_file);
+		else if (wfn.find(".fchk") != string::npos) {
+			wavy[0].read_fchk(wfn, log_file, debug_all);
+			if(debug_all) wavy[0].write_wfn("test.wfn", false, true);
+		}
+		else
+			wavy[0].read_wfn(wfn, debug_all, log_file);
 		wavy[0].set_method(method);
-		//wavy[0].write_wfn("test.wfn", false, true);
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
@@ -412,13 +447,8 @@ int main(int argc, char **argv){
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
 				log2 << argv[i] << endl;
-		log2 << "    _   __     _____       __              ___   ___\n";
-		log2 << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
-		log2 << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
-		log2 << " / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
-		log2 << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
-		log2 << "                /_/\n" << flush;
-		log2 << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
+		log2 << NoSpherA2_message;
+		log2.flush();
 #ifdef _WIN32
 		if(debug_main){
 			log2 << "float min: " << dec << FLT_MIN << endl;
