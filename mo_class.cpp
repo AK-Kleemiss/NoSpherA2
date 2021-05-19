@@ -48,6 +48,10 @@ bool MO::push_back_coef(double val, const int nex){
 	return true;
 };
 
+void MO::push_back_coef(double val) {
+	coefficients.push_back(val);
+};
+
 bool MO::erase_coef(int nr, const int nex){
 	// Check, if Element (nr) is a valid Vector-Entry
 	if (nr - 1 < 0)

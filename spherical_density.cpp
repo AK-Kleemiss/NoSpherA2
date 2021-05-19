@@ -2,40 +2,42 @@
 
 #include <math.h>
 #include <cmath>
+#include <vector>
+#include <stdio.h>
 
-const int Thakkar_nex[113] = { 1, 5,
- 8,  8, 15, 15, 15, 15, 15, 15,
-17, 17, 20, 20, 20, 20, 20, 20,
-22, 22, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31,
-33, 33, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38,
+const int Thakkar_nex[113] = { 1,                                                                                            5,
+ 8,  8,                                                                                                 15, 15, 15, 15, 15, 15,
+17, 17,                                                                                                 20, 20, 20, 20, 20, 20,
+22, 22,                                                         30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 31, 31, 31, 31, 31, 31,
+33, 33,                                                         36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38,
 30, 30, 32, 38, 36, 36, 36, 36, 36, 38, 36, 36, 36, 36, 36, 36, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 40, 40, 40, 40, 40, 40,
 42, 42, 44, 44, 46, 46, 46, 44, 44, 46, 46, 44, 44, 44, 44, 44, 46};
-const int Thakkar_ns[113] = { 1, 5,
- 8,  8,  8,  8,  8,  8,  8,  8,
-10, 10, 10, 10, 10, 10, 10, 10,
-12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
+const int Thakkar_ns[113] = { 1,                                                                                             5,
+ 8,  8,                                                                                                  8,  8,  8,  8,  8,  8,
+10, 10,                                                                                                 10, 10, 10, 10, 10, 10,
+12, 12,                                                         12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
+14, 14,                                                         14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14,
 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13,
 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15};
-const int Thakkar_np[113] = { 0, 0,
- 0,  0,  7,  7,  7,  7,  7,  7,
- 7,  7, 10, 10, 10, 10, 10, 10,
-10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11,
-11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 13, 13, 13, 13, 13, 13,
+const int Thakkar_np[113] = { 0,                                                                                             0,
+ 0,  0,                                                                                                  7,  7,  7,  7,  7,  7,
+ 7,  7,                                                                                                 10, 10, 10, 10, 10, 10,
+10, 10,                                                         10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11,
+11, 11,                                                         11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 13, 13, 13, 13, 13, 13,
 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 12, 12, 12, 12, 12, 12,
 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12};
-const int Thakkar_nd[113] = { 0, 0,
- 0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
- 8,  8, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
+const int Thakkar_nd[113] = { 0,                                                                                             0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                          8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,
+ 8,  8,                                                         11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11,
  7,  7,  9,  9,  7,  7,  7,  7,  7,  9,  7,  7,  7,  7,  7,  7,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,  9,
  9,  9, 11, 11, 11, 11, 11,  9,  9, 11, 11,  9,  9,  9,  9,  9, 11};
-const int Thakkar_nf[113] = { 0, 0,
- 0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
- 0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+const int Thakkar_nf[113] = { 0,                                                                                             0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
  0,  0,  0,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,  6,
  6,  6,  6,  6,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8,  8};
 const int Thakkar_occ[] = {
@@ -4000,7 +4002,7 @@ const double Thakkar_c[]{
 				0.000400441, 0.306235602
 };
 
-int first_ex_SF(int atomic_number) {
+int Thakkar::first_ex() {
 	if (atomic_number == 1) return 0;
 	else if (atomic_number > 113) return 200000000;
 	int ex = 0;
@@ -4010,10 +4012,100 @@ int first_ex_SF(int atomic_number) {
 	return ex;
 };
 
-int first_coef_SF(int atomic_number) {
+int Thakkar::get_max_l() {
+	int l[4](0, 0, 0, 0);
+	int temp = atomic_number - 1;
+	for (int m = 0; m < 7; m++)
+		if (Thakkar_occ[temp * 19 + 0 + m] != 0)
+			l[0] = 1;
+	for (int m = 0; m < 6; m++)
+		if (Thakkar_occ[temp * 19 + 7 + m] != 0)
+			l[1] = 1;
+	for (int m = 0; m < 4; m++)
+		if (Thakkar_occ[temp * 19 + 13 + m] != 0)
+			l[2] = 1;
+	for (int m = 0; m < 2; m++)
+		if (Thakkar_occ[temp * 19 + 17 + m] != 0)
+			l[3] = 1;
+	return l[0]+l[1]+l[2]+l[3];
+};
+
+double Thakkar::get_max_alpha() {
+	const int offset = (atomic_number - 1) * 19;
+	int nr_ex = first_ex();
+	double max_exp = 0.0;
+	for (int ex = 0; ex < Thakkar_ns[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 7; m++) {
+			if (Thakkar_occ[offset + m] == 0) continue;
+			max_exp = std::max(Thakkar_z[nr_ex],max_exp);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_np[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 6; m++) {
+			if (Thakkar_occ[offset + m + 7] == 0) continue;
+			max_exp = std::max(Thakkar_z[nr_ex], max_exp);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nd[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 4; m++) {
+			if (Thakkar_occ[offset + m + 13] == 0) continue;
+			max_exp = std::max(Thakkar_z[nr_ex], max_exp);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nf[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 2; m++) {
+			if (Thakkar_occ[offset + m + 17] == 0) continue;
+			max_exp = std::max(Thakkar_z[nr_ex], max_exp);
+		}
+		nr_ex++;
+	}
+	return max_exp;
+};
+
+std::vector <double> Thakkar::get_min_alpha() { 
+	const int offset = (atomic_number - 1) * 19;
+	int nr_ex = first_ex();
+	std::vector<double> min_exp;
+	for (int i = 0; i < 4; i++) 
+		min_exp.push_back(1E40);
+	for (int ex = 0; ex < Thakkar_ns[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 7; m++) {
+			if (Thakkar_occ[offset + m] == 0) continue;
+			min_exp[0] = std::min(Thakkar_z[nr_ex], min_exp[0]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_np[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 6; m++) {
+			if (Thakkar_occ[offset + m + 7] == 0) continue;
+			min_exp[1] = std::min(Thakkar_z[nr_ex], min_exp[1]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nd[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 4; m++) {
+			if (Thakkar_occ[offset + m + 13] == 0) continue;
+			min_exp[2] = std::min(Thakkar_z[nr_ex], min_exp[2]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nf[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 2; m++) {
+			if (Thakkar_occ[offset + m + 17] == 0) continue;
+			min_exp[3] = std::min(Thakkar_z[nr_ex], min_exp[3]);
+		}
+		nr_ex++;
+	}
+	return min_exp;
+};
+
+int Thakkar::previous_element_coef() {
 	if (atomic_number == 1) return 0;
 	int counter = 0;
-	int temp = atomic_number - 1;
+	const int temp = atomic_number - 2;
 	for (int m = 0; m < 7; m++)
 		if (Thakkar_occ[temp * 19 + 0 + m] != 0)
 			counter += Thakkar_ns[temp];
@@ -4026,25 +4118,29 @@ int first_coef_SF(int atomic_number) {
 	for (int m = 0; m < 2; m++)
 		if (Thakkar_occ[temp * 19 + 17 + m] != 0)
 			counter += Thakkar_nf[temp];
-	return first_coef_SF(temp) + counter;
+	return Thakkar(atomic_number - 1).previous_element_coef() + counter;
 };
 
-double get_radial_density(
-	int atom_number,
+double Thakkar::get_radial_density(
 	double dist)
 {
 	//Speedup things for H
+	const int atom_number = atomic_number;
 	if (atom_number == 1)
 		return pow(exp(-dist) * 2, 2) / (4 * PI);
 
 	double Rho = 0.0;
-	int nr_ex = first_ex_SF(atom_number);
+	int nr_ex = first_ex();
 	if (nr_ex == 200000000)
 		return -20;
-	int nr_coef = first_coef_SF(atom_number - 1) + 1;
+	int nr_coef = previous_element_coef() + 1;
 
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	int offset = (atom_number - 1) * 19;
+	const int offset = (atom_number - 1) * 19;
+	if (dist == 0.0000001) {
+		cout << "fist dist" << endl;
+	}
+
 	double exponent;
 	for (int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
 		for (int m = 0; m < 7; m++) {
@@ -4076,8 +4172,7 @@ double get_radial_density(
 	}
 	for (int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
 		for (int m = 0; m < 4; m++) {
-			if (Thakkar_occ[offset + m + 13] == 0) 
-				continue;
+			if (Thakkar_occ[offset + m + 13] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
 			if (exponent > -46.5) {
 				if (Thakkar_n[nr_ex] == 1)
@@ -4091,8 +4186,7 @@ double get_radial_density(
 	}
 	for (int ex = 0; ex < Thakkar_nf[atom_number - 1]; ex++) {
 		for (int m = 0; m < 2; m++) {
-			if (Thakkar_occ[offset + m + 17] == 0)
-				continue;
+			if (Thakkar_occ[offset + m + 17] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
 			if (ex > -46.5) {
 				if (Thakkar_n[nr_ex] == 1)

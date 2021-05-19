@@ -606,6 +606,28 @@ int filetype_identifier(string &file, bool debug){
 	return -1;
 }
 
+vector<string> split_string(const string& input, const string delimiter) {
+	string input_copy = input + delimiter; // Need to add one delimiter in the end to return all elements
+	vector<string> result;
+	size_t pos = 0;
+	while ((pos = input_copy.find(delimiter)) != string::npos) {
+		result.push_back(input_copy.substr(0, pos));
+		input_copy.erase(0, pos + delimiter.length());
+	}
+	return result;
+};
+
+string go_get_string(ifstream& file, string search, bool rewind) {
+	if (rewind) file.seekg(0);
+	string line;
+	while (line.find(search) == string::npos && !file.eof())
+		getline(file, line);
+	if (file.eof())
+		return "";
+	else
+		return line;
+}
+
 string shrink_string(string &input){
 	while(input.find(" ")!=-1){input.erase(input.find(" "),1);}
 	while(input.find("1")!=-1){input.erase(input.find("1"),1);}
@@ -1013,7 +1035,7 @@ void progress_bar::write(double fraction)
 	auto width = bar_width - message.size();
 	auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
 
-	os << '\r';// << message.c_str();
+	os << '\r' << message.c_str();
 	os.write(full_bar.data() + offset, width);
 	os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction*20)*0.05) << "%] " << std::flush;
 }
@@ -1212,6 +1234,18 @@ void readxyzMinMax_fromCIF(
 
 	cif_input.close();
 }
+
+const int ft[11] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800 };
+
+const double normgauss(const int type, const double exp) {
+	int t[3];
+	if (type > 0)
+		type2vector(type, t);
+	else
+		t[0] = t[1] = t[2] = 0;
+	const int m = ft[t[0]] * ft[t[1]] * ft[t[2]] / (ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]]);
+	return pow(2 * exp / c_pi, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * m);
+};
 
 const int type_vector[168]{ 
 	0, 0, 0,
@@ -1559,3 +1593,51 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell &unit_cell, ofstream &
 	return true;
 };
 
+bool read_fchk_integer_block(ifstream& in, string heading, vector<int>& result, bool rewind) {
+	if (result.size() != 0) result.clear();
+	string line = go_get_string(in, heading, rewind);
+	int limit = read_fchk_integer(line);
+	int run = 0;
+	int temp;
+	getline(in, line);
+	while (run < limit) {
+		if (in.eof()) return false;
+		temp = stoi(line.substr(12 * (run % 6), 12 * (run % 6 + 1)));
+		result.push_back(temp);
+		run++;
+		if (run % 6 == 0)
+			getline(in, line);
+	}
+	return true;
+};
+bool read_fchk_double_block(ifstream& in, string heading, vector<double>& result, bool rewind) {
+	if (result.size() != 0) result.clear();
+	string line = go_get_string(in, heading, rewind);
+	int limit = read_fchk_integer(line);
+	int run = 0;
+	double temp;
+	getline(in, line);
+	while (run < limit) {
+		if (in.eof()) return false;
+		temp = stod(line.substr(16 * (run % 5), 16 * (run % 5 + 1)));
+		result.push_back(temp);
+		run++;
+		if (run % 5 == 0)
+			getline(in, line);
+	}
+	return true;
+};
+int read_fchk_integer(string in) {
+	return stoi(in.substr(49, in.length() - 49));
+};
+double read_fchk_double(string in) {
+	return stod(in.substr(49, in.length() - 49));
+};
+int read_fchk_integer(std::ifstream& in, std::string search, bool rewind) {
+	string temp = go_get_string(in, search, rewind);
+	return stoi(temp.substr(49, temp.length() - 49));
+};
+double read_fchk_double(std::ifstream& in, std::string search, bool rewind) {
+	string temp = go_get_string(in, search, rewind);
+	return stod(temp.substr(49, temp.length() - 49));
+};

@@ -287,23 +287,15 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_aw[],
     double grid_mw[]) const
 {
-
-    for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
-    {
-        grid_x_bohr[ipoint] =
-            atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
-        grid_y_bohr[ipoint] =
-            atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
-        grid_z_bohr[ipoint] =
-            atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
-
-        double becke_w = 1.0;
-
-        // if there are no other centers
-        // no point in partitioning the space
-        if (num_centers > 1)
+    // if there are no other centers
+    // no point in partitioning the space
+    if (num_centers > 1)
+        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
         {
-            becke_w = get_becke_w(num_centers,
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_mw[ipoint] = atom_grid_w_[ipoint] * get_becke_w(num_centers,
                 proton_charges,
                 x_coordinates_bohr,
                 y_coordinates_bohr,
@@ -312,11 +304,17 @@ void AtomGrid::get_grid(const int num_centers,
                 grid_x_bohr[ipoint],
                 grid_y_bohr[ipoint],
                 grid_z_bohr[ipoint]);
+            grid_aw[ipoint] = atom_grid_w_[ipoint];
         }
-
-        grid_mw[ipoint] = atom_grid_w_[ipoint] * becke_w;
-        grid_aw[ipoint] = atom_grid_w_[ipoint];
-    }
+    else
+        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
+        {
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_mw[ipoint] = atom_grid_w_[ipoint];
+            grid_aw[ipoint] = atom_grid_w_[ipoint];
+        }
 }
 
 void AtomGrid::get_grid(const int num_centers,
@@ -330,35 +328,72 @@ void AtomGrid::get_grid(const int num_centers,
                         double grid_z_bohr[],
                         double grid_w[]) const
 {
+    // if there are no other centers
+    // no point in partitioning the space
+    if (num_centers > 1)
+        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++){
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_w[ipoint] = atom_grid_w_[ipoint] * get_becke_w(num_centers,
+                proton_charges,
+                x_coordinates_bohr,
+                y_coordinates_bohr,
+                z_coordinates_bohr,
+                center_index,
+                grid_x_bohr[ipoint],
+                grid_y_bohr[ipoint],
+                grid_z_bohr[ipoint]);
+        }
+    else
+        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_w[ipoint] = atom_grid_w_[ipoint];
+        }
+}
 
-    for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
-    {
-        grid_x_bohr[ipoint] =
-            atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
-        grid_y_bohr[ipoint] =
-            atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
-        grid_z_bohr[ipoint] =
-            atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
-
-        double becke_w = 1.0;
-
-        // if there are no other centers
-        // no point in partitioning the space
-        if (num_centers > 1)
+void AtomGrid::get_grid_omp(const int num_centers,
+    const int center_index,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int* proton_charges,
+    double grid_x_bohr[],
+    double grid_y_bohr[],
+    double grid_z_bohr[],
+    double grid_w[]) const
+{
+    // if there are no other centers
+    // no point in partitioning the space
+    if (num_centers > 1)
+#pragma omp parallel for
+        for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
         {
-            becke_w = get_becke_w(num_centers,
-                                  proton_charges,
-                                  x_coordinates_bohr,
-                                  y_coordinates_bohr,
-                                  z_coordinates_bohr,
-                                  center_index,
-                                  grid_x_bohr[ipoint],
-                                  grid_y_bohr[ipoint],
-                                  grid_z_bohr[ipoint]);
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_w[ipoint] = atom_grid_w_[ipoint] * get_becke_w(num_centers,
+                proton_charges,
+                x_coordinates_bohr,
+                y_coordinates_bohr,
+                z_coordinates_bohr,
+                center_index,
+                grid_x_bohr[ipoint],
+                grid_y_bohr[ipoint],
+                grid_z_bohr[ipoint]);
         }
 
-        grid_w[ipoint] = atom_grid_w_[ipoint] * becke_w;
-    }
+    else
+#pragma omp parallel for
+        for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+            grid_w[ipoint] = atom_grid_w_[ipoint];
+        }
+    
 }
 
 void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const
