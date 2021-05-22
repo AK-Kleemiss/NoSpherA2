@@ -4013,7 +4013,7 @@ int Thakkar::first_ex() {
 };
 
 int Thakkar::get_max_l() {
-	int l[4](0, 0, 0, 0);
+	int l[4] = {0, 0, 0, 0};
 	int temp = atomic_number - 1;
 	for (int m = 0; m < 7; m++)
 		if (Thakkar_occ[temp * 19 + 0 + m] != 0)
@@ -4103,7 +4103,7 @@ std::vector <double> Thakkar::get_min_alpha() {
 };
 
 int Thakkar::previous_element_coef() {
-	if (atomic_number == 1) return 0;
+	if (atomic_number == 2) return 0;
 	int counter = 0;
 	const int temp = atomic_number - 2;
 	for (int m = 0; m < 7; m++)
@@ -4121,9 +4121,7 @@ int Thakkar::previous_element_coef() {
 	return Thakkar(atomic_number - 1).previous_element_coef() + counter;
 };
 
-double Thakkar::get_radial_density(
-	double dist)
-{
+double Thakkar::get_radial_density(double dist){
 	//Speedup things for H
 	const int atom_number = atomic_number;
 	if (atom_number == 1)
@@ -4137,9 +4135,6 @@ double Thakkar::get_radial_density(
 
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	const int offset = (atom_number - 1) * 19;
-	if (dist == 0.0000001) {
-		cout << "fist dist" << endl;
-	}
 
 	double exponent;
 	for (int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
