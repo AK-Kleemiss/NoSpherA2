@@ -1246,6 +1246,188 @@ const double normgauss(const int type, const double exp) {
 	const int m = ft[t[0]] * ft[t[1]] * ft[t[2]] / (ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]]);
 	return pow(2 * exp / c_pi, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * m);
 };
+bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h) {
+	//                                                   
+	//From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
+	//To 6D : 1  2  3  4  5  6                           
+	//XX, YY, ZZ, XY, XZ, YZ      
+	// 
+	d.resize(6);
+#pragma omp parallel for
+	for (int i = 0; i < 6; i++) {
+		d[i].resize(5);
+		fill(d[i].begin(), d[i].end(), 0.0);
+	}
+	//D0 = -0.5 * XX - 0.5 * YY + ZZ
+	d[0][0] = -0.5;
+	d[1][0] = -0.5;
+	d[2][0] = 1.0;
+	//D + 1 = XZ
+	d[4][1] = 1.0;
+	//D - 1 = YZ
+	d[5][2] = 1.0;
+	//D + 2 = SQRT(3) / 2 * (XX - YY)
+	d[0][3] = sqrt(3.0) / 2.0;
+	d[1][3] = -sqrt(3.0) / 2.0;
+	//D - 2 = XY
+	d[3][4] = 1.0;
+
+	//From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
+	//To 10F : 1   2   3   4   5   6   7   8   9  10
+	//XXX, YYY, ZZZ, XYY, XXY, XXZ, XZZ, YZZ, YYZ, XYZ(Gaussian sequence, not identical to Multiwfn)
+	//
+	f.resize(10);
+#pragma omp parallel for
+	for (int i = 0; i < 10; i++) {
+		f[i].resize(7);
+		fill(f[i].begin(), f[i].end(), 0.0);
+	}
+	//F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
+	f[2][0] = 1.0;
+	f[5][0] = -1.5 / sqrt(5.0);
+	f[8][0] = -1.5 / sqrt(5.0);
+	//F + 1 = -sqrt(3 / 8) * XXX - sqrt(3 / 40) * XYY + sqrt(6 / 5) * XZZ
+	f[0][1] = -sqrt(3.0 / 8.0);
+	f[3][1] = -sqrt(3.0 / 40.0);
+	f[6][1] = sqrt(6.0 / 5.0);
+	//F - 1 = -sqrt(3 / 40) * XXY - sqrt(3 / 8) * YYY + sqrt(6 / 5) * YZZ
+	f[1][2] = -sqrt(3.0 / 8.0);
+	f[4][2] = -sqrt(3.0 / 40.0);
+	f[7][2] = sqrt(6.0 / 5.0);
+	//F + 2 = sqrt3 / 2 * (XXZ - YYZ)
+	f[5][3] = sqrt(3.0) / 2.0;
+	f[8][3] = -sqrt(3.0) / 2.0;
+	//F - 2 = XYZ
+	f[9][4] = 1.0;
+	//F + 3 = sqrt(5 / 8) * XXX - 3 / sqrt8 * XYY
+	f[0][5] = sqrt(5.0 / 8.0);
+	f[3][5] = -3.0 / sqrt(8.0);
+	//F - 3 = 3 / sqrt8 * XXY - sqrt(5 / 8) * YYY
+	f[1][6] = -sqrt(5.0 / 8.0);
+	f[4][6] = 3.0 / sqrt(8.0);
+
+	//From 9G: G 0, G + 1, G - 1, G + 2, G - 2, G + 3, G - 3, G + 4, G - 4
+	//To 15G : 1    2    3    4    5    6    7    8
+	//ZZZZ, YZZZ, YYZZ, YYYZ, YYYY, XZZZ, XYZZ, XYYZ
+	//9   10   11   12   13   14   15
+	//XYYY, XXZZ, XXYZ, XXYY, XXXZ, XXXY, XXXX
+	//
+	g.resize(15);
+#pragma omp parallel for
+	for (int i = 0; i < 15; i++) {
+		g[i].resize(9);
+		std::fill(g[i].begin(), g[i].end(), 0.0);
+	}
+	//G 0 = ZZZZ + 3 / 8 * (XXXX + YYYY) - 3 * sqrt(3 / 35) * (XXZZ + YYZZ - 1 / 4 * XXYY)
+	g[0][0] = 1.0;
+	g[2][0] = -3.0 * sqrt(3.0 / 35.0);
+	g[4][0] = 3.0 / 8.0;
+	g[9][0] = -3.0 * sqrt(3.0 / 35.0);
+	g[11][0] = 3.0 / 4.0 * sqrt(3.0 / 35.0);
+	g[14][0] = 3.0 / 8.0;
+	//G + 1 = 2 * sqrt(5 / 14) * XZZZ - 3 / 2 * sqrt(5 / 14) * XXXZ - 3 / 2 / sqrt14 * XYYZ
+	g[5][1] = 2.0 * sqrt(5.0 / 14.0);
+	g[7][1] = -1.5 / sqrt(14.0);
+	g[12][1] = -1.5 * sqrt(5.0 / 14.0);
+	//G - 1 = 2 * sqrt(5 / 14) * YZZZ - 3 / 2 * sqrt(5 / 14) * YYYZ - 3 / 2 / sqrt14 * XXYZ
+	g[1][2] = 2.0 * sqrt(5.0 / 14.0);
+	g[3][2] = -1.5 * sqrt(5.0 / 14.0);
+	g[10][2] = -1.5 / sqrt(14.0);
+	//G + 2 = 3 * sqrt(3 / 28) * (XXZZ - YYZZ) - sqrt5 / 4 * (XXXX - YYYY)
+	g[2][3] = -3.0 * sqrt(3.0 / 28.0);
+	g[4][3] = sqrt(5.0) / 4.0;
+	g[9][3] = 3.0 * sqrt(3.0 / 28.0);
+	g[14][3] = -sqrt(5.0) / 4.0;
+	//G - 2 = 3 / sqrt7 * XYZZ - sqrt(5 / 28) * (XXXY + XYYY)
+	g[6][4] = 3.0 / sqrt(7.0);
+	g[8][4] = -sqrt(5.0 / 28.0);
+	g[13][4] = -sqrt(5.0 / 28.0);
+	//G + 3 = sqrt(5 / 8) * XXXZ - 3 / sqrt8 * XYYZ
+	g[7][5] = -3.0 / sqrt(8.0);
+	g[12][5] = sqrt(5.0 / 8.0);
+	//G - 3 = -sqrt(5 / 8) * YYYZ + 3 / sqrt8 * XXYZ
+	g[3][6] = -sqrt(5.0 / 8.0);
+	g[10][6] = 3.0 / sqrt(8.0);
+	//G + 4 = sqrt35 / 8 * (XXXX + YYYY) - 3 / 4 * sqrt3 * XXYY
+	g[4][7] = sqrt(35.0) / 8.0;
+	g[11][7] = -3.0 / 4.0 * sqrt(3.0);
+	g[14][7] = sqrt(35.0) / 8.0;
+	//G - 4 = sqrt5 / 2 * (XXXY - XYYY)
+	g[8][8] = -sqrt(5.0) / 2.0;
+	g[13][8] = sqrt(5.0) / 2.0;
+
+	//From 11H: H 0, H + 1, H - 1, H + 2, H - 2, H + 3, H - 3, H + 4, H - 4, H + 5, H - 5
+	//To 21H : 1     2     3     4     5     6     7     8     9    10
+	//ZZZZZ YZZZZ YYZZZ YYYZZ YYYYZ YYYYY XZZZZ XYZZZ XYYZZ XYYYZ
+	//11    12    13    14    15    16    17    18    19    20    21
+	//XYYYY XXZZZ XXYZZ XXYYZ XXYYY XXXZZ XXXYZ XXXYY XXXXZ XXXXY XXXXX
+	//
+	h.resize(21);
+#pragma omp parallel for
+	for (int i = 0; i < 21; i++) {
+		h[i].resize(11);
+		std::fill(h[i].begin(), h[i].end(), 0.0);
+	}
+	//H 0 = ZZZZZ - 5 / sqrt21 * (XXZZZ + YYZZZ) + 5 / 8 * (XXXXZ + YYYYZ) + sqrt(15 / 7) / 4 * XXYYZ
+	h[0][0] = 1.0;
+	h[11][0] = -5.0 / sqrt(21.0);
+	h[2][0] = -5.0 / sqrt(21.0);
+	h[18][0] = 5.0 / 8.0;
+	h[4][0] = 5.0 / 8.0;
+	h[13][0] = sqrt(15.0 / 7.0) / 4.0;
+	//H + 1 = sqrt(5 / 3) * XZZZZ - 3 * sqrt(5 / 28) * XXXZZ - 3 / sqrt28 * XYYZZ + sqrt15 / 8 * XXXXX + sqrt(5 / 3) / 8 * XYYYY + sqrt(5 / 7) / 4 * XXXYY
+	h[6][1] = sqrt(5.0 / 3.0);
+	h[15][1] = -3.0 * sqrt(5.0 / 28.0);
+	h[8][1] = -3.0 / sqrt(28.0);
+	h[20][1] = sqrt(15.0) / 8.0;
+	h[10][1] = sqrt(5.0 / 3.0) / 8.0;
+	h[17][1] = sqrt(5.0 / 7.0) / 4.0;
+	//H - 1 = sqrt(5 / 3) * YZZZZ - 3 * sqrt(5 / 28) * YYYZZ - 3 / sqrt28 * XXYZZ + sqrt15 / 8 * YYYYY + sqrt(5 / 3) / 8 * XXXXY + sqrt(5 / 7) / 4 * XXYYY
+	h[1][2] = sqrt(5.0 / 3.0);
+	h[3][2] = -3.0 * sqrt(5.0 / 28.0);
+	h[12][2] = -3.0 / sqrt(28.0);
+	h[5][2] = sqrt(15.0) / 8.0;
+	h[19][2] = sqrt(5.0 / 3.0) / 8.0;
+	h[14][2] = sqrt(5.0 / 7.0) / 4.0;
+	//H + 2 = sqrt5 / 2 * (XXZZZ - YYZZZ) - sqrt(35 / 3) / 4 * (XXXXZ - YYYYZ)
+	h[11][3] = sqrt(5.0) / 2.0;
+	h[2][3] = -sqrt(5.0) / 2.0;
+	h[18][3] = -sqrt(35.0 / 3.0) / 4.0;
+	h[4][3] = sqrt(35.0 / 3.0) / 4.0;
+	//H - 2 = sqrt(5 / 3) * XYZZZ - sqrt(5 / 12) * (XXXYZ + XYYYZ)
+	h[7][4] = sqrt(5.0 / 3.0);
+	h[16][4] = -sqrt(5.0 / 12.0);
+	h[9][4] = -sqrt(5.0 / 12.0);
+	//H + 3 = sqrt(5 / 6) * XXXZZ - sqrt(3 / 2) * XYYZZ - sqrt(35 / 2) / 8 * (XXXXX - XYYYY) + sqrt(5 / 6) / 4 * XXXYY
+	h[15][5] = sqrt(5.0 / 6.0);
+	h[8][5] = -sqrt(1.5);
+	h[20][5] = -sqrt(17.5) / 8.0;
+	h[10][5] = sqrt(17.5) / 8.0;
+	h[17][5] = sqrt(5.0 / 6.0) / 4.0;
+	//H - 3 = -sqrt(5 / 6) * YYYZZ + sqrt(3 / 2) * XXYZZ - sqrt(35 / 2) / 8 * (XXXXY - YYYYY) - sqrt(5 / 6) / 4 * XXYYY
+	h[3][6] = -sqrt(5.0 / 6.0);
+	h[12][6] = sqrt(1.5);
+	h[19][6] = -sqrt(17.5) / 8.0;
+	h[5][6] = sqrt(17.5) / 8.0;
+	h[14][6] = -sqrt(5.0 / 6.0) / 4.0;
+	//H + 4 = sqrt35 / 8 * (XXXXZ + YYYYZ) - 3 / 4 * sqrt3 * XXYYZ
+	h[18][7] = sqrt(35.0) / 8.0;
+	h[4][7] = sqrt(35.0) / 8.0;
+	h[13][7] = -0.75 * sqrt(3.0);
+	//H - 4 = sqrt5 / 2 * (XXXYZ - XYYYZ)
+	h[16][8] = sqrt(5.0) / 2.0;
+	h[9][8] = -sqrt(5.0) / 2.0;
+	//H + 5 = 3 / 8 * sqrt(7 / 2) * XXXXX + 5 / 8 * sqrt(7 / 2) * XYYYY - 5 / 4 * sqrt(3 / 2) * XXXYY
+	h[20][9] = 3.0 / 8.0 * sqrt(3.5);
+	h[10][9] = 5.0 / 8.0 * sqrt(3.5);
+	h[17][9] = -1.25 * sqrt(1.5);
+	//H - 5 = 3 / 8 * sqrt(7 / 2) * YYYYY + 5 / 8 * sqrt(7 / 2) * XXXXY - 5 / 4 * sqrt(3 / 2) * XXYYY
+	h[5][10] = 3.0 / 8.0 * sqrt(3.5);
+	h[19][10] = 5.0 / 8.0 * sqrt(3.5);
+	h[14][10] = -1.25 * sqrt(1.5);
+	return true;
+}
+
 
 const int type_vector[168]{ 
 	0, 0, 0,

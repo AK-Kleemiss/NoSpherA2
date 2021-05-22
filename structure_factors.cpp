@@ -1229,8 +1229,7 @@ bool calculate_structure_factors_HF(
 				for (int x = 0; x < 3; x++)
 					hkl[x].erase(hkl[x].begin() + j);
 
-	if (debug)
-		file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
+	file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
 
 	if (debug)
 		file << "starting to read cif!" << endl;
@@ -1468,7 +1467,7 @@ bool calculate_structure_factors_HF(
 	}
 
 	if (debug) {
-		file << "Read " << sym[0][0].size() << " symmetry elements! Size of sym: " << sym[0][0].size() << endl;
+		file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
 		for (int i = 0; i < sym[0][0].size(); i++) {
 			for (int x = 0; x < 3; x++) {
 				for (int y = 0; y < 3; y++)
@@ -1478,6 +1477,8 @@ bool calculate_structure_factors_HF(
 			file << endl;
 		}
 	}
+	else
+		file << "Number of symmetry operations: " << sym[0][0].size() << endl;
 
 	cif_input.close();
 
@@ -2003,22 +2004,19 @@ bool calculate_structure_factors_HF(
 			for (int j = 0; j < radial_density[i].size(); j++) {
 				if (radial_density[i][j] < 0.1)
 					break;
-				file << radial_density[i][j] << endl;
+				file << scientific << setprecision(8) << radial_density[i][j] << endl;
 			}
 		}
 	}
 	else {
 #pragma omp parallel for
 		for (int i = 0; i < atom_type_list.size(); i++) {
-			if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
 			double current = 1;
 			double dist = min_dist;
 			if (accuracy > 3)
 				while (current > 1E-10) {
 					radial_dist[i].push_back(dist);
 					current = sphericals[i].get_radial_density(dist);
-					if (current == -20)
-						return false;
 					radial_density[i].push_back(current);
 					dist *= incr;
 				}
@@ -2026,19 +2024,9 @@ bool calculate_structure_factors_HF(
 				while (current > 1E-12) {
 					radial_dist[i].push_back(dist);
 					current = sphericals[i].get_radial_density(dist);
-					if (current == -20)
-						return false;
 					radial_density[i].push_back(current);
 					dist *= incr;
 				}
-			if (debug) {
-				file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
-				for (int j = 0; j < radial_density[i].size(); j++) {
-					if (radial_density[i][j] < 0.1)
-						break;
-					file << radial_density[i][j] << endl;
-				}
-			}
 		}
 	}
 	sphericals.clear();
@@ -2894,7 +2882,9 @@ bool calculate_structure_factors_HF(
 
 	
 	if (shrink) {
-		if (debug) file << "Starting to make Mask!" << endl;
+		file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
+		file << "Determining unique k-points... ";
+		file.flush();
 		vector <bool> mask;
 		mask.resize(k_pt[0].size());
 		mask.assign(k_pt[0].size(), true);
@@ -2905,6 +2895,9 @@ bool calculate_structure_factors_HF(
 					continue;
 				if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
 					mask[j] = false;
+				else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
+					mask[j] = false;
+				}
 			}
 		if (debug)  file << "Mask done!" << endl;
 		for (int i = k_pt[0].size() - 1; i >= 0; i--) {
@@ -2916,12 +2909,11 @@ bool calculate_structure_factors_HF(
 				for (int h = 0; h < 3; h++)
 					hkl_unique[h].erase(hkl_unique[h].begin() + i);
 		}
-		if (debug)
-			file << "K-pt_unique size: " << k_pt_unique[0].size() << endl;
-		file << endl << "Number of k points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
+		file << " ... Done!";
+		file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 	}
 	else
-		file << endl << "Number of k points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
+		file << endl << "Number of k-points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
 
 	vector< vector < complex<double> > > sf;
 	sf.resize(asym_atom_list.size());
@@ -3066,7 +3058,7 @@ bool calculate_structure_factors_HF(
 		tsc_file << " " << labels[i];
 	tsc_file << endl << "DATA:" << endl;
 
-	if (shrink)
+	if (shrink) {
 		for (int r = 0; r < hkl_unique[0].size(); r++) {
 			for (int h = 0; h < 3; h++)
 				tsc_file << hkl_unique[h][r] << " ";
@@ -3075,6 +3067,15 @@ bool calculate_structure_factors_HF(
 				<< scientific << setprecision(8) << imag(sf[i][r]) << " ";
 			tsc_file << endl;
 		}
+		for (int r = 0; r < hkl_unique[0].size(); r++) {
+			for (int h = 0; h < 3; h++)
+				tsc_file << -hkl_unique[h][r] << " ";
+			for (int i = 0; i < asym_atom_list.size(); i++)
+				tsc_file << scientific << setprecision(8) << real(sf[i][r]) << ","
+				<< scientific << setprecision(8) << -imag(sf[i][r]) << " ";
+			tsc_file << endl;
+		}
+	}
 
 	else {
 		if (debug) file << "Writing a total of " << sym[0][0].size() << " symmetry generated sets of hkls!" << endl;
