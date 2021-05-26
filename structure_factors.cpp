@@ -1252,7 +1252,7 @@ bool calculate_structure_factors_HF(
 				file << setw(10) << fixed << unit_cell.get_rcm(i, j) / 2 / M_PI / 0.529177249 << ' ';
 			file << endl;
 		}
-		file << "CM in bohr:" << endl;
+		file << "CM in 2*PI bohr:" << endl;
 		for (int i = 0; i < 3; ++i) {
 			for (int j = 0; j < 3; ++j)
 				file << setw(10) << fixed << unit_cell.get_cm(i, j) << ' ';
@@ -3067,14 +3067,14 @@ bool calculate_structure_factors_HF(
 				<< scientific << setprecision(8) << imag(sf[i][r]) << " ";
 			tsc_file << endl;
 		}
-		for (int r = 0; r < hkl_unique[0].size(); r++) {
-			for (int h = 0; h < 3; h++)
-				tsc_file << -hkl_unique[h][r] << " ";
-			for (int i = 0; i < asym_atom_list.size(); i++)
-				tsc_file << scientific << setprecision(8) << real(sf[i][r]) << ","
-				<< scientific << setprecision(8) << -imag(sf[i][r]) << " ";
-			tsc_file << endl;
-		}
+		//for (int r = 0; r < hkl_unique[0].size(); r++) {
+		//	for (int h = 0; h < 3; h++)
+		//		tsc_file << -hkl_unique[h][r] << " ";
+		//	for (int i = 0; i < asym_atom_list.size(); i++)
+		//		tsc_file << scientific << setprecision(8) << real(sf[i][r]) << ","
+		//		<< scientific << setprecision(8) << -imag(sf[i][r]) << " ";
+		//	tsc_file << endl;
+		//}
 	}
 
 	else {

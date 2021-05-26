@@ -3,7 +3,7 @@ RM := rm
 #LIBS := -lgomp -static-libgcc -static-libstdc++
 LIBS := -lgomp
 
-LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/7/libgomp.a
+LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.a
 
 all: NoSpherA2
 
@@ -28,11 +28,38 @@ CPP_DEPS += \
 ./unity4.d \
 ./unity5.d
 
+CPP_SRCS_QCT += \
+./unity1.cpp \
+./unity2.cpp \
+./unity3.cpp \
+./unity4_QCT.cpp \
+./unity5.cpp
+
+OBJS_QCT += \
+./unity1.o \
+./unity2.o \
+./unity3.o \
+./unity4_QCT.o \
+./unity5.o
+
+CPP_DEPS_QCT += \
+./unity1.d \
+./unity2.d \
+./unity3.d \
+./unity4_QCT.d \
+./unity5.d
+
 -include ${CPP_DEPS}
 
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
+	${RM} ${CPP_DEPS} ${OBJS}
+	@echo 'Finished building target: $@'
+	
+QCT: ${OBJS_QCT} ${USER_OBJS}
+	@echo 'Building target: $@'
+	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS_QCT} ${LIBS} -I../ -L../
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
@@ -52,6 +79,11 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Finished building: $<'
 
 ./unity4.o: ./unity4.cpp
+	@echo 'Building file: $<'
+	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@echo 'Finished building: $<'
+	
+./unity4_QCT.o: ./unity4_QCT.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

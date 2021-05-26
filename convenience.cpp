@@ -618,10 +618,13 @@ vector<string> split_string(const string& input, const string delimiter) {
 };
 
 string go_get_string(ifstream& file, string search, bool rewind) {
-	if (rewind) file.seekg(0);
+	if (rewind) {
+		file.clear();
+		file.seekg(0, file.beg);
+	}
 	string line;
-	while (line.find(search) == string::npos && !file.eof())
-		getline(file, line);
+	while (line.find(search) == string::npos && !file.eof() && getline(file, line))
+		continue;
 	if (file.eof())
 		return "";
 	else
@@ -1243,8 +1246,9 @@ const double normgauss(const int type, const double exp) {
 		type2vector(type, t);
 	else
 		t[0] = t[1] = t[2] = 0;
-	const int m = ft[t[0]] * ft[t[1]] * ft[t[2]] / (ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]]);
-	return pow(2 * exp / c_pi, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * m);
+	int temp = ft[t[0]] * ft[t[1]] * ft[t[2]];
+	int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
+	return pow(2 * exp / c_pi, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp/temp2);
 };
 bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h) {
 	//                                                   
@@ -1490,7 +1494,7 @@ const int type_vector[168]{
 void type2vector(
 	const int index,
 	int* vector) {
-	if (index < 1 || index > 35) {
+	if (index < 1 || index > 56) {
 		vector[0] = -1;
 		vector[1] = -1;
 		vector[2] = -1;
