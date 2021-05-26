@@ -307,7 +307,7 @@ int main(int argc, char **argv){
 	NoSpherA2_message.append("                /_/\n");
 	NoSpherA2_message.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
 	NoSpherA2_message.append("Please give credit and cite corresponding pieces!\n");
-	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al.Chem.Sci., 2021, 12, 1675 - 1692\n");
+	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
 	if (argc > 1) {
 		string keyword = argv[1];
 		if (keyword.find("--help") != string::npos)

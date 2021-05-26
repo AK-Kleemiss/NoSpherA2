@@ -2990,11 +2990,20 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 	if (debug) {
 		log << "nprim" << endl;
 		log << setw(3) << nprims << endl;
-		log << "amocoeff";
-		for (int i = 0; i < acoef.size(); i++) {
+		log << "amocoeff of MO:1";
+		for (int i = 0; i < 4; i++) {
 			if (i % 2 == 0)
 				log << endl;
 			log << setprecision(8) << setw(16) << scientific << acoef[i];
+		}
+		log << endl << "First of MOs 1-4:" << endl;
+		for (int i = 0; i < 4; i++) {
+			if (i % 2 == 0)
+				log << endl;
+			if (is_spherical)
+				log << setprecision(8) << setw(16) << scientific << acoef[i * nbas5D];
+			else
+				log << setprecision(8) << setw(16) << scientific << acoef[i * nbas];
 		}
 	}
 	//vector<primitive> basis;
@@ -3045,12 +3054,13 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 		if (debug) {
 			log << endl << "CObasa5d";
 			int run = 0;
-			for (int i = 0; i < nbas5D; i++) {
+			for (int i = 0; i < 2; i++) {
 				for (int j = 0; j < nbas5D; j++) {
 					if (run % 2 == 0) log << endl;
 					log << setprecision(8) << setw(16) << scientific << CObasa_spherical[i][j];
 					run++;
 				}
+				log << endl;
 			}
 			log << endl;
 		}
@@ -3083,7 +3093,22 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 #pragma omp parallel for
 				for (int i = 0; i < nbas5D; i++)
 					for (int j = 0; j < shell_size6D; j++)
-						CObasa[ipos_cart + j][i] = CObasa_spherical[i][ipos_spher + j];
+						CObasa[ipos_cart + j][i] = CObasa_spherical[ipos_spher + j][i];
+				if (debug) {
+					int run = 0;
+					for (int i = 0; i < nbas5D; i++) {
+						if (run % 2 == 0) log << endl;
+						log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher][i];
+						run++;
+					}
+					log << endl;
+					for (int i = 0; i < nbas; i++) {
+						if (run % 2 == 0) log << endl;
+						log << setprecision(8) << setw(16) << scientific << CObasa[ipos_cart][i];
+						run++;
+					}
+					log << endl;
+				}
 				//if (debug) {
 				//	int run = 0;
 				//	for (int i = 0; i < nbas5D; i++) {
@@ -3168,8 +3193,7 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 							+ mat_11h21h[j][7] * CObasa_spherical[ipos_spher + 7][i]
 							+ mat_11h21h[j][8] * CObasa_spherical[ipos_spher + 8][i]
 							+ mat_11h21h[j][9] * CObasa_spherical[ipos_spher + 9][i]
-							+ mat_11h21h[j][10] * CObasa_spherical[ipos_spher + 10][i]
-							+ mat_11h21h[j][11] * CObasa_spherical[ipos_spher + 11][i];
+							+ mat_11h21h[j][10] * CObasa_spherical[ipos_spher + 10][i];
 			if (r_u_ro_switch == 1) {
 				if (temp_typ5D >= -1) // S and P shells are fine!
 #pragma omp parallel for
@@ -3227,8 +3251,7 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 							+ mat_11h21h[j][7] * CObasb_spherical[ipos_spher + 7][i]
 							+ mat_11h21h[j][8] * CObasb_spherical[ipos_spher + 8][i]
 							+ mat_11h21h[j][9] * CObasb_spherical[ipos_spher + 9][i]
-							+ mat_11h21h[j][10] * CObasb_spherical[ipos_spher + 10][i]
-							+ mat_11h21h[j][11] * CObasb_spherical[ipos_spher + 11][i];
+							+ mat_11h21h[j][10] * CObasb_spherical[ipos_spher + 10][i];
 			}
 			ipos_cart += shell_size6D;
 			ipos_spher += shell_size5D;
@@ -3236,12 +3259,12 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 		if (debug) {
 			log << endl << "CObasa";
 			int run = 0;
-			for (int i = 0; i < nbas; i++) {
+			for (int i = 0; i < 10; i++) {
 				run = 0;
 				for (int j = 0; j < nbas; j++) {
 					if (run % 2 == 0)
 						log << endl;
-					log << setprecision(8) << setw(16) << scientific << CObasa[j][i];
+					log << setprecision(8) << setw(16) << scientific << CObasa[i][j];
 					run++;
 				}
 				log << endl;
@@ -3260,6 +3283,16 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 				for (int b = 0; b < nbas; b++)
 					CObasb[b][mo] = bcoef[nbas * b + mo];
 	}
+	if (debug) {
+		log << endl;
+		int run = 0;
+		for (int i = 0; i < contraction.size(); i++) {
+			if (run % 2 == 0) log << endl;
+			log << setprecision(8) << setw(16) << scientific << contraction[i];
+			run++;
+		}
+		log << flush;
+	}
 	int k = 0, iexp = 0, ibasis = 0;
 	//double tnormgau;
 	for (int i = 0; i < nshell; i++) {
@@ -3269,24 +3302,18 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 		int lim = sht2nbas(shell_types[i]);
 		for (j = 0; j < lim; j++) {
 			int temp = shell2function(shell_types[i], j);
+#pragma omp parallel for
 			for (int l = 0; l < nr_prims_shell[i]; l++)
 				types[k + l] = temp;
 			for (int l = 0; l < nr_prims_shell[i]; l++) {
 				exponents[k] = exp[iexp + l];
 				primconnorm[k] = contraction[iexp + l] * normgauss(types[k], exponents[k]);
+				if (debug) log << setw(22) << setprecision(16) << normgauss(types[k], exponents[k]) << endl;
 #pragma omp parallel for
 				for (int mo = 0; mo < nmo; mo++) {
-					if (r_u_ro_switch == 0 || r_u_ro_switch == 2)//R or RO
-						COa[mo][k] = CObasa[mo][ibasis] * primconnorm[k];
-					else {
-						//if (is_spherical) { // Possibly not neede since alpha and beta are separated
-							COa[mo][k] = CObasa[mo][ibasis] * primconnorm[k];
-							COb[mo][k] = CObasb[mo][ibasis] * primconnorm[k];
-						//}
-						//else {
-						//
-						//}
-					}
+					COa[mo][k] = CObasa[ibasis][mo] * primconnorm[k];
+					if (r_u_ro_switch == 1)//R or RO
+						COb[mo][k] = CObasb[ibasis][mo] * primconnorm[k];
 				}
 				k++;
 			}
