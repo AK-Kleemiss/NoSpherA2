@@ -356,8 +356,8 @@ bool cube::read_file(bool full, bool header, bool expert){
 	return (true);
 }
 
-bool cube::write_file(WFN &wave, bool force, bool absolute){
-	bool end=false;
+bool cube::write_file(WFN& wave, bool force, bool absolute) {
+	bool end = false;
 	if (!force) {
 		while (exists(path) && !end) {
 			cout << "File already exists, do you want to overwrite it? ";
@@ -381,90 +381,88 @@ bool cube::write_file(WFN &wave, bool force, bool absolute){
 	}
 	stringstream stream;
 	string temp;
-	ofstream of(path.c_str(),ios::out);
-	of << comment1 << '\n';
-	of << comment2 << '\n';
-	of << setw(6) << na << fixed << setw(12) << origin[0] << fixed << setw(12) << origin[1] << fixed << setw(12) << origin[2] << '\n';
-	for(int i=0; i<3; i++){
-		stream << setw(6) << size[i];
-		for(int j=0; j<3; j++)  stream << fixed << setw(12) << setprecision (6)<< vectors[i][j];
-		stream << '\n';
+	ofstream of(path.c_str(), ios::out);
+	of << comment1 << endl;
+	of << comment2 << endl;
+	of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
+	for (int i = 0; i < 3; i++) {
+		stream << setw(5) << size[i];
+		for (int j = 0; j < 3; j++)  stream << fixed << setw(12) << setprecision(6) << vectors[i][j];
+		stream << endl;
 	}
 	of << stream.str();
 	stream.str("");
-	for(int i=0; i<na ; i++){
-		of << setw(6) << wave.get_atom_charge(i) << setw(6) << wave.get_atom_charge (i) << ".00000";
-		for(int j=0; j<3; j++) 
-			of << fixed << setw(12) << wave.get_atom_coordinate (i,j,false);
-		of << '\n';
+	for (int i = 0; i < na; i++) {
+		of << setw(5) << wave.get_atom_charge(i) << setw(5) << wave.get_atom_charge(i) << ".000000";
+		for (int j = 0; j < 3; j++)
+			of << fixed << setw(12) << setprecision(6) << wave.get_atom_coordinate(i, j, false);
+		of << endl;
 	}
-	for(int run_x=0; run_x<size[0]; run_x++){
-		for(int run_y=0; run_y<size[1]; run_y++){
-			int temp_write=0;
-			while(temp_write<size[2]){
-				if(absolute)
-					stream << uppercase << scientific << setw(15) << setprecision(7) << abs(values[run_x][run_y][temp_write]);
+	for (int run_x = 0; run_x < size[0]; run_x++) {
+		for (int run_y = 0; run_y < size[1]; run_y++) {
+			int temp_write = 0;
+			while (temp_write < size[2]) {
+				if (absolute)
+					stream << uppercase << scientific << setw(13) << setprecision(5) << abs(values[run_x][run_y][temp_write]);
 				else
-					stream << uppercase << scientific << setw(15) << setprecision(7) << values[run_x][run_y][temp_write];
+					stream << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
 				temp_write++;
-				if(temp_write%6==0) stream << '\n';
+				if (temp_write % 6 == 0) stream << endl;
 			}
-			if(temp_write%6!=0) stream << '\n';
+			if (temp_write % 6 != 0) stream << endl;
 		}
 		of << stream.str();
 		stream.str("");
 	}
-	of.flush();
-	of.close();
 	return (true);
 };
 
-bool cube::write_file(WFN &wave, string &given_path, bool debug){
+bool cube::write_file(WFN& wave, string& given_path, bool debug) {
 	stringstream stream;
 	string temp;
-	ofstream of(given_path.c_str(),ios::out);
-	of << comment1 << '\n';
-	of << comment2 << '\n';
-	of << setw(6) << na << fixed << setw(12) << origin[0] << fixed << setw(12) << origin[1] << fixed << setw(12) << origin[2] << '\n';
+	ofstream of(given_path.c_str(), ios::out);
+	of << comment1 << endl;
+	of << comment2 << endl;
+	of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
 	for (int i = 0; i < 3; i++) {
-		stream << setw(6) << size[i];
-		for (int j = 0; j < 3; j++)  stream << fixed << setw(12) << setprecision(6) << vectors[i][j];
-		stream << '\n';
+		of << setw(5) << size[i];
+		for (int j = 0; j < 3; j++)  of << fixed << setw(12) << setprecision(6) << vectors[i][j];
+		of << endl;
 	}
-	of << stream.str();
-	stream.str("");
-	for(int i=0; i<na ; i++){
-		of << setw(6) << wave.get_atom_charge(i) << setw(6) << wave.get_atom_charge(i) << ".000000";
+	//of << stream.str();
+	//stream.str("");
+	for (int i = 0; i < na; i++) {
+		of << setw(5) << wave.get_atom_charge(i) << setw(5) << wave.get_atom_charge(i) << ".000000";
 		for (int j = 0; j < 3; j++)
-			of << fixed << setw(12) << wave.get_atom_coordinate(i, j, false);
-		of << '\n';
+			of << fixed << setw(12) << setprecision(6) << wave.get_atom_coordinate(i, j, false);
+		of << endl;
 	}
-	if(debug) cout << "Finished atoms!" << endl;
-	if(get_loaded())
-		for(int run_x=0; run_x<size[0]; run_x++)
-			for(int run_y=0; run_y<size[1]; run_y++){
-				int temp_write=0;
-				while(temp_write<size[2]){
-					of << uppercase << scientific << setw(15) << setprecision(7) << values[run_x][run_y][temp_write];
+	if (debug) cout << "Finished atoms!" << endl;
+	if (get_loaded())
+		for (int run_x = 0; run_x < size[0]; run_x++)
+			for (int run_y = 0; run_y < size[1]; run_y++) {
+				int temp_write = 0;
+				while (temp_write < size[2]) {
+					of << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
 					temp_write++;
-					if(temp_write%6==0) of << '\n';
+					if (temp_write % 6 == 0) of << endl;
 				}
-				if(debug) cout << "Write Z-line!" << '\n';
-				if(temp_write%6!=0) of << '\n';
+				if (debug) cout << "Write Z-line!" << endl;
+				if (temp_write % 6 != 0) of << endl;
 			}
-	else{
+	else {
 		ifstream f(path, ios::in);
 		string line_buffer;
-		for(int a=0; a<na+6; a++) getline(f,line_buffer);
-		while(!f.eof()){
-			getline(f,line_buffer);
-			of << line_buffer << '\n';
+		for (int a = 0; a < na + 6; a++) getline(f, line_buffer);
+		while (!f.eof()) {
+			getline(f, line_buffer);
+			of << line_buffer << endl;
 		}
 	}
 	//of << stream.str();
 	of.flush();
 	of.close();
-	path=given_path;
+	path = given_path;
 	return (true);
 };
 
