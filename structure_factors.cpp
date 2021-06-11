@@ -1644,6 +1644,10 @@ bool calculate_structure_factors_HF(
 	//Make Prototype grids with only single atom weights for all elements
 	vector <AtomGrid> Prototype_grids;
 	if (debug) file << "max_l_overall: " << max_l_overall << endl;
+	const int lebedev_table[33] = { 6,   14,   26,   38,   50,   74,   86,  110,
+								  146,  170,  194,  230,  266,  302,  350,  434,
+								  590,  770,  974, 1202, 1454, 1730, 2030, 2354,
+								 2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
 	for (int i = 0; i < atom_type_list.size(); i++) {
 		if (debug) file << "Atom " << i << endl;
 		double alpha_max_temp;
@@ -1674,29 +1678,64 @@ bool calculate_structure_factors_HF(
 		int lebedev_high, lebedev_low;
 		double radial_acc;
 		if (accuracy == 0) {
-			lebedev_high = (max_l_temp < 3) ? 0 : 10;
-			lebedev_low = (max_l_temp < 3) ? 0 : 10;
-			radial_acc = 1e-5;
+			if (atom_type_list[i] != 1) {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+				radial_acc = 1e-5;
+			}
+			else {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+				radial_acc = 1e-4;
+			}
 		}
 		else if (accuracy == 1) {
-			lebedev_high = (max_l_temp < 3) ? 110 : 146;
-			lebedev_low = (max_l_temp < 3) ? 38 : 50;
-			radial_acc = 1e-8;
+			if (atom_type_list[i] != 1) {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
+				radial_acc = 1e-8;
+			}
+			else {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
+				radial_acc = 1e-7;
+			}
 		}
 		else if (accuracy == 2) {
-			lebedev_high = (max_l_temp < 3) ? 230 : 266;
-			lebedev_low = (max_l_temp < 3) ? 110 : 146;
-			radial_acc = 1e-10;
+			if (atom_type_list[i] != 1) {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+				radial_acc = 1e-10;
+			}
+			else {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+				radial_acc = 1e-9;
+			}
 		}
 		else if (accuracy == 3) {
-			lebedev_high = (max_l_temp < 3) ? 350 : 590;
-			lebedev_low = (max_l_temp < 3) ? 266 : 350;
-			radial_acc = 1e-15;
+			if (atom_type_list[i] != 1) {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
+				radial_acc = 1e-15;
+			}
+			else {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
+				radial_acc = 1e-14;
+			}
 		}
 		else if (accuracy > 3) {
-			lebedev_high = (max_l_temp < 3) ? 590 : 5810;
-			lebedev_low = (max_l_temp < 3) ? 350 : 4802;
-			radial_acc = 1e-20;
+			if (atom_type_list[i] != 1) {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
+				radial_acc = 1e-20;
+			}
+			else {
+				lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
+				lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+				radial_acc = 1e-15;
+			}
 		}
 		Prototype_grids.push_back(AtomGrid(radial_acc,
 			lebedev_low,
@@ -2349,7 +2388,7 @@ bool calculate_structure_factors_HF(
 	}
 #endif
 
-	file << "Calculating aspherical densities..." << flush;
+	file << "Calculating non-spherical densities..." << flush;
     vector < vector < double > > periodic_grid;
 
 #ifdef FLO_CUDA
@@ -2647,7 +2686,7 @@ bool calculate_structure_factors_HF(
 	delete[] mo_coef;
 
 	if (debug) file << endl << "with total number of points: " << total_grid[0].size() << endl;
-	else file << "                   done!" << endl;
+	else file << "                done!" << endl;
 
 	file << "Applying hirshfeld weights and integrating charges..." << flush;
 	double el_sum_becke = 0.0;
@@ -2701,7 +2740,7 @@ bool calculate_structure_factors_HF(
 	file << "Number of points evaluated: " << total_grid[0].size();
 #endif
 	
-	file << " with " << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
+	file << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
 
 	file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
 

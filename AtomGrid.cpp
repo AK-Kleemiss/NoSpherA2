@@ -187,15 +187,16 @@ AtomGrid::AtomGrid(const double radial_precision,
      double r_inner = get_r_inner(radial_precision,  alpha_max * 2.0); // factor 2.0 to match DIRAC
      double h = (std::numeric_limits<double>::max)();
      double r_outer = 0.0;
+
      for (int l = 0; l <= max_l_quantum_number; l++)
      {
          if (alpha_min[l] > 0.0)
          {
-             if (debug) 
-                 file << "ATOM GRID: " 
-                    << "l= " << l 
-                    << " r_inner: " << r_inner 
-                    << " alpha_min: " << alpha_min[l] << endl;
+             //if (debug) 
+             //    file << "ATOM GRID: " 
+             //       << "l= " << l 
+             //       << " r_inner: " << r_inner 
+             //       << " alpha_min: " << alpha_min[l] << endl;
              r_outer = std::max(r_outer, 
                                 get_r_outer(radial_precision, 
                                     alpha_min[l], 
@@ -211,11 +212,11 @@ AtomGrid::AtomGrid(const double radial_precision,
      }
      NUMGRID_ASSERT(r_outer > h);
 
-     if(debug) 
-         file << "ATOM GRID: " 
-            << "r_inner: " << r_inner 
-            << " h: " << h 
-            << " r_outer: " << r_outer << endl;
+     //if(debug) 
+     //    file << "ATOM GRID: " 
+     //       << "r_inner: " << r_inner 
+     //       << " h: " << h 
+     //       << " r_outer: " << r_outer << endl;
 
      num_radial_grid_points_ = 0;
 
@@ -223,11 +224,11 @@ AtomGrid::AtomGrid(const double radial_precision,
      double c = r_inner / (exp(h) - 1.0);
      int num_radial = int(log(1.0 + (r_outer / c)) / h);
 
-     if (debug) 
-         file << "ATOM GRID: " 
-            << "rb: " << rb 
-            << " c: " << c 
-            << " num_radial: " << num_radial << endl;
+     //if (debug) 
+     //    file << "ATOM GRID: " 
+     //       << "rb: " << rb 
+     //       << " c: " << c 
+     //       << " num_radial: " << num_radial << endl;
 
      for (int irad = 0; irad < num_radial; irad++)
      {
