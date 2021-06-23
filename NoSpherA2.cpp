@@ -56,21 +56,21 @@ bool debug_all = false;
 bool expert = false;
 int main(int argc, char **argv){
 	vector <string> known_keywords;
-	known_keywords.push_back("-wfn");
-	known_keywords.push_back("-fchk");
-	known_keywords.push_back("-b");
-	known_keywords.push_back("-d");
-	known_keywords.push_back("-v");
-	known_keywords.push_back("-hkl");
-	known_keywords.push_back("-cif");
-	known_keywords.push_back("-acc");
-	known_keywords.push_back("-mult");
-	known_keywords.push_back("-method");
-	known_keywords.push_back("-symm");
-	known_keywords.push_back("-asym_cif");
-	known_keywords.push_back("-asym-cif");
-	known_keywords.push_back("-wfn-cif");
-	known_keywords.push_back("-wfn_cif");
+	//known_keywords.push_back("-wfn");
+	//known_keywords.push_back("-fchk");
+	//known_keywords.push_back("-b");
+	//known_keywords.push_back("-d");
+	//known_keywords.push_back("-v");
+	//known_keywords.push_back("-hkl");
+	//known_keywords.push_back("-cif");
+	//known_keywords.push_back("-acc");
+	//known_keywords.push_back("-mult");
+	//known_keywords.push_back("-method");
+	//known_keywords.push_back("-symm");
+	//known_keywords.push_back("-asym_cif");
+	//known_keywords.push_back("-asym-cif");
+	//known_keywords.push_back("-wfn-cif");
+	//known_keywords.push_back("-wfn_cif");
 	if(debug_main) 
 		cout << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -131,72 +131,74 @@ int main(int argc, char **argv){
 	bool all_mos = false;
 	for (int i=0; i<argc; i++){
 		temp = argv[i];
-		if(temp.find(known_keywords[0]) != string::npos)
+		if (temp.find("-") > 0) continue;
+		if(temp.find("-wfn") < 1)
 			wfn = argv[i+1];
-		if(temp.find(known_keywords[1]) != string::npos)
+		else if(temp.find("-fchk") < 1)
 			fchk = argv[i+1];
-		if(temp.find(known_keywords[2]) != string::npos)
+		else if(temp.find("-b") < 1)
 			basis_set = argv[i+1];
-		if (temp.find(known_keywords[3]) != string::npos)
+		else if (temp.find("-d") < 1)
 			basis_set_path = argv[i + 1];
-		if (temp.find(known_keywords[5]) != string::npos)
+		else if (temp.find("-hkl") < 1)
 			hkl = argv[i+1];
-		if (temp.find(known_keywords[6]) != string::npos)
+		else if (temp.find("-cif") < 1)
 			cif = argv[i+1];
-		if (temp.find(known_keywords[7]) != string::npos)
+		else if (temp.find("-acc") < 1)
 			accuracy = stoi(argv[i+1]);
-		if (temp.find(known_keywords[8]) != string::npos)
+		else if (temp.find("-mult") < 1)
 			mult = stoi(argv[i + 1]);
-		if (temp.find(known_keywords[9]) != string::npos)
+		else if (temp.find("-method") < 1)
 			method = argv[i + 1];
-		if (temp.find(known_keywords[10]) != string::npos)
+		else if (temp.find("-symm") < 1)
 			symm = argv[i + 1];
-		if (temp.find(known_keywords[11]) != string::npos)
+		else if (temp.find("-asym_cif") < 1)
 			asym_cif = argv[i + 1];
-		if (temp.find(known_keywords[12]) != string::npos)
+		else if (temp.find("-asym-cif") < 1)
 			asym_cif = argv[i + 1];
-		if (temp.find(known_keywords[13]) != string::npos)
+		else if (temp.find("-wfn-cif") < 1)
 			asym_cif = argv[i + 1];
-		if (temp.find(known_keywords[14]) != string::npos)
+		else if (temp.find("-wfn_cif") < 1)
 			asym_cif = argv[i + 1];
-		if (temp.find("-cpus") != string::npos)
+		else if (temp.find("-cpus") < 1)
 			threads = stoi(argv[i + 1]);
-		if (temp.find("-pbc") != string::npos)
+		else if (temp.find("-pbc") < 1)
 			pbc = stoi(argv[i + 1]);
-		if (temp.find("-ED") != string::npos)
+		else if (temp.find("-ED") < 1)
 			electron_diffraction = true;
-		if (temp.find("-v") != string::npos) {
+		else if (temp.find("-v2") < 1) {
+			cout << "Turning on verbose mode 2!" << endl;
+			debug_all = true;
+			debug_main = true;
+		}
+		else if (temp.find("-v") < 1) {
 			cout << "Turning on verbose mode!" << endl;
 			debug_main = true;
 		}
-		if (temp.find("-v2") != string::npos) {
-			cout << "Turning on verbose mode 2!" << endl;
-			debug_all = true;
-		}
-		if (temp.find("-eli") != string::npos) {
+		else if (temp.find("-eli") < 1) {
 			calc = true;
 			eli = true;
 		}
-		if (temp.find("-elf") != string::npos) {
+		else if (temp.find("-elf") < 1) {
 			calc = true;
 			elf = true;
 		}
-		if (temp.find("-lap") != string::npos) {
+		else if (temp.find("-lap") < 1) {
 			calc = true;
 			lap = true;
 		}
-		if (temp.find("-esp") != string::npos) {
+		else if (temp.find("-esp") < 1) {
 			calc = true;
 			esp = true;
 		}
-		if (temp.find("-rdg") != string::npos) {
+		else if (temp.find("-rdg") < 1) {
 			calc = true;
 			rdg = true;
 		}
-		if (temp.find("-resolution") != string::npos) {
+		else if (temp.find("-resolution") < 1) {
 			resolution = stod(argv[i + 1]);
 		}
-		if (temp.find("-pdf") != string::npos) {
+		else if (temp.find("-pdf") < 1) {
 			pdf = true;
 			int n = 1;
 			while (argv[i + n][0] != '-') {
@@ -213,34 +215,34 @@ int main(int argc, char **argv){
 			if (debug_main)
 				cout << "scnd: " << scnd << " thrd: " << thrd << " fourth: " << frth << endl;
 		}
-		if (temp.find("-radius") != string::npos) {
+		else if (temp.find("-radius") < 1) {
 			radius = stod(argv[i + 1]);
 		}
-		if (temp.find("-MO") != string::npos) {
+		else if (temp.find("-MO") < 1) {
 			if (string(argv[i + 1]) != "all") 
 				MOs.push_back(stoi(argv[i + 1]));
 			else
 				all_mos = true;
 			calc = true;
 		}
-		if (temp.find("-fractal") != string::npos) {
+		else if (temp.find("-fractal") < 1) {
 			fract = true;
 			fract_name = argv[i + 1];
 		}
-		if (temp.find("-HDEF") != string::npos) {
+		else if (temp.find("-HDEF") < 1) {
 			hdef = true;
 			calc = true;
 		}
-		if (temp.find("-def") != string::npos) {
+		else if (temp.find("-def") < 1) {
 			def = true;
 			calc = true;
 		}
-		if (temp.find("-group") != string::npos) {
+		else if (temp.find("-group") < 1) {
 			while (string(argv[i + 1]).find("-") != string::npos) {
 				groups.push_back(stoi(argv[i + 1]));
 			}
 		}
-		if (temp.find("-twin") != string::npos) {
+		else if (temp.find("-twin") < 1) {
 			twin_law.resize(twin_law.size() + 1);
 			twin_law[twin_law.size() - 1].resize(9);
 			for (int twl = 0; twl < 9; twl++) {
@@ -254,7 +256,7 @@ int main(int argc, char **argv){
 			}
 			i += 9;
 		}
-		if (temp.find("-sfac") != string::npos) {
+		else if (temp.find("-sfac") != string::npos) {
 			int atom_numbers;
 			int n = 1;
 			while (argv[i + n][0] != '-' && i + n < argc) {
@@ -262,7 +264,7 @@ int main(int argc, char **argv){
 
 			}
 		}
-		if (temp.find("-merge") != string::npos) {
+		else if (temp.find("-merge") != string::npos) {
 			vector<string> filenames;
 			int n = 1;
 			while (i + n < argc && string(argv[i + n]).find("-") > 0) {

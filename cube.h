@@ -52,6 +52,7 @@ class cube
 		double rrs(cube &right);
 		double sum();
 		double diff_sum();
+		std::vector<double> double_sum();
 		double get_value(int x, int y, int z) const;
 		bool set_value(int x, int y, int z, double value);
 		bool read_file(bool full, bool header, WFN &wave, bool expert = false);

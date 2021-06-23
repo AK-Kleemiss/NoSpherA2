@@ -517,6 +517,7 @@ bool cube::fractal_dimension(const double stepsize) {
 				if (values[i][j][k] < min) min = values[i][j][k];
 				if (values[i][j][k] > max) max = values[i][j][k];
 			}
+	vector<double> e = double_sum();
 	min -= 2 * stepsize, max += 2 * stepsize;
 	const int steps = int((max - min) / stepsize) + 2;
 	vector<int> bins;
@@ -567,7 +568,11 @@ bool cube::fractal_dimension(const double stepsize) {
 	}
 	string output(path + "_fractal_plot");
 	ofstream of(output.c_str(), ios::out);
-	of << setw(8) << scientific << setprecision(8) << steps << setw(16) << scientific << setprecision(8) << min << setw(16) << scientific << setprecision(8) << max << "\n";
+	of << setw(8) << scientific << setprecision(8) << steps 
+		<< setw(16) << scientific << setprecision(8) << min 
+		<< setw(16) << scientific << setprecision(8) << max 
+		<< setw(16) << scientific << setprecision(8) << e[0] * pow(0.529177249, 3)
+		<< setw(16) << scientific << setprecision(8) << e[1] * pow(0.529177249, 3) << "\n";
 	for (int i = 0; i < steps; i++)
 		of << setw(16) << scientific << setprecision(8) << iso[i] << setw(16) << scientific << setprecision(8) << df[i] << "\n";
 	of.flush();
@@ -1066,6 +1071,27 @@ double cube::diff_sum(){
 	               +vectors[0][1]*vectors[1][2]*vectors[2][0]-vectors[2][1]*vectors[1][2]*vectors[0][0]
 	               +vectors[0][2]*vectors[1][0]*vectors[2][1]-vectors[2][2]*vectors[1][0]*vectors[0][1]);
 	return (s*dv); //RETURN Sum of values inside the cube
+};
+
+vector<double> cube::double_sum() {
+	for (int i = 0; i < 3; i++) if (size[i] == 0) return (vector<double>(-1));
+	double s = 0.0;
+	double s2 = 0.0;
+	for (int x = 0; x < size[0]; x++)
+		for (int y = 0; y < size[1]; y++)
+			for (int z = 0; z < size[2]; z++) {
+				s += abs(values[x][y][z]) / 2;
+				s2 += values[x][y][z];
+			}
+
+	double dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2]
+		+ vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0]
+		+ vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+	vector<double> result;
+	result.resize(2);
+	result[0] = s * dv;
+	result[1] = s2* dv;
+	return (result); //RETURN Sums of values inside the cube
 };
 
 double cube::get_vector(int i, int j) const{
