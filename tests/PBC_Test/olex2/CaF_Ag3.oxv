@@ -1,0 +1,360 @@
+﻿<GraphicsView version="1"
+ <Style LinkFile="" Name="" Version="2"
+  <Materials
+   <Prop0 "3077;2131693327;427259767">
+   <Prop1 "2049;4278190080">
+   <Prop2 "85;2130706687;419495935;4294967295;1">
+   <Prop3 "2049;2135904079">
+   <Prop4 "3073;4294967295">
+   <Prop5 "1;0">
+   <Prop6 "2049;16711935">
+   <Prop7 "85;2131693327;4286611584;41975936;32">
+   <Prop8 "1279;2113994496;2113994496;2113929471;2113929471;2164260863;2164260863;128;128">
+   <Prop9 "3077;2135904079;2135904079">
+   <Prop10 "2049;8322942">
+   <Prop11 "63;2147483903;2155839359;2155313015;2155313015;50529027;2164260863">
+   <Prop12 "63;2147548928;2155839359;2155313015;2155313015;50529027;2164260863">
+   <Prop13 "63;2164195328;2155839359;2155313015;2155313015;50529027;2164260863">
+   <Prop14 "2111;2164195328;2155839359;2155313015;2155313015;50529027;2164260863">
+   <Prop15 "63;2155839359;2155839359;2155313015;2155313015;50529027;50529027">
+   <Prop16 "2048">
+   <Prop17 "1037;4279176975;3624865551;3623878656">
+   <Prop18 "1247;4278255360;4278255360;3632300160;3632300160;4278202880;36;36">
+   <Prop19 "1087;4278190335;4278190335;3632300160;3632300160;4278190130;4278190130">
+   <Prop20 "1029;3628944717;645955712">
+   <Prop21 "3077;4279176975;986895">
+   <Prop22 "2049;4289835441">
+   <Prop23 "3077;4278190080;2147483647">
+   <Prop24 "2305;8322942;4278190080">
+   <Prop25 "3;4294967295;4294967295">
+   <Prop26 "3077;0;0">
+   <Prop27 "1109;4290805760;2768240640;4281150765;5">
+   <Prop28 "2053;2136422952;2137144606">
+   <Prop29 "2053;2143326838;2143979345">
+   <Prop30 "2053;4278255615;2147483647">
+   <Prop31 "2049;0">
+   <Prop32 "2049;65535">
+   <Prop33 "255;5592320;8421376;14276924;14671711;4294967295;4294967295;12;12">
+   <Prop34 "255;65280;32768;1202706;6283103;4286611584;4294967295;12;12">
+   <Prop35 "3076;8421504">
+   <Prop36 "255;11184640;8421376;14276924;14671711;4294967295;4294967295;12;12">
+   <Prop37 "255;38144;32768;2472997;6283103;4286611584;4294967295;50;12">
+   <Prop38 "5;4290822336;4286611584">
+  >
+  <Root Name="Root"
+   <SubStyles
+    <S_0 Name="3DFrame" spherical="false"
+     <SubStyles>
+     <S0 PName="Box"
+      <Material GraphicsView.Style.Materials.Prop27>
+     >
+     <S1 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop27>
+     >
+    >
+    <S_1 Left="2126" Name="AtomLegend" Top="1189" Z="0" visible="true"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop26>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop22>
+     >
+    >
+    <S_2 DefDS="2" DefMask="5" DefR="16" DefZ="1" DiskIR="0" DiskOR="1.02" DiskQ="15" DiskS="0.05" Name="AtomParams" Persistent="true" QPeakMinAlpha="0.1" QPeakScale="3" QPeakSizeScale="1" Quality="2" RimQ="15" RimR="1.02" RimW="0.05" SphereQ="15" TelpP="1.5382"
+     <SubStyles>
+    >
+    <S_3 A="16777215" B="16777215" C="5714463" D="5714463" Name="Background"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop3>
+     >
+    >
+    <S_4 ConeQ="15" ConeStipples="6" DefM="48" DefR="1" Name="BondParams" Persistent="true" Quality="1"
+     <SubStyles>
+     <S0 PName="Single cone"
+      <Material GraphicsView.Style.Materials.Prop38>
+     >
+    >
+    <S_5 DR="16" DS="2" Name="Ca" PMask="5" R="0.057706" Z="1"
+     <SubStyles>
+     <S0 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop33>
+     >
+     <S1 PName="Rims"
+      <Material GraphicsView.Style.Materials.Prop36>
+     >
+    >
+    <S_6 Name="Ca-F" PMask="48" R="1"
+     <SubStyles>
+     <S0 PName="Bottom cone"
+      <Material GraphicsView.Style.Materials.Prop33>
+     >
+     <S1 PName="Top cone"
+      <Material GraphicsView.Style.Materials.Prop34>
+     >
+    >
+    <S_7 A="4294967295" B="4294967295" C="0" D="0" Name="Ceiling"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop9>
+     >
+    >
+    <S_8 LineSpacing="0" LineWidth="80" LinesToShow="18446744073709551615" Name="Console" Prompt=">>"
+     <SubStyles>
+     <S0 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop29>
+     >
+    >
+    <S_9 Char="|" Name="Cursor"
+     <SubStyles>
+     <S0 PName="On"
+      <Material GraphicsView.Style.Materials.Prop32>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop32>
+     >
+    >
+    <S_10 Name="db_label" Persistent="true"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop0>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop1>
+     >
+    >
+    <S_11 Name="DBasis"
+     <SubStyles>
+     <S0 PName="ConeX"
+      <Material GraphicsView.Style.Materials.Prop11>
+     >
+     <S1 PName="DiskX"
+      <Material GraphicsView.Style.Materials.Prop11>
+     >
+     <S2 PName="CylinderX"
+      <Material GraphicsView.Style.Materials.Prop11>
+     >
+     <S3 PName="ConeY"
+      <Material GraphicsView.Style.Materials.Prop12>
+     >
+     <S4 PName="DiskY"
+      <Material GraphicsView.Style.Materials.Prop12>
+     >
+     <S5 PName="CylinderY"
+      <Material GraphicsView.Style.Materials.Prop12>
+     >
+     <S6 PName="ConeZ"
+      <Material GraphicsView.Style.Materials.Prop13>
+     >
+     <S7 PName="DiskZ"
+      <Material GraphicsView.Style.Materials.Prop13>
+     >
+     <S8 PName="CylinderZ"
+      <Material GraphicsView.Style.Materials.Prop13>
+     >
+     <S9 PName="Label"
+      <Material GraphicsView.Style.Materials.Prop14>
+     >
+     <S10 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop15>
+     >
+    >
+    <S_12 Name="DFrame"
+     <SubStyles>
+     <S0 PName="Lines"
+      <Material GraphicsView.Style.Materials.Prop16>
+     >
+    >
+    <S_13 Name="DSphere"
+     <SubStyles>
+    >
+    <S_14 Name="duc_label" Persistent="true"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop0>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop1>
+     >
+    >
+    <S_15 Name="DUnitCell" RenderLine="false" Thickness="1"
+     <SubStyles>
+     <S0 PName="Lines"
+      <Material GraphicsView.Style.Materials.Prop5>
+     >
+     <S1 PName="Label"
+      <Material GraphicsView.Style.Materials.Prop6>
+     >
+     <S2 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop7>
+     >
+     <S3 PName="Cylinder"
+      <Material GraphicsView.Style.Materials.Prop7>
+     >
+    >
+    <S_16 Name="DUnitCell1" RenderLine="false" Thickness="1"
+     <SubStyles>
+     <S0 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop7>
+     >
+     <S1 PName="Cylinder"
+      <Material GraphicsView.Style.Materials.Prop7>
+     >
+    >
+    <S_17 DR="16" DS="2" Name="F" PMask="5" R="0.070143" Z="1"
+     <SubStyles>
+     <S0 PName="Sphere"
+      <Material GraphicsView.Style.Materials.Prop34>
+     >
+     <S1 PName="Rims"
+      <Material GraphicsView.Style.Materials.Prop37>
+     >
+    >
+    <S_18 Name="facectrl"
+     <SubStyles>
+     <S0 PName="Button"
+      <Material GraphicsView.Style.Materials.Prop2>
+     >
+     <S1 PName="button"
+      <Material GraphicsView.Style.Materials.Prop2>
+     >
+    >
+    <S_19 Name="Fader"
+     <SubStyles>
+     <S0 PName="Quad"
+      <Material GraphicsView.Style.Materials.Prop4>
+     >
+    >
+    <S_20 Left="0" Name="HelpWindow" Top="40"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop23>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop10>
+     >
+    >
+    <S_21 Left="0" Name="InfoBox" Top="1"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop28>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop29>
+     >
+    >
+    <S_22 Name="Labels" duplicate_color="255" processed_color="0"
+     <SubStyles>
+     <S0 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop10>
+     >
+    >
+    <S_23 Name="PLabels" Persistent="true"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop35>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop10>
+     >
+    >
+    <S_24 Blended="false" Name="Selection"
+     <SubStyles>
+     <S0 PName="mat"
+      <Material GraphicsView.Style.Materials.Prop8>
+     >
+    >
+    <S_25 Left="672" Name="Tooltip" Top="170"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop30>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop31>
+     >
+    >
+    <S_26 Name="XGrid"
+     <SubStyles>
+     <S0 PName="eMap"
+      <Material GraphicsView.Style.Materials.Prop17>
+     >
+     <S1 PName="+Surface"
+      <Material GraphicsView.Style.Materials.Prop18>
+     >
+     <S2 PName="-Surface"
+      <Material GraphicsView.Style.Materials.Prop19>
+     >
+     <S3 PName="Contour plane"
+      <Material GraphicsView.Style.Materials.Prop20>
+     >
+    >
+    <S_27 Left="0" Name="XGrid_Label" Top="0"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop21>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop22>
+     >
+    >
+    <S_28 Left="0" Name="XGrid_Legend" Top="0"
+     <SubStyles>
+     <S0 PName="Plane"
+      <Material GraphicsView.Style.Materials.Prop23>
+     >
+     <S1 PName="Text"
+      <Material GraphicsView.Style.Materials.Prop24>
+     >
+     <S2 PName="Plane-text"
+      <Material GraphicsView.Style.Materials.Prop25>
+     >
+    >
+   >
+  >
+ >
+ <Scene
+  <LightModel Ambient="4289835441" ClearColor="4294967295" Flags="6"
+   <Light0 Ambient="0" Attenuation="4278190335" Diffuse="7960953" Enabled="true" Position="-56.000,46.000,100.000,1.000" Specular="8092539" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light1 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="true" Position="0.000,26.000,1.000,1.000" Specular="201326656" SpotCutoff="180" SpotDirection="4278190335" SpotExponent="0">
+   <Light2 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="true" Position="60.000,33.000,1.000,1.000" Specular="205520896" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light3 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="true" Position="-98.000,-100.000,-100.000,1.000" Specular="201343104" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light4 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="false" Position="4294901760" Specular="252645135" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light5 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="false" Position="4294901760" Specular="252645135" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light6 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="false" Position="4294901760" Specular="252645135" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+   <Light7 Ambient="4278190080" Attenuation="4278190335" Diffuse="4278190080" Enabled="false" Position="4294901760" Specular="252645135" SpotCutoff="180" SpotDirection="4278190080" SpotExponent="0">
+  >
+  <Fonts
+   <Default "#olex2.fnt:frb_12">
+   <Help "#olex2.fnt:frb_12">
+   <Notes "#olex2.fnt:frb_12">
+   <Labels "#olex2.fnt:frb_20">
+   <AtomLabels "#olex2.fnt:frb_20">
+   <BondLabels "#olex2.fnt:frb_20">
+   <Tooltip "#olex2.fnt:frb_12">
+   <Picture_labels "#olex2.fnt:frb_20">
+   <Console "#olex2.fnt:frb_0">
+  >
+  <Materials
+   <Error "1;32511">
+   <Exception "1;255">
+   <Exec "2305;4286578688;4278190080">
+   <Help_cmd "1;65535">
+   <Help_txt "1;16776960">
+   <Info "1;16743936">
+   <Warning "1;32511">
+  >
+ >
+ <ICollections>
+ <NameRegistry
+  <Planes>
+  <Atoms>
+  <Bonds>
+ >
+>
+<Dimensions maxd="7.326613,7.326613,7.326613" mind="-2.47,-2.47,-2.47"
+ <Basis zoom="0.088196"
+  <matrix xx="-0.008453" xy="-0.772707" xz="0.634707" yx="0.006793" yy="-0.63476" yz="-0.772683" zx="0.999941" zy="-0.002219" zz="0.010614">
+  <center x="-2.003143" y="-2.003143" z="-2.003143">
+ >
+>
