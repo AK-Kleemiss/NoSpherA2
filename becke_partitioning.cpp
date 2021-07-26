@@ -51,11 +51,12 @@ double get_becke_w(const int num_centers,
         dist_a = std::sqrt(dist_a);
 
         //      in principle good idea but fails for larger molecules containing
-        //      diffuse sets if (a != icent && dist_a > BECKE_CUTOFF)
-        //      {
-        //          pa[a] = 0.0;
-        //          continue;
-        //      }
+        //      diffuse sets 
+        if (a != center_index && dist_a > 15)
+        {
+            pa[a] = 0.0;
+            continue;
+        }
 
         R_a = bragg_angstrom[proton_charges[a]];
 

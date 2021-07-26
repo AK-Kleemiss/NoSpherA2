@@ -1272,9 +1272,13 @@ bool calculate_structure_factors_HF(
 	int position_field[3] = { 0,0,0 };
 	int label_field = 1000;
 	vector <int> asym_atom_list;
-	vector <int> all_atom_list;
+	//vector <int> all_atom_list;
 	vector < bool > is_asym;
 	vector < vector <double > > positions;
+	if (wave.get_ncen() == 0) {
+		file << "No Atoms in the wavefunction, this will not work!! ABORTING!!" << endl;
+		return false;
+	}
 	positions.resize(wave.get_ncen());
 	is_asym.resize(wave.get_ncen());
 	for (int i = 0; i < wave.get_ncen(); i++) {
@@ -1316,10 +1320,10 @@ bool calculate_structure_factors_HF(
 				fields.resize(count_fields);
 				for (int i = 0; i < count_fields; i++)
 					s >> fields[i];
-				if (debug) file << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+				if (debug) file << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << flush;
 				positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
 				bool found_this_one = false;
-				if (debug) file << "label: " << fields[label_field] << " position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
+				if (debug) file << " cart. position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
 					if (is_similar(positions[labels.size()][0], wave.atoms[i].x, -0.5)
 						&& is_similar(positions[labels.size()][1], wave.atoms[i].y, -0.5)
@@ -1327,7 +1331,7 @@ bool calculate_structure_factors_HF(
 						if (debug) file << "WFN position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z
 							<< " Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 						wave.atoms[i].label = fields[label_field];
-						all_atom_list.push_back(i);
+						//all_atom_list.push_back(i);
 						found_this_one = true;
 						break;
 					}
@@ -1339,10 +1343,10 @@ bool calculate_structure_factors_HF(
 			}
 		}
 	}
-	if (labels.size() != wave.get_ncen()) {
-		file << "Number of atoms in labels: " << labels.size() << " and number of atoms in Wavefunction: " << wave.get_ncen() << "!" << endl << "This is not good, i will stop here!" << endl;
-		return false;
-	}
+	//if (labels.size() != wave.get_ncen()) {
+	//	file << "Number of atoms in labels: " << labels.size() << " and number of atoms in Wavefunction: " << wave.get_ncen() << "!" << endl << "This is not good, i will stop here!" << endl;
+	//	return false;
+	//}
 	atoms_read = false;
 	label_field = 1000;
 	count_fields = 0;
@@ -1428,7 +1432,7 @@ bool calculate_structure_factors_HF(
 		file << endl;
 		file << "Mapping of asym atoms:" << endl;
 		for (int i = 0; i < wave.get_ncen(); i++)
-			file << setw(4) << wave.atoms[all_atom_list[i]].charge;
+			file << setw(4) << wave.atoms[i].charge;
 		file << endl;
 		for (int i = 0; i < wave.get_ncen(); i++)
 			file << setw(4) << is_asym[i];
@@ -1598,7 +1602,7 @@ bool calculate_structure_factors_HF(
 
 	if (debug)
 		file << "alpha_min is there!" << endl
-		<< "Nr of asym atoms: " << asym_atom_list.size() << " Number of all atoms: " << all_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << endl;
+		<< "Nr of asym atoms: " << asym_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << endl;
 	else
 		file << "There are:\n" << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
 		//<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
@@ -1775,8 +1779,8 @@ bool calculate_structure_factors_HF(
 #endif
 
 #ifdef FLO_CUDA
-	vector < vector < float > > radial_density;
-	vector < vector < float > > radial_dist;
+	vector < vector < double > > radial_density;
+	vector < vector < double > > radial_dist;
 
 	radial_density.resize(atom_type_list.size());
 	radial_dist.resize(atom_type_list.size());
@@ -1784,35 +1788,66 @@ bool calculate_structure_factors_HF(
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		spherical_density[i].resize(num_points[i]);
 
-	const float incr = pow(1.005, max(1, accuracy - 1));
-	const float lincr = log(incr);
-	const float min_dist = 0.0000001;
+	const double incr = pow(1.005, max(1, accuracy - 1));
+	const double lincr = log(incr);
+	const double min_dist = 0.0000001;
+	vector<Thakkar> sphericals;
+	for (int i = 0; i < atom_type_list.size(); i++)
+		sphericals.push_back(Thakkar(atom_type_list[i]));
 	//Make radial grids
-	for (int i = 0; i < atom_type_list.size(); i++) {
-		if (debug) file << "Calculating for atomic number " << atom_type_list[i] << endl;
-		float current = 1;
-		float dist = min_dist;
-		if (accuracy < 3)
-			while (current > 1E-10) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		else
-			while (current > 1E-12) {
-				radial_dist[i].push_back(dist);
-				current = get_radial_density(atom_type_list[i], dist);
-				if (current == -20)
-					return false;
-				radial_density[i].push_back(current);
-				dist *= incr;
-			}
-		if (debug)
+	if (debug) {
+		for (int i = 0; i < atom_type_list.size(); i++) {
+			file << "Calculating for atomic number " << atom_type_list[i] << endl;
+			double current = 1;
+			double dist = min_dist;
+			if (accuracy > 3)
+				while (current > 1E-10) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+			else
+				while (current > 1E-12) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					if (current == -20)
+						return false;
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
 			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
+			//for (int j = 0; j < radial_density[i].size(); j++) {
+			//	if (radial_density[i][j] < 0.1)
+			//		break;
+			//	file << scientific << setprecision(8) << radial_density[i][j] << endl;
+			//}
+		}
 	}
+	else {
+#pragma omp parallel for
+		for (int i = 0; i < atom_type_list.size(); i++) {
+			double current = 1;
+			double dist = min_dist;
+			if (accuracy > 3)
+				while (current > 1E-10) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+			else
+				while (current > 1E-12) {
+					radial_dist[i].push_back(dist);
+					current = sphericals[i].get_radial_density(dist);
+					radial_density[i].push_back(current);
+					dist *= incr;
+				}
+		}
+	}
+	sphericals.clear();
 
 	float** gpu_PosAtomsx = NULL,
 		** gpu_PosAtomsy = NULL,
@@ -2040,11 +2075,11 @@ bool calculate_structure_factors_HF(
 					dist *= incr;
 				}
 			file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
-			for (int j = 0; j < radial_density[i].size(); j++) {
-				if (radial_density[i][j] < 0.1)
-					break;
-				file << scientific << setprecision(8) << radial_density[i][j] << endl;
-			}
+			//for (int j = 0; j < radial_density[i].size(); j++) {
+			//	if (radial_density[i][j] < 0.1)
+			//		break;
+			//	file << scientific << setprecision(8) << radial_density[i][j] << endl;
+			//}
 		}
 	}
 	else {
@@ -2233,10 +2268,10 @@ bool calculate_structure_factors_HF(
 #else
 
 	for (int i = 0; i < wave.get_ncen(); i++) {
-		int nr = all_atom_list[i];
+		//int nr = all_atom_list[i];
 		int type_list_number = -1;
 		for (int j = 0; j < atom_type_list.size(); j++)
-			if (wave.atoms[nr].charge == atom_type_list[j])
+			if (wave.atoms[i].charge == atom_type_list[j])
 				type_list_number = j;
 		for (int g = 0; g < asym_atom_list.size(); g++) {
 			if (i == 0) spherical_density[g].resize(num_points[g]);
@@ -2245,13 +2280,13 @@ bool calculate_structure_factors_HF(
 				double temp =
 					linear_interpolate_spherical_density(radial_density[type_list_number]
 						, radial_dist[type_list_number]
-						, sqrt(pow(grid[g][0][p] - wave.atoms[nr].x, 2)
-							+ pow(grid[g][1][p] - wave.atoms[nr].y, 2)
-							+ pow(grid[g][2][p] - wave.atoms[nr].z, 2))
+						, sqrt(pow(grid[g][0][p] - wave.atoms[i].x, 2)
+							+ pow(grid[g][1][p] - wave.atoms[i].y, 2)
+							+ pow(grid[g][2][p] - wave.atoms[i].z, 2))
 						, lincr
 						, min_dist
 					);
-				if (all_atom_list[i] == asym_atom_list[g])
+				if (i == asym_atom_list[g])
 					spherical_density[g][p] = temp;
 				grid[g][4][p] += temp;
 			}
@@ -2266,9 +2301,9 @@ bool calculate_structure_factors_HF(
 						continue;
 					for (int i = 0; i < wave.get_ncen(); i++) {
 						int type_list_number = -1;
-						int nr = all_atom_list[i];
+						//int nr = all_atom_list[i];
 						for (int j = 0; j < atom_type_list.size(); j++)
-							if (wave.atoms[nr].charge == atom_type_list[j])
+							if (wave.atoms[i].charge == atom_type_list[j])
 								type_list_number = j;
 						for (int g = 0; g < asym_atom_list.size(); g++)
 #pragma omp parallel for
@@ -2277,9 +2312,9 @@ bool calculate_structure_factors_HF(
 									radial_density[type_list_number],
 									radial_dist[type_list_number],
 									sqrt(
-										  pow(grid[g][0][p] - (wave.atoms[nr].x + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2)), 2)
-										+ pow(grid[g][1][p] - (wave.atoms[nr].y + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2)), 2)
-										+ pow(grid[g][2][p] - (wave.atoms[nr].z + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2)), 2)
+										  pow(grid[g][0][p] - (wave.atoms[i].x + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2)), 2)
+										+ pow(grid[g][1][p] - (wave.atoms[i].y + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2)), 2)
+										+ pow(grid[g][2][p] - (wave.atoms[i].z + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2)), 2)
 									),
 									lincr,
 									min_dist
@@ -2748,10 +2783,10 @@ bool calculate_structure_factors_HF(
 	for (int i = 0; i < wave.get_ncen(); i++) {
 		if (is_asym[i]) {
 			file << setw(6) << labels[i]
-				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
-				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[1][counter]
-				<< fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[2][counter];
-			if (debug) file << " " << setw(4) << wave.atoms[all_atom_list[i]].charge << " " << fixed << setw(10) << setprecision(3) << wave.atoms[all_atom_list[i]].charge - atom_els[0][counter]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[i].charge - atom_els[0][counter]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[i].charge - atom_els[1][counter]
+				<< fixed << setw(10) << setprecision(3) << wave.atoms[i].charge - atom_els[2][counter];
+			if (debug) file << " " << setw(4) << wave.atoms[i].charge << " " << fixed << setw(10) << setprecision(3) << wave.atoms[i].charge - atom_els[0][counter]
 				<< fixed << setw(10) << setprecision(3) << atom_els[1][counter]
 				<< fixed << setw(10) << setprecision(3) << atom_els[2][counter];
 			counter++;

@@ -1,0 +1,50 @@
+snum {
+  current_process_diagnostics = "refinement"
+  hkl {
+    hkl_stat_file = 'E:\\temp\\CaF2\\CaF_Ag3.hkl'
+  }
+  solution {
+    current_atomic_volume = 13.5
+  }
+  refinement {
+    completeness {
+      target = '- Laue Group Completeness to 2Θ=39.3: 100.0%%&#013;- Laue Group Completeness to 2Θ=88.5: 100.0%%'
+    }
+    data_parameter_ratio = 32
+    parameters = 3
+    max_shift_over_esd = 7.65043006e-05
+    max_shift_site = 0
+    max_shift_site_atom = "Ca01"
+    max_shift_u = 9.912514912e-08
+    max_shift_u_atom = "Ca01"
+    max_peak = 0.6601587995
+    max_hole = -0.4216137016
+    goof = 0.9018
+    last_R1 = "0.012785"
+    last_wR2 = "0.034722"
+    max_peaks = 5
+    suggested_weight = 0.02196137232 0.2860048387
+    refine_extinction = 0
+  }
+  history {
+    current_node = '87967f154ceff70d8f03c659e0409d43'
+  }
+  report {
+    diffractometer = "XtaLAB Synergy, Dualflex, HyPix"
+  }
+  NoSpherA2 {
+    use_aspherical = True
+    basis_name = "3-21G"
+    becke_accuracy = "Low"
+    Calculate = False
+    h_afix = False
+    h_aniso = False
+    method = "PBE"
+    multiplicity = "1"
+    ORCA_SCF_Conv = "SloppySCF"
+    pySCF_PBC = True
+    source = "pySCF"
+    mem = "15.0"
+    ncpus = "6"
+  }
+}

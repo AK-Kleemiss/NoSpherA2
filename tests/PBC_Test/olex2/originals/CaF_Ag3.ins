@@ -1,0 +1,56 @@
+TITL caf_ag3_a.res in Fm-3m
+REM Old TITL CaF_Ag3 in Fm-3m
+REM SHELXT solution in Fm-3m
+REM R1 0.012, Rweak 0.001, Alpha 0.002, Orientation as input
+REM Formula found by SHELXT: F2 Ca
+CELL 0.56087 5.450952 5.450952 5.450952 90 90 90
+ZERR 4 0.000052 0.000052 0.000052 0 0 0
+LATT 4
+SYMM -X,-Y,+Z
+SYMM -X,+Y,-Z
+SYMM +X,-Y,-Z
+SYMM +Z,+X,+Y
+SYMM +Z,-X,-Y
+SYMM -Z,-X,+Y
+SYMM -Z,+X,-Y
+SYMM +Y,+Z,+X
+SYMM -Y,+Z,-X
+SYMM +Y,-Z,-X
+SYMM -Y,-Z,+X
+SYMM +Y,+X,-Z
+SYMM -Y,-X,-Z
+SYMM +Y,-X,+Z
+SYMM -Y,+X,+Z
+SYMM +X,+Z,-Y
+SYMM -X,+Z,+Y
+SYMM -X,-Z,-Y
+SYMM +X,-Z,+Y
+SYMM +Z,+Y,-X
+SYMM +Z,-Y,+X
+SYMM -Z,+Y,+X
+SYMM -Z,-Y,-X
+SFAC Ca F
+DISP Ca 0.1378 0.1937 651.9347
+DISP F 0.006 0.0061 27.6988
+UNIT 4 8
+
+L.S. 10
+PLAN  20
+CONF
+MORE -1
+fmap 2
+acta 
+LIST -6
+WGHT 0.019251 0.035775
+FVAR 5.672964
+REM <olex2.extras>
+REM <HklSrc "%.\\CaF_Ag3.hkl">
+REM </olex2.extras>
+
+Ca01  1     0.50000  0.50000  0.50000  10.02083  0.00330  0.00330  0.00330 =
+ 0.00000 -0.00000  0.00000 
+F002  2     0.25000  0.75000  0.75000  10.04167  0.00503  0.00503  0.00503 =
+ 0.00000  0.00000 -0.00000 
+HKLF 4
+
+END

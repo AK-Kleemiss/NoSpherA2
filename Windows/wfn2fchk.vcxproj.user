@@ -5,6 +5,11 @@
     <LocalDebuggerWorkingDirectory>E:\temp\fchk_test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">
+    <LocalDebuggerCommandArguments>-fractal Pd-OTf2-dppf_diff.cube</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>C:\Users\Florian\AppData\Roaming\Olex2Data\0e432fb3d57fe0fae1e32cfe1ccc90b3\samples\Pd-OTf2-dppf</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">
     <LocalDebuggerCommandArguments>-v -sfac 1 2 3 4</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>
@@ -17,8 +22,14 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
-    <LocalDebuggerCommandArguments>-wfn sucrose.fchk -cif sucrose.cif -asym_cif olex2/Wfn_job/sucrose.cif -hkl olex2/Wfn_job/sucrose.hkl -cpus 6 -acc 2 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn olex2\Wfn_job\sucrose.wfx -cif sucrose.cif -asym_cif olex2/Wfn_job/sucrose.cif -hkl olex2/Wfn_job/sucrose.hkl -cpus 6 -acc 2 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_fchk_SF\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x64'">
+    <LocalDebuggerCommandArguments>-wfn gamma_321G.wfn -cif CaF_Ag3.cif -asym_cif olex2/Wfn_job/CaF_Ag3.cif -hkl olex2/Wfn_job/CaF_Ag3.hkl -cpus 1 -acc 4 -pbc 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\PBC_Test\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
