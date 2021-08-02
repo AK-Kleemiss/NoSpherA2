@@ -11,6 +11,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NoSpherA2CUDA", "..\Windows
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug_fchk_generation|ARM = Debug_fchk_generation|ARM
+		Debug_fchk_generation|ARM64 = Debug_fchk_generation|ARM64
+		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
+		Debug_fchk_generation|x86 = Debug_fchk_generation|x86
 		Debug_Fchk|ARM = Debug_Fchk|ARM
 		Debug_Fchk|ARM64 = Debug_Fchk|ARM64
 		Debug_Fchk|x64 = Debug_Fchk|x64
@@ -45,6 +49,12 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|ARM.ActiveCfg = Debug_fchk_generation|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|ARM64.ActiveCfg = Debug_fchk_generation|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x86.ActiveCfg = Debug_fchk_generation|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x86.Build.0 = Debug_fchk_generation|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fchk|ARM.ActiveCfg = Debug_Fchk|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fchk|ARM64.ActiveCfg = Debug_Fchk|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fchk|x64.ActiveCfg = Debug_Fchk|x64
@@ -91,6 +101,18 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.Build.0 = Release|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x86.ActiveCfg = Release|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x86.Build.0 = Release|Win32
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM.ActiveCfg = Debug_fchk_generation|ARM
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM.Build.0 = Debug_fchk_generation|ARM
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM.Deploy.0 = Debug_fchk_generation|ARM
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM64.ActiveCfg = Debug_fchk_generation|ARM64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM64.Build.0 = Debug_fchk_generation|ARM64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|ARM64.Deploy.0 = Debug_fchk_generation|ARM64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x64.Deploy.0 = Debug_fchk_generation|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x86.ActiveCfg = Debug_fchk_generation|x86
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x86.Build.0 = Debug_fchk_generation|x86
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x86.Deploy.0 = Debug_fchk_generation|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Fchk|ARM.ActiveCfg = Debug|ARM
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Fchk|ARM.Build.0 = Debug|ARM
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Fchk|ARM.Deploy.0 = Debug|ARM
@@ -187,6 +209,10 @@ Global
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.ActiveCfg = Release|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.Build.0 = Release|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.Deploy.0 = Release|x86
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|ARM.ActiveCfg = Release|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|ARM64.ActiveCfg = Release|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|x64.ActiveCfg = Debug_Fractal|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|x86.ActiveCfg = Debug_Fractal|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fchk|ARM.ActiveCfg = Debug|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fchk|ARM64.ActiveCfg = Debug|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fchk|x64.ActiveCfg = Debug|x64

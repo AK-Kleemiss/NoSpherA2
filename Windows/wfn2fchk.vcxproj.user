@@ -27,6 +27,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_fchk_generation|x64'">
+    <LocalDebuggerCommandArguments>-wfn test.ffn -b def2-TZVP -d D:\temp\Lorraine\ -fchk test.fchk</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>D:\temp\Lorraine\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x64'">
     <LocalDebuggerCommandArguments>-wfn gamma_321G.wfn -cif CaF_Ag3.cif -asym_cif olex2/Wfn_job/CaF_Ag3.cif -hkl olex2/Wfn_job/CaF_Ag3.hkl -cpus 1 -acc 4 -pbc 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\PBC_Test\</LocalDebuggerWorkingDirectory>
