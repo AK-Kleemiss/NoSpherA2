@@ -319,7 +319,7 @@ int main(int argc, char **argv){
 		cube residual(fract_name,true,debug_all);
 		residual.fractal_dimension(0.01);
 	}
-	if (!calc && wfn != "" && hkl == "") {
+	if (!calc && wfn != "" && hkl == "" && fchk == "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
