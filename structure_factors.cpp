@@ -1080,7 +1080,7 @@ bool thakkar_sfac(
 	double alpha_max = atom.get_max_alpha();
 	vector<double> alpha_min = atom.get_min_alpha();
 	const int max_l = atom.get_max_l();
-	int lebedev_high, lebedev_low;
+	int lebedev_high=146, lebedev_low=50;
 	if (angular_level == 0) {
 		lebedev_high = (max_l < 3) ? 0 : 10;
 		lebedev_low = (max_l < 3) ? 0 : 10;
@@ -1107,14 +1107,15 @@ bool thakkar_sfac(
 		atom_number,
 		alpha_max,
 		max_l,
-		alpha_min.data());
+		alpha_min.data()
+	);
 
 	int num_points = Prototype_grid.get_num_grid_points();
 
 	cout << "Number of points for atom: " << num_points << endl;
 
 	double **grid = new double*[4];
-	for (int n = 0; n < 6; n++)
+	for (int n = 0; n < 4; n++)
 		grid[n] = new double[num_points];
 
 	double pos = 0.0;
@@ -1175,8 +1176,8 @@ bool calculate_structure_factors_HF(
 	gettimeofday(&t1, 0);
 #endif
 
-	if (debug)
-		file << "Reading hkl now" << endl;
+	file << "Reading: " << hkl_filename;
+	file.flush();
 
 	vector< vector <int> > hkl;
 	string line;
@@ -1212,6 +1213,7 @@ bool calculate_structure_factors_HF(
 		}
 	}
 	hkl_input.close();
+	file << "                   ...done!" << endl;
 	int refl_size = hkl[0].size();
 	if (debug)
 		file << "Number of reflections before twin: " << hkl[0].size() << endl;
@@ -1222,14 +1224,15 @@ bool calculate_structure_factors_HF(
 	if (debug)
 		file << "Number of reflections after twin: " << hkl[0].size() << endl;
 
-	// Remove duplicate reflections
+	file << "Remove duplicate reflections...";
+	file.flush();
 	for (int i = 0; i < hkl[0].size(); i++)
 		for (int j = i + 1; j < hkl[0].size(); j++)
 			if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
 				for (int x = 0; x < 3; x++)
 					hkl[x].erase(hkl[x].begin() + j);
 
-	file << "Reflections read! Nr of reflections: " << hkl[0].size() << endl;
+	file << "                   ...done!\nNr of reflections to be used: " << hkl[0].size() << endl;
 
 	if (debug)
 		file << "starting to read cif!" << endl;
@@ -2105,7 +2108,6 @@ bool calculate_structure_factors_HF(
 	}
 	sphericals.clear();
 
-#pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < asym_atom_list.size(); i++) {
 		int nr = asym_atom_list[i];
 		int type;
@@ -2119,6 +2121,7 @@ bool calculate_structure_factors_HF(
 
 		for (int n = 0; n < 6; n++)
 			grid[i][n] = new double[num_points[i]];
+#pragma omp parallel for schedule(dynamic)
 		for (int p = 0; p < num_points[i]; p++)
 			grid[i][4][p] = 0.0;
 

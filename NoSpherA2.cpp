@@ -122,6 +122,8 @@ int main(int argc, char **argv){
 	bool def = false;
 	bool pdf = false;
 	bool fract = false;
+	bool hirsh = false;
+	int hirsh_number = 0;
 	bool scnd = true, thrd = true, frth = true;
 	double MinMax[6];
 	double NbSteps[3];
@@ -194,6 +196,11 @@ int main(int argc, char **argv){
 		else if (temp.find("-rdg") < 1) {
 			calc = true;
 			rdg = true;
+		}
+		else if (temp.find("-hirsh") < 1) {
+			calc = true;
+			hirsh = true;
+			hirsh_number = stoi(argv[i + 1]);
 		}
 		else if (temp.find("-resolution") < 1) {
 			resolution = stod(argv[i + 1]);
@@ -385,7 +392,7 @@ int main(int argc, char **argv){
 				return -1;
 			}
 		}
-		log_file << "Reading: " << wfn << endl;
+		log_file << "Reading: " << wfn;
 		log_file.flush();
 		if (wfn.find(".wfx") != string::npos)
 			wavy[0].read_wfx(wfn, debug_all, log_file);
@@ -396,6 +403,7 @@ int main(int argc, char **argv){
 		else
 			wavy[0].read_wfn(wfn, debug_all, log_file);
 		wavy[0].set_method(method);
+		log_file << "                   ...done!" << endl;
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
@@ -529,6 +537,7 @@ int main(int argc, char **argv){
 		cube MO(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), true);
 		cube HDEF(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hdef);
 		cube DEF(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), def);
+		cube Hirsh(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hirsh);
 
 		for (int i = 0; i < 3; i++) {
 			Rho.set_origin(i, MinMax[i]);
@@ -540,6 +549,7 @@ int main(int argc, char **argv){
 			MO.set_origin(i, MinMax[i]);
 			HDEF.set_origin(i, MinMax[i]);
 			DEF.set_origin(i, MinMax[i]);
+			Hirsh.set_origin(i, MinMax[i]);
 			for (int j = 0; j < 3; j++) {
 				Rho.set_vector(i, j, cell_matrix[i][j]);
 				RDG.set_vector(i, j, cell_matrix[i][j]);
@@ -550,6 +560,7 @@ int main(int argc, char **argv){
 				MO.set_vector(i, j, cell_matrix[i][j]);
 				HDEF.set_vector(i, j, cell_matrix[i][j]);
 				DEF.set_vector(i, j, cell_matrix[i][j]);
+				Hirsh.set_vector(i, j, cell_matrix[i][j]);
 			}
 		}
 		if (debug_main)
@@ -562,7 +573,8 @@ int main(int argc, char **argv){
 		ESP.set_comment1("Calculated electrostatic potential using NoSpherA2");
 		MO.set_comment1("Calcualted MO values using NoSpherA2");
 		HDEF.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-		HDEF.set_comment1("Calculated static deformation density values using NoSpherA2");
+		DEF.set_comment1("Calculated static deformation density values using NoSpherA2");
+		Hirsh.set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
 		Rho.set_comment2("from " + wavy[0].get_path());
 		RDG.set_comment2("from " + wavy[0].get_path());
 		Elf.set_comment2("from " + wavy[0].get_path());
@@ -572,6 +584,7 @@ int main(int argc, char **argv){
 		MO.set_comment2("from" + wavy[0].get_path());
 		HDEF.set_comment2("from" + wavy[0].get_path());
 		DEF.set_comment2("from" + wavy[0].get_path());
+		Hirsh.set_comment2("from" + wavy[0].get_path());
 		Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
 		RDG.path = get_basename_without_ending(wavy[0].get_path()) + "_rdg.cube";
 		Elf.path = get_basename_without_ending(wavy[0].get_path()) + "_elf.cube";
@@ -579,6 +592,7 @@ int main(int argc, char **argv){
 		Lap.path = get_basename_without_ending(wavy[0].get_path()) + "_lap.cube";
 		ESP.path = get_basename_without_ending(wavy[0].get_path()) + "_esp.cube";
 		DEF.path = get_basename_without_ending(wavy[0].get_path()) + "_def.cube";
+		Hirsh.path = get_basename_without_ending(wavy[0].get_path()) + "_hirsh.cube";
 
 		if (debug_main)
 			log2 << "Everything is set up; starting calculation..." << endl;
@@ -593,18 +607,21 @@ int main(int argc, char **argv){
 				MO.write_file(wavy[0], true);
 			}
 
-		if (hdef || def) {
+		if (hdef || def || hirsh) {
 			log2 << "Calcualting Rho...";
 			Calc_Rho(Rho, wavy[0], ncpus, radius, log2);
 			log2 << " ...done!" << endl;
-			cube temp(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hdef);
+			cube temp(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hdef||hirsh);
 			for (int i = 0; i < 3; i++) {
 				temp.set_origin(i, MinMax[i]);
 				for (int j = 0; j < 3; j++)
 					temp.set_vector(i, j, cell_matrix[i][j]);
 			}
-			if (hdef)
+			if (hdef || hirsh) {
+				log2 << "Calcualting spheircal Rho...";
 				Calc_Spherical_Dens(temp, wavy[0], ncpus, radius, log2);
+				log2 << " ...done!" << endl;
+			}
 				
 			if (def) {
 				log2 << "Calculating static deformation density...";
@@ -623,6 +640,13 @@ int main(int argc, char **argv){
 					HDEF.write_file(wavy[0], true);
 					HDEF.set_zero();
 				}
+
+			if (hirsh)
+			{
+				log2 << "Calcualting Hirshfeld density for atom: " << hirsh_number << endl;
+				Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy[0], ncpus, radius, hirsh_number, log2);
+				log2 << "..done!" << endl;
+			}
 		}
 
 		if (lap || eli || elf || rdg || esp)
@@ -644,10 +668,12 @@ int main(int argc, char **argv){
 			DEF.write_file(wavy[0], true);
 			Rho.write_file(wavy[0], true);
 		}
+		if (hirsh) Hirsh.write_file(wavy[0], true);
 
 		log2 << " done!" << endl;
 
 		if (esp) {
+			log2 << "Calculating ESP..." << flush;
 			Calc_ESP(ESP, wavy[0], ncpus, radius, log2);
 			log2 << "Writing cube to Disk..." << flush;
 			ESP.write_file(wavy[0], true);
