@@ -27,6 +27,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_properties|x64'">
+    <LocalDebuggerCommandArguments>-wfn benzene.wfx -cif benzene.cif -hirsh 0 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>D:\temp\benzene</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_fchk_generation|x64'">
     <LocalDebuggerCommandArguments>-wfn test.ffn -b def2-TZVP -d D:\temp\Lorraine\ -fchk test.fchk</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>D:\temp\Lorraine\</LocalDebuggerWorkingDirectory>
@@ -46,8 +52,8 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>E:\Dropbox\ELMO\INPUTS\6ANM\olex2\Wfn_job</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>D:\temp\benzene</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-cif .\6anm.cif -asym_cif .\6anm.cif -wfn .\6anm.wfx -hkl .\6anm.hkl -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif benzene.cif -wfn benzene.wfx -hirsh 0 -v</LocalDebuggerCommandArguments>
   </PropertyGroup>
 </Project>
