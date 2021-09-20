@@ -1,7 +1,7 @@
 RM := rm
 
-#LIBS := -lgomp -static-libgcc -static-libstdc++
-LIBS := -lgomp
+LIBS := -lgomp -static-libgcc -static-libstdc++
+#LIBS := -lgomp
 
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.a
 
@@ -65,32 +65,32 @@ QCT: ${OBJS_QCT} ${USER_OBJS}
 
 ./unity1.o: ./unity1.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./unity2.o: ./unity2.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./unity3.o: ./unity3.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./unity4.o: ./unity4.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	
 ./unity4_QCT.o: ./unity4_QCT.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 ./unity5.o: ./unity5.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++0x -O3   -c -fmessage-length=0  -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ -std=c++0x -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 clean:

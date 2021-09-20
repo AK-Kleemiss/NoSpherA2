@@ -1685,48 +1685,48 @@ bool calculate_structure_factors_HF(
 			if (atom_type_list[i] != 1) {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-				radial_acc = 1e-5;
+				radial_acc = 1e-2;
 			}
 			else {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-				radial_acc = 1e-4;
+				radial_acc = 1e-3;
 			}
 		}
 		else if (accuracy == 1) {
 			if (atom_type_list[i] != 1) {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
-				radial_acc = 1e-8;
+				radial_acc = 1e-4;
 			}
 			else {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
-				radial_acc = 1e-7;
+				radial_acc = 1e-5;
 			}
 		}
 		else if (accuracy == 2) {
 			if (atom_type_list[i] != 1) {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
-				radial_acc = 1e-10;
+				radial_acc = 1e-5;
 			}
 			else {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
-				radial_acc = 1e-9;
+				radial_acc = 1e-6;
 			}
 		}
 		else if (accuracy == 3) {
 			if (atom_type_list[i] != 1) {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
-				radial_acc = 1e-15;
+				radial_acc = 1e-10;
 			}
 			else {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
-				radial_acc = 1e-14;
+				radial_acc = 1e-11;
 			}
 		}
 		else if (accuracy > 3) {
