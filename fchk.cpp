@@ -2000,6 +2000,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 						}
 					}
 					else {
+						if (wave.get_MO_occ(m) == 0.0) continue;
 						temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
 						if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
 							file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
@@ -2055,7 +2056,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		if (debug) file << "Starting to write fchk now!" << endl;
 		// open fchk for writing
 		string temp_fchk = fchk_name;
-		temp_fchk.append("fchk");
+		temp_fchk.append(".fchk");
 		if (exists(temp_fchk) && !force_overwrite) {
 			file << "The fchk already exists, do you want me to overwrite it?" << endl;
 			if (!yesno()) return false;
