@@ -291,7 +291,8 @@ void AtomGrid::get_grid(const int num_centers,
     // if there are no other centers
     // no point in partitioning the space
     if (num_centers > 1)
-        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
+#pragma omp parallel for schedule(dynamic)
+        for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
         {
             grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
             grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
@@ -308,7 +309,8 @@ void AtomGrid::get_grid(const int num_centers,
             grid_aw[ipoint] = atom_grid_w_[ipoint];
         }
     else
-        for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
+#pragma omp parallel for schedule(dynamic)
+        for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++)
         {
             grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
             grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
