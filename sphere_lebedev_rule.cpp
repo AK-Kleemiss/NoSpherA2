@@ -1,79 +1,15 @@
-# include <stdlib.h>
-# include <stdio.h>
-# include <math.h>
-# include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+#include <time.h>
+#include <iostream>
 
-# include "sphere_lebedev_rule.h"
+#include "sphere_lebedev_rule.h"
 
-# define NMAX 65
-# define MMAX ((NMAX*2+3)*(NMAX*2+3)/3)
+#define NMAX 65
+#define MMAX ((NMAX*2+3)*(NMAX*2+3)/3)
 
-/******************************************************************************/
-
-int available_table ( int rule )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    AVAILABLE_TABLE returns the availability of a Lebedev rule.
-
-  Modified:
-
-    12 September 2010
-
-  Author:
-
-    John Burkardt
-
-  Reference:
-
-    Vyacheslav Lebedev, Dmitri Laikov,
-    A quadrature formula for the sphere of the 131st
-    algebraic order of accuracy,
-    Russian Academy of Sciences Doklady Mathematics,
-    Volume 59, Number 3, 1999, pages 477-481.
-
-  Parameters:
-
-    Input, int RULE, the index of the rule, between 1 and 65.
-
-    Output, int AVAILABLE_TABLE, the availability of the rule.
-    * -1, there is no such rule;
-    *  0, there is such a rule, but it is not available in this library.
-    *  1, the rule is available in this library.
-*/
-{
-  int rule_max = 65;
-  int table[65] = {
-    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-    1,    1,    1,    1,    1,    0,    1,    0,    0,    1,
-    0,    0,    1,    0,    0,    1,    0,    0,    1,    0,
-    0,    1,    0,    0,    1,    0,    0,    1,    0,    0,
-    1,    0,    0,    1,    0,    0,    1,    0,    0,    1,
-    0,    0,    1,    0,    0,    1,    0,    0,    1,    0,
-    0,    1,    0,    0,    1 };
-  int value;
-
-  if ( rule < 1 )
-  {
-    value = - 1;
-  }
-  else if ( rule_max < rule )
-  {
-    value = - 1;
-  }
-  else
-  {
-    value = table[rule-1];
-  }
-
-  return value;
-}
-/******************************************************************************/
-
-int gen_oh ( int code, double a, double b, double v, double *x, double *y,
-  double *z, double *w )
+int gen_oh ( int code, double a, double b, double v, double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -134,8 +70,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
   double c;
   int n;
 
-  if ( code == 1 )
-  {
+  if ( code == 1 ) {
     a = 1.0;
     x[0] =   a; y[0] = 0.0; z[0] = 0.0; w[0] = v;
     x[1] =  -a; y[1] = 0.0; z[1] = 0.0; w[1] = v;
@@ -145,8 +80,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[5] = 0.0; y[5] = 0.0; z[5] =  -a; w[5] = v;
     n = 6;
   }
-  else if ( code == 2 )
-  {
+  else if ( code == 2 ) {
     a = 1.0 / sqrt ( 2.0 );
     x[ 0] = 0.0; y[ 0] =   a; z[ 0] =   a; w[ 0] = v;
     x[ 1] = 0.0; y[ 1] =   a; z[ 1] =  -a; w[ 1] = v;
@@ -162,8 +96,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[11] =  -a; y[11] =  -a; z[11] = 0.0; w[11] = v;
     n = 12;
   }
-  else if ( code == 3 )
-  {
+  else if ( code == 3 ) {
     a = 1.0 / sqrt ( 3.0 );
     x[0] =   a; y[0] =   a; z[0] =   a; w[0] = v;
     x[1] =   a; y[1] =   a; z[1] =  -a; w[1] = v;
@@ -175,8 +108,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[7] =  -a; y[7] =  -a; z[7] =  -a; w[7] = v;
     n = 8;
   }
-  else if ( code == 4 )
-  {
+  else if ( code == 4 ) {
     b = sqrt ( 1.0 - 2.0 * a * a );
     x[ 0] =   a; y[ 0] =   a; z[ 0] =   b; w[ 0] = v;
     x[ 1] =   a; y[ 1] =   a; z[ 1] =  -b; w[ 1] = v;
@@ -204,8 +136,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[23] =  -b; y[23] =  -a; z[23] =  -a; w[23] = v;
     n = 24;
   }
-  else if ( code == 5 )
-  {
+  else if ( code == 5 ) {
     b = sqrt ( 1.0 - a * a );
     x[ 0] =   a; y[ 0] =   b; z[ 0] = 0.0; w[ 0] = v;
     x[ 1] =   a; y[ 1] =  -b; z[ 1] = 0.0; w[ 1] = v;
@@ -233,8 +164,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[23] = 0.0; y[23] =  -b; z[23] =  -a; w[23] = v;
     n = 24;
   }
-  else if ( code == 6 )
-  {
+  else if ( code == 6 ) {
     c = sqrt ( 1.0 - a * a - b * b );
     x[ 0] =   a; y[ 0] =   b; z[ 0] =   c; w[ 0] = v;
     x[ 1] =   a; y[ 1] =   b; z[ 1] =  -c; w[ 1] = v;
@@ -286,12 +216,11 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y,
     x[47] =  -c; y[47] =  -b; z[47] =  -a; w[47] = v;
     n = 48;
   }
-  else
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "GEN_OH - Fatal error!\n" );
-    fprintf ( stderr, "  Illegal value of code.\n" );
-    exit ( 1 );
+  else {
+    std::cout << "\n";
+    std::cout << "GEN_OH - Fatal error!\n";
+    std::cout << "  Illegal value of code.\n";
+    exit (1);
   }
   return n;
 }
@@ -334,139 +263,74 @@ void ld_by_order ( int order, double *x, double *y, double *z, double *w )
 */
 {
   if ( order == 6 )
-  {
     ld0006 ( x, y, z, w );
-  }
   else if ( order == 14 )
-  {
     ld0014 ( x, y, z, w );
-  }
   else if ( order == 26 )
-  {
     ld0026 ( x, y, z, w );
-  }
   else if ( order == 38 )
-  {
     ld0038 ( x, y, z, w );
-  }
   else if ( order == 50 )
-  {
     ld0050 ( x, y, z, w );
-  }
   else if ( order == 74 )
-  {
     ld0074 ( x, y, z, w );
-  }
   else if ( order == 86 )
-  {
     ld0086 ( x, y, z, w );
-  }
   else if ( order == 110 )
-  {
     ld0110 ( x, y, z, w );
-  }
   else if ( order == 146 )
-  {
     ld0146 ( x, y, z, w );
-  }
   else if ( order == 170 )
-  {
     ld0170 ( x, y, z, w );
-  }
   else if ( order == 194 )
-  {
     ld0194 ( x, y, z, w );
-  }
   else if ( order == 230 )
-  {
     ld0230 ( x, y, z, w );
-  }
   else if ( order == 266 )
-  {
     ld0266 ( x, y, z, w );
-  }
   else if ( order == 302 )
-  {
     ld0302 ( x, y, z, w );
-  }
   else if ( order == 350 )
-  {
     ld0350 ( x, y, z, w );
-  }
   else if ( order == 434 )
-  {
     ld0434 ( x, y, z, w );
-  }
   else if ( order == 590 )
-  {
     ld0590 ( x, y, z, w );
-  }
   else if ( order == 770 )
-  {
     ld0770 ( x, y, z, w );
-  }
   else if ( order == 974 )
-  {
      ld0974 ( x, y, z, w );
-  }
   else if ( order == 1202 )
-  {
     ld1202 ( x, y, z, w );
-  }
   else if ( order == 1454 )
-  {
     ld1454 ( x, y, z, w );
-  }
   else if ( order == 1730 )
-  {
     ld1730 ( x, y, z, w );
-  }
   else if ( order == 2030 )
-  {
     ld2030 ( x, y, z, w );
-  }
   else if ( order == 2354 )
-  {
     ld2354 ( x, y, z, w );
-  }
   else if ( order == 2702 )
-  {
     ld2702 ( x, y, z, w );
-  }
   else if ( order == 3074 )
-  {
     ld3074 ( x, y, z, w );
-  }
   else if ( order == 3470 )
-  {
     ld3470 ( x, y, z, w );
-  }
   else if ( order == 3890 )
-  {
     ld3890 ( x, y, z, w );
-  }
   else if ( order == 4334 )
-  {
     ld4334 ( x, y, z, w );
-  }
   else if ( order == 4802 )
-  {
     ld4802 ( x, y, z, w );
-  }
   else if ( order == 5294 )
-  {
     ld5294 ( x, y, z, w );
-  }
   else if ( order == 5810 )
-  {
     ld5810 ( x, y, z, w );
-  }
-  else
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "LD_BY_ORDER - Fatal error!\n" );
-    fprintf ( stderr, "  Unexpected value of ORDER.\n" );
-    exit ( 1 );
+  else {
+    std::cout << "\n";
+    std::cout << "LD_BY_ORDER - Fatal error!\n";
+    std::cout << "Unexpected value of ORDER.\n";
+    exit (1);
   }
 
   return;
@@ -6320,241 +6184,3 @@ void ld5810 ( double *x, double *y, double *z, double *w )
   return;
 }
 /******************************************************************************/
-
-int order_table ( int rule )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    ORDER_TABLE returns the order of a Lebedev rule.
-
-  Modified:
-
-    11 September 2010
-
-  Author:
-
-    John Burkardt
-
-  Reference:
-
-    Vyacheslav Lebedev, Dmitri Laikov,
-    A quadrature formula for the sphere of the 131st
-    algebraic order of accuracy,
-    Russian Academy of Sciences Doklady Mathematics,
-    Volume 59, Number 3, 1999, pages 477-481.
-
-  Parameters:
-
-    Input, int RULE, the index of the rule, between 1 and 65.
-
-    Output, int ORDER_TABLE, the order of the rule.
-*/
-{
-  int rule_max = 65;
-  int table[65]= {
-      6,   14,   26,   38,   50,   74,   86,  110,  146,  170,
-    194,  230,  266,  302,  350,  386,  434,  482,  530,  590,
-    650,  698,  770,  830,  890,  974, 1046, 1118, 1202, 1274,
-   1358, 1454, 1538, 1622, 1730, 1814, 1910, 2030, 2126, 2222,
-   2354, 2450, 2558, 2702, 2810, 2930, 3074, 3182, 3314, 3470,
-   3590, 3722, 3890, 4010, 4154, 4334, 4466, 4610, 4802, 4934,
-   5090, 5294, 5438, 5606, 5810 };
-  int value;
-
-  if ( rule < 1 )
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "ORDER_TABLE - Fatal error!\n" );
-    fprintf ( stderr, "  RULE < 1.\n" );
-    exit ( 1 );
-  }
-  else if ( rule_max < rule )
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "ORDER_TABLE - Fatal error!\n" );
-    fprintf ( stderr, "  RULE_MAX < RULE.\n" );
-    exit ( 1 );
-  }
-
-  value = table[rule-1];
-
-  return value;
-}
-/******************************************************************************/
-
-int precision_table ( int rule )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    PRECISION_TABLE returns the precision of a Lebedev rule.
-
-  Modified:
-
-    11 September 2010
-
-  Author:
-
-    John Burkardt
-
-  Reference:
-
-    Vyacheslav Lebedev, Dmitri Laikov,
-    A quadrature formula for the sphere of the 131st
-    algebraic order of accuracy,
-    Russian Academy of Sciences Doklady Mathematics,
-    Volume 59, Number 3, 1999, pages 477-481.
-
-  Parameters:
-
-    Input, int RULE, the index of the rule, between 1 and 65.
-
-    Output, int PRECISION_TABLE, the precision of the rule.
-*/
-{
-  int rule_max = 65;
-  int table[65]= {
-     3,   5,   7,   9,  11,  13,  15,  17,  19,  21,
-    23,  25,  27,  29,  31,  33,  35,  37,  39,  41,
-    43,  45,  47,  49,  51,  53,  55,  57,  59,  61,
-    63,  65,  67,  69,  71,  73,  75,  77,  79,  81,
-    83,  85,  87,  89,  91,  93,  95,  97,  99, 101,
-   103, 105, 107, 109, 111, 113, 115, 117, 119, 121,
-   123, 125, 127, 129, 131 };
-  int value;
-
-  if ( rule < 1 )
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "PRECISION_TABLE - Fatal error!\n" );
-    fprintf ( stderr, "  RULE < 1.\n" );
-    exit ( 1 );
-  }
-  else if ( rule_max < rule )
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "PRECISION_TABLE - Fatal error!\n" );
-    fprintf ( stderr, "  RULE_MAX < RULE.\n" );
-    exit ( 1 );
-  }
-
-  value = table[rule-1];
-
-  return value;
-}
-/******************************************************************************/
-
-void timestamp ( void )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    TIMESTAMP prints the current YMDHMS date as a time stamp.
-
-  Example:
-
-    31 May 2001 09:45:54 AM
-
-  Licensing:
-
-    This code is distributed under the GNU LGPL license.
-
-  Modified:
-
-    24 September 2003
-
-  Author:
-
-    John Burkardt
-
-  Parameters:
-
-    None
-*/
-{
-# define TIME_SIZE 40
-
-  static char time_buffer[TIME_SIZE];
-  const struct tm *tm;
-  size_t len;
-  time_t now;
-
-  now = time ( NULL );
-  tm = localtime ( &now );
-
-  len = strftime ( time_buffer, TIME_SIZE, "%d %B %Y %I:%M:%S %p", tm );
-  if (len == 0)
-  {
-    fprintf ( stderr, "\n" );
-    fprintf ( stderr, "TIMESTAMP - Fatal error!\n" );
-    fprintf ( stderr, "  TIME_SIZE constant too small.\n" );
-    exit ( 1 );
-  }
- 
-
-  fprintf ( stdout, "%s\n", time_buffer );
-
-  return;
-# undef TIME_SIZE
-}
-/******************************************************************************/
-
-void xyz_to_tp ( double x, double y, double z, double *t, double *p )
-
-/******************************************************************************/
-/*
-  Purpose:
-
-    XYZ_TO_TP converts (X,Y,Z) to (Theta,Phi) coordinates on the unit sphere.
-
-  Modified:
-
-    09 September 2010
-
-  Author:
-
-    Dmitri Laikov
-
-  Parameters:
-
-    Input, double X, Y, Z, the Cartesian coordinates of a point
-    on the unit sphere.
-
-    Output, double T, P, the Theta and Phi coordinates of
-    the point.
-*/
-{
-  double ang_x;
-  double fact;
-  double pi = 3.14159265358979323846;
-
-  *p = acos ( z );
-
-  fact = sqrt ( x * x + y * y );
-
-  if ( 0 < fact )
-  {
-    ang_x = acos ( x / fact );
-  }
-  else
-  {
-    ang_x = acos ( x );
-  }
-
-  if ( y < 0 )
-  {
-    ang_x = - ang_x;
-  }
-  *t = ang_x;
-/*
-  Convert to degrees.
-*/
-  *t = *t * 180.0 / pi;
-  *p = *p * 180.0 / pi;
-
-  return;
-}
