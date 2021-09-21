@@ -798,11 +798,9 @@
   <ItemGroup>
     <ClCompile Include="../AtomGrid.cpp" />
     <ClCompile Include="../basis_set.cpp" />
-    <ClCompile Include="../becke_partitioning.cpp" />
     <ClCompile Include="../convenience.cpp" />
     <ClCompile Include="../cube.cpp" />
     <ClCompile Include="../fchk.cpp" />
-    <ClCompile Include="../grid_radial.cpp" />
     <ClCompile Include="../mo_class.cpp" />
     <ClCompile Include="../sphere_lebedev_rule.cpp" />
     <CudaCompile Include="../structure_factors.cpp">
@@ -818,12 +816,9 @@
     <ClInclude Include="../AtomGrid.h" />
     <ClInclude Include="../atoms.h" />
     <ClInclude Include="../basis_set.h" />
-    <ClInclude Include="../becke_partitioning.h" />
     <ClInclude Include="../convenience.h" />
     <ClInclude Include="../cube.h" />
-    <ClInclude Include="../error_handling.h" />
     <ClInclude Include="../fchk.h" />
-    <ClInclude Include="../grid_radial.h" />
     <ClInclude Include="../mo_class.h" />
     <ClInclude Include="../parameters.h" />
     <ClInclude Include="../sphere_lebedev_rule.h" />
