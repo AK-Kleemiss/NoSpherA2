@@ -907,7 +907,6 @@ copy D:\git\wfn2fchk\Windows\x64\Release\NoSpherA2.exe D:\devel\rundir-py3\NoSph
     <ClInclude Include="../cube.h" />
     <ClInclude Include="../fchk.h" />
     <ClInclude Include="../mo_class.h" />
-    <ClInclude Include="../parameters.h" />
     <ClInclude Include="../sphere_lebedev_rule.h" />
     <ClInclude Include="../structure_factors.h" />
     <ClInclude Include="../wfn_class.h" />

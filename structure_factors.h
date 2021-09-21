@@ -31,7 +31,8 @@ bool calculate_structure_factors_HF(
 	std::vector <std::vector <double> > &twin_law,
 	int cpus = -1,
 	bool electron_diffraction = false,
-	int pbc = 0);
+	int pbc = 0,
+	bool Olex2_1_3_switch = false);
 
 bool calculate_structure_factors_RI(
 	std::string& hkl_filename,
