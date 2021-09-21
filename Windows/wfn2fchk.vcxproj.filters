@@ -21,9 +21,6 @@
     <ClCompile Include="../basis_set.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../becke_partitioning.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../convenience.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -31,9 +28,6 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="../fchk.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="../grid_radial.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="../mo_class.cpp">
@@ -68,22 +62,13 @@
     <ClInclude Include="../basis_set.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../becke_partitioning.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../convenience.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../cube.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../error_handling.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../fchk.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="../grid_radial.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../mo_class.h">
