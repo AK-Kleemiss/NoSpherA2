@@ -120,7 +120,6 @@ int main(int argc, char **argv){
 	bool rdg = false;
 	bool hdef = false;
 	bool def = false;
-	bool pdf = false;
 	bool fract = false;
 	bool hirsh = false;
 	int hirsh_number = 0;
@@ -204,23 +203,6 @@ int main(int argc, char **argv){
 		}
 		else if (temp.find("-resolution") < 1) {
 			resolution = stod(argv[i + 1]);
-		}
-		else if (temp.find("-pdf") < 1) {
-			pdf = true;
-			int n = 1;
-			while (argv[i + n][0] != '-') {
-				if (stoi(argv[i + n]) == '2')
-					scnd = true;
-				else if (stoi(argv[i + n]) == '3')
-					thrd = true;
-				else if (stoi(argv[i + n]) == '4')
-					frth = true;
-				else
-					break;
-				n++;
-			}
-			if (debug_main)
-				cout << "scnd: " << scnd << " thrd: " << thrd << " fourth: " << frth << endl;
 		}
 		else if (temp.find("-radius") < 1) {
 			radius = stod(argv[i + 1]);
@@ -678,47 +660,6 @@ int main(int argc, char **argv){
 			log2 << "Writing cube to Disk..." << flush;
 			ESP.write_file(wavy[0], true);
 			log2 << "  done!" << endl;
-		}
-	}
-	if (pdf) {
-		ofstream log3("NoSpherA2_pdf.log", ios::out);
-		if (debug_main)
-			for (int i = 0; i < argc; i++)
-				log3 << argv[i] << ' '<< endl;
-		log3 << "    _   __     _____       __              ___   ___\n";
-		log3 << "   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n";
-		log3 << "  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n";
-		log3 << " / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n";
-		log3 << "/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n";
-		log3 << "                /_/\n" << flush;
-		log3 << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-		if (cif == "" || wfn == "") {
-			log3 << "No CIF or WFN specified!";
-			return -1;
-		}
-		if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-		else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
-		else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
-		else {
-			log3 << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
-			return -1;
-		}
-
-		if (wfn.find(".wfx") == string::npos)
-			wavy[0].read_wfn(wfn, debug_all, log3);
-		else
-			wavy[0].read_wfx(wfn, debug_all, log3);
-
-		cell unit_cell(cif,log3,debug_main);
-
-		read_fracs_ADPs_from_CIF(cif, wavy[0], unit_cell, log3, debug_main);
-		
-		for (int i = 0; i < wavy[0].get_ncen(); i++) {
-			if (wavy[0].atoms[i].is_anharm()) {
-				if (debug_main)
-					log3 << "Atom " << i << " is anharmonic! Starting calcualtion of PDF" << endl;
-				PDFbyFFT(i, scnd, thrd, frth, resolution, unit_cell, wavy[0]);
-			}
 		}
 	}
 	return 0;

@@ -1688,7 +1688,7 @@ bool calculate_structure_factors_HF(
 			if (atom_type_list[i] != 1) {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
 				lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-				radial_acc = 1e-2;
+				radial_acc = 1e-4;
 			}
 			else {
 				lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
