@@ -1147,7 +1147,8 @@ bool calculate_structure_factors_HF(
 	vector < vector <double> >& twin_law,
 	int cpus,
 	bool electron_diffraction,
-	int pbc
+	int pbc,
+	bool Olex2_1_3_switch
 )
 {
 #ifdef FLO_CUDA
@@ -2933,7 +2934,9 @@ bool calculate_structure_factors_HF(
 	if (debug)
 		file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 
-	const bool shrink = true;
+	bool shrink = true;
+	if (Olex2_1_3_switch)
+		shrink = false;
 	vector < vector<double> > k_pt_unique;
 	vector < vector<int> > hkl_unique;
 	if (shrink) {

@@ -74,9 +74,6 @@
     <ClInclude Include="../mo_class.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../parameters.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../sphere_lebedev_rule.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>

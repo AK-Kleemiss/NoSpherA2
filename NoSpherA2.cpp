@@ -122,6 +122,7 @@ int main(int argc, char **argv){
 	bool def = false;
 	bool fract = false;
 	bool hirsh = false;
+	bool Olex2_1_3_switch = false;
 	int hirsh_number = 0;
 	bool scnd = true, thrd = true, frth = true;
 	double MinMax[6];
@@ -167,6 +168,8 @@ int main(int argc, char **argv){
 			pbc = stoi(argv[i + 1]);
 		else if (temp.find("-ED") < 1)
 			electron_diffraction = true;
+		else if (temp.find("-Olex2_1_3") < 1)
+			Olex2_1_3_switch = true;
 		else if (temp.find("-v2") < 1) {
 			cout << "Turning on verbose mode 2!" << endl;
 			debug_all = true;
@@ -430,7 +433,7 @@ int main(int argc, char **argv){
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, twin_law, threads, electron_diffraction, pbc))
+			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, twin_law, threads, electron_diffraction, pbc, Olex2_1_3_switch))
 				log_file << "Error during SF Calculation!" << endl;
 		}
 	}
