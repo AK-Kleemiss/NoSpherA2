@@ -73,6 +73,7 @@ bool merge_tscs(
 		bool data = false;
 		vector<bool> is_a_new_scatterer;
 		int nr_scatterers = 0;
+		int nr_new_scatterers;
 		while (!data) {
 			getline(inf, line);
 			if (line.find("SCATTERERS:") != string::npos) {
@@ -90,7 +91,8 @@ bool merge_tscs(
 					if(is_new) labels.push_back(new_label);
 					temp_labels.erase(0, pos + delimiter.length());
 				}
-				cout << "Read " << nr_scatterers << " atoms, " << sum_of_bools(is_a_new_scatterer) << " are new." << endl;
+				nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
+				cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << endl;
 				form_fact.resize(labels.size());
 				form_fact.resize(labels.size());
 			}
@@ -99,12 +101,12 @@ bool merge_tscs(
 			else if (f == 0) header.push_back(line);
 		}
 		cout << "Reading Data Block..." << endl;
+		vector <vector <int> > local_indices;
 		while (!inf.eof()) {
 			getline(inf, line);
 			vector<string> digest = split_string(line, " ");
 			if (digest.size() == 1 && digest[0] == "")
 				continue;
-			vector <vector <int> > local_indices;
 			local_indices.resize(3);
 			for (int i = 0; i < 3; i++)
 				local_indices[i].push_back(stoi(digest[i]));
@@ -121,9 +123,47 @@ bool merge_tscs(
 			}
 		}
 		if (form_fact[form_fact.size() - 1].size() != form_fact[0].size()) {
-			cout << "ERROR! Incorrect number of reflections among files! Aborting!" << endl;
+			cout << "Mismatching number of reflections in tsc files encountered, trying to find common set...";
+			vector <int> sorting;
+			if (indices.size() > local_indices.size()) {
+				sorting.resize(indices.size());
+#pragma omp parallel for
+				for (int ind = 0; ind < indices.size(); ind++) {
+					sorting[ind] = 0;
+					for (int ind2 = 0; ind2 < local_indices.size(); ind2++){
+						if (indices[0][ind] == local_indices[0][ind2] && indices[1][ind] == local_indices[1][ind2] && indices[2][ind] == local_indices[2][ind2])
+							sorting[ind] = ind2+1;
+						else if (indices[0][ind] == -local_indices[0][ind2] && indices[1][ind] == -local_indices[1][ind2] && indices[2][ind] == -local_indices[2][ind2])
+							sorting[ind] = -ind2-1;
+					}
+				}
+				for (int i = sorting.size() - 1; i >= 0; i--) {
+					//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
+					if (sorting[i] == 0) {
+						for (int j = 0; j < offset; j++)
+							form_fact[j].erase(form_fact[j].begin() + i);
+						sorting.erase(sorting.begin() + i);
+						for (int j = 0; j < 3; j++)
+							indices[j].erase(indices[0].begin() + i);
+					}
+				}
+			}
+			else {
+				sorting.resize(local_indices.size());
+#pragma omp parallel for
+				for (int ind = 0; ind < local_indices.size(); ind++) {
+					sorting[ind] = 0;
+					for (int ind2 = 0; ind2 < indices.size(); ind2++) {
+						if (indices[0][ind2] == local_indices[0][ind] && indices[1][ind2] == local_indices[1][ind] && indices[2][ind2] == local_indices[2][ind])
+							sorting[ind] = ind2;
+						else if (indices[0][ind2] == -local_indices[0][ind] && indices[1][ind2] == -local_indices[1][ind] && indices[2][ind2] == -local_indices[2][ind])
+							sorting[ind] = -ind2;
+					}
+				}
+			}
 			return false;
 		}
+		local_indices.clear();
 		cout << "Data for " << form_fact[0].size() << " indices read." << endl;
 		offset = labels.size();
 	}
