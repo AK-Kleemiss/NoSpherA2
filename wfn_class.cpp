@@ -1223,6 +1223,71 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream &file) {
 	return true;
 };
 
+bool WFN::read_xyz(string &filename, ofstream& file, bool debug) {
+	if (ncen > 0) {
+		file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
+		if (!yesno()) return false;
+		else file << "okay, carrying on then..." << endl;
+	}
+	if (exists(filename)) {
+		if (debug_wfn) file << "File is valid, continuing...\n";
+	}
+	else {
+		file << "couldn't open or find " << filename << ", leaving" << endl;
+		return false;
+	}
+	origin = 7;
+	ifstream rf(filename.c_str());
+	if (rf.good())
+		path = filename;
+	string line;
+	rf.seekg(0);
+	
+	getline(rf, line);
+	stringstream stream(line);
+	int e_nuc = 0; //number of expected MOs, Exponents and nuclei
+	stream >> e_nuc;
+	if (debug) 
+		file << "e_nuc: " << e_nuc << endl;
+	getline(rf, line);
+	comment = line;
+	//----------------------------- Read Atoms ------------------------------------------------------------
+	vector<unsigned int> dum_nr, dum_ch;
+	dum_nr.resize(e_nuc); dum_ch.resize(e_nuc);
+	vector<string> dum_label;
+	vector<double> dum_x, dum_y, dum_z;
+	dum_x.resize(e_nuc); dum_y.resize(e_nuc); dum_z.resize(e_nuc); dum_label.resize(e_nuc);
+	for (int i = 0; i < e_nuc; i++) {
+		vector <string> temp;
+		getline(rf, line);
+		stream.str(line);
+		if (debug) file << i << ".run, line:" << line << endl;
+		dum_nr[i] = i;
+		temp = split_string(line, " ");
+		dum_label[i] = temp[0];
+		dum_x[i] = ang2bohr(stod(temp[2]));
+		dum_y[i] = ang2bohr(stod(temp[3]));
+		dum_z[i] = ang2bohr(stod(temp[4]));
+		dum_ch[i] = get_Z_from_label(dum_label[i].c_str())+1;
+		if (debug) {
+			file << "label:" << dum_label[i]
+				<< " nr: " << dum_nr[i]
+				<< " x: " << dum_x[i]
+				<< " y: " << dum_y[i]
+				<< " z: " << dum_z[i]
+				<< " charge: " << dum_ch[i] << endl;
+		}
+	}
+	//---------------------Start writing everything from the temp arrays into wave ---------------------
+	if (debug) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
+
+	for (int i = 0; i < e_nuc; i++) 
+		if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) 
+			file << "Error while making atoms!!\n";
+
+	return true;
+};
+
 bool WFN::read_wfx(string fileName, bool debug, ofstream& file) {
 	if (exists(fileName)) {
 		if (debug)

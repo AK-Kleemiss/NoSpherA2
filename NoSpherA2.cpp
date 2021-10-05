@@ -103,6 +103,7 @@ int main(int argc, char **argv){
 	string symm("");
 	string asym_cif("");
 	string method("rhf");
+	string xyz_file("");
 	string temp;
 	string fract_name("");
 	int accuracy = 2;
@@ -123,6 +124,9 @@ int main(int argc, char **argv){
 	bool fract = false;
 	bool hirsh = false;
 	bool Olex2_1_3_switch = false;
+	bool iam_switch = false;
+	bool read_k_pts = false;
+	bool save_k_pts = false;
 	int hirsh_number = 0;
 	bool scnd = true, thrd = true, frth = true;
 	double MinMax[6];
@@ -229,6 +233,12 @@ int main(int argc, char **argv){
 			def = true;
 			calc = true;
 		}
+		else if (temp.find("-skpts") < 1) {
+			save_k_pts = true;
+		}
+		else if (temp.find("-rkpts") < 1) {
+			read_k_pts = true;
+		}
 		else if (temp.find("-group") < 1) {
 			while (string(argv[i + 1]).find("-") != string::npos) {
 				groups.push_back(stoi(argv[i + 1]));
@@ -248,14 +258,11 @@ int main(int argc, char **argv){
 			}
 			i += 9;
 		}
-		else if (temp.find("-sfac") != string::npos) {
-			int atom_numbers;
-			int n = 1;
-			while (argv[i + n][0] != '-' && i + n < argc) {
-				atom_numbers = stoi(string(argv[i + 1]));
-
-			}
+		else if (temp.find("-IAM") != string::npos) {
+			iam_switch = true;
 		}
+		else if (temp.find("-xyz") != string::npos)
+			xyz_file = argv[i + 1];
 		else if (temp.find("-merge") != string::npos) {
 			vector<string> filenames;
 			int n = 1;
@@ -282,9 +289,10 @@ int main(int argc, char **argv){
 	help_message.append("   -v2                             Even more stuff\n");
 	help_message.append("	-mult	<NUMBER>				Input multiplicity of wavefunction\n");
 	help_message.append("   -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF\n");
-	help_message.append("   -cif      <FILENAME>.cif        cif to use for calculation of scatteriung factors\n");
-	help_message.append("   -asym-cif <FILENAME>.cif        cif to use to identify the asymetric unit atoms from\n");
-	help_message.append("   -sfac     <ATOMIC NUMBERS>      Make scattering factors based on Thakkar functions for elements given\n");
+	help_message.append("   -cif      <FILENAME>.cif        CIF to use for calculation of scatteriung factors\n");
+	help_message.append("   -asym-cif <FILENAME>.cif        CIF to use to identify the asymetric unit atoms from\n");
+	help_message.append("   -IAM                            Make scattering factors based on Thakkar functions for elements in CIF\n");
+	help_message.append("   -xyz                            Read atom positions from this xyz file for IAM\n");
 	help_message.append("   -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors\n");
 	help_message.append("   -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use\n");
 	help_message.append("              If there is more than a single twin law to be used use the twin command multiple times.\n");
@@ -339,7 +347,51 @@ int main(int argc, char **argv){
 			wavy[0].read_wfn(wfn, debug_all, log_file);
 	}
 
-	if (hkl != "" || basis_set != "" || fchk != "") {
+	if (iam_switch) {
+		ofstream log_file("NoSpherA2.log", ios::out);
+		if (debug_main)
+			for (int i = 0; i < argc; i++)
+				log_file << argv[i] << endl;
+
+		log_file << NoSpherA2_message;
+		log_file.flush();
+		if (argc > 1) {
+			string keyword = argv[1];
+			if (keyword.find("--help") != string::npos) {
+				log_file << help_message << endl;
+				log_file.close();
+				return 0;
+			}
+		}
+
+		log_file.flush();
+		if (debug_main)
+			log_file << "status: " << cif << "&" << hkl << "&" << asym_cif << "&" << xyz_file << endl;
+		if (xyz_file == "") {
+			log_file << "No .xyz file specified! Please provide an xyz file for calculation of IAM .tscs" << endl;
+			return -1;
+		}
+		else {
+			if (exists(xyz_file)) {
+				wavy.push_back(WFN(7));
+				wavy[0].read_xyz(xyz_file, log_file, debug_main);
+			}
+			else {
+				log_file << ".xyz file does not exist!" << endl;
+				return -1;
+			}
+		}
+
+		if (electron_diffraction)
+			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+		if (cif != "" || hkl != "") {
+			if (debug_main)
+				log_file << "Entering Structure Factor Calculation!" << endl;
+			if (!thakkar_sfac(hkl, cif, asym_cif, debug_main, log_file, groups, twin_law, wavy[0], threads, electron_diffraction))
+				log_file << "Error during SF Calculation!" << endl;
+		}
+	}
+	else if (hkl != "" || basis_set != "" || fchk != "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
@@ -433,7 +485,24 @@ int main(int argc, char **argv){
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!calculate_structure_factors_HF(hkl, cif, asym_cif, symm, wavy[0], debug_main, accuracy, log_file, groups, twin_law, threads, electron_diffraction, pbc, Olex2_1_3_switch))
+			if (!calculate_structure_factors_HF(
+					hkl, 
+					cif, 
+					asym_cif, 
+					symm, 
+					wavy[0], 
+					debug_main, 
+					accuracy, 
+					log_file, 
+					groups, 
+					twin_law, 
+					threads, 
+					electron_diffraction, 
+					pbc, 
+					Olex2_1_3_switch,
+					save_k_pts,
+					read_k_pts)
+				)
 				log_file << "Error during SF Calculation!" << endl;
 		}
 	}

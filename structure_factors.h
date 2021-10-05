@@ -14,9 +14,16 @@ bool merge_tscs(
 	);
 
 bool thakkar_sfac(
-	const int atom_number,
-	const double radial_acc = 1E-25,
-	const int angular_level = 3);
+	std::string& hkl_filename,
+	std::string& cif,
+	std::string& asym_cif,
+	bool debug,
+	std::ofstream& file,
+	std::vector <int>& input_groups,
+	std::vector < std::vector <double> >& twin_law,
+	WFN &wave,
+	int cpus = -1,
+	bool electron_diffraction = false);
 
 bool calculate_structure_factors_HF(
 	std::string &hkl_filename, 
@@ -32,7 +39,9 @@ bool calculate_structure_factors_HF(
 	int cpus = -1,
 	bool electron_diffraction = false,
 	int pbc = 0,
-	bool Olex2_1_3_switch = false);
+	bool Olex2_1_3_switch = false,
+	bool save_k_pts = false,
+	bool read_k_pts = false);
 
 bool calculate_structure_factors_RI(
 	std::string& hkl_filename,

@@ -16,7 +16,8 @@ public:
 	double get_radial_density(double dist);
 	int get_max_l();
 	double get_max_alpha();
-	std::vector<double> get_min_alpha();
+	std::vector<double> get_min_alpha_vector();
+	double get_min_alpha();
 };
 
 
