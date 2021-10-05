@@ -1,6 +1,8 @@
 #ifndef __CONVENIENCE_H__
 #define __CONVENIENCE_H__
 
+#pragma once
+
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -12,6 +14,15 @@
 
 class WFN;
 class cell;
+
+
+constexpr double bohr2aang(double inp) {
+	return inp * 0.529177249;
+}
+
+constexpr double ang2bohr(double inp) {
+	return inp / 0.529177249;
+}
 
 //------------------general functions for easy use of terminal input--------------------
 const double bragg_angstrom[114]{
@@ -313,6 +324,12 @@ inline double double_from_string_with_esd(std::string in) {
 		return stod(in);
 	else
 		return stod(in.substr(0, in.find('(')));
+}
+
+constexpr double Laguerre_ploynom(int n, double x) {
+	if (n == 0) return 1;
+	else if (n == 1) return 1 - x;
+	else return (((int(2) * n + int(1) - x) * Laguerre_ploynom(n - 1, x) - n * Laguerre_ploynom(n - 2, x)) / (n + int(1)));
 }
 
 #include "wfn_class.h"

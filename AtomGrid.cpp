@@ -13,12 +13,12 @@
 #endif
 //Constants for later use
 const int hardness = 3;
-const double cutoff = 1.0e-14;
+const double cutoff = 1.0e-20;
 const double PI = 3.14159265358979323846;
 const double C0 = 4.0 * std::sqrt(2.0) * PI;
 const double PI2 = pow(PI, 2);
 const double TG32 = tgamma(3.0 / 2.0);
-const int MAO = 33;
+const int max_LT = 33;
 const int MAG = 5810;
 
 //                       3,     5     7,    9,    11,   13,   15,   17
@@ -28,10 +28,10 @@ int lebedev_table[33] = {6,    14,   26,   38,   50,   74,   86,   110,
                          590,  770,  974,  1202, 1454, 1730, 2030, 2354,
                          2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810};
 
-int get_closest_num_angular(int n) {
+constexpr int get_closest_num_angular(int n) {
     int m;
 
-    for (int i = 0; i < MAO; i++) {
+    for (int i = 0; i < max_LT; i++) {
         m = lebedev_table[i];
         if (m >= n)
             return m;
@@ -41,8 +41,8 @@ int get_closest_num_angular(int n) {
     return -1;
 }
 
-int get_angular_order(int n) {
-    for (int i = 0; i < MAO; i++) {
+constexpr int get_angular_order(int n) {
+    for (int i = 0; i < max_LT; i++) {
         if (lebedev_table[i] == n)
             return i;
     }
@@ -62,10 +62,10 @@ AtomGrid::AtomGrid(const double radial_precision,
     int min_num_angular_points_closest = get_closest_num_angular(min_num_angular_points);
     int max_num_angular_points_closest = get_closest_num_angular(max_num_angular_points);
 
-    double *angular_x = new double[MAO * MAG];
-    double *angular_y = new double[MAO * MAG];
-    double *angular_z = new double[MAO * MAG];
-    double *angular_w = new double[MAO * MAG];
+    double *angular_x = new double[max_LT * MAG];
+    double *angular_y = new double[max_LT * MAG];
+    double *angular_z = new double[max_LT * MAG];
+    double *angular_w = new double[max_LT * MAG];
 
     for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
         int angular_off = i * MAG;
@@ -138,7 +138,8 @@ AtomGrid::AtomGrid(const double radial_precision,
                    const int max_l_quantum_number,
                    const double alpha_min[],
                    const bool debug,
-                   std::ofstream& file)
+                   std::ofstream& file,
+                   const bool slater)
  {
     using namespace std;
      int min_num_angular_points_closest =
@@ -146,13 +147,14 @@ AtomGrid::AtomGrid(const double radial_precision,
      int max_num_angular_points_closest =
          get_closest_num_angular(max_num_angular_points);
 
-     double* angular_x = new double[MAO * MAG];
-     double* angular_y = new double[MAO * MAG];
-     double* angular_z = new double[MAO * MAG];
-     double* angular_w = new double[MAO * MAG];
+     double* angular_x = new double[max_LT * MAG];
+     double* angular_y = new double[max_LT * MAG];
+     double* angular_z = new double[max_LT * MAG];
+     double* angular_w = new double[max_LT * MAG];
+     int angular_off;
 
      for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
-         int angular_off = i * MAG;
+         angular_off = i * MAG;
          ld_by_order(lebedev_table[i],
              &angular_x[angular_off],
              &angular_y[angular_off],
@@ -161,7 +163,9 @@ AtomGrid::AtomGrid(const double radial_precision,
      }
 
      // radial parameters
-     double r_inner = get_r_inner(radial_precision,  alpha_max * 2.0); // factor 2.0 to match DIRAC
+     double r_inner = get_r_inner(radial_precision, alpha_max * 2.0); // factor 2.0 to match DIRAC
+     if (slater)
+         r_inner *= 1E-5;
      double h = (std::numeric_limits<double>::max)();
      double r_outer = 0.0;
 
@@ -173,11 +177,11 @@ AtomGrid::AtomGrid(const double radial_precision,
              //       << " r_inner: " << r_inner 
              //       << " alpha_min: " << alpha_min[l] << endl;
              r_outer = std::max(r_outer, 
-                                get_r_outer(radial_precision, 
-                                    alpha_min[l], 
-                                    l, 
-                                    4.0 * bragg_angstrom[proton_charge])
-                                );
+                get_r_outer(radial_precision, 
+                        alpha_min[l], 
+                        l, 
+                        4.0 * bragg_angstrom[proton_charge])
+                        );
              h = std::min(h, get_h(radial_precision, 
                                     l, 
                                     0.1 * (r_outer - r_inner))
@@ -185,11 +189,11 @@ AtomGrid::AtomGrid(const double radial_precision,
          }
      }
 
-     //if(debug) 
-     //    file << "ATOM GRID: " 
-     //       << "r_inner: " << r_inner 
-     //       << " h: " << h 
-     //       << " r_outer: " << r_outer << endl;
+     if(debug) 
+         file << "ATOM GRID: " 
+            << "r_inner: " << r_inner 
+            << " h: " << h 
+            << " r_outer: " << r_outer << endl;
 
      num_radial_grid_points_ = 0;
 
@@ -197,15 +201,16 @@ AtomGrid::AtomGrid(const double radial_precision,
      double c = r_inner / (exp(h) - 1.0);
      int num_radial = int(log(1.0 + (r_outer / c)) / h);
 
-     //if (debug) 
-     //    file << "ATOM GRID: " 
-     //       << "rb: " << rb 
-     //       << " c: " << c 
-     //       << " num_radial: " << num_radial << endl;
+     if (debug) 
+         file << "ATOM GRID: " 
+            << "rb: " << rb 
+            << " c: " << c 
+            << " num_radial: " << num_radial << endl;
 
      for (int irad = 0; irad < num_radial; irad++) {
          double radial_r = c * (exp(double(irad + 1.0) * h) - 1.0);
-         double radial_w = (radial_r + c) * radial_r * radial_r * h;
+         double radial_w;
+         radial_w = (radial_r + c) * radial_r * radial_r * h;
 
          radial_atom_grid_r_bohr_.push_back(radial_r);
          radial_atom_grid_w_.push_back(radial_w);
@@ -221,13 +226,18 @@ AtomGrid::AtomGrid(const double radial_precision,
          }
 
          int angular_off = get_angular_order(num_angular) * MAG;
+         int start = atom_grid_x_bohr_.size();
+         atom_grid_x_bohr_.resize(start + num_angular);
+         atom_grid_y_bohr_.resize(start + num_angular);
+         atom_grid_z_bohr_.resize(start + num_angular);
+         atom_grid_w_.resize(start + num_angular);
+#pragma omp parallel for
+         for (int iang = start; iang < start + num_angular; iang++) {
+             atom_grid_x_bohr_[iang] = angular_x[angular_off + iang - start] * radial_r;
+             atom_grid_y_bohr_[iang] = angular_y[angular_off + iang - start] * radial_r;
+             atom_grid_z_bohr_[iang] = angular_z[angular_off + iang - start] * radial_r;
 
-         for (int iang = 0; iang < num_angular; iang++) {
-             atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] * radial_r);
-             atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] * radial_r);
-             atom_grid_z_bohr_.push_back(angular_z[angular_off + iang] * radial_r);
-
-             atom_grid_w_.push_back(4.0 * PI * angular_w[angular_off + iang] * radial_w);
+             atom_grid_w_[iang] = 4.0 * PI * angular_w[angular_off + iang - start] * radial_w;
          }
      }
 
@@ -359,6 +369,22 @@ void AtomGrid::get_grid_omp(const int num_centers,
     
 }
 
+void AtomGrid::get_atom_grid_omp(
+    double grid_x_bohr[],
+    double grid_y_bohr[],
+    double grid_z_bohr[],
+    double grid_w[]) const
+{
+#pragma omp parallel for
+        for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+            grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint];
+            grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint];
+            grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint];
+            grid_w[ipoint] = atom_grid_w_[ipoint];
+        }
+
+}
+
 void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const {
     for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
         grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
@@ -366,13 +392,31 @@ void AtomGrid::get_radial_grid(double grid_r_bohr[], double grid_w[]) const {
     }
 }
 
+void AtomGrid::get_radial_distances(double grid_r_bohr[]) const {
+    for (size_t ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+}
+
+void AtomGrid::get_radial_grid_omp(double grid_r_bohr[], double grid_w[]) const {
+#pragma omp parallel for
+    for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++) {
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+        grid_w[ipoint] = radial_atom_grid_w_[ipoint];
+    }
+}
+
+void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const {
+#pragma omp parallel for
+    for (int ipoint = 0; ipoint < num_radial_grid_points_; ipoint++)
+        grid_r_bohr[ipoint] = radial_atom_grid_r_bohr_[ipoint];
+}
+
 // JCP 88, 2547 (1988), eq. 20
 inline double f3(const double x)
 {
     double f = x;
-    for (int i = 0; i < hardness; i++) {
+    for (int i = 0; i < hardness; i++)
         f *= (1.5 - 0.5 * f * f);
-    }
     return f;
 }
 
@@ -536,19 +580,15 @@ double get_h(const double max_error, const int l, const double guess)
     double h = guess;
     double h_old = h * 2;
     double step = 0.1 * guess;
-    double sign, sign_old;
-    double f = 1.0e50;
-    double cm, pm, rd0, e0;
-
-    (f > max_error) ? (sign = -1.0) : (sign = 1.0);
+    double sign = -1.0, sign_old, f, pl, rd0, e0;
+    const double cm = TG32 / tgamma((m + 3.0) / 2.0);
 
     while (std::abs(h_old - h) > cutoff)
     {
-        cm = TG32 / tgamma((m + 3.0) / 2.0);
         e0 = std::exp(-PI2 / (2.0 * h));
-        pm = std::pow(PI / h, m / 2.0);
+        pl = std::pow(PI / h, l);
         rd0 = C0 / h * e0;
-        f = cm * pm * rd0;
+        f = cm * pl * rd0;
 
         sign_old = sign;
         (f > max_error) ? (sign = -1.0) : (sign = 1.0);
@@ -559,7 +599,7 @@ double get_h(const double max_error, const int l, const double guess)
 
         h_old = h;
         h += sign * step;
-        if (h < 0.007) h = 0.007;
+        //if (h < 0.007) h = 0.007;
     }
 
     return h;

@@ -27,6 +27,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_IAM_SF|x64'">
+    <LocalDebuggerCommandArguments>-xyz sucrose.xyz -cif sucrose.cif -asym_cif sucrose.cif -hkl sucrose.hkl -cpus 6 -IAM -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_IAM_SF\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_properties|x64'">
     <LocalDebuggerCommandArguments>-wfn benzene.wfx -cif benzene.cif -hirsh 0 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>D:\temp\benzene</LocalDebuggerWorkingDirectory>

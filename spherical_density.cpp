@@ -4065,7 +4065,7 @@ double Thakkar::get_max_alpha() {
 	return max_exp;
 };
 
-std::vector <double> Thakkar::get_min_alpha() { 
+std::vector <double> Thakkar::get_min_alpha_vector() { 
 	const int offset = (atomic_number - 1) * 19;
 	int nr_ex = first_ex();
 	std::vector<double> min_exp;
@@ -4100,6 +4100,43 @@ std::vector <double> Thakkar::get_min_alpha() {
 		nr_ex++;
 	}
 	return min_exp;
+};
+
+double Thakkar::get_min_alpha() {
+	const int offset = (atomic_number - 1) * 19;
+	int nr_ex = first_ex();
+	std::vector<double> min_exp;
+	for (int i = 0; i < 4; i++)
+		min_exp.push_back(1E40);
+	for (int ex = 0; ex < Thakkar_ns[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 7; m++) {
+			if (Thakkar_occ[offset + m] == 0) continue;
+			min_exp[0] = std::min(Thakkar_z[nr_ex], min_exp[0]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_np[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 6; m++) {
+			if (Thakkar_occ[offset + m + 7] == 0) continue;
+			min_exp[1] = std::min(Thakkar_z[nr_ex], min_exp[1]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nd[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 4; m++) {
+			if (Thakkar_occ[offset + m + 13] == 0) continue;
+			min_exp[2] = std::min(Thakkar_z[nr_ex], min_exp[2]);
+		}
+		nr_ex++;
+	}
+	for (int ex = 0; ex < Thakkar_nf[atomic_number - 1]; ex++) {
+		for (int m = 0; m < 2; m++) {
+			if (Thakkar_occ[offset + m + 17] == 0) continue;
+			min_exp[3] = std::min(Thakkar_z[nr_ex], min_exp[3]);
+		}
+		nr_ex++;
+	}
+	return std::min({ min_exp[0], min_exp[1], min_exp[2], min_exp[3] });
 };
 
 int Thakkar::previous_element_coef() {
