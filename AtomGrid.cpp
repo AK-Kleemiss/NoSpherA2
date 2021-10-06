@@ -29,7 +29,7 @@ int lebedev_table[33] = {6,    14,   26,   38,   50,   74,   86,   110,
                          2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810};
 
 constexpr int get_closest_num_angular(int n) {
-    int m;
+    int m = 0;
 
     for (int i = 0; i < max_LT; i++) {
         m = lebedev_table[i];
@@ -39,7 +39,7 @@ constexpr int get_closest_num_angular(int n) {
 
     std::cout << "Input n too high";
     return -1;
-}
+};
 
 constexpr int get_angular_order(int n) {
     for (int i = 0; i < max_LT; i++) {
@@ -49,7 +49,7 @@ constexpr int get_angular_order(int n) {
 
     std::cout << "Not found in get_angular_offset";
     return -1;
-}
+};
 
 AtomGrid::AtomGrid(const double radial_precision,
                    const int min_num_angular_points,
