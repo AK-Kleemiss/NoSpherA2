@@ -98,30 +98,89 @@ bool merge_tscs(
 			}
 			else if (line.find("DATA:") != string::npos)
 				data = true;
-			else if (f == 0) header.push_back(line);
+			else if (f == 0) {
+				if (line.find("AD: ") != string::npos)
+					continue;
+				header.push_back(line);
+			}
 		}
 		cout << "Reading Data Block..." << endl;
-		vector <vector <int> > local_indices;
 		while (!inf.eof()) {
 			getline(inf, line);
 			vector<string> digest = split_string(line, " ");
 			if (digest.size() == 1 && digest[0] == "")
 				continue;
-			local_indices.resize(3);
-			for (int i = 0; i < 3; i++)
-				local_indices[i].push_back(stoi(digest[i]));
-			if (f == 0)
-				indices = local_indices;
+			const int l_indices[3] = { stoi(digest[0]), stoi(digest[1]), stoi(digest[2]) };
+			if (l_indices[0] == 0 && l_indices[1] == 0 && l_indices[2] == 0) continue;
+			if (f == 0) {
+				// For the first file we only read what is not Freidel mates
+				bool new_index = true;
+				for (int run = 0; run < indices[0].size(); run++) {
+					if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) {
+						new_index = false;
+						break;
+					}
+					else if (stoi(digest[0]) == -indices[0][run] && stoi(digest[1]) == -indices[1][run] && stoi(digest[2]) == -indices[2][run]) {
+						new_index = false;
+						break;
+					}
+				}
+				if (!new_index)
+					continue;
+				for (int i = 0; i < 3; i++)
+					indices[i].push_back(l_indices[i]);
 #pragma omp parallel for
-			for (int i = 0; i < nr_scatterers; i++) {
-				if (!is_a_new_scatterer[i]) continue;
-				size_t nr_in_new_scats = 0;
-				for (int p = 0; p < i; p++)
-					if(is_a_new_scatterer[p]) nr_in_new_scats++;
-				vector<string> re_im = split_string(digest[i + 3], ",");
-				form_fact[offset+nr_in_new_scats].push_back(complex<double>(stod(re_im[0]),stod(re_im[1])));
+				for (int i = 0; i < nr_scatterers; i++) {
+					if (!is_a_new_scatterer[i]) continue;
+					size_t nr_in_new_scats = 0;
+					for (int p = 0; p < i; p++)
+						if (is_a_new_scatterer[p]) nr_in_new_scats++;
+					vector<string> re_im = split_string(digest[i + 3], ",");
+					form_fact[offset + nr_in_new_scats].push_back(complex<double>(stod(re_im[0]), stod(re_im[1])));
+				}
+			}
+			else {
+				//Otherwise we put stuff where it belongs
+#pragma omp parallel for
+				for (int i = 0; i < nr_scatterers; i++) {
+					if (!is_a_new_scatterer[i]) continue;
+					size_t nr_in_new_scats = 0;
+					for (int p = 0; p < i; p++)
+						if (is_a_new_scatterer[p]) nr_in_new_scats++;
+					form_fact[offset + nr_in_new_scats].resize(form_fact[0].size());
+				}
+				bool found = false;
+				for (int run = 0; run < indices[0].size(); run++) {
+					if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) {
+#pragma omp parallel for
+						for (int i = 0; i < nr_scatterers; i++) {
+							if (!is_a_new_scatterer[i]) continue;
+							size_t nr_in_new_scats = 0;
+							for (int p = 0; p < i; p++)
+								if (is_a_new_scatterer[p]) nr_in_new_scats++;
+							vector<string> re_im = split_string(digest[i + 3], ",");
+							form_fact[offset + nr_in_new_scats][run] = complex<double>(stod(re_im[0]), stod(re_im[1]));
+						}
+						found = true;
+					}
+					else if (l_indices[0] == -indices[0][run] && l_indices[1] == -indices[1][run] && l_indices[2] == -indices[2][run]) {
+#pragma omp parallel for
+						for (int i = 0; i < nr_scatterers; i++) {
+							if (!is_a_new_scatterer[i]) continue;
+							size_t nr_in_new_scats = 0;
+							for (int p = 0; p < i; p++)
+								if (is_a_new_scatterer[p]) nr_in_new_scats++;
+							vector<string> re_im = split_string(digest[i + 3], ",");
+							form_fact[offset + nr_in_new_scats][run] = complex<double>(stod(re_im[0]), -stod(re_im[1]));
+						}
+						found = true;
+					}
+					if (found)
+						break;
+				}
 			}
 		}
+		/*
 		if (form_fact[form_fact.size() - 1].size() != form_fact[0].size()) {
 			cout << "Mismatching number of reflections in tsc files encountered, trying to find common set...";
 			vector <int> sorting;
@@ -161,6 +220,7 @@ bool merge_tscs(
 					return false;
 				}
 				swap_sort_multi(sorting, indices);
+				//Make compelx conjugate of friedel mates
 #pragma omp parallel for
 				for (int i = 0; i < sorting.size(); i++) 
 					if (sorting[i] < 0){
@@ -186,7 +246,7 @@ bool merge_tscs(
 				}
 			}
 		}
-		local_indices.clear();
+		*/
 		cout << "Data for " << form_fact[0].size() << " indices read." << endl;
 		offset = labels.size();
 	}
