@@ -47,6 +47,10 @@ Global
 		Debug_SF|ARM64 = Debug_SF|ARM64
 		Debug_SF|x64 = Debug_SF|x64
 		Debug_SF|x86 = Debug_SF|x86
+		Debug_tsc_merge|ARM = Debug_tsc_merge|ARM
+		Debug_tsc_merge|ARM64 = Debug_tsc_merge|ARM64
+		Debug_tsc_merge|x64 = Debug_tsc_merge|x64
+		Debug_tsc_merge|x86 = Debug_tsc_merge|x86
 		Publish|ARM = Publish|ARM
 		Publish|ARM64 = Publish|ARM64
 		Publish|x64 = Publish|x64
@@ -109,6 +113,12 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x64.Build.0 = Debug_SF|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x86.ActiveCfg = Debug_SF|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x86.Build.0 = Debug_SF|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|ARM.ActiveCfg = Debug_tsc_merge|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|ARM64.ActiveCfg = Debug_tsc_merge|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x64.ActiveCfg = Debug_tsc_merge|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x64.Build.0 = Debug_tsc_merge|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x86.ActiveCfg = Debug_tsc_merge|Win32
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x86.Build.0 = Debug_tsc_merge|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|ARM.ActiveCfg = Publish|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|ARM64.ActiveCfg = Publish|Win32
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|x64.ActiveCfg = Publish|x64
@@ -229,6 +239,10 @@ Global
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF|x86.ActiveCfg = Debug|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF|x86.Build.0 = Debug|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF|x86.Deploy.0 = Debug|x86
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tsc_merge|ARM.ActiveCfg = Debug_PDF|ARM
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tsc_merge|ARM64.ActiveCfg = Debug_PDF|ARM64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tsc_merge|x64.ActiveCfg = Debug_PDF|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tsc_merge|x86.ActiveCfg = Debug_PDF|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Publish|ARM.ActiveCfg = Release|ARM
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Publish|ARM.Build.0 = Release|ARM
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Publish|ARM.Deploy.0 = Release|ARM
@@ -301,6 +315,10 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF|x64.ActiveCfg = Debug_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF|x86.ActiveCfg = Debug_SF|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF|x86.Build.0 = Debug_SF|Win32
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tsc_merge|ARM.ActiveCfg = Publish|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tsc_merge|ARM64.ActiveCfg = Publish|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tsc_merge|x64.ActiveCfg = Debug_SF_twin|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tsc_merge|x86.ActiveCfg = Debug_SF_twin|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|ARM.ActiveCfg = Publish|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|ARM64.ActiveCfg = Publish|Win32
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|x64.ActiveCfg = Publish|x64
