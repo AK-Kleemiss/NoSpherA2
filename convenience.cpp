@@ -1827,3 +1827,48 @@ double read_fchk_double(std::ifstream& in, std::string search, bool rewind) {
 	string temp = go_get_string(in, search, rewind);
 	return stod(temp.substr(49, temp.length() - 49));
 };
+void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v) {
+	int i = 0;
+	while (i < v.size() - 1) {
+		int new_index = 0;
+		for (int j = i; j < v.size(); j++)
+			if (order[j] < order[i])
+				new_index++;
+		if (new_index > 0) {
+			std::complex<double> temp = v[i];
+			v[i] = v[i + new_index];
+			v[i + new_index] = temp;
+			int temp2 = order[i];
+			order[i] = order[i + new_index];
+			order[i + new_index] = temp2;
+		}
+		else
+			i++;
+	}
+}
+
+void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v) {
+	int i = 0;
+	std::vector<int> temp;
+	temp.resize(v.size());
+	while (i < v.size() - 1) {
+		int new_index = 0;
+#pragma omp parallel for reduction(+:new_index)
+		for (int j = i; j < v.size(); j++)
+			if (order[j] < order[i])
+				new_index++;
+		if (new_index > 0) {
+#pragma omp parallel for
+			for (int run = 0; run < v.size(); run++) {
+				temp[run] = v[run][i];
+				v[run][i] = v[run][i + new_index];
+				v[run][i + new_index] = temp[run];
+			}
+			int temp2 = order[i];
+			order[i] = order[i + new_index];
+			order[i + new_index] = temp2;
+		}
+		else
+			i++;
+	}
+}
