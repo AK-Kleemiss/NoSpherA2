@@ -11,6 +11,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cctype>
+#include <complex>
 
 class WFN;
 class cell;
@@ -332,28 +333,9 @@ constexpr double Laguerre_ploynom(int n, double x) {
 	else return (((int(2) * n + int(1) - x) * Laguerre_ploynom(n - 1, x) - n * Laguerre_ploynom(n - 2, x)) / (n + int(1)));
 }
 
+void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v);
 
-template< typename order_iterator, typename value_iterator >
-void reorder_destructive(order_iterator order_begin, order_iterator order_end, value_iterator v) {
-//https://stackoverflow.com/questions/838384/reorder-vector-using-a-vector-of-indices
-	typedef typename std::iterator_traits< value_iterator >::value_type value_t;
-	typedef typename std::iterator_traits< order_iterator >::value_type index_t;
-	typedef typename std::iterator_traits< order_iterator >::difference_type diff_t;
-
-	diff_t remaining = order_end - 1 - order_begin;
-	for (index_t s = index_t(); remaining > 0; ++s) {
-		index_t d = order_begin[s];
-		if (d == (diff_t)-1) continue;
-		--remaining;
-		value_t temp = v[s];
-		for (index_t d2; d != s; d = d2) {
-			swap(temp, v[d]);
-			swap(order_begin[d], d2 = (diff_t)-1);
-			--remaining;
-		}
-		v[s] = temp;
-	}
-}
+void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v);
 
 #include "wfn_class.h"
 

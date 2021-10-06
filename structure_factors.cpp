@@ -127,6 +127,7 @@ bool merge_tscs(
 			vector <int> sorting;
 			if (indices.size() > local_indices.size()) {
 				sorting.resize(indices.size());
+				// Look for matching indices, either direct match or Friedel match
 #pragma omp parallel for
 				for (int ind = 0; ind < indices.size(); ind++) {
 					sorting[ind] = 0;
@@ -137,6 +138,14 @@ bool merge_tscs(
 							sorting[ind] = -ind2-1;
 					}
 				}
+				//Now make sure we do not have a direct match and a Friedel match
+#pragma omp parallel for
+				for (int i = 0; i < sorting.size(); i++) {
+					for (int j = i + 1; j < sorting.size(); j++)
+						if (sorting[i] == -sorting[j])
+							sorting[j] = 0;
+				}
+				//Throw out the ones we do not have in the smaller subset
 				for (int i = sorting.size() - 1; i >= 0; i--) {
 					//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
 					if (sorting[i] == 0) {
@@ -144,9 +153,24 @@ bool merge_tscs(
 							form_fact[j].erase(form_fact[j].begin() + i);
 						sorting.erase(sorting.begin() + i);
 						for (int j = 0; j < 3; j++)
-							indices[j].erase(indices[0].begin() + i);
+							indices[j].erase(indices[j].begin() + i);
 					}
 				}
+				if (sorting.size() != local_indices.size()) {
+					cout << "Mismatch in number of reflections! Aborting!" << endl;
+					return false;
+				}
+				swap_sort_multi(sorting, indices);
+#pragma omp parallel for
+				for (int i = 0; i < sorting.size(); i++) 
+					if (sorting[i] < 0){
+						for (int j = 0; j < offset; j++)
+							form_fact[j][i] = conj(form_fact[j][i]);
+						sorting[i] = -sorting[i];
+				}
+#pragma omp parallel for
+				for (int j = 0; j < offset; j++)
+					swap_sort(sorting, form_fact[j]);
 			}
 			else {
 				sorting.resize(local_indices.size());
@@ -161,7 +185,6 @@ bool merge_tscs(
 					}
 				}
 			}
-			return false;
 		}
 		local_indices.clear();
 		cout << "Data for " << form_fact[0].size() << " indices read." << endl;
