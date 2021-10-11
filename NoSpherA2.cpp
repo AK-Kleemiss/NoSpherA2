@@ -272,6 +272,15 @@ int main(int argc, char **argv){
 			}
 			merge_tscs("combine", filenames, debug_all);
 		}
+		else if (temp.find("-merge_nocheck") != string::npos) {
+		vector<string> filenames;
+		int n = 1;
+		while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+			filenames.push_back(argv[i + n]);
+			n++;
+		}
+		merge_tscs_without_checks("combine", filenames, debug_all);
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
