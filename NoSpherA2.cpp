@@ -1,22 +1,3 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 4; tab-width: 4 -*-  */
-/*
- * main.cc
- * Copyright (C) 2016 Florian Kleemiss <florian.kleemiss@uni-bremen.de>
- * 
- * wfn-cpp is free software: you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * wfn-cpp is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See the GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License along
- * with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,23 +35,49 @@ using namespace std;
 bool debug_main = false;
 bool debug_all = false;
 bool expert = false;
+
+
+
 int main(int argc, char **argv){
-	vector <string> known_keywords;
-	//known_keywords.push_back("-wfn");
-	//known_keywords.push_back("-fchk");
-	//known_keywords.push_back("-b");
-	//known_keywords.push_back("-d");
-	//known_keywords.push_back("-v");
-	//known_keywords.push_back("-hkl");
-	//known_keywords.push_back("-cif");
-	//known_keywords.push_back("-acc");
-	//known_keywords.push_back("-mult");
-	//known_keywords.push_back("-method");
-	//known_keywords.push_back("-symm");
-	//known_keywords.push_back("-asym_cif");
-	//known_keywords.push_back("-asym-cif");
-	//known_keywords.push_back("-wfn-cif");
-	//known_keywords.push_back("-wfn_cif");
+	string help_message = "\n----------------------------------------------------------------------------\n";
+	help_message.append("          These commands and arguments are known by NoSpherA2:\n");
+	help_message.append("----------------------------------------------------------------------------\n\n");
+	help_message.append("   -wfn            <FILENAME>.wfn/wfx     Read the following file. (might even read fchk, not finally tested)\n");
+	help_message.append("   -fchk           <FILENAME>.fchk        Write a wavefunction to the given filename\n");
+	help_message.append("   -b              <FILENAME>             Read this basis set\n");
+	help_message.append("   -d              <PATH>                 Path to basis_sets directory with basis_sets in tonto style\n");
+	help_message.append("   --help/-help/--h                       print this help\n");
+	help_message.append("   -v                                     Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
+	help_message.append("   -v2                                    Even more stuff\n");
+	help_message.append("   -mult           <NUMBER>               Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
+	help_message.append("   -method         <METHOD NAME>          Can be RKS or RHF to distinguish between DFT and HF\n");
+	help_message.append("   -cif            <FILENAME>.cif         CIF to get labels of atoms to use for calculation of scatteriung factors\n");
+	help_message.append("   -IAM                                   Make scattering factors based on Thakkar functions for atoms in CIF\n");
+	help_message.append("   -xyz            <FILENAME>.xyz         Read atom positions from this xyz file for IAM\n");
+	help_message.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
+	help_message.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
+	help_message.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
+	help_message.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
+	help_message.append("   -merge          <List of .tsc files>   Names/Paths to .tsc files to be merged.\n");
+	help_message.append("   -merge_nocheck  <List of .tsc files>   Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
+	help_message.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
+	help_message.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
+	help_message.append("                                            without spaces.\n   Typical use Examples:\n");
+	help_message.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
+	help_message.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
+	help_message.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
+	help_message.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0 2.wfn 0 3_1.wfn 0,1 3_2.wfn 0,2\n");
+	help_message.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
+	help_message.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
+	string NoSpherA2_message = "    _   __     _____       __              ___   ___\n";
+	NoSpherA2_message.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
+	NoSpherA2_message.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
+	NoSpherA2_message.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
+	NoSpherA2_message.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
+	NoSpherA2_message.append("                /_/\n");
+	NoSpherA2_message.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
+	NoSpherA2_message.append("Please give credit and cite corresponding pieces!\n");
+	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
 	if(debug_main) 
 		cout << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -79,33 +86,18 @@ int main(int argc, char **argv){
 	string turbomole_path;
 	string basis_set_path;
 	int ncpus=0;
-	float mem=0.0;
+	double mem=0.0;
 	int mult = 0;
-	/*int config=program_confi(gaussian_path, turbomole_path, basis_set_path, ncpus, mem, debug_main, expert);
-	if(config==-1){
-		log_file << "No .cuQCT.conf found, do you want to continue without the employment of external programs?" << endl;
-		if(!yesno()){
-			log_file << "Then please start again and write a config file or use the template choice." << endl;
-			log_file.flush();
-			log_file.close();
-			return -1;
-		}
-	}
-	else
-		if(config==0) 
-			log_file << "The programs file was newly written, please check if everything is correct!" << endl;
-	*/
 	string wfn("");
 	string fchk("");
 	string basis_set("");
 	string hkl("");
 	string cif("");
-	string symm("");
-	string asym_cif("");
 	string method("rhf");
 	string xyz_file("");
 	string temp;
 	string fract_name("");
+	vector<string> combined_tsc_calc_files;
 	int accuracy = 2;
 	int threads = -1;
 	int pbc = 0;
@@ -127,45 +119,37 @@ int main(int argc, char **argv){
 	bool iam_switch = false;
 	bool read_k_pts = false;
 	bool save_k_pts = false;
+	bool combined_tsc_calc = false;
 	int hirsh_number = 0;
-	bool scnd = true, thrd = true, frth = true;
 	double MinMax[6];
 	double NbSteps[3];
 	vector <int> MOs;
-	vector <int> groups;
+	vector < vector <int> > groups;
 	vector < vector <double> > twin_law;
+	vector < vector <int> > combined_tsc_groups;
 	bool all_mos = false;
-	for (int i=0; i<argc; i++){
+	groups.resize(1);
+	for (int i = 0; i < argc; i++) {
 		temp = argv[i];
 		if (temp.find("-") > 0) continue;
-		if(temp.find("-wfn") < 1)
-			wfn = argv[i+1];
-		else if(temp.find("-fchk") < 1)
-			fchk = argv[i+1];
-		else if(temp.find("-b") < 1)
-			basis_set = argv[i+1];
+		if (temp.find("-wfn") < 1)
+			wfn = argv[i + 1];
+		else if (temp.find("-fchk") < 1)
+			fchk = argv[i + 1];
+		else if (temp.find("-b") < 1)
+			basis_set = argv[i + 1];
 		else if (temp.find("-d") < 1)
 			basis_set_path = argv[i + 1];
 		else if (temp.find("-hkl") < 1)
-			hkl = argv[i+1];
+			hkl = argv[i + 1];
 		else if (temp.find("-cif") < 1)
-			cif = argv[i+1];
+			cif = argv[i + 1];
 		else if (temp.find("-acc") < 1)
-			accuracy = stoi(argv[i+1]);
+			accuracy = stoi(argv[i + 1]);
 		else if (temp.find("-mult") < 1)
 			mult = stoi(argv[i + 1]);
 		else if (temp.find("-method") < 1)
 			method = argv[i + 1];
-		else if (temp.find("-symm") < 1)
-			symm = argv[i + 1];
-		else if (temp.find("-asym_cif") < 1)
-			asym_cif = argv[i + 1];
-		else if (temp.find("-asym-cif") < 1)
-			asym_cif = argv[i + 1];
-		else if (temp.find("-wfn-cif") < 1)
-			asym_cif = argv[i + 1];
-		else if (temp.find("-wfn_cif") < 1)
-			asym_cif = argv[i + 1];
 		else if (temp.find("-cpus") < 1)
 			threads = stoi(argv[i + 1]);
 		else if (temp.find("-pbc") < 1)
@@ -174,82 +158,60 @@ int main(int argc, char **argv){
 			electron_diffraction = true;
 		else if (temp.find("-Olex2_1_3") < 1)
 			Olex2_1_3_switch = true;
-		else if (temp.find("-v2") < 1) {
-			cout << "Turning on verbose mode 2!" << endl;
-			debug_all = true;
-			debug_main = true;
-		}
-		else if (temp.find("-v") < 1) {
-			cout << "Turning on verbose mode!" << endl;
-			debug_main = true;
-		}
-		else if (temp.find("-eli") < 1) {
-			calc = true;
-			eli = true;
-		}
-		else if (temp.find("-elf") < 1) {
-			calc = true;
-			elf = true;
-		}
-		else if (temp.find("-lap") < 1) {
-			calc = true;
-			lap = true;
-		}
-		else if (temp.find("-esp") < 1) {
-			calc = true;
-			esp = true;
-		}
-		else if (temp.find("-rdg") < 1) {
-			calc = true;
-			rdg = true;
-		}
-		else if (temp.find("-hirsh") < 1) {
-			calc = true;
-			hirsh = true;
-			hirsh_number = stoi(argv[i + 1]);
-		}
-		else if (temp.find("-resolution") < 1) {
+		else if (temp.find("-v2") < 1)
+			cout << "Turning on verbose mode 2!" << endl, debug_all = debug_main = true;
+		else if (temp.find("-v") < 1)
+			cout << "Turning on verbose mode!" << endl, debug_main = true;
+		else if (temp.find("-eli") < 1)
+			calc = eli = true;
+		else if (temp.find("-elf") < 1)
+			calc = elf = true;
+		else if (temp.find("-lap") < 1)
+			calc = lap = true;
+		else if (temp.find("-esp") < 1)
+			calc = esp = true;
+		else if (temp.find("-rdg") < 1)
+			calc = rdg = true;
+		else if (temp.find("-hirsh") < 1)
+			calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
+		else if (temp.find("-resolution") < 1)
 			resolution = stod(argv[i + 1]);
-		}
-		else if (temp.find("-radius") < 1) {
+		else if (temp.find("-radius") < 1)
 			radius = stod(argv[i + 1]);
-		}
 		else if (temp.find("-MO") < 1) {
-			if (string(argv[i + 1]) != "all") 
+			if (string(argv[i + 1]) != "all")
 				MOs.push_back(stoi(argv[i + 1]));
 			else
 				all_mos = true;
 			calc = true;
 		}
-		else if (temp.find("-fractal") < 1) {
-			fract = true;
-			fract_name = argv[i + 1];
-		}
-		else if (temp.find("-HDEF") < 1) {
-			hdef = true;
-			calc = true;
-		}
-		else if (temp.find("-def") < 1) {
-			def = true;
-			calc = true;
-		}
-		else if (temp.find("-skpts") < 1) {
+		else if (temp.find("-fractal") < 1)
+			fract = true, fract_name = argv[i + 1];
+		else if (temp.find("-HDEF") < 1)
+			hdef = calc = true;
+		else if (temp.find("-def") < 1)
+			def = calc = true;
+		else if (temp.find("-skpts") < 1)
 			save_k_pts = true;
-		}
-		else if (temp.find("-rkpts") < 1) {
+		else if (temp.find("-rkpts") < 1)
 			read_k_pts = true;
-		}
 		else if (temp.find("-group") < 1) {
-			while (string(argv[i + 1]).find("-") != string::npos) {
-				groups.push_back(stoi(argv[i + 1]));
+			int n = 1;
+			while (i + n < argc && string(argv[i + n]).find("-") == string::npos) {
+				int group;
+				if (argv[i + 1][0] == '+')
+					group = -stoi(argv[i + n]);
+				else
+					group = stoi(argv[i + n]);
+				groups[0].push_back(group), n++;
 			}
+			i += n;
 		}
 		else if (temp.find("-twin") < 1) {
 			twin_law.resize(twin_law.size() + 1);
 			twin_law[twin_law.size() - 1].resize(9);
-			for (int twl = 0; twl < 9; twl++) {
+			for (int twl = 0; twl < 9; twl++) 
 				twin_law[twin_law.size() - 1][twl] = stod(argv[i + 1 + twl]);
-			}
 			if (debug_main) {
 				cout << "twin_law: ";
 				for (int twl = 0; twl < 9; twl++)
@@ -258,9 +220,8 @@ int main(int argc, char **argv){
 			}
 			i += 9;
 		}
-		else if (temp.find("-IAM") != string::npos) {
+		else if (temp.find("-IAM") != string::npos)
 			iam_switch = true;
-		}
 		else if (temp.find("-xyz") != string::npos)
 			xyz_file = argv[i + 1];
 		else if (temp.find("-merge") != string::npos) {
@@ -271,91 +232,126 @@ int main(int argc, char **argv){
 				n++;
 			}
 			merge_tscs("combine", filenames, debug_all);
+			return 0;
 		}
 		else if (temp.find("-merge_nocheck") != string::npos) {
-		vector<string> filenames;
-		int n = 1;
-		while (i + n < argc && string(argv[i + n]).find("-") > 0) {
-			filenames.push_back(argv[i + n]);
-			n++;
+			vector<string> filenames;
+			int n = 1;
+			while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+				filenames.push_back(argv[i + n]);
+				n++;
+			}
+			merge_tscs_without_checks("combine", filenames, debug_all);
+			return 0;
 		}
-		merge_tscs_without_checks("combine", filenames, debug_all);
+		else if (temp.find("-mtc") != string::npos) {
+			combined_tsc_calc = true;
+			int n = 1;
+			string delimiter = ",";
+			groups.pop_back();
+			while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+				combined_tsc_calc_files.push_back(argv[i + n]);
+				n++;
+				const string temp = argv[i + n];
+				groups.push_back(split_string<int>(temp, delimiter));
+				n++;
+			}
 		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
 		omp_set_dynamic(0);
 	}
-	string help_message = "----------------------------------------------------------------------------\n";
-	help_message.append("		These commands and arguments are known by wfn2fchk:\n");
-	help_message.append("----------------------------------------------------------------------------\n\n");
-	help_message.append("	-wfn  <FILENAME>.wfn/ffn/wfx	Read the following file\n");
-	help_message.append("	-fchk <FILENAME>.fchk			Write a wavefunction to the given filename\n");
-	help_message.append("	-b    <FILENAME>				Read this basis set\n");
-	help_message.append("	-d    <PATH>					Path to basis_sets directory with basis_sets in tonto style\n");
-	help_message.append("	--help 							print this help\n");
-	help_message.append("	-v 		    					Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
-	help_message.append("   -v2                             Even more stuff\n");
-	help_message.append("	-mult	<NUMBER>				Input multiplicity of wavefunction\n");
-	help_message.append("   -method <METHOD NAME>           Can be RKS or RHF to distinguish between DFT and HF\n");
-	help_message.append("   -cif      <FILENAME>.cif        CIF to use for calculation of scatteriung factors\n");
-	help_message.append("   -asym-cif <FILENAME>.cif        CIF to use to identify the asymetric unit atoms from\n");
-	help_message.append("   -IAM                            Make scattering factors based on Thakkar functions for elements in CIF\n");
-	help_message.append("   -xyz                            Read atom positions from this xyz file for IAM\n");
-	help_message.append("   -hkl      <FILENAME>.hkl        hkl file (ideally merged) to use for calculation of form factors\n");
-	help_message.append("   -twin     3x3 floating-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use\n");
-	help_message.append("              If there is more than a single twin law to be used use the twin command multiple times.\n");
-	help_message.append("   -merge    <List of .tsc files>  Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
-	//"    -e                          Turn on expert mode (Disable a lot of assumptions and enter paths manually)" << endl
-	help_message.append("*****************************************************************************************************\n");
-	help_message.append("	Explanation: A .ffn file is an extended wfn file containing also unoccupied orbitals\n");
-	help_message.append("*****************************************************************************************************\n");
-	string NoSpherA2_message = "    _   __     _____       __              ___   ___\n";
-	NoSpherA2_message.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
-	NoSpherA2_message.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
-	NoSpherA2_message.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
-	NoSpherA2_message.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
-	NoSpherA2_message.append("                /_/\n");
-	NoSpherA2_message.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
-	NoSpherA2_message.append("Please give credit and cite corresponding pieces!\n");
-	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
 	if (argc > 1) {
-		string keyword = argv[1];
-		if (keyword.find("--help") != string::npos)
-			cout << help_message << endl;
+		if (string(argv[1]).find("--help") != string::npos) {
+			cout << NoSpherA2_message << help_message << endl;
+			return 0;
+		}
+		if (string(argv[1]).find("--h") != string::npos) {
+			cout << NoSpherA2_message << help_message << endl;
+			return 0;
+		}
+		if (string(argv[1]).find("-help") != string::npos) {
+			cout << NoSpherA2_message << help_message << endl;
+			return 0;
+		}
+	}
+	//Lets print what was the command line, for debugging
+	if (debug_main) {
+		ofstream log("NoSpherA2.log", ios::out);
+		for (int i = 0; i < argc; i++) {
+			cout << argv[i] << endl;
+			log << argv[i] << endl;
+		}
+		log.close();
 	}
 	if (fract) {
 		cube residual(fract_name,true,debug_all);
 		residual.fractal_dimension(0.01);
+		return 0;
 	}
-	if (!calc && wfn != "" && hkl == "" && fchk == "") {
+	if (combined_tsc_calc) {
 		ofstream log_file("NoSpherA2.log", ios::out);
-		if (debug_main)
-			for (int i = 0; i < argc; i++)
-				log_file << argv[i] << endl;
-
 		log_file << NoSpherA2_message;
 		log_file.flush();
-		if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-		else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
-		else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
-		else if (wfn.find(".fch") != string::npos) wavy.push_back(WFN(4));
-		else {
-			log_file << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
-			return -1;
-		}
-		log_file.flush();
-		if (wfn.find(".wfx") != string::npos)
-			wavy[0].read_wfx(wfn, debug_all, log_file);
-		else if (wfn.find(".fchk") != string::npos) {
-			if (debug_all) log_file << "Reading FCHK" << endl;
-			wavy[0].read_fchk(wfn, log_file, debug_all);
-			if (debug_all) wavy[0].write_wfn(wfn+"_test.wfn", false, false);
-		}
-		else
-			wavy[0].read_wfn(wfn, debug_all, log_file);
-	}
+		error_check(hkl != "", __FILE__, __LINE__, "No hkl specified", log_file);
+		error_check(exists(hkl), __FILE__, __LINE__, "hkl doesn't exist", log_file);
+		error_check(cif != "", __FILE__, __LINE__, "No cif specified", log_file);
+		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
+		//Make sure we have more than 2 files...
+		error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
+		//First make sure all files exist
+		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+			error_check(exists(combined_tsc_calc_files[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
+		
+		wavy.resize(combined_tsc_calc_files.size());
+		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+			wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
 
+		vector<string> empty;
+		tsc_block result = calculate_structure_factors_MTC(
+			hkl,
+			cif,
+			wavy[0],
+			debug_main,
+			accuracy,
+			log_file,
+			groups[0],
+			twin_law,
+			empty,
+			threads,
+			electron_diffraction,
+			true,
+			false
+		);
+
+		if(debug_main) 
+			for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
+				log_file << combined_tsc_calc_files[i] << " ";
+				for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
+				log_file << endl;
+			}
+
+		for (int i = 1; i < combined_tsc_calc_files.size(); i++)
+			result.append(calculate_structure_factors_MTC(
+				hkl,
+				cif,
+				wavy[i],
+				debug_main,
+				accuracy,
+				log_file,
+				groups[i],
+				twin_law,
+				result.get_sctaerrers(),
+				threads,
+				electron_diffraction,
+				false,
+				true
+			), log_file);
+
+		result.write_tsc_file(cif);
+		return 0;
+	}
 	if (iam_switch) {
 		ofstream log_file("NoSpherA2.log", ios::out);
 		if (debug_main)
@@ -364,107 +360,70 @@ int main(int argc, char **argv){
 
 		log_file << NoSpherA2_message;
 		log_file.flush();
-		if (argc > 1) {
-			string keyword = argv[1];
-			if (keyword.find("--help") != string::npos) {
+		if (argc > 1)
+			if (string(argv[1]).find("--help") != string::npos) {
 				log_file << help_message << endl;
 				log_file.close();
 				return 0;
 			}
-		}
 
 		log_file.flush();
 		if (debug_main)
-			log_file << "status: " << cif << "&" << hkl << "&" << asym_cif << "&" << xyz_file << endl;
-		if (xyz_file == "") {
-			log_file << "No .xyz file specified! Please provide an xyz file for calculation of IAM .tscs" << endl;
-			return -1;
-		}
-		else {
-			if (exists(xyz_file)) {
-				wavy.push_back(WFN(7));
-				wavy[0].read_xyz(xyz_file, log_file, debug_main);
-			}
-			else {
-				log_file << ".xyz file does not exist!" << endl;
-				return -1;
-			}
-		}
+			log_file << "status: " << cif << "&" << hkl << "&" << xyz_file << endl;
+		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
+		error_check(xyz_file == "", __FILE__, __LINE__, "No xyz specified", log_file);
+		error_check(exists(xyz_file), __FILE__, __LINE__, "xyz doesn't exist", log_file);
+		wavy.push_back(WFN(0));
+		wavy[0].read_known_wavefunction_format(xyz_file, log_file, debug_main);
 
-		if (electron_diffraction)
+		if (electron_diffraction && debug_main)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!thakkar_sfac(hkl, cif, asym_cif, debug_main, log_file, groups, twin_law, wavy[0], threads, electron_diffraction))
-				log_file << "Error during SF Calculation!" << endl;
+			error_check(thakkar_sfac(hkl, cif, debug_main, log_file, groups[0], twin_law, wavy[0], threads, electron_diffraction), __FILE__, __LINE__, "Error during SF Calculation!", log_file);
 		}
+		return 0;
 	}
 	else if (hkl != "" || basis_set != "" || fchk != "") {
 		ofstream log_file("NoSpherA2.log", ios::out);
+
+		log_file << NoSpherA2_message;
+		cout << NoSpherA2_message;
+		//Lets print what was the command line, for debugging
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
 				log_file << argv[i] << endl;
-
-		log_file << NoSpherA2_message;
 		log_file.flush();
-		if (argc > 1) {
-			string keyword = argv[1];
-			if (keyword.find("--help") != string::npos) {
-				log_file << help_message << endl;
-				log_file.close();
-				return 0;
-			}
-		}
 		if (argc < 4) {
 			cout << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>" << endl;
+			log_file << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>" << endl;
+			log_file.flush();
+			log_file.close();
 			return -1;
 		}
-
 		log_file.flush();
-		if (debug_main)
-			log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << asym_cif << endl;
-		if (wfn == "") {
-			log_file << "Error, no wfn file specified!";
-			return -1;
+		if (debug_main) {
+			log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << groups.size();
+			if (groups.size() != 0) log_file << "&" << groups[0].size();
+			log_file << endl;
 		}
-		else {
-			if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-			else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
-			else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
-			else if (wfn.find(".fch") != string::npos) wavy.push_back(WFN(4));
-			else {
-				log_file << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
-				return -1;
-			}
-		}
+		error_check(wfn != "", __FILE__, __LINE__, "No wfn specified", log_file);
+		wavy.push_back(WFN(0));		
 		log_file << "Reading: " << wfn;
 		log_file.flush();
-		if (wfn.find(".wfx") != string::npos)
-			wavy[0].read_wfx(wfn, debug_all, log_file);
-		else if (wfn.find(".fchk") != string::npos) {
-			wavy[0].read_fchk(wfn, log_file, debug_all);
-			if(debug_all) wavy[0].write_wfn("test.wfn", false, true);
-		}
-		else
-			wavy[0].read_wfn(wfn, debug_all, log_file);
+		wavy[0].read_known_wavefunction_format(wfn, log_file, debug_main);
 		wavy[0].set_method(method);
-		log_file << "                   ...done!" << endl;
+		log_file << "                   ...done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
 		if (basis_set != "" || fchk != "") {
+			//Make and fchk out of the wfn/wfx file
 			join_path(basis_set_path, basis_set);
-			if (!exists(basis_set_path)) {
-				log_file << "Basis set file does not exist!" << endl;
-				return -1;
-			}
+			error_check(exists(basis_set_path), __FILE__, __LINE__, "Basis set file does not exist!", log_file);
 			wavy[0].set_basis_set_name(basis_set_path);
 
-			vector<string> endings;
-			endings.push_back(".fchk");
-			endings.push_back(".Fchk");
-			endings.push_back(".FChk");
 			string outputname;
 			if (fchk != "")
 				outputname = fchk;
@@ -475,45 +434,37 @@ int main(int argc, char **argv){
 				if (wavy[0].get_origin() == 2) where = outputname.find("wfn");
 				else if (wavy[0].get_origin() == 4) where = outputname.find("ffn");
 				else if (wavy[0].get_origin() == 4) where = outputname.find(".wfx");
-				if (where >= outputname.length() && where != string::npos) {
-					log_file << "Cannot make output file name!";
-					return -1;
-				}
-				else
-					outputname.erase(where, 3);
+				if (where >= outputname.length() && where != string::npos) error_check(false, __FILE__, __LINE__, "Cannot make output file name!", log_file);
+				else outputname.erase(where, 3);
 			}
-
 			wavy[0].assign_charge(wavy[0].calculate_charge());
-			if (mult == 0) {
-				wavy[0].guess_multiplicity(log_file, expert);
-			}
-			else
-				wavy[0].assign_multi(mult);
+			if (mult == 0) error_check(wavy[0].guess_multiplicity(log_file, expert), __FILE__, __LINE__, "Error guessing multiplicity", log_file);
+			else wavy[0].assign_multi(mult);
 			free_fchk(log_file, outputname, "", wavy[0], debug_main, true);
 		}
 		if (cif != "" || hkl != "") {
+			// Calculate tsc fiel from given files
+			error_check(exists(hkl), __FILE__, __LINE__, "Hkl file doesn't exist!", log_file);
+			error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist!", log_file);
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			if (!calculate_structure_factors_HF(
+			error_check(calculate_structure_factors_HF(
 					hkl, 
 					cif, 
-					asym_cif, 
-					symm, 
 					wavy[0], 
 					debug_main, 
 					accuracy, 
 					log_file, 
-					groups, 
+					groups[0], 
 					twin_law, 
 					threads, 
 					electron_diffraction, 
 					pbc, 
 					Olex2_1_3_switch,
 					save_k_pts,
-					read_k_pts)
-				)
-				log_file << "Error during SF Calculation!" << endl;
+					read_k_pts), __FILE__, __LINE__, "Error during SF Calcualtion", log_file);
 		}
+		return 0;
 	}
 	if (calc) {
 		ofstream log2("NoSpherA2_cube.log", ios::out);
@@ -541,24 +492,9 @@ int main(int argc, char **argv){
 		}
 #endif
 
-		if (wfn == "") {
-			log2 << "Error, no wfn file specified!";
-			return -1;
-		}
-		else {
-			if (wfn.find(".wfn") != string::npos) wavy.push_back(WFN(2));
-			else if (wfn.find(".ffn") != string::npos) wavy.push_back(WFN(4));
-			else if (wfn.find(".wfx") != string::npos) wavy.push_back(WFN(6));
-			else {
-				log2 << "Argument to -wfn does not look like wfn, wfx or ffn file!" << endl;
-				return -1;
-			}
-		}
-		log2.flush();
-		if (wfn.find(".wfx") == string::npos)
-			wavy[0].read_wfn(wfn, debug_all, log2);
-		else
-			wavy[0].read_wfx(wfn, debug_all, log2);
+		error_check(wfn != "", __FILE__, __LINE__, "Error, no wfn file specified!", log2);
+		wavy.push_back(WFN(0));
+		wavy[0].read_known_wavefunction_format(wfn,log2,debug_main);
 		if (debug_main)
 			log2 << "Starting calcualtion of properties" << endl;
 		if (all_mos)
@@ -742,7 +678,8 @@ int main(int argc, char **argv){
 			ESP.write_file(wavy[0], true);
 			log2 << "  done!" << endl;
 		}
+		return 0;
 	}
+	cout << NoSpherA2_message << "Did not understand the task to perform!\n" << help_message << endl;
 	return 0;
 }
-

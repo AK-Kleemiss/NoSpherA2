@@ -363,6 +363,30 @@ string WFN::hdr(bool occupied){
 	return temp;
 };
 
+void WFN::read_known_wavefunction_format(string fileName, bool debug) {
+	if (fileName.find(".wfn") != string::npos) origin = 2, error_check(read_wfn(fileName, debug),__FILE__,__LINE__,"Problem reading wfn", cout);
+	else if (fileName.find(".ffn") != string::npos) origin = 4, error_check(read_wfn(fileName, debug), __FILE__, __LINE__, "Problem reading ffn", cout);
+	else if (fileName.find(".wfx") != string::npos) origin = 6, error_check(read_wfx(fileName, debug, cout), __FILE__, __LINE__, "Problem reading wfx", cout);
+	else if (fileName.find(".fch") != string::npos) {
+		origin = 4, error_check(read_fchk(fileName, cout, debug), __FILE__, __LINE__, "Problem reading fchk", cout);
+		if (debug) error_check(write_wfn("test.wfn", debug, false), __FILE__, __LINE__, "Problem writing test.wfn", cout);
+	}
+	else if (fileName.find(".xyz") != string::npos) origin = 7, error_check(read_xyz(fileName, cout, debug), __FILE__, __LINE__, "Problem reading xyz", cout);
+	else error_check(false, __FILE__, __LINE__, "Unknown filetype!", cout);
+};
+
+void WFN::read_known_wavefunction_format(string fileName, ofstream &file, bool debug) {
+	if (fileName.find(".wfn") != string::npos) origin = 2, error_check(read_wfn(fileName, debug), __FILE__, __LINE__, "Problem reading wfn", file);
+	else if (fileName.find(".ffn") != string::npos) origin = 4, error_check(read_wfn(fileName, debug), __FILE__, __LINE__, "Problem reading ffn", file);
+	else if (fileName.find(".wfx") != string::npos) origin = 6, error_check(read_wfx(fileName, debug, file), __FILE__, __LINE__, "Problem reading wfx", file);
+	else if (fileName.find(".fch") != string::npos) {
+		origin = 4, error_check(read_fchk(fileName, file, debug), __FILE__, __LINE__, "Problem reading fchk", file);
+		if (debug) error_check(write_wfn("test.wfn", debug, false), __FILE__, __LINE__, "Problem writing test.wfn", file);
+	}
+	else if (fileName.find(".xyz") != string::npos) origin = 7, error_check(read_xyz(fileName, file, debug), __FILE__, __LINE__, "Problem reading xyz", file);
+	else error_check(false, __FILE__, __LINE__, "Unknown filetype!", file);
+};
+
 bool WFN::read_wfn(string fileName, bool debug){
 	if(ncen>0){
 		cout << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
@@ -1263,7 +1287,7 @@ bool WFN::read_xyz(string &filename, ofstream& file, bool debug) {
 		stream.str(line);
 		if (debug) file << i << ".run, line:" << line << endl;
 		dum_nr[i] = i;
-		temp = split_string(line, " ");
+		temp = split_string<string>(line, " ");
 		dum_label[i] = temp[0];
 		dum_x[i] = ang2bohr(stod(temp[2]));
 		dum_y[i] = ang2bohr(stod(temp[3]));
@@ -1283,6 +1307,71 @@ bool WFN::read_xyz(string &filename, ofstream& file, bool debug) {
 
 	for (int i = 0; i < e_nuc; i++) 
 		if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) 
+			file << "Error while making atoms!!\n";
+
+	return true;
+};
+
+bool WFN::read_xyz(string& filename, ostream& file, bool debug) {
+	if (ncen > 0) {
+		file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
+		if (!yesno()) return false;
+		else file << "okay, carrying on then..." << endl;
+	}
+	if (exists(filename)) {
+		if (debug_wfn) file << "File is valid, continuing...\n";
+	}
+	else {
+		file << "couldn't open or find " << filename << ", leaving" << endl;
+		return false;
+	}
+	origin = 7;
+	ifstream rf(filename.c_str());
+	if (rf.good())
+		path = filename;
+	string line;
+	rf.seekg(0);
+
+	getline(rf, line);
+	stringstream stream(line);
+	int e_nuc = 0; //number of expected MOs, Exponents and nuclei
+	stream >> e_nuc;
+	if (debug)
+		file << "e_nuc: " << e_nuc << endl;
+	getline(rf, line);
+	comment = line;
+	//----------------------------- Read Atoms ------------------------------------------------------------
+	vector<unsigned int> dum_nr, dum_ch;
+	dum_nr.resize(e_nuc); dum_ch.resize(e_nuc);
+	vector<string> dum_label;
+	vector<double> dum_x, dum_y, dum_z;
+	dum_x.resize(e_nuc); dum_y.resize(e_nuc); dum_z.resize(e_nuc); dum_label.resize(e_nuc);
+	for (int i = 0; i < e_nuc; i++) {
+		vector <string> temp;
+		getline(rf, line);
+		stream.str(line);
+		if (debug) file << i << ".run, line:" << line << endl;
+		dum_nr[i] = i;
+		temp = split_string<string>(line, " ");
+		dum_label[i] = temp[0];
+		dum_x[i] = ang2bohr(stod(temp[2]));
+		dum_y[i] = ang2bohr(stod(temp[3]));
+		dum_z[i] = ang2bohr(stod(temp[4]));
+		dum_ch[i] = get_Z_from_label(dum_label[i].c_str()) + 1;
+		if (debug) {
+			file << "label:" << dum_label[i]
+				<< " nr: " << dum_nr[i]
+				<< " x: " << dum_x[i]
+				<< " y: " << dum_y[i]
+				<< " z: " << dum_z[i]
+				<< " charge: " << dum_ch[i] << endl;
+		}
+	}
+	//---------------------Start writing everything from the temp arrays into wave ---------------------
+	if (debug) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
+
+	for (int i = 0; i < e_nuc; i++)
+		if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]))
 			file << "Error while making atoms!!\n";
 
 	return true;
@@ -1508,6 +1597,241 @@ bool WFN::read_wfx(string fileName, bool debug, ofstream& file) {
 		}
 		for (int i = 0; i < nex; i++)
 			MOs[nr-1].push_back_coef(coef[i], nex);
+		coef.resize(0);
+		getline(rf, line);
+	}
+	while (line.find("<Energy =") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	total_energy = stod(line);
+	while (line.find("<Virial Ratio") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	virial_ratio = stod(line);
+	rf.close();
+	return true;
+};
+
+bool WFN::read_wfx(string fileName, bool debug, ostream& file) {
+	if (exists(fileName)) {
+		if (debug)
+			file << "File is valid, continuing...\n";
+	}
+	else {
+		file << "couldn't open or find " << fileName << ", leaving" << endl;
+		return false;
+	}
+	ifstream rf(fileName.c_str());
+	path = fileName;
+	string line;
+	rf.seekg(0);
+	getline(rf, line);
+	while (line.find("<Title>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "comment line " << line << endl;
+	comment = line;
+	rf.seekg(0);
+	while (line.find("<Number of Nuclei>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << line << endl;
+	int temp_ncen = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Number of Primitives>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "nex line: " << line << endl;
+	int temp_nex = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Number of Occupied Molecular Orbitals>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	if (debug) file << "nmo line: " << line << endl;
+	int temp_nmo = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Atomic Numbers>") == string::npos)
+		getline(rf, line);
+	vector <int> nrs;
+	while (true) {
+		getline(rf, line);
+		if (debug) file << "atom number line: " << line << endl;
+		if (line.find("</Atomic Numbers>") != string::npos)
+			break;
+		nrs.push_back(stoi(line));
+	}
+	if (nrs.size() != temp_ncen)
+		return false;
+	rf.seekg(0);
+	while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
+		getline(rf, line);
+	vector < vector <double> > pos;
+	pos.resize(3);
+	double temp[3];
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
+			break;
+		istringstream is(line);
+		is >> temp[0] >> temp[1] >> temp[2];
+		for (int i = 0; i < 3; i++)
+			pos[i].push_back(temp[i]);
+	}
+	if (pos[0].size() != temp_ncen)
+		return false;
+	for (int i = 0; i < temp_ncen; i++)
+		push_back_atom(atnr2letter(nrs[i]) + to_string(i), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
+	if (ncen != temp_ncen)
+		return false;
+	for (int i = 0; i < 3; i++)
+		pos[i].resize(0);
+	pos.resize(0);
+	rf.seekg(0);
+	while (line.find("<Net Charge>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	charge = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Electronic Spin Multiplicity>") == string::npos)
+		getline(rf, line);
+	getline(rf, line);
+	multi = stoi(line);
+	rf.seekg(0);
+	while (line.find("<Primitive Centers>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Primitive Centers>") != string::npos)
+			break;
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		int temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			centers.push_back(temp);
+		}
+	}
+	rf.seekg(0);
+	while (line.find("<Primitive Types>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		if (line.find("</Primitive Types>") != string::npos)
+			break;
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		int temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			types.push_back(temp);
+		}
+	}
+	rf.seekg(0);
+	while (line.find("<Primitive Exponents>") == string::npos)
+		getline(rf, line);
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Primitive Exponents>") != string::npos) {
+			if (CountWords(line.c_str()) != 2)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		if (please_break)
+			number -= 2;
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			exponents.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	if (exponents.size() == temp_nex && centers.size() == temp_nex && types.size() == temp_nex)
+		nex = temp_nex;
+	else
+		return false;
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
+		getline(rf, line);
+	vector <double> occ;
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Molecular Orbital Occupation Numbers>") != string::npos) {
+			if (CountWords(line.c_str()) != 4)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			occ.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Energies>") == string::npos)
+		getline(rf, line);
+	vector <double> ener;
+	while (true) {
+		getline(rf, line);
+		bool please_break = false;
+		if (line.find("</Molecular Orbital Energies>") != string::npos) {
+			if (CountWords(line.c_str()) != 3)
+				please_break = true;
+			else
+				break;
+		}
+		int number = CountWords(line.c_str());
+		istringstream is(line);
+		double temp;
+		for (int i = 0; i < number; i++) {
+			is >> temp;
+			ener.push_back(temp);
+		}
+		if (please_break)
+			break;
+	}
+	for (int i = 0; i < temp_nmo; i++)
+		if (!push_back_MO(i + 1, occ[i], ener[i]))
+			return false;
+	occ.resize(0);
+	ener.resize(0);
+	rf.seekg(0);
+	while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
+		getline(rf, line);
+	vector <double> coef;
+	while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos) {
+		while (line.find("<MO Number>") == string::npos)
+			getline(rf, line);
+		getline(rf, line);
+		if (debug) file << "mo Nr line: " << line << endl;
+		int nr = stoi(line);
+		while (line.find("</MO Number>") == string::npos)
+			getline(rf, line);
+		while (coef.size() != nex) {
+			getline(rf, line);
+			if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
+			int number = CountWords(line.c_str());
+			istringstream is(line);
+			double temp;
+			for (int i = 0; i < number; i++) {
+				is >> temp;
+				coef.push_back(temp);
+			}
+			if (coef.size() > nex)
+				return false;
+		}
+		for (int i = 0; i < nex; i++)
+			MOs[nr - 1].push_back_coef(coef[i], nex);
 		coef.resize(0);
 		getline(rf, line);
 	}
@@ -3385,6 +3709,552 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug) {
 			ibasis++;
 		}
 		iexp+= nr_prims_shell[i];
+	}
+	nex = nprims;
+	if (r_u_ro_switch != 1)
+		MOs.resize(aMOene.size());
+	else
+		MOs.resize(aMOene.size() + bMOene.size());
+#pragma omp parallel for
+	for (int i = 0; i < MOs.size(); i++) {
+		MOs[i].set_ener(aMOene[i]);
+		MOs[i].set_nr(i + 1);
+		MOs[i].set_occ(MOocc[i]);
+		MOs[i].assign_coefs(COa[i]);
+	}
+	if (r_u_ro_switch == 1) {
+#pragma omp parallel for
+		for (int i = aMOene.size(); i < aMOene.size() + bMOene.size(); i++) {
+			const int b_step = i - aMOene.size();
+			MOs[i].set_ener(bMOene[b_step]);
+			MOs[i].set_nr(i + 1);
+			MOs[i].set_occ(MOocc[i]);
+			MOs[i].assign_coefs(COb[b_step]);
+		}
+	}
+	return true;
+};
+
+bool WFN::read_fchk(string& filename, ostream& log, bool debug) {
+	vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
+	if (!generate_sph2cart_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
+	int r_u_ro_switch = 0;
+	ifstream fchk(filename, ios::in);
+	if (!fchk.is_open()) {
+		log << "ERROR while opening .fchk file!" << endl;
+		return false;
+	}
+	string line;
+	getline(fchk, line);
+	string title = line;
+	getline(fchk, line);
+	string calculation_level = line;
+	if (line[10] == 'R') {
+		if (line[11] == 'O') {
+			if (line[12] == '3')
+				r_u_ro_switch = 0;
+			else
+				r_u_ro_switch = 2;
+		}
+	}
+	else if (line[10] == 'U') //Unrestricted
+		r_u_ro_switch = 1;
+	int el, ael, bel;
+	el = read_fchk_integer(fchk, "Number of electrons", false);
+	getline(fchk, line);
+	ael = read_fchk_integer(line);
+	getline(fchk, line);
+	bel = read_fchk_integer(line);
+	if (ael != bel && r_u_ro_switch == 0) r_u_ro_switch = 1; //If U was not correctly recognized
+	if (calculation_level.find("CASSCF") != string::npos && ael != bel) r_u_ro_switch = 2; // CASSCF requires open shell treatment
+	int nbas = read_fchk_integer(fchk, "Number of basis functions");
+	line = go_get_string(fchk, "Number of independent functions");
+	int indbas;
+	if (line == "") indbas = read_fchk_integer(fchk, "Number of independant functions");
+	else indbas = read_fchk_integer(line);
+	line = go_get_string(fchk, "Virial Ratio");
+	if (line != "")
+		virial_ratio = read_fchk_double(line);
+	line = go_get_string(fchk, "Total Energy");
+	if (line != "")
+		total_energy = read_fchk_double(line);
+	vector<int> atnbrs;
+	if (!read_fchk_integer_block(fchk, "Atomic numbers", atnbrs)) {
+		log << "Error reading atnbrs" << endl;
+		return false;
+	}
+	ncen = atnbrs.size();
+	atoms.resize(ncen);
+	for (int i = 0; i < ncen; i++)
+		atoms[i].label = atnr2letter(atnbrs[i]);
+	vector<double> charges;
+	if (!read_fchk_double_block(fchk, "Nuclear charges", charges)) {
+		log << "Error reading charges" << endl;
+		return false;
+	}
+	for (int i = 0; i < charges.size(); i++)
+		atoms[i].charge = charges[i];
+	vector<double> coords;
+	if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords)) {
+		log << "Error reading coordinates" << endl;
+		return false;
+	}
+	if (coords.size() != ncen * 3) {
+		log << "Inconsistant number of atoms and coordinates" << endl;
+		return false;
+	}
+	for (int i = 0; i < ncen; i++) {
+		atoms[i].x = coords[3 * i];
+		atoms[i].y = coords[3 * i + 1];
+		atoms[i].z = coords[3 * i + 2];
+	}
+	vector <int> shell_types;
+	if (!read_fchk_integer_block(fchk, "Shell types", shell_types, false)) {
+		log << "Error reading shell types" << endl;
+		return false;
+	}
+	bool is_spherical = false;
+	for (int i = 0; i < shell_types.size(); i++) if (shell_types[i] < -1) is_spherical = true;
+	if (debug) log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << endl
+		<< "Loading basis set information..." << endl;
+	vector <int> nr_prims_shell;
+	if (!read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell)) {
+		log << "Error reading primitives per shell" << endl;
+		return false;
+	}
+	vector <int> shell2atom;
+	if (!read_fchk_integer_block(fchk, "Shell to atom map", shell2atom)) {
+		log << "Error reading shell2atom" << endl;
+		return false;
+	}
+	vector <double> exp;
+	if (!read_fchk_double_block(fchk, "Primitive exponents", exp)) {
+		log << "Error reading Primitive exponents" << endl;
+		return false;
+	}
+	vector <double> contraction;
+	if (!read_fchk_double_block(fchk, "Contraction coefficients", contraction)) {
+		log << "Error reading Contraction coefficients" << endl;
+		return false;
+	}
+	vector<double> acoef, bcoef;
+	vector<double> MOocc, aMOene, bMOene;
+	int l_nmo;
+	if (r_u_ro_switch == 0 || r_u_ro_switch == 2) { // Restricted or Restricted-Open-Shell
+		if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene)) {
+			log << "Error during reading of Alpha Energies" << endl;
+			return false;
+		}
+		if (!read_fchk_double_block(fchk, "MO coefficients", acoef)) {
+			log << "Error during reading of Alpha MOs" << endl;
+			return false;
+		}
+		MOocc.resize(aMOene.size());
+		if (r_u_ro_switch == 0)
+#pragma omp parallel for
+			for (int i = 0; i < MOocc.size(); i++) {
+				if (i < ael) MOocc[i] = 2.0;
+				else MOocc[i] = 0.0;
+			}
+		else
+#pragma omp parallel for
+			for (int i = 0; i < MOocc.size(); i++) {
+				if (i < bel) MOocc[i] = 2.0;
+				else if (i < ael) MOocc[i] = 1.0;
+				else MOocc[i] = 0.0;
+			}
+	}
+	else { // Unrestricted
+		l_nmo = 2 * nbas;
+		if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene)) {
+			log << "Error during reading of Alpha Energies" << endl;
+			return false;
+		}
+		if (!read_fchk_double_block(fchk, "Beta Orbital Energies", bMOene)) {
+			log << "Error during reading of Beta Energies" << endl;
+			return false;
+		}
+		if (!read_fchk_double_block(fchk, "Alpha MO coefficients", acoef)) {
+			log << "Error during reading of Alpha MOs" << endl;
+			return false;
+		}
+		if (!read_fchk_double_block(fchk, "Beta MO coefficients", bcoef)) {
+			log << "Error during reading of Beta MOs" << endl;
+			return false;
+		}
+		MOocc.resize(aMOene.size() + bMOene.size());
+#pragma omp parallel for
+		for (int i = 0; i < aMOene.size(); i++) {
+			if (i < ael) MOocc[i] = 1.0;
+			else MOocc[i] = 0.0;
+		}
+#pragma omp parallel for
+		for (int i = aMOene.size(); i < aMOene.size() + bMOene.size(); i++) {
+			if (i - aMOene.size() < bel) MOocc[i] = 1.0;
+			else MOocc[i] = 0.0;
+		}
+	}
+	if (debug) log << "Finished reading the file! Transferring to WFN object!" << endl;
+	vector<int> shelltypesspherical;
+	int nbas5D;
+	nmo = nbas;
+	int nshell = shell_types.size();
+	if (is_spherical) {
+		shelltypesspherical.resize(shell_types.size());
+		if (debug) {
+			log << "shelltype:" << endl;
+			for (int i = 0; i < nshell; i++) log << setw(3) << shell_types[i] << endl;
+		}
+		shelltypesspherical = shell_types;
+		for (int i = 0; i < nshell; i++) if (shell_types[i] <= -2) shell_types[i] = -shell_types[i];
+		nbas5D = nbas;
+		nbas = 0;
+		for (int i = 0; i < nshell; i++) nbas += sht2nbas(shell_types[i]);
+	}
+	if (debug) {
+		log << "sizes" << endl;
+		log << setw(3) << nshell << endl;
+		log << setw(3) << nbas5D << endl;
+		log << setw(3) << nbas << endl;
+	}
+	vector<int> shelltypescartesian(size_t(shell_types.size()), 0);
+	shelltypescartesian = shell_types;
+	int nbasCart = nbas;
+	int nprims = 0;
+	for (int i = 0; i < nshell; i++) nprims += sht2nbas(shell_types[i]) * nr_prims_shell[i];
+	if (debug) {
+		log << "nprim" << endl;
+		log << setw(3) << nprims << endl;
+		log << "amocoeff of MO:1";
+		for (int i = 0; i < 4; i++) {
+			if (i % 2 == 0)
+				log << endl;
+			log << setprecision(8) << setw(16) << scientific << acoef[i];
+		}
+		log << endl << "First of MOs 1-4:" << endl;
+		for (int i = 0; i < 4; i++) {
+			if (i % 2 == 0)
+				log << endl;
+			if (is_spherical)
+				log << setprecision(8) << setw(16) << scientific << acoef[i * nbas5D];
+			else
+				log << setprecision(8) << setw(16) << scientific << acoef[i * nbas];
+		}
+	}
+	//vector<primitive> basis;
+	vector<vector<double>> COa, COb, CObasa, CObasb, CObasa_spherical, CObasb_spherical;
+	//vector<int> basshell, bascen, bastype, basstart, basend, primstart, primend;
+	vector<double> primconnorm;
+	//create arrays
+	//basshell.resize(nbas);
+	//bascen.resize(nbas);
+	//bastype.resize(nbas);
+	//primstart.resize(nbas);
+	//primend.resize(nbas);
+	primconnorm.resize(nprims);
+	//basstart.resize(ncen);
+	//basend.resize(nbas);
+	exponents.resize(nprims);
+	centers.resize(nprims);
+	types.resize(nprims);
+	COa.resize(nmo);
+#pragma omp parallel for
+	for (int i = 0; i < nmo; i++)
+		COa[i].resize(nprims);
+	CObasa.resize(nbas);
+#pragma omp parallel for
+	for (int i = 0; i < nbas; i++)
+		CObasa[i].resize(nbas);
+	if (r_u_ro_switch == 1) {
+		COb.resize(nmo);
+#pragma omp parallel for
+		for (int i = 0; i < nmo; i++)
+			COb[i].resize(nprims);
+		CObasb.resize(nbas);
+#pragma omp parallel for
+		for (int i = 0; i < nbas; i++)
+			CObasb[i].resize(nbas);
+	}
+
+	if (is_spherical) {
+		// NEEEEEEEEDS TO BE DONE!!!!!!!!
+		CObasa_spherical.resize(nbas5D);
+#pragma omp parallel for
+		for (int mo = 0; mo < nbas5D; mo++)
+			CObasa_spherical[mo].resize(nbas);
+#pragma omp parallel for
+		for (int mo = 0; mo < nbas5D; mo++)
+			for (int b = 0; b < nbas5D; b++)
+				CObasa_spherical[mo][b] = acoef[nbas5D * b + mo];
+		if (debug) {
+			log << endl << "CObasa5d";
+			int run = 0;
+			for (int i = 0; i < 2; i++) {
+				for (int j = 0; j < nbas5D; j++) {
+					if (run % 2 == 0) log << endl;
+					log << setprecision(8) << setw(16) << scientific << CObasa_spherical[i][j];
+					run++;
+				}
+				log << endl;
+			}
+			log << endl;
+		}
+		if (r_u_ro_switch == 1) {
+			CObasb_spherical.resize(nbas5D);
+#pragma omp parallel for
+			for (int mo = 0; mo < nbas5D; mo++)
+				CObasb_spherical[mo].resize(nbas5D);
+#pragma omp parallel for
+			for (int mo = 0; mo < nbas5D; mo++)
+				for (int b = 0; b < nbas5D; b++)
+					CObasb_spherical[mo][b] = bcoef[nbas5D * b + mo];
+		}
+		int ipos_spher = 0, ipos_cart = 0;
+		for (int shell = 0; shell < nshell; shell++) {
+			int temp_typ5D = shelltypesspherical[shell];
+			int temp_typ6D = shell_types[shell];
+			int shell_size5D = sht2nbas(temp_typ5D);
+			int shell_size6D = sht2nbas(temp_typ6D);
+			if (debug) {
+				log << setw(3) << ipos_spher;
+				log << setw(3) << ipos_cart;
+				log << setw(3) << temp_typ5D;
+				log << setw(3) << temp_typ6D;
+				log << setw(3) << shell_size5D;
+				log << setw(3) << shell_size6D;
+				log << endl;
+			}
+			if (temp_typ5D >= -1) {// S and P shells are fine!
+#pragma omp parallel for
+				for (int i = 0; i < nbas5D; i++)
+					for (int j = 0; j < shell_size6D; j++)
+						CObasa[ipos_cart + j][i] = CObasa_spherical[ipos_spher + j][i];
+				if (debug) {
+					int run = 0;
+					for (int i = 0; i < nbas5D; i++) {
+						if (run % 2 == 0) log << endl;
+						log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher][i];
+						run++;
+					}
+					log << endl;
+					for (int i = 0; i < nbas; i++) {
+						if (run % 2 == 0) log << endl;
+						log << setprecision(8) << setw(16) << scientific << CObasa[ipos_cart][i];
+						run++;
+					}
+					log << endl;
+				}
+				//if (debug) {
+				//	int run = 0;
+				//	for (int i = 0; i < nbas5D; i++) {
+				//		if (run % 2 == 0) log << endl;
+				//		log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher][i];
+				//		run++;
+				//	}
+				//	log << endl;
+				//}
+			}
+			else if (temp_typ5D == -2) {// 5D -> 6D
+#pragma omp parallel for
+				for (int i = 0; i < nbas5D; i++)
+					for (int j = 0; j < 6; j++)
+						CObasa[ipos_cart + j][i] =
+						mat_5d6d[j][0] * CObasa_spherical[ipos_spher][i]
+						+ mat_5d6d[j][1] * CObasa_spherical[ipos_spher + 1][i]
+						+ mat_5d6d[j][2] * CObasa_spherical[ipos_spher + 2][i]
+						+ mat_5d6d[j][3] * CObasa_spherical[ipos_spher + 3][i]
+						+ mat_5d6d[j][4] * CObasa_spherical[ipos_spher + 4][i];
+				if (debug) {
+					int run = 0;
+					for (int j = 0; j < 5; j++)
+						for (int i = 0; i < nbas5D; i++) {
+							if (run % 2 == 0) log << endl;
+							log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher + j][i];
+							run++;
+						}
+					log << endl;
+				}
+				if (debug) {
+					int run = 0;
+					for (int j = 0; j < 6; j++) {
+						for (int i = 0; i < nbas5D; i++) {
+							if (run % 2 == 0) log << endl;
+							log << setprecision(8) << setw(16) << scientific << CObasa[ipos_cart + j][i];
+							run++;
+						}
+						log << endl;
+					}
+					log << endl;
+				}
+			}
+			else if (temp_typ5D == -3) // 7F -> 10F
+#pragma omp parallel for
+				for (int i = 0; i < nbas5D; i++)
+					for (int j = 0; j < 10; j++)
+						CObasa[ipos_cart + j][i] =
+						mat_7f10f[j][0] * CObasa_spherical[ipos_spher][i]
+						+ mat_7f10f[j][1] * CObasa_spherical[ipos_spher + 1][i]
+						+ mat_7f10f[j][2] * CObasa_spherical[ipos_spher + 2][i]
+						+ mat_7f10f[j][3] * CObasa_spherical[ipos_spher + 3][i]
+						+ mat_7f10f[j][4] * CObasa_spherical[ipos_spher + 4][i]
+						+ mat_7f10f[j][5] * CObasa_spherical[ipos_spher + 5][i]
+						+ mat_7f10f[j][6] * CObasa_spherical[ipos_spher + 6][i];
+			else if (temp_typ5D == -4) // 9G -> 15G
+#pragma omp parallel for
+				for (int i = 0; i < nbas5D; i++)
+					for (int j = 0; j < 15; j++)
+						CObasa[ipos_cart + j][i] =
+						mat_9g15g[j][0] * CObasa_spherical[ipos_spher][i]
+						+ mat_9g15g[j][1] * CObasa_spherical[ipos_spher + 1][i]
+						+ mat_9g15g[j][2] * CObasa_spherical[ipos_spher + 2][i]
+						+ mat_9g15g[j][3] * CObasa_spherical[ipos_spher + 3][i]
+						+ mat_9g15g[j][4] * CObasa_spherical[ipos_spher + 4][i]
+						+ mat_9g15g[j][5] * CObasa_spherical[ipos_spher + 5][i]
+						+ mat_9g15g[j][6] * CObasa_spherical[ipos_spher + 6][i]
+						+ mat_9g15g[j][7] * CObasa_spherical[ipos_spher + 7][i]
+						+ mat_9g15g[j][8] * CObasa_spherical[ipos_spher + 8][i];
+			else if (temp_typ5D == -5) // 11H -> 21H
+#pragma omp parallel for
+				for (int i = 0; i < nbas5D; i++)
+					for (int j = 0; j < 21; j++)
+						CObasa[ipos_cart + j][i] =
+						mat_11h21h[j][0] * CObasa_spherical[ipos_spher][i]
+						+ mat_11h21h[j][1] * CObasa_spherical[ipos_spher + 1][i]
+						+ mat_11h21h[j][2] * CObasa_spherical[ipos_spher + 2][i]
+						+ mat_11h21h[j][3] * CObasa_spherical[ipos_spher + 3][i]
+						+ mat_11h21h[j][4] * CObasa_spherical[ipos_spher + 4][i]
+						+ mat_11h21h[j][5] * CObasa_spherical[ipos_spher + 5][i]
+						+ mat_11h21h[j][6] * CObasa_spherical[ipos_spher + 6][i]
+						+ mat_11h21h[j][7] * CObasa_spherical[ipos_spher + 7][i]
+						+ mat_11h21h[j][8] * CObasa_spherical[ipos_spher + 8][i]
+						+ mat_11h21h[j][9] * CObasa_spherical[ipos_spher + 9][i]
+						+ mat_11h21h[j][10] * CObasa_spherical[ipos_spher + 10][i];
+			if (r_u_ro_switch == 1) {
+				if (temp_typ5D >= -1) // S and P shells are fine!
+#pragma omp parallel for
+					for (int i = 0; i < nbas5D; i++)
+						for (int j = 0; j < shell_size6D; j++)
+							CObasb[ipos_cart + j][i] = CObasb_spherical[ipos_spher + j][i];
+				else if (temp_typ5D == -2) // 5D -> 6D
+#pragma omp parallel for
+					for (int i = 0; i < nbas5D; i++)
+						for (int j = 0; j < 6; j++)
+							CObasb[ipos_cart + j][i] =
+							mat_5d6d[j][0] * CObasb_spherical[ipos_spher][i]
+							+ mat_5d6d[j][1] * CObasb_spherical[ipos_spher + 1][i]
+							+ mat_5d6d[j][2] * CObasb_spherical[ipos_spher + 2][i]
+							+ mat_5d6d[j][3] * CObasb_spherical[ipos_spher + 3][i]
+							+ mat_5d6d[j][4] * CObasb_spherical[ipos_spher + 4][i];
+				else if (temp_typ5D == -3) // 7F -> 10F
+#pragma omp parallel for
+					for (int i = 0; i < nbas5D; i++)
+						for (int j = 0; j < 10; j++)
+							CObasb[ipos_cart + j][i] =
+							mat_7f10f[j][0] * CObasb_spherical[ipos_spher][i]
+							+ mat_7f10f[j][1] * CObasb_spherical[ipos_spher + 1][i]
+							+ mat_7f10f[j][2] * CObasb_spherical[ipos_spher + 2][i]
+							+ mat_7f10f[j][3] * CObasb_spherical[ipos_spher + 3][i]
+							+ mat_7f10f[j][4] * CObasb_spherical[ipos_spher + 4][i]
+							+ mat_7f10f[j][5] * CObasb_spherical[ipos_spher + 5][i]
+							+ mat_7f10f[j][6] * CObasb_spherical[ipos_spher + 6][i];
+				else if (temp_typ5D == -4) // 9G -> 15G
+#pragma omp parallel for
+					for (int i = 0; i < nbas5D; i++)
+						for (int j = 0; j < 15; j++)
+							CObasb[ipos_cart + j][i] =
+							mat_9g15g[j][0] * CObasb_spherical[ipos_spher][i]
+							+ mat_9g15g[j][1] * CObasb_spherical[ipos_spher + 1][i]
+							+ mat_9g15g[j][2] * CObasb_spherical[ipos_spher + 2][i]
+							+ mat_9g15g[j][3] * CObasb_spherical[ipos_spher + 3][i]
+							+ mat_9g15g[j][4] * CObasb_spherical[ipos_spher + 4][i]
+							+ mat_9g15g[j][5] * CObasb_spherical[ipos_spher + 5][i]
+							+ mat_9g15g[j][6] * CObasb_spherical[ipos_spher + 6][i]
+							+ mat_9g15g[j][7] * CObasb_spherical[ipos_spher + 7][i]
+							+ mat_9g15g[j][8] * CObasb_spherical[ipos_spher + 8][i];
+				else if (temp_typ5D == -5) // 11H -> 21H
+#pragma omp parallel for
+					for (int i = 0; i < nbas5D; i++)
+						for (int j = 0; j < 21; j++)
+							CObasb[ipos_cart + j][i] =
+							mat_11h21h[j][0] * CObasb_spherical[ipos_spher][i]
+							+ mat_11h21h[j][1] * CObasb_spherical[ipos_spher + 1][i]
+							+ mat_11h21h[j][2] * CObasb_spherical[ipos_spher + 2][i]
+							+ mat_11h21h[j][3] * CObasb_spherical[ipos_spher + 3][i]
+							+ mat_11h21h[j][4] * CObasb_spherical[ipos_spher + 4][i]
+							+ mat_11h21h[j][5] * CObasb_spherical[ipos_spher + 5][i]
+							+ mat_11h21h[j][6] * CObasb_spherical[ipos_spher + 6][i]
+							+ mat_11h21h[j][7] * CObasb_spherical[ipos_spher + 7][i]
+							+ mat_11h21h[j][8] * CObasb_spherical[ipos_spher + 8][i]
+							+ mat_11h21h[j][9] * CObasb_spherical[ipos_spher + 9][i]
+							+ mat_11h21h[j][10] * CObasb_spherical[ipos_spher + 10][i];
+			}
+			ipos_cart += shell_size6D;
+			ipos_spher += shell_size5D;
+		}
+		if (debug) {
+			log << endl << "CObasa";
+			int run = 0;
+			for (int i = 0; i < 10; i++) {
+				run = 0;
+				for (int j = 0; j < nbas; j++) {
+					if (run % 2 == 0)
+						log << endl;
+					log << setprecision(8) << setw(16) << scientific << CObasa[i][j];
+					run++;
+				}
+				log << endl;
+			}
+			log << endl;
+		}
+	}
+	else {
+#pragma omp parallel for
+		for (int mo = 0; mo < nbas; mo++)
+			for (int b = 0; b < nbas; b++)
+				CObasa[b][mo] = acoef[nbas * b + mo];
+		if (r_u_ro_switch == 1)
+#pragma omp parallel for
+			for (int mo = 0; mo < nbas; mo++)
+				for (int b = 0; b < nbas; b++)
+					CObasb[b][mo] = bcoef[nbas * b + mo];
+	}
+	if (debug) {
+		log << endl;
+		int run = 0;
+		for (int i = 0; i < contraction.size(); i++) {
+			if (run % 2 == 0) log << endl;
+			log << setprecision(8) << setw(16) << scientific << contraction[i];
+			run++;
+		}
+		log << flush;
+	}
+	int k = 0, iexp = 0, ibasis = 0;
+	//double tnormgau;
+	for (int i = 0; i < nshell; i++) {
+		int j;
+		for (j = 0; j < nr_prims_shell[i] * sht2nbas(shell_types[i]); j++)
+			centers[k + j] = shell2atom[i];
+		int lim = sht2nbas(shell_types[i]);
+		for (j = 0; j < lim; j++) {
+			int temp = shell2function(shell_types[i], j);
+#pragma omp parallel for
+			for (int l = 0; l < nr_prims_shell[i]; l++)
+				types[k + l] = temp;
+			for (int l = 0; l < nr_prims_shell[i]; l++) {
+				exponents[k] = exp[iexp + l];
+				primconnorm[k] = contraction[iexp + l] * normgauss(types[k], exponents[k]);
+				if (debug) log << setw(22) << setprecision(16) << normgauss(types[k], exponents[k]) << endl;
+#pragma omp parallel for
+				for (int mo = 0; mo < nmo; mo++) {
+					COa[mo][k] = CObasa[ibasis][mo] * primconnorm[k];
+					if (r_u_ro_switch == 1)//R or RO
+						COb[mo][k] = CObasb[ibasis][mo] * primconnorm[k];
+				}
+				k++;
+			}
+			ibasis++;
+		}
+		iexp += nr_prims_shell[i];
 	}
 	nex = nprims;
 	if (r_u_ro_switch != 1)

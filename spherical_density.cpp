@@ -1,4 +1,5 @@
 #include "spherical_density.h"
+#include "convenience.h"
 
 #include <math.h>
 #include <cmath>

@@ -92,9 +92,6 @@
     <ClInclude Include="..\cell.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\bondwise_analysis.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="..\tsc_block.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>

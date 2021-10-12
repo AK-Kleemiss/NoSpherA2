@@ -23,7 +23,6 @@ bool merge_tscs_without_checks(
 bool thakkar_sfac(
 	std::string& hkl_filename,
 	std::string& cif,
-	std::string& asym_cif,
 	bool debug,
 	std::ofstream& file,
 	std::vector <int>& input_groups,
@@ -35,8 +34,6 @@ bool thakkar_sfac(
 bool calculate_structure_factors_HF(
 	std::string &hkl_filename, 
 	std::string &cif_file, 
-	std::string &asym_cif, 
-	std::string &symm, 
 	WFN &wave, 
 	bool debug, 
 	int accuracy, 
@@ -50,17 +47,16 @@ bool calculate_structure_factors_HF(
 	bool save_k_pts = false,
 	bool read_k_pts = false);
 
-tsc_block calculate_structure_factors_fragHAR(
+tsc_block calculate_structure_factors_MTC(
 	std::string& hkl_filename,
 	std::string& cif_file,
-	std::string& asym_cif,
-	std::string& symm,
 	WFN& wave,
 	bool debug,
 	int accuracy,
 	std::ofstream& file,
 	std::vector <int>& input_groups,
 	std::vector <std::vector <double> >& twin_law,
+	std::vector <std::string> known_atoms,
 	int cpus = -1,
 	bool electron_diffraction = false,
 	bool save_k_pts = false,
@@ -80,6 +76,6 @@ bool calculate_structure_factors_RI(
 	int pbc = 0);
 
 #include "wfn_class.h"
-#indlude "tsc_block.h"
+#include "tsc_block.h"
 
 #endif

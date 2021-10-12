@@ -11,22 +11,6 @@
     #include <algorithm>
     #include <io.h>
 #endif
-//Constants for later use
-const int hardness = 3;
-const double cutoff = 1.0e-20;
-const double PI = 3.14159265358979323846;
-const double C0 = 4.0 * std::sqrt(2.0) * PI;
-const double PI2 = pow(PI, 2);
-const double TG32 = tgamma(3.0 / 2.0);
-const int max_LT = 33;
-const int MAG = 5810;
-
-//                       3,     5     7,    9,    11,   13,   15,   17
-//                      19,    21
-int lebedev_table[33] = {6,    14,   26,   38,   50,   74,   86,   110,
-                         146,  170,  194,  230,  266,  302,  350,  434,
-                         590,  770,  974,  1202, 1454, 1730, 2030, 2354,
-                         2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810};
 
 constexpr int get_closest_num_angular(int n) {
     int m = 0;

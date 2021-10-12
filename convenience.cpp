@@ -28,20 +28,8 @@
 #include "cell.h"
 
 using namespace std;
-const double c_pi = 3.141592653589793;
 
 //--------------------------General convenience terminal functions---------------------------------
-
-
-inline void copyright(){
-	std::cout << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-};
-
-inline bool copyright(ofstream& file){
-  file << "This software is part of the cuQCT software suite developed by Florian Kleemiss.\nPlease give credit and cite corresponding pieces!\n";
-  return true;
-};
-
 bool yesno(){
 	bool end=false;
 	while (!end) {
@@ -226,62 +214,6 @@ void copy_file(string from, string to){
 
     source.close();
     dest.close();
-};
-
-//----------------------------WFN Handling-------------------------------------------------------------
-
-bool writewfn(WFN &wavefunction, const string &path, bool &debug,bool occ){
-	try{
-		if(wavefunction.write_wfn (path,debug, occ)){
-			wavefunction.set_path(path);
-			return true;
-		}
-		else{
-			cout << "Sorry, something went wrong, try to look above what i might be..\n";
-			throw (int)1;
-		}
-	}
-	catch(exception& e)
-	{
-		cerr << "Sorry, something went wrong, try to look above what i might be.. the error code is " << e.what() << endl;
-		throw (int) 3;
-	}
-}; 
-
-bool readwfn(WFN &wavefunction, const string &path, bool &debug){
-	try{
-		if(wavefunction.read_wfn (path,debug)){
-			wavefunction.set_path(path);
-			return true;
-		}
-		else{
-			cout << "Sorry, something went wrong, try to look above what i might be..\n";
-			throw (int)1;
-		}
-	}
-	catch(exception& e)
-	{
-		cerr << "Sorry, something went wrong, try to look above what i might be.. the error code is " << e.what() << endl;
-		throw (int) 3;
-	}
-};
-
-bool readwfn(WFN& wavefunction, const string& path, bool& debug, ofstream &file) {
-	try {
-		if (wavefunction.read_wfn(path, debug,file)) {
-			wavefunction.set_path(path);
-			return true;
-		}
-		else {
-			cout << "Sorry, something went wrong, try to look above what i might be..\n";
-			throw (int)1;
-		}
-	}
-	catch (exception& e)
-	{
-		cerr << "Sorry, something went wrong, try to look above what i might be.. the error code is " << e.what() << endl;
-		throw (int)3;
-	}
 };
 
 //---------------------------Configuration files ---------------------------------------------------
@@ -605,17 +537,6 @@ int filetype_identifier(string &file, bool debug){
 	}
 	return -1;
 }
-
-vector<string> split_string(const string& input, const string delimiter) {
-	string input_copy = input + delimiter; // Need to add one delimiter in the end to return all elements
-	vector<string> result;
-	size_t pos = 0;
-	while ((pos = input_copy.find(delimiter)) != string::npos) {
-		result.push_back(input_copy.substr(0, pos));
-		input_copy.erase(0, pos + delimiter.length());
-	}
-	return result;
-};
 
 string go_get_string(ifstream& file, string search, bool rewind) {
 	if (rewind) {
@@ -1238,8 +1159,6 @@ void readxyzMinMax_fromCIF(
 	cif_input.close();
 }
 
-const int ft[11] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800 };
-
 const double normgauss(const int type, const double exp) {
 	int t[3];
 	if (type > 0)
@@ -1248,7 +1167,7 @@ const double normgauss(const int type, const double exp) {
 		t[0] = t[1] = t[2] = 0;
 	int temp = ft[t[0]] * ft[t[1]] * ft[t[2]];
 	int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
-	return pow(2 * exp / c_pi, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp/temp2);
+	return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp/temp2);
 };
 bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h) {
 	//                                                   

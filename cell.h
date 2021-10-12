@@ -170,17 +170,8 @@ public:
 		cell_keywords.push_back("_cell_angle_gamma");
 		cell_keywords.push_back("_cell_volume");
 		if (debug)
-			file << "Starting while !.eof()" << std::endl;
+			file << "\nStarting while !.eof()" << std::endl;
 		while (!cif_input.eof()) {
-			if (debug)
-				file << "While line! " << std::setw(80) << line
-				<< std::setw(10) << a << found[0]
-				<< std::setw(10) << b << found[1]
-				<< std::setw(10) << c << found[2]
-				<< std::setw(10) << alpha << found[3]
-				<< std::setw(10) << beta << found[4]
-				<< std::setw(10) << gamma << found[5]
-				<< std::setw(10) << v << found[6] << std::endl;
 			getline(cif_input, line);
 			for (int k = 0; k < cell_keywords.size(); k++) {
 				if (line.find(cell_keywords[k]) != std::string::npos) {
@@ -267,7 +258,7 @@ public:
 					//cm[i][j] = 0.0;
 				}
 				else {
-					rcm[i][j] *= 0.529177249;
+					rcm[i][j] = bohr2ang(rcm[i][j]);
 					//cm[i][j] *= 0.529177249;
 				}
 
@@ -291,17 +282,8 @@ public:
 		cell_keywords.push_back("_cell_angle_gamma");
 		cell_keywords.push_back("_cell_volume");
 		if (debug)
-			std::cout << "Starting while !.eof()" << std::endl;
+			std::cout << "\nStarting while !.eof()" << std::endl;
 		while (!cif_input.eof()) {
-			if (debug)
-				std::cout << "While line! " << std::setw(80) << line
-				<< std::setw(10) << a << found[0]
-				<< std::setw(10) << b << found[1]
-				<< std::setw(10) << c << found[2]
-				<< std::setw(10) << alpha << found[3]
-				<< std::setw(10) << beta << found[4]
-				<< std::setw(10) << gamma << found[5]
-				<< std::setw(10) << v << found[6] << std::endl;
 			getline(cif_input, line);
 			for (int k = 0; k < cell_keywords.size(); k++) {
 				if (line.find(cell_keywords[k]) != std::string::npos) {
@@ -388,7 +370,7 @@ public:
 					//cm[i][j] = 0.0;
 				}
 				else {
-					rcm[i][j] *= 0.529177249;
+					rcm[i][j] = bohr2ang(rcm[i][j]);
 					//cm[i][j] *= 0.529177249;
 				}
 
