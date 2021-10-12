@@ -116,14 +116,10 @@ bool merge_tscs(
 				bool new_index = true;
 #pragma omp parallel for reduction(&&:new_index)
 				for (int run = 0; run < indices[0].size(); run++) {
-					if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) {
+					if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) 
 						new_index = false;
-						break;
-					}
-					else if (stoi(digest[0]) == -indices[0][run] && stoi(digest[1]) == -indices[1][run] && stoi(digest[2]) == -indices[2][run]) {
+					else if (stoi(digest[0]) == -indices[0][run] && stoi(digest[1]) == -indices[1][run] && stoi(digest[2]) == -indices[2][run])
 						new_index = false;
-						break;
-					}
 				}
 				if (!new_index)
 					continue;
@@ -3579,7 +3575,7 @@ bool calculate_structure_factors_HF(
 			if (save_k_pts) {
 				
 				ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
-				unsigned __int64 nr[1] = { k_pt_unique[0].size() };
+				int nr[1] = { k_pt_unique[0].size() };
 				file << "Writing k-points to kpoints.dat!" << endl;
 				k_points_file.write((char *) &nr, sizeof(nr));
 				double temp[1];
@@ -3598,7 +3594,7 @@ bool calculate_structure_factors_HF(
 			file << endl << "Number of k-points to evaluate: " << k_pt[0].size() << " for " << points << " gridpoints." << endl;
 			if (save_k_pts) {
 				ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
-				unsigned __int64 nr[1] = { k_pt[0].size() };
+				int nr[1] = { k_pt[0].size() };
 				k_points_file.write((char *) &nr, sizeof(nr));
 				double temp[1];
 				int hkl_temp[1];
@@ -3618,7 +3614,7 @@ bool calculate_structure_factors_HF(
 	else {
 		ifstream k_points_file("kpts.dat", ios::binary);
 		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
-		unsigned __int64 nr[1];
+		int nr[1];
 		k_points_file.read((char*) &nr, sizeof(nr));
 		file << "Reading k-points... expecting " << nr[0] << " k points... " << flush;
 		double temp[1];
@@ -5531,9 +5527,8 @@ tsc_block calculate_structure_factors_MTC(
 		file << " ... Done!";
 		file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 		if (save_k_pts) {
-
 			ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
-			unsigned __int64 nr[1] = { k_pt_unique[0].size() };
+			int nr[1] = { k_pt_unique[0].size() };
 			file << "Writing k-points to kpoints.dat!" << endl;
 			k_points_file.write((char*)&nr, sizeof(nr));
 			double temp[1];
@@ -5551,7 +5546,7 @@ tsc_block calculate_structure_factors_MTC(
 	else {
 		ifstream k_points_file("kpts.dat", ios::binary);
 		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
-		unsigned __int64 nr[1];
+		int nr[1];
 		k_points_file.read((char*)&nr, sizeof(nr));
 		file << "Reading k-points... expecting " << nr[0] << " k points... " << flush;
 		double temp[1];
