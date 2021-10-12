@@ -15,15 +15,6 @@
 
 using namespace std;
 
-const double alpha = 0.1616204596739954813316614;
-const double c_43 = 4.0 / 3.0;
-const double c_38 = 3.0 / 8.0;
-const double c_m53 = -5.0 / 3.0;
-const double c_pi = 3.141592653589793;
-const double ctelf = 10 * pow(2, -0.666666666666666666666666666666666666) * pow(3, -1.666666666666666666666666666666666666) * pow(3.141592653589793, -1.33333333333333333333333333333333);
-const int factorial[11] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800 };
-
-
 void computeValues(
 	double* PosGrid,		// [3] vector with current position on te grid
 	WFN &wavy,
@@ -787,7 +778,7 @@ void fill_pre() {
 				int imax = min(j, l);
 				int imin = max(0, j - m);
 				for (int i = imin; i <= imax; i++)
-					pre[j][l][m][i] = factorial[j] * factorial[l] / factorial[l - i] / factorial[i] * factorial[m] / factorial[m - j + i] / factorial[j - i];
+					pre[j][l][m][i] = ft[j] * ft[l] / ft[l - i] / ft[i] * ft[m] / ft[m - j + i] / ft[j - i];
 			}
 }
 double fj(int &j, int &l, int &m, double &aa, double &bb) {
@@ -811,7 +802,7 @@ void fill_Afac_pre() {
 	for (int l = 0; l < 9; l++)
 		for (int r = 0; r <= l / 2; r++)
 			for (int s = 0; s <= (l - 2 * r) / 2; s++)
-				Afac_pre[l][r][s] = factorial[r] * factorial[s] * factorial[l - 2 * r - 2 * s];
+				Afac_pre[l][r][s] = ft[r] * ft[s] * ft[l - 2 * r - 2 * s];
 }
 
 double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) {

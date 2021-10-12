@@ -16,8 +16,29 @@
 class WFN;
 class cell;
 
+//Constants for later use
+inline const int hardness = 3;
+inline const double cutoff = 1.0e-20;
+inline const double PI = 3.14159265358979323846;
+inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
+inline const double PI2 = pow(PI, 2);
+inline const double TG32 = tgamma(3.0 / 2.0);
+inline const int max_LT = 33;
+inline const int MAG = 5810;
+//                       3,     5     7,    9,    11,   13,   15,   17
+//                      19,    21
+inline const int lebedev_table[33] = { 6,    14,   26,   38,   50,   74,   86,   110,
+						 146,  170,  194,  230,  266,  302,  350,  434,
+						 590,  770,  974,  1202, 1454, 1730, 2030, 2354,
+						 2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
+inline const int ft[11] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800 };
+inline const double alpha = 0.1616204596739954813316614;
+inline const double c_43 = 4.0 / 3.0;
+inline const double c_38 = 3.0 / 8.0;
+inline const double c_m53 = -5.0 / 3.0;
+inline const double ctelf = 10 * pow(2, -0.666666666666666666666666666666666666) * pow(3, -1.666666666666666666666666666666666666) * pow(3.141592653589793, -1.33333333333333333333333333333333);
 
-constexpr double bohr2aang(double inp) {
+constexpr double bohr2ang(double inp) {
 	return inp * 0.529177249;
 }
 
@@ -26,7 +47,7 @@ constexpr double ang2bohr(double inp) {
 }
 
 //------------------general functions for easy use of terminal input--------------------
-const double bragg_angstrom[114]{
+inline const double bragg_angstrom[114]{
 0.00, 
 	0.35, 0.35, 
 	1.45, 1.05,																																					0.85, 0.70, 0.65, 0.60, 0.50, 0.45,
@@ -42,6 +63,19 @@ void Enter();
 void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
+inline void error_check(bool condition, std::string file, int line, std::string error_mesasge, std::ofstream& log_file) {
+	if (!condition) {
+		log_file << "Error at: " << file << ":" << line << " " << error_mesasge << std::endl;
+		log_file.close();
+		exit(-1);
+	}
+};
+inline void error_check(bool condition, std::string file, int line, std::string error_mesasge, std::ostream& log_file) {
+	if (!condition) {
+		log_file << "Error at: " << file << ":" << line << " " << error_mesasge << std::endl;
+		exit(-1);
+	}
+};
 
 bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
@@ -112,7 +146,16 @@ template<class T> T fromString(const std::string& s)
      return t;
 }
 
-inline void copyright();
+template <class T> std::vector<T> split_string(const std::string& input, const std::string delimiter) {
+	std::string input_copy = input + delimiter; // Need to add one delimiter in the end to return all elements
+	std::vector<T> result;
+	size_t pos = 0;
+	while ((pos = input_copy.find(delimiter)) != std::string::npos) {
+		result.push_back(fromString<T>(input_copy.substr(0, pos)));
+		input_copy.erase(0, pos + delimiter.length());
+	}
+	return result;
+};
 
 inline int CountWords(const char* str)
 {
@@ -140,8 +183,6 @@ inline int CountWords(const char* str)
 	return numWords;
 };
 
-inline bool copyright(std::ofstream& file);
-
 inline bool exists(const std::string &name){
 	std::ifstream f(name.c_str());
 	return f.good();
@@ -151,14 +192,9 @@ std::string atnr2letter(const int nr);
 void copy_file(std::string from, std::string to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int atom_number);
-std::vector<std::string> split_string(const std::string& input, const std::string delimiter);
 std::string get_filename_from_path(const std::string &input);
 std::string get_foldername_from_path(const std::string &input);
 std::string get_basename_without_ending(const std::string &input);
-//------------------Functions to handle .wfn files--------------------------------------
-bool writewfn(WFN &wavefunction, const std::string &path, bool &debug, bool occ);
-bool readwfn(WFN &wavefunction, const std::string &path, bool &debug);
-bool readwfn(WFN& wavefunction, const std::string& path, bool& debug, std::ofstream &file);
 //------------------Functions to read from .fchk files----------------------------------
 bool read_fchk_integer_block(std::ifstream& in, std::string heading, std::vector<int>& result, bool rewind = true);
 bool read_fchk_double_block(std::ifstream& in, std::string heading, std::vector<double>& result, bool rewind = true);
@@ -202,22 +238,6 @@ inline std::string trim(const std::string& s)
 
 	return std::string(start, end + 1);
 }
-
-inline void err(const char message, std::ofstream log) {
-	log << message << std::endl;
-	exit(-1);
-}
-
-inline void err(std::string& message, std::ofstream log) {
-	log << message << std::endl;
-	exit(-1);
-}
-
-inline void err(std::string& message) {
-	std::cout << message << std::endl;
-	exit(-1);
-}
-
 
 //-------------------------Progress_bar--------------------------------------------------
 
