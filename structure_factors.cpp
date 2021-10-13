@@ -4048,9 +4048,9 @@ tsc_block calculate_structure_factors_MTC(
 				vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
 				if (debug) file << " cart. position: " << position[0] << " " << position[1] << " " << position[2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
-					if (is_similar(position[0], wave.atoms[i].x, -2)
-						&& is_similar(position[1], wave.atoms[i].y, -2)
-						&& is_similar(position[2], wave.atoms[i].z, -2)) {
+					if (is_similar(position[0], wave.atoms[i].x, -1.5)
+						&& is_similar(position[1], wave.atoms[i].y, -1.5)
+						&& is_similar(position[2], wave.atoms[i].z, -1.5)) {
 						if (debug) {
 							file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 							file << " cart. position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl;

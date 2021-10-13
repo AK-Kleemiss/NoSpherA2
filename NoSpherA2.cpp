@@ -299,7 +299,7 @@ int main(int argc, char **argv){
 		error_check(cif != "", __FILE__, __LINE__, "No cif specified", log_file);
 		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
 		//Make sure we have more than 2 files...
-		error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
+		//error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
 		//First make sure all files exist
 		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
 			error_check(exists(combined_tsc_calc_files[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
