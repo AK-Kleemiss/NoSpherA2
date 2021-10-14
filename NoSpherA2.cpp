@@ -98,6 +98,7 @@ int main(int argc, char **argv){
 	string temp;
 	string fract_name("");
 	vector<string> combined_tsc_calc_files;
+	vector<string> combined_tsc_calc_cifs;
 	int accuracy = 2;
 	int threads = -1;
 	int pbc = 0;
@@ -120,6 +121,7 @@ int main(int argc, char **argv){
 	bool read_k_pts = false;
 	bool save_k_pts = false;
 	bool combined_tsc_calc = false;
+	bool cif_based_combined_tsc_calc = false;
 	int hirsh_number = 0;
 	double MinMax[6];
 	double NbSteps[3];
@@ -257,6 +259,21 @@ int main(int argc, char **argv){
 				n++;
 			}
 		}
+		else if (temp.find("-cmtc") != string::npos) {
+			cif_based_combined_tsc_calc = true;
+			int n = 1;
+			string delimiter = ",";
+			groups.pop_back();
+			while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+				combined_tsc_calc_files.push_back(argv[i + n]);
+				n++;
+				combined_tsc_calc_cifs.push_back(argv[i + n]);
+				n++;
+				const string temp = argv[i + n];
+				groups.push_back(split_string<int>(temp, delimiter));
+				n++;
+			}
+		}
 	}
 	if (threads != -1) {
 		omp_set_num_threads(threads);
@@ -336,6 +353,68 @@ int main(int argc, char **argv){
 			result.append(calculate_structure_factors_MTC(
 				hkl,
 				cif,
+				wavy[i],
+				debug_main,
+				accuracy,
+				log_file,
+				groups[i],
+				twin_law,
+				result.get_sctaerrers(),
+				threads,
+				electron_diffraction,
+				false,
+				true
+			), log_file);
+
+		result.write_tsc_file(cif);
+		return 0;
+	}
+	if (cif_based_combined_tsc_calc) {
+		ofstream log_file("NoSpherA2.log", ios::out);
+		log_file << NoSpherA2_message;
+		log_file.flush();
+		error_check(hkl != "", __FILE__, __LINE__, "No hkl specified", log_file);
+		error_check(exists(hkl), __FILE__, __LINE__, "hkl doesn't exist", log_file);
+		//Make sure we have more than 2 files...
+		//error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
+		//First make sure all files exist
+		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+			error_check(exists(combined_tsc_calc_files[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
+		for (int i = 0; i < combined_tsc_calc_cifs.size(); i++)
+			error_check(exists(combined_tsc_calc_cifs[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_cifs[i], log_file);
+
+		wavy.resize(combined_tsc_calc_files.size());
+		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+			wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
+
+		vector<string> empty;
+		tsc_block result = calculate_structure_factors_MTC(
+			hkl,
+			combined_tsc_calc_cifs[0],
+			wavy[0],
+			debug_main,
+			accuracy,
+			log_file,
+			groups[0],
+			twin_law,
+			empty,
+			threads,
+			electron_diffraction,
+			true,
+			false
+		);
+
+		if (debug_main)
+			for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
+				log_file << combined_tsc_calc_files[i] << " ";
+				for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
+				log_file << endl;
+			}
+
+		for (int i = 1; i < combined_tsc_calc_files.size(); i++)
+			result.append(calculate_structure_factors_MTC(
+				hkl,
+				combined_tsc_calc_cifs[i],
 				wavy[i],
 				debug_main,
 				accuracy,
