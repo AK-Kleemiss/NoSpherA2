@@ -4003,17 +4003,16 @@ const double Thakkar_c[]{
 				0.000400441, 0.306235602
 };
 
-int Thakkar::first_ex() {
+const int Thakkar::first_ex() {
 	if (atomic_number == 1) return 0;
 	else if (atomic_number > 113) return 200000000;
 	int ex = 0;
-#pragma loop(no_vector)
 	for (int i = 0; i < atomic_number - 1; i++)
 		ex += Thakkar_nex[i];
 	return ex;
 };
 
-int Thakkar::get_max_l() {
+const int Thakkar::get_max_l() {
 	int l[4] = {0, 0, 0, 0};
 	int temp = atomic_number - 1;
 	for (int m = 0; m < 7; m++)
@@ -4031,7 +4030,7 @@ int Thakkar::get_max_l() {
 	return l[0]+l[1]+l[2]+l[3];
 };
 
-double Thakkar::get_max_alpha() {
+const double Thakkar::get_max_alpha() {
 	const int offset = (atomic_number - 1) * 19;
 	int nr_ex = first_ex();
 	double max_exp = 0.0;
@@ -4066,7 +4065,7 @@ double Thakkar::get_max_alpha() {
 	return max_exp;
 };
 
-std::vector <double> Thakkar::get_min_alpha_vector() { 
+const std::vector <double> Thakkar::get_min_alpha_vector() { 
 	const int offset = (atomic_number - 1) * 19;
 	int nr_ex = first_ex();
 	std::vector<double> min_exp;
@@ -4103,7 +4102,7 @@ std::vector <double> Thakkar::get_min_alpha_vector() {
 	return min_exp;
 };
 
-double Thakkar::get_min_alpha() {
+const double Thakkar::get_min_alpha() {
 	const int offset = (atomic_number - 1) * 19;
 	int nr_ex = first_ex();
 	std::vector<double> min_exp;
@@ -4140,7 +4139,7 @@ double Thakkar::get_min_alpha() {
 	return std::min({ min_exp[0], min_exp[1], min_exp[2], min_exp[3] });
 };
 
-int Thakkar::previous_element_coef() {
+const int Thakkar::previous_element_coef() {
 	if (atomic_number == 2) return 0;
 	int counter = 0;
 	const int temp = atomic_number - 2;
@@ -4159,7 +4158,7 @@ int Thakkar::previous_element_coef() {
 	return Thakkar(atomic_number - 1).previous_element_coef() + counter;
 };
 
-double Thakkar::get_radial_density(double dist){
+const double Thakkar::get_radial_density(double dist){
 	//Speedup things for H
 	const int atom_number = atomic_number;
 	if (atom_number == 1)
@@ -4238,4 +4237,57 @@ double Thakkar::get_radial_density(double dist){
 		Rho += Thakkar_occ[offset + m] * pow(Orb[m], 2);
 	}
 	return Rho / (4 * PI);
+};
+
+double cosinus_integral(const int N, const double z, const double k);
+
+double sinus_integral(const int N, const double z, const double k) {
+	//Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr
+	if (N == 0)
+		return k / (z * z + k * k);
+	else
+		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
+};
+
+double cosinus_integral(const int N, const double z, const double k) {
+	//Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr
+	if (N == 0)
+		return z / (z * z + k * k);
+	else
+		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
+};
+
+const int number_of_terms(const int number) {
+	const int temp = 0.5 * (number + pow(number, 2));
+	return temp;
+};
+
+const double Thakkar::get_form_factor(const double k_vector, bool debug) {
+	double result(0.0);
+	double integral_sum(0.0);
+	using namespace std;
+
+	int ns = Thakkar_ns[atomic_number - 1];
+	
+	int nr_ex = first_ex();
+	if (nr_ex == 200000000)
+		return -20;
+	int nr_coef = previous_element_coef() + 1;
+
+	//double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+	const int offset = (atomic_number - 1) * 19;
+	double temp;
+	for (int i = 0; i < ns; i++) {
+		for (int j = i; j < ns; j++) {
+			if (Thakkar_occ[offset] != 0) {
+				temp = Thakkar_occ[offset] * Thakkar_c[nr_coef+i] * Thakkar_c[nr_coef+i+j] * sinus_integral(Thakkar_n[nr_ex+i] + Thakkar_n[nr_ex+j+j] - 2, Thakkar_z[nr_ex+i] + Thakkar_z[nr_ex+i+j], k_vector);
+				if (i != j)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+
+	return 4 * PI / k_vector * integral_sum;
 };
