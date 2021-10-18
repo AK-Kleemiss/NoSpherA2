@@ -1355,10 +1355,14 @@ bool thakkar_sfac(
 	file << "Remove duplicate reflections...";
 	file.flush();
 	for (int i = 0; i < hkl[0].size(); i++)
-		for (int j = i + 1; j < hkl[0].size(); j++)
+		for (int j = i + 1; j < hkl[0].size(); j++) {
 			if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
 				for (int x = 0; x < 3; x++)
 					hkl[x].erase(hkl[x].begin() + j);
+			if (hkl[0][i] == -hkl[0][j] && hkl[1][i] == -hkl[1][j] && hkl[2][i] == -hkl[2][j])
+				for (int x = 0; x < 3; x++)
+					hkl[x].erase(hkl[x].begin() + j);
+		}
 
 	file << "                   ...done!\nNr of reflections to be used: " << hkl[0].size() << endl;
 
@@ -1560,12 +1564,12 @@ bool thakkar_sfac(
 	for (int i = 0; i < atom_type_list.size(); i++) {
 		spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
-		Prototype_grids.push_back(AtomGrid(1E-20,
+		Prototype_grids.push_back(AtomGrid(1E-15,
 			lebedev_low,
 			lebedev_high,
 			atom_type_list[i],
 			spherical_atoms[i].get_max_alpha(),
-			spherical_atoms[i].get_max_l()+2,
+			spherical_atoms[i].get_max_l(),
 			spherical_atoms[i].get_min_alpha_vector().data(),
 			debug,
 			file,
@@ -1797,6 +1801,19 @@ bool thakkar_sfac(
 
 	Thakkar Helium(2);
 	file << "Density at distance 1: " << Helium.get_radial_density(1.0) << "Density at distance 0.5: " << Helium.get_radial_density(0.5) << endl;
+
+	for (int i = 1; i < 2000; i+=100)
+		file << "sfac at stl=" << i * 0.001 << ": " << Helium.get_form_factor(i * 0.0001, file, i==1901) << endl;
+	Thakkar Bor(5);
+	for (int i = 1; i < 2000; i += 100)
+		file << "sfac at stl=" << i * 0.001 << ": " << Bor.get_form_factor(i * 0.0001, file, i == 1901) << endl;
+
+	//Thakkar Uut(103);
+	//for (int i = 1; i < 2000; i += 100)
+	//	file << "sfac at stl=" << i * 0.001 << ": " << Uut.get_form_factor(i * 0.0001, file, i == 1901) << endl;
+	Thakkar H(1);
+	for (int i = 1; i < 2000; i += 100)
+		file << "sfac at stl=" << i * 0.001 << ": " << H.get_form_factor(i * 0.0001, file, i == 1901) << endl;
 
 	Thakkar Neon(10);
 	file << "Density at distance 1: " << Neon.get_radial_density(1.0) << "Density at distance 0.5: " << Neon.get_radial_density(0.5) << endl;
@@ -5675,10 +5692,6 @@ tsc_block calculate_structure_factors_MTC(
 	else printf("Time to calculate: %10.1lf h\n", time4 / 3600);
 
 #endif
-	if (debug)
-		file << endl << "SFs are made, now just write them!" << endl;
-	else
-		file << endl << "Writing tsc file..." << endl;
 
 	vector<string> labels;
 	for (int i = 0; i < wave.get_ncen(); i++)

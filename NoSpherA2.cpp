@@ -450,7 +450,7 @@ int main(int argc, char **argv){
 		if (debug_main)
 			log_file << "status: " << cif << "&" << hkl << "&" << xyz_file << endl;
 		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
-		error_check(xyz_file == "", __FILE__, __LINE__, "No xyz specified", log_file);
+		error_check(xyz_file != "", __FILE__, __LINE__, "No xyz specified", log_file);
 		error_check(exists(xyz_file), __FILE__, __LINE__, "xyz doesn't exist", log_file);
 		wavy.push_back(WFN(0));
 		wavy[0].read_known_wavefunction_format(xyz_file, log_file, debug_main);
