@@ -3,6 +3,7 @@
 #define __c_spherical_density__
 
 #include <vector>
+#include <iostream>
 
 class Thakkar {
 private:
@@ -16,7 +17,7 @@ public:
 	const double get_max_alpha();
 	const std::vector<double> get_min_alpha_vector();
 	const double get_min_alpha();
-	const double get_form_factor(const double k_vector, bool debug = false);
+	const double get_form_factor(const double k_vector, std::ofstream &file, bool debug = false);
 };
 
 
