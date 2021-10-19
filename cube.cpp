@@ -35,6 +35,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 	loaded=grow_values;
 	if(grow_values){
 		values.resize(x);
+#pragma omp parallel for
 		for(int i=0; i<x; i++){
 			values[i].resize(y);
 			for (int j = 0; j < y; j++) 
@@ -46,37 +47,19 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 };
 
 cube::cube(string filepath, bool read, WFN &wave, bool &return_value, bool expert){
-	if(!exists(filepath)){
-		cout << "Sorry, this file does not exist!" << endl;
-		Enter();
-		return_value=false;
-		return;
-	}
-	else path=filepath;
-	if(!read_file(read,true,wave)){
-		cout << "Sorry, something went wrong while reading!" << endl;
-		Enter();
-		return_value=false;
-		return;
-	}
+	error_check(exists(filepath), __FILE__, __LINE__, "Sorry, this file does not exist!", std::cout);
+	path=filepath;
+	error_check(read_file(read, true, wave), __FILE__, __LINE__, "Sorry, something went wrong while reading!", cout);
 	loaded=read;
 	na = wave.get_ncen();
 	return_value=true;
 };
 
 cube::cube(string filepath, bool read, bool expert){
-	if(!exists(filepath)){
-		cout << "Sorry, this file does not exist!" << endl;
-		Enter();
-		return;
-	}
-	else path=filepath;
-	if(!read_file(read,true)){
-		cout << "Sorry, something went wrong while reading!" << endl;
-		Enter();
-		return;
-	}
-	loaded=read;
+	error_check(exists(filepath), __FILE__, __LINE__, "Sorry, this file does not exist!", std::cout);
+	path = filepath;
+	error_check(read_file(read, true), __FILE__, __LINE__, "Sorry, something went wrong while reading!", cout);
+	loaded = read;
 };
 
 cube::cube(int g_na, const vector<int>& g_size,const vector< double >& g_origin, const vector< vector<double> >& g_vectors, const vector<vector<vector<double> > >& g_values){
@@ -92,6 +75,7 @@ cube::cube(int g_na, const vector<int>& g_size,const vector< double >& g_origin,
 			vectors[i].push_back(g_vectors[i][j]);
 	}
 	values.resize(size[0]);
+#pragma omp parallel for
 	for(int x=0; x<size[0]; x++){
 		values[x].resize(size[1]);
 		for(int y=0; y<size[1]; y++){
@@ -119,6 +103,7 @@ cube::cube(const cube &given){
 	loaded=given.get_loaded();
 	if(loaded){
 		values.resize(size[0]);
+#pragma omp parallel for
 		for(int x=0; x<size[0]; x++){
 			values[x].resize(size[1]);
 			for(int y=0; y<size[1]; y++){
@@ -590,6 +575,7 @@ void cube::operator=(cube &right){
 	for(int i=0; i<3; i++)
 		vectors[i].resize(3);
 	values.resize(size[0]);
+#pragma omp parallel for
 	for(int i=0; i<size[0]; i++){
 		values[i].resize(size[1]);
 		for(int j=0; j<size[1]; j++)
@@ -600,6 +586,7 @@ void cube::operator=(cube &right){
 			vectors[i][j]=right.get_vector(i,j);
 	}
 	if(right.get_loaded()){
+#pragma omp parallel for
 		for(int x=0; x<size[0]; x++){
 			for(int y=0; y<size[1]; y++)
 				for(int z=0; z<size[2]; z++)
@@ -620,6 +607,7 @@ cube cube::operator+(cube &right) const{
 		if(size[i]!=right.get_size(i))
 			return (cube());
 	if(right.get_loaded())
+#pragma omp parallel for
 		for(int x=0; x<size[0]; x++)
 			for(int y=0; y<size[1]; y++)
 				for(int z=0; z<size[2]; z++)
@@ -705,6 +693,7 @@ cube cube::operator-(cube &right) const{
 		if(size[i]!=right.get_size(i))
 			return (cube());
 	if(right.get_loaded())
+#pragma omp parallel for
 		for(int x=0; x<size[0]; x++)
 			for(int y=0; y<size[1]; y++)
 				for(int z=0; z<size[2]; z++)
@@ -757,6 +746,7 @@ cube cube::operator-(cube &right) const{
 							res_cube.set_value(run_x,run_y,reads2-reads1+i,res_cube.get_value(run_x,run_y,reads2-reads1+i)-tmp[i]);
 				}
 				else
+#pragma omp parallel for
 					for(int z=0; z<size[2]; z++)
 						res_cube.set_value(run_x,run_y,z,res_cube.get_value(run_x,run_y,z)-right.get_value(run_x,run_y,z));
 			}
@@ -842,6 +832,7 @@ cube cube::operator*(cube &right) const{
 							res_cube.set_value(run_x,run_y,reads2-reads1+i,res_cube.get_value(run_x,run_y,reads2-reads1+i)*tmp[i]);
 				}
 				else
+#pragma omp parallel for
 					for(int z=0; z<size[2]; z++)
 						res_cube.set_value(run_x,run_y,z,res_cube.get_value(run_x,run_y,z)*right.get_value(run_x,run_y,z));
 			}
@@ -927,6 +918,7 @@ cube cube::operator/(cube &right) const{
 							res_cube.set_value(run_x,run_y,reads2-reads1+i,res_cube.get_value(run_x,run_y,reads2-reads1+i)/tmp[i]);
 				}
 				else
+#pragma omp parallel for
 					for(int z=0; z<size[2]; z++)
 						res_cube.set_value(run_x,run_y,z,res_cube.get_value(run_x,run_y,z)/right.get_value(run_x,run_y,z));
 			}
@@ -951,6 +943,7 @@ cube cube::operator/(cube &right) const{
 
 bool cube::operator+=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
+#pragma omp parallel for
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++) 
@@ -960,6 +953,7 @@ bool cube::operator+=(cube &right){
 
 bool cube::operator-=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
+#pragma omp parallel for
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++) 
@@ -1179,6 +1173,7 @@ string cube::super_cube(WFN &wave){
 };
 
 void cube::set_zero() {
+#pragma omp parallel for
 	for (int i = 0; i < size[0]; i++)
 		for (int j = 0; j < size[1]; j++)
 			fill(values[i][j].begin(), values[i][j].end(), 0.0);
