@@ -498,6 +498,7 @@ bool cube::fractal_dimension(const double stepsize) {
 				if (values[i][j][k] < min) min = values[i][j][k];
 				if (values[i][j][k] > max) max = values[i][j][k];
 			}
+	const double map_min = min, map_max = max;
 	vector<double> e = double_sum();
 	min -= 2 * stepsize, max += 2 * stepsize;
 	const int steps = int((max - min) / stepsize) + 2;
@@ -550,8 +551,8 @@ bool cube::fractal_dimension(const double stepsize) {
 	string output(path + "_fractal_plot");
 	ofstream of(output.c_str(), ios::out);
 	of << setw(8) << scientific << setprecision(8) << steps 
-		<< setw(16) << scientific << setprecision(8) << min 
-		<< setw(16) << scientific << setprecision(8) << max 
+		<< setw(16) << scientific << setprecision(8) << map_min 
+		<< setw(16) << scientific << setprecision(8) << map_max 
 		<< setw(16) << scientific << setprecision(8) << e[0] * pow(0.529177249, 3)
 		<< setw(16) << scientific << setprecision(8) << e[1] * pow(0.529177249, 3) << "\n";
 	for (int i = 0; i < steps; i++)
@@ -968,24 +969,27 @@ bool cube::operator-=(cube &right){
 
 bool cube::operator*=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
+#pragma omp parallel for
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++) 
-				values[x][y][z]=values[x][y][z]*right.get_value(x,y,z);
+				values[x][y][z]*=right.get_value(x,y,z);
 	return (true);
 };
 
 bool cube::operator/=(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (false);
+#pragma omp parallel for
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++) 
-				values[x][y][z]=values[x][y][z]/right.get_value(x,y,z);
+				values[x][y][z]/=right.get_value(x,y,z);
 	return (true);
 };
 
 bool cube::mask (cube &right){
 	if(size[0]!=right.get_size(0) || size[1]!=right.get_size(1) ||size[2]!=right.get_size(2)) return (false);
+#pragma omp parallel for
 	for (int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
@@ -996,6 +1000,7 @@ bool cube::mask (cube &right){
 
 bool cube::mask (cube &right, double thresh){
 	if(size[0]!=right.get_size(0) || size[1]!=right.get_size(1) ||size[2]!=right.get_size(2)) return (false);
+#pragma omp parallel for
 	for (int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
@@ -1006,6 +1011,7 @@ bool cube::mask (cube &right, double thresh){
 
 bool cube::negative_mask (cube &right){
 	if(size[0]!=right.get_size(0) || size[1]!=right.get_size(1) ||size[2]!=right.get_size(2)) return (false);
+#pragma omp parallel for
 	for (int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
@@ -1017,6 +1023,7 @@ double cube::rrs(cube &right){
 	for(int i=0; i<3; i++) if(size[i]!=right.get_size(i)) return (-1);
 	double diff_pos=0.0;
 	double diff_neg=0.0;
+#pragma omp parallel for reduction(+:diff_pos,diff_neg)
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++){
@@ -1029,6 +1036,7 @@ double cube::rrs(cube &right){
 double cube::sum(){
 	for(int i=0; i<3; i++) if(size[i]==0) return (-1);
 	double s=0.0;
+#pragma omp parallel for reduction(+:s)
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
@@ -1043,6 +1051,7 @@ double cube::sum(){
 double cube::diff_sum(){
 	for(int i=0; i<3; i++) if(size[i]==0) return (-1);
 	double s=0.0;
+#pragma omp parallel for reduction(+:s)
 	for(int x=0; x<size[0]; x++)
 		for(int y=0; y<size[1]; y++)
 			for(int z=0; z<size[2]; z++)
@@ -1058,6 +1067,7 @@ vector<double> cube::double_sum() {
 	for (int i = 0; i < 3; i++) if (size[i] == 0) return (vector<double>(-1));
 	double s = 0.0;
 	double s2 = 0.0;
+#pragma omp parallel for reduction(+:s,s2)
 	for (int x = 0; x < size[0]; x++)
 		for (int y = 0; y < size[1]; y++)
 			for (int z = 0; z < size[2]; z++) {

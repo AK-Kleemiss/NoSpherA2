@@ -1341,7 +1341,7 @@ bool thakkar_sfac(
 		}
 	}
 	hkl_input.close();
-	file << "                   ...done!" << endl;
+	file << "done!" << endl;
 	int refl_size = hkl[0].size();
 	if (debug)
 		file << "Number of reflections before twin: " << hkl[0].size() << endl;
@@ -1721,7 +1721,7 @@ bool thakkar_sfac(
 			for (int h = 0; h < 3; h++)
 				hkl_unique[h].erase(hkl_unique[h].begin() + i);
 	}
-	file << " ... Done!";
+	file << "                               done!";
 	file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 
 	vector< vector < complex<double> > > sf;
@@ -1867,11 +1867,10 @@ bool calculate_structure_factors_HF(
 	gettimeofday(&t1, 0);
 #endif
 
-	file << "Reading: " << hkl_filename;
-	file.flush();
 	vector< vector <int> > hkl;
 	string line;
 	if (!read_k_pts) {
+		file << "Reading: " << setw(44) << hkl_filename << flush;
 		hkl.resize(3);
 		error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
 		ifstream hkl_input(hkl_filename.c_str(), ios::in);
@@ -1901,7 +1900,7 @@ bool calculate_structure_factors_HF(
 			}
 		}
 		hkl_input.close();
-		file << "                   ...done!" << endl;
+		file << " done!" << endl;
 		int refl_size = hkl[0].size();
 		if (debug)
 			file << "Number of reflections before twin: " << hkl[0].size() << endl;
@@ -1929,7 +1928,7 @@ bool calculate_structure_factors_HF(
 
 	if (debug)
 		file << "starting to read cif!" << endl;
-	file << "Reading: " << cif << flush;
+	file << "Reading: " << setw(44) << cif << flush;
 
 	cell unit_cell(cif, file, debug);
 
@@ -2067,7 +2066,7 @@ bool calculate_structure_factors_HF(
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-	file << "                   ...done!" << endl;
+	file << " done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
 		for (int i = 0; i < atom_type_list.size(); i++)
@@ -3629,11 +3628,13 @@ bool calculate_structure_factors_HF(
 		}
 	}
 	else {
+		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
 		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*) &nr, sizeof(nr));
-		file << "Reading k-points... expecting " << nr[0] << " k points... " << flush;
+		file << " expecting " << nr[0] << " k points... " << flush;
 		double temp[1];
 		int hkl_temp[1];
 		if (shrink) {
@@ -3659,7 +3660,7 @@ bool calculate_structure_factors_HF(
 				}
 		}
 		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
-		file << " ... done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
+		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}
 
@@ -3912,11 +3913,10 @@ tsc_block calculate_structure_factors_MTC(
 	gettimeofday(&t1, 0);
 #endif
 
-	file << "Reading: " << hkl_filename;
-	file.flush();
 	vector< vector <int> > hkl;
 	string line;
 	if (!read_k_pts) {
+		file << "Reading: " << setw(44) << hkl_filename << flush;
 		hkl.resize(3);
 		error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
 		ifstream hkl_input(hkl_filename.c_str(), ios::in);
@@ -3946,7 +3946,7 @@ tsc_block calculate_structure_factors_MTC(
 			}
 		}
 		hkl_input.close();
-		file << "                   ...done!" << endl;
+		file << " done!" << endl;
 		int refl_size = hkl[0].size();
 		if (debug)
 			file << "Number of reflections before twin: " << hkl[0].size() << endl;
@@ -3974,7 +3974,7 @@ tsc_block calculate_structure_factors_MTC(
 
 	if (debug)
 		file << "\nstarting to read cif!" << endl;
-	file << "Reading: " << cif << flush;
+	file << "Reading: " << setw(44) << cif << flush;
 
 	cell unit_cell(cif, file, debug);
 
@@ -4124,7 +4124,7 @@ tsc_block calculate_structure_factors_MTC(
 
 	for (int i = 0; i < atom_type_list.size(); i++)
 		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-	file << "                   ...done!" << endl;
+	file << " done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
 		for (int i = 0; i < atom_type_list.size(); i++)
@@ -5515,7 +5515,7 @@ tsc_block calculate_structure_factors_MTC(
 		}
 
 		file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
-		file << "Determining unique k-points... ";
+		file << "Determining unique k-points...";
 		file.flush();
 		vector <bool> mask;
 		mask.resize(k_pt[0].size());
@@ -5541,7 +5541,7 @@ tsc_block calculate_structure_factors_MTC(
 				for (int h = 0; h < 3; h++)
 					hkl_unique[h].erase(hkl_unique[h].begin() + i);
 		}
-		file << " ... Done!";
+		file << "                         done!";
 		file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 		if (save_k_pts) {
 			ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
@@ -5561,11 +5561,13 @@ tsc_block calculate_structure_factors_MTC(
 		}
 	}
 	else {
+		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
 		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*)&nr, sizeof(nr));
-		file << "Reading k-points... expecting " << nr[0] << " k points... " << flush;
+		file << " expecting " << nr[0] << " k points... " << flush;
 		double temp[1];
 		int hkl_temp[1];
 		k_pt_unique.resize(3);
@@ -5578,7 +5580,7 @@ tsc_block calculate_structure_factors_MTC(
 				hkl_unique[i].push_back(hkl_temp[0]);
 			}
 		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
-		file << " ... done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
+		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}
 
