@@ -66,7 +66,7 @@ int main(int argc, char **argv){
 	help_message.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
 	help_message.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
 	help_message.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
-	help_message.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0 2.wfn 0 3_1.wfn 0,1 3_2.wfn 0,2\n");
+	help_message.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
 	help_message.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
 	help_message.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
 	string NoSpherA2_message = "    _   __     _____       __              ___   ___\n";
@@ -384,8 +384,11 @@ int main(int argc, char **argv){
 			error_check(exists(combined_tsc_calc_cifs[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_cifs[i], log_file);
 
 		wavy.resize(combined_tsc_calc_files.size());
-		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+		for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
+			log_file << "Reading: " << setw(44) << combined_tsc_calc_files[i] << flush;
 			wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
+			log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+		}
 
 		vector<string> empty;
 		tsc_block result = calculate_structure_factors_MTC(
@@ -473,15 +476,7 @@ int main(int argc, char **argv){
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
 				log_file << argv[i] << endl;
-		log_file.flush();
-		if (argc < 4) {
-			cout << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>" << endl;
-			log_file << "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>" << endl;
-			log_file.flush();
-			log_file.close();
-			return -1;
-		}
-		log_file.flush();
+		error_check(argc >= 4, __FILE__, __LINE__, "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>", log_file);
 		if (debug_main) {
 			log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << groups.size();
 			if (groups.size() != 0) log_file << "&" << groups[0].size();
@@ -489,11 +484,10 @@ int main(int argc, char **argv){
 		}
 		error_check(wfn != "", __FILE__, __LINE__, "No wfn specified", log_file);
 		wavy.push_back(WFN(0));		
-		log_file << "Reading: " << wfn;
-		log_file.flush();
+		log_file << "Reading: " << setw(44) << wfn << flush;
 		wavy[0].read_known_wavefunction_format(wfn, log_file, debug_main);
 		wavy[0].set_method(method);
-		log_file << "                   ...done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+		log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 		if (electron_diffraction)
 			log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
