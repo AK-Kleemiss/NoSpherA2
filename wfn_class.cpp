@@ -376,8 +376,8 @@ void WFN::read_known_wavefunction_format(string fileName, bool debug) {
 };
 
 void WFN::read_known_wavefunction_format(string fileName, ofstream &file, bool debug) {
-	if (fileName.find(".wfn") != string::npos) origin = 2, error_check(read_wfn(fileName, debug), __FILE__, __LINE__, "Problem reading wfn", file);
-	else if (fileName.find(".ffn") != string::npos) origin = 4, error_check(read_wfn(fileName, debug), __FILE__, __LINE__, "Problem reading ffn", file);
+	if (fileName.find(".wfn") != string::npos) origin = 2, error_check(read_wfn(fileName, debug, file), __FILE__, __LINE__, "Problem reading wfn", file);
+	else if (fileName.find(".ffn") != string::npos) origin = 4, error_check(read_wfn(fileName, debug, file), __FILE__, __LINE__, "Problem reading ffn", file);
 	else if (fileName.find(".wfx") != string::npos) origin = 6, error_check(read_wfx(fileName, debug, file), __FILE__, __LINE__, "Problem reading wfx", file);
 	else if (fileName.find(".fch") != string::npos) {
 		origin = 4, error_check(read_fchk(fileName, file, debug), __FILE__, __LINE__, "Problem reading fchk", file);
@@ -405,6 +405,8 @@ bool WFN::read_wfn(string fileName, bool debug){
 		return false;
 	}
 	ifstream rf(fileName.c_str());
+	if (rf.good())
+		path = fileName;
 	string line;
 	rf.seekg(0);
 	getline(rf,line);
