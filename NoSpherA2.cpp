@@ -569,7 +569,7 @@ int main(int argc, char **argv){
 		wavy.push_back(WFN(0));
 		wavy[0].read_known_wavefunction_format(wfn,log2,debug_main);
 		if (debug_main)
-			log2 << "Starting calcualtion of properties" << endl;
+			log2 << "Starting calculation of properties" << endl;
 		if (all_mos)
 			for (int mo = 0; mo < wavy[0].get_nmo(); mo++)
 				MOs.push_back(mo);

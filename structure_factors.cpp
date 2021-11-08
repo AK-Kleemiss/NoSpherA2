@@ -1445,9 +1445,9 @@ bool thakkar_sfac(
 				vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
 				if (debug) file << " cart. position: " << position[0] << " " << position[1] << " " << position[2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
-					if (is_similar(position[0], wave.atoms[i].x, -2)
-						&& is_similar(position[1], wave.atoms[i].y, -2)
-						&& is_similar(position[2], wave.atoms[i].z, -2)) {
+					if (is_similar(position[0], wave.atoms[i].x, -1)
+						&& is_similar(position[1], wave.atoms[i].y, -1)
+						&& is_similar(position[2], wave.atoms[i].z, -1)) {
 						if (debug) {
 							file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 							file << " cart. position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl;
@@ -1564,7 +1564,7 @@ bool thakkar_sfac(
 	for (int i = 0; i < atom_type_list.size(); i++) {
 		spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
-		Prototype_grids.push_back(AtomGrid(1E-15,
+		Prototype_grids.push_back(AtomGrid(1E-2,
 			lebedev_low,
 			lebedev_high,
 			atom_type_list[i],
@@ -1799,24 +1799,28 @@ bool thakkar_sfac(
 
 	tsc_file.close();
 
+	file << "Hydrogen:" << endl;
+	Thakkar H(1);
+	for (int i = 1; i < 50000; i += 100)
+		file << "sfac at stl= " << i * 0.0001 << " : " << H.get_form_factor(i * 0.0001, file, i == 1) << endl;
+	file << "Helium:" << endl;
 	Thakkar Helium(2);
-	file << "Density at distance 1: " << Helium.get_radial_density(1.0) << "Density at distance 0.5: " << Helium.get_radial_density(0.5) << endl;
-
-	for (int i = 1; i < 2000; i+=100)
-		file << "sfac at stl=" << i * 0.001 << ": " << Helium.get_form_factor(i * 0.0001, file, i==1901) << endl;
-	Thakkar Bor(5);
-	for (int i = 1; i < 2000; i += 100)
-		file << "sfac at stl=" << i * 0.001 << ": " << Bor.get_form_factor(i * 0.0001, file, i == 1901) << endl;
+	for (int i = 1; i < 50000; i += 100)
+		file << "sfac at stl= " << i * 0.0001 << " : " << Helium.get_form_factor(i * 0.0001, file, i==1) << endl;
+	//file << "Density at distance 1: " << Helium.get_radial_density(1.0) << " Density at distance 0.5: " << Helium.get_radial_density(0.5) << endl;
+	//
+	//for (int i = 1; i < 20000; i+=100)
+	//	file << "sfac at stl=" << i * 0.0001 << ": " << Helium.get_form_factor(i * 0.0001, file, i==19001) << endl;
+	//Thakkar Bor(5);
+	//for (int i = 1; i < 20000; i += 100)
+	//	file << "sfac at stl=" << i * 0.0001 << ": " << Bor.get_form_factor(i * 0.0001, file, i == 19001) << endl;
 
 	//Thakkar Uut(103);
 	//for (int i = 1; i < 2000; i += 100)
 	//	file << "sfac at stl=" << i * 0.001 << ": " << Uut.get_form_factor(i * 0.0001, file, i == 1901) << endl;
-	Thakkar H(1);
-	for (int i = 1; i < 2000; i += 100)
-		file << "sfac at stl=" << i * 0.001 << ": " << H.get_form_factor(i * 0.0001, file, i == 1901) << endl;
 
-	Thakkar Neon(10);
-	file << "Density at distance 1: " << Neon.get_radial_density(1.0) << "Density at distance 0.5: " << Neon.get_radial_density(0.5) << endl;
+	//Thakkar Neon(10);
+	//file << "Density at distance 1: " << Neon.get_radial_density(1.0) << "Density at distance 0.5: " << Neon.get_radial_density(0.5) << endl;
 
 	return true;
 }
@@ -2006,9 +2010,9 @@ bool calculate_structure_factors_HF(
 				vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
 				if (debug) file << " cart. position: " << position[0] << " " << position[1] << " " << position[2] << endl;
 				for (int i = 0; i < wave.get_ncen(); i++) {
-					if (is_similar(position[0], wave.atoms[i].x, -2)
-						&& is_similar(position[1], wave.atoms[i].y, -2)
-						&& is_similar(position[2], wave.atoms[i].z, -2)) {
+					if (is_similar(position[0], wave.atoms[i].x, -1)
+						&& is_similar(position[1], wave.atoms[i].y, -1)
+						&& is_similar(position[2], wave.atoms[i].z, -1)) {
 						if (debug) {
 							file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
 							file << " cart. position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl;
