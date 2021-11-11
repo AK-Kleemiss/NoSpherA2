@@ -266,7 +266,7 @@ const int Thakkar_n[] = {
 
 };
 const double Thakkar_z[] = {
-	1.00,																				//H
+	1.173660279,																				//H
 	6.437494,3.384356,2.177906,1.455077,1.354958,										//He
 	
 	10.335672,5.553473,3.453336,2.416445,1.555772,0.889955,0.637402,0.626614,			//Li
@@ -608,7 +608,7 @@ const double Thakkar_c[]{
 	//Sorry, i gave up with labelling...
 	//believe me when i say it's the c values in the Thakkar Slater Basis with:
 	//S in one block, below P if present, D afterwards and F is present in the end
-	1.0,							//H
+	2.54298387126949,				//H
 	0.098380109,					//He
 	0.994709459,
 	1.158109106,
@@ -4157,9 +4157,8 @@ const int Thakkar::previous_element_coef() {
 
 const double Thakkar::get_radial_density(double dist){
 	//Speedup things for H
-	const int atom_number = atomic_number;
-	if (atom_number == 1)
-		return pow(exp(-dist) * 2, 2) / (4 * PI);
+	if (atomic_number == 1)
+		return pow(exp(-dist*1.24) * 2.76161112396369, 2) / (4 * PI);
 
 	double Rho = 0.0;
 	int nr_ex = first_ex();
@@ -4168,10 +4167,10 @@ const double Thakkar::get_radial_density(double dist){
 	int nr_coef = previous_element_coef() + 1;
 
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	const int offset = (atom_number - 1) * 19;
+	const int offset = (atomic_number - 1) * 19;
 
 	double exponent;
-	for (int ex = 0; ex < Thakkar_ns[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_ns[atomic_number - 1]; ex++) {
 		for (int m = 0; m < 7; m++) {
 			if (Thakkar_occ[offset + m] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
@@ -4185,7 +4184,7 @@ const double Thakkar::get_radial_density(double dist){
 		}
 		nr_ex++;
 	}
-	for (int ex = 0; ex < Thakkar_np[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_np[atomic_number - 1]; ex++) {
 		for (int m = 0; m < 6; m++) {
 			if (Thakkar_occ[offset + m + 7] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
@@ -4199,7 +4198,7 @@ const double Thakkar::get_radial_density(double dist){
 		}
 		nr_ex++;
 	}
-	for (int ex = 0; ex < Thakkar_nd[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_nd[atomic_number - 1]; ex++) {
 		for (int m = 0; m < 4; m++) {
 			if (Thakkar_occ[offset + m + 13] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
@@ -4213,7 +4212,7 @@ const double Thakkar::get_radial_density(double dist){
 		}
 		nr_ex++;
 	}
-	for (int ex = 0; ex < Thakkar_nf[atom_number - 1]; ex++) {
+	for (int ex = 0; ex < Thakkar_nf[atomic_number - 1]; ex++) {
 		for (int m = 0; m < 2; m++) {
 			if (Thakkar_occ[offset + m + 17] == 0) continue;
 			exponent = -Thakkar_z[nr_ex] * dist;
@@ -4254,14 +4253,10 @@ double cosinus_integral(const int N, const double z, const double k) {
 		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
-//const int number_of_terms(const int number) {
-//	const int temp = 0.5 * (number + pow(number, 2));
-//	return temp;
-//};
-
 const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file, bool debug) {
 	double result(0.0);
 	using namespace std;
+	const double local_k = cubic_ang2bohr(k_vector); // since the radial exponents are in a.u.
 
 	const int ns = Thakkar_ns[atomic_number - 1];
 	const int np = Thakkar_np[atomic_number - 1];
@@ -4272,7 +4267,7 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 	if (nr_ex == 200000000)
 		return -20;
 	int nr_coef = previous_element_coef() + 1;
-	if (atomic_number == 1) nr_coef = 0;
+	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
 	const int offset = (atomic_number - 1) * 19;
 	double temp;
 	int i_j_distance = 0;
@@ -4287,16 +4282,14 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 		for (int i = 0; i < ns; i++) {
 			if (debug) file << "i=" << i << "\n  c = " << Thakkar_c[nr_coef + m + i * i_j_distance] << " n = " << Thakkar_n[nr_ex + i] << " z = " << Thakkar_z[nr_ex + i] << endl;
 			for (int j = 0; j < ns-i; j++) {
-				if (debug) file << "    j=" << j << "\n      c = " << Thakkar_c[nr_coef + m + (i + j) * i_j_distance] << " n = " << Thakkar_n[nr_ex + i + j] << " z = " << Thakkar_z[nr_ex + i + j] 
-					<< " occ*ci*cj=" << Thakkar_occ[offset + m]*Thakkar_c[nr_coef + m + i * i_j_distance]*Thakkar_c[nr_coef + m + (i + j) * i_j_distance] 
-					<< " ni+nj-1=" << Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1
-					<< " zi+zj=" << Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j] 
-					<< " temp = " << Thakkar_occ[offset + m] * Thakkar_c[nr_coef + m + i * i_j_distance] * Thakkar_c[nr_coef + m + (i + j) * i_j_distance] * sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], k_vector)/k_vector << endl;
-				temp = Thakkar_occ[offset + m] * Thakkar_c[nr_coef + m + i * i_j_distance] * Thakkar_c[nr_coef + m + (i + j) * i_j_distance] * sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, (Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j]), k_vector);
-				if (i != j)
+				temp = Thakkar_occ[offset + m] 
+					* Thakkar_c[nr_coef + m + i * i_j_distance] * Thakkar_c[nr_coef + m + (i + j) * i_j_distance]
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, (Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j]), local_k);
+				if (j != 0)
 					result += 2 * temp;
 				else
 					result += temp;
+				if (debug) file << " result=" << result / (k_vector * 2* PI) << endl;
 			}
 		}
 	}
@@ -4316,8 +4309,10 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 			if (debug) file << "i=" << i << "\n  c = " << Thakkar_c[nr_coef + m-7 + i * i_j_distance] << " n = " << Thakkar_n[nr_ex + i] << " z = " << Thakkar_z[nr_ex + i] << endl;
 			for (int j = 0; j < np - i; j++) {
 				if (debug) file << "    j=" << j << "\n      c = " << Thakkar_c[nr_coef + m-7 + (i + j) * i_j_distance] << " n = " << Thakkar_n[nr_ex + i + j] << " z = " << Thakkar_z[nr_ex + i + j] << endl;
-				temp = Thakkar_occ[offset + m] * Thakkar_c[nr_coef + m-7 + i*i_j_distance] * Thakkar_c[nr_coef + m-7 + (i + j) * i_j_distance] * sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], k_vector);
-				if (i != j)
+				temp = Thakkar_occ[offset + m] 
+					* Thakkar_c[nr_coef + m-7 + i*i_j_distance] * Thakkar_c[nr_coef + m-7 + (i + j) * i_j_distance] 
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
 					result += 2 * temp;
 				else
 					result += temp;
@@ -4340,8 +4335,10 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 			if (debug) file << "i=" << i << "\n  c = " << Thakkar_c[nr_coef + m - 13 + i * i_j_distance] << " n = " << Thakkar_n[nr_ex + i] << " z = " << Thakkar_z[nr_ex + i] << endl;
 			for (int j = 0; j < nd - i; j++) {
 				if (debug) file << "    j=" << j << "\n      c = " << Thakkar_c[nr_coef + m - 13 + (i + j) * i_j_distance] << " n = " << Thakkar_n[nr_ex + i + j] << " z = " << Thakkar_z[nr_ex + i + j] << endl;
-				temp = Thakkar_occ[offset + m] * Thakkar_c[nr_coef + m - 13 + i * i_j_distance] * Thakkar_c[nr_coef + m - 13 + (i + j) * i_j_distance] * sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], k_vector);
-				if (i != j)
+				temp = Thakkar_occ[offset + m] 
+					* Thakkar_c[nr_coef + m - 13 + i * i_j_distance] * Thakkar_c[nr_coef + m - 13 + (i + j) * i_j_distance] 
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
 					result += 2 * temp;
 				else
 					result += temp;
@@ -4364,8 +4361,10 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 			if (debug) file << "i=" << i << "\n  c = " << Thakkar_c[nr_coef + m - 17 + i * i_j_distance] << " n = " << Thakkar_n[nr_ex + i] << " z = " << Thakkar_z[nr_ex + i] << endl;
 			for (int j = 0; j < nf - i; j++) {
 				if (debug) file << "    j=" << j << "\n      c = " << Thakkar_c[nr_coef + m - 17 + (i + j) * i_j_distance] << " n = " << Thakkar_n[nr_ex + i + j] << " z = " << Thakkar_z[nr_ex + i + j] << endl;
-				temp = Thakkar_occ[offset + m] * Thakkar_c[nr_coef + m - 17 + i * i_j_distance] * Thakkar_c[nr_coef + m - 17 + (i + j) * i_j_distance] * sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], k_vector);
-				if (i != j)
+				temp = Thakkar_occ[offset + m] 
+					* Thakkar_c[nr_coef + m - 17 + i * i_j_distance] * Thakkar_c[nr_coef + m - 17 + (i + j) * i_j_distance] 
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
 					result += 2 * temp;
 				else
 					result += temp;
@@ -4373,5 +4372,5 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 		}
 	}
 
-	return result/k_vector;
+	return result/ local_k;
 };

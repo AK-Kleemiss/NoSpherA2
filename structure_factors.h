@@ -29,7 +29,22 @@ bool thakkar_sfac(
 	std::vector < std::vector <double> >& twin_law,
 	WFN &wave,
 	int cpus = -1,
-	bool electron_diffraction = false);
+	bool electron_diffraction = false,
+	bool save_k_pts = false,
+	bool read_k_pts = false);
+
+tsc_block MTC_thakkar_sfac(
+	std::string& hkl_filename,
+	std::string& cif,
+	bool debug,
+	std::ofstream& file,
+	std::vector <int>& input_groups,
+	std::vector < std::vector <double> >& twin_law,
+	WFN& wave,
+	int cpus = -1,
+	bool electron_diffraction = false,
+	bool save_k_pts = false,
+	bool read_k_pts = false);
 
 bool calculate_structure_factors_HF(
 	std::string &hkl_filename, 

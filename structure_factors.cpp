@@ -1304,7 +1304,9 @@ bool thakkar_sfac(
 	vector < vector <double> >& twin_law,
 	WFN & wave,
 	int cpus,
-	bool electron_diffraction
+	bool electron_diffraction,
+	bool save_k_pts,
+	bool read_k_pts
 ) {
 	error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
 	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
@@ -1313,59 +1315,60 @@ bool thakkar_sfac(
 
 	vector< vector <int> > hkl;
 	string line;
-	hkl.resize(3);
-	ifstream hkl_input(hkl_filename.c_str(), ios::in);
-	hkl_input.seekg(0, hkl_input.beg);
-	regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
-	while (!hkl_input.eof()) {
-		getline(hkl_input, line);
-		if (hkl_input.eof())
-			break;
-		if (line.size() < 2)
-			continue;
-		cmatch result;
-		if (regex_search(line.c_str(), result, r))
-			continue;
-		//if (debug) file << "hkl: ";
-		for (int i = 0; i < 3; i++) {
-			string temp = line.substr(4 * size_t(i) + 1, 3);
-			temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
-			hkl[i].push_back(stoi(temp));
-			//if (debug) file << setw(4) << temp;
+	if (!read_k_pts) {
+		hkl.resize(3);
+		ifstream hkl_input(hkl_filename.c_str(), ios::in);
+		hkl_input.seekg(0, hkl_input.beg);
+		regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
+		while (!hkl_input.eof()) {
+			getline(hkl_input, line);
+			if (hkl_input.eof())
+				break;
+			if (line.size() < 2)
+				continue;
+			cmatch result;
+			if (regex_search(line.c_str(), result, r))
+				continue;
+			//if (debug) file << "hkl: ";
+			for (int i = 0; i < 3; i++) {
+				string temp = line.substr(4 * size_t(i) + 1, 3);
+				temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
+				hkl[i].push_back(stoi(temp));
+				//if (debug) file << setw(4) << temp;
+			}
+			//if (debug) file << endl;
+			if (hkl[0][hkl[0].size() - 1] == 0 && hkl[1][hkl[0].size() - 1] == 0 && hkl[2][hkl[0].size() - 1] == 0) {
+				if (debug) file << "popping back 0 0 0" << endl;
+				for (int i = 0; i < 3; i++)
+					hkl[i].pop_back();
+			}
 		}
-		//if (debug) file << endl;
-		if (hkl[0][hkl[0].size() - 1] == 0 && hkl[1][hkl[0].size() - 1] == 0 && hkl[2][hkl[0].size() - 1] == 0) {
-			if (debug) file << "popping back 0 0 0" << endl;
-			for (int i = 0; i < 3; i++)
-				hkl[i].pop_back();
-		}
+		hkl_input.close();
+		file << "done!" << endl;
+		int refl_size = hkl[0].size();
+		if (debug)
+			file << "Number of reflections before twin: " << hkl[0].size() << endl;
+		for (int len = 0; len < refl_size; len++)
+			for (int i = 0; i < twin_law.size(); i++)
+				for (int h = 0; h < 3; h++)
+					hkl[h].push_back(int(twin_law[i][0 + 3 * h] * hkl[0][len] + twin_law[i][1 + 3 * h] * hkl[1][len] + twin_law[i][2 + 3 * h] * hkl[2][len]));
+		if (debug)
+			file << "Number of reflections after twin: " << hkl[0].size() << endl;
+
+		file << "Remove duplicate reflections...";
+		file.flush();
+		for (int i = 0; i < hkl[0].size(); i++)
+			for (int j = i + 1; j < hkl[0].size(); j++) {
+				if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
+					for (int x = 0; x < 3; x++)
+						hkl[x].erase(hkl[x].begin() + j);
+				if (hkl[0][i] == -hkl[0][j] && hkl[1][i] == -hkl[1][j] && hkl[2][i] == -hkl[2][j])
+					for (int x = 0; x < 3; x++)
+						hkl[x].erase(hkl[x].begin() + j);
+			}
+
+		file << "                   ...done!\nNr of reflections to be used: " << hkl[0].size() << endl;
 	}
-	hkl_input.close();
-	file << "done!" << endl;
-	int refl_size = hkl[0].size();
-	if (debug)
-		file << "Number of reflections before twin: " << hkl[0].size() << endl;
-	for (int len = 0; len < refl_size; len++)
-		for (int i = 0; i < twin_law.size(); i++)
-			for (int h = 0; h < 3; h++)
-				hkl[h].push_back(int(twin_law[i][0 + 3 * h] * hkl[0][len] + twin_law[i][1 + 3 * h] * hkl[1][len] + twin_law[i][2 + 3 * h] * hkl[2][len]));
-	if (debug)
-		file << "Number of reflections after twin: " << hkl[0].size() << endl;
-
-	file << "Remove duplicate reflections...";
-	file.flush();
-	for (int i = 0; i < hkl[0].size(); i++)
-		for (int j = i + 1; j < hkl[0].size(); j++) {
-			if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
-				for (int x = 0; x < 3; x++)
-					hkl[x].erase(hkl[x].begin() + j);
-			if (hkl[0][i] == -hkl[0][j] && hkl[1][i] == -hkl[1][j] && hkl[2][i] == -hkl[2][j])
-				for (int x = 0; x < 3; x++)
-					hkl[x].erase(hkl[x].begin() + j);
-		}
-
-	file << "                   ...done!\nNr of reflections to be used: " << hkl[0].size() << endl;
-
 	if (debug)
 		file << "starting to read cif!" << endl;
 
@@ -1544,7 +1547,12 @@ bool thakkar_sfac(
 	if (debug)
 		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl 
 		<< "made it post CIF, now make grids!" << endl;
+	
+	vector <Thakkar> spherical_atoms;
+	for (int i = 0; i < atom_type_list.size(); i++)
+		spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
+	/*
 	vector <AtomGrid> Prototype_grids;
 	vector <Thakkar> spherical_atoms;
 	int lebedev_high=50, lebedev_low=50;
@@ -1662,74 +1670,127 @@ bool thakkar_sfac(
 				charge += dens[j][i];
 			file << charge << endl;
 		}
-	}
-
-	vector < vector <double> > k_pt;
-	k_pt.resize(3);
-#pragma omp parallel for
-	for (int i = 0; i < 3; i++)
-		k_pt[i].resize(sym[0][0].size() * hkl[0].size());
-
-	if (debug)
-		file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+	}*/
 
 	vector < vector<double> > k_pt_unique;
 	vector < vector<int> > hkl_unique;
-	k_pt_unique.resize(3);
-	hkl_unique.resize(3);
-	for (int s = 0; s < sym[0][0].size(); s++)
-		for (int ref = 0; ref < hkl[0].size(); ref++)
-			for (int h = 0; h < 3; h++)
-				hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
-
-	for (int s = 0; s < sym[0][0].size(); s++) {
+	vector < vector <double> > k_pt;
+	if (!read_k_pts) {
+		k_pt.resize(3);
 #pragma omp parallel for
-		for (int ref = 0; ref < hkl[0].size(); ref++)
-			for (int x = 0; x < 3; x++)
-				for (int h = 0; h < 3; h++) {
-					double rcm_sym = 0.0;
-					for (int j = 0; j < 3; j++)
-						rcm_sym += unit_cell.get_rcm(x, j) * sym[j][h][s];
-					k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
-				}
-	}
+		for (int i = 0; i < 3; i++)
+			k_pt[i].resize(sym[0][0].size() * hkl[0].size());
 
-	file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
-	file << "Determining unique k-points... ";
-	file.flush();
-	vector <bool> mask;
-	mask.resize(k_pt[0].size());
-	mask.assign(k_pt[0].size(), true);
-	for (int i = 0; i < k_pt[0].size(); i++)
+		if (debug)
+			file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+
+
+		k_pt_unique.resize(3);
+		hkl_unique.resize(3);
+		for (int s = 0; s < sym[0][0].size(); s++)
+			for (int ref = 0; ref < hkl[0].size(); ref++)
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
+
+
+		for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
-		for (int j = i + 1; j < k_pt[0].size(); j++) {
-			if (!mask[j])
-				continue;
-			if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
-				mask[j] = false;
-			else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
-				mask[j] = false;
-			}
+			for (int ref = 0; ref < hkl[0].size(); ref++)
+				for (int x = 0; x < 3; x++)
+					for (int h = 0; h < 3; h++) {
+						double rcm_sym = 0.0;
+						for (int j = 0; j < 3; j++)
+							rcm_sym += unit_cell.get_rcm(x, j) * sym[j][h][s];
+						k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
+					}
 		}
-	if (debug)  file << "Mask done!" << endl;
-	for (int i = k_pt[0].size() - 1; i >= 0; i--) {
-		//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
-		if (mask[i])
-			for (int h = 0; h < 3; h++)
-				k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
-		else
-			for (int h = 0; h < 3; h++)
-				hkl_unique[h].erase(hkl_unique[h].begin() + i);
-	}
-	file << "                               done!";
-	file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << points << " gridpoints." << endl;
 
-	vector< vector < complex<double> > > sf;
+		file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
+		file << "Determining unique k-points...";
+		file.flush();
+		vector <bool> mask;
+		mask.resize(k_pt[0].size());
+		mask.assign(k_pt[0].size(), true);
+		for (int i = 0; i < k_pt[0].size(); i++)
+#pragma omp parallel for
+			for (int j = i + 1; j < k_pt[0].size(); j++) {
+				if (!mask[j])
+					continue;
+				if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
+					mask[j] = false;
+				else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
+					mask[j] = false;
+				}
+			}
+		if (debug)  file << "Mask done!" << endl;
+		for (int i = k_pt[0].size() - 1; i >= 0; i--) {
+			//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
+			if (mask[i])
+				for (int h = 0; h < 3; h++)
+					k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
+			else
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].erase(hkl_unique[h].begin() + i);
+		}
+		file << "                         done!";
+		file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << endl;
+		if (save_k_pts) {
+			ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
+			int nr[1] = { k_pt_unique[0].size() };
+			file << "Writing k-points to kpoints.dat!" << endl;
+			k_points_file.write((char*)&nr, sizeof(nr));
+			double temp[1];
+			int hkl_temp[1];
+			for (int run = 0; run < nr[0]; run++)
+				for (int i = 0; i < 3; i++) {
+					temp[0] = k_pt_unique[i][run];
+					k_points_file.write((char*)&temp, sizeof(temp));
+					hkl_temp[0] = hkl_unique[i][run];
+					k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
+				}
+			k_points_file.close();
+		}
+	}
+	else {
+		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		file << "Reading: kpts.dat" << flush;
+		ifstream k_points_file("kpts.dat", ios::binary);
+		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		int nr[1];
+		k_points_file.read((char*)&nr, sizeof(nr));
+		file << " expecting " << nr[0] << " k points... " << flush;
+		double temp[1];
+		int hkl_temp[1];
+		k_pt_unique.resize(3);
+		hkl_unique.resize(3);
+		for (int run = 0; run < nr[0]; run++)
+			for (int i = 0; i < 3; i++) {
+				k_points_file.read((char*)&temp, sizeof(temp));
+				k_pt_unique[i].push_back(temp[0]);
+				k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
+				hkl_unique[i].push_back(hkl_temp[0]);
+			}
+		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
+		k_points_file.close();
+	}
+
+	const int smax = k_pt_unique[0].size();
+	const int imax = asym_atom_list.size();
+	const int amax = atom_type_list.size();
+	vector< vector < double> > sf;
 	sf.resize(asym_atom_list.size());
 #pragma omp parallel for
 	for (int i = 0; i < asym_atom_list.size(); i++)
 		sf[i].resize(hkl_unique[0].size());
 
+#pragma omp parallel for
+	for (int s = 0; s < smax; s++) {
+		double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug);
+		for (int i = 0; i < imax; i++)
+			sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k,file,false);
+	}
+	/*
 	if (debug)
 		file << "Initialized FFs" << endl
 		<< "asym atom list size: " << asym_atom_list.size() << " total grid size: " << points << endl;
@@ -1763,6 +1824,7 @@ bool thakkar_sfac(
 			progress->write(i / double(imax));
 	}
 	delete(progress);
+	*/
 
 	if (electron_diffraction) {
 		const double fact = 0.023934;
@@ -1771,7 +1833,7 @@ bool thakkar_sfac(
 		for (int s = 0; s < smax; s++) {
 			h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug), 2);
 			for (int i = 0; i < imax; i++)
-				sf[i][s] = complex<double>(fact * (atom_type_list[i] - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
+				sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
 		}
 	}
 
@@ -1792,37 +1854,433 @@ bool thakkar_sfac(
 		for (int h = 0; h < 3; h++)
 			tsc_file << hkl_unique[h][r] << " ";
 		for (int i = 0; i < asym_atom_list.size(); i++)
-			tsc_file << scientific << setprecision(8) << real(sf[asym_atom_to_type_list[i]][r]) << ","
-			<< scientific << setprecision(8) << imag(sf[asym_atom_to_type_list[i]][r]) << " ";
+			tsc_file << scientific << setprecision(8) << sf[i][r] << ","
+			<< scientific << setprecision(8) << 0.0 << " ";
 		tsc_file << endl;
 	}
 
 	tsc_file.close();
 
-	file << "Hydrogen:" << endl;
-	Thakkar H(1);
-	for (int i = 1; i < 50000; i += 100)
-		file << "sfac at stl= " << i * 0.0001 << " : " << H.get_form_factor(i * 0.0001, file, i == 1) << endl;
-	file << "Helium:" << endl;
-	Thakkar Helium(2);
-	for (int i = 1; i < 50000; i += 100)
-		file << "sfac at stl= " << i * 0.0001 << " : " << Helium.get_form_factor(i * 0.0001, file, i==1) << endl;
-	//file << "Density at distance 1: " << Helium.get_radial_density(1.0) << " Density at distance 0.5: " << Helium.get_radial_density(0.5) << endl;
-	//
-	//for (int i = 1; i < 20000; i+=100)
-	//	file << "sfac at stl=" << i * 0.0001 << ": " << Helium.get_form_factor(i * 0.0001, file, i==19001) << endl;
+	//file << "Hydrogen:" << endl;
+	//Thakkar H(1);
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << H.get_form_factor(i * 0.0001, file, i == 1) << endl;
+	//file << "Helium:" << endl;
+	//Thakkar Helium(2);
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << Helium.get_form_factor(i * 0.0001, file, i==1) << endl;
+	//file << "Lithium" << endl;
+	//Thakkar Li(3);
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << Li.get_form_factor(i * 0.0001, file, i == 1) << endl;
+	//file << "Boron:" << endl;
 	//Thakkar Bor(5);
-	//for (int i = 1; i < 20000; i += 100)
-	//	file << "sfac at stl=" << i * 0.0001 << ": " << Bor.get_form_factor(i * 0.0001, file, i == 19001) << endl;
-
-	//Thakkar Uut(103);
-	//for (int i = 1; i < 2000; i += 100)
-	//	file << "sfac at stl=" << i * 0.001 << ": " << Uut.get_form_factor(i * 0.0001, file, i == 1901) << endl;
-
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << Bor.get_form_factor(i * 0.0001, file, false) << endl;
+	//file << "Neon:" << endl;
 	//Thakkar Neon(10);
-	//file << "Density at distance 1: " << Neon.get_radial_density(1.0) << "Density at distance 0.5: " << Neon.get_radial_density(0.5) << endl;
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << Neon.get_form_factor(i * 0.0001, file, false) << endl;
+	//file << "Lead:" << endl;
+	//Thakkar Pb(82);
+	//for (int i = 1; i < 12000; i += 100)
+	//	file << "sfac at stl= " << i * 0.0001 << " : " << Pb.get_form_factor(i * 0.0001, file, false) << endl;
 
 	return true;
+}
+
+tsc_block MTC_thakkar_sfac(
+	string& hkl_filename,
+	string& cif,
+	bool debug,
+	ofstream& file,
+	vector <int>& input_groups,
+	vector < vector <double> >& twin_law,
+	WFN& wave,
+	int cpus,
+	bool electron_diffraction,
+	bool save_k_pts,
+	bool read_k_pts
+) {
+	error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
+	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	file << "Reading: " << hkl_filename;
+	file.flush();
+
+	vector< vector <int> > hkl;
+	string line;
+	if (!read_k_pts) {
+		hkl.resize(3);
+		ifstream hkl_input(hkl_filename.c_str(), ios::in);
+		hkl_input.seekg(0, hkl_input.beg);
+		regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
+		while (!hkl_input.eof()) {
+			getline(hkl_input, line);
+			if (hkl_input.eof())
+				break;
+			if (line.size() < 2)
+				continue;
+			cmatch result;
+			if (regex_search(line.c_str(), result, r))
+				continue;
+			for (int i = 0; i < 3; i++) {
+				string temp = line.substr(4 * size_t(i) + 1, 3);
+				temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
+				hkl[i].push_back(stoi(temp));
+			}
+			if (hkl[0][hkl[0].size() - 1] == 0 && hkl[1][hkl[0].size() - 1] == 0 && hkl[2][hkl[0].size() - 1] == 0) {
+				if (debug) file << "popping back 0 0 0" << endl;
+				for (int i = 0; i < 3; i++)
+					hkl[i].pop_back();
+			}
+		}
+		hkl_input.close();
+		file << "done!" << endl;
+		int refl_size = hkl[0].size();
+		if (debug)
+			file << "Number of reflections before twin: " << hkl[0].size() << endl;
+		for (int len = 0; len < refl_size; len++)
+			for (int i = 0; i < twin_law.size(); i++)
+				for (int h = 0; h < 3; h++)
+					hkl[h].push_back(int(twin_law[i][0 + 3 * h] * hkl[0][len] + twin_law[i][1 + 3 * h] * hkl[1][len] + twin_law[i][2 + 3 * h] * hkl[2][len]));
+		if (debug)
+			file << "Number of reflections after twin: " << hkl[0].size() << endl;
+
+		file << "Remove duplicate reflections...";
+		file.flush();
+		for (int i = 0; i < hkl[0].size(); i++)
+			for (int j = i + 1; j < hkl[0].size(); j++) {
+				if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
+					for (int x = 0; x < 3; x++)
+						hkl[x].erase(hkl[x].begin() + j);
+				if (hkl[0][i] == -hkl[0][j] && hkl[1][i] == -hkl[1][j] && hkl[2][i] == -hkl[2][j])
+					for (int x = 0; x < 3; x++)
+						hkl[x].erase(hkl[x].begin() + j);
+			}
+
+		file << "                   ...done!\nNr of reflections to be used: " << hkl[0].size() << endl;
+	}
+	if (debug)
+		file << "starting to read cif!" << endl;
+
+	cell unit_cell(cif, file, debug);
+
+	if (debug) {
+		file << "RCM done, now labels and asym atoms!" << endl;
+		for (int i = 0; i < 3; ++i) {
+			for (int j = 0; j < 3; ++j)
+				file << setw(10) << fixed << unit_cell.get_rcm(i, j) / 2 / PI / 0.529177249 << ' ';
+			file << endl;
+		}
+		file << "CM in 2*PI bohr:" << endl;
+		for (int i = 0; i < 3; ++i) {
+			for (int j = 0; j < 3; ++j)
+				file << setw(10) << fixed << unit_cell.get_cm(i, j) << ' ';
+			file << endl;
+		}
+	}
+
+	ifstream cif_input(cif.c_str(), std::ios::in);
+	cif_input.clear();
+	cif_input.seekg(0, cif_input.beg);
+	vector <int> atom_type_list;
+	vector <int> asym_atom_to_type_list;
+	int count_fields = 0;
+	int group_field = 0;
+	int position_field[3] = { 0,0,0 };
+	int label_field = 1000;
+	vector <int> asym_atom_list;
+	vector < bool > is_asym;
+	is_asym.resize(wave.get_ncen());
+#pragma omp parallel for
+	for (int i = 0; i < wave.get_ncen(); i++)
+		is_asym[i] = false;
+	bool atoms_read = false;
+	if (debug && input_groups.size() > 0)
+		file << "Group size: " << input_groups.size() << endl;
+	while (!cif_input.eof() && !atoms_read) {
+		getline(cif_input, line);
+		if (debug) file << "line: " << line << endl;
+		if (line.find("loop_") != string::npos) {
+			getline(cif_input, line);
+			if (debug) file << "line in loop field definition: " << trim(line) << endl;
+			while (trim(line).find("_") == 0) {
+				if (debug) file << "line in loop field definition: " << trim(line) << endl;
+				if (line.find("label") != string::npos)
+					label_field = count_fields;
+				else if (line.find("disorder_group") != string::npos)
+					group_field = count_fields;
+				else if (line.find("fract_x") != string::npos)
+					position_field[0] = count_fields;
+				else if (line.find("fract_y") != string::npos)
+					position_field[1] = count_fields;
+				else if (line.find("fract_z") != string::npos)
+					position_field[2] = count_fields;
+				else if (label_field == 1000) {
+					if (debug) file << "I don't think this is the atom block.. moving on!" << endl;
+					break;
+				}
+				getline(cif_input, line);
+				count_fields++;
+			}
+			while (trim(line).find("_") > 0 && line.length() > 3) {
+				atoms_read = true;
+				stringstream s(line);
+				vector <string> fields;
+				fields.resize(count_fields);
+				int nr = -1;
+				for (int i = 0; i < count_fields; i++)
+					s >> fields[i];
+				fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
+				if (debug) file << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << flush;
+				vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
+				if (debug) file << " cart. position: " << position[0] << " " << position[1] << " " << position[2] << endl;
+				for (int i = 0; i < wave.get_ncen(); i++) {
+					if (is_similar(position[0], wave.atoms[i].x, -1)
+						&& is_similar(position[1], wave.atoms[i].y, -1)
+						&& is_similar(position[2], wave.atoms[i].z, -1)) {
+						if (debug) {
+							file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
+							file << " cart. position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl;
+							if (input_groups.size() > 0) {
+								file << "checking disorder group: " << fields[group_field] << " vs. ";
+								for (int g = 0; g < input_groups.size(); g++)
+									file << input_groups[g] << ",";
+								file << endl;
+							}
+						}
+						wave.atoms[i].label = fields[label_field];
+						if (input_groups.size() > 0) {
+							bool yep = false;
+							for (int g = 0; g < input_groups.size(); g++) {
+								if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0) {
+									if (debug) file << "appears to be group 0" << endl;
+									yep = true;
+									break;
+								}
+								else if (stoi(fields[group_field]) == input_groups[g])
+									yep = true;
+							}
+							if (!yep) {
+								if (debug) file << "Wrong part!" << endl;
+								continue;
+							}
+						}
+						asym_atom_list.push_back(i);
+						is_asym[i] = true;
+						nr = i;
+						break;
+					}
+				}
+				if (debug) file << "nr= " << nr << endl;
+				if (nr != -1) {
+					if (debug) file << "Checking for new atom type" << endl;
+					bool already_there = false;
+					for (int i = 0; i < atom_type_list.size(); i++)
+						if (atom_type_list[i] == wave.atoms[nr].charge) {
+							already_there = true;
+							asym_atom_to_type_list.push_back(i);
+							break;
+						}
+					if (already_there == false) {
+						asym_atom_to_type_list.push_back(atom_type_list.size());
+						atom_type_list.push_back(wave.atoms[nr].charge);
+					}
+				}
+				getline(cif_input, line);
+			}
+		}
+	}
+
+	error_check(asym_atom_list.size() <= wave.get_ncen(), __FILE__, __LINE__, "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+	error_check(asym_atom_list.size() != 0, __FILE__, __LINE__, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+
+	for (int i = 0; i < atom_type_list.size(); i++)
+		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+	file << "                   ...done!" << endl;
+	if (debug) {
+		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
+		for (int i = 0; i < atom_type_list.size(); i++)
+			file << setw(4) << atom_type_list[i];
+		file << endl << "asym_atoms_to_type_list: " << endl;
+		for (int i = 0; i < asym_atom_to_type_list.size(); i++)
+			file << setw(4) << asym_atom_to_type_list[i];
+		file << endl;
+		file << "Mapping of asym atoms:" << endl;
+		for (int i = 0; i < wave.get_ncen(); i++)
+			file << setw(4) << wave.atoms[i].charge;
+		file << endl;
+	}
+
+	vector < vector < vector <int> > > sym;
+	sym.resize(3);
+	sym = unit_cell.get_sym();
+
+	if (debug) {
+		file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+		for (int i = 0; i < sym[0][0].size(); i++) {
+			for (int x = 0; x < 3; x++) {
+				for (int y = 0; y < 3; y++)
+					file << setw(3) << sym[y][x][i];
+				file << endl;
+			}
+			file << endl;
+		}
+	}
+	else
+		file << "Number of symmetry operations: " << sym[0][0].size() << endl;
+
+	cif_input.close();
+
+	if (debug)
+		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl
+		<< "made it post CIF, now make grids!" << endl;
+
+	vector <Thakkar> spherical_atoms;
+	for (int i = 0; i < atom_type_list.size(); i++)
+		spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+
+	vector < vector<double> > k_pt_unique;
+	vector < vector<int> > hkl_unique;
+	vector < vector <double> > k_pt;
+	if (!read_k_pts) {
+		k_pt.resize(3);
+#pragma omp parallel for
+		for (int i = 0; i < 3; i++)
+			k_pt[i].resize(sym[0][0].size() * hkl[0].size());
+
+		if (debug)
+			file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+
+
+		k_pt_unique.resize(3);
+		hkl_unique.resize(3);
+		for (int s = 0; s < sym[0][0].size(); s++)
+			for (int ref = 0; ref < hkl[0].size(); ref++)
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
+
+
+		for (int s = 0; s < sym[0][0].size(); s++) {
+#pragma omp parallel for
+			for (int ref = 0; ref < hkl[0].size(); ref++)
+				for (int x = 0; x < 3; x++)
+					for (int h = 0; h < 3; h++) {
+						double rcm_sym = 0.0;
+						for (int j = 0; j < 3; j++)
+							rcm_sym += unit_cell.get_rcm(x, j) * sym[j][h][s];
+						k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
+					}
+		}
+
+		file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
+		file << "Determining unique k-points...";
+		file.flush();
+		vector <bool> mask;
+		mask.resize(k_pt[0].size());
+		mask.assign(k_pt[0].size(), true);
+		for (int i = 0; i < k_pt[0].size(); i++)
+#pragma omp parallel for
+			for (int j = i + 1; j < k_pt[0].size(); j++) {
+				if (!mask[j])
+					continue;
+				if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
+					mask[j] = false;
+				else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
+					mask[j] = false;
+				}
+			}
+		if (debug)  file << "Mask done!" << endl;
+		for (int i = k_pt[0].size() - 1; i >= 0; i--) {
+			//if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
+			if (mask[i])
+				for (int h = 0; h < 3; h++)
+					k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
+			else
+				for (int h = 0; h < 3; h++)
+					hkl_unique[h].erase(hkl_unique[h].begin() + i);
+		}
+		file << "                         done!";
+		file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << endl;
+		if (save_k_pts) {
+			ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
+			int nr[1] = { k_pt_unique[0].size() };
+			file << "Writing k-points to kpoints.dat!" << endl;
+			k_points_file.write((char*)&nr, sizeof(nr));
+			double temp[1];
+			int hkl_temp[1];
+			for (int run = 0; run < nr[0]; run++)
+				for (int i = 0; i < 3; i++) {
+					temp[0] = k_pt_unique[i][run];
+					k_points_file.write((char*)&temp, sizeof(temp));
+					hkl_temp[0] = hkl_unique[i][run];
+					k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
+				}
+			k_points_file.close();
+		}
+	}
+	else {
+		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		file << "Reading: kpts.dat" << flush;
+		ifstream k_points_file("kpts.dat", ios::binary);
+		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		int nr[1];
+		k_points_file.read((char*)&nr, sizeof(nr));
+		file << " expecting " << nr[0] << " k points... " << flush;
+		double temp[1];
+		int hkl_temp[1];
+		k_pt_unique.resize(3);
+		hkl_unique.resize(3);
+		for (int run = 0; run < nr[0]; run++)
+			for (int i = 0; i < 3; i++) {
+				k_points_file.read((char*)&temp, sizeof(temp));
+				k_pt_unique[i].push_back(temp[0]);
+				k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
+				hkl_unique[i].push_back(hkl_temp[0]);
+			}
+		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
+		k_points_file.close();
+	}
+
+	const int smax = k_pt_unique[0].size();
+	const int imax = asym_atom_list.size();
+	const int amax = atom_type_list.size();
+	vector< vector < complex<double> > > sf;
+	sf.resize(asym_atom_list.size());
+#pragma omp parallel for
+	for (int i = 0; i < asym_atom_list.size(); i++)
+		sf[i].resize(hkl_unique[0].size());
+
+#pragma omp parallel for
+	for (int s = 0; s < smax; s++) {
+		double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug);
+		for (int i = 0; i < imax; i++)
+			sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
+	}
+
+	if (electron_diffraction) {
+		const double fact = 0.023934;
+		double h2;
+#pragma omp parallel for private(h2)
+		for (int s = 0; s < smax; s++) {
+			h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug), 2);
+			for (int i = 0; i < imax; i++)
+				sf[i][s] = fact * (atom_type_list[i] - sf[i][s].real()) / h2;
+		}
+	}
+
+	vector<string> labels;
+	for (int i = 0; i < wave.get_ncen(); i++)
+		if (is_asym[i]) labels.push_back(wave.atoms[i].label);
+
+	tsc_block blocky(
+		sf,
+		labels,
+		hkl_unique
+	);
+
+	return blocky;
 }
 
 bool calculate_structure_factors_HF(

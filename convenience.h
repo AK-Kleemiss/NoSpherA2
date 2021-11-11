@@ -46,6 +46,10 @@ constexpr double ang2bohr(double inp) {
 	return inp / 0.529177249;
 }
 
+constexpr double cubic_ang2bohr(double inp) {
+	return inp / (0.529177249* 0.529177249* 0.529177249);
+}
+
 //------------------general functions for easy use of terminal input--------------------
 inline const double bragg_angstrom[114]{
 0.00, 
