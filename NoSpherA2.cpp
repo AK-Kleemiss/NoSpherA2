@@ -326,23 +326,38 @@ int main(int argc, char **argv){
 			wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
 
 		vector<string> empty;
-		tsc_block result = calculate_structure_factors_MTC(
-			hkl,
-			cif,
-			wavy[0],
-			debug_main,
-			accuracy,
-			log_file,
-			groups[0],
-			twin_law,
-			empty,
-			threads,
-			electron_diffraction,
-			true,
-			false
-		);
+		tsc_block result;
+		if (wavy[0].get_origin() != 7)
+			result = calculate_structure_factors_MTC(
+				hkl,
+				cif,
+				wavy[0],
+				debug_main,
+				accuracy,
+				log_file,
+				groups[0],
+				twin_law,
+				empty,
+				threads,
+				electron_diffraction,
+				true,
+				false
+			);
+		else
+			result = MTC_thakkar_sfac(
+				hkl,
+				cif,
+				debug_main,
+				log_file,
+				groups[0],
+				twin_law,
+				wavy[0],
+				threads,
+				electron_diffraction,
+				true, false
+			);
 
-		if(debug_main) 
+		if (debug_main)
 			for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
 				log_file << combined_tsc_calc_files[i] << " ";
 				for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
@@ -350,21 +365,35 @@ int main(int argc, char **argv){
 			}
 
 		for (int i = 1; i < combined_tsc_calc_files.size(); i++)
-			result.append(calculate_structure_factors_MTC(
-				hkl,
-				cif,
-				wavy[i],
-				debug_main,
-				accuracy,
-				log_file,
-				groups[i],
-				twin_law,
-				result.get_sctaerrers(),
-				threads,
-				electron_diffraction,
-				false,
-				true
-			), log_file);
+			if (wavy[i].get_origin() != 7)
+				result.append(calculate_structure_factors_MTC(
+					hkl,
+					cif,
+					wavy[i],
+					debug_main,
+					accuracy,
+					log_file,
+					groups[i],
+					twin_law,
+					result.get_sctaerrers(),
+					threads,
+					electron_diffraction,
+					false,
+					true
+				), log_file);
+			else
+				result.append(MTC_thakkar_sfac(
+					hkl,
+					cif,
+					debug_main,
+					log_file,
+					groups[i],
+					twin_law,
+					wavy[i],
+					threads,
+					electron_diffraction,
+					true, false
+				), log_file);
 
 		result.write_tsc_file(cif);
 		return 0;
@@ -391,7 +420,9 @@ int main(int argc, char **argv){
 		}
 
 		vector<string> empty;
-		tsc_block result = calculate_structure_factors_MTC(
+		tsc_block result;
+		if (wavy[0].get_origin() != 7)
+			result = calculate_structure_factors_MTC(
 			hkl,
 			combined_tsc_calc_cifs[0],
 			wavy[0],
@@ -406,6 +437,19 @@ int main(int argc, char **argv){
 			true,
 			false
 		);
+		else
+			result = MTC_thakkar_sfac(
+				hkl,
+				combined_tsc_calc_cifs[0],
+				debug_main,
+				log_file,
+				groups[0],
+				twin_law,
+				wavy[0],
+				threads,
+				electron_diffraction,
+				true,false
+			);
 
 		if (debug_main)
 			for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
@@ -415,21 +459,35 @@ int main(int argc, char **argv){
 			}
 
 		for (int i = 1; i < combined_tsc_calc_files.size(); i++)
-			result.append(calculate_structure_factors_MTC(
-				hkl,
-				combined_tsc_calc_cifs[i],
-				wavy[i],
-				debug_main,
-				accuracy,
-				log_file,
-				groups[i],
-				twin_law,
-				result.get_sctaerrers(),
-				threads,
-				electron_diffraction,
-				false,
-				true
-			), log_file);
+			if (wavy[i].get_origin() != 7)
+				result.append(calculate_structure_factors_MTC(
+					hkl,
+					combined_tsc_calc_cifs[i],
+					wavy[i],
+					debug_main,
+					accuracy,
+					log_file,
+					groups[i],
+					twin_law,
+					result.get_sctaerrers(),
+					threads,
+					electron_diffraction,
+					false,
+					true
+				), log_file);
+			else
+				result.append(MTC_thakkar_sfac(
+					hkl,
+					combined_tsc_calc_cifs[i],
+					debug_main,
+					log_file,
+					groups[i],
+					twin_law,
+					wavy[i],
+					threads,
+					electron_diffraction,
+					true, false
+				), log_file);
 
 		result.write_tsc_file(cif);
 		return 0;
@@ -521,19 +579,33 @@ int main(int argc, char **argv){
 			error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist!", log_file);
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			error_check(calculate_structure_factors_HF(
-					hkl, 
-					cif, 
-					wavy[0], 
-					debug_main, 
-					accuracy, 
-					log_file, 
-					groups[0], 
-					twin_law, 
-					threads, 
-					electron_diffraction, 
-					pbc, 
+			if (wavy[0].get_origin() != 7)
+				error_check(calculate_structure_factors_HF(
+					hkl,
+					cif,
+					wavy[0],
+					debug_main,
+					accuracy,
+					log_file,
+					groups[0],
+					twin_law,
+					threads,
+					electron_diffraction,
+					pbc,
 					Olex2_1_3_switch,
+					save_k_pts,
+					read_k_pts), __FILE__, __LINE__, "Error during SF Calcualtion", log_file);
+			else
+				error_check(thakkar_sfac(
+					hkl,
+					cif,
+					debug_main,
+					log_file,
+					groups[0],
+					twin_law,
+					wavy[0],
+					threads,
+					electron_diffraction,
 					save_k_pts,
 					read_k_pts), __FILE__, __LINE__, "Error during SF Calcualtion", log_file);
 		}
