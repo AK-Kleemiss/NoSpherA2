@@ -1,2 +1,0 @@
-#include "../properties.cpp"
-
