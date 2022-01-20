@@ -1,27 +1,3 @@
-#include <iostream>
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <string.h>
-#include <fstream>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#include <sys/wait.h>
-#include <termios.h>
-#endif
-#include <limits>
-#include <sstream>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <iomanip>
-#include <vector>
-#include <omp.h>
-#include <limits>
-#include <cstddef>
-#include <thread>
 
 #include "convenience.h"
 #include "fchk.h"
@@ -36,48 +12,7 @@ bool debug_main = false;
 bool debug_all = false;
 bool expert = false;
 
-
-
 int main(int argc, char **argv){
-	string help_message = "\n----------------------------------------------------------------------------\n";
-	help_message.append("          These commands and arguments are known by NoSpherA2:\n");
-	help_message.append("----------------------------------------------------------------------------\n\n");
-	help_message.append("   -wfn            <FILENAME>.wfn/wfx     Read the following file. (might even read fchk, not finally tested)\n");
-	help_message.append("   -fchk           <FILENAME>.fchk        Write a wavefunction to the given filename\n");
-	help_message.append("   -b              <FILENAME>             Read this basis set\n");
-	help_message.append("   -d              <PATH>                 Path to basis_sets directory with basis_sets in tonto style\n");
-	help_message.append("   --help/-help/--h                       print this help\n");
-	help_message.append("   -v                                     Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
-	help_message.append("   -v2                                    Even more stuff\n");
-	help_message.append("   -mult           <NUMBER>               Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
-	help_message.append("   -method         <METHOD NAME>          Can be RKS or RHF to distinguish between DFT and HF\n");
-	help_message.append("   -cif            <FILENAME>.cif         CIF to get labels of atoms to use for calculation of scatteriung factors\n");
-	help_message.append("   -IAM                                   Make scattering factors based on Thakkar functions for atoms in CIF\n");
-	help_message.append("   -xyz            <FILENAME>.xyz         Read atom positions from this xyz file for IAM\n");
-	help_message.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
-	help_message.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
-	help_message.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
-	help_message.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
-	help_message.append("   -merge          <List of .tsc files>   Names/Paths to .tsc files to be merged.\n");
-	help_message.append("   -merge_nocheck  <List of .tsc files>   Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
-	help_message.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
-	help_message.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
-	help_message.append("                                            without spaces.\n   Typical use Examples:\n");
-	help_message.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
-	help_message.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
-	help_message.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
-	help_message.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
-	help_message.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
-	help_message.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
-	string NoSpherA2_message = "    _   __     _____       __              ___   ___\n";
-	NoSpherA2_message.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
-	NoSpherA2_message.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
-	NoSpherA2_message.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
-	NoSpherA2_message.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
-	NoSpherA2_message.append("                /_/\n");
-	NoSpherA2_message.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
-	NoSpherA2_message.append("Please give credit and cite corresponding pieces!\n");
-	NoSpherA2_message.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
 	if(debug_main) 
 		cout << "argc:"<< argc << endl;
 	vector<WFN> wavy;
@@ -281,15 +216,15 @@ int main(int argc, char **argv){
 	}
 	if (argc > 1) {
 		if (string(argv[1]).find("--help") != string::npos) {
-			cout << NoSpherA2_message << help_message << endl;
+			cout << NoSpherA2_message() << help_message() << endl;
 			return 0;
 		}
 		if (string(argv[1]).find("--h") != string::npos) {
-			cout << NoSpherA2_message << help_message << endl;
+			cout << NoSpherA2_message() << help_message() << endl;
 			return 0;
 		}
 		if (string(argv[1]).find("-help") != string::npos) {
-			cout << NoSpherA2_message << help_message << endl;
+			cout << NoSpherA2_message() << help_message() << endl;
 			return 0;
 		}
 	}
@@ -309,7 +244,7 @@ int main(int argc, char **argv){
 	}
 	if (combined_tsc_calc) {
 		ofstream log_file("NoSpherA2.log", ios::out);
-		log_file << NoSpherA2_message;
+		log_file << NoSpherA2_message();
 		log_file.flush();
 		error_check(hkl != "", __FILE__, __LINE__, "No hkl specified", log_file);
 		error_check(exists(hkl), __FILE__, __LINE__, "hkl doesn't exist", log_file);
@@ -488,8 +423,9 @@ int main(int argc, char **argv){
 					electron_diffraction,
 					true, false
 				), log_file);
-
+		log_file << "Writing tsc file... " << flush;
 		result.write_tsc_file(cif);
+		log_file << " ... done!" << endl;
 		return 0;
 	}
 	if (iam_switch) {

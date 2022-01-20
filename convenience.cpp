@@ -1,9 +1,3 @@
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <string.h>
-#include <sstream>
-#include <iostream>
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
@@ -13,11 +7,6 @@
 #define GetCurrentDir getcwd
 #include <sys/wait.h>
 #endif
-#include <fcntl.h>
-#include <math.h>
-#include <vector>
-#include <stdio.h>
-#include <iomanip>
 #ifdef __cplusplus__
  #include  <cstdlib>
 #else
@@ -51,6 +40,55 @@ void Enter(){
 	//cin.ignore();
 	//cin.get();
 };
+
+string help_message()
+{
+	std::string t = "\n----------------------------------------------------------------------------\n";
+	t.append("          These commands and arguments are known by NoSpherA2:\n");
+	t.append("----------------------------------------------------------------------------\n\n");
+	t.append("   -wfn            <FILENAME>.wfn/wfx     Read the following file. (might even read fchk, not finally tested)\n");
+	t.append("   -fchk           <FILENAME>.fchk        Write a wavefunction to the given filename\n");
+	t.append("   -b              <FILENAME>             Read this basis set\n");
+	t.append("   -d              <PATH>                 Path to basis_sets directory with basis_sets in tonto style\n");
+	t.append("   --help/-help/--h                       print this help\n");
+	t.append("   -v                                     Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
+	t.append("   -v2                                    Even more stuff\n");
+	t.append("   -mult           <NUMBER>               Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
+	t.append("   -method         <METHOD NAME>          Can be RKS or RHF to distinguish between DFT and HF\n");
+	t.append("   -cif            <FILENAME>.cif         CIF to get labels of atoms to use for calculation of scatteriung factors\n");
+	t.append("   -IAM                                   Make scattering factors based on Thakkar functions for atoms in CIF\n");
+	t.append("   -xyz            <FILENAME>.xyz         Read atom positions from this xyz file for IAM\n");
+	t.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
+	t.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
+	t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
+	t.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
+	t.append("   -merge          <List of .tsc files>   Names/Paths to .tsc files to be merged.\n");
+	t.append("   -merge_nocheck  <List of .tsc files>   Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
+	t.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
+	t.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
+	t.append("                                            without spaces.\n   Typical use Examples:\n");
+	t.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
+	t.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
+	t.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
+	t.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
+	t.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
+	t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
+	return t;
+}
+string NoSpherA2_message() {
+	string t = "    _   __     _____       __              ___   ___\n";
+	t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
+	t.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
+	t.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
+	t.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
+	t.append("                /_/\n");
+	t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
+	t.append("Please give credit and cite corresponding pieces!\n");
+	t.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
+	return t;
+}
+
+
 
 bool is_similar_rel(double first, double second, double tolerance) {
 	double diff = abs(first - second);

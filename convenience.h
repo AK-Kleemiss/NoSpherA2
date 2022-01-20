@@ -6,16 +6,25 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <sys/stat.h>
 #include <vector>
 #include <fstream>
 #include <algorithm>
-#include <cctype>
 #include <complex>
+#include <iomanip>
+#include <omp.h>
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#include <sys/wait.h>
+#include <termios.h>
+#endif
 
 class WFN;
 class cell;
 
+std::string help_message();
+std::string NoSpherA2_message();
 //Constants for later use
 inline const int hardness = 3;
 inline const double cutoff = 1.0e-20;
@@ -47,7 +56,7 @@ constexpr double ang2bohr(double inp) {
 }
 
 constexpr double cubic_ang2bohr(double inp) {
-	return inp / (0.529177249* 0.529177249* 0.529177249);
+	return inp / (0.529177249 * 0.529177249 * 0.529177249);
 }
 
 //------------------general functions for easy use of terminal input--------------------
@@ -148,6 +157,12 @@ template<class T> T fromString(const std::string& s)
      T t;
      stream >> t;
      return t;
+}
+
+template<typename T> void shrink_vector(std::vector<T>& g)
+{
+	g.clear();
+	std::vector<T>(g).swap(g);
 }
 
 template <class T> std::vector<T> split_string(const std::string& input, const std::string delimiter) {

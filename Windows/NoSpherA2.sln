@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29306.81
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32112.339
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NoSpherA2", "wfn2fchk.vcxproj", "{2AB57786-36D2-4490-82E3-032F9A65CF10}"
 EndProject
@@ -281,8 +281,6 @@ Global
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|ARM64.Build.0 = Release|ARM64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|ARM64.Deploy.0 = Release|ARM64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x64.ActiveCfg = Release|x64
-		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x64.Build.0 = Release|x64
-		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x64.Deploy.0 = Release|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.ActiveCfg = Release|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.Build.0 = Release|x86
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x86.Deploy.0 = Release|x86

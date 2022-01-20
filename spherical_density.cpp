@@ -1,11 +1,6 @@
 #include "spherical_density.h"
 #include "convenience.h"
 
-#include <math.h>
-#include <cmath>
-#include <vector>
-#include <stdio.h>
-
 const int Thakkar_nex[103] = { 1,                                                                                            5,
  8,  8,                                                                                                 15, 15, 15, 15, 15, 15,
 17, 17,                                                                                                 20, 20, 20, 20, 20, 20,
