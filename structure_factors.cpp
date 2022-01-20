@@ -1163,11 +1163,11 @@ tsc_block MTC_thakkar_sfac(
 		}
 	}
 
-	error_check(asym_atom_list.size() <= wave.get_ncen(), __FILE__, __LINE__, "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
-	error_check(asym_atom_list.size() != 0, __FILE__, __LINE__, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
-		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+		err_checkf(atom_type_list[i] <= 113 && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
 	file << "                   ...done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -1291,10 +1291,10 @@ tsc_block MTC_thakkar_sfac(
 		}
 	}
 	else {
-		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
 		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
-		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*)&nr, sizeof(nr));
 		file << " expecting " << nr[0] << " k points... " << flush;
@@ -1309,7 +1309,7 @@ tsc_block MTC_thakkar_sfac(
 				k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
 				hkl_unique[i].push_back(hkl_temp[0]);
 			}
-		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
 		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}
@@ -1377,10 +1377,10 @@ bool calculate_structure_factors_HF(
 		exit(false);
 	}
 #endif
-	error_check(wave.get_ncen() != 0, __FILE__, __LINE__, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
-	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
+	err_checkf(exists(cif), "CIF does not exists!", file);
 	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
-	//error_check(exists(asym_cif), __FILE__, __LINE__, "Asym/Wfn CIF does not exists!", file);
+	//err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
@@ -1406,7 +1406,7 @@ bool calculate_structure_factors_HF(
 	if (!read_k_pts) {
 		file << "Reading: " << setw(44) << hkl_filename << flush;
 		hkl.resize(3);
-		error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
+		err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
 		ifstream hkl_input(hkl_filename.c_str(), ios::in);
 		hkl_input.seekg(0, hkl_input.beg);
 		regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
@@ -1596,10 +1596,10 @@ bool calculate_structure_factors_HF(
 		}
 	}
 
-	error_check(asym_atom_list.size() <= wave.get_ncen(), __FILE__, __LINE__, "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
-		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+		err_checkf(atom_type_list[i] <= 113 && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
 	file << " done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -1640,7 +1640,7 @@ bool calculate_structure_factors_HF(
 	if (debug)
 		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
-	error_check(asym_atom_list.size() != 0, __FILE__, __LINE__, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	if (debug)
 		file << "made it post CIF, now make grids!" << endl;
@@ -2462,7 +2462,7 @@ bool calculate_structure_factors_HF(
 				}
 	}
 	for (int i = 0; i < asym_atom_list.size(); i++)
-		error_check(num_points[i] == spherical_density[i].size(), __FILE__, __LINE__, "mismatch in number of spherical density points! i=" + toString(i), file);
+		err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 #endif
 
 	file << "                    done!" << endl;
@@ -3162,10 +3162,10 @@ bool calculate_structure_factors_HF(
 		}
 	}
 	else {
-		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
 		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
-		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*) &nr, sizeof(nr));
 		file << " expecting " << nr[0] << " k points... " << flush;
@@ -3193,7 +3193,7 @@ bool calculate_structure_factors_HF(
 					hkl[i].push_back(hkl_temp[0]);
 				}
 		}
-		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
 		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}
@@ -3423,10 +3423,10 @@ tsc_block calculate_structure_factors_MTC(
 #ifdef FLO_CUDA
 
 #endif
-	error_check(wave.get_ncen() != 0, __FILE__, __LINE__, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
-	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
+	err_checkf(exists(cif), "CIF does not exists!", file);
 	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
-	//error_check(exists(asym_cif), __FILE__, __LINE__, "Asym/Wfn CIF does not exists!", file);
+	//err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
 		omp_set_dynamic(0);
@@ -3453,7 +3453,7 @@ tsc_block calculate_structure_factors_MTC(
 	if (!read_k_pts) {
 		file << "Reading: " << setw(44) << hkl_filename << flush;
 		hkl.resize(3);
-		error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
+		err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
 		ifstream hkl_input(hkl_filename.c_str(), ios::in);
 		hkl_input.seekg(0, hkl_input.beg);
 		regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
@@ -3667,10 +3667,10 @@ tsc_block calculate_structure_factors_MTC(
 		}
 	}
 
-	error_check(asym_atom_list.size() <= wave.get_ncen(), __FILE__, __LINE__, "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
-		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+		err_checkf(atom_type_list[i] <= 113 && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
 	file << " done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -3711,7 +3711,7 @@ tsc_block calculate_structure_factors_MTC(
 	if (debug)
 		file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
-	error_check(asym_atom_list.size() != 0, __FILE__, __LINE__, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	if (debug)
 		file << "made it post CIF, now make grids!" << endl;
@@ -4461,7 +4461,7 @@ tsc_block calculate_structure_factors_MTC(
 		for (int j = 0; j < atom_type_list.size(); j++)
 			if (wave.atoms[i].charge == atom_type_list[j])
 				type_list_number = j;
-		error_check(type_list_number != -1, __FILE__, __LINE__, "Atom type not found! Check CIF and atom types in wavefunction file!", file);
+		err_checkf(type_list_number != -1, "Atom type not found! Check CIF and atom types in wavefunction file!", file);
 		for (int g = 0; g < asym_atom_list.size(); g++) {
 			if (i == 0) spherical_density[g].resize(num_points[g]);
 #pragma omp parallel for
@@ -4482,7 +4482,7 @@ tsc_block calculate_structure_factors_MTC(
 		}
 	}
 	for (int i = 0; i < asym_atom_list.size(); i++)
-		error_check(num_points[i] == spherical_density[i].size(), __FILE__, __LINE__, "mismatch in number of spherical density points! i=" + toString(i), file);
+		err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 #endif
 
 	file << "                    done!" << endl;
@@ -5109,10 +5109,10 @@ tsc_block calculate_structure_factors_MTC(
 		}
 	}
 	else {
-		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
 		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
-		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*)&nr, sizeof(nr));
 		file << " expecting " << nr[0] << " k points... " << flush;
@@ -5127,7 +5127,7 @@ tsc_block calculate_structure_factors_MTC(
 				k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
 				hkl_unique[i].push_back(hkl_temp[0]);
 			}
-		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		err_checkf(!k_points_file.bad(), "Error reading k - points file!", file);
 		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}

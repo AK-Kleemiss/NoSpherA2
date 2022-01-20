@@ -39,18 +39,18 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 };
 
 cube::cube(string filepath, bool read, WFN &wave, bool &return_value, bool expert){
-	error_check(exists(filepath), __FILE__, __LINE__, "Sorry, this file does not exist!", std::cout);
+	err_checkc(exists(filepath), "Sorry, this file does not exist!");
 	path=filepath;
-	error_check(read_file(read, true, wave), __FILE__, __LINE__, "Sorry, something went wrong while reading!", cout);
+	err_checkc(read_file(read, true, wave), "Sorry, something went wrong while reading!");
 	loaded=read;
 	na = wave.get_ncen();
 	return_value=true;
 };
 
 cube::cube(string filepath, bool read, bool expert){
-	error_check(exists(filepath), __FILE__, __LINE__, "Sorry, this file does not exist!", std::cout);
+	err_checkc(exists(filepath), "Sorry, this file does not exist!");
 	path = filepath;
-	error_check(read_file(read, true), __FILE__, __LINE__, "Sorry, something went wrong while reading!", cout);
+	err_checkc(read_file(read, true), "Sorry, something went wrong while reading!");
 	loaded = read;
 };
 
