@@ -1039,20 +1039,22 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 		vector <vector <double> > changed_coefs;
 		changed_coefs.resize(wave.get_nmo());
 		ofstream norm_cprim;
-		if(debug) norm_cprim.open("norm_prim.debug", ofstream::out);
-		for(int m=0; m< wave.get_nmo(); m++){
-			if(debug) norm_cprim << m << ". MO:" << endl;
+		for(int m=0; m< wave.get_nmo(); m++)
 			for(int p=0; p<wave.get_MO_primitive_count(m);p++){
-				if(debug) cout << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
 				changed_coefs[m].push_back(wave.get_MO_coef(m,p, debug)/norm_const[p]);
-				if(debug){
-					cout << " temp after normalization: " << changed_coefs[m][p] << endl;
-					norm_cprim << " " << changed_coefs[m][p] << endl;
-				}
 				run++;
 			}
-		}
+
 		if(debug) {
+			norm_cprim.open("norm_prim.debug", ofstream::out);
+			for (int m = 0; m < wave.get_nmo(); m++) {
+				norm_cprim << m << ". MO:" << endl;
+				for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
+					cout << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl 
+						<< " temp after normalization: " << changed_coefs[m][p] << endl;
+					norm_cprim << " " << changed_coefs[m][p] << endl;
+				}
+			}
 			norm_cprim.flush();
 			norm_cprim.close();
 			cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
@@ -1590,7 +1592,8 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 		Enter();
 	}
 	if (wave.get_origin() == 2 || wave.get_origin() == 4) {
-		double pi = 3.14159265358979;
+		//-----------------------check ordering and order accordingly----------------------
+		wave.sort_wfn(wave.check_order(debug), debug);
 		//---------------normalize basis set---------------------------------
 		if (debug) file << "starting to normalize the basis set" << endl;
 		vector<double> norm_const;
@@ -1607,8 +1610,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 			file << "Primitive count of first MO: " << wave.get_MO_primitive_count(1) << endl;
 			Enter();
 		}
-		//-----------------------check ordering and order accordingly----------------------
-		wave.sort_wfn(wave.check_order(debug), debug);
+		
 		//-------------------normalize the basis set shell wise into a copy vector---------
 		vector <vector <double> > basis_coefficients;
 		basis_coefficients.resize(wave.get_ncen());
@@ -1620,28 +1622,28 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 				double temp = wave.get_atom_basis_set_exponent(a, p);
 				switch (wave.get_atom_primitive_type(a, p)) {
 				case 1:
-					temp = 2 * temp / pi;
+					temp = 2 * temp / PI;
 					temp = pow(temp, 0.75);
 					temp = temp * wave.get_atom_basis_set_coefficient(a, p);
 					basis_coefficients[a].push_back(temp);
 					break;
 				case 2:
 					temp = 128 * pow(temp, 5);
-					temp = temp / pow(pi, 3);
+					temp = temp / pow(PI, 3);
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					basis_coefficients[a].push_back(temp);
 					break;
 				case 3:
 					temp = 2048 * pow(temp, 7);
-					temp = temp / (9 * pow(pi, 3));
+					temp = temp / (9 * pow(PI, 3));
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					basis_coefficients[a].push_back(temp);
 					break;
 				case 4:
 					temp = 32768 * pow(temp, 9);
-					temp = temp / (225 * pow(pi, 3));
+					temp = temp / (225 * pow(PI, 3));
 					temp = pow(temp, 0.25);
 					temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
 					basis_coefficients[a].push_back(temp);
@@ -1675,7 +1677,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 					for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-							double term = (pi / aiaj);
+							double term = (PI / aiaj);
 							term = pow(term, 1.5);
 							factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
 						}
@@ -1699,7 +1701,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 4 * pow(aiaj, 5);
-							term = pow(pi, 3) / term;
+							term = pow(PI, 3) / term;
 							term = pow(term, 0.5);
 							factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
 						}
@@ -1723,7 +1725,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 16 * pow(aiaj, 7);
-							term = pow(pi, 3) / term;
+							term = pow(PI, 3) / term;
 							term = pow(term, 0.5);
 							factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
 						}
@@ -1748,7 +1750,7 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 						for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
 							double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
 							double term = 64 * pow((aiaj), 9);
-							term = pow(pi, 3) / term;
+							term = pow(PI, 3) / term;
 							term = pow(term, 0.5);
 							factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
 						}

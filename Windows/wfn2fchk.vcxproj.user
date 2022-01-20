@@ -27,6 +27,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Molden|x64'">
+    <LocalDebuggerCommandArguments>-wfn sucrose.molden -cif sucrose.cif -hkl sucrose.hkl -cpus 6 -acc 1 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|x64'">
     <LocalDebuggerCommandArguments>-wfn olex2\Wfn_job\Part_1\thpp.wfx -cif thpp.cif -asym_cif thpp.cif -hkl olex2/Wfn_job/Part_1\thpp.hkl -cpus 6 -acc 2 -v -group 0 1</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>

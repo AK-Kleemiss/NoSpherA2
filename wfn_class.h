@@ -19,7 +19,7 @@ class WFN {
 		int nex;
 		int charge;
 		unsigned int multi;
-		int origin; //0=NOT_YET_DEFINED; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ
+		int origin; //0=NOT_YET_DEFINED; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden
 		double total_energy;
 		double virial_ratio;
 		std::string basis_set_name;
@@ -79,6 +79,7 @@ class WFN {
 		bool read_fchk(std::string& filename, std::ofstream& log, bool debug = false);
 		bool read_xyz(std::string& filename, std::ofstream& file, bool debug = false);
 		bool read_xyz(std::string& filename, std::ostream& file, bool debug = false);
+		bool read_molden(std::string& filename, std::ofstream& file, bool debug = false);
 		bool write_wfn(const std::string &fileName, bool debug, bool occupied);
 		bool set_path(std::string given_path) { path=given_path; return true; };
 		void print_primitive(int nr);
@@ -93,6 +94,7 @@ class WFN {
 		int get_origin() const { return origin; };
 		double get_exponent(int nr) const {return exponents[nr];};
 		unsigned int get_nr_electrons(bool &debug);
+		double count_nr_electrons(void);
 		/*int get_type(int nr) { if(nr>types.size()||nr<0) return -1; else return types[nr]; };
 		int get_center(int nr) { if(nr>centers.size()||nr<0) return -1; else return centers[nr]; };					NOT NEEDED AT THIS POINT!
 		double get_exponent(int nr) { if(nr>exponents.size()||nr<0) return -1; else return exponents[nr]; }; */
@@ -126,6 +128,7 @@ class WFN {
 		int calculate_charge(std::ofstream &file);
 		bool guess_multiplicity(bool expert = false);
 		bool guess_multiplicity(std::ofstream& file,bool expert = false);
+		std::vector<double> get_norm_const(std::ofstream& file, bool debug = false);
 		//-------------------atom handling--------------------------------------------------------------
 		double get_atom_coordinate(int nr, int axis, bool debug);
 		std::string get_atom_label(int nr);

@@ -210,7 +210,7 @@ else 	if (strcmp(tmp, "At") == 0)  return 84;
 else 	if (strcmp(tmp, "Rn") == 0)  return 85;
 else                                 return -1;
 }
-
+/*
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
 	resize(100);
 }
@@ -234,7 +234,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
 {
 	return cos(x) - get(x);
 }
-
+*/
 void copy_file(string from, string to){
     ifstream source(from.c_str(), ios::binary);
     ofstream dest(to.c_str(), ios::binary);

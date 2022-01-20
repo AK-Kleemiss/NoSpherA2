@@ -50,7 +50,7 @@ inline const double alpha = 0.1616204596739954813316614;
 inline const double c_43 = 4.0 / 3.0;
 inline const double c_38 = 3.0 / 8.0;
 inline const double c_m53 = -5.0 / 3.0;
-inline const double ctelf = 10 * pow(2, -0.666666666666666666666666666666666666) * pow(3, -1.666666666666666666666666666666666666) * pow(3.141592653589793, -1.33333333333333333333333333333333);
+inline const double ctelf = 10 * pow(2, -2.0/3.0) * pow(3, c_m53) * pow(PI, -c_43);
 
 constexpr double bohr2ang(double inp) {
 	return inp * 0.529177249;
@@ -94,6 +94,8 @@ inline void error_check(bool condition, std::string file, int line, std::string 
 		exit(-1);
 	}
 };
+#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, error_message, file)
+#define err_checkc(condition, error_message) error_check(condition, __FILE__, __LINE__, error_message, std::cout)
 
 bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
@@ -180,6 +182,12 @@ template <class T> std::vector<T> split_string(const std::string& input, const s
 	}
 	return result;
 };
+
+inline void remove_empty_elements(std::vector <std::string>& input, const std::string& empty = " ") {
+	for (int i = input.size() - 1; i >= 0; i--)
+		if (input[i] == empty || input[i] == "")
+			input.erase(input.begin() + i);
+}
 
 inline int CountWords(const char* str)
 {
@@ -304,7 +312,7 @@ public:
 
 	void write(double fraction);
 };
-
+/*
 const double MPI2 = 2 * 3.14159265358979323844;
 
 class cosinus_annaeherung
@@ -313,14 +321,13 @@ public:
 	cosinus_annaeherung();
 	inline double get(double x) const
 	{
-////////////////double xa = abs(x);
-////////////////size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
-////////////////double dx = xa - pos * mStepwidth;
-////////////////pos = pos % mSize; // Modulo, da sinus periodisch ist.
-////////////////double y1 = mBase_values[pos];
-////////////////double y2 = mBase_values[pos + 1];
-////////////////return y1 + dx * (y2 - y1) / mStepwidth;
-		return 0.0;
+        double xa = abs(x);
+        size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
+        double dx = xa - pos * mStepwidth;
+        pos = pos % mSize; // Modulo, da sinus periodisch ist.
+        double y1 = mBase_values[pos];
+        double y2 = mBase_values[pos + 1];
+        return y1 + dx * (y2 - y1) / mStepwidth;
 	}
 
 	void   resize(size_t size);
@@ -343,7 +350,7 @@ struct cosinus
 	double get(double x) { return helper.get(x); }
 	cosinus_annaeherung& helper;
 };
-
+*/
 void readxyzMinMax_fromWFN(
 	WFN& wavy,
 	double* CoordMinMax,
