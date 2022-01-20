@@ -377,8 +377,9 @@ bool thakkar_sfac(
 	bool save_k_pts,
 	bool read_k_pts
 ) {
-	error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
-	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
+	err_checkf(exists(cif), "CIF does not exists!", file);
+	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl;
 	file << "Reading: " << hkl_filename;
 	file.flush();
 
@@ -573,11 +574,11 @@ bool thakkar_sfac(
 		}
 	}
 
-	error_check(asym_atom_list.size() <= wave.get_ncen(), __FILE__, __LINE__, "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
-	error_check(asym_atom_list.size() != 0, __FILE__, __LINE__, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
+	err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
+	err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
 	for (int i = 0; i < atom_type_list.size(); i++)
-		error_check(atom_type_list[i] <= 113 && atom_type_list[i] > 0, __FILE__, __LINE__, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+		err_checkf(atom_type_list[i] <= 113 && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
 	file << "                   ...done!" << endl;
 	if (debug) {
 		file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -821,10 +822,10 @@ bool thakkar_sfac(
 		}
 	}
 	else {
-		error_check(exists("kpts.dat"), __FILE__, __LINE__, "k-points file does not exist!", file);
+		err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
 		file << "Reading: kpts.dat" << flush;
 		ifstream k_points_file("kpts.dat", ios::binary);
-		error_check(k_points_file.good(), __FILE__, __LINE__, "Error Reading the k-points!", file);
+		err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
 		int nr[1];
 		k_points_file.read((char*)&nr, sizeof(nr));
 		file << " expecting " << nr[0] << " k points... " << flush;
@@ -839,7 +840,7 @@ bool thakkar_sfac(
 				k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
 				hkl_unique[i].push_back(hkl_temp[0]);
 			}
-		error_check(!k_points_file.bad(), __FILE__, __LINE__, "Error reading k-points file!", file);
+		err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
 		file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
 		k_points_file.close();
 	}
@@ -971,8 +972,9 @@ tsc_block MTC_thakkar_sfac(
 	bool save_k_pts,
 	bool read_k_pts
 ) {
-	error_check(exists(hkl_filename), __FILE__, __LINE__, "HKL file does not exists!", file);
-	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
+	err_checkf(exists(cif), "CIF does not exists!", file);
+	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl;
 	file << "Reading: " << hkl_filename;
 	file.flush();
 
@@ -1377,6 +1379,7 @@ bool calculate_structure_factors_HF(
 #endif
 	error_check(wave.get_ncen() != 0, __FILE__, __LINE__, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
 	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
 	//error_check(exists(asym_cif), __FILE__, __LINE__, "Asym/Wfn CIF does not exists!", file);
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
@@ -3422,6 +3425,7 @@ tsc_block calculate_structure_factors_MTC(
 #endif
 	error_check(wave.get_ncen() != 0, __FILE__, __LINE__, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
 	error_check(exists(cif), __FILE__, __LINE__, "CIF does not exists!", file);
+	file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
 	//error_check(exists(asym_cif), __FILE__, __LINE__, "Asym/Wfn CIF does not exists!", file);
 	if (cpus != -1) {
 		omp_set_num_threads(cpus);
@@ -3558,6 +3562,12 @@ tsc_block calculate_structure_factors_MTC(
 	bool atoms_read = false;
 	if (debug && input_groups.size() > 0)
 		file << "Group size: " << input_groups.size() << endl;
+	if (debug && known_atoms.size() > 0) {
+		file << "I know atoms: ";
+		for (int i = 0; i < known_atoms.size(); i++)
+			file << known_atoms[i] << " ";
+		file << endl;
+	}
 	while (!cif_input.eof() && !atoms_read) {
 		getline(cif_input, line);
 		if (debug) file << "line: " << line << endl;
@@ -3610,11 +3620,13 @@ tsc_block calculate_structure_factors_MTC(
 							}
 						}
 						bool old_atom = false;
+#pragma omp parallel for reduction(||:old_atom)
 						for (int run = 0; run < known_atoms.size(); run++)
-							if (fields[label_field] == known_atoms[run])
+							if (fields[label_field] == known_atoms[run]) {
 								old_atom = true;
+								if (debug) file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
+							}
 						if (old_atom) continue;
-						wave.atoms[i].label = fields[label_field];
 						if (input_groups.size() > 0) {
 							bool yep = false;
 							for (int g = 0; g < input_groups.size(); g++) {
@@ -3623,14 +3635,18 @@ tsc_block calculate_structure_factors_MTC(
 									yep = true;
 									break;
 								}
-								else if (stoi(fields[group_field]) == input_groups[g])
+								else if (stoi(fields[group_field]) == input_groups[g]) {
+									if (debug) file << stoi(fields[group_field]) << " appears to be group " << input_groups[g] << endl;
 									yep = true;
+									break;
+								}
 							}
 							if (!yep) {
 								if (debug) file << "Wrong part!" << endl;
 								continue;
 							}
 						}
+						wave.atoms[i].label = fields[label_field];
 						asym_atom_list.push_back(i);
 						is_asym[i] = true;
 						nr = i;
