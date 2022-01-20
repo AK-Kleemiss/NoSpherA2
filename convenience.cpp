@@ -1,16 +1,7 @@
 #ifdef _WIN32
-#include <direct.h>
-#include <io.h>
 #define GetCurrentDir _getcwd
 #else
-#include <unistd.h>
 #define GetCurrentDir getcwd
-#include <sys/wait.h>
-#endif
-#ifdef __cplusplus__
- #include  <cstdlib>
-#else
- #include <stdlib.h>
 #endif
 
 #include "convenience.h"

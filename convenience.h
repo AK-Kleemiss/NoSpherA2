@@ -19,6 +19,11 @@
 #include <sys/wait.h>
 #include <termios.h>
 #endif
+#ifdef __cplusplus__
+#include  <cstdlib>
+#else
+#include <stdlib.h>
+#endif
 
 class WFN;
 class cell;
