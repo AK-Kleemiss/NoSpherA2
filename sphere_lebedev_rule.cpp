@@ -1,5 +1,5 @@
-#include "convenience.h"
 #include "sphere_lebedev_rule.h"
+#include "convenience.h"
 
 #define NMAX 65
 #define MMAX ((NMAX*2+3)*(NMAX*2+3)/3)
