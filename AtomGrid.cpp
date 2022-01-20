@@ -37,7 +37,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 {
     int min_num_angular_points_closest = get_closest_num_angular(min_num_angular_points);
     int max_num_angular_points_closest = get_closest_num_angular(max_num_angular_points);
-    error_check(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, __FILE__, __LINE__, "No valid value for angular number found!", std::cout);
+    err_checkc(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!");
 
     double *angular_x = new double[max_LT * MAG];
     double *angular_y = new double[max_LT * MAG];
@@ -86,13 +86,13 @@ AtomGrid::AtomGrid(const double radial_precision,
         if (radial_r < rb) {
             num_angular = static_cast<int>(max_num_angular_points_closest * (radial_r / rb));
             num_angular = get_closest_num_angular(num_angular);
-            error_check(num_angular != -1 , __FILE__, __LINE__, "No valid value for angular number found!", std::cout);
+            err_checkc(num_angular != -1 , "No valid value for angular number found!");
             if (num_angular < min_num_angular_points_closest)
                 num_angular = min_num_angular_points_closest;
         }
 
         int angular_off = get_angular_order(num_angular) * MAG;
-        error_check(angular_off != -MAG, __FILE__, __LINE__, "Invalid angular order!", std::cout);
+        err_checkc(angular_off != -MAG, "Invalid angular order!");
         for (int iang = 0; iang < num_angular; iang++) {
             atom_grid_x_bohr_.push_back(angular_x[angular_off + iang] * radial_r);
             atom_grid_y_bohr_.push_back(angular_y[angular_off + iang] * radial_r);
@@ -124,7 +124,7 @@ AtomGrid::AtomGrid(const double radial_precision,
          get_closest_num_angular(min_num_angular_points);
      int max_num_angular_points_closest =
          get_closest_num_angular(max_num_angular_points);
-     error_check(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, __FILE__, __LINE__, "No valid value for angular number found!", file);
+     err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
      double* angular_x = new double[max_LT * MAG];
      double* angular_y = new double[max_LT * MAG];
@@ -200,13 +200,13 @@ AtomGrid::AtomGrid(const double radial_precision,
              num_angular = static_cast<int>(max_num_angular_points_closest *
                  (radial_r / rb));
              num_angular = get_closest_num_angular(num_angular);
-             error_check(num_angular != -1, __FILE__, __LINE__, "No valid value for angular number found!", file);
+             err_checkf(num_angular != -1, "No valid value for angular number found!", file);
              if (num_angular < min_num_angular_points_closest)
                  num_angular = min_num_angular_points_closest;
          }
 
          int angular_off = get_angular_order(num_angular) * MAG;
-         error_check(angular_off != -MAG, __FILE__, __LINE__, "Invalid angular order!", file);
+         err_checkf(angular_off != -MAG, "Invalid angular order!", file);
          int start = atom_grid_x_bohr_.size();
          atom_grid_x_bohr_.resize(start + num_angular);
          atom_grid_y_bohr_.resize(start + num_angular);

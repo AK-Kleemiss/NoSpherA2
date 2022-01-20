@@ -12,8 +12,11 @@
 #include <omp.h>
 #include <regex>
 #ifdef _WIN32
+#include <direct.h>
+#define GetCurrentDir _getcwd(NULL, 0)
 #include <io.h>
 #else
+#define GetCurrentDir getcwd
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -52,31 +55,43 @@ inline const double c_38 = 3.0 / 8.0;
 inline const double c_m53 = -5.0 / 3.0;
 inline const double ctelf = 10 * pow(2, -2.0/3.0) * pow(3, c_m53) * pow(PI, -c_43);
 
-constexpr double bohr2ang(double inp) {
+constexpr double bohr2ang(const double &inp) {
 	return inp * 0.529177249;
 }
 
-constexpr double ang2bohr(double inp) {
+constexpr double ang2bohr(const double &inp) {
 	return inp / 0.529177249;
 }
 
-constexpr double cubic_ang2bohr(double inp) {
+constexpr double cubic_ang2bohr(const double &inp) {
 	return inp / (0.529177249 * 0.529177249 * 0.529177249);
 }
 
 //------------------general functions for easy use of terminal input--------------------
 inline const double bragg_angstrom[114]{
-0.00, 
-	0.35, 0.35, 
-	1.45, 1.05,																																					0.85, 0.70, 0.65, 0.60, 0.50, 0.45,
-	1.80, 1.50,																																					1.25, 1.10, 1.00, 1.00, 1.00, 1.00,
-	2.20, 1.80,																						1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10,
-	2.35, 2.00,																						1.80, 1.55, 1.45, 1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40,
+  0.00, //DUMMY LINE
+	0.35,																																														                                                                                          0.35, 
+	1.45, 1.05,																																																										                              0.85, 0.70, 0.65, 0.60, 0.50, 0.45,
+	1.80, 1.50,																																																										                              1.25, 1.10, 1.00, 1.00, 1.00, 1.00,
+	2.20, 1.80,																																											1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10,
+	2.35, 2.00,																																											1.80, 1.55, 1.45, 1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40,
 	2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60, 1.90, 1.50, 1.50,
 	2.80, 2.35, 2.15, 2.05, 2.05, 2.05, 2.05, 2.05, 2.05, 2.00, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95};
+
+//Covalent Radii according to the CSD
+inline const double covalent_radii[114]{
+	 0.0,
+	0.23,	                                                                                                                                                                                    1.5,
+	1.28, 0.96,	                                                                                                                                                0.83,	0.68,	0.68,	0.68,	0.64, 1.5,
+	1.66,	1.41,																																																																									1.21,	1.2,	1.05,	1.02,	0.99,	1.51,
+	2.03,	1.76,																																											1.7,	1.6,	1.53,	1.39,	1.61,	1.52,	1.26,	1.24,	1.32,	1.22,	1.22,	1.17,	1.21,	1.22,	1.21,	1.5,
+	2.2,	1.95,																																											1.9,	1.75,	1.64,	1.54,	1.47,	1.46,	1.42,	1.39,	1.45,	1.54,	1.42,	1.39,	1.39,	1.47,	1.4,	1.5,
+	2.44,	2.15,	2.07,	2.04,	2.03,	2.01,	1.99,	1.98,	1.98,	1.96,	1.94,	1.92,	1.92,	1.89,	1.9,	1.87,	1.87,	1.75,	1.7,	1.62,	1.51,	1.44,	1.41,	1.36,	1.36,	1.32,	1.45,	1.46,	1.48,	1.4,	1.21,	1.5,
+	2.6,	2.21,	2.15,	2.06,	2.00,	1.96,	1.9,	1.87,	1.8,	1.69,	1.54,	1.83,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5,	1.5
+};
 bool yesno();
-bool is_similar_rel(double first, double second, double tolerance);
-bool is_similar(double first, double second, double tolerance);
+bool is_similar_rel(const double &first, const double &second, const double &tolerance);
+bool is_similar(const double &first, const double &second, const double &tolerance);
 void Enter();
 void cls();
 std::string get_home_path(void);

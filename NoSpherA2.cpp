@@ -246,15 +246,15 @@ int main(int argc, char **argv){
 		ofstream log_file("NoSpherA2.log", ios::out);
 		log_file << NoSpherA2_message();
 		log_file.flush();
-		error_check(hkl != "", __FILE__, __LINE__, "No hkl specified", log_file);
-		error_check(exists(hkl), __FILE__, __LINE__, "hkl doesn't exist", log_file);
-		error_check(cif != "", __FILE__, __LINE__, "No cif specified", log_file);
-		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
+		err_checkf(hkl != "", "No hkl specified", log_file);
+		err_checkf(exists(hkl), "hkl doesn't exist", log_file);
+		err_checkf(cif != "", "No cif specified", log_file);
+		err_checkf(exists(cif), "CIF doesn't exist", log_file);
 		//Make sure we have more than 2 files...
-		//error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
+		//err_checkf(combined_tsc_calc_files.size() > 1, "Need at least 2 wfn files", log_file);
 		//First make sure all files exist
 		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
-			error_check(exists(combined_tsc_calc_files[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
+			err_checkf(exists(combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
 		
 		wavy.resize(combined_tsc_calc_files.size());
 		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
@@ -337,15 +337,15 @@ int main(int argc, char **argv){
 		ofstream log_file("NoSpherA2.log", ios::out);
 		log_file << NoSpherA2_message;
 		log_file.flush();
-		error_check(hkl != "", __FILE__, __LINE__, "No hkl specified", log_file);
-		error_check(exists(hkl), __FILE__, __LINE__, "hkl doesn't exist", log_file);
+		err_checkf(hkl != "", "No hkl specified", log_file);
+		err_checkf(exists(hkl), "hkl doesn't exist", log_file);
 		//Make sure we have more than 2 files...
-		//error_check(combined_tsc_calc_files.size() > 1, __FILE__, __LINE__, "Need at least 2 wfn files", log_file);
+		//err_checkf(combined_tsc_calc_files.size() > 1, "Need at least 2 wfn files", log_file);
 		//First make sure all files exist
 		for (int i = 0; i < combined_tsc_calc_files.size(); i++)
-			error_check(exists(combined_tsc_calc_files[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
+			err_checkf(exists(combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
 		for (int i = 0; i < combined_tsc_calc_cifs.size(); i++)
-			error_check(exists(combined_tsc_calc_cifs[i]), __FILE__, __LINE__, "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_cifs[i], log_file);
+			err_checkf(exists(combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_cifs[i], log_file);
 
 		wavy.resize(combined_tsc_calc_files.size());
 		for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
@@ -446,9 +446,9 @@ int main(int argc, char **argv){
 		log_file.flush();
 		if (debug_main)
 			log_file << "status: " << cif << "&" << hkl << "&" << xyz_file << endl;
-		error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist", log_file);
-		error_check(xyz_file != "", __FILE__, __LINE__, "No xyz specified", log_file);
-		error_check(exists(xyz_file), __FILE__, __LINE__, "xyz doesn't exist", log_file);
+		err_checkf(exists(cif), "CIF doesn't exist", log_file);
+		err_checkf(xyz_file != "", "No xyz specified", log_file);
+		err_checkf(exists(xyz_file), "xyz doesn't exist", log_file);
 		wavy.push_back(WFN(0));
 		wavy[0].read_known_wavefunction_format(xyz_file, log_file, debug_main);
 
@@ -457,7 +457,7 @@ int main(int argc, char **argv){
 		if (cif != "" || hkl != "") {
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
-			error_check(thakkar_sfac(hkl, cif, debug_main, log_file, groups[0], twin_law, wavy[0], threads, electron_diffraction), __FILE__, __LINE__, "Error during SF Calculation!", log_file);
+			err_checkf(thakkar_sfac(hkl, cif, debug_main, log_file, groups[0], twin_law, wavy[0], threads, electron_diffraction), "Error during SF Calculation!", log_file);
 		}
 		return 0;
 	}
@@ -470,13 +470,13 @@ int main(int argc, char **argv){
 		if (debug_main)
 			for (int i = 0; i < argc; i++)
 				log_file << argv[i] << endl;
-		error_check(argc >= 4, __FILE__, __LINE__, "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>", log_file);
+		err_checkf(argc >= 4, "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>", log_file);
 		if (debug_main) {
 			log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << groups.size();
 			if (groups.size() != 0) log_file << "&" << groups[0].size();
 			log_file << endl;
 		}
-		error_check(wfn != "", __FILE__, __LINE__, "No wfn specified", log_file);
+		err_checkf(wfn != "", "No wfn specified", log_file);
 		wavy.push_back(WFN(0));		
 		log_file << "Reading: " << setw(44) << wfn << flush;
 		wavy[0].read_known_wavefunction_format(wfn, log_file, debug_main);
@@ -488,7 +488,7 @@ int main(int argc, char **argv){
 		if (basis_set != "" || fchk != "") {
 			//Make and fchk out of the wfn/wfx file
 			join_path(basis_set_path, basis_set);
-			error_check(exists(basis_set_path), __FILE__, __LINE__, "Basis set file does not exist!", log_file);
+			err_checkf(exists(basis_set_path), "Basis set file does not exist!", log_file);
 			wavy[0].set_basis_set_name(basis_set_path);
 
 			string outputname;
@@ -501,22 +501,22 @@ int main(int argc, char **argv){
 				if (wavy[0].get_origin() == 2) where = outputname.find("wfn");
 				else if (wavy[0].get_origin() == 4) where = outputname.find("ffn");
 				else if (wavy[0].get_origin() == 4) where = outputname.find(".wfx");
-				if (where >= outputname.length() && where != string::npos) error_check(false, __FILE__, __LINE__, "Cannot make output file name!", log_file);
+				if (where >= outputname.length() && where != string::npos) err_checkf(false, "Cannot make output file name!", log_file);
 				else outputname.erase(where, 3);
 			}
 			wavy[0].assign_charge(wavy[0].calculate_charge());
-			if (mult == 0) error_check(wavy[0].guess_multiplicity(log_file, expert), __FILE__, __LINE__, "Error guessing multiplicity", log_file);
+			if (mult == 0) err_checkf(wavy[0].guess_multiplicity(log_file, expert), "Error guessing multiplicity", log_file);
 			else wavy[0].assign_multi(mult);
 			free_fchk(log_file, outputname, "", wavy[0], debug_main, true);
 		}
 		if (cif != "" || hkl != "") {
 			// Calculate tsc fiel from given files
-			error_check(exists(hkl), __FILE__, __LINE__, "Hkl file doesn't exist!", log_file);
-			error_check(exists(cif), __FILE__, __LINE__, "CIF doesn't exist!", log_file);
+			err_checkf(exists(hkl), "Hkl file doesn't exist!", log_file);
+			err_checkf(exists(cif), "CIF doesn't exist!", log_file);
 			if (debug_main)
 				log_file << "Entering Structure Factor Calculation!" << endl;
 			if (wavy[0].get_origin() != 7)
-				error_check(calculate_structure_factors_HF(
+				err_checkf(calculate_structure_factors_HF(
 					hkl,
 					cif,
 					wavy[0],
@@ -530,9 +530,9 @@ int main(int argc, char **argv){
 					pbc,
 					Olex2_1_3_switch,
 					save_k_pts,
-					read_k_pts), __FILE__, __LINE__, "Error during SF Calcualtion", log_file);
+					read_k_pts), "Error during SF Calcualtion", log_file);
 			else
-				error_check(thakkar_sfac(
+				err_checkf(thakkar_sfac(
 					hkl,
 					cif,
 					debug_main,
@@ -543,7 +543,7 @@ int main(int argc, char **argv){
 					threads,
 					electron_diffraction,
 					save_k_pts,
-					read_k_pts), __FILE__, __LINE__, "Error during SF Calcualtion", log_file);
+					read_k_pts), "Error during SF Calcualtion", log_file);
 		}
 		return 0;
 	}
@@ -573,7 +573,7 @@ int main(int argc, char **argv){
 		}
 #endif
 
-		error_check(wfn != "", __FILE__, __LINE__, "Error, no wfn file specified!", log2);
+		err_checkf(wfn != "", "Error, no wfn file specified!", log2);
 		wavy.push_back(WFN(0));
 		wavy[0].read_known_wavefunction_format(wfn,log2,debug_main);
 		if (debug_main)

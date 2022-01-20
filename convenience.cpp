@@ -1,9 +1,3 @@
-#ifdef _WIN32
-#define GetCurrentDir _getcwd
-#else
-#define GetCurrentDir getcwd
-#endif
-
 #include "convenience.h"
 #include "cell.h"
 
@@ -81,7 +75,7 @@ string NoSpherA2_message() {
 
 
 
-bool is_similar_rel(double first, double second, double tolerance) {
+bool is_similar_rel(const double &first, const double &second, const double &tolerance) {
 	double diff = abs(first - second);
 	if ( diff > abs((first + second+0.01) * tolerance/2)) 
 		return false;
@@ -89,7 +83,7 @@ bool is_similar_rel(double first, double second, double tolerance) {
 		return true;
 };
 
-bool is_similar(double first, double second, double tolerance) {
+bool is_similar(const double &first, const double &second, const double &tolerance) {
 	double diff = abs(first - second);
 	if (diff > pow(10,tolerance))
 		return false;

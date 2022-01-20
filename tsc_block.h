@@ -46,40 +46,40 @@ public:
 		index.clear();
 	};
 	const std::vector<std::complex<double> > get_sf_for_scatterer(const unsigned int nr) {
-		error_check(nr < scatterer.size(), __FILE__, __LINE__, "Wrong number in get SF", std::cout);
+		err_checkc(nr < scatterer.size(), "Wrong number in get SF");
 		return sf[nr];
 	};
 	const std::vector<std::complex<double> > get_sf_for_scatterer(const unsigned int nr, std::ofstream &log) {
-		error_check(nr < scatterer.size(), __FILE__, __LINE__, "Wrong number in get SF", log);
+		err_checkf(nr < scatterer.size(), "Wrong number in get SF", log);
 		return sf[nr];
 	};
 	const std::string get_scatterer(const unsigned int nr) { 
-		error_check(nr < scatterer.size(), __FILE__, __LINE__, "Invalid nr of scatterer", std::cout); 
+		err_checkc(nr < scatterer.size(), "Invalid nr of scatterer"); 
 		return scatterer[nr];
 	};
 	const std::string get_scatterer(const unsigned int nr, std::ofstream &log) {
-		error_check(nr < scatterer.size(), __FILE__, __LINE__, "Invalid nr of scatterer", log);
+		err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", log);
 		return scatterer[nr];
 	};
 	const std::vector<std::string> get_sctaerrers() { return scatterer; }
 	void set_AD(const bool value) { anomalous_dispersion = value; };
 	bool get_AD() { return anomalous_dispersion; };
 	const std::vector<int> get_indices(const unsigned int nr) { 
-		error_check(nr < index[0].size(), __FILE__, __LINE__, "Invalid nr of index", std::cout);
+		err_checkc(nr < index[0].size(), "Invalid nr of index");
 		return { index[0][nr], index[1][nr], index[2][nr] };
 	};
 	const std::vector<int> get_indices(const unsigned int nr, std::ofstream &file) {
-		error_check(nr < index[0].size(), __FILE__, __LINE__, "Invalid nr of index", file);
+		err_checkf(nr < index[0].size(), "Invalid nr of index", file);
 		return { index[0][nr], index[1][nr], index[2][nr] };
 	};
 	const int get_index(const unsigned int dim, const unsigned int nr) { 
-		error_check(dim < 3, __FILE__, __LINE__, "invalid dimension for index", std::cout);
-		error_check(nr < index[dim].size(), __FILE__, __LINE__, "invalid nr for index", std::cout);
+		err_checkc(dim < 3, "invalid dimension for index");
+		err_checkc(nr < index[dim].size(), "invalid nr for index");
 		return index[dim][nr];
 	};
 	const int get_index(const unsigned int dim, const unsigned int nr, std::ofstream &file) {
-		error_check(dim < 3, __FILE__, __LINE__, "invalid dimension for index", file);
-		error_check(nr < index[dim].size(), __FILE__, __LINE__, "invalid nr for index", file);
+		err_checkf(dim < 3, "invalid dimension for index", file);
+		err_checkf(nr < index[dim].size(), "invalid nr for index", file);
 		return index[dim][nr];
 	};
 	const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
@@ -87,12 +87,12 @@ public:
 	const unsigned int reflection_size() { if (sf[0].size() == index[0].size() && index[0].size() == index[1].size() && index[1].size() == index[2].size()) return index[0].size(); else return 0; }
 	void append(tsc_block& rhs, std::ofstream &log) {
 		//Appends the scatterers of rhs to the current set assuming same size of reflections.
-		error_check(reflection_size() == rhs.reflection_size(), __FILE__, __LINE__, "Inconsistent number of reflections!", log);
-		error_check(rhs.reflection_size() > 0, __FILE__, __LINE__, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
+		err_checkf(reflection_size() == rhs.reflection_size(), "Inconsistent number of reflections!", log);
+		err_checkf(rhs.reflection_size() > 0, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
 #pragma omp parallel for
 		for (int i = 0; i < rhs.reflection_size(); i++)
 			for(int dim = 0; dim < 3; dim++)
-				error_check(index[dim][i] == rhs.get_index(dim, i), __FILE__, __LINE__, "Mismatch in indices in append!", log);
+				err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
 		int new_scatterers = 0;
 		std::vector<bool> is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+:new_scatterers)
@@ -119,12 +119,12 @@ public:
 	};
 	void append(tsc_block rhs, std::ofstream& log) {
 		//Appends the scatterers of rhs to the current set assuming same size of reflections.
-		error_check(reflection_size() == rhs.reflection_size(), __FILE__, __LINE__, "Inconsistent number of reflections!", log);
-		error_check(rhs.reflection_size() > 0, __FILE__, __LINE__, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
+		err_checkf(reflection_size() == rhs.reflection_size(), "Inconsistent number of reflections!", log);
+		err_checkf(rhs.reflection_size() > 0, "Nothing to append or inconsinstency in given block detected, then please don't do it!", log);
 #pragma omp parallel for
 		for (int i = 0; i < rhs.reflection_size(); i++)
 			for (int dim = 0; dim < 3; dim++)
-				error_check(index[dim][i] == rhs.get_index(dim, i), __FILE__, __LINE__, "Mismatch in indices in append!", log);
+				err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
 		int new_scatterers = 0;
 		std::vector<bool> is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+:new_scatterers)

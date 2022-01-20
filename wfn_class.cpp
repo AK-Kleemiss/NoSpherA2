@@ -1814,7 +1814,7 @@ bool WFN::read_wfx(string fileName, bool debug, ostream& file) {
 bool WFN::read_molden(string& filename, ofstream& file, bool debug) {
 	err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
 	if (debug)
-		file << "File is valid, continuing...\n" << filesystem::current_path() << endl;
+		file << "File is valid, continuing...\n" << GetCurrentDir << endl;
 	origin = 8;
 	ifstream rf(filename.c_str());
 	if (rf.good())
