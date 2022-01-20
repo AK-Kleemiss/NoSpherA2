@@ -95,5 +95,8 @@
     <ClInclude Include="..\tsc_block.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\CUDA_utilities.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

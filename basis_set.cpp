@@ -1,15 +1,7 @@
 #include "basis_set.h"
-
+#include "convenience.h"
 struct basis_set_entry;
 class WFN;
-#include "convenience.h"
-#include <fstream>
-#include <iostream>
-#include <string>
-#include <vector>
-#include <sstream>
-#include <math.h>
-
 using namespace std;
 bool debug_dens=false;
 

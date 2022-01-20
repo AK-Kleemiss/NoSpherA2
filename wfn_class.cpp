@@ -1,22 +1,3 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <math.h>
-#include <iostream>
-#include <iomanip>
-#include <string>
-#include <fstream>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#include <sys/wait.h>
-#endif
-#include <sstream>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <vector>
-
 #include "wfn_class.h"
 #include "mo_class.h"
 #include "convenience.h"

@@ -1,22 +1,3 @@
-#include <iostream>
-#include <fstream>
-#ifdef _WIN32
-#include <io.h>
-#else
-#include <unistd.h>
-#include <sys/wait.h>
-#endif
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string>
-#include <math.h>
-#include <sstream>
-#include <stdlib.h>
-#include <stdio.h>
-#include <iomanip>
-#include <sys/types.h>
-#include <vector>
-
 #include "fchk.h"
 #include "convenience.h"
 #include "basis_set.h"

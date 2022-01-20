@@ -3,15 +3,6 @@
 #include "spherical_density.h"
 #include "cell.h"
 #include "cube.h"
-#include <vector>
-#include <time.h>
-#include <iomanip>
-#include <math.h>
-#include <omp.h>
-#include <complex>
-#ifdef _WIN32
-#include <io.h>
-#endif
 
 using namespace std;
 

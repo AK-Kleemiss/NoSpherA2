@@ -1,5 +1,3 @@
-#include <cmath>
-#include <limits>
 #include <fstream>
 
 #include "AtomGrid.h"

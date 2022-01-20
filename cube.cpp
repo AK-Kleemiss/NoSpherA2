@@ -1,13 +1,5 @@
 #include "cube.h"
 #include "convenience.h"
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <iomanip>
-#include <stdio.h>
-#include <math.h>
-#include <cmath>
-#include <vector>
 
 using namespace std;
 
