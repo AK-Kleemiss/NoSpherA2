@@ -1,8 +1,6 @@
 #ifndef __CONVENIENCE_H__
 #define __CONVENIENCE_H__
 
-#pragma once
-
 #include <iostream>
 #include <string>
 #include <sstream>
@@ -12,15 +10,17 @@
 #include <complex>
 #include <iomanip>
 #include <omp.h>
+#include <regex>
 #ifdef _WIN32
 #include <io.h>
 #else
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <termios.h>
 #endif
 #ifdef __cplusplus__
-#include  <cstdlib>
+#include <cstdlib>
 #else
 #include <stdlib.h>
 #endif

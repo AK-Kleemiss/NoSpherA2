@@ -1,7 +1,5 @@
-#include <fstream>
-
-#include "AtomGrid.h"
 #include "convenience.h"
+#include "AtomGrid.h"
 #include "sphere_lebedev_rule.h"
 
 #ifdef _WIN32

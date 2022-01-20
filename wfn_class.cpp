@@ -1,6 +1,6 @@
 #include "wfn_class.h"
-#include "mo_class.h"
 #include "convenience.h"
+#include "mo_class.h"
 #include "cube.h"
 
 using namespace std;

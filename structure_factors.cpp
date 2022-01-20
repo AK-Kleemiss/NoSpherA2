@@ -5,11 +5,9 @@
  *      Author: florian
  */
 
-#include <regex>
-
 #include "structure_factors.h"
-#include "cell.h"
 #include "convenience.h"
+#include "cell.h"
 #include "wfn_class.h"
 #include "spherical_density.h"
 #include "tsc_block.h"
