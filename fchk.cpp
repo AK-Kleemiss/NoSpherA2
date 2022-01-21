@@ -639,8 +639,9 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 		Enter();
 		return false;
 	}
+	string tfn("temp.fchk");
 	ofstream ofchk;
-	ofchk.open("temp.fchk",ofstream::out);
+	ofchk.open(tfn,ofstream::out);
 	string line;
 	int dum_nao=0;
 	if(wave.get_origin()==2||wave.get_origin()==4){
@@ -759,10 +760,10 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 	if(debug){
 		cout << "Do you want me to keep the old fchk file and the new temp.fchk?";
 		if(!yesno()){
-			copy_file("temp.fchk",temp_fchk);
+			copy_file(tfn,temp_fchk);
 		}
 	}
-	else copy_file("temp.fchk",temp_fchk);
+	else copy_file(tfn,temp_fchk);
 	if(remove("temp.fchk")!=0) cout << "error deleting temp.fchk!" << endl;
 	cls();
 	return true;

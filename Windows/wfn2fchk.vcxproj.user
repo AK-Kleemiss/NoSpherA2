@@ -22,7 +22,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
-    <LocalDebuggerCommandArguments>-wfn olex2\Wfn_job\sucrose.wfx -cif sucrose.cif -asym_cif olex2/Wfn_job/sucrose.cif -hkl olex2/Wfn_job/sucrose.hkl -cpus 6 -acc 2 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn olex2\Wfn_job\sucrose.wfx -cif olex2/Wfn_job/sucrose.cif -hkl olex2/Wfn_job/sucrose.hkl -cpus 6 -acc 2 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_fchk_SF\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
