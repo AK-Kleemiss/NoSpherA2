@@ -92,6 +92,9 @@
     <ClInclude Include="..\cell.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\CUDA_utilities.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="../structure_factors.cpp">
