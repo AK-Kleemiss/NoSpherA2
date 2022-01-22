@@ -1604,8 +1604,12 @@ bool WFN::read_wfx(string fileName, bool debug, ofstream& file)
     while (line.find("<MO Number>") == string::npos)
       getline(rf, line);
     getline(rf, line);
-    if (debug) file << "mo Nr line: " << line << endl;
     int nr = stoi(line);
+    if (debug) {
+      if (nr == 1 || nr == 2)
+        file << "Reading MO: ";
+      file << line << " ";
+    }
     while (line.find("</MO Number>") == string::npos)
       getline(rf, line);
     while (coef.size() != nex) {
@@ -4636,7 +4640,6 @@ double WFN::compute_dens(
   const int atom
 )
 {
-  const int nmo = get_nmo(true);
   vector<double> phi(nmo, 0.0);
   double Rho = 0.0;
 
@@ -4644,9 +4647,8 @@ double WFN::compute_dens(
   int l[3];
   double ex;
   int mo;
-  double temp;
   // x, y, z and dsqd
-  vector<vector<float> > d(4);
+  vector<vector<double> > d(4);
   for (int i = 0; i < 4; i++)
     d[i].resize(ncen);
 
@@ -4658,13 +4660,14 @@ double WFN::compute_dens(
   }
 
   for (int j = 0; j < nex; j++) {
-    iat = get_center(j) - 1;
+    iat = centers[j] - 1;
     //if (iat != atom) continue;
     type2vector(get_type(j), l);
-    temp = -get_exponent(j) * d[3][iat];
-    if (temp < -46.0517) //corresponds to cutoff of ex ~< 1E-20
+    ex = -exponents[j] * d[3][iat];
+    if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
       continue;
-    ex = exp(temp);
+    }
+    ex = exp(ex);
     for (int k = 0; k < 3; k++) {
       if (l[k] == 0)		continue;
       else if (l[k] == 1)	ex *= d[k][iat];
@@ -4673,11 +4676,64 @@ double WFN::compute_dens(
       else if (l[k] == 4)	ex *= pow(d[k][iat], 4);
       else if (l[k] == 5)	ex *= pow(d[k][iat], 5);
     }
-    for (mo = 0; mo < nmo; mo++)
+    for (mo = 0; mo < nmo; mo++) {
       phi[mo] += MOs[mo].get_coefficient_f(j) * ex;      //build MO values at this point
+    }
   }
 
-  shrink_vector<vector<float>>(d);
+  for (int i = 0; i < 4; i++)
+    shrink_vector<double>(d[i]);
+  shrink_vector<vector<double>>(d);
+
+  for (mo = 0; mo < nmo; mo++)
+    Rho += get_MO_occ(mo) * pow(phi[mo], 2);
+
+  return Rho;
+}
+
+double WFN::compute_dens(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3,
+  vector<vector<double>>& d,
+  vector<double>& phi
+)
+{
+  std::fill(phi.begin(), phi.end(), 0.0);
+  double Rho = 0.0;
+  int iat;
+  int l[3];
+  double ex;
+  int mo;
+
+  for (iat = 0; iat < ncen; iat++) {
+    d[0][iat] = Pos1 - atoms[iat].x;
+    d[1][iat] = Pos2 - atoms[iat].y;
+    d[2][iat] = Pos3 - atoms[iat].z;
+    d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+  }
+
+  for (int j = 0; j < nex; j++) {
+    iat = centers[j] - 1;
+    //if (iat != atom) continue;
+    type2vector(types[j], l);
+    ex = -exponents[j] * d[3][iat];
+    if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
+      continue;
+    }
+    ex = exp(ex);
+    for (int k = 0; k < 3; k++) {
+      if (l[k] == 0)		continue;
+      else if (l[k] == 1)	ex *= d[k][iat];
+      else if (l[k] == 2)	ex *= d[k][iat] * d[k][iat];
+      else if (l[k] == 3)	ex *= pow(d[k][iat], 3);
+      else if (l[k] == 4)	ex *= pow(d[k][iat], 4);
+      else if (l[k] == 5)	ex *= pow(d[k][iat], 5);
+    }
+    for (mo = 0; mo < nmo; mo++) {
+      phi[mo] += MOs[mo].get_coefficient_f(j) * ex;      //build MO values at this point
+    }
+  }
 
   for (mo = 0; mo < nmo; mo++)
     Rho += get_MO_occ(mo) * pow(phi[mo], 2);

@@ -265,7 +265,6 @@ string get_home_path(void)
 
 void join_path(string& s1, string& s2)
 {
-  char ch = s1.back();
 #ifdef _WIN32
   s1.append("\\");
 #else
@@ -933,7 +932,7 @@ void select_cubes(vector <vector <unsigned int> >& selection, vector<WFN>& wavy,
     }
     cout << "_____________________________________________________________" << endl << endl << endl;
   }
-  bool happy = false;
+  //bool happy = false;
   unsigned int selected_cubes = 0;
   do {
     cout << "Select " << selected_cubes + 1 << ". ";
@@ -1854,7 +1853,6 @@ void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
 double get_lambda_1(double* a)
 {
   vector<double> bw, zw;
-  double c, g, gapq, h, s, t, tau, term, termp, termq, theta, thresh, w;
   int run = 0;
   double eig1, eig2, eig3;
   double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
