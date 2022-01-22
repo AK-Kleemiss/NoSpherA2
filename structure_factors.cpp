@@ -297,12 +297,56 @@ double linear_interpolate_spherical_density(
     return 0;
   else if (dist < spherical_dist[0])
     return radial_dens[0];
-  int nr = floor(log(dist / start) / lincr);
+  int nr = int(floor(log(dist / start) / lincr));
   result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
   if (result < 1E-10) result = 0;
   return result;
 }
 #endif
+
+void read_k_points(vector<vector<double>>& k_pt, vector<vector<int>>& hkl, ofstream& file)
+{
+  err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
+  file << "Reading: kpts.dat" << flush;
+  ifstream k_points_file("kpts.dat", ios::binary);
+  err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
+  int nr[1];
+  k_points_file.read((char*)&nr, sizeof(nr));
+  file << " expecting " << nr[0] << " k points... " << flush;
+  double temp[1];
+  int hkl_temp[1];
+  k_pt.resize(3);
+  hkl.resize(3);
+  for (int run = 0; run < nr[0]; run++)
+    for (int i = 0; i < 3; i++) {
+      k_points_file.read((char*)&temp, sizeof(temp));
+      k_pt[i].push_back(temp[0]);
+      k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
+      hkl[i].push_back(hkl_temp[0]);
+    }
+  err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
+  file << " done!" << endl << "Size of k_points: " << k_pt[0].size() << endl;
+  k_points_file.close();
+}
+
+void save_k_points(vector<vector<double>>& k_pt, vector<vector<int>>& hkl)
+{
+  ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
+  int nr[1] = { (int)k_pt[0].size() };
+  k_points_file.write((char*)&nr, sizeof(nr));
+  double temp[1]{ 0.0 };
+  int hkl_temp[1]{ 0 };
+  for (int run = 0; run < nr[0]; run++) {
+    for (int i = 0; i < 3; i++) {
+      temp[0] = k_pt[i][run];
+      k_points_file.write((char*)&temp, sizeof(temp));
+      hkl_temp[0] = hkl[i][run];
+      k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
+    }
+  }
+  k_points_file.flush();
+  k_points_file.close();
+}
 
 void read_hkl(std::string& hkl_filename,
   vector<vector<int>>& hkl,
@@ -341,8 +385,9 @@ void read_hkl(std::string& hkl_filename,
     }
   }
   hkl_input.close();
-  file << " done!" << endl;
   int refl_size = hkl[0].size();
+  file << " done!\nNr of reflections to be used : " << hkl[0].size() << endl;
+
   if (debug)
     file << "Number of reflections before twin: " << hkl[0].size() << endl;
   for (int len = 0; len < refl_size; len++)
@@ -423,20 +468,22 @@ void read_atoms_from_CIF(ifstream& cif_input,
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
         fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
-        if (debug) file << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << flush;
+        if (debug) file << "label: " << fields[label_field] << " frac. pos: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << flush;
         vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
-        if (debug) file << " cart. position: " << position[0] << " " << position[1] << " " << position[2] << endl;
+        if (debug) file << " cart. pos.: " << position[0] << " " << position[1] << " " << position[2] << endl;
         for (int i = 0; i < wave.get_ncen(); i++) {
           if (is_similar(position[0], wave.atoms[i].x, -1)
             && is_similar(position[1], wave.atoms[i].y, -1)
             && is_similar(position[2], wave.atoms[i].z, -1)) {
             if (debug) {
-              file << "Found an asymmetric atom: " << fields[label_field] << " Corresponding to atom charge " << wave.atoms[i].charge << endl;
-              file << " cart. position: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << endl;
+              file << "ASYM: " << fields[label_field] << " charge: " << wave.atoms[i].charge << " wfn cart. pos: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << flush;
               if (input_groups.size() > 0) {
-                file << "checking disorder group: " << fields[group_field] << " vs. ";
+                file << " checking disorder group: " << fields[group_field] << " vs. ";
                 for (int g = 0; g < input_groups.size(); g++)
                   file << input_groups[g] << ",";
+                file << endl;
+              }
+              else {
                 file << endl;
               }
             }
@@ -471,9 +518,8 @@ void read_atoms_from_CIF(ifstream& cif_input,
             break;
           }
         }
-        if (debug) file << "nr= " << nr << endl;
+        if (debug) file << " type nr= " << nr << endl;
         if (nr != -1) {
-          if (debug) file << "Checking for new atom type" << endl;
           bool already_there = false;
           for (int i = 0; i < atom_type_list.size(); i++)
             if (atom_type_list[i] == wave.atoms[nr].charge) {
@@ -535,7 +581,8 @@ int make_hirshfeld_grids(const int& pbc,
   time_t& end_prune,
   time_t& end_aspherical,
 #else
-  struct timeval& t2
+  timeval& t1,
+  timeval& t2,
 #endif
   bool debug = false)
 {
@@ -546,9 +593,9 @@ int make_hirshfeld_grids(const int& pbc,
   }
   vector<int> num_points(atoms_with_grids);
   vector<vector<vector<double>>> grid(atoms_with_grids);
-  vector<double> x, y, z;
-  vector<int> atom_z;
-  x.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), y.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), z.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3)), atom_z.resize(wave.get_ncen() * pow(pbc * 2 + 1, 3));
+  const int nr_of_atoms = (wave.get_ncen() * (int)pow(pbc * 2 + 1, 3));
+  vector<double> x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
+  vector<int> atom_z(nr_of_atoms);
   double* alpha_max = new double[wave.get_ncen()];
   int* max_l = new int[wave.get_ncen()];
   int max_l_overall = 0;
@@ -691,7 +738,7 @@ int make_hirshfeld_grids(const int& pbc,
   for (int i = 0; i < atom_type_list.size(); i++) {
     if (debug) file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
     double alpha_max_temp;
-    double max_l_temp;
+    int max_l_temp;
     double* alpha_min_temp = new double[max_l_overall];
     for (int j = 0; j < wave.get_ncen(); j++) {
       if (wave.atoms[j].charge == atom_type_list[i]) {
@@ -794,7 +841,7 @@ int make_hirshfeld_grids(const int& pbc,
   if (debug) {
 
     for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
-      file << "Number of gridpoints for atom type " << atom_type_list[prototype] << " :" << Prototype_grids[prototype].get_num_grid_points() << endl;
+      file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
     //	int diff = end - start;
     if (end_prototypes - start < 1) file << "Time until prototypes are done: <1 s" << endl;
@@ -1074,44 +1121,60 @@ int make_hirshfeld_grids(const int& pbc,
   vector < vector < double > > radial_density(atom_type_list.size());
   vector < vector < double > > radial_dist(atom_type_list.size());
 
-  for (int i = 0; i < atoms_with_grids; i++) {
-    int nr = 0;
-    for (int j = 0; j < wave.get_ncen(); j++) {
-      if (needs_grid[j]) {
-        if (nr == i)
-          break;
-        nr++;
-      }
+  // get_grid is parallelized, therefore not parallel here
+  for (int i = 0; i < wave.get_ncen(); i++) {
+    //skip atoms, that do not need a grid
+    if (!needs_grid[i]) {
+      continue;
     }
     int type;
     for (int j = 0; j < atom_type_list.size(); j++)
-      if (atom_type_list[j] == wave.atoms[nr].charge)
+      if (atom_type_list[j] == wave.atoms[i].charge)
         type = j;
 
-    num_points[i] = Prototype_grids[type].get_num_grid_points();
-
-    if (debug) file << "Number of points for atom " << i << ": " << num_points[i] << endl;
+    int grid_number = 0;
+    for (int j = 0; j < i; j++) {
+      if (needs_grid[j]) {
+        grid_number++;
+      }
+    }
+    num_points[grid_number] = Prototype_grids[type].get_num_grid_points();
 
     for (int n = 0; n < 6; n++)
-      grid[i][n].resize(num_points[i], 0.0);
+      grid[grid_number][n].resize(num_points[grid_number], 0.0);
 
     Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
-      nr,
+      i,
       &x[0],
       &y[0],
       &z[0],
       &atom_z[0],
-      grid[i][0].data(),
-      grid[i][1].data(),
-      grid[i][2].data(),
-      grid[i][3].data(),
-      grid[i][5].data());
+      grid[grid_number][0].data(),
+      grid[grid_number][1].data(),
+      grid[grid_number][2].data(),
+      grid[grid_number][3].data(),
+      grid[grid_number][5].data());
+  }
+  if (debug) {
+    int run = 0;
+    file << "  label | needs_grid | number of gridpoints\n";
+    for (int j = 0; j < wave.get_ncen(); j++) {
+      file << setw(8) << wave.atoms[j].label << setw(13) << needs_grid[j];
+      if (needs_grid[j]) {
+        file << setw(7) << num_points[run];
+        run++;
+      }
+      else {
+        file << setw(6) << "---";
+      }
+      file << endl;
+    }
   }
   Prototype_grids.clear();
 #endif
 
   int points = 0;
-  for (int i = 0; i < asym_atom_list.size(); i++)
+  for (int i = 0; i < atoms_with_grids; i++)
     points += num_points[i];
   if (debug) file << "Becke Grid exists" << endl;
   else file << "                                 done! Number of gridpoints: " << defaultfloat << points << endl;
@@ -1307,16 +1370,16 @@ int make_hirshfeld_grids(const int& pbc,
 #pragma omp parallel
   {
 #pragma omp for
-    for (int g = 0; g < asym_atom_list.size(); g++) {
+    for (int g = 0; g < atoms_with_grids; g++) {
       spherical_density[g].resize(num_points[g]);
     }
-#pragma omp for
     for (int i = 0; i < wave.get_ncen(); i++) {
       int type_list_number = -1;
       //Determine which type in the type list of sphericals to use
       for (int j = 0; j < atom_type_list.size(); j++)
         if (wave.atoms[i].charge == atom_type_list[j])
           type_list_number = j;
+#pragma omp for
       for (int g = 0; g < atoms_with_grids; g++) {
         for (int p = 0; p < num_points[g]; p++) {
           double temp =
@@ -1348,7 +1411,7 @@ int make_hirshfeld_grids(const int& pbc,
             for (int j = 0; j < atom_type_list.size(); j++)
               if (wave.atoms[i].charge == atom_type_list[j])
                 type_list_number = j;
-            for (int g = 0; g < atoms_with_grids; g++)
+            for (int g = 0; g < atoms_with_grids; g++) {
 #pragma omp parallel for
               for (int p = 0; p < num_points[g]; p++)
                 grid[g][4][p] += linear_interpolate_spherical_density(
@@ -1362,10 +1425,11 @@ int make_hirshfeld_grids(const int& pbc,
                   lincr,
                   min_dist
                 );
+            }
           }
         }
   }
-  for (int i = 0; i < asym_atom_list.size(); i++)
+  for (int i = 0; i < atoms_with_grids; i++)
     err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 #endif
 
@@ -1408,21 +1472,37 @@ int make_hirshfeld_grids(const int& pbc,
   else
     cutoff = 1E-30;
 #ifndef FLO_CUDA
-  if (!debug) {
+  vector<int> new_gridsize(atoms_with_grids, 0);
+  vector<int> reductions(atoms_with_grids, 0);
+  int final_size = 0;
+  bool prune = true;
+  if (prune) {
     file << "Pruning Grid..." << flush;
-    for (int i = 0; i < asym_atom_list.size(); i++) {
+    
+#pragma omp parallel for reduction(+:final_size)
+    for (int i = 0; i < atoms_with_grids; i++) {
+      for (int p = 0; p < num_points[i]; p++) {
+        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > cutoff) {
+          new_gridsize[i]++;
+        }
+      }
+      reductions[i] = num_points[i] - new_gridsize[i];
+      final_size += new_gridsize[i];
+    }
+    for (int k = 0; k < 7; k++)
+      total_grid[k].resize(final_size);
+#pragma omp parallel for
+    for (int i = 0; i < atoms_with_grids; i++) {
+      int offset = 0;
+      for (int j = 0; j < i; j++) {
+        offset += new_gridsize[j];
+      }
       int reduction = 0;
       for (int p = 0; p < num_points[i]; p++) {
-        if (grid[i][4][p] != 0.0) {
-          if (abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > cutoff) {
-            for (int k = 0; k < 5; k++)
-              total_grid[k].push_back(grid[i][k][p]);
-            total_grid[6].push_back(grid[i][5][p]);
-          }
-          else {
-            spherical_density[i].erase(spherical_density[i].begin() + (p - reduction));
-            reduction++;
-          }
+        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > cutoff) {
+          for (int k = 0; k < 5; k++)
+            total_grid[k][p + offset - reduction] = grid[i][k][p];
+          total_grid[6][p + offset - reduction] = grid[i][5][p];
         }
         else {
           spherical_density[i].erase(spherical_density[i].begin() + (p - reduction));
@@ -1434,7 +1514,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
   }
   else {
-    for (int i = 0; i < asym_atom_list.size(); i++) {
+    for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
         for (int k = 0; k < 5; k++)
           total_grid[k].push_back(grid[i][k][p]);
@@ -1448,7 +1528,7 @@ int make_hirshfeld_grids(const int& pbc,
   for (int i = 0; i < asym_atom_list.size(); i++)
     points += num_points[i];
 
-  total_grid[5].resize(total_grid[0].size());
+  //total_grid[5].resize(total_grid[0].size());
   if (debug) file << "sphericals done!" << endl;
   else file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 #endif
@@ -1704,13 +1784,27 @@ int make_hirshfeld_grids(const int& pbc,
   file << " done!" << endl;
   file << "Number of points evaluated: " << MaxGrid;
 #else
-#pragma omp parallel for
-  for (int i = 0; i < total_grid[0].size(); i++) {
-    total_grid[5][i] = wave.compute_dens(new double[3]{
-            total_grid[0][i],
-            total_grid[1][i],
-            total_grid[2][i]
-      });
+#pragma omp parallel
+  {
+    vector<vector<double>> d_temp(4);
+    for (int i = 0; i < 4; i++) {
+      d_temp[i].resize(wave.get_ncen());
+    }
+    vector<double> phi_temp(wave.get_nmo());
+#pragma omp for
+    for (int i = 0; i < total_grid[0].size(); i++) {
+      total_grid[5][i] = wave.compute_dens(
+        total_grid[0][i],
+        total_grid[1][i],
+        total_grid[2][i],
+        d_temp,
+        phi_temp
+      );
+    }
+    for (int i = 0; i < 4; i++)
+      shrink_vector<double>(d_temp[i]);
+    shrink_vector<vector<double>>(d_temp);
+    shrink_vector<double>(phi_temp);
   }
   //if (debug) {
   //	//Copy grid from GPU to print:
@@ -1727,9 +1821,9 @@ int make_hirshfeld_grids(const int& pbc,
   //	grid.close();
   //}
   if (pbc != 0) {
-    periodic_grid.resize(pow(pbc * 2 + 1, 3));
+    periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
     int j = 0;
-    for (int d = 0; d < pow(pbc * 2 + 1, 3); d++)
+    for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
       periodic_grid[d].resize(total_grid[5].size());
     for (int x = -pbc; x < pbc + 1; x++)
       for (int y = -pbc; y < pbc + 1; y++)
@@ -1769,13 +1863,9 @@ int make_hirshfeld_grids(const int& pbc,
   // Vector containing integrated numbers of electrons
   // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
   // dimension 1: atoms of asym_atom_list
-  vector < vector <double> > atom_els;
-  atom_els.resize(3);
+  vector < vector <double> > atom_els(3);
   for (int n = 0; n < 3; n++) {
-    atom_els[n].resize(asym_atom_list.size());
-#pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
-      atom_els[n][i] = 0.0;
+    atom_els[n].resize(asym_atom_list.size(), 0.0);
   }
 
   if (debug) file << "before loop" << endl;
@@ -1791,7 +1881,9 @@ int make_hirshfeld_grids(const int& pbc,
         atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
         atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
       }
-      atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+      if (total_grid[4][p] != 0) {
+        atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+      }
     }
     el_sum_becke += atom_els[0][i];
     el_sum_spherical += atom_els[1][i];
@@ -1961,10 +2053,11 @@ int make_hirshfeld_grids(const int& pbc,
 }
 
 //return whether it remnoved symmetry equivalent entries
-bool make_k_pts(const bool& Olex2_1_3_switch,
+void make_k_pts(const bool& Olex2_1_3_switch,
   const bool& read_k_pts,
   const bool& save_k_pts,
   const int gridsize,
+  bool shrink,
   cell& unit_cell,
   vector<vector<int>>& hkl,
   vector<vector<double>>& k_pt,
@@ -1991,7 +2084,6 @@ bool make_k_pts(const bool& Olex2_1_3_switch,
   }
   else
     file << "Number of symmetry operations: " << sym[0][0].size() << endl;
-  bool shrink = true;
   if (Olex2_1_3_switch)
     shrink = false;
   if (!read_k_pts) {
@@ -2002,15 +2094,6 @@ bool make_k_pts(const bool& Olex2_1_3_switch,
 
     if (debug)
       file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-
-    if (shrink) {
-      k_pt_unique.resize(3);
-      hkl_unique.resize(3);
-      for (int s = 0; s < sym[0][0].size(); s++)
-        for (int ref = 0; ref < hkl[0].size(); ref++)
-          for (int h = 0; h < 3; h++)
-            hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
-    }
 
     for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
@@ -2026,23 +2109,33 @@ bool make_k_pts(const bool& Olex2_1_3_switch,
 
 
     if (shrink) {
+      k_pt_unique.resize(3);
+      hkl_unique.resize(3);
+      for (int s = 0; s < sym[0][0].size(); s++)
+        for (int ref = 0; ref < hkl[0].size(); ref++)
+          for (int h = 0; h < 3; h++)
+            hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
       file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
       file << "Determining unique k-points... ";
       file.flush();
-      vector <bool> mask;
-      mask.resize(k_pt[0].size(), true);
-      for (int i = 0; i < k_pt[0].size(); i++)
-#pragma omp parallel for
-        for (int j = i + 1; j < k_pt[0].size(); j++) {
+      int size_ = k_pt[0].size();
+      vector <bool> mask(size_, true);
+
+      int b = 100;
+
+      for (int i = 0; i < size_; i++) {
+        for (int j = i + 1; j < size_; j++) {
           if (!mask[j])
             continue;
-          if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j])
+          if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j]) {
             mask[j] = false;
+          }
           else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
             mask[j] = false;
           }
         }
-      if (debug)  file << "Mask done!" << endl;
+
+      }
       for (int i = k_pt[0].size() - 1; i >= 0; i--) {
         //if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
         if (mask[i])
@@ -2053,83 +2146,15 @@ bool make_k_pts(const bool& Olex2_1_3_switch,
             hkl_unique[h].erase(hkl_unique[h].begin() + i);
       }
       file << " ... Done!";
-      file << endl << "Number of k-points to evaluate: " << k_pt_unique[0].size() << " for " << gridsize << " gridpoints." << endl;
-      if (save_k_pts) {
-
-        ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
-        int nr[1] = { k_pt_unique[0].size() };
-        file << "Writing k-points to kpoints.dat!" << endl;
-        k_points_file.write((char*)&nr, sizeof(nr));
-        double temp[1];
-        int hkl_temp[1];
-        for (int run = 0; run < nr[0]; run++)
-          for (int i = 0; i < 3; i++) {
-            temp[0] = k_pt_unique[i][run];
-            k_points_file.write((char*)&temp, sizeof(temp));
-            hkl_temp[0] = hkl_unique[i][run];
-            k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
-          }
-        k_points_file.close();
-      }
     }
-    else {
-      file << endl << "Number of k-points to evaluate: " << k_pt[0].size() << " for " << gridsize << " gridpoints." << endl;
-      if (save_k_pts) {
-        ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
-        int nr[1] = { k_pt[0].size() };
-        k_points_file.write((char*)&nr, sizeof(nr));
-        double temp[1];
-        int hkl_temp[1];
-        for (int run = 0; run < nr[0]; run++) {
-          for (int i = 0; i < 3; i++) {
-            temp[0] = k_pt[i][run];
-            k_points_file.write((char*)&temp, sizeof(temp));
-            hkl_temp[0] = hkl[i][run];
-            k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
-          }
-        }
-        k_points_file.flush();
-        k_points_file.close();
-      }
-    }
+    file << endl << "Number of k-points to evaluate: ";
+    shrink ? file << k_pt_unique[0].size() : file << k_pt[0].size();
+    file << " for " << gridsize << " gridpoints." << endl;
+    shrink ? save_k_points(k_pt_unique, hkl_unique) : save_k_points(k_pt, hkl);
   }
   else {
-    err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
-    file << "Reading: kpts.dat" << flush;
-    ifstream k_points_file("kpts.dat", ios::binary);
-    err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
-    int nr[1];
-    k_points_file.read((char*)&nr, sizeof(nr));
-    file << " expecting " << nr[0] << " k points... " << flush;
-    double temp[1];
-    int hkl_temp[1];
-    if (shrink) {
-      k_pt_unique.resize(3);
-      hkl_unique.resize(3);
-      for (int run = 0; run < nr[0]; run++)
-        for (int i = 0; i < 3; i++) {
-          k_points_file.read((char*)&temp, sizeof(temp));
-          k_pt_unique[i].push_back(temp[0]);
-          k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
-          hkl_unique[i].push_back(hkl_temp[0]);
-        }
-    }
-    else {
-      k_pt.resize(3);
-      hkl.resize(3);
-      for (int run = 0; run < nr[0]; run++)
-        for (int i = 0; i < 3; i++) {
-          k_points_file.read((char*)&temp, sizeof(temp));
-          k_pt[i].push_back(temp[0]);
-          k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
-          hkl[i].push_back(hkl_temp[0]);
-        }
-    }
-    err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
-    file << " done!" << endl << "Size of k_points: " << k_pt_unique[0].size() << endl;
-    k_points_file.close();
+    shrink ? read_k_points(k_pt_unique, hkl_unique, file) : read_k_points(k_pt, hkl, file);
   }
-  return shrink;
 }
 
 void calc_SF(const bool& shrink,
@@ -2148,7 +2173,8 @@ void calc_SF(const bool& shrink,
   time_t& start,
   time_t& end1,
 #else
-  struct timeval& t2
+  timeval& t1,
+  timeval& t2,
 #endif
   bool debug = false)
 {
@@ -2342,11 +2368,13 @@ bool thakkar_sfac(
   vector<vector<double>> k_pt;
   vector<vector<double>> k_pt_unique;
   vector<vector<int>> hkl_unique;
-  int shrink = make_k_pts(
+  int shrink = true;
+  make_k_pts(
     false,
     read_k_pts,
     save_k_pts,
     0,
+    shrink,
     unit_cell,
     hkl,
     k_pt,
@@ -2463,11 +2491,13 @@ tsc_block MTC_thakkar_sfac(
   vector<vector<double>> k_pt;
   vector<vector<double>> k_pt_unique;
   vector<vector<int>> hkl_unique;
-  int shrink = make_k_pts(
+  int shrink = true;
+  make_k_pts(
     false,
     read_k_pts,
     save_k_pts,
     0,
+    shrink,
     unit_cell,
     hkl,
     k_pt,
@@ -2550,6 +2580,7 @@ bool calculate_structure_factors_HF(
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (cpus != -1) {
     omp_set_num_threads(cpus);
+    omp_set_dynamic(0);
   }
 
 #ifdef _WIN64
@@ -2615,18 +2646,21 @@ bool calculate_structure_factors_HF(
     end_prune,
     end_aspherical,
 #else
-    t2
+    t1,
+    t2,
 #endif
     debug);
 
   vector<vector<double>> k_pt;
   vector<vector<double>> k_pt_unique;
   vector<vector<int>> hkl_unique;
-  int shrink = make_k_pts(
+  int shrink = true;
+  make_k_pts(
     Olex2_1_3_switch,
     read_k_pts,
     save_k_pts,
     points,
+    shrink,
     unit_cell,
     hkl,
     k_pt,
@@ -2649,7 +2683,8 @@ bool calculate_structure_factors_HF(
     start,
     end1,
 #else
-    t2
+    t1,
+    t2,
 #endif
     debug);
 
@@ -2662,7 +2697,7 @@ bool calculate_structure_factors_HF(
       hkl_unique,
       file,
       debug);
-}
+  }
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
@@ -2808,18 +2843,21 @@ tsc_block calculate_structure_factors_MTC(
     end_prune,
     end_aspherical,
 #else
-    t2
+    t1,
+    t2,
 #endif
     debug);
 
   vector<vector<double>> k_pt;
   vector<vector<double>> k_pt_unique;
   vector<vector<int>> hkl_unique;
-  int shrink = make_k_pts(
+  int shrink = true;
+  make_k_pts(
     false,
     read_k_pts,
     save_k_pts,
     points,
+    shrink,
     unit_cell,
     hkl,
     k_pt,
@@ -2842,7 +2880,8 @@ tsc_block calculate_structure_factors_MTC(
     start,
     end1,
 #else
-    t2
+    t1,
+    t2,
 #endif
     debug);
 
@@ -2855,7 +2894,7 @@ tsc_block calculate_structure_factors_MTC(
       hkl_unique,
       file,
       debug);
-}
+  }
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)

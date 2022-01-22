@@ -21,8 +21,7 @@ class AtomGrid
         const int max_l_quantum_number,
         const double alpha_min[],
         const bool debug,
-        std::ofstream& file,
-        const bool slater = false);
+        std::ofstream& file);
 
     ~AtomGrid();
 
@@ -108,13 +107,7 @@ double get_becke_w(const int num_centers,
 
 double get_r_inner(const double max_error, const double alpha_inner);
 
-double get_r_inner_slater(const double max_error, const double alpha_inner);
-
 double get_r_outer(const double max_error,
-    const double alpha_outer,
-    const int l,
-    const double guess);
-double get_r_outer_slater(const double max_error,
     const double alpha_outer,
     const int l,
     const double guess);
