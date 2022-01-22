@@ -8,27 +8,13 @@ LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/10/libgomp.a
 all: NoSpherA2
 
 CPP_SRCS += \
-./unity.cpp 
+../unity.cpp 
 
 OBJS += \
 ./unity.o 
 
 CPP_DEPS += \
 ./unity.d 
-
-CPP_SRCS_QCT += \
-./unity1.cpp \
-./unity2.cpp \
-./unity3.cpp \
-./unity4_QCT.cpp \
-./unity5.cpp
-
-OBJS_QCT += \
-./unity.o 
-
-CPP_DEPS_QCT += \
-./unity1.d \
-./unity4_QCT.d 
 
 -include ${CPP_DEPS}
 
@@ -39,19 +25,8 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
-	
-QCT: ${OBJS_QCT} ${USER_OBJS}
-	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS_QCT} ${LIBS} -I../ -L../
-	${RM} ${CPP_DEPS_QCT} ${OBJS_QCT}
-	@echo 'Finished building target: $@'
 
-./unity.o: ./unity.cpp
-	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-	
-./unity4_QCT.o: ./unity4_QCT.cpp
+./unity.o: ../unity.cpp
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

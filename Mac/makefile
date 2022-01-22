@@ -8,25 +8,13 @@ LIBOMP := /usr/local/lib/libomp.a
 all: NoSpherA2
 
 CPP_SRCS += \
-./unity1.cpp \
-./unity2.cpp \
-./unity3.cpp \
-./unity4.cpp \
-./unity5.cpp
+../unity.cpp 
 
 OBJS += \
-./unity1.o \
-./unity2.o \
-./unity3.o \
-./unity4.o \
-./unity5.o
+./unity.o 
 
 CPP_DEPS += \
-./unity1.d \
-./unity2.d \
-./unity3.d \
-./unity4.d \
-./unity5.d
+./unity.d 
 
 -include ${CPP_DEPS}
 
@@ -35,27 +23,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
 	@echo 'Finished building target: $@'
 
-./unity1.o: ./unity1.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./unity2.o: ./unity2.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./unity3.o: ./unity3.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./unity4.o: ./unity4.cpp
-	@echo 'Building file: $<'
-	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-./unity5.o: ./unity5.cpp
+./unity.o: ../unity1.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
