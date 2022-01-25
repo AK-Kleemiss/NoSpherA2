@@ -299,16 +299,19 @@ int main(int argc, char** argv)
           i != 0
         ), log_file);
       }
+    }
 
-      if (debug_main) {
-        for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
-          log_file << combined_tsc_calc_files[i] << " ";
-          for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
-          log_file << endl;
-        }
+    if (debug_main) {
+      for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
+        log_file << combined_tsc_calc_files[i] << " ";
+        for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
+        log_file << endl;
       }
     }
+    
+    log_file << "Writing tsc file... " << flush;
     result.write_tsc_file(cif);
+    log_file << " ... done!" << endl;
     return 0;
   }
   if (cif_based_combined_tsc_calc) {
@@ -370,15 +373,16 @@ int main(int argc, char** argv)
           i != 0
         ), log_file);
       }
+    }
 
-      if (debug_main) {
-        for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
-          log_file << combined_tsc_calc_files[i] << " ";
-          for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
-          log_file << endl;
-        }
+    if (debug_main) {
+      for (int i = 1; i < combined_tsc_calc_files.size(); i++) {
+        log_file << combined_tsc_calc_files[i] << " ";
+        for (int j = 0; j < groups[i].size(); j++) log_file << groups[i][j] << " ";
+        log_file << endl;
       }
     }
+    
     log_file << "Writing tsc file... " << flush;
     result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
