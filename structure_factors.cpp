@@ -537,6 +537,20 @@ void read_atoms_from_CIF(ifstream& cif_input,
     }
   }
 
+  //Add missing atom types to be abel to calc sphericals correctly
+  for (int nr = 0; nr < wave.get_ncen(); nr++) {
+    bool already_there = false;
+    for (int i = 0; i < atom_type_list.size(); i++) {
+      if (atom_type_list[i] == wave.atoms[nr].charge) {
+        already_there = true;
+        break;
+      }
+    }
+    if (already_there == false) {
+      atom_type_list.push_back(wave.atoms[nr].charge);
+    }
+  }
+
   err_checkf(asym_atom_list.size() <= wave.get_ncen(), "More asymmetric unit atoms detected than in the wavefunction! Aborting!", file);
   err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
@@ -1127,6 +1141,9 @@ int make_hirshfeld_grids(const int& pbc,
     if (!needs_grid[i]) {
       continue;
     }
+    if (debug) {
+      file << "Making grid for atom " << i << endl;
+    }
     int type;
     for (int j = 0; j < atom_type_list.size(); j++)
       if (atom_type_list[j] == wave.atoms[i].charge)
@@ -1307,10 +1324,7 @@ int make_hirshfeld_grids(const int& pbc,
   // Dimensions: [a] [d]
   // a = atom number in atom type list for which the weight is calcualted
   // d = distance to look at obtained from point_to_distance_map
-  vector < vector < double > > spherical_density(asym_atom_list.size());
-
-  for (int i = 0; i < asym_atom_list.size(); i++)
-    spherical_density[i].resize(num_points[i]);
+  vector < vector < double > > spherical_density(atoms_with_grids);
 
   const double incr = pow(1.005, max(1, accuracy - 1));
   const double lincr = log(incr);
@@ -1367,6 +1381,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
   }
   sphericals.clear();
+  int type_list_number;
 #pragma omp parallel
   {
 #pragma omp for
@@ -1374,11 +1389,17 @@ int make_hirshfeld_grids(const int& pbc,
       spherical_density[g].resize(num_points[g]);
     }
     for (int i = 0; i < wave.get_ncen(); i++) {
-      int type_list_number = -1;
-      //Determine which type in the type list of sphericals to use
-      for (int j = 0; j < atom_type_list.size(); j++)
-        if (wave.atoms[i].charge == atom_type_list[j])
-          type_list_number = j;
+#pragma omp single
+      {
+        type_list_number = -1;
+        //Determine which type in the type list of sphericals to use
+        for (int j = 0; j < atom_type_list.size(); j++)
+          if (wave.atoms[i].charge == atom_type_list[j])
+            type_list_number = j;
+        if (debug && type_list_number != -1) {
+          file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
+        }
+      }
 #pragma omp for
       for (int g = 0; g < atoms_with_grids; g++) {
         for (int p = 0; p < num_points[g]; p++) {
