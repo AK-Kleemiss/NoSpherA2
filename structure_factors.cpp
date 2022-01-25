@@ -386,7 +386,7 @@ void read_hkl(std::string& hkl_filename,
   }
   hkl_input.close();
   int refl_size = hkl[0].size();
-  file << " done!\nNr of reflections to be used : " << hkl[0].size() << endl;
+  file << " done!\nNr of reflections to be used: " << hkl[0].size() << endl;
 
   if (debug)
     file << "Number of reflections before twin: " << hkl[0].size() << endl;
@@ -2122,7 +2122,6 @@ void make_k_pts(const bool& Olex2_1_3_switch,
       vector <bool> mask(size_, true);
 
       int b = 100;
-
       for (int i = 0; i < size_; i++) {
         for (int j = i + 1; j < size_; j++) {
           if (!mask[j])
@@ -2134,7 +2133,6 @@ void make_k_pts(const bool& Olex2_1_3_switch,
             mask[j] = false;
           }
         }
-
       }
       for (int i = k_pt[0].size() - 1; i >= 0; i--) {
         //if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
@@ -2709,8 +2707,6 @@ bool calculate_structure_factors_HF(
     hkl_unique
   );
 
-  blocky.write_tsc_file(cif);
-
 #ifdef _WIN64
   time_t end = time(NULL);
 
@@ -2736,6 +2732,7 @@ bool calculate_structure_factors_HF(
   else printf("Total Time: %10.1lf h\n", time2 / 3600);
 
 #endif
+  blocky.write_tsc_file(cif);
 
 #ifdef PEOJECT_NAME
 #undef FLO_CUDA
@@ -2765,7 +2762,7 @@ tsc_block calculate_structure_factors_MTC(
 
 #endif
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-  err_checkf(exists(cif), "CIF does not exists!", file);
+  err_checkf(exists(cif), "CIF " +cif+" does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (cpus != -1) {
