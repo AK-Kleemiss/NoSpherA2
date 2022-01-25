@@ -233,7 +233,7 @@ int main(int argc, char** argv)
   if (debug_main) {
     ofstream log("NoSpherA2.log", ios::out);
     for (int i = 0; i < argc; i++) {
-      cout << argv[i] << endl;
+      //cout << argv[i] << endl;
       log << argv[i] << endl;
     }
     log.close();
@@ -278,6 +278,7 @@ int main(int argc, char** argv)
           known_scatterer,
           threads,
           electron_diffraction,
+          0,
           i == 0,
           i != 0
         ), log_file);
@@ -338,7 +339,7 @@ int main(int argc, char** argv)
       if (wavy[i].get_origin() != 7) {
         result.append(calculate_structure_factors_MTC(
           hkl,
-          cif,
+          combined_tsc_calc_cifs[i],
           wavy[i],
           debug_main,
           accuracy,
@@ -348,6 +349,7 @@ int main(int argc, char** argv)
           known_scatterer,
           threads,
           electron_diffraction,
+          0,
           i == 0,
           i != 0
         ), log_file);
@@ -355,7 +357,7 @@ int main(int argc, char** argv)
       else {
         result.append(MTC_thakkar_sfac(
           hkl,
-          cif,
+          combined_tsc_calc_cifs[i],
           debug_main,
           log_file,
           groups[i],

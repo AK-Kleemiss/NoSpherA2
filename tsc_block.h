@@ -135,8 +135,23 @@ public:
     return index[dim][nr];
   };
   const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
-  const unsigned int scatterer_size() { if (sf.size() == scatterer.size()) return sf.size(); else return 0; };
-  const unsigned int reflection_size() { if (sf[0].size() == index[0].size() && index[0].size() == index[1].size() && index[1].size() == index[2].size()) return index[0].size(); else return 0; }
+  const unsigned int scatterer_size() { 
+    if (sf.size() == scatterer.size()) 
+      return sf.size(); 
+    else 
+      return 0; 
+  };
+  const unsigned int reflection_size() { 
+    if (sf.size() == 0 || index.size() == 0) {
+      return 0;
+    }
+    else if (sf[0].size() == index[0].size() && index[0].size() == index[1].size() && index[1].size() == index[2].size()) {
+      return index[0].size();
+    }
+    else {
+      return 0;
+    }
+  }
   void append(tsc_block& rhs, std::ofstream& log)
   {
     if (reflection_size() == 0) {
