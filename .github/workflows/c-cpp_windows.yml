@@ -13,5 +13,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
     - name: make
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
