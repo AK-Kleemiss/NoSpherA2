@@ -23,7 +23,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
 	@echo 'Finished building target: $@'
 
-./unity.o: ../unity1.cpp
+./unity.o: ../unity.cpp
 	@echo 'Building file: $<'
 	g++ -std=c++17 -O3   -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
