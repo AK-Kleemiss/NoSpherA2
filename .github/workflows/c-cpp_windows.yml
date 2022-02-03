@@ -1,4 +1,4 @@
-name: CI MacOS
+name: CI Windows
 
 on:
   push:
@@ -9,9 +9,9 @@ on:
 jobs:
   build:
 
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
     - name: make
-      run: brew install libomp && cd Mac && make
+      run: cd Windows && msbuild -nologo -p:Configuration=Release

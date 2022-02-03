@@ -8,7 +8,7 @@
 #include <io.h>
 #endif
 
-constexpr int get_closest_num_angular(int n)
+int get_closest_num_angular(const int& n)
 {
   int m = 0;
 
@@ -20,7 +20,7 @@ constexpr int get_closest_num_angular(int n)
   return -1;
 };
 
-constexpr int get_angular_order(int n)
+int get_angular_order(const int& n)
 {
   for (int i = 0; i < max_LT; i++) {
     if (lebedev_table[i] == n)
