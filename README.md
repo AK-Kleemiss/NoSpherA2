@@ -12,4 +12,4 @@ NoSpherA2 is publsihed in Chem. Sci., 2021,12, 1675-1692 (https://pubs.rsc.org/e
 
 Olex2 is free for use by OlexSys Ltd. (www.olxsys.org)
 
-The software is provided as-is with no warranty whatsoever.
+The software is provided as-is under the BSD-2 licence. Please see LICENSE for furtehr details!
