@@ -1,4 +1,4 @@
-# wfn2fchk
+# NoSpherA2
 
 ![Windows](https://github.com/floriankleemiss/wfn2fchk/actions/workflows/c-cpp_windows.yml/badge.svg)
 
