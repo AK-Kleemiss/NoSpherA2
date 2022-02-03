@@ -527,7 +527,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
               asym_atom_to_type_list.push_back(i);
               break;
             }
-          if (already_there == false) {
+          if (already_there == false && wave.atoms[nr].charge != 119) {
             asym_atom_to_type_list.push_back(atom_type_list.size());
             atom_type_list.push_back(wave.atoms[nr].charge);
           }
@@ -537,7 +537,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
     }
   }
 
-  //Add missing atom types to be abel to calc sphericals correctly
+  //Add missing atom types to be able to calc sphericals correctly
   for (int nr = 0; nr < wave.get_ncen(); nr++) {
     bool already_there = false;
     for (int i = 0; i < atom_type_list.size(); i++) {
@@ -546,7 +546,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
         break;
       }
     }
-    if (already_there == false) {
+    if (already_there == false && wave.atoms[nr].charge != 119) {
       atom_type_list.push_back(wave.atoms[nr].charge);
     }
   }
@@ -555,7 +555,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
   err_checkf(asym_atom_list.size() != 0, "0 asym atoms is imposible! something is wrong with reading the CIF!", file);
 
   for (int i = 0; i < atom_type_list.size(); i++)
-    err_checkf(atom_type_list[i] <= 113 && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
+    err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
   file << " done!" << endl;
   if (debug) {
     file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -565,7 +565,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
     for (int i = 0; i < asym_atom_to_type_list.size(); i++)
       file << setw(4) << asym_atom_to_type_list[i];
     file << endl;
-    file << "Mapping of asym atoms:" << endl;
+    file << "Charges of atoms:" << endl;
     for (int i = 0; i < wave.get_ncen(); i++)
       file << setw(4) << wave.atoms[i].charge;
     file << endl;
@@ -755,6 +755,9 @@ int make_hirshfeld_grids(const int& pbc,
     int max_l_temp;
     double* alpha_min_temp = new double[max_l_overall];
     for (int j = 0; j < wave.get_ncen(); j++) {
+      if (wave.atoms[j].charge == 119) {
+        continue;
+      }
       if (wave.atoms[j].charge == atom_type_list[i]) {
         if (debug) {
           file << alpha_max[j] << " " << max_l[j] - 1 << " ";
@@ -1334,8 +1337,9 @@ int make_hirshfeld_grids(const int& pbc,
     sphericals.push_back(Thakkar(atom_type_list[i]));
   //Make radial grids
   if (debug) {
+    file << "Size of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
     for (int i = 0; i < atom_type_list.size(); i++) {
-      file << "Calculating for atomic number " << atom_type_list[i] << endl;
+      file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
       double current = 1;
       double dist = min_dist;
       if (accuracy > 3)
@@ -1382,6 +1386,9 @@ int make_hirshfeld_grids(const int& pbc,
   }
   sphericals.clear();
   int type_list_number;
+  if (debug) {
+    file << "Cleared the sphericals!" << endl;
+  }
 #pragma omp parallel
   {
 #pragma omp for
@@ -1398,7 +1405,14 @@ int make_hirshfeld_grids(const int& pbc,
             type_list_number = j;
         if (debug && type_list_number != -1) {
           file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
+        } 
+      }
+      if (type_list_number == -1) {
+#pragma omp single
+        {
+          file << "I skipped an atom! make sure this is okay!" << endl;
         }
+        continue;
       }
 #pragma omp for
       for (int g = 0; g < atoms_with_grids; g++) {

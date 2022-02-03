@@ -382,10 +382,34 @@ int main(int argc, char** argv)
         log_file << endl;
       }
     }
-    
+#ifdef _WIN64
+    time_t start = time(NULL);
+    time_t end_write;
+#else
+    struct timeval t1, t2;
+
+    gettimeofday(&t1, 0);
+#endif
     log_file << "Writing tsc file... " << flush;
     result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
+#ifdef _WIN64
+    end_write = time(NULL);
+
+    if (end_write - start < 60) log_file << "Writing Time: " << fixed << setprecision(0) << end_write - start << " s\n";
+    else if (end_write - start < 3600) log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 60) << " m " << (end_write - start) % 60 << " s\n";
+    else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
+    log_file << endl;
+#else
+    gettimeofday(&t2, 0);
+
+    double time2 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
+
+    if (time2 < 60) printf("Total Time: %4.1lf s\n", time2);
+    else if (time2 < 3600) printf("Total Time: %10.1lf m\n", time2 / 60);
+    else printf("Total Time: %10.1lf h\n", time2 / 3600);
+
+#endif
     return 0;
   }
   if (iam_switch) {

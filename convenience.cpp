@@ -115,6 +115,10 @@ string atnr2letter(const int& nr)
     ,"Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"
   };
   if (nr > 113 || nr <= 0) {
+    if (nr == 119) {
+      //Exception for Q in ECPs from ORCA
+      return "Q";
+    }
     cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-113!" << endl;
     Enter();
     return ("PROBLEM");
