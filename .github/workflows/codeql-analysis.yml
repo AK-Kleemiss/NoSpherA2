@@ -49,11 +49,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
       - name: flawfinder_scan
-        uses: david-a-wheeler/flawfinder@8e4a779ad59dbfaee5da586aa9210853b701959c
+        uses: david-a-wheeler/flawfinder@2.0.19
         with:
           arguments: '--sarif ./'
           output: 'flawfinder_results.sarif'
-
+      - name: Archive executable
+        uses: actions/upload-artifact@v2
+        with:
+          name: executable_Linux
+          path: 'flawfinder_results.sarif'
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v1
         with:
