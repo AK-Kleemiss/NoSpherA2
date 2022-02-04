@@ -50,9 +50,9 @@ jobs:
         uses: actions/checkout@v2
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@8e4a779ad59dbfaee5da586aa9210853b701959c
-          with:
-            arguments: '--sarif ./'
-            output: 'flawfinder_results.sarif'
+        with:
+          arguments: '--sarif ./'
+          output: 'flawfinder_results.sarif'
 
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v1
