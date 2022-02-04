@@ -3739,13 +3739,15 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
       log << setprecision(8) << setw(16) << scientific << acoef[i];
     }
     log << endl << "First of MOs 1-4:" << endl;
+    int temp = 0;
     for (int i = 0; i < 4; i++) {
       if (i % 2 == 0)
         log << endl;
       if (is_spherical)
-        log << setprecision(8) << setw(16) << scientific << acoef[i * nbas5D];
+        temp = i * nbas5D;
       else
-        log << setprecision(8) << setw(16) << scientific << acoef[i * nbas];
+        temp = i * nbas;
+      log << setprecision(8) << setw(16) << scientific << acoef[temp];
     }
   }
   //vector<primitive> basis;
@@ -4286,13 +4288,15 @@ bool WFN::read_fchk(string& filename, ostream& log, bool debug)
       log << setprecision(8) << setw(16) << scientific << acoef[i];
     }
     log << endl << "First of MOs 1-4:" << endl;
+    int temp = 0;
     for (int i = 0; i < 4; i++) {
       if (i % 2 == 0)
         log << endl;
       if (is_spherical)
-        log << setprecision(8) << setw(16) << scientific << acoef[i * nbas5D];
+        temp = i * nbas5D;
       else
-        log << setprecision(8) << setw(16) << scientific << acoef[i * nbas];
+        temp = i * nbas;
+      log << setprecision(8) << setw(16) << scientific << acoef[temp];
     }
   }
   //vector<primitive> basis;
