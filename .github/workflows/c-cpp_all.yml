@@ -1,4 +1,4 @@
-name: CI Combined
+name: CI
 
 on:
   push:
@@ -31,7 +31,7 @@ jobs:
       uses: microsoft/setup-msbuild@v1.1
     - name: make_Windows
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
-    - name: Archive production artifacts
+    - name: Upload .exe
       uses: actions/upload-artifact@v2
       with:
         name: executable_Windows
@@ -45,10 +45,27 @@ jobs:
     - uses: actions/checkout@v2
     - name: make_Linux
       run: cd Linux && make
-    - name: Archive production artifacts
+    - name: Archive executable
       uses: actions/upload-artifact@v2
       with:
         name: executable_Linux
         path: |
           Linux/NoSpherA2
+  combine_all:
     
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: gather executables
+      needs: [build_Linux,build_Mac,build_windows]
+      uses: actions/download-artifact@v2
+      with:
+        name: [executable_Linux,executable_MacOS,executable_Windows]
+    - name: Archive all executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: executables
+        path: |
+          NoSpherA2
+          NoSpherA2.exe
+          NoSpherA2_Mac
