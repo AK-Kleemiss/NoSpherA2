@@ -1326,10 +1326,11 @@ bool WFN::read_xyz(string& filename, ofstream& file, bool debug)
     if (debug) file << i << ".run, line:" << line << endl;
     dum_nr[i] = i;
     temp = split_string<string>(line, " ");
+    remove_empty_elements(temp);
     dum_label[i] = temp[0];
-    dum_x[i] = ang2bohr(stod(temp[2]));
-    dum_y[i] = ang2bohr(stod(temp[3]));
-    dum_z[i] = ang2bohr(stod(temp[4]));
+    dum_x[i] = ang2bohr(stod(temp[1]));
+    dum_y[i] = ang2bohr(stod(temp[2]));
+    dum_z[i] = ang2bohr(stod(temp[3]));
     dum_ch[i] = get_Z_from_label(dum_label[i].c_str()) + 1;
     if (debug) {
       file << "label:" << dum_label[i]
