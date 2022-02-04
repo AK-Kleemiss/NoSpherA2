@@ -1,0 +1,54 @@
+name: CI Combined
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build_Mac:
+
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make_MacOS
+      run: brew install libomp && cd Mac && make && cp NoSpherA2 NoSpherA2_Mac
+    - name: Archive executable
+        uses: actions/upload-artifact@v2
+        with:
+          name: executable_MacOS
+          path: |
+            Mac/NoSpherA2_Mac
+  build_windows:
+
+    runs-on: windows-2022
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.1
+    - name: make_Windows
+      run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+    - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: executable_Windows
+          path: |
+            Windows/x64/Release/NoSpherA2.exe
+  build_Linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make_Linux
+      run: cd Linux && make
+    - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: executable_Linux
+          path: |
+            Linux/NoSpherA2
+    
