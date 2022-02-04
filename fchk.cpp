@@ -596,14 +596,16 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 				if(debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu*(iu+1)/2<< endl;
 				for(int m=0; m < wave.get_nmo(); m++){
 					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
-					if(!wave.set_DM(iuv,wave.get_DM(iuv)+2*CMO[iu+(m*nao)]*CMO[iv+(m*nao)])){
-						cout << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-						cout << "accessing CMO elements: " << iu+(m*nao) << " and " << iv+(m*nao) << " while CMO has size: " << CMO.size() << endl;
-						cout << "CMO[" << iu+(m*nao) << "] = " << CMO[iu*(m*nao)] << "; CMO[" << iv+(m*nao) << "] = " << CMO[iv+(m*nao)] << " DM: " << wave.get_DM(iuv) << endl;
-						cout << "DM_size: " << wave.get_DM_size() << endl;
-						Enter();
-						return false;
-					}
+					const int temp1 = iu + (m * nao);
+					const int temp2 = iv + (m * nao);
+					err_checkc(
+						wave.set_DM(iuv, wave.get_DM(iuv) + 2 * CMO[temp1] * CMO[temp2]), 
+						"Something went wrong while writing the DM! iuv=" + 
+						  to_string(iuv) + " while CMO has size: " + 
+						  to_string(CMO.size()) + "\nCMO[" + to_string(temp1) + "] = " +
+							to_string(CMO[temp1]) + "; CMO[" + to_string(temp2) + "] = " + 
+						  to_string(CMO[temp2]) + " DM: " + to_string(wave.get_DM(iuv)) + 
+						  "\nDM_size: " + to_string(wave.get_DM_size()));
 					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
@@ -1141,14 +1143,16 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 				if(debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu*(iu+1)/2<< endl;
 				for(int m=0; m < wave.get_nmo(); m++){
 					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
-					if(!wave.set_DM(iuv,wave.get_DM(iuv)+wave.get_MO_occ(m)*CMO[iu+(m*nao)]*CMO[iv+(m*nao)])){
-						cout << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-						cout << "accessing CMO elements: " << iu+(m*nao) << " and " << iv+(m*nao) << " while CMO has size: " << CMO.size() << endl;
-						cout << "CMO[" << iu+(m*nao) << "] = " << CMO[iu*(m*nao)] << "; CMO[" << iv+(m*nao) << "] = " << CMO[iv+(m*nao)] << " DM: " << wave.get_DM(iuv) << endl;
-						cout << "DM_size: " << wave.get_DM_size() << endl;
-						Enter();
-						return false;
-					}
+					const int temp1 = iu + (m * nao);
+					const int temp2 = iv + (m * nao);
+					err_checkc(
+						wave.set_DM(iuv, wave.get_DM(iuv) + 2 * CMO[temp1] * CMO[temp2]),
+						"Something went wrong while writing the DM! iuv=" +
+						to_string(iuv) + " while CMO has size: " +
+						to_string(CMO.size()) + "\nCMO[" + to_string(temp1) + "] = " +
+						to_string(CMO[temp1]) + "; CMO[" + to_string(temp2) + "] = " +
+						to_string(CMO[temp2]) + " DM: " + to_string(wave.get_DM(iuv)) +
+						"\nDM_size: " + to_string(wave.get_DM_size()));
 					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
@@ -1948,52 +1952,19 @@ bool free_fchk(ofstream &file, const string& fchk_name, const string& basis_set_
 					if (alpha != beta) {
 						if (m < alpha) {
 							temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-							if (!wave.set_SDM(iuv, wave.get_SDM(iuv) + temp)) {
-								file << "Something went wrong while writing the SDM! iuv=" << iuv << endl;
-								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_SDM(iuv) << endl;
-								file << "SDM_size: " << wave.get_SDM_size() << endl;
-								return false;
-							}
-							if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
-								file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
-								file << "DM_size: " << wave.get_DM_size() << endl;
-								//Enter();
-								return false;
-							}
+							err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv),file);
+							err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
 						}
 						else {
 							temp = wave.get_MO_occ(m) * CMO_beta[iu + ((m-alpha) * nao)] * CMO_beta[iv + ((m-alpha) * nao)];
-							if (!wave.set_SDM(iuv, wave.get_SDM(iuv) - temp)) {
-								file << "Something went wrong while writing the SDM! iuv=" << iuv << endl;
-								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_SDM(iuv) << endl;
-								file << "SDM_size: " << wave.get_SDM_size() << endl;
-								return false;
-							}
-							if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
-								file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-								file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-								file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
-								file << "DM_size: " << wave.get_DM_size() << endl;
-								//Enter();
-								return false;
-							}
+							err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), file);
+							err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
 						}
 					}
 					else {
 						if (wave.get_MO_occ(m) == 0.0) continue;
 						temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-						if (!wave.set_DM(iuv, wave.get_DM(iuv) + temp)) {
-							file << "Something went wrong while writing the DM! iuv=" << iuv << endl;
-							file << "accessing CMO elements: " << iu + (m * nao) << " and " << iv + (m * nao) << " while CMO has size: " << CMO.size() << endl;
-							file << "CMO[" << iu + (m * nao) << "] = " << CMO[iu * (m * nao)] << "; CMO[" << iv + (m * nao) << "] = " << CMO[iv + (m * nao)] << " DM: " << wave.get_DM(iuv) << endl;
-							file << "DM_size: " << wave.get_DM_size() << endl;
-							//Enter();
-							return false;
-						}
+						err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM!", file);
 					}
 					//else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
 				}
