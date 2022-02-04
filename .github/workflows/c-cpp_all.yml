@@ -60,7 +60,10 @@ jobs:
     - name: gather executables
       uses: actions/download-artifact@v2
       with:
-        name: [executable_Linux,executable_MacOS,executable_Windows]
+        name: |
+          executable_Linux
+          executable_MacOS
+          executable_Windows
     - name: Archive all executable
       uses: actions/upload-artifact@v2
       with:
