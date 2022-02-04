@@ -17,3 +17,9 @@ jobs:
       uses: microsoft/setup-msbuild@v1.1
     - name: make
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+    - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: executable_Windows
+          path: |
+            Windows/x64/Release/NoSpherA2.exe
