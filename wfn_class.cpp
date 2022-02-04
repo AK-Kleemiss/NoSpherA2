@@ -5367,7 +5367,7 @@ double WFN::computeMO(
   double temp;
 
   // x, y, z and dsqd
-  vector<vector<float> > d(4);
+  vector<vector<double> > d(4);
   for (int i = 0; i < 4; i++)
     d[i].resize(ncen);
 
@@ -5396,7 +5396,7 @@ double WFN::computeMO(
     }
     result += MOs[mo].get_coefficient_f(j) * ex;      //build MO values at this point
   }
-  shrink_vector<vector<float>>(d);
+  shrink_vector<vector<double>>(d);
   return result;
 }
 
