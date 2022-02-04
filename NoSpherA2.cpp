@@ -449,7 +449,6 @@ int main(int argc, char** argv)
     ofstream log_file("NoSpherA2.log", ios::out);
 
     log_file << NoSpherA2_message();
-    cout << NoSpherA2_message();
     //Lets print what was the command line, for debugging
     if (debug_main)
       for (int i = 0; i < argc; i++)
