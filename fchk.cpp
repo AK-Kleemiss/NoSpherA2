@@ -4,7 +4,7 @@
 using namespace std;
 bool debug_fchk=false;
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
-
+/*
 bool chk2fchk(const string &outputname, const string &chk_name, const string &gaussian_path){
 	bool success=false;
 	string fchk_path=gaussian_path;
@@ -78,6 +78,7 @@ bool gaussian(const string &programPath, const bool &debug){
 	else success=true;
 	return success;
 };
+*/
 
 string prepare_gaussian(const string &basis_set_path, const string &fchkname, WFN &wave, const int &ncpus, const float &mem, bool debug){
 	if(exists("gaussian.com")){
@@ -247,6 +248,7 @@ string prepare_gaussian(const string &basis_set_path, const string &fchkname, WF
 	return temp;
 };
 
+/*
 bool new_fchk(const string &basis_set_path, const std::string &fchkname, 
               const std::string &gaussian_path, WFN &wave, const int &ncpus, const float &mem, bool debug){
 	if(debug) debug_fchk=true;
@@ -280,6 +282,7 @@ bool new_fchk(const string &basis_set_path, const std::string &fchkname,
 	}
 	return success;
 };
+*/
 
 bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave, bool &debug, const bool &read){
 	wave.set_modified();
