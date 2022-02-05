@@ -753,7 +753,7 @@ int make_hirshfeld_grids(const int& pbc,
     if (debug) file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
     double alpha_max_temp;
     int max_l_temp;
-    double* alpha_min_temp = new double[max_l_overall];
+    vector<double> alpha_min_temp(max_l_overall);
     for (int j = 0; j < wave.get_ncen(); j++) {
       if (wave.atoms[j].charge == 119) {
         continue;
@@ -847,7 +847,7 @@ int make_hirshfeld_grids(const int& pbc,
       atom_type_list[i],
       alpha_max_temp,
       max_l_temp,
-      alpha_min_temp,
+      alpha_min_temp.data(),
       debug,
       file));
 
@@ -1137,7 +1137,9 @@ int make_hirshfeld_grids(const int& pbc,
 #else
   vector < vector < double > > radial_density(atom_type_list.size());
   vector < vector < double > > radial_dist(atom_type_list.size());
-
+  if (!debug) {
+    file << " ...  " << flush;
+  }
   // get_grid is parallelized, therefore not parallel here
   for (int i = 0; i < wave.get_ncen(); i++) {
     //skip atoms, that do not need a grid
@@ -1197,7 +1199,7 @@ int make_hirshfeld_grids(const int& pbc,
   for (int i = 0; i < atoms_with_grids; i++)
     points += num_points[i];
   if (debug) file << "Becke Grid exists" << endl;
-  else file << "                                 done! Number of gridpoints: " << defaultfloat << points << endl;
+  else file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
 #ifdef _WIN64
   if (debug) {
