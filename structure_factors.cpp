@@ -610,8 +610,8 @@ int make_hirshfeld_grids(const int& pbc,
   const int nr_of_atoms = (wave.get_ncen() * (int)pow(pbc * 2 + 1, 3));
   vector<double> x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
   vector<int> atom_z(nr_of_atoms);
-  double* alpha_max = new double[wave.get_ncen()];
-  int* max_l = new int[wave.get_ncen()];
+  vector<double> alpha_max(wave.get_ncen());
+  vector<int> max_l(wave.get_ncen());
   int max_l_overall = 0;
 #pragma omp parallel for
   for (int i = 0; i < atoms_with_grids; i++)
@@ -676,9 +676,9 @@ int make_hirshfeld_grids(const int& pbc,
   if (debug)
     file << "Atoms are there!" << endl;
 
-  double** alpha_min = new double* [wave.get_ncen()];
+  vector<vector<double>> alpha_min(wave.get_ncen());
   for (int i = 0; i < wave.get_ncen(); i++)
-    alpha_min[i] = new double[max_l_overall];
+    alpha_min[i].resize(max_l_overall, 100000000.0);
 
 #pragma omp parallel for
   for (int i = 0; i < wave.get_ncen(); i++) {
