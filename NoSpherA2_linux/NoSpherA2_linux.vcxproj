@@ -1,129 +1,61 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
-    <ProjectConfiguration Include="Debug_fchk_generation|Win32">
-      <Configuration>Debug_fchk_generation</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_fchk_generation|x64">
       <Configuration>Debug_fchk_generation</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_Fractal|Win32">
-      <Configuration>Debug_Fractal</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_Fractal|x64">
       <Configuration>Debug_Fractal</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_grown|Win32">
-      <Configuration>Debug_grown</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_IAM_SF|Win32">
-      <Configuration>Debug_IAM_SF</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_IAM_SF|x64">
       <Configuration>Debug_IAM_SF</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_merge_tscs|Win32">
-      <Configuration>Debug_merge_tscs</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_merge_tscs|x64">
       <Configuration>Debug_merge_tscs</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_PBC_CaF2|Win32">
-      <Configuration>Debug_PBC_CaF2</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_PBC_CaF2|x64">
       <Configuration>Debug_PBC_CaF2</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_PDF|Win32">
-      <Configuration>Debug_PDF</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_PDF|x64">
       <Configuration>Debug_PDF</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_properties|Win32">
-      <Configuration>Debug_properties</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_properties|x64">
       <Configuration>Debug_properties</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_SFAC|Win32">
-      <Configuration>Debug_SFAC</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SFAC|x64">
       <Configuration>Debug_SFAC</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_SF_Disorder|Win32">
-      <Configuration>Debug_SF_Disorder</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SF_Disorder|x64">
       <Configuration>Debug_SF_Disorder</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_SF_kpts_file|Win32">
-      <Configuration>Debug_SF_kpts_file</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SF_kpts_file|x64">
       <Configuration>Debug_SF_kpts_file</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_SF_MTC_Disorder|Win32">
-      <Configuration>Debug_SF_MTC_Disorder</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SF_MTC_Disorder|x64">
       <Configuration>Debug_SF_MTC_Disorder</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_SF|Win32">
-      <Configuration>Debug_SF</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SF|x64">
       <Configuration>Debug_SF</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_Fchk|Win32">
-      <Configuration>Debug_Fchk</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Debug_tsc_merge|Win32">
-      <Configuration>Debug_tsc_merge</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_tsc_merge|x64">
       <Configuration>Debug_tsc_merge</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
-    <ProjectConfiguration Include="Publish|Win32">
-      <Configuration>Publish</Configuration>
-      <Platform>Win32</Platform>
-    </ProjectConfiguration>
     <ProjectConfiguration Include="Publish|x64">
       <Configuration>Publish</Configuration>
       <Platform>x64</Platform>
-    </ProjectConfiguration>
-    <ProjectConfiguration Include="Release|Win32">
-      <Configuration>Release</Configuration>
-      <Platform>Win32</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_Fchk|x64">
       <Configuration>Debug_Fchk</Configuration>
