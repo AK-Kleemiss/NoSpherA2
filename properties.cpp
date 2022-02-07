@@ -616,7 +616,7 @@ void Calc_Prop(
   int cpus,
   double radius,
   ofstream& file,
-  bool no_time
+  bool test
 )
 {
 #ifdef _OPENMP
@@ -764,7 +764,7 @@ void Calc_Prop(
       progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
   }
   delete(progress);
-  if (no_time) {
+  if (!test) {
     time_t end;
     time(&end);
     if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;

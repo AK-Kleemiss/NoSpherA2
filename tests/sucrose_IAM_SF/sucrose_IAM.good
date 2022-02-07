@@ -1,0 +1,21 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692
+Number of protons: 182
+Reading: sucrose.hklReading:                                  sucrose.hkl done!
+Nr of reflections to be used: 3318
+Remove duplicate reflections...                       done!
+Nr of reflections to be used: 1978
+Reading:                                  sucrose.cif done!
+Number of symmetry operations: 2
+Number of k-points from reflections: 3956
+Determining unique k-points...  ... Done!
+Number of k-points to evaluate: 3726 for 0 gridpoints.
+
+Writing tsc file...

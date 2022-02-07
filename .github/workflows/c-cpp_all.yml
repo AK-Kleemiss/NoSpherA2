@@ -51,6 +51,19 @@ jobs:
         name: executable_Linux
         path: |
           Linux/NoSpherA2
+  tests:
+    runs-on: ubuntu-latest
+    needs: build_Linux
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Get executable
+      uses: actions/download-artifact@v2
+      with:
+        name: executable_Linux
+    - name: Run tests
+      run: cd tests && make all -k
+
   combine_all:
     
     runs-on: ubuntu-latest
