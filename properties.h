@@ -50,7 +50,8 @@ void Calc_Prop(
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ofstream& file,
+	bool no_time
 );
 void Calc_ESP(
 	cube& CubeESP,

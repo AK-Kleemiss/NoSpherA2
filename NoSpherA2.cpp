@@ -66,6 +66,7 @@ int main(int argc, char** argv)
   vector < vector <double> > twin_law;
   vector < vector <int> > combined_tsc_groups;
   bool all_mos = false;
+  bool test = false;
   groups.resize(1);
   for (int i = 0; i < argc; i++) {
     temp = argv[i];
@@ -100,6 +101,8 @@ int main(int argc, char** argv)
       cout << "Turning on verbose mode 2!" << endl, debug_all = debug_main = true;
     else if (temp.find("-v") < 1)
       cout << "Turning on verbose mode!" << endl, debug_main = true;
+    else if (temp.find("-test") < 1)
+      cout << "Running in test mode!" << endl, test = true;
     else if (temp.find("-eli") < 1)
       calc = eli = true;
     else if (temp.find("-elf") < 1)
@@ -681,7 +684,7 @@ int main(int argc, char** argv)
           temp.set_vector(i, j, cell_matrix[i][j]);
       }
       if (hdef || hirsh) {
-        log2 << "Calcualting spheircal Rho...";
+        log2 << "Calcualting spherical Rho...";
         Calc_Spherical_Dens(temp, wavy[0], ncpus, radius, log2);
         log2 << " ...done!" << endl;
       }
@@ -713,7 +716,7 @@ int main(int argc, char** argv)
     }
 
     if (lap || eli || elf || rdg || esp)
-      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], ncpus, radius, log2);
+      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], ncpus, radius, log2, test);
 
     log2 << "Writing cubes to Disk..." << flush;
     if (rdg) {

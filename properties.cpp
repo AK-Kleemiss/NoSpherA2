@@ -615,7 +615,8 @@ void Calc_Prop(
   WFN& wavy,
   int cpus,
   double radius,
-  ofstream& file
+  ofstream& file,
+  bool no_time
 )
 {
 #ifdef _OPENMP
@@ -763,12 +764,13 @@ void Calc_Prop(
       progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
   }
   delete(progress);
-
-  time_t end;
-  time(&end);
-  if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
-  else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+  if (no_time) {
+    time_t end;
+    time(&end);
+    if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
+    else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+    else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+  }
 };
 
 void Calc_ESP(
