@@ -1,6 +1,6 @@
 RM := rm
 
-all: sucrose_SF sucrose_IAM fractal disorder_THPP grown_water
+all: sucrose_SF sucrose_IAM fractal disorder_THPP grown_water properties
 
 sucrose_SF:
 	@echo 'Running test: $@'
@@ -45,6 +45,14 @@ fractal:
 	cd sucrose_fchk_SF && ../../NoSpherA2 \
 		-fractal sucrose_diff.cube \
 		&& cp NoSpherA2.log $@.log
+	@echo 'Finished running: $@'
+	
+properties:
+	@echo 'Running test: $@'
+	cd sucrose_fchk_SF && ../../NoSpherA2 \
+		-wfn olex2/Wfn_job/sucrose.wfx \
+		-cif sucrose.cif -lap -eli -resolution 0.5 \
+		&& cp NoSpherA2_cube.log $@.log
 	@echo 'Finished running: $@'
 
 clean:
