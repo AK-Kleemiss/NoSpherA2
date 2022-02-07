@@ -667,14 +667,20 @@ int make_hirshfeld_grids(const int& pbc,
         else if (l >= 21 && l <= 35)
           l = 5;
         max_l[i] = l;
-        if (l > max_l_overall)
-          max_l_overall = l;
+#pragma omp critical
+        {
+          if (l > max_l_overall)
+            max_l_overall = l;
+        }
       }
     }
   }
 
-  if (debug)
-    file << "Atoms are there!" << endl;
+  if (debug) {
+    file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
+    for (int i = 0; i < max_l.size(); i++)
+      file << "max_l: " << setw(5) << max_l[i] << endl;
+  }
 
   vector<vector<double>> alpha_min(wave.get_ncen());
   for (int i = 0; i < wave.get_ncen(); i++)

@@ -24,6 +24,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
 	${RM} ${CPP_DEPS} ${OBJS}
+	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
 
 ./unity.o: ../unity.cpp
