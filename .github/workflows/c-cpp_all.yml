@@ -62,7 +62,7 @@ jobs:
       with:
         name: executable_Linux
     - name: Run tests
-      run: cd tests && make all -k
+      run: chmod +x NoSpherA2 && cd tests && make all -k
 
   combine_all:
     
