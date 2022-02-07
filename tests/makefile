@@ -1,14 +1,18 @@
 RM := rm
 
-all: sucrose_SF sucrose_IAM fractal disorder_THPP grown_water properties
+DIFF := diff -q -i
+
+all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties
 
 sucrose_SF:
 	@echo 'Running test: $@'
 	cd sucrose_fchk_SF && ../../NoSpherA2 \
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
-		-wfn olex2/Wfn_job/sucrose.wfx -acc 1\
-		&& cp NoSpherA2.log $@.log
+		-wfn olex2/Wfn_job/sucrose.wfx \
+		-acc 1\
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 sucrose_IAM:
@@ -17,7 +21,19 @@ sucrose_IAM:
 		-cif sucrose.cif \
 		-hkl sucrose.hkl \
 		-xyz sucrose.xyz -IAM\
-		&& cp NoSpherA2.log $@.log
+		&& mv NoSpherA2.log $@.log\
+		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+	
+sucrose_twin:
+	@echo 'Running test: $@'
+	cd sucrose_fchk_SF && ../../NoSpherA2 \
+		-cif sucrose.cif \
+		-hkl olex2/Wfn_job/sucrose.hkl \
+		-wfn olex2/Wfn_job/sucrose.wfx \
+		-acc 1 \
+		-twin 1 0 0 0 -1 0 0 1 -2\
+		&& mv NoSpherA2.log $@.log
 	@echo 'Finished running: $@'
 
 disorder_THPP:
@@ -26,8 +42,10 @@ disorder_THPP:
 		-cif thpp.cif \
 		-hkl thpp.hkl \
 		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1\
-		olex2/Wfn_job/Part_2/thpp.wfx 0,2 -acc 1\
-		&& cp NoSpherA2.log $@.log
+		olex2/Wfn_job/Part_2/thpp.wfx 0,2\
+		-acc 1\
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 grown_water:
@@ -37,22 +55,26 @@ grown_water:
 		-hkl water.hkl \
 		-wfn water.wfx \
 		-acc 1 \
-		&& cp NoSpherA2.log $@.log
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 fractal:
 	@echo 'Running test: $@'
 	cd sucrose_fchk_SF && ../../NoSpherA2 \
 		-fractal sucrose_diff.cube \
-		&& cp NoSpherA2.log $@.log
+		&& mv sucrose_diff.cube_fractal_plot $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 	
 properties:
 	@echo 'Running test: $@'
 	cd sucrose_fchk_SF && ../../NoSpherA2 \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-cif sucrose.cif -lap -eli -resolution 0.5 \
-		&& cp NoSpherA2_cube.log $@.log
+		-cif sucrose.cif -lap -eli\
+		-resolution 0.5 -test \
+		&& mv NoSpherA2_cube.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 clean:

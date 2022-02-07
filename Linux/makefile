@@ -33,7 +33,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Finished building: $<'
 
 clean:
-	-${RM} ${CPP_DEPS} ${OBJS} NoSpherA2
+	-${RM} NoSpherA2 ../NoSpherA2
 	-@echo ' '
 
 .PHONY: all clean dependents
