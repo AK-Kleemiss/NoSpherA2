@@ -51,7 +51,7 @@ void Calc_Prop(
 	int cpus,
 	double radius,
 	std::ofstream& file,
-	bool no_time
+	bool test
 );
 void Calc_ESP(
 	cube& CubeESP,
