@@ -76,7 +76,7 @@ public:
     index = given_index;
     anomalous_dispersion = false;
   };
-  tsc_block() {};
+  tsc_block() { anomalous_dispersion = false; };
   ~tsc_block()
   {
     for (int i = 0; i < sf.size(); i++) {
@@ -247,6 +247,7 @@ public:
       tsc_file << std::endl;
     }
     tsc_file.close();
+    err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
   }
 };
 
