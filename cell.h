@@ -147,7 +147,7 @@ public:
     return crystal_system;
   }
 
-  double get_d_of_hkl(const std::vector<int> hkl, std::ofstream& file, bool debug = false)
+  double get_d_of_hkl(const std::vector<int> hkl)
   {
     double d, upper, lower;
     // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
@@ -157,9 +157,9 @@ public:
     return d;
   }
 
-  double get_stl_of_hkl(const std::vector<int> hkl, std::ofstream& file, bool debug = false)
+  double get_stl_of_hkl(const std::vector<int> hkl)
   {
-    return 1.0 / (2 * get_d_of_hkl(hkl, file, debug));
+    return 1.0 / (2 * get_d_of_hkl(hkl));
   }
 
   void make_coords_cartesian(double* positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true)
