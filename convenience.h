@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <omp.h>
 #include <regex>
+#include <algorithm>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
