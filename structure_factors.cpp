@@ -480,6 +480,9 @@ void read_atoms_from_CIF(ifstream& cif_input,
           get_decimal_precision_from_CIF_number(fields[position_field[0]]), 
           get_decimal_precision_from_CIF_number(fields[position_field[1]]), 
           get_decimal_precision_from_CIF_number(fields[position_field[2]]));
+        for (int i = 0; i < 3; i++) {
+          precisions[i] = abs(precisions[i]);
+        }
         if (debug) file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
         bool old_atom = false;
 #pragma omp parallel for reduction(||:old_atom)
@@ -494,9 +497,9 @@ void read_atoms_from_CIF(ifstream& cif_input,
           continue;
         }
         for (int i = 0; i < wave.get_ncen(); i++) {
-          if (is_similar_abs(position[0], wave.atoms[i].x, precisions[0])
-            && is_similar_abs(position[1], wave.atoms[i].y, precisions[1])
-            && is_similar_abs(position[2], wave.atoms[i].z, precisions[2])) {
+          if ( is_similar_abs(position[0], wave.atoms[i].x, max(min(precisions[0],1.0),0.01))
+            && is_similar_abs(position[1], wave.atoms[i].y, max(min(precisions[1],1.0),0.01))
+            && is_similar_abs(position[2], wave.atoms[i].z, max(min(precisions[2],1.0),0.01))) {
             string element = atnr2letter(wave.atoms[i].charge);
             string label = fields[label_field];
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);

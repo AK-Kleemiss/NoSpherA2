@@ -99,7 +99,7 @@ bool is_similar(const double& first, const double& second, const double& toleran
 bool is_similar_abs(const double& first, const double& second, const double& tolerance)
 {
   double diff = abs(first - second);
-  if (diff > tolerance)
+  if (diff > abs(tolerance))
     return false;
   else
     return true;
@@ -1956,6 +1956,6 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
   else {
     digits = close_bracket - open_bracket - 1;
   }
-  result = precision * pow(10, -digits);
+  result = abs(precision * pow(10, -digits));
   return result;
 };
