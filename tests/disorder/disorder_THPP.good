@@ -94,4 +94,5 @@ Size of k_points: 5832
 Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors =============         [ 65%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
 
 Writing tsc file...
+Final number of atoms in .tsc file: 32
 Writing tsc file...  ... done!

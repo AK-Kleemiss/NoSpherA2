@@ -96,6 +96,15 @@ bool is_similar(const double& first, const double& second, const double& toleran
     return true;
 };
 
+bool is_similar_abs(const double& first, const double& second, const double& tolerance)
+{
+  double diff = abs(first - second);
+  if (diff > tolerance)
+    return false;
+  else
+    return true;
+};
+
 void cls()
 {
   //    cout << string( 100, '\n' );
@@ -1913,4 +1922,40 @@ double get_lambda_1(double* a)
     else
       return eig3;
   }
+};
+
+double get_decimal_precision_from_CIF_number(string& given_string) {
+  int len = given_string.length();
+  int open_bracket = -1;
+  int close_bracket = -1;
+  int decimal_point = -1;
+  const char* gs = given_string.c_str();
+  for (int i = 0; i < len; i++) {
+    if (given_string[i] == '(' && open_bracket == -1) {
+      open_bracket = i;
+    }
+    else if (given_string[i] == ')' && close_bracket == -1) {
+      close_bracket = i;
+    }
+    else if (given_string[i] == '.' && decimal_point == -1) {
+      decimal_point = i;
+    }
+  }
+  double result = 0;
+  int precision = 1;
+  int size_of_precision = 1;
+  if (open_bracket != -1 && close_bracket != -1){
+    size_of_precision = close_bracket - open_bracket - 1;
+    string temp = given_string.substr(open_bracket + 1, size_of_precision);
+    precision = stoi(temp);
+  }
+  int digits = 0;
+  if (decimal_point != -1) {
+    digits = open_bracket - decimal_point - 1;
+  }
+  else {
+    digits = close_bracket - open_bracket - 1;
+  }
+  result = precision * pow(10, -digits);
+  return result;
 };

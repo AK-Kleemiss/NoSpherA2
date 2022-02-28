@@ -95,10 +95,16 @@ inline const double covalent_radii[114]{
 bool yesno();
 bool is_similar_rel(const double& first, const double& second, const double& tolerance);
 bool is_similar(const double& first, const double& second, const double& tolerance);
+bool is_similar_abs(const double& first, const double& second, const double& tolerance);
 void Enter();
 void cls();
 std::string get_home_path(void);
 void join_path(std::string& s1, std::string& s2);
+inline char asciitolower(char in) {
+  if (in <= 'Z' && in >= 'A')
+    return in - ('Z' - 'z');
+  return in;
+}
 inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& error_mesasge, std::ofstream& log_file)
 {
   if (!condition) {
@@ -406,19 +412,15 @@ inline double double_from_string_with_esd(std::string in)
   else
     return stod(in.substr(0, in.find('(')));
 }
-/*
-constexpr double Laguerre_ploynom(int n, double x) {
-  if (n == 0) return 1;
-  else if (n == 1) return 1 - x;
-  else return (((int(2) * n + int(1) - x) * Laguerre_ploynom(n - 1, x) - n * Laguerre_ploynom(n - 2, x)) / (n + int(1)));
-}
-*/
+
 void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v);
 
 void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v);
 
 //Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
 double get_lambda_1(double* a);
+
+double get_decimal_precision_from_CIF_number(std::string& given_string);
 
 #include "wfn_class.h"
 
