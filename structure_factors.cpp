@@ -468,33 +468,50 @@ void read_atoms_from_CIF(ifstream& cif_input,
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
         fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
-        if (debug) file << "label: " << fields[label_field] << " frac. pos: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << flush;
-        vector <double> position = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
-        if (debug) file << " cart. pos.: " << position[0] << " " << position[1] << " " << position[2] << endl;
+        if (debug) file << "label: " << setw(8) << fields[label_field] << " frac. pos: " 
+            << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
+            << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
+            << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+        vector <double> position = unit_cell.get_coords_cartesian(
+          stod(fields[position_field[0]]), 
+          stod(fields[position_field[1]]), 
+          stod(fields[position_field[2]]));
+        vector <double> precisions = unit_cell.get_coords_cartesian(
+          get_decimal_precision_from_CIF_number(fields[position_field[0]]), 
+          get_decimal_precision_from_CIF_number(fields[position_field[1]]), 
+          get_decimal_precision_from_CIF_number(fields[position_field[2]]));
+        if (debug) file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
+        bool old_atom = false;
+#pragma omp parallel for reduction(||:old_atom)
+        for (int run = 0; run < known_atoms.size(); run++) {
+          if (fields[label_field] == known_atoms[run]) {
+            old_atom = true;
+            if (debug) file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
+          }
+        }
+        if (old_atom) {
+          getline(cif_input, line);
+          continue;
+        }
         for (int i = 0; i < wave.get_ncen(); i++) {
-          if (is_similar(position[0], wave.atoms[i].x, -1)
-            && is_similar(position[1], wave.atoms[i].y, -1)
-            && is_similar(position[2], wave.atoms[i].z, -1)) {
+          if (is_similar_abs(position[0], wave.atoms[i].x, precisions[0])
+            && is_similar_abs(position[1], wave.atoms[i].y, precisions[1])
+            && is_similar_abs(position[2], wave.atoms[i].z, precisions[2])) {
+            string element = atnr2letter(wave.atoms[i].charge);
+            string label = fields[label_field];
+            std::transform(element.begin(), element.end(), element.begin(), asciitolower);
+            std::transform(label.begin(), label.end(), label.begin(), asciitolower);
             if (debug) {
-              file << "ASYM: " << fields[label_field] << " charge: " << wave.atoms[i].charge << " wfn cart. pos: " << wave.atoms[i].x << " " << wave.atoms[i].y << " " << wave.atoms[i].z << flush;
+              file << "ASYM:  " << setw(8) << fields[label_field] << " charge: " << setw(17) << wave.atoms[i].charge << "                          wfn cart. pos: "
+                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
+                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].y << " "
+                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].z << flush;
               if (input_groups.size() > 0) {
                 file << " checking disorder group: " << fields[group_field] << " vs. ";
                 for (int g = 0; g < input_groups.size(); g++)
                   file << input_groups[g] << ",";
-                file << endl;
-              }
-              else {
-                file << endl;
               }
             }
-            bool old_atom = false;
-#pragma omp parallel for reduction(||:old_atom)
-            for (int run = 0; run < known_atoms.size(); run++)
-              if (fields[label_field] == known_atoms[run]) {
-                old_atom = true;
-                if (debug) file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
-              }
-            if (old_atom) continue;
             if (input_groups.size() > 0) {
               bool yep = false;
               for (int g = 0; g < input_groups.size(); g++) {
@@ -511,6 +528,10 @@ void read_atoms_from_CIF(ifstream& cif_input,
                 continue;
               }
             }
+            if (label.find(element) == string::npos) {
+              if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
+              continue;
+            }
             wave.atoms[i].label = fields[label_field];
             asym_atom_list.push_back(i);
             needs_grid[i] = true;
@@ -518,7 +539,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
             break;
           }
         }
-        if (debug) file << " type nr= " << nr << endl;
+        if (debug) file << " nr= " << nr << endl;
         if (nr != -1) {
           bool already_there = false;
           for (int i = 0; i < atom_type_list.size(); i++)
@@ -530,6 +551,11 @@ void read_atoms_from_CIF(ifstream& cif_input,
           if (already_there == false && wave.atoms[nr].charge != 119) {
             asym_atom_to_type_list.push_back(atom_type_list.size());
             atom_type_list.push_back(wave.atoms[nr].charge);
+          }
+        }
+        else if (!old_atom) {
+          if (debug) {
+            file << "I did not find this atom!" << endl;
           }
         }
         getline(cif_input, line);
@@ -2341,7 +2367,7 @@ void convert_to_ED(const vector <int>& asym_atom_list,
   double h2;
 #pragma omp parallel for private(h2)
   for (int s = 0; s < hkl_unique[0].size(); s++) {
-    h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug), 2);
+    h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
       sf[i][s] = complex<double>(fact * (wave.atoms[asym_atom_list[i]].charge - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
   }
@@ -2435,7 +2461,7 @@ bool thakkar_sfac(
 
 #pragma omp parallel for
   for (int s = 0; s < smax; s++) {
-    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug);
+    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] });
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
@@ -2445,7 +2471,7 @@ bool thakkar_sfac(
     double h2;
 #pragma omp parallel for private(h2)
     for (int s = 0; s < smax; s++) {
-      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug), 2);
+      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
       for (int i = 0; i < imax; i++)
         sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
     }
@@ -2558,7 +2584,7 @@ tsc_block MTC_thakkar_sfac(
 
 #pragma omp parallel for
   for (int s = 0; s < smax; s++) {
-    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug);
+    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] });
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
@@ -2568,7 +2594,7 @@ tsc_block MTC_thakkar_sfac(
     double h2;
 #pragma omp parallel for private(h2)
     for (int s = 0; s < smax; s++) {
-      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }, file, debug), 2);
+      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
       for (int i = 0; i < imax; i++)
         sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
     }

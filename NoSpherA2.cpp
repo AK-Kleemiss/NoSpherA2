@@ -311,10 +311,24 @@ int main(int argc, char** argv)
         log_file << endl;
       }
     }
-    
+    known_scatterer = result.get_scatterers();
+    log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
+#ifdef _WIN64
+    time_t start = time(NULL);
+    time_t end_write;
+#endif
     log_file << "Writing tsc file... " << flush;
     result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
+#ifdef _WIN64
+    end_write = time(NULL);
+
+    if (end_write - start < 60) log_file << "Writing Time: " << fixed << setprecision(0) << end_write - start << " s\n";
+    else if (end_write - start < 3600) log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 60) << " m " << (end_write - start) % 60 << " s\n";
+    else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
+    log_file << endl;
+#endif
+    log_file.close();
     return 0;
   }
   if (cif_based_combined_tsc_calc) {
@@ -385,13 +399,11 @@ int main(int argc, char** argv)
         log_file << endl;
       }
     }
+    known_scatterer = result.get_scatterers();
+    log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
 #ifdef _WIN64
     time_t start = time(NULL);
     time_t end_write;
-#else
-    struct timeval t1, t2;
-
-    gettimeofday(&t1, 0);
 #endif
     log_file << "Writing tsc file... " << flush;
     result.write_tsc_file(cif);
@@ -403,16 +415,8 @@ int main(int argc, char** argv)
     else if (end_write - start < 3600) log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 60) << " m " << (end_write - start) % 60 << " s\n";
     else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
     log_file << endl;
-#else
-    gettimeofday(&t2, 0);
-
-    double time2 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (time2 < 60) printf("Total Time: %4.1lf s\n", time2);
-    else if (time2 < 3600) printf("Total Time: %10.1lf m\n", time2 / 60);
-    else printf("Total Time: %10.1lf h\n", time2 / 3600);
-
 #endif
+    log_file.close();
     return 0;
   }
   if (iam_switch) {
@@ -540,24 +544,6 @@ int main(int argc, char** argv)
         log2 << argv[i] << endl;
     log2 << NoSpherA2_message();
     log2.flush();
-#ifdef _WIN32
-    if (debug_main) {
-      log2 << "float min: " << dec << FLT_MIN << endl;
-      log2 << "float max: " << dec << FLT_MAX << endl;
-      log2 << "float Min_exp: " << dec << FLT_MIN_EXP << endl;
-      log2 << "float Max_exp: " << dec << FLT_MAX_EXP << endl;
-
-      log2 << "double min: " << dec << DBL_MIN << endl;
-      log2 << "double max: " << dec << DBL_MAX << endl;
-      log2 << "double Min_exp: " << dec << DBL_MIN_EXP << endl;
-      log2 << "double Max_exp: " << dec << DBL_MAX_EXP << endl;
-
-      log2 << "long double min: " << dec << LDBL_MIN << endl;
-      log2 << "long double max: " << dec << LDBL_MAX << endl;
-      log2 << "long double Min_exp: " << dec << LDBL_MIN_EXP << endl;
-      log2 << "long double Max_exp: " << dec << LDBL_MAX_EXP << endl;
-    }
-#endif
 
     err_checkf(wfn != "", "Error, no wfn file specified!", log2);
     wavy.push_back(WFN(0));
