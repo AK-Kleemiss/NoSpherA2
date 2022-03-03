@@ -5345,7 +5345,7 @@ void WFN::computeLapELI(
     const double occ = get_MO_occ(mo);
     const double docc = 2 * occ;
     if (occ != 0) {
-      phi_temp = &phi[mo * 10];
+      phi_temp = &phi[mo * 7];
       Rho += occ * pow(*phi_temp, 2);
       Grad[0] += docc * *phi_temp * phi_temp[1];
       Grad[1] += docc * *phi_temp * phi_temp[2];
