@@ -304,63 +304,68 @@ double linear_interpolate_spherical_density(
 }
 #endif
 
-void read_k_points(vector<vector<double>>& k_pt, vector<vector<int>>& hkl, ofstream& file)
+void read_k_points(vector<vector<double>>& k_pt, hkl_list& hkl, ofstream& file)
 {
   err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
   file << "Reading: kpts.dat" << flush;
   ifstream k_points_file("kpts.dat", ios::binary);
   err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
-  int nr[1];
+  int nr[1]{ 0 };
   k_points_file.read((char*)&nr, sizeof(nr));
   file << " expecting " << nr[0] << " k points... " << flush;
-  double temp[1];
-  int hkl_temp[1];
+  double temp[1]{ 0.0 };
+  int hkl_temp[1]{ 0 };
   k_pt.resize(3);
-  hkl.resize(3);
-  for (int run = 0; run < nr[0]; run++)
+  vector<int> hkl_(3);
+  for (int run = 0; run < nr[0]; run++) {
     for (int i = 0; i < 3; i++) {
       k_points_file.read((char*)&temp, sizeof(temp));
       k_pt[i].push_back(temp[0]);
       k_points_file.read((char*)&hkl_temp, sizeof(hkl_temp));
-      hkl[i].push_back(hkl_temp[0]);
+      hkl_[i] = hkl_temp[0];
     }
+    hkl.emplace(hkl_);
+  }
   err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
   file << " done!" << endl << "Size of k_points: " << k_pt[0].size() << endl;
   k_points_file.close();
 }
 
-void save_k_points(vector<vector<double>>& k_pt, vector<vector<int>>& hkl)
+void save_k_points(vector<vector<double>>& k_pt, hkl_list& hkl)
 {
   ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
   int nr[1] = { (int)k_pt[0].size() };
   k_points_file.write((char*)&nr, sizeof(nr));
   double temp[1]{ 0.0 };
   int hkl_temp[1]{ 0 };
+  hkl_list_it hkl_ = hkl.begin();
   for (int run = 0; run < nr[0]; run++) {
     for (int i = 0; i < 3; i++) {
       temp[0] = k_pt[i][run];
       k_points_file.write((char*)&temp, sizeof(temp));
-      hkl_temp[0] = hkl[i][run];
+      hkl_temp[0] = (*hkl_)[i];
       k_points_file.write((char*)&hkl_temp, sizeof(hkl_temp));
     }
+    hkl_ = next(hkl_);
   }
   k_points_file.flush();
   k_points_file.close();
 }
 
 void read_hkl(std::string& hkl_filename,
-  vector<vector<int>>& hkl,
+  hkl_list& hkl,
   vector<vector<double>>& twin_law,
+  cell& unit_cell,
   ofstream& file,
   bool debug = false)
 {
   file << "Reading: " << setw(44) << hkl_filename << flush;
-  hkl.resize(3);
+  vector<int> hkl_(3);
   err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
   ifstream hkl_input(hkl_filename.c_str(), ios::in);
   hkl_input.seekg(0, hkl_input.beg);
   regex r{ R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])" };
-  string line;
+  string line, temp;
   while (!hkl_input.eof()) {
     getline(hkl_input, line);
     if (hkl_input.eof())
@@ -372,44 +377,83 @@ void read_hkl(std::string& hkl_filename,
       continue;
     //if (debug) file << "hkl: ";
     for (int i = 0; i < 3; i++) {
-      string temp = line.substr(4 * size_t(i) + 1, 3);
+      temp = line.substr(4 * size_t(i) + 1, 3);
       temp.erase(remove_if(temp.begin(), temp.end(), ::isspace), temp.end());
-      hkl[i].push_back(stoi(temp));
+      hkl_[i] = stoi(temp);
       //if (debug) file << setw(4) << temp;
     }
     //if (debug) file << endl;
-    if (hkl[0][hkl[0].size() - 1] == 0 && hkl[1][hkl[0].size() - 1] == 0 && hkl[2][hkl[0].size() - 1] == 0) {
-      if (debug) file << "popping back 0 0 0" << endl;
-      for (int i = 0; i < 3; i++)
-        hkl[i].pop_back();
-    }
+    hkl.emplace(hkl_);
+  }
+  hkl_list_it found = hkl.find(vector<int> {0,0,0});
+  if(found != hkl.end()) {
+    if (debug) file << "popping back 0 0 0" << endl;
+    hkl.erase(vector<int>{0,0,0});
   }
   hkl_input.close();
-  int refl_size = hkl[0].size();
-  file << " done!\nNr of reflections to be used: " << hkl[0].size() << endl;
+  file << " done!\nNr of reflections read from file: " << hkl.size() << endl;
 
   if (debug)
-    file << "Number of reflections before twin: " << hkl[0].size() << endl;
-  for (int len = 0; len < refl_size; len++)
-    for (int i = 0; i < twin_law.size(); i++)
-      for (int h = 0; h < 3; h++)
-        hkl[h].push_back(int(twin_law[i][0 + 3 * h] * hkl[0][len] + twin_law[i][1 + 3 * h] * hkl[1][len] + twin_law[i][2 + 3 * h] * hkl[2][len]));
+    file << "Number of reflections before twin: " << hkl.size() << endl;
+  if (twin_law.size() > 0) {
+    for (const vector<int>& hkl__ : hkl)
+      for (int i = 0; i < twin_law.size(); i++)
+        hkl.emplace(vector<int>{
+          int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+          int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+          int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])
+        });
+  }
   if (debug)
-    file << "Number of reflections after twin: " << hkl[0].size() << endl;
+    file << "Number of reflections after twin: " << hkl.size() << endl;
 
-  file << "Remove duplicate reflections...";
-  file.flush();
-  for (int i = 0; i < hkl[0].size(); i++)
-    for (int j = i + 1; j < hkl[0].size(); j++) {
-      if (hkl[0][i] == hkl[0][j] && hkl[1][i] == hkl[1][j] && hkl[2][i] == hkl[2][j])
-        for (int x = 0; x < 3; x++)
-          hkl[x].erase(hkl[x].begin() + j);
-      if (hkl[0][i] == -hkl[0][j] && hkl[1][i] == -hkl[1][j] && hkl[2][i] == -hkl[2][j])
-        for (int x = 0; x < 3; x++)
-          hkl[x].erase(hkl[x].begin() + j);
+  vector < vector < vector <int> > > sym(3);
+  for (int i = 0; i < 3; i++)
+    sym[i].resize(3);
+  sym = unit_cell.get_sym();
+
+  if (debug) {
+    file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+    for (int i = 0; i < sym[0][0].size(); i++) {
+      for (int x = 0; x < 3; x++) {
+        for (int y = 0; y < 3; y++)
+          file << setw(3) << sym[y][x][i];
+        file << endl;
+      }
+      file << endl;
     }
+  }
+  else
+    file << "Number of symmetry operations: " << sym[0][0].size() << endl;
 
-  file << "                       done!\nNr of reflections to be used: " << hkl[0].size() << endl;
+  vector<int> tempv(3);
+  hkl_list hkl_enlarged = hkl;
+  for (int s = 0; s < sym[0][0].size(); s++) {
+    if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+      sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+      sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0) {
+      continue;
+    }
+    for (const vector<int>& hkl__ : hkl) {
+      for (int h = 0; h < 3; h++) {
+        for (int j = 0; j < 3; j++)
+          tempv[j] += hkl__[h] * sym[j][h][s];
+      }
+      hkl_enlarged.emplace(tempv);
+    }
+  }
+
+  for (const vector<int>& hkl__ : hkl_enlarged) {
+    tempv = hkl__;
+    tempv[0] *= -1;
+    tempv[1] *= -1;
+    tempv[2] *= -1;
+    if (hkl_enlarged.find(tempv) != hkl_enlarged.end()) {
+      hkl_enlarged.erase(tempv);
+    }
+  }
+  hkl = hkl_enlarged;
+  file << "Nr of reflections to be used: " << hkl.size() << endl;
 }
 
 void read_atoms_from_CIF(ifstream& cif_input,
@@ -2125,114 +2169,52 @@ int make_hirshfeld_grids(const int& pbc,
 }
 
 //return whether it remnoved symmetry equivalent entries
-void make_k_pts(const bool& Olex2_1_3_switch,
-  const bool& read_k_pts,
+void make_k_pts(const bool& read_k_pts,
   const bool& save_k_pts,
   const int gridsize,
-  bool shrink,
   cell& unit_cell,
-  vector<vector<int>>& hkl,
+  hkl_list& hkl,
   vector<vector<double>>& k_pt,
-  vector<vector<double>>& k_pt_unique,
-  vector<vector<int>>& hkl_unique,
   ofstream& file,
   bool debug = false)
 {
-  vector < vector < vector <int> > > sym(3);
-  for (int i = 0; i < 3; i++)
-    sym[i].resize(3);
-  sym = unit_cell.get_sym();
-
-  if (debug) {
-    file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
-    for (int i = 0; i < sym[0][0].size(); i++) {
-      for (int x = 0; x < 3; x++) {
-        for (int y = 0; y < 3; y++)
-          file << setw(3) << sym[y][x][i];
-        file << endl;
-      }
-      file << endl;
-    }
-  }
-  else
-    file << "Number of symmetry operations: " << sym[0][0].size() << endl;
-  if (Olex2_1_3_switch)
-    shrink = false;
+  const int size = hkl.size();
   if (!read_k_pts) {
     k_pt.resize(3);
 #pragma omp parallel for
     for (int i = 0; i < 3; i++)
-      k_pt[i].resize(sym[0][0].size() * hkl[0].size());
+      k_pt[i].resize(size, 0.0);
 
-    if (debug)
-      file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+  if (debug)
+    file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 
-    for (int s = 0; s < sym[0][0].size(); s++) {
 #pragma omp parallel for
-      for (int ref = 0; ref < hkl[0].size(); ref++)
-        for (int x = 0; x < 3; x++)
-          for (int h = 0; h < 3; h++) {
-            double rcm_sym = 0.0;
-            for (int j = 0; j < 3; j++)
-              rcm_sym += unit_cell.get_rcm(x, j) * sym[j][h][s];
-            k_pt[x][ref + s * hkl[0].size()] += rcm_sym * hkl[h][ref];
-          }
-    }
-
-
-    if (shrink) {
-      k_pt_unique.resize(3);
-      hkl_unique.resize(3);
-      for (int s = 0; s < sym[0][0].size(); s++)
-        for (int ref = 0; ref < hkl[0].size(); ref++)
-          for (int h = 0; h < 3; h++)
-            hkl_unique[h].push_back(hkl[0][ref] * sym[h][0][s] + hkl[1][ref] * sym[h][1][s] + hkl[2][ref] * sym[h][2][s]);
-      file << "Number of k-points from reflections: " << k_pt[0].size() << endl;
-      file << "Determining unique k-points... ";
-      file.flush();
-      int size_ = k_pt[0].size();
-      vector <bool> mask(size_, true);
-
-      int b = 100;
-      for (int i = 0; i < size_; i++) {
-        for (int j = i + 1; j < size_; j++) {
-          if (!mask[j])
-            continue;
-          if (k_pt[0][i] == k_pt[0][j] && k_pt[1][i] == k_pt[1][j] && k_pt[2][i] == k_pt[2][j]) {
-            mask[j] = false;
-          }
-          else if (k_pt[0][i] == -k_pt[0][j] && k_pt[1][i] == -k_pt[1][j] && k_pt[2][i] == -k_pt[2][j]) {
-            mask[j] = false;
-          }
+    for (int ref = 0; ref < size; ref++) {
+      const vector<int>& hkl_ = *next(hkl.begin(), ref);
+      for (int x = 0; x < 3; x++) {
+        double r = 0;
+        for (int h = 0; h < 3; h++) {
+          double rcm_sym = 0.0;
+          for (int j = 0; j < 3; j++)
+            rcm_sym += unit_cell.get_rcm(x, j);
+          r += rcm_sym * hkl_[h];
         }
+        k_pt[x][ref] = r;
       }
-      for (int i = k_pt[0].size() - 1; i >= 0; i--) {
-        //if (debug) file << "i: " << i << " mask; " << mask[i] << endl;
-        if (mask[i])
-          for (int h = 0; h < 3; h++)
-            k_pt_unique[h].insert(k_pt_unique[h].begin(), k_pt[h][i]);
-        else
-          for (int h = 0; h < 3; h++)
-            hkl_unique[h].erase(hkl_unique[h].begin() + i);
-      }
-      file << " ... Done!";
     }
+
     file << endl << "Number of k-points to evaluate: ";
-    shrink ? file << k_pt_unique[0].size() : file << k_pt[0].size();
+    file << k_pt[0].size();
     file << " for " << gridsize << " gridpoints." << endl;
-    shrink ? save_k_points(k_pt_unique, hkl_unique) : save_k_points(k_pt, hkl);
+    save_k_points(k_pt, hkl);
   }
   else {
-    shrink ? read_k_points(k_pt_unique, hkl_unique, file) : read_k_points(k_pt, hkl, file);
+    read_k_points(k_pt, hkl, file);
   }
 }
 
-void calc_SF(const bool& shrink,
-  const int& points,
-  vector<vector<int>>& hkl,
+void calc_SF(const int& points,
   vector<vector<double>>& k_pt,
-  vector<vector<double>>& k_pt_unique,
-  vector<vector<int>>& hkl_unique,
   vector<vector<double>>& d1,
   vector<vector<double>>& d2,
   vector<vector<double>>& d3,
@@ -2250,14 +2232,9 @@ void calc_SF(const bool& shrink,
 {
   const int imax = dens.size();
   sf.resize(imax);
-  if (shrink)
 #pragma omp parallel for
-    for (int i = 0; i < imax; i++)
-      sf[i].resize(k_pt_unique[0].size());
-  else
-#pragma omp parallel for
-    for (int i = 0; i < imax; i++)
-      sf[i].resize(k_pt[0].size());
+  for (int i = 0; i < imax; i++)
+    sf[i].resize(k_pt[0].size());
 
   if (debug)
     file << "Initialized FFs" << endl
@@ -2310,13 +2287,13 @@ void calc_SF(const bool& shrink,
 
   progress_bar* progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
   const int step = max(floor(imax / 20), 1.0);
-  const int smax = shrink ? k_pt_unique[0].size() : k_pt[0].size();
+  const int smax = k_pt[0].size();
   int pmax;
   double* dens_local, * d1_local, * d2_local, * d3_local;
   complex<double>* sf_local;
-  const double* k1_local = shrink ? k_pt_unique[0].data() : k_pt[0].data();
-  const double* k2_local = shrink ? k_pt_unique[1].data() : k_pt[1].data();
-  const double* k3_local = shrink ? k_pt_unique[2].data() : k_pt[2].data();
+  const double* k1_local = k_pt[0].data();
+  const double* k2_local = k_pt[1].data();
+  const double* k3_local = k_pt[2].data();
   double work, rho;
   for (int i = 0; i < imax; i++) {
     pmax = dens[i].size();
@@ -2362,20 +2339,21 @@ void convert_to_ED(const vector <int>& asym_atom_list,
   WFN& wave,
   vector<vector<complex<double>>>& sf,
   cell& unit_cell,
-  vector<vector<int>>& hkl_unique,
+  hkl_list& hkl,
   ofstream& file,
   bool debug = false)
 {
   const double fact = 0.023934;
   double h2;
-#pragma omp parallel for private(h2)
-  for (int s = 0; s < hkl_unique[0].size(); s++) {
-    h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
+  hkl_list_it it;
+#pragma omp parallel for private(h2,it)
+  for (int s = 0; s < hkl.size(); s++) {
+    it = next(hkl.begin(), s);
+    h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
       sf[i][s] = complex<double>(fact * (wave.atoms[asym_atom_list[i]].charge - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
   }
 }
-
 
 bool thakkar_sfac(
   string& hkl_filename,
@@ -2397,12 +2375,11 @@ bool thakkar_sfac(
   file << "Reading: " << hkl_filename;
   file.flush();
 
-  vector< vector <int> > hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, file, debug);
-  }
-
   cell unit_cell(cif, file, debug);
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
@@ -2436,35 +2413,30 @@ bool thakkar_sfac(
     spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
   vector<vector<double>> k_pt;
-  vector<vector<double>> k_pt_unique;
-  vector<vector<int>> hkl_unique;
-  int shrink = true;
   make_k_pts(
-    false,
     read_k_pts,
     save_k_pts,
     0,
-    shrink,
     unit_cell,
     hkl,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     file,
     debug);
 
-  const int smax = k_pt_unique[0].size();
+  const int smax = k_pt[0].size();
   const int imax = asym_atom_list.size();
   const int amax = atom_type_list.size();
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for
   for (int i = 0; i < asym_atom_list.size(); i++)
-    sf[i].resize(hkl_unique[0].size());
+    sf[i].resize(hkl.size());
 
-#pragma omp parallel for
+  hkl_list_it it = hkl.begin();
+#pragma omp parallel for private(it)
   for (int s = 0; s < smax; s++) {
-    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] });
+    it = next(hkl.begin(), s);
+    double k = unit_cell.get_stl_of_hkl(*it);
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
@@ -2472,9 +2444,10 @@ bool thakkar_sfac(
   if (electron_diffraction) {
     const double fact = 0.023934;
     double h2;
-#pragma omp parallel for private(h2)
+#pragma omp parallel for private(h2, it)
     for (int s = 0; s < smax; s++) {
-      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
+      it = next(hkl.begin(), s);
+      h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
         sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
     }
@@ -2492,7 +2465,7 @@ bool thakkar_sfac(
   tsc_block blocky(
     sf,
     labels,
-    hkl_unique
+    hkl
   );
 
   blocky.write_tsc_file(cif);
@@ -2520,13 +2493,11 @@ tsc_block MTC_thakkar_sfac(
   file << "Reading: " << hkl_filename;
   file.flush();
 
-  vector< vector <int> > hkl;
-  string line;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, file, debug);
-  }
-
   cell unit_cell(cif, file, debug);
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
@@ -2559,35 +2530,30 @@ tsc_block MTC_thakkar_sfac(
     spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
   vector<vector<double>> k_pt;
-  vector<vector<double>> k_pt_unique;
-  vector<vector<int>> hkl_unique;
-  int shrink = true;
   make_k_pts(
-    false,
     read_k_pts,
     save_k_pts,
     0,
-    shrink,
     unit_cell,
     hkl,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     file,
     debug);
 
-  const int smax = k_pt_unique[0].size();
+  const int smax = k_pt[0].size();
   const int imax = asym_atom_list.size();
   const int amax = atom_type_list.size();
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for
   for (int i = 0; i < asym_atom_list.size(); i++)
-    sf[i].resize(hkl_unique[0].size());
+    sf[i].resize(hkl.size());
 
-#pragma omp parallel for
+  hkl_list_it it = hkl.begin();
+#pragma omp parallel for private(it)
   for (int s = 0; s < smax; s++) {
-    double k = unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] });
+    it = next(hkl.begin(), s);
+    double k = unit_cell.get_stl_of_hkl(*it);
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
@@ -2595,9 +2561,10 @@ tsc_block MTC_thakkar_sfac(
   if (electron_diffraction) {
     const double fact = 0.023934;
     double h2;
-#pragma omp parallel for private(h2)
+#pragma omp parallel for private(h2, it)
     for (int s = 0; s < smax; s++) {
-      h2 = pow(unit_cell.get_stl_of_hkl({ hkl_unique[0][s],hkl_unique[1][s],hkl_unique[2][s] }), 2);
+      it = next(hkl.begin(), s);
+      h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
         sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
     }
@@ -2615,7 +2582,7 @@ tsc_block MTC_thakkar_sfac(
   tsc_block blocky(
     sf,
     labels,
-    hkl_unique
+    hkl
   );
 
   return blocky;
@@ -2662,12 +2629,11 @@ bool calculate_structure_factors_HF(
   gettimeofday(&t1, 0);
 #endif
 
-  vector< vector <int> > hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, file, debug);
-  }
-
   cell unit_cell(cif, file, debug);
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
@@ -2722,30 +2688,19 @@ bool calculate_structure_factors_HF(
     debug);
 
   vector<vector<double>> k_pt;
-  vector<vector<double>> k_pt_unique;
-  vector<vector<int>> hkl_unique;
-  int shrink = true;
   make_k_pts(
-    Olex2_1_3_switch,
     read_k_pts,
     save_k_pts,
     points,
-    shrink,
     unit_cell,
     hkl,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     file,
     debug);
 
   vector<vector<complex<double>>> sf;
-  calc_SF(shrink,
-    points,
-    hkl,
+  calc_SF(points,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     d1, d2, d3, dens,
     sf,
     file,
@@ -2759,12 +2714,11 @@ bool calculate_structure_factors_HF(
     debug);
 
   if (electron_diffraction) {
-    err_checkf(shrink, "Impossible to make sfs for ED with unshrinked data!", file);
     convert_to_ED(asym_atom_list,
       wave,
       sf,
       unit_cell,
-      hkl_unique,
+      hkl,
       file,
       debug);
   }
@@ -2776,7 +2730,7 @@ bool calculate_structure_factors_HF(
   tsc_block blocky(
     sf,
     labels,
-    hkl_unique
+    hkl
   );
 
 #ifdef _WIN64
@@ -2858,13 +2812,11 @@ tsc_block calculate_structure_factors_MTC(
   gettimeofday(&t1, 0);
 #endif
 
-  vector< vector <int> > hkl;
-  string line;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, file, debug);
-  }
-
   cell unit_cell(cif, file, debug);
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
@@ -2918,30 +2870,19 @@ tsc_block calculate_structure_factors_MTC(
     debug);
 
   vector<vector<double>> k_pt;
-  vector<vector<double>> k_pt_unique;
-  vector<vector<int>> hkl_unique;
-  int shrink = true;
   make_k_pts(
-    false,
     read_k_pts,
     save_k_pts,
     points,
-    shrink,
     unit_cell,
     hkl,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     file,
     debug);
 
   vector<vector<complex<double>>> sf;
-  calc_SF(shrink,
-    points,
-    hkl,
+  calc_SF(points,
     k_pt,
-    k_pt_unique,
-    hkl_unique,
     d1, d2, d3, dens,
     sf,
     file,
@@ -2955,12 +2896,11 @@ tsc_block calculate_structure_factors_MTC(
     debug);
 
   if (electron_diffraction) {
-    err_checkf(shrink, "Impossible to make sfs for ED with unshrinked data!", file);
     convert_to_ED(asym_atom_list,
       wave,
       sf,
       unit_cell,
-      hkl_unique,
+      hkl,
       file,
       debug);
   }
@@ -2972,7 +2912,7 @@ tsc_block calculate_structure_factors_MTC(
   tsc_block blocky(
     sf,
     labels,
-    hkl_unique
+    hkl
   );
 
 #ifdef _WIN64
