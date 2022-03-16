@@ -87,21 +87,21 @@ class AtomGrid
     std::vector<double> radial_atom_grid_w_;
 };
 
-double get_becke_w(const int num_centers,
+double get_becke_w(const int& num_centers,
     const int proton_charges[],
     const double x_coordinates_bohr[],
     const double y_coordinates_bohr[],
     const double z_coordinates_bohr[],
-    const int center_index,
-    const double x,
-    const double y,
-    const double z);
+    const int& center_index,
+    const double& x,
+    const double& y,
+    const double& z);
 
-double get_r_inner(const double max_error, const double alpha_inner);
+double get_r_inner(const double& max_error, const double& alpha_inner);
 
-double get_r_outer(const double max_error,
-    const double alpha_outer,
-    const int l,
-    const double guess);
+double get_r_outer(const double& max_error,
+    const double& alpha_outer,
+    const int& l,
+    const double& guess);
 
-double get_h(const double max_error, const int l, const double guess);
+double get_h(const double& max_error, const int& l, const double& guess);
