@@ -12,6 +12,7 @@
 #include <omp.h>
 #include <regex>
 #include <algorithm>
+#include <set>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
@@ -422,6 +423,60 @@ void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v);
 double get_lambda_1(double* a);
 
 double get_decimal_precision_from_CIF_number(std::string& given_string);
+
+template <typename numtype = int>
+struct hashFunction {
+  size_t operator()(const std::vector<numtype>& myVector) const {
+    std::hash<numtype> hasher;
+    size_t answer = 0;
+    for (numtype i : myVector) {
+      answer ^= hasher(i) + 0x9e3779b9 + (answer << 6) + (answer >> 2);
+    }
+    return answer;
+  }
+};
+
+template <typename numtype = int>
+struct hkl_equal
+{
+  bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const {
+    const int size = vec1.size();
+    if (size != vec2.size()) return false;
+    int similar = 0;
+    for (int i = 0; i < size; i++) {
+      if (vec1[i] == vec2[i])       similar++;
+      else if (vec1[i] == -vec2[i]) similar--;
+    }
+    if (abs(similar) == size) return true;
+    else                      return false;
+  }
+};
+
+template <typename numtype = int>
+struct hkl_less
+{
+  bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const {
+    if (vec1[0] < vec2[0]) {
+      return true;
+    }
+    else if (vec1[0] == vec2[0]) {
+      if (vec1[1] < vec2[1]) {
+        return true;
+      }
+      else if (vec1[1] == vec2[1]) {
+        if (vec1[2] < vec2[2]) {
+          return true;
+        }
+        else return false;
+      }
+      else return false;
+    }
+    else return false;
+  }
+};
+
+typedef std::set<std::vector<int>> hkl_list;
+typedef std::set<std::vector<int>>::const_iterator hkl_list_it;
 
 #include "wfn_class.h"
 

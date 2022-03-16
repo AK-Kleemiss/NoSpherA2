@@ -20,25 +20,15 @@ private:
   bool anomalous_dispersion;
 
 public:
+  template<typename numtype>
   tsc_block(
-    std::vector<std::vector<std::complex<double> > >& given_sf,
-    std::vector<std::string>& given_scatterer,
-    std::vector<std::vector<int> >& given_index,
-    std::string& given_header)
-  {
-    sf = given_sf;
-    scatterer = given_scatterer;
-    index = given_index;
-    header = given_header;
-    anomalous_dispersion = false;
-  };
-  tsc_block(
-    std::vector<std::vector<double> >& given_sf,
+    std::vector<std::vector<numtype> >& given_sf,
     std::vector<std::string>& given_scatterer,
     std::vector<std::vector<int> >& given_index,
     std::string& given_header)
   {
     sf.resize(given_sf.size());
+#pragma omp parallel for
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
@@ -50,22 +40,14 @@ public:
     header = given_header;
     anomalous_dispersion = false;
   };
+  template<typename numtype>
   tsc_block(
-    std::vector<std::vector<std::complex<double> > >& given_sf,
-    std::vector<std::string>& given_scatterer,
-    std::vector<std::vector<int> >& given_index)
-  {
-    sf = given_sf;
-    scatterer = given_scatterer;
-    index = given_index;
-    anomalous_dispersion = false;
-  };
-  tsc_block(
-    std::vector<std::vector<double> >& given_sf,
+    std::vector<std::vector<numtype> >& given_sf,
     std::vector<std::string>& given_scatterer,
     std::vector<std::vector<int> >& given_index)
   {
     sf.resize(given_sf.size());
+#pragma omp parallel for
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
@@ -74,6 +56,28 @@ public:
     }
     scatterer = given_scatterer;
     index = given_index;
+    anomalous_dispersion = false;
+  };
+  template<typename numtype>
+  tsc_block(
+    std::vector<std::vector<numtype> >& given_sf,
+    std::vector<std::string>& given_scatterer,
+    hkl_list& given_index)
+  {
+    sf.resize(given_sf.size());
+#pragma omp parallel for
+    for (int i = 0; i < given_sf.size(); i++) {
+      sf[i].resize(given_sf[i].size());
+      for (int j = 0; j < given_sf[i].size(); j++) {
+        sf[i][j] = given_sf[i][j];
+      }
+    }
+    scatterer = given_scatterer;
+    index.resize(3);
+    for (const std::vector<int>& hkl : given_index) {
+      for (int i = 0; i < 3; i++)
+        index[i].push_back(hkl[i]);
+    }
     anomalous_dispersion = false;
   };
   tsc_block() { anomalous_dispersion = false; };

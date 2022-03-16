@@ -316,7 +316,7 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
-inline double f3(const double x)
+constexpr double f3(const double& x)
 {
   double f = x;
   for (int i = 0; i < hardness; i++)
@@ -325,15 +325,15 @@ inline double f3(const double x)
 }
 
 // JCP 88, 2547 (1988)
-double get_becke_w(const int num_centers,
+double get_becke_w(const int& num_centers,
   const int proton_charges[],
   const double x_coordinates_bohr[],
   const double y_coordinates_bohr[],
   const double z_coordinates_bohr[],
-  const int center_index,
-  const double x,
-  const double y,
-  const double z)
+  const int& center_index,
+  const double& x,
+  const double& y,
+  const double& z)
 {
   double R_a, R_b;
   double u_ab, a_ab, mu_ab, nu_ab;
@@ -427,7 +427,7 @@ double get_becke_w(const int num_centers,
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-double get_r_inner(const double max_error, const double alpha_inner)
+double get_r_inner(const double& max_error, const double& alpha_inner)
 {
   int m = 0;
   double d = 1.9;
@@ -441,10 +441,10 @@ double get_r_inner(const double max_error, const double alpha_inner)
 }
 
 // TCA 106, 178 (2001), eq. 19
-double get_r_outer(const double max_error,
-  const double alpha_outer,
-  const int l,
-  const double guess)
+double get_r_outer(const double& max_error,
+  const double& alpha_outer,
+  const int& l,
+  const double& guess)
 {
   const int m = 2 * l;
   double r = guess;
@@ -478,7 +478,7 @@ double get_r_outer(const double max_error,
 }
 
 // TCA 106, 178 (2001), eqs. 17 and 18
-double get_h(const double max_error, const int l, const double guess)
+double get_h(const double& max_error, const int& l, const double& guess)
 {
   const int m = 2 * l;
   double h = guess;
