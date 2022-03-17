@@ -1,6 +1,4 @@
 #pragma once
-#ifndef __ATOMS_H__
-#define __ATOMS_H__
 
 #include <iostream>
 #include <vector>
@@ -188,5 +186,3 @@ inline void atom::assign_ADPs(std::vector<double> &second, std::vector<double> &
 		ADPs[2] = fourth;
 	}
 };
-
-#endif

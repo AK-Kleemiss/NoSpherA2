@@ -1,5 +1,4 @@
-#ifndef __BASIS_SET_H__
-#define __BASIS_SET_H__
+#pragma once
 
 class WFN;
 #include <string>
@@ -13,5 +12,3 @@ bool read_basis_set_missing(const std::string &basis_set_path, WFN &wave, bool d
 bool delete_basis_set_vanilla(const std::string &basis_set_path, WFN &wave, bool debug);
 
 #include "wfn_class.h"
-
-#endif

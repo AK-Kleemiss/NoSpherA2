@@ -1,3 +1,5 @@
+#pragma once
+
 int gen_oh ( int code, double a, double b, double v, double *x, double *y, double *z, double *w );
 void ld_by_order ( int order, double *x, double *y, double *z, double *w );
 void ld0006 ( double *x, double *y, double *z, double *w );

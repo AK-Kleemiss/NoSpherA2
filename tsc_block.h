@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef __TSC_BLOCK_H__
-#define __TSC_BLOCK_H__
-
 #include <iostream>
 #include <stdio.h>
 #include <vector>
@@ -254,6 +251,3 @@ public:
     err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
   }
 };
-
-
-#endif
