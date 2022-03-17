@@ -3286,7 +3286,7 @@ void WFN::operator=(const WFN& right)
 int WFN::calculate_charge()
 {
   int atomic_charges = 0;
-  int mo_charges = 0;
+  double mo_charges = 0;
   for (int a = 0; a < ncen; a++) {
     int nr = atoms[a].charge;
     if (nr == 0) {
@@ -3304,7 +3304,7 @@ int WFN::calculate_charge()
 int WFN::calculate_charge(ofstream& file)
 {
   int atomic_charges = 0;
-  int mo_charges = 0;
+  double mo_charges = 0;
   for (int a = 0; a < ncen; a++) {
     int nr = atoms[a].charge;
     if (nr == 0) {
@@ -4735,13 +4735,20 @@ double WFN::compute_dens(
       else if (l[k] == 4)	ex *= pow(d[k][iat], 4);
       else if (l[k] == 5)	ex *= pow(d[k][iat], 5);
     }
+    auto run = phi.data();
+    auto run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++) {
-      phi[mo] += MOs[mo].get_coefficient_f(j) * ex;      //build MO values at this point
+      *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
+      run++, run2++;
     }
   }
 
-  for (mo = 0; mo < nmo; mo++)
-    Rho += get_MO_occ(mo) * pow(phi[mo], 2);
+  auto run = phi.data();
+  auto run2 = MOs.data();
+  for (mo = 0; mo < nmo; mo++) {
+    Rho += (*run2).get_occ() * pow(*run, 2);
+    run++, run2++;
+  }
 
   return Rho;
 }

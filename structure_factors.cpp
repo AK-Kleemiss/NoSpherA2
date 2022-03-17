@@ -435,6 +435,7 @@ void read_hkl(std::string& hkl_filename,
       continue;
     }
     for (const vector<int>& hkl__ : hkl) {
+      tempv = { 0,0,0 };
       for (int h = 0; h < 3; h++) {
         for (int j = 0; j < 3; j++)
           tempv[j] += hkl__[h] * sym[j][h][s];
@@ -1907,7 +1908,7 @@ int make_hirshfeld_grids(const int& pbc,
       d_temp[i].resize(wave.get_ncen());
     }
     vector<double> phi_temp(wave.get_nmo());
-#pragma omp for
+#pragma omp for schedule(dynamic)
     for (int i = 0; i < total_grid[0].size(); i++) {
       total_grid[5][i] = wave.compute_dens(
         total_grid[0][i],
@@ -2138,27 +2139,37 @@ int make_hirshfeld_grids(const int& pbc,
   file << "CUDA device resetted!" << endl;
 #else
   points = 0;
+#pragma omp parallel for
+  for (int i = 0; i < asym_atom_list.size(); i++) {
+    dens[i].resize(num_points[i]);
+    d1[i].resize(num_points[i]);
+    d2[i].resize(num_points[i]);
+    d3[i].resize(num_points[i]);
+  }
 #pragma omp parallel for reduction(+:points)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
+    int run = 0;
     double res;
     for (int a = 0; a < i; a++)
       start_p += num_points[a];
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       if (abs(res) > cutoff) {
-        dens[i].push_back(res);
-        d1[i].push_back(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-        d2[i].push_back(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-        d3[i].push_back(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+        dens[i][run]=(res);
+        d1[i][run]=(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+        d2[i][run]=(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+        d3[i][run]=(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+        run++;
       }
     }
-    points += dens[i].size();
-  }
-
-#pragma omp parallel for
-  for (int i = 0; i < asym_atom_list.size(); i++)
+    points += run;
     shrink_vector<double>(spherical_density[i]);
+    dens[i].resize(run);
+    d1[i].resize(run);
+    d2[i].resize(run);
+    d3[i].resize(run);
+  }
   shrink_vector<vector<double>>(spherical_density);
 #pragma omp parallel for
   for (int grid = 0; grid < total_grid.size(); grid++)
@@ -2183,23 +2194,18 @@ void make_k_pts(const bool& read_k_pts,
     k_pt.resize(3);
 #pragma omp parallel for
     for (int i = 0; i < 3; i++)
-      k_pt[i].resize(size, 0.0);
+      k_pt[i].resize(size,0.0);
 
-  if (debug)
-    file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-
+    if (debug)
+      file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+    int hkl_temp[3];
 #pragma omp parallel for
     for (int ref = 0; ref < size; ref++) {
-      const vector<int>& hkl_ = *next(hkl.begin(), ref);
+      hkl_list_it hkl_ = next(hkl.begin(), ref);
       for (int x = 0; x < 3; x++) {
-        double r = 0;
-        for (int h = 0; h < 3; h++) {
-          double rcm_sym = 0.0;
-          for (int j = 0; j < 3; j++)
-            rcm_sym += unit_cell.get_rcm(x, j);
-          r += rcm_sym * hkl_[h];
+        for (int j = 0; j < 3; j++) {
+          k_pt[x][ref] += unit_cell.get_rcm(x, j) * (*(hkl_))[j];
         }
-        k_pt[x][ref] = r;
       }
     }
 
@@ -2286,7 +2292,7 @@ void calc_SF(const int& points,
   //#else
 
   progress_bar* progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
-  const int step = max(floor(imax / 20), 1.0);
+  const int step = max((int) floor(imax / 20), 1);
   const int smax = k_pt[0].size();
   int pmax;
   double* dens_local, * d1_local, * d2_local, * d3_local;
@@ -2630,11 +2636,6 @@ bool calculate_structure_factors_HF(
 #endif
 
   cell unit_cell(cif, file, debug);
-  hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
-  }
-
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
@@ -2658,6 +2659,11 @@ bool calculate_structure_factors_HF(
 
   if (debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   if (debug)
     file << "made it post CIF, now make grids!" << endl;
@@ -2813,11 +2819,6 @@ tsc_block calculate_structure_factors_MTC(
 #endif
 
   cell unit_cell(cif, file, debug);
-  hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
-  }
-
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
@@ -2840,6 +2841,11 @@ tsc_block calculate_structure_factors_MTC(
 
   if (debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   if (debug)
     file << "made it post CIF, now make grids!" << endl;

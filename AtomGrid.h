@@ -95,7 +95,8 @@ double get_becke_w(const int& num_centers,
     const int& center_index,
     const double& x,
     const double& y,
-    const double& z);
+    const double& z,
+    std::vector<double>& pa);
 
 double get_r_inner(const double& max_error, const double& alpha_inner);
 
