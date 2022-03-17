@@ -13,6 +13,7 @@
 #include <regex>
 #include <algorithm>
 #include <set>
+#include <numeric>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
