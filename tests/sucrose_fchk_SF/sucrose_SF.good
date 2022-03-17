@@ -11,11 +11,11 @@ Reading:                    olex2/Wfn_job/sucrose.wfx done!
 Number of atoms in Wavefunction file: 45 Number of MOs: 91
 Number of protons: 182
 Number of electrons: 182
-Reading:                    olex2/Wfn_job/sucrose.hkl done!
-Nr of reflections to be used: 4027
-Remove duplicate reflections...                       done!
-Nr of reflections to be used: 2137
 Reading:                                  sucrose.cif done!
+Reading:                    olex2/Wfn_job/sucrose.hkl done!
+Nr of reflections read from file: 4027
+Number of symmetry operations: 2
+Nr of reflections to be used: 4021
 There are:
   45 atoms read from the wavefunction, of which 
   45 are identified as asymmetric unit atoms!
@@ -77,9 +77,7 @@ Atom       Becke   Spherical Hirshfeld
   H12b     0.087     0.038     0.055
 Total number of electrons in the wavefunction: 181.998
  and Hirshfeld electrons (asym unit): 182.001
-Number of symmetry operations: 2
-Number of k-points from reflections: 4274
-Determining unique k-points...  ... Done!
+
 Number of k-points to evaluate: 4021 for 77826 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] Calculating scattering factors ===================== [100%] 
 

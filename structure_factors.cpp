@@ -2382,10 +2382,6 @@ bool thakkar_sfac(
   file.flush();
 
   cell unit_cell(cif, file, debug);
-  hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
-  }
 
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
@@ -2413,6 +2409,11 @@ bool thakkar_sfac(
 
   if (debug)
     file << "made it post CIF, now make grids!" << endl;
+
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   vector <Thakkar> spherical_atoms;
   for (int i = 0; i < atom_type_list.size(); i++)
@@ -2500,11 +2501,6 @@ tsc_block MTC_thakkar_sfac(
   file.flush();
 
   cell unit_cell(cif, file, debug);
-  hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
-  }
-
   ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
@@ -2530,6 +2526,11 @@ tsc_block MTC_thakkar_sfac(
 
   if (debug)
     file << "made it post CIF, now make grids!" << endl;
+
+  hkl_list hkl;
+  if (!read_k_pts) {
+    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  }
 
   vector <Thakkar> spherical_atoms;
   for (int i = 0; i < atom_type_list.size(); i++)

@@ -11,11 +11,11 @@ Reading:                                    water.wfx done!
 Number of atoms in Wavefunction file: 48 Number of MOs: 261
 Number of protons: 261
 Number of electrons: 261
-Reading:                                    water.hkl done!
-Nr of reflections to be used: 3019
-Remove duplicate reflections...                       done!
-Nr of reflections to be used: 3019
 Reading:                                    water.cif done!
+Reading:                                    water.hkl done!
+Nr of reflections read from file: 3019
+Number of symmetry operations: 2
+Nr of reflections to be used: 5928
 There are:
   48 atoms read from the wavefunction, of which 
   26 are identified as asymmetric unit atoms!
@@ -58,9 +58,7 @@ Atom       Becke   Spherical Hirshfeld
   H10b     0.044    -0.101     0.131
 Total number of electrons in the wavefunction: 149.367
  and Hirshfeld electrons (asym unit): 147.952
-Number of symmetry operations: 2
-Number of k-points from reflections: 6038
-Determining unique k-points...  ... Done!
+
 Number of k-points to evaluate: 5928 for 49208 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 
