@@ -1,5 +1,4 @@
-#ifndef _CUBE_H_
-#define _CUBE_H_
+#pragma once
 
 #include <vector>
 #include <string>
@@ -66,6 +65,3 @@ class cube
 };
 
 #include "wfn_class.h"
-
-#endif // _CUBE_H_
-

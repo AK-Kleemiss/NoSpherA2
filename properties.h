@@ -1,6 +1,4 @@
 #pragma once
-#ifndef __c_properties__
-#define __c_properties__
 
 #include <string>
 #include <fstream>
@@ -100,5 +98,3 @@ void Calc_Hirshfeld_atom(
 
 #include "wfn_class.h"
 #include "cell.h"
-
-#endif

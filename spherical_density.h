@@ -1,6 +1,4 @@
 #pragma once
-#ifndef __c_spherical_density__
-#define __c_spherical_density__
 
 #include <vector>
 #include <iostream>
@@ -19,7 +17,3 @@ public:
 	const double get_min_alpha();
 	const double get_form_factor(const double k_vector, std::ofstream &file, bool debug = false);
 };
-
-
-
-#endif

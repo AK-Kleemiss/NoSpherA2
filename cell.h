@@ -1,8 +1,5 @@
 #pragma once
 
-#ifndef __CELL_H__
-#define __CELL_H__
-
 #include <vector>
 #include <string>
 #include <fstream>
@@ -687,5 +684,3 @@ public:
     }
   };
 };
-
-#endif

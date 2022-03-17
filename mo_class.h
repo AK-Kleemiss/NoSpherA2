@@ -1,10 +1,7 @@
 #pragma once
-#ifndef __MO_CLASS_H__
-#define __MO_CLASS_H__
 
 #include <vector>
 #include <string>
-
 
 class MO
 {
@@ -34,5 +31,3 @@ public:
   double* get_ptr_coefficients() { return &coefficients[0]; };
   void assign_coefs(std::vector<double>& values) { coefficients.resize(values.size()); coefficients = values; }
 };
-
-#endif
