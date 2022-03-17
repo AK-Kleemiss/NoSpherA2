@@ -1,7 +1,4 @@
 #pragma once
-#ifndef __WFN_CLASS_H__
-#define __WFN_CLASS_H__
-
 
 class MO;
 #include "atoms.h"
@@ -206,9 +203,4 @@ public:
   double* get_ptr_mo_coefficients(int mo);
 
 };
-
-
 #include "mo_class.h"
-
-
-#endif

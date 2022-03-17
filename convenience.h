@@ -1,5 +1,4 @@
-#ifndef __CONVENIENCE_H__
-#define __CONVENIENCE_H__
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -480,5 +479,3 @@ typedef std::set<std::vector<int>> hkl_list;
 typedef std::set<std::vector<int>>::const_iterator hkl_list_it;
 
 #include "wfn_class.h"
-
-#endif

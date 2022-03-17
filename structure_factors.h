@@ -1,9 +1,7 @@
-#ifndef __c_structure_factors__
-#define __c_structure_factors__
+#pragma once
 
 #include <string>
 #include <fstream>
-
 
 class WFN;
 class tsc_block;
@@ -95,5 +93,3 @@ bool calculate_structure_factors_RI(
   */
 #include "wfn_class.h"
 #include "tsc_block.h"
-
-#endif
