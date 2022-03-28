@@ -2766,6 +2766,7 @@ bool calculate_structure_factors_HF(
 
 #endif
   blocky.write_tsc_file(cif);
+  blocky.write_tscb_file();
 
 #ifdef PEOJECT_NAME
 #undef FLO_CUDA
