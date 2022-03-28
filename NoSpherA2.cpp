@@ -57,6 +57,7 @@ int main(int argc, char** argv)
   bool read_k_pts = false;
   bool save_k_pts = false;
   bool combined_tsc_calc = false;
+  bool binary_tsc = true;
   bool cif_based_combined_tsc_calc = false;
   int hirsh_number = 0;
   double MinMax[6];
@@ -318,6 +319,8 @@ int main(int argc, char** argv)
     time_t end_write;
 #endif
     log_file << "Writing tsc file... " << flush;
+    if (binary_tsc)
+      result.write_tscb_file();
     result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
 #ifdef _WIN64
@@ -406,6 +409,8 @@ int main(int argc, char** argv)
     time_t end_write;
 #endif
     log_file << "Writing tsc file... " << flush;
+    if (binary_tsc)
+      result.write_tscb_file();
     result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
 #ifdef _WIN64
