@@ -1,12 +1,5 @@
 #pragma once
 
-#include <vector>
-#include <string>
-#include <fstream>
-#include <iostream>
-#include <iomanip>
-#include <math.h>
-
 class cell
 {
 private:

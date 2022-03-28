@@ -1,10 +1,5 @@
 #pragma once
 
-#include <iostream>
-#include <stdio.h>
-#include <vector>
-#include <string>
-#include <complex>
 #include "convenience.h"
 
 class tsc_block
@@ -111,6 +106,14 @@ public:
     return scatterer[nr];
   };
   const std::vector<std::string> get_scatterers() { return scatterer; }
+  const std::string scatterers_string() {
+    std::string result;
+    for (int i = 0; i < scatterer.size(); i++) {
+      result.append(scatterer[i]);
+      if(i != scatterer.size()-1) result.append(" ");
+    }
+    return result;
+  }
   void set_AD(const bool value) { anomalous_dispersion = value; };
   bool get_AD() { return anomalous_dispersion; };
   const std::vector<int> get_indices(const unsigned int nr)
@@ -246,6 +249,33 @@ public:
         tsc_file << std::scientific << std::setprecision(8) << real(sf[i][r]) << ","
         << std::scientific << std::setprecision(8) << imag(sf[i][r]) << " ";
       tsc_file << std::endl;
+    }
+    tsc_file.close();
+    err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
+  }
+  void write_tscb_file()
+  {
+    std::ofstream tsc_file("experimental.tscb", std::ios::out | std::ios::binary | std::ios::trunc);
+
+    int head[1] = { header.size() };
+    tsc_file.write((char*)&head, sizeof(head));
+    tsc_file.write(header.c_str(), head[0] * sizeof(char));
+    std::string sc = scatterers_string();
+    head[0] = sc.size();
+    tsc_file.write((char*)&head, sizeof(head));
+    tsc_file.write(sc.c_str(), head[0] * sizeof(char));
+    
+    int nr_hkl[1] = { index[0].size() };
+    tsc_file.write((char*)&nr_hkl, sizeof(nr_hkl));
+    const int scat_size = scatterer_size();
+    
+    for (int run = 0; run < *nr_hkl; run++) {
+      for (int i = 0; i < 3; i++) {
+        tsc_file.write((char*)&(index[i][run]), sizeof(int));
+      }
+      for (int i = 0; i < scat_size; i++) {
+        tsc_file.write((char*)&(sf[i][run]), sizeof(std::complex<double>));
+      }
     }
     tsc_file.close();
     err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
