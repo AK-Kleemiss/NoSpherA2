@@ -2024,12 +2024,12 @@ int make_hirshfeld_grids(const int& pbc,
 
   file << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl << endl;
 
-  file << "Table of Charges in electrons" << endl << endl << "Atom       Becke   Spherical Hirshfeld" << endl;
+  file << "Table of Charges in electrons" << endl << endl << "    Atom       Becke   Spherical Hirshfeld" << endl;
 
   int counter = 0;
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int a = asym_atom_list[i];
-    file << setw(6) << wave.atoms[a].label
+    file << setw(10) << wave.atoms[a].label
       << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[0][counter]
       << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[1][counter]
       << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[2][counter];
