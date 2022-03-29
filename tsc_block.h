@@ -257,7 +257,7 @@ public:
   {
     std::ofstream tsc_file("experimental.tscb", std::ios::out | std::ios::binary | std::ios::trunc);
 
-    int head[1] = { header.size() };
+    int head[1] = { static_cast<int>(header.size()) };
     tsc_file.write((char*)&head, sizeof(head));
     tsc_file.write(header.c_str(), head[0] * sizeof(char));
     std::string sc = scatterers_string();
@@ -265,7 +265,7 @@ public:
     tsc_file.write((char*)&head, sizeof(head));
     tsc_file.write(sc.c_str(), head[0] * sizeof(char));
     
-    int nr_hkl[1] = { index[0].size() };
+    int nr_hkl[1] = { static_cast<int>(index[0].size()) };
     tsc_file.write((char*)&nr_hkl, sizeof(nr_hkl));
     const int scat_size = scatterer_size();
     
