@@ -878,7 +878,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
   int e_nmo, e_nex, e_nuc = 0; //number of expected MOs, Exponents and nuclei
   stream >> header_tmp >> e_nmo >> header_tmp >> header_tmp >> e_nex >> header_tmp >> e_nuc;
   if (debug) {
-    file << "e_nmo: %d, e_nex: %d, e_nuc: %d\n", e_nmo, e_nex, e_nuc;
+    file << "e_nmo: " << e_nmo << ", e_nex: " << e_nex << ", e_nuc : " << e_nuc << endl;
     Enter();
   }
   //----------------------------- Read Atoms ------------------------------------------------------------
