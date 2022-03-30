@@ -57,7 +57,7 @@ int main(int argc, char** argv)
   bool read_k_pts = false;
   bool save_k_pts = false;
   bool combined_tsc_calc = false;
-  bool binary_tsc = true;
+  bool binary_tsc = false;
   bool cif_based_combined_tsc_calc = false;
   int hirsh_number = 0;
   double MinMax[6];

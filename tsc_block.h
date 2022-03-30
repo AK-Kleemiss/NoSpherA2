@@ -277,6 +277,7 @@ public:
         tsc_file.write((char*)&(sf[i][run]), sizeof(std::complex<double>));
       }
     }
+    tsc_file.flush();
     tsc_file.close();
     err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
   }
