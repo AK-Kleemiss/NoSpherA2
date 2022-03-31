@@ -72,6 +72,54 @@ public:
     }
     anomalous_dispersion = false;
   };
+  tsc_block(std::string &file_name)
+  {
+    using namespace std;
+    ifstream tsc_file(file_name.c_str(), ios::binary);
+
+    auto charsize = sizeof(char);
+    int head[1];
+    auto intsize = sizeof(head);
+    tsc_file.read((char*)&head, intsize);
+    char* cheader;
+    string header_str;
+    if (head[0] != 0) {
+      cheader = new char[head[0]];
+      tsc_file.read(cheader, head[0] * charsize);
+      header_str = cheader;
+      free(cheader);
+    }
+    header = header_str;
+    //read scatterer labels and map onto scattterers list
+    int sc_len[1];
+    tsc_file.read((char*)&sc_len, intsize);
+    vector<char> scat_line(sc_len[0]);
+    tsc_file.read((char*)scat_line.data(), sc_len[0] * charsize);
+    string scat_str(scat_line.begin(), scat_line.end());
+    //scat_str.resize(sc_len[0]);
+    scatterer = split_string<string>(scat_str,string(" "));
+    const int nr_scatterers = scatterer.size();
+    //read number of indices in tscb file
+    int nr_hkl[1];
+    tsc_file.read((char*)&nr_hkl, intsize);
+    //read indices and scattering factors row by row
+    int rindex[3];
+    sf.resize(nr_scatterers);
+    index.resize(3);
+    for (int run = 0; run < *nr_hkl; run++) {
+      tsc_file.read((char*)&rindex, 3 * intsize);
+      for (int i = 0; i < 3; i++) {
+        index[i].push_back(rindex[i]);
+      }
+      vector<complex<double>> row(nr_scatterers);
+      tsc_file.read((char*)row.data(), nr_scatterers * sizeof(complex<double>));
+      for (int i = 0; i < nr_scatterers; i++) {
+        sf[i].push_back(row[i]);
+      }
+    }
+    tsc_file.close();
+    err_checkc(!tsc_file.bad(),"TSCB file wen bad!");
+  };
   tsc_block() { anomalous_dispersion = false; };
   ~tsc_block()
   {
