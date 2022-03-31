@@ -2334,11 +2334,6 @@ void calc_SF(const int& points,
   else printf("Time to calculate: %10.1lf h\n", time4 / 3600);
 
 #endif
-
-  if (debug)
-    file << endl << "SFs are made, now just write them!" << endl;
-  else
-    file << endl << "Writing tsc file..." << endl;
 }
 
 void convert_to_ED(const vector <int>& asym_atom_list,

@@ -57,7 +57,7 @@ int main(int argc, char** argv)
   bool read_k_pts = false;
   bool save_k_pts = false;
   bool combined_tsc_calc = false;
-  bool binary_tsc = false;
+  bool binary_tsc = true;
   bool cif_based_combined_tsc_calc = false;
   int hirsh_number = 0;
   double MinMax[6];
@@ -213,6 +213,13 @@ int main(int argc, char** argv)
         groups.push_back(split_string<int>(temp, delimiter));
         n++;
       }
+    }
+    else if (temp.find("-tscb") != string::npos) {
+      string name = argv[i + 1];
+      tsc_block blocky = tsc_block(name);
+      name = "test.cif";
+      blocky.write_tsc_file(name);
+      return 0;
     }
   }
   if (threads != -1) {
