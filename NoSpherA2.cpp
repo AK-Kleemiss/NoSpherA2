@@ -328,7 +328,8 @@ int main(int argc, char** argv)
     log_file << "Writing tsc file... " << flush;
     if (binary_tsc)
       result.write_tscb_file();
-    result.write_tsc_file(cif);
+    else
+      result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
 #ifdef _WIN64
     end_write = time(NULL);
@@ -418,7 +419,8 @@ int main(int argc, char** argv)
     log_file << "Writing tsc file... " << flush;
     if (binary_tsc)
       result.write_tscb_file();
-    result.write_tsc_file(cif);
+    else
+      result.write_tsc_file(cif);
     log_file << " ... done!" << endl;
 #ifdef _WIN64
     end_write = time(NULL);

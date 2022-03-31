@@ -2760,8 +2760,10 @@ bool calculate_structure_factors_HF(
   else printf("Total Time: %10.1lf h\n", time2 / 3600);
 
 #endif
-  blocky.write_tsc_file(cif);
+  file << "Writing tsc file... " << flush;
   blocky.write_tscb_file();
+  blocky.write_tsc_file(cif);
+  file << " ... done!" << endl;
 
 #ifdef PEOJECT_NAME
 #undef FLO_CUDA
