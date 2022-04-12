@@ -605,6 +605,107 @@ void Calc_Rho(
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
 };
 
+void Calc_Rho_spherical_harmonics(
+  cube& CubeRho,
+  WFN& wavy,
+  int cpus,
+  ofstream& file
+)
+{
+#ifdef _OPENMP
+  if (cpus != -1) {
+    omp_set_num_threads(cpus);
+    omp_set_dynamic(0);
+    if (cpus > 1)
+      omp_set_nested(1);
+  }
+#endif
+
+  time_t start;
+  time(&start);
+
+  progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
+  const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
+
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 0; i < CubeRho.get_size(0); i++) {
+    for (int j = 0; j < CubeRho.get_size(1); j++)
+      for (int k = 0; k < CubeRho.get_size(2); k++) {
+
+        double PosGrid[3],
+          Rho;
+
+        PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
+        PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
+        PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
+
+        Rho = wavy.compute_dens_spherical(PosGrid[0],PosGrid[1],PosGrid[2]);
+
+        CubeRho.set_value(i, j, k, Rho);
+      }
+    if (i != 0 && i % step == 0)
+      progress->write((i) / double(CubeRho.get_size(0)));
+  }
+  delete(progress);
+
+  time_t end;
+  time(&end);
+  if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
+  else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+};
+
+void Calc_MO_spherical_harmonics(
+  cube& CubeMO,
+  WFN& wavy,
+  int cpus,
+  int MO,
+  ofstream& file
+)
+{
+#ifdef _OPENMP
+  if (cpus != -1) {
+    omp_set_num_threads(cpus);
+    omp_set_dynamic(0);
+    if (cpus > 1)
+      omp_set_nested(1);
+  }
+#endif
+
+  time_t start;
+  time(&start);
+
+  progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
+  const int step = max(floor(CubeMO.get_size(0) * 3 / 20), 1.0);
+
+#pragma omp parallel for schedule(dynamic)
+  for (int i = 0; i < CubeMO.get_size(0); i++) {
+    for (int j = 0; j < CubeMO.get_size(1); j++)
+      for (int k = 0; k < CubeMO.get_size(2); k++) {
+
+        double PosGrid[3],
+          Rho;
+
+        PosGrid[0] = i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0);
+        PosGrid[1] = i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1);
+        PosGrid[2] = i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2);
+
+        Rho = wavy.compute_MO_spherical(PosGrid[0], PosGrid[1], PosGrid[2], MO);
+
+        CubeMO.set_value(i, j, k, Rho);
+      }
+    if (i != 0 && i % step == 0)
+      progress->write((i) / double(CubeMO.get_size(0)));
+  }
+  delete(progress);
+
+  time_t end;
+  time(&end);
+  if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
+  else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+};
+
 void Calc_Prop(
   cube& CubeRho,
   cube& CubeRDG,

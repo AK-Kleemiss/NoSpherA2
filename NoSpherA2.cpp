@@ -59,6 +59,7 @@ int main(int argc, char** argv)
   bool combined_tsc_calc = false;
   bool binary_tsc = true;
   bool cif_based_combined_tsc_calc = false;
+  bool density_test_cube = false;
   int hirsh_number = 0;
   double MinMax[6];
   double NbSteps[3];
@@ -114,6 +115,8 @@ int main(int argc, char** argv)
       calc = esp = true;
     else if (temp.find("-rdg") < 1)
       calc = rdg = true;
+    else if (temp.find("-rho_cube_test") != string::npos)
+      density_test_cube = true;
     else if (temp.find("-hirsh") < 1)
       calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
     else if (temp.find("-resolution") < 1)
@@ -668,6 +671,7 @@ int main(int argc, char** argv)
     if (MOs.size() != 0)
       for (int i = 0; i < MOs.size(); i++) {
         log2 << "Calcualting MO: " << MOs[i] << endl;
+        MO.set_zero();
         MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(MOs[i]) + ".cube";
         Calc_MO(MO, MOs[i], wavy[0], ncpus, radius, log2);
         MO.write_file(wavy[0], true);
@@ -745,6 +749,39 @@ int main(int argc, char** argv)
       ESP.write_file(wavy[0], true);
       log2 << "  done!" << endl;
     }
+    return 0;
+  }
+  if (density_test_cube) {
+    ofstream log_file("NoSpherA2.log", ios::out);
+    log_file << NoSpherA2_message();
+    log_file.flush();
+    err_checkf(wfn != "", "No wfn specified", log_file);
+    err_checkf(exists(wfn), "wfn doesn't exist", log_file);
+    wavy.resize(1);
+    wavy[0].read_known_wavefunction_format(wfn, log_file);
+    cube Rho(100, 100, 100, wavy[0].get_ncen(), true);
+    Rho.set_origin(0, -7), Rho.set_origin(1, -7), Rho.set_origin(2, -7);
+    Rho.set_vector(0, 0, 0.141414);
+    Rho.set_vector(1, 1, 0.141414);
+    Rho.set_vector(2, 2, 0.141414);
+    Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
+    log_file << "Calcualting Rho...";
+    Calc_Rho_spherical_harmonics(Rho, wavy[0], ncpus, log_file);
+    log_file << " ...done!" << endl;
+    Rho.write_file(wavy[0], true);
+    for (int i = 0; i < 5; i++) {
+      cube MO(100, 100, 100, wavy[0].get_ncen(), true);
+      MO.set_origin(0, -7), MO.set_origin(1, -7), MO.set_origin(2, -7);
+      MO.set_vector(0, 0, 0.141414);
+      MO.set_vector(1, 1, 0.141414);
+      MO.set_vector(2, 2, 0.141414);
+      MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(i) + ".cube";
+      log_file << "Calcualting MO " + to_string(i) + "...";
+      Calc_MO_spherical_harmonics(MO, wavy[0], ncpus, i, log_file);
+      log_file << " ...done!" << endl;
+      MO.write_file(wavy[0], true);
+    }
+ 
     return 0;
   }
   cout << NoSpherA2_message() << "Did not understand the task to perform!\n" << help_message() << endl;
