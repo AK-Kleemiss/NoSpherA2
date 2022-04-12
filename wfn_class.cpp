@@ -1856,8 +1856,8 @@ bool WFN::read_wfx(string fileName, bool debug, ostream& file)
       istringstream is(line);
       double temp;
       for (int i = 0; i < number; i++) {
-        is >> temp;
-        coef.push_back(temp);
+is >> temp;
+coef.push_back(temp);
       }
       if (coef.size() > nex)
         return false;
@@ -1890,13 +1890,16 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     path = filename;
   string line;
   rf.seekg(0);
+  d_f_switch = true;
 
   getline(rf, line);
   err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
   getline(rf, line);
   comment = split_string<string>(line, "]")[1];
   bool au_bohr = false; //au = false, angs = true;
-  getline(rf, line);
+  while (line.find("[Atoms]") == string::npos) {
+    getline(rf, line);
+  }
   if (split_string<string>(line, "]")[1].find("angs") != string::npos) au_bohr = true;
   else if (split_string<string>(line, "]")[1].find("Angs") != string::npos) au_bohr = true;
   getline(rf, line);
@@ -1954,37 +1957,54 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     atoms_with_basis++;
     getline(rf, line);
   }
-  while (line.find("[MO]") == string::npos)
+  bool d5 = false;
+  bool f7 = false;
+  bool g9 = false;
+  while (line.find("[MO]") == string::npos) {
+    if (line.find("[5D]") != string::npos) {
+      d5 = true;
+    }
+    if (line.find("[7F]") != string::npos) {
+      f7 = true;
+    }
+    if (line.find("[9G]") != string::npos) {
+      g9 = true;
+    }
     getline(rf, line); //Read more lines until we reach MO block
+  }
+  err_checkf(d5 && f7 && g9, "Molden files without spheircal harmonics not yet implemented!", file);
   int run = 0;
   string sym;
   bool spin; //alpha = false, beta = true
   double ene, occup;
   int expected_coefs = 0;
-  vector<int> coef_type;
-  vector<int> coef_centers;
+  vector<primitive> prims;
+  vector<int> temp_shellsizes;
   for (int a = 0; a < ncen; a++) {
     int current_shell = -1;
     for (int s = 0; s < atoms[a].basis_set.size(); s++) {
       if (atoms[a].basis_set[s].shell != current_shell) {
-        coef_type.push_back(atoms[a].basis_set[s].type);
-        coef_centers.push_back(a + 1);
         if (atoms[a].basis_set[s].type == 1)
           expected_coefs++;
         else if (atoms[a].basis_set[s].type == 2)
           expected_coefs += 3;
         else if (atoms[a].basis_set[s].type == 3)
-          expected_coefs += 6;
+          expected_coefs += 5;
         else if (atoms[a].basis_set[s].type == 4)
-          expected_coefs += 10;
+          expected_coefs += 7;
         else if (atoms[a].basis_set[s].type == 5)
-          expected_coefs += 15;
+          expected_coefs += 9;
         current_shell++;
       }
+      temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+      prims.push_back(primitive(a + 1, 
+        atoms[a].basis_set[s].type, 
+        atoms[a].basis_set[s].exponent,
+        atoms[a].basis_set[s].coefficient) );
     }
   }
   getline(rf, line);
-  vector<double> norm_const = get_norm_const(file);
+  //vector<double> norm_const = get_norm_const(file);
   int norm_const_run = 0;
   int MO_run = 0;
   while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos) {
@@ -2006,40 +2026,104 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     occup = stod(temp[1]);
     push_back_MO(run, occup, ene);
     int run_coef = 0;
-    for (int i = 0; i < coef_type.size(); i++) {
+    int p_run = 0;
+    int d_run = 0;
+    int f_run = 0;
+    int g_run = 0;
+    int basis_run = 0;
+    for (int i = 0; i < expected_coefs; i++) {
+      getline(rf, line);
       temp = split_string<string>(line, " ");
       remove_empty_elements(temp);
-      if (MO_run == 0) {
-        switch (coef_type[i]) {
-        case 1: {
-          for (int s = 0; s < atoms[coef_centers[i] - 1].shellcount.size(); s++)
-            for (int b = 0; b < atoms[coef_centers[i] - 1].shellcount[s]; b++) {
-              push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
-              push_back_exponent(atoms[coef_centers[i] - 1].basis_set[b].exponent);
-              norm_const_run++;
-            }
-          break;
+      switch (prims[basis_run].type) {
+      case 1: {
+        //push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
+          if (MO_run == 0) {
+            push_back_exponent(prims[basis_run+s].exp);
+            push_back_center(prims[basis_run].center);
+            push_back_type(prims[basis_run].type);
+            nex++;
+          }
+          //norm_const_run++;
         }
-        case 2: {
-          for (int s = 0; s < atoms[coef_centers[i] - 1].shellcount.size(); s++)
-            for (int b = 0; b < atoms[coef_centers[i] - 1].shellcount[s]; b++) {
-              push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
-              norm_const_run++;
-            }
-          break;
-        }
-        }
+        basis_run += temp_shellsizes[basis_run];
+        break;
       }
-      else {
-        switch (coef_type[i]) {
-        case 1:
-          for (int s = 0; s < atoms[coef_centers[i]].shellcount.size(); s++) {
-            push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
+      case 2: {
+        //push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
+          if (MO_run == 0) {
+            push_back_exponent(prims[basis_run+s].exp);
+            push_back_center(prims[basis_run].center);
+            push_back_type(prims[basis_run].type+p_run);
+            nex++;
+          }
+          //norm_const_run++;
+        }
+        p_run++;
+        if (p_run == 3) {
+          p_run = 0;
+          basis_run += temp_shellsizes[basis_run];
+        }
+        break;
+      }
+      case 3: {
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
+          if (MO_run == 0) {
+            push_back_exponent(prims[basis_run + s].exp);
+            push_back_center(prims[basis_run].center);
+            push_back_type(5 + d_run);
+            nex++;
           }
         }
+        d_run++;
+        if (d_run == 5) {
+          d_run = 0;
+          basis_run++;
+        }
+        break;
+      }
+      case 4: {
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
+          if (MO_run == 0) {
+            push_back_exponent(prims[basis_run + s].exp);
+            push_back_center(prims[basis_run].center);
+            push_back_type(10 + f_run);
+          }
+        }
+        f_run++;
+        if (f_run == 7) {
+          f_run = 0;
+          basis_run++;
+        }
+        break;
+      }
+      case 5: {
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
+          if (MO_run == 0) {
+            push_back_exponent(prims[basis_run + s].exp);
+            push_back_center(prims[basis_run].center);
+            push_back_type(17 + g_run);
+          }
+        }
+        g_run++;
+        if (g_run == 9) {
+          g_run = 0;
+          basis_run++;
+        }
+        break;
+      }
       }
     }
+    err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
     MO_run++;
+    getline(rf, line);
   }
 
 
@@ -3536,12 +3620,6 @@ double WFN::get_MO_occ(const int nr)
   else return MOs[nr].get_occ();
 };
 
-struct primitive
-{
-  int center, type;
-  double exp;
-};
-
 bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
 {
   vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
@@ -4739,6 +4817,295 @@ double WFN::compute_dens(
     auto run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++) {
       *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
+      run++, run2++;
+    }
+  }
+
+  auto run = phi.data();
+  auto run2 = MOs.data();
+  for (mo = 0; mo < nmo; mo++) {
+    Rho += (*run2).get_occ() * pow(*run, 2);
+    run++, run2++;
+  }
+
+  return Rho;
+}
+
+double WFN::compute_MO_spherical(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3,
+  const int& MO
+)
+{
+  err_checkc(d_f_switch, "Only works for spheriacl wavefunctions!");
+  int iat;
+  int l;
+  //ex will carry information about radial function
+  double ex;
+  vector<vector<double>> d(5);
+  for (int i = 0; i < 5; i++)
+    d[i].resize(ncen);
+  double phi(0.0);
+
+  for (iat = 0; iat < ncen; iat++) {
+    d[0][iat] = Pos1 - atoms[iat].x;
+    d[1][iat] = Pos2 - atoms[iat].y;
+    d[2][iat] = Pos3 - atoms[iat].z;
+    d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+    d[4][iat] = sqrt(d[3][iat]);
+  }
+  /*Here d[0] = x
+         d[1] = y
+         d[2] = z
+         d[3] = r^2
+         d[4] = r
+         */
+
+  for (int j = 0; j < nex; j++) {
+    iat = centers[j] - 1;
+    //if (iat != atom) continue;
+    ex = -exponents[j] * d[3][iat];
+    if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
+      continue;
+    }
+    ex = exp(ex);
+    //apply radial function:
+    l = types[j];
+    if (l > 1) {
+      if (l <= 4)	ex *= d[4][iat];
+      else if (l <= 9)	ex *= d[3][iat];
+      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
+      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
+      else if (l <= 36)	ex *= pow(d[4][iat], 5);
+    }
+    //calc spherical harmonic
+    double SH;
+    switch (l) {
+    case 1: { //S
+      SH = c_1_4p; break;
+    }
+    case 4: { //P 0 Z
+      SH = c_3_4p * d[2][iat] / d[4][iat]; break;
+    }
+    case 2: { //P 1 X
+      SH = c_3_4p * d[0][iat] / d[4][iat]; break;
+    }
+    case 3: { //P -1 Y
+      SH = c_3_4p * d[1][iat] / d[4][iat]; break;
+    }
+    case 5: { //D 0 Z2
+      SH = c_5_16p * (3 / d[3][iat] * pow(d[2][iat], 2) - 1.0); break;
+    }
+    case 6: { //D 1 XZ
+      SH = c_15_4p * d[0][iat] * d[2][iat] / d[3][iat]; break;
+    }
+    case 7: { //D -1 YZ
+      SH = c_15_4p * d[1][iat] * d[2][iat] / d[3][iat]; break;
+    }
+    case 8: { //D 2 X2-Y2
+      SH = c_15_16p * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) / d[3][iat]; break;
+    }
+    case 9: { //D -2 XY
+      SH = c_15_4p * d[1][iat] * d[0][iat] / d[3][iat]; break;
+    }
+    case 10: { //F 0 Z3
+      SH = c_7_16p / pow(d[4][iat], 3) * (5 * pow(d[2][iat], 3) - 3 * d[3][iat] * d[2][iat]); break;
+    }
+    case 11: { //F 1 XZZ
+      SH = c_21_32p / pow(d[4][iat], 3) * d[0][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 12: { //F -1 YZZ
+      SH = c_21_32p / pow(d[4][iat], 3) * d[1][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 13: { //F 2 Z(X2-Y2)
+      SH = c_105_16p / pow(d[4][iat], 3) * ((pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]); break;
+    }
+    case 14: { //F -2 XYZ
+      SH = c_105_4p / pow(d[4][iat], 3) * d[0][iat] * d[1][iat] * d[2][iat]; break;
+    }
+    case 15: { //F 3 X(X^2-3Y^2)
+      SH = c_35_32p / pow(d[4][iat], 3) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)); break;
+    }
+    case 16: { //F -3 Y(3X^2-Y^2)
+      SH = c_35_32p / pow(d[4][iat], 3) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
+    }
+    case 17: { //G 0 Z^4
+      SH = c_9_256p / pow(d[4][iat], 4) * (35 * pow(d[2][iat], 4) - 30 * pow(d[2][iat] * d[4][iat], 2) + 3.0 * pow(d[4][iat], 4)); break;
+    }
+    case 18: { //G 1 X(7Z^3-3ZR^2)
+      SH = c_45_32p / pow(d[4][iat], 4) * d[0][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
+    }
+    case 19: { //G -1 Y(7Z^2-3ZR^2)
+      SH = c_45_32p / pow(d[4][iat], 4) * d[1][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
+    }
+    case 20: { //G 2
+      SH = c_45_64p / pow(d[4][iat], 4) * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 21: { //G -2
+      SH = c_45_64p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 22: { //G 3 XZ(X^2-3Y^2)
+      SH = c_315_32p / pow(d[4][iat], 4) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)) * d[2][iat]; break;
+    }
+    case 23: { //G -3 XZ(3X^2-Y^2)
+      SH = c_315_32p / pow(d[4][iat], 4) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]; break;
+    }
+    case 24: { //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
+      SH = c_315_256p / pow(d[4][iat], 4) * ((pow(d[0][iat], 2) * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2))) -
+        (pow(d[1][iat], 2) * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)))); break;
+    }
+    case 25: { //G -4 XY(X^2-Y^2)
+      SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
+    }
+    default: {
+      err_checkc(false, "Not yet implemented!");
+    }
+    };
+    SH *= ex; // multiply radial part with spherical harmonic
+    phi += MOs[MO].get_coefficient_f(j) * SH;      //build MO values at this point
+  }
+
+  return phi;
+}
+
+double WFN::compute_dens_spherical(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3
+)
+{
+  err_checkc(d_f_switch, "Only works for spheriacl wavefunctions!");
+  double Rho = 0.0;
+  int iat;
+  int l;
+  //ex will carry information about radial function
+  double ex;
+  int mo;
+  vector<vector<double>> d(5);
+  for (int i = 0; i < 5; i++)
+    d[i].resize(ncen);
+  vector<double> phi(nmo, 0.0);
+
+  for (iat = 0; iat < ncen; iat++) {
+    d[0][iat] = Pos1 - atoms[iat].x;
+    d[1][iat] = Pos2 - atoms[iat].y;
+    d[2][iat] = Pos3 - atoms[iat].z;
+    d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+    d[4][iat] = sqrt(d[3][iat]);
+  }
+  /*Here d[0] = x
+         d[1] = y
+         d[2] = z
+         d[3] = r^2
+         d[4] = r
+         */
+
+  for (int j = 0; j < nex; j++) {
+    iat = centers[j] - 1;
+    //if (iat != atom) continue;
+    ex = -exponents[j] * d[3][iat];
+    if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
+      continue;
+    }
+    ex = exp(ex);
+    //apply radial function:
+    l = types[j];
+    if (l > 1) {
+      if (l <= 4)	ex *= d[4][iat];
+      else if (l <= 9)	ex *= d[3][iat];
+      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
+      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
+      else if (l <= 36)	ex *= pow(d[4][iat], 5);
+    }
+    //calc spherical harmonic
+    double SH;
+    switch(l) {
+    case 1: { //S
+      SH = c_1_4p; break;
+    }
+    case 4: { //P 0 Z
+      SH = c_3_4p * d[2][iat] / d[4][iat]; break;
+    }
+    case 2: { //P 1 X
+      SH = c_3_4p * d[0][iat] / d[4][iat]; break;
+    }
+    case 3: { //P -1 Y
+      SH = c_3_4p * d[1][iat] / d[4][iat]; break;
+    }
+    case 5: { //D 0 Z2
+      SH = c_5_16p * (3 / d[3][iat] * pow(d[2][iat], 2) - 1.0); break;
+    }
+    case 6: { //D 1 XZ
+      SH = c_15_4p * d[0][iat] * d[2][iat] / d[3][iat]; break;
+    }
+    case 7: { //D -1 YZ
+      SH = c_15_4p * d[1][iat] * d[2][iat] / d[3][iat]; break;
+    }
+    case 8: { //D 2 X2-Y2
+      SH = c_15_16p * (pow(d[0][iat],2) - pow(d[1][iat], 2)) / d[3][iat]; break;
+    }
+    case 9: { //D -2 XY
+      SH = c_15_4p * d[1][iat] * d[0][iat] / d[3][iat]; break;
+    }
+    case 10: { //F 0 Z3
+      SH = c_7_16p / pow(d[4][iat], 3) * (5 * pow(d[2][iat], 3) - 3 * d[3][iat] * d[2][iat]); break;
+    }
+    case 11: { //F 1 XZZ
+      SH = c_21_32p / pow(d[4][iat], 3) * d[0][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 12: { //F -1 YZZ
+      SH = c_21_32p / pow(d[4][iat], 3) * d[1][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 13: { //F 2 Z(X2-Y2)
+      SH = c_105_16p / pow(d[4][iat], 3) * ((pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]); break;
+    }
+    case 14: { //F -2 XYZ
+      SH = c_105_4p / pow(d[4][iat], 3) * d[0][iat] * d[1][iat] * d[2][iat]; break;
+    }
+    case 15: { //F 3 X(X^2-3Y^2)
+      SH = c_35_32p / pow(d[4][iat], 3) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)); break;
+    }
+    case 16: { //F -3 Y(3X^2-Y^2)
+      SH = c_35_32p / pow(d[4][iat], 3) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
+    }
+    case 17: { //G 0 Z^4
+      SH = c_9_256p / pow(d[4][iat], 4) * (35 * pow(d[2][iat], 4) - 30 * pow(d[2][iat] * d[4][iat], 2) + 3.0 * pow(d[4][iat], 4)); break;
+    }
+    case 18: { //G 1 X(7Z^3-3ZR^2)
+      SH = c_45_32p / pow(d[4][iat], 4) * d[0][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
+    }
+    case 19: { //G -1 Y(7Z^2-3ZR^2)
+      SH = c_45_32p / pow(d[4][iat], 4) * d[1][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
+    }
+    case 20: { //G 2
+      SH = c_45_64p / pow(d[4][iat], 4) * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 21: { //G -2
+      SH = c_45_64p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
+    }
+    case 22: { //G 3 XZ(X^2-3Y^2)
+      SH = c_315_32p / pow(d[4][iat], 4) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)) * d[2][iat]; break;
+    }
+    case 23: { //G -3 XZ(3X^2-Y^2)
+      SH = c_315_32p / pow(d[4][iat], 4) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]; break;
+    }
+    case 24: { //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
+      SH = c_315_256p / pow(d[4][iat], 4) * ((pow(d[0][iat], 2) * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2))) - 
+                                             (pow(d[1][iat], 2) * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)))); break;
+    }
+    case 25: { //G -4 XY(X^2-Y^2)
+      SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
+    }
+    default: {
+      err_checkc(false, "Not yet implemented!");
+    }
+    };
+    SH *= ex; // multiply radial part with spherical harmonic
+    auto run = phi.data();
+    auto run2 = MOs.data();
+    for (mo = 0; mo < nmo; mo++) {
+      *run += (*run2).get_coefficient_f(j) * SH;      //build MO values at this point
       run++, run2++;
     }
   }

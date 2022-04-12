@@ -27,6 +27,16 @@ private:
 
   std::vector<MO> MOs;
   std::vector<int> centers;
+  // For cartesian the order of types is: 
+  // 1                              = S, 
+  // 2,3,4                          = X,Y,Z
+  // 5,6,7,8,9,10                   = XX, YY, ZZ, XY, XZ, YZ
+  // 11,12,13,14,15,16,17,118,19,20 = XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ etc..
+  // for sphericals the order is:
+  // 1 = S
+  // 2,3,4 = 0, 1, -1
+  // 5,6,7,8,9 = 0, +1, -1, +2, -2
+  // 10,11,12,13,14,15,16 = 0, +1, -1, +2, -2, +3, -3 etc...
   std::vector<int> types;
   std::vector<double> exponents;
   std::vector<double> DensityMatrix;
@@ -41,7 +51,7 @@ private:
   void push_back_MO_coef(int nr, double value);
   void assign_MO_coefs(int nr, std::vector<double>& values);
   bool modified;
-  bool d_f_switch;
+  bool d_f_switch; //true if spherical harmonics are used for the basis set
   bool distance_switch;
   //precomputed factors and helper functions for ESP calc
   int pre[9][5][5][9];
@@ -173,6 +183,7 @@ public:
   double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
   double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
+  double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3);
   void computeValues(const double* PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap);
   void computeLapELIELF(const double* PosGrid, double& Elf, double& Eli, double& Lap);
   void computeELIELF(const double* PosGrid, double& Elf, double& Eli);
@@ -180,6 +191,7 @@ public:
   void computeELI(const double* PosGrid, double& Eli);
   void computeELF(const double* PosGrid, double& Elf);
   double computeMO(const double* PosGrid, const int& mo);
+  double compute_MO_spherical(const double& Pos1, const double& Pos2, const double& Pos3, const int& MO);
   double computeESP(double* PosGrid, std::vector<std::vector<double> >& d2);
   //----------DM Handling--------------------------------
   void push_back_DM(double value);
