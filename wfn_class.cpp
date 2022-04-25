@@ -4729,7 +4729,7 @@ bool WFN::read_fchk(string& filename, ostream& log, bool debug)
   }
   return true;
 };
-
+/*
 double WFN::compute_dens(
   const double* PosGrid,			// [3] array with current position on the grid
   const int atom
@@ -4785,8 +4785,51 @@ double WFN::compute_dens(
 
   return Rho;
 }
+*/
 
 double WFN::compute_dens(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3,
+  vector<vector<double>>& d,
+  vector<double>& phi
+)
+{
+  if (d_f_switch) {
+    err_checkc(d.size() >= 5, "d is too small!");
+    err_checkc(phi.size() == nmo, "phi is too small!");
+    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+  }
+  else {
+    err_checkc(d.size() >= 4, "d is too small!");
+    err_checkc(phi.size() == nmo, "phi is too small!");
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+  }
+};
+
+double WFN::compute_dens(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3
+)
+{
+  if (d_f_switch) {
+    vector<vector<double>> d(5);
+    for (int i = 0; i < 5; i++)
+      d[i].resize(ncen, 0.0);
+    vector<double> phi(nmo, 0.0);
+    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
+  }
+  else {
+    vector<vector<double>> d(4);
+    for (int i = 0; i < 4; i++)
+      d[i].resize(ncen, 0.0);
+    vector<double> phi(nmo, 0.0);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+  }
+};
+
+double WFN::compute_dens_cartesian(
   const double& Pos1,
   const double& Pos2,
   const double& Pos3,
@@ -4979,6 +5022,7 @@ double WFN::compute_MO_spherical(
     SH *= ex; // multiply radial part with spherical harmonic
     phi += MOs[MO].get_coefficient_f(j) * SH;      //build MO values at this point
   }
+  shrink_vector<vector<double>>(d);
 
   return phi;
 }
@@ -4986,20 +5030,19 @@ double WFN::compute_MO_spherical(
 double WFN::compute_dens_spherical(
   const double& Pos1,
   const double& Pos2,
-  const double& Pos3
+  const double& Pos3,
+  vector<vector<double>>& d,
+  vector<double>& phi
 )
 {
   err_checkc(d_f_switch, "Only works for spheriacl wavefunctions!");
+  std::fill(phi.begin(), phi.end(), 0.0);
   double Rho = 0.0;
   int iat;
   int l;
   //ex will carry information about radial function
   double ex;
   int mo;
-  vector<vector<double>> d(5);
-  for (int i = 0; i < 5; i++)
-    d[i].resize(ncen);
-  vector<double> phi(nmo, 0.0);
 
   for (iat = 0; iat < ncen; iat++) {
     d[0][iat] = Pos1 - atoms[iat].x;
@@ -5017,7 +5060,6 @@ double WFN::compute_dens_spherical(
 
   for (int j = 0; j < nex; j++) {
     iat = centers[j] - 1;
-    //if (iat != atom) continue;
     ex = -exponents[j] * d[3][iat];
     if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
       continue;
