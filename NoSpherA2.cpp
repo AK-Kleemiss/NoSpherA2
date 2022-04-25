@@ -766,7 +766,7 @@ int main(int argc, char** argv)
     Rho.set_vector(2, 2, 0.141414);
     Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
     log_file << "Calcualting Rho...";
-    Calc_Rho_spherical_harmonics(Rho, wavy[0], ncpus, log_file);
+    Calc_Rho_spherical_harmonics(Rho, wavy[0], threads, log_file);
     log_file << " ...done!" << endl;
     Rho.write_file(wavy[0], true);
     log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho.sum() << endl;
@@ -780,7 +780,7 @@ int main(int argc, char** argv)
       MO.set_vector(2, 2, 0.141414);
       MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(i) + ".cube";
       log_file << "Calcualting MO " + to_string(i) + "...";
-      Calc_MO_spherical_harmonics(MO, wavy[0], ncpus, i, log_file);
+      Calc_MO_spherical_harmonics(MO, wavy[0], threads, i, log_file);
       log_file << " ...done!" << endl;
       MO.write_file(wavy[0], true);
     }
