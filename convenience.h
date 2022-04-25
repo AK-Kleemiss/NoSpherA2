@@ -519,6 +519,8 @@ struct primitive
       pow(4 * exp, l) / doublefactorial(2 * l - 1)
     );
   };
+  primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
+  primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef){}
 };
 
 typedef std::set<std::vector<int>> hkl_list;

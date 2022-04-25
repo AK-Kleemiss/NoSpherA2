@@ -180,10 +180,12 @@ public:
   unsigned int get_atom_integer_mass(unsigned int atomnr);
   double get_atom_real_mass(int atomnr);
   //----------Calcualtion of Properties
-  double compute_dens(const double* PosGrid, const int atom = -1);
+  //double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
+  double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3);
   double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
-  double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3);
+  double compute_dens_cartesian(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
+  double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
   void computeValues(const double* PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap);
   void computeLapELIELF(const double* PosGrid, double& Elf, double& Eli, double& Lap);
   void computeELIELF(const double* PosGrid, double& Elf, double& Eli);

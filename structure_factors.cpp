@@ -1948,11 +1948,11 @@ int make_hirshfeld_grids(const int& pbc,
           if (x == 0 && y == 0 && z == 0)
             continue;
 #pragma omp parallel for
-          for (int i = 0; i < total_grid[0].size(); i++)
-            periodic_grid[j][i] = wave.compute_dens(new double[3]{
-              total_grid[0][i] + x * unit_cell.get_cm(0,0) + y * unit_cell.get_cm(0,1) + z * unit_cell.get_cm(0,2),
-              total_grid[1][i] + x * unit_cell.get_cm(1,0) + y * unit_cell.get_cm(1,1) + z * unit_cell.get_cm(1,2),
-              total_grid[2][i] + x * unit_cell.get_cm(2,0) + y * unit_cell.get_cm(2,1) + z * unit_cell.get_cm(2,2) });
+          for (int i = 0; i < total_grid[0].size(); i++) {
+            periodic_grid[j][i] = wave.compute_dens(total_grid[0][i] + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2),
+              total_grid[1][i] + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2),
+              total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2));
+          }
           j++;
         }
     if (debug) {
