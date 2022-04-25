@@ -75,11 +75,6 @@ inline const double c_315_16p = sqrt(315.0 / (16.0 * PI));
 inline const double c_315_32p = sqrt(315.0 / (32.0 * PI));
 inline const double c_315_256p = sqrt(315.0 / (256.0 * PI));
 
-struct primitive
-{
-  int center, type;
-  double exp, coefficient;
-};
 
 constexpr double bohr2ang(const double& inp)
 {
@@ -497,6 +492,33 @@ struct hkl_less
     }
     else return false;
   }
+};
+
+inline unsigned int doublefactorial(int n)
+{
+  if (n <= 1)
+    return 1;
+  return n * doublefactorial(n - 2);
+}
+
+struct primitive
+{
+  int center, type;
+  double exp, coefficient;
+  void normalize() {
+    const int l = type - 1;
+    coefficient *= sqrt(
+      pow(2 * exp / PI, 3.0 / 2.0) *
+      pow(4 * exp, l) / doublefactorial(2 * l - 1)
+    );
+  };
+  void unnormalize() {
+    const int l = type - 1;
+    coefficient /= sqrt(
+      pow(2 * exp / PI, 3.0 / 2.0) *
+      pow(4 * exp, l) / doublefactorial(2 * l - 1)
+    );
+  };
 };
 
 typedef std::set<std::vector<int>> hkl_list;

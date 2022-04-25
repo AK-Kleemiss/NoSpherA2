@@ -881,28 +881,28 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 					case 1:
 						temp=2*temp/pi;
 						temp=pow(temp,0.75);
-						temp=temp*wave.get_atom_basis_set_coefficient(a,p);
+						temp*=wave.get_atom_basis_set_coefficient(a,p);
 						basis_coefficients[a].push_back(temp);
 						break;
 					case 2:
 						temp=128*pow(temp,5);
 						temp=temp/pow(pi,3);
 						temp=pow(temp,0.25);
-						temp=wave.get_atom_basis_set_coefficient(a,p)*temp;
+						temp*=wave.get_atom_basis_set_coefficient(a,p);
 						basis_coefficients[a].push_back(temp);
 						break;
 					case 3:
 						temp=2048*pow(temp,7);
 						temp=temp/(9*pow(pi,3));
 						temp=pow(temp,0.25);
-						temp=wave.get_atom_basis_set_coefficient(a,p)*temp;
+						temp*=wave.get_atom_basis_set_coefficient(a,p);
 						basis_coefficients[a].push_back(temp);
 						break;
 					case 4:
 						temp=32768*pow(temp,9);
 						temp=temp/(225*pow(pi,3));
 						temp=pow(temp,0.25);
-						temp=wave.get_atom_basis_set_coefficient(a,p)*temp;
+						temp*=wave.get_atom_basis_set_coefficient(a,p);
 						basis_coefficients[a].push_back(temp);
 						break;
 					case -1:

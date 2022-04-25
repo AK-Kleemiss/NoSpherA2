@@ -769,6 +769,9 @@ int main(int argc, char** argv)
     Calc_Rho_spherical_harmonics(Rho, wavy[0], ncpus, log_file);
     log_file << " ...done!" << endl;
     Rho.write_file(wavy[0], true);
+    log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho.sum() << endl;
+    cube Rho2("test.eldens.cube", true);
+    log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << Rho2.sum() << endl;
     for (int i = 0; i < 5; i++) {
       cube MO(100, 100, 100, wavy[0].get_ncen(), true);
       MO.set_origin(0, -7), MO.set_origin(1, -7), MO.set_origin(2, -7);
