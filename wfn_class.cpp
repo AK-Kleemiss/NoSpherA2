@@ -1856,8 +1856,8 @@ bool WFN::read_wfx(string fileName, bool debug, ostream& file)
       istringstream is(line);
       double temp;
       for (int i = 0; i < number; i++) {
-is >> temp;
-coef.push_back(temp);
+        is >> temp;
+        coef.push_back(temp);
       }
       if (coef.size() > nex)
         return false;
@@ -1982,25 +1982,37 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
   vector<int> temp_shellsizes;
   for (int a = 0; a < ncen; a++) {
     int current_shell = -1;
+    int l = 0;
     for (int s = 0; s < atoms[a].basis_set.size(); s++) {
       if (atoms[a].basis_set[s].shell != current_shell) {
-        if (atoms[a].basis_set[s].type == 1)
+        if (atoms[a].basis_set[s].type == 1) {
           expected_coefs++;
-        else if (atoms[a].basis_set[s].type == 2)
+          l = 0;
+        }
+        else if (atoms[a].basis_set[s].type == 2) {
           expected_coefs += 3;
-        else if (atoms[a].basis_set[s].type == 3)
+          l = 1;
+        }
+        else if (atoms[a].basis_set[s].type == 3) {
           expected_coefs += 5;
-        else if (atoms[a].basis_set[s].type == 4)
+          l = 2;
+        }
+        else if (atoms[a].basis_set[s].type == 4) {
           expected_coefs += 7;
-        else if (atoms[a].basis_set[s].type == 5)
+          l = 3;
+        }
+        else if (atoms[a].basis_set[s].type == 5) {
           expected_coefs += 9;
+          l = 4;
+        }
         current_shell++;
       }
       temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
       prims.push_back(primitive(a + 1, 
         atoms[a].basis_set[s].type, 
         atoms[a].basis_set[s].exponent,
-        atoms[a].basis_set[s].coefficient) );
+        atoms[a].basis_set[s].coefficient));
+      prims.back().unnormalize();
     }
   }
   getline(rf, line);
@@ -4869,19 +4881,21 @@ double WFN::compute_MO_spherical(
     if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
       continue;
     }
-    ex = exp(ex);
     //apply radial function:
     l = types[j];
     if (l > 1) {
-      if (l <= 4)	ex *= d[4][iat];
-      else if (l <= 9)	ex *= d[3][iat];
-      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
-      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
-      else if (l <= 36)	ex *= pow(d[4][iat], 5);
+      if (l <= 4)	      l = 1;
+      else if (l <= 9)	l = 2;
+      else if (l <= 16)	l = 3;
+      else if (l <= 25)	l = 4;
+      else if (l <= 36)	l = 5;
     }
+    else l = 0;
+    ex = exp(ex);
+    ex *= pow(d[4][iat], l);
     //calc spherical harmonic
     double SH;
-    switch (l) {
+    switch (types[j]) {
     case 1: { //S
       SH = c_1_4p; break;
     }
