@@ -577,8 +577,14 @@ void read_atoms_from_CIF(ifstream& cif_input,
               }
             }
             if (label.find(element) == string::npos) {
-              if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
-              continue;
+              if (element != "h") {
+                if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
+                continue;
+              }
+              else if (label.find("d") == string::npos) {
+                if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
+                continue;
+              }
             }
             wave.atoms[i].label = fields[label_field];
             asym_atom_list.push_back(i);

@@ -138,6 +138,7 @@ string atnr2letter(const int& nr)
 int get_Z_from_label(const char* tmp)
 {
   if (strcmp(tmp, "H") == 0)  return 0;
+  else  if (strcmp(tmp, "D") == 0)  return 0;
   else 	if (strcmp(tmp, "He") == 0)  return 1;
   else 	if (strcmp(tmp, "Li") == 0)  return 2;
   else 	if (strcmp(tmp, "Be") == 0)  return 3;
