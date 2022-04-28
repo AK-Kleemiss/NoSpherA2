@@ -2761,9 +2761,9 @@ bool calculate_structure_factors_HF(
 
   double time2 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
 
-  if (time2 < 60) printf("Total Time: %4.1lf s\n", time2);
-  else if (time2 < 3600) printf("Total Time: %10.1lf m\n", time2 / 60);
-  else printf("Total Time: %10.1lf h\n", time2 / 3600);
+  if (time2 < 60) cout << "Total Time: " << setw(4) << setprecision(1) << time2 << " s\n";
+  else if (time2 < 3600) cout << "Total Time: " << setw(4) << setprecision(1) << time2/60 << " s\n";
+  else cout << "Total Time: " << setw(4) << setprecision(1) << time2/3600 << " s\n";
 
 #endif
   file << "Writing tsc file... " << flush;
