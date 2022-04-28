@@ -87,7 +87,7 @@ public:
       cheader = new char[head[0]];
       tsc_file.read(cheader, head[0] * charsize);
       header_str = cheader;
-      free(cheader);
+      delete(cheader);
     }
     header = header_str;
     //read scatterer labels and map onto scattterers list

@@ -616,8 +616,6 @@ void Calc_Rho_spherical_harmonics(
   if (cpus != -1) {
     omp_set_num_threads(cpus);
     //omp_set_dynamic(0);
-    if (cpus > 1)
-      omp_set_nested(1);
   }
 #endif
 
@@ -627,22 +625,30 @@ void Calc_Rho_spherical_harmonics(
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Rho" };
   const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
 
-#pragma omp parallel for schedule(dynamic)
-  for (int i = 0; i < CubeRho.get_size(0); i++) {
+//#pragma omp parallel shared(CubeRho)
+  {
     cout << omp_get_thread_num() << endl;
-    for (int j = 0; j < CubeRho.get_size(1); j++)
-      for (int k = 0; k < CubeRho.get_size(2); k++) {
+    vector<vector<double>> d(5);
+    for (int i = 0; i < 5; i++)
+      d[i].resize(wavy.get_ncen(), 0.0);
+    const int n = wavy.get_nmo(true);
+    vector<double> phi(n, 0.0);
+//#pragma omp for schedule(dynamic)
+    for (int i = 0; i < CubeRho.get_size(0); i++) {
+      for (int j = 0; j < CubeRho.get_size(1); j++)
+        for (int k = 0; k < CubeRho.get_size(2); k++) {
 
-        double PosGrid[3];
+          double PosGrid[3];
 
-        PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
-        PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
-        PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
+          PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
+          PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
+          PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
 
-        CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2]));
-      }
-    if (i != 0 && i % step == 0)
-      progress->write((i) / double(CubeRho.get_size(0)));
+          CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+        }
+      if (i != 0 && i % step == 0)
+        progress->write((i) / double(CubeRho.get_size(0)));
+    }
   }
   delete(progress);
 

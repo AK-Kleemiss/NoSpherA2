@@ -141,10 +141,16 @@ inline void error_check(const bool condition, const std::string& file, const int
     exit(-1);
   }
 };
+inline void not_implemented(const std::string& file, const int& line, const std::string& error_mesasge, std::ofstream& log_file) {
+  log_file << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+  exit(-1);
+};
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, error_message, file)
 #define err_checkc(condition, error_message) error_check(condition, __FILE__, __LINE__, error_message, std::cout)
+#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, error_message, file)
 
-bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
+bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f);
+bool generate_cart2sph_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
 inline const int sht2nbas(const int& type)
@@ -506,19 +512,21 @@ struct primitive
   int center, type;
   double exp, coefficient;
   void normalize() {
-    const int l = type - 1;
-    coefficient *= sqrt(
-      pow(2 * exp / PI, 3.0 / 2.0) *
-      pow(4 * exp, l) / doublefactorial(2 * l - 1)
-    );
+    double c = normalization_constant();
+    coefficient *= c;
   };
   void unnormalize() {
     const int l = type - 1;
-    coefficient /= sqrt(
-      pow(2 * exp / PI, 3.0 / 2.0) *
-      pow(4 * exp, l) / doublefactorial(2 * l - 1)
-    );
+    double c = normalization_constant();
+    coefficient /= c;
   };
+  double normalization_constant() {
+    const int l = type - 1;
+    return sqrt(
+      pow(2 * exp / PI, 3.0 / 2.0) *
+      pow(4 * exp, l)
+    );
+  }
   primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
   primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef){}
 };

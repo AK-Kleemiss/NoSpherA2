@@ -230,6 +230,7 @@ bool cube::read_file(bool full, bool header, bool expert){
 		getline(file,line);
 		origin.resize(3);
 		dump = sscanf(line.c_str(),"%d %lf %lf %lf",&na,&origin[0],&origin[1],&origin[2]); //na=number of atoms in the cube file
+		na = abs(na);
 		double spat[9];
 		size.resize(3);
 		vectors.resize(3);
