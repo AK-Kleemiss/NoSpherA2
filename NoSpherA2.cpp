@@ -783,6 +783,10 @@ int main(int argc, char** argv)
       Calc_MO_spherical_harmonics(MO, wavy[0], threads, i, log_file);
       log_file << " ...done!" << endl;
       MO.write_file(wavy[0], true);
+      string name("test.mo" + to_string(i) + "a.cube");
+      cube MO2(name, true);
+      log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
+      log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
     }
  
     return 0;

@@ -2012,7 +2012,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         atoms[a].basis_set[s].type, 
         atoms[a].basis_set[s].exponent,
         atoms[a].basis_set[s].coefficient));
-      prims.back().unnormalize();
+      //prims.back().unnormalize();
     }
   }
   getline(rf, line);
@@ -2043,13 +2043,16 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     int f_run = 0;
     int g_run = 0;
     int basis_run = 0;
+    vector<vector<double>> d_pure_2_cart;
+    vector<vector<double>> f_pure_2_cart;
+    err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart), "Error creating the ocnversion matrix", file);
     for (int i = 0; i < expected_coefs; i++) {
       getline(rf, line);
       temp = split_string<string>(line, " ");
       remove_empty_elements(temp);
+      err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
       switch (prims[basis_run].type) {
       case 1: {
-        //push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
           push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
           if (MO_run == 0) {
@@ -2058,13 +2061,11 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
             push_back_type(prims[basis_run].type);
             nex++;
           }
-          //norm_const_run++;
         }
         basis_run += temp_shellsizes[basis_run];
         break;
       }
       case 2: {
-        //push_back_MO_coef(MO_run, stod(temp[1]) * norm_const[norm_const_run]);
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
           push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
           if (MO_run == 0) {
@@ -2073,7 +2074,6 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
             push_back_type(prims[basis_run].type+p_run);
             nex++;
           }
-          //norm_const_run++;
         }
         p_run++;
         if (p_run == 3) {
@@ -2116,6 +2116,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         break;
       }
       case 5: {
+        err_not_impl_f("G type", file);
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
           push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
           if (MO_run == 0) {
@@ -3635,7 +3636,7 @@ double WFN::get_MO_occ(const int nr)
 bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
 {
   vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
-  if (!generate_sph2cart_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
+  if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
   int r_u_ro_switch = 0;
   ifstream fchk(filename, ios::in);
   if (!fchk.is_open()) {
@@ -4184,7 +4185,7 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
 bool WFN::read_fchk(string& filename, ostream& log, bool debug)
 {
   vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
-  if (!generate_sph2cart_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
+  if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
   int r_u_ro_switch = 0;
   ifstream fchk(filename, ios::in);
   if (!fchk.is_open()) {
@@ -4797,12 +4798,12 @@ double WFN::compute_dens(
 {
   if (d_f_switch) {
     err_checkc(d.size() >= 5, "d is too small!");
-    err_checkc(phi.size() == nmo, "phi is too small!");
+    err_checkc(phi.size() >= get_nmo(true), "phi is too small!");
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
   }
   else {
     err_checkc(d.size() >= 4, "d is too small!");
-    err_checkc(phi.size() == nmo, "phi is too small!");
+    err_checkc(phi.size() >= get_nmo(true), "phi is too small!");
     return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
   }
 };
@@ -4813,18 +4814,19 @@ double WFN::compute_dens(
   const double& Pos3
 )
 {
+  int n = get_nmo(true);
   if (d_f_switch) {
     vector<vector<double>> d(5);
     for (int i = 0; i < 5; i++)
       d[i].resize(ncen, 0.0);
-    vector<double> phi(nmo, 0.0);
+    vector<double> phi(n, 0.0);
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
   }
   else {
     vector<vector<double>> d(4);
     for (int i = 0; i < 4; i++)
       d[i].resize(ncen, 0.0);
-    vector<double> phi(nmo, 0.0);
+    vector<double> phi(n, 0.0);
     return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
   }
 };
@@ -4870,7 +4872,7 @@ double WFN::compute_dens_cartesian(
     }
     auto run = phi.data();
     auto run2 = MOs.data();
-    for (mo = 0; mo < nmo; mo++) {
+    for (mo = 0; mo < phi.size(); mo++) {
       *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
       run++, run2++;
     }
@@ -4878,7 +4880,7 @@ double WFN::compute_dens_cartesian(
 
   auto run = phi.data();
   auto run2 = MOs.data();
-  for (mo = 0; mo < nmo; mo++) {
+  for (mo = 0; mo < phi.size(); mo++) {
     Rho += (*run2).get_occ() * pow(*run, 2);
     run++, run2++;
   }
@@ -4919,26 +4921,23 @@ double WFN::compute_MO_spherical(
 
   for (int j = 0; j < nex; j++) {
     iat = centers[j] - 1;
-    //if (iat != atom) continue;
     ex = -exponents[j] * d[3][iat];
     if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
       continue;
     }
     //apply radial function:
+    ex = exp(ex);
     l = types[j];
     if (l > 1) {
-      if (l <= 4)	      l = 1;
-      else if (l <= 9)	l = 2;
-      else if (l <= 16)	l = 3;
-      else if (l <= 25)	l = 4;
-      else if (l <= 36)	l = 5;
+      if (l <= 4)	ex *= d[4][iat];
+      else if (l <= 9)	ex *= d[3][iat];
+      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
+      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
+      else if (l <= 36)	ex *= pow(d[4][iat], 5);
     }
-    else l = 0;
-    ex = exp(ex);
-    ex *= pow(d[4][iat], l);
     //calc spherical harmonic
     double SH;
-    switch (types[j]) {
+    switch (l) {
     case 1: { //S
       SH = c_1_4p; break;
     }
@@ -4952,7 +4951,7 @@ double WFN::compute_MO_spherical(
       SH = c_3_4p * d[1][iat] / d[4][iat]; break;
     }
     case 5: { //D 0 Z2
-      SH = c_5_16p * (3 / d[3][iat] * pow(d[2][iat], 2) - 1.0); break;
+      SH = c_5_16p / d[3][iat] * (3 * pow(d[2][iat], 2) - d[3][iat]); break;
     }
     case 6: { //D 1 XZ
       SH = c_15_4p * d[0][iat] * d[2][iat] / d[3][iat]; break;
@@ -4993,7 +4992,7 @@ double WFN::compute_MO_spherical(
     case 18: { //G 1 X(7Z^3-3ZR^2)
       SH = c_45_32p / pow(d[4][iat], 4) * d[0][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
     }
-    case 19: { //G -1 Y(7Z^2-3ZR^2)
+    case 19: { //G -1 Y(7Z^3-3ZR^2)
       SH = c_45_32p / pow(d[4][iat], 4) * d[1][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
     }
     case 20: { //G 2
@@ -5160,7 +5159,7 @@ double WFN::compute_dens_spherical(
     SH *= ex; // multiply radial part with spherical harmonic
     auto run = phi.data();
     auto run2 = MOs.data();
-    for (mo = 0; mo < nmo; mo++) {
+    for (mo = 0; mo < phi.size(); mo++) {
       *run += (*run2).get_coefficient_f(j) * SH;      //build MO values at this point
       run++, run2++;
     }
@@ -5168,7 +5167,7 @@ double WFN::compute_dens_spherical(
 
   auto run = phi.data();
   auto run2 = MOs.data();
-  for (mo = 0; mo < nmo; mo++) {
+  for (mo = 0; mo < phi.size(); mo++) {
     Rho += (*run2).get_occ() * pow(*run, 2);
     run++, run2++;
   }

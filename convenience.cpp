@@ -1230,7 +1230,66 @@ const double normgauss(const int& type, const double& exp)
   int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
   return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)
+bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f) {
+  //                                                   
+  //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
+  //To 6D : 1  2  3  4  5  6                           
+  //XX, YY, ZZ, XY, XZ, YZ      
+  // 
+  d.resize(6);
+#pragma omp parallel for
+  for (int i = 0; i < 6; i++) {
+    d[i].resize(5, 0.0);
+  }
+  //XX = -0.5SQRT(3) * D0 + 0.5 * D2
+  d[0][0] = -0.5*sqrt(3);
+  d[0][3] = 0.5;
+  //YY = -0.5SQRT(3) * D0 - 0.5 * D2
+  d[1][0] = -0.5 * sqrt(3);
+  d[1][3] = -0.5;
+  //ZZ = SQRT(1/3) * D0
+  d[2][0] = sqrt(1.0/3.0);
+  //XY = D-2
+  d[3][4] = 1.0;
+  //XZ = D1
+  d[4][1] = 1.0;
+  //YZ = D-1
+  d[5][4] = 1.0;
+
+  //From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
+  //To 10F : 1   2   3   4   5   6   7   8   9  10
+  //XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
+  //
+  f.resize(10);
+#pragma omp parallel for
+  for (int i = 0; i < 10; i++) {
+    f[i].resize(7,0.0);
+  }
+  //F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
+  f[2][0] = 1.0;
+  f[5][0] = -1.5 / sqrt(5.0);
+  f[8][0] = -1.5 / sqrt(5.0);
+  //F + 1 = -sqrt(3 / 8) * XXX - sqrt(3 / 40) * XYY + sqrt(6 / 5) * XZZ
+  f[0][1] = -sqrt(3.0 / 8.0);
+  f[3][1] = -sqrt(3.0 / 40.0);
+  f[6][1] = sqrt(6.0 / 5.0);
+  //F - 1 = -sqrt(3 / 40) * XXY - sqrt(3 / 8) * YYY + sqrt(6 / 5) * YZZ
+  f[1][2] = -sqrt(3.0 / 8.0);
+  f[4][2] = -sqrt(3.0 / 40.0);
+  f[7][2] = sqrt(6.0 / 5.0);
+  //F + 2 = sqrt3 / 2 * (XXZ - YYZ)
+  f[5][3] = sqrt(3.0) / 2.0;
+  f[8][3] = -sqrt(3.0) / 2.0;
+  //F - 2 = XYZ
+  f[9][4] = 1.0;
+  //F + 3 = sqrt(5 / 8) * XXX - 3 / sqrt8 * XYY
+  f[0][5] = sqrt(5.0 / 8.0);
+  f[3][5] = -3.0 / sqrt(8.0);
+  //F - 3 = 3 / sqrt8 * XXY - sqrt(5 / 8) * YYY
+  f[1][6] = -sqrt(5.0 / 8.0);
+  f[4][6] = 3.0 / sqrt(8.0);
+}
+bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)
 {
   //                                                   
   //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
