@@ -1241,11 +1241,11 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
   for (int i = 0; i < 6; i++) {
     d[i].resize(5, 0.0);
   }
-  //XX = -0.5SQRT(3) * D0 + 0.5 * D2
-  d[0][0] = -0.5*sqrt(3);
+  //XX = -0.5/SQRT(3) * D0 + 0.5 * D2
+  d[0][0] = -0.5 / sqrt(3);
   d[0][3] = 0.5;
-  //YY = -0.5SQRT(3) * D0 - 0.5 * D2
-  d[1][0] = -0.5 * sqrt(3);
+  //YY = -0.5/SQRT(3) * D0 - 0.5 * D2
+  d[1][0] = -0.5 / sqrt(3);
   d[1][3] = -0.5;
   //ZZ = SQRT(1/3) * D0
   d[2][0] = sqrt(1.0/3.0);
