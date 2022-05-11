@@ -1890,7 +1890,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     path = filename;
   string line;
   rf.seekg(0);
-  d_f_switch = true;
+  //d_f_switch = true;
 
   getline(rf, line);
   err_checkf(line.find("Molden Format") != string::npos, "Does not look like proper molden format file!", file);
@@ -2020,6 +2020,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
   int norm_const_run = 0;
   int MO_run = 0;
   while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos) {
+    run++;
     temp = split_string<string>(line, " ");
     remove_empty_elements(temp);
     sym = temp[1];
@@ -2040,12 +2041,15 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     int run_coef = 0;
     int p_run = 0;
     int d_run = 0;
+    vector<double> d_temp(5);
     int f_run = 0;
+    vector<double> f_temp(7);
     int g_run = 0;
+    vector<double> g_temp(9);
     int basis_run = 0;
     vector<vector<double>> d_pure_2_cart;
     vector<vector<double>> f_pure_2_cart;
-    err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart), "Error creating the ocnversion matrix", file);
+    err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart), "Error creating the conversion matrix", file);
     for (int i = 0; i < expected_coefs; i++) {
       getline(rf, line);
       temp = split_string<string>(line, " ");
@@ -2084,16 +2088,24 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
       }
       case 3: {
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
-          if (MO_run == 0) {
-            push_back_exponent(prims[basis_run + s].exp);
-            push_back_center(prims[basis_run].center);
-            push_back_type(5 + d_run);
-            nex++;
-          }
+          //push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
+          d_temp[d_run] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         d_run++;
         if (d_run == 5) {
+          double temp_coef = 0;
+          for (int cart = 0; cart < 6; cart++) {
+            for (int spher = 0; spher < 5; spher++) {
+              temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher];
+            }
+            push_back_MO_coef(MO_run, temp_coef);
+            if (MO_run == 0) {
+              push_back_exponent(prims[basis_run].exp); // this will ony work with one shell yet
+              push_back_center(prims[basis_run].center);
+              push_back_type(5 + cart);
+              nex++;
+            }
+          }
           d_run = 0;
           basis_run++;
         }
@@ -2101,15 +2113,23 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
       }
       case 4: {
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
-          if (MO_run == 0) {
-            push_back_exponent(prims[basis_run + s].exp);
-            push_back_center(prims[basis_run].center);
-            push_back_type(10 + f_run);
-          }
+          f_temp[f_run] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         f_run++;
         if (f_run == 7) {
+          double temp_coef = 0;
+          for (int cart = 0; cart < 10; cart++) {
+            for (int spher = 0; spher < 7; spher++) {
+              temp_coef += f_pure_2_cart[spher][cart] * f_temp[spher];
+            }
+            push_back_MO_coef(MO_run, temp_coef);
+            if (MO_run == 0) {
+              push_back_exponent(prims[basis_run].exp); // this will ony work with one shell yet
+              push_back_center(prims[basis_run].center);
+              push_back_type(11 + cart);
+              nex++;
+            }
+          }
           f_run = 0;
           basis_run++;
         }
@@ -2123,6 +2143,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
             push_back_exponent(prims[basis_run + s].exp);
             push_back_center(prims[basis_run].center);
             push_back_type(17 + g_run);
+            nex++;
           }
         }
         g_run++;
