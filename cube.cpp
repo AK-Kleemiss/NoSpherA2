@@ -47,10 +47,26 @@ cube::cube(string filepath, bool read, WFN &wave, bool &return_value, bool exper
 	return_value=true;
 };
 
+cube::cube(string filepath, bool read, WFN& wave, bool& return_value, ofstream& file, bool expert) {
+	err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
+	path = filepath;
+	err_checkf(read_file(read, true, wave), "Sorry, something went wrong while reading!", file);
+	loaded = read;
+	na = wave.get_ncen();
+	return_value = true;
+};
+
 cube::cube(string filepath, bool read, bool expert){
 	err_checkc(exists(filepath), "Sorry, this file does not exist!");
 	path = filepath;
 	err_checkc(read_file(read, true), "Sorry, something went wrong while reading!");
+	loaded = read;
+};
+
+cube::cube(string filepath, bool read, ofstream& file, bool expert) {
+	err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
+	path = filepath;
+	err_checkf(read_file(read, true), "Sorry, something went wrong while reading!", file);
 	loaded = read;
 };
 
