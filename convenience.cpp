@@ -1245,10 +1245,10 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
   d[0][0] = -0.5 / sqrt(3);
   d[0][3] = 0.5;
   //YY = -0.5/SQRT(3) * D0 - 0.5 * D2
-  d[1][0] = -0.5 / sqrt(3);
-  d[1][3] = -0.5;
+  d[2][0] = 0.5 / sqrt(3);
+  d[2][3] = 0.5;
   //ZZ = SQRT(1/3) * D0
-  d[2][0] = sqrt(1.0/3.0);
+  d[1][0] = sqrt(1.0/3.0);
   //XY = D-2
   d[3][4] = 1.0;
   //XZ = D1
@@ -1260,34 +1260,51 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
   //To 10F : 1   2   3   4   5   6   7   8   9  10
   //XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
   //
-  f.resize(10);
+  f.resize(7);
 #pragma omp parallel for
-  for (int i = 0; i < 10; i++) {
-    f[i].resize(7,0.0);
+  for (int i = 0; i < 7; i++) {
+    f[i].resize(10,0.0);
   }
-  //F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
-  f[2][0] = 1.0;
-  f[5][0] = -1.5 / sqrt(5.0);
-  f[8][0] = -1.5 / sqrt(5.0);
-  //F + 1 = -sqrt(3 / 8) * XXX - sqrt(3 / 40) * XYY + sqrt(6 / 5) * XZZ
-  f[0][1] = -sqrt(3.0 / 8.0);
-  f[3][1] = -sqrt(3.0 / 40.0);
-  f[6][1] = sqrt(6.0 / 5.0);
-  //F - 1 = -sqrt(3 / 40) * XXY - sqrt(3 / 8) * YYY + sqrt(6 / 5) * YZZ
-  f[1][2] = -sqrt(3.0 / 8.0);
-  f[4][2] = -sqrt(3.0 / 40.0);
-  f[7][2] = sqrt(6.0 / 5.0);
-  //F + 2 = sqrt3 / 2 * (XXZ - YYZ)
-  f[5][3] = sqrt(3.0) / 2.0;
-  f[8][3] = -sqrt(3.0) / 2.0;
-  //F - 2 = XYZ
-  f[9][4] = 1.0;
-  //F + 3 = sqrt(5 / 8) * XXX - 3 / sqrt8 * XYY
-  f[0][5] = sqrt(5.0 / 8.0);
-  f[3][5] = -3.0 / sqrt(8.0);
-  //F - 3 = 3 / sqrt8 * XXY - sqrt(5 / 8) * YYY
-  f[1][6] = -sqrt(5.0 / 8.0);
-  f[4][6] = 3.0 / sqrt(8.0);
+  f[0][0] = 0.089443;
+  f[1][0] = -0.12772352;
+  f[3][0] = -0.409928;
+  f[5][0] = -0.195503;
+  
+  f[2][1] = -0.154785;
+  f[6][1] = 0.201561716;
+
+  f[0][2] = 0.379576;
+  f[1][2] = -0.096767;
+  f[3][2] = 0.29476;
+  f[5][2] = 0.173278;
+
+  f[2][3] = -0.154785;
+  f[6][3] = -0.614936481;
+  
+  f[0][4] = -0.38490;
+  f[1][4] = 0.074536;
+  f[3][4] = -0.266815;
+  f[5][4] = -0.211923;
+
+  f[0][5] = -0.168639;
+  f[1][5] = -0.091287;
+  f[3][5] = -0.33390093;
+  f[5][5] = 0.276326;
+
+  f[0][6] = -0.168639;
+  f[1][6] = -0.091287;
+  f[3][6] = -0.409928;
+  f[5][6] = 0.276326;
+
+  f[0][7] = -0.05096383;
+  f[1][7] = 0.595753;
+  f[3][7] = -0.1441988;
+  f[5][7] = -0.189987;
+
+  f[2][8] = 0.54719317;
+  f[6][8] = 0.065610075;
+
+  f[4][9] = 1.0;
 }
 bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)
 {
@@ -1299,8 +1316,7 @@ bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f,
   d.resize(6);
 #pragma omp parallel for
   for (int i = 0; i < 6; i++) {
-    d[i].resize(5);
-    fill(d[i].begin(), d[i].end(), 0.0);
+    d[i].resize(5, 0.0);
   }
   //D0 = -0.5 * XX - 0.5 * YY + ZZ
   d[0][0] = -0.5;
@@ -1323,8 +1339,7 @@ bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f,
   f.resize(10);
 #pragma omp parallel for
   for (int i = 0; i < 10; i++) {
-    f[i].resize(7);
-    fill(f[i].begin(), f[i].end(), 0.0);
+    f[i].resize(7, 0.0);
   }
   //F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
   f[2][0] = 1.0;
@@ -1359,8 +1374,7 @@ bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f,
   g.resize(15);
 #pragma omp parallel for
   for (int i = 0; i < 15; i++) {
-    g[i].resize(9);
-    std::fill(g[i].begin(), g[i].end(), 0.0);
+    g[i].resize(9, 0.0);
   }
   //G 0 = ZZZZ + 3 / 8 * (XXXX + YYYY) - 3 * sqrt(3 / 35) * (XXZZ + YYZZ - 1 / 4 * XXYY)
   g[0][0] = 1.0;

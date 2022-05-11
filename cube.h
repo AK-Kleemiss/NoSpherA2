@@ -12,6 +12,8 @@ class cube
 		cube(int x, int y, int z, int g_na = 0, bool grow_values = false);
 		cube(std::string filepath, bool read, WFN &wave, bool &return_value, bool expert = false);
 		cube(std::string filepath, bool read, bool expert = false);
+		cube(std::string filepath, bool read, WFN& wave, bool& return_value, std::ofstream& file, bool expert = false);
+		cube(std::string filepath, bool read, std::ofstream& file, bool expert = false);
 		cube(int g_na, const std::vector <int> &g_size, const std::vector <double> &g_origin, const std::vector < std::vector<double> > &g_vectors, const std::vector<std::vector<std::vector<double> > > &g_values);
 		cube(const cube &given);
 		std::string path;
