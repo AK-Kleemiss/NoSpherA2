@@ -27,40 +27,38 @@ Number of points evaluated: 36464 with 115.986089 electrons in Becke Grid in tot
 
 Table of Charges in electrons
 
-Atom       Becke   Spherical Hirshfeld
-    F1     0.317     0.520    -0.051
-    F2     0.303     0.514    -0.065
-    N8    -0.026     0.165    -0.108
-    N3    -0.086     0.200    -0.204
-    C9    -0.063     0.009     0.008
-    C4    -0.088    -0.068     0.060
-    N5    -0.030     0.162    -0.109
-    C2    -0.310    -0.341     0.116
-   C10    -0.075     0.071    -0.047
-    C1    -0.285    -0.271     0.063
-   C11    -0.146    -0.060     0.014
-   C13    -0.101     0.116    -0.053
-  H13A     0.098     0.031     0.067
-  H13B     0.080     0.016     0.061
-  H13C     0.095     0.029     0.066
-    C6    -0.111     0.043    -0.024
-   H6A     0.104     0.044     0.063
-   H6B     0.103     0.032     0.069
-   N12    -0.048     0.205    -0.188
-   C7A    -0.116     0.039    -0.026
-  H7AA     0.106     0.047     0.063
-  H7AB     0.106     0.032     0.071
-   C14    -0.112     0.106    -0.051
-  H14A     0.120     0.047     0.078
-  H14B     0.083     0.016     0.063
-  H14C     0.098     0.038     0.062
+    Atom       Becke   Spherical Hirshfeld
+        F1     0.317     0.520    -0.051
+        F2     0.303     0.514    -0.065
+        N8    -0.026     0.165    -0.108
+        N3    -0.086     0.200    -0.204
+        C9    -0.063     0.009     0.008
+        C4    -0.088    -0.068     0.060
+        N5    -0.030     0.162    -0.109
+        C2    -0.310    -0.341     0.116
+       C10    -0.075     0.071    -0.047
+        C1    -0.285    -0.271     0.063
+       C11    -0.146    -0.060     0.014
+       C13    -0.101     0.116    -0.053
+      H13A     0.098     0.031     0.067
+      H13B     0.080     0.016     0.061
+      H13C     0.095     0.029     0.066
+        C6    -0.111     0.043    -0.024
+       H6A     0.104     0.044     0.063
+       H6B     0.103     0.032     0.069
+       N12    -0.048     0.205    -0.188
+       C7A    -0.116     0.039    -0.026
+      H7AA     0.106     0.047     0.063
+      H7AB     0.106     0.032     0.071
+       C14    -0.112     0.106    -0.051
+      H14A     0.120     0.047     0.078
+      H14B     0.083     0.016     0.063
+      H14C     0.098     0.038     0.062
 Total number of electrons in the wavefunction: 115.986
  and Hirshfeld electrons (asym unit): 116.003
 
 Number of k-points to evaluate: 5832 for 36464 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
-
-Writing tsc file...
 Number of protons: 116
 Number of electrons: 116.000
 Reading:                                     thpp.cif done!
@@ -77,19 +75,17 @@ Number of points evaluated: 7880 with  15.838852 electrons in Becke Grid in tota
 
 Table of Charges in electrons
 
-Atom       Becke   Spherical Hirshfeld
-   C6A    -0.127     0.026    -0.027
-  H6AA     0.102     0.032     0.068
-  H6AB     0.095     0.045     0.054
-   C7B    -0.115     0.034    -0.022
-  H7BA     0.105     0.035     0.069
-  H7BB     0.101     0.042     0.061
+    Atom       Becke   Spherical Hirshfeld
+       C6A    -0.127     0.026    -0.027
+      H6AA     0.102     0.032     0.068
+      H6AB     0.095     0.045     0.054
+       C7B    -0.115     0.034    -0.022
+      H7BA     0.105     0.035     0.069
+      H7BB     0.101     0.042     0.061
 Total number of electrons in the wavefunction: 15.839
  and Hirshfeld electrons (asym unit): 15.796
 Reading: kpts.dat expecting 5832 k points...  done!
 Size of k_points: 5832
 Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors =============         [ 65%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
-
-Writing tsc file...
 Final number of atoms in .tsc file: 32
 Writing tsc file...  ... done!
