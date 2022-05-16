@@ -14,7 +14,6 @@
 *.o
 *.idb
 *.ilk
-*.wfn
 *.tsc
 *.sarif
 *.xml
