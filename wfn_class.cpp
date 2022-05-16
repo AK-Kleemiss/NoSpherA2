@@ -2019,6 +2019,9 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
   //vector<double> norm_const = get_norm_const(file);
   int norm_const_run = 0;
   int MO_run = 0;
+  vector<vector<double>> d_pure_2_cart;
+  vector<vector<double>> f_pure_2_cart;
+  err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart), "Error creating the conversion matrix", file);
   while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos) {
     run++;
     temp = split_string<string>(line, " ");
@@ -2047,9 +2050,6 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     int g_run = 0;
     vector<double> g_temp(9);
     int basis_run = 0;
-    vector<vector<double>> d_pure_2_cart;
-    vector<vector<double>> f_pure_2_cart;
-    err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart), "Error creating the conversion matrix", file);
     for (int i = 0; i < expected_coefs; i++) {
       getline(rf, line);
       temp = split_string<string>(line, " ");
@@ -2095,6 +2095,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         if (d_run == 5) {
           double temp_coef = 0;
           for (int cart = 0; cart < 6; cart++) {
+            temp_coef = 0;
             for (int spher = 0; spher < 5; spher++) {
               temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher];
             }
@@ -2119,6 +2120,7 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         if (f_run == 7) {
           double temp_coef = 0;
           for (int cart = 0; cart < 10; cart++) {
+            temp_coef = 0;
             for (int spher = 0; spher < 7; spher++) {
               temp_coef += f_pure_2_cart[spher][cart] * f_temp[spher];
             }
