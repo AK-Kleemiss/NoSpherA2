@@ -1233,7 +1233,7 @@ const double normgauss(const int& type, const double& exp)
 bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f) {
   //                                                   
   //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
-  //To 6D : 1  2  3  4  5  6                           
+  //To 6D : 5  6  7  8  9 10                           
   //XX, YY, ZZ, XY, XZ, YZ      
   // 
   d.resize(6);
@@ -1245,19 +1245,19 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
   d[0][0] = -0.5 / sqrt(3);
   d[0][3] = 0.5;
   //YY = -0.5/SQRT(3) * D0 - 0.5 * D2
-  d[2][0] = 0.5 / sqrt(3);
-  d[2][3] = 0.5;
+  d[1][0] = -0.5 / sqrt(3);
+  d[1][3] = -0.5;
   //ZZ = SQRT(1/3) * D0
-  d[1][0] = sqrt(1.0/3.0);
+  d[2][0] = sqrt(1.0/3.0);
   //XY = D-2
   d[3][4] = 1.0;
   //XZ = D1
   d[4][1] = 1.0;
   //YZ = D-1
-  d[5][4] = 1.0;
+  d[5][2] = 1.0;
 
   //From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
-  //To 10F : 1   2   3   4   5   6   7   8   9  10
+  //To 10F : 11   12   13   14   15   16   17   18   19  20
   //XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
   //
   f.resize(7);
@@ -1305,6 +1305,8 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
   f[6][8] = 0.065610075;
 
   f[4][9] = 1.0;
+
+  return true;
 }
 bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)
 {
