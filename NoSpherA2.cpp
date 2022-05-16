@@ -757,7 +757,7 @@ int main(int argc, char** argv)
     log_file.flush();
     err_checkf(wfn != "", "No wfn specified", log_file);
     err_checkf(exists(wfn), "wfn doesn't exist", log_file);
-    wavy.resize(3);
+    wavy.resize(4);
     wavy[0].read_known_wavefunction_format(wfn, log_file);
     cube Rho(100, 100, 100, wavy[0].get_ncen(), true);
     Rho.set_origin(0, -7), Rho.set_origin(1, -7), Rho.set_origin(2, -7);
@@ -772,7 +772,8 @@ int main(int argc, char** argv)
     log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho.sum() << endl;
     cube Rho2("test.eldens.cube", true);
     log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << Rho2.sum() << endl;
-    for (int i = 0; i < 1; i++) {
+    //wavy[2].read_known_wavefunction_format()
+    for (int i = 0; i < 3; i++) {
       cube MO(100, 100, 100, wavy[0].get_ncen(), true);
       MO.set_origin(0, -7), MO.set_origin(1, -7), MO.set_origin(2, -7);
       MO.set_vector(0, 0, 0.141414);
@@ -783,15 +784,15 @@ int main(int argc, char** argv)
       Calc_MO(MO,i, wavy[0], threads, 4.0, log_file);
       log_file << " ...done!" << endl;
       MO.write_file(wavy[0], true);
-      //string name("test.mo" + to_string(i) + "a.cube");
-      //cube MO2(name, true, file);
+      string name("test.mo" + to_string(i) + "a.cube");
+      cube MO2(name, true, log_file);
       log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
-      //log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
+      log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
     }
-    wavy[1].read_known_wavefunction_format("Ce_full.molden", log_file);
-    wavy[1].write_wfn("Ce_conv.wfn", false, true);
-    wavy[2].read_known_wavefunction_format("Sc_full.molden", log_file);
-    wavy[2].write_wfn("Sc_conv.wfn", false, true);
+    wavy[2].read_known_wavefunction_format("Ce_full.molden", log_file);
+    wavy[2].write_wfn("Ce_conv.wfn", false, true);
+    wavy[3].read_known_wavefunction_format("Sc_full.molden", log_file);
+    wavy[3].write_wfn("Sc_conv.wfn", false, true);
     return 0;
   }
   cout << NoSpherA2_message() << "Did not understand the task to perform!\n" << help_message() << endl;
