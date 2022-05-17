@@ -2044,21 +2044,23 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
     int run_coef = 0;
     int p_run = 0;
     int d_run = 0;
-    vector<double> d_temp(5);
+    vector<vector<double>> d_temp(5);
     int f_run = 0;
-    vector<double> f_temp(7);
+    vector<vector<double>> f_temp(7);
     int g_run = 0;
-    vector<double> g_temp(9);
+    vector<vector<double>> g_temp(9);
     int basis_run = 0;
     for (int i = 0; i < expected_coefs; i++) {
       getline(rf, line);
       temp = split_string<string>(line, " ");
       remove_empty_elements(temp);
-      err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
+      //err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
       switch (prims[basis_run].type) {
       case 1: {
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
+          double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+          if (abs(t) < 1E-10) t = 0;
+          push_back_MO_coef(MO_run, t);
           if (MO_run == 0) {
             push_back_exponent(prims[basis_run+s].exp);
             push_back_center(prims[basis_run].center);
@@ -2071,7 +2073,9 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
       }
       case 2: {
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run+s].coefficient);
+          double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+          //if (abs(t) < 1E-10) t = 0;
+          push_back_MO_coef(MO_run, t);
           if (MO_run == 0) {
             push_back_exponent(prims[basis_run+s].exp);
             push_back_center(prims[basis_run].center);
@@ -2087,24 +2091,34 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         break;
       }
       case 3: {
+        if (d_run == 0) {
+          for (int i = 0; i < 5; i++) {
+            d_temp[i].resize(temp_shellsizes[basis_run], 0.0);
+            for (int j = 0; j < temp_shellsizes[basis_run]; j++) {
+              d_temp[i][j] = 0.0;
+            }
+          }
+        }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          //push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
-          d_temp[d_run] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         d_run++;
         if (d_run == 5) {
-          double temp_coef = 0;
-          for (int cart = 0; cart < 6; cart++) {
-            temp_coef = 0;
-            for (int spher = 0; spher < 5; spher++) {
-              temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher];
-            }
-            push_back_MO_coef(MO_run, temp_coef);
-            if (MO_run == 0) {
-              push_back_exponent(prims[basis_run].exp); // this will ony work with one shell yet
-              push_back_center(prims[basis_run].center);
-              push_back_type(5 + cart);
-              nex++;
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+            double temp_coef = 0;
+            for (int cart = 0; cart < 6; cart++) {
+              temp_coef = 0;
+              for (int spher = 0; spher < 5; spher++) {
+                temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher][s];
+              }
+              //if (abs(temp_coef) < 1E-10) temp_coef = 0;
+              push_back_MO_coef(MO_run, temp_coef);
+              if (MO_run == 0) {
+                push_back_exponent(prims[basis_run].exp);
+                push_back_center(prims[basis_run].center);
+                push_back_type(5 + cart);
+                nex++;
+              }
             }
           }
           d_run = 0;
@@ -2113,23 +2127,34 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
         break;
       }
       case 4: {
+        if (f_run == 0) {
+          for (int i = 0; i < 7; i++) {
+            f_temp[i].resize(temp_shellsizes[basis_run], 0.0);
+            for (int j = 0; j < temp_shellsizes[basis_run]; j++) {
+              f_temp[i][j] = 0.0;
+            }
+          }
+        }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          f_temp[f_run] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         f_run++;
         if (f_run == 7) {
-          double temp_coef = 0;
-          for (int cart = 0; cart < 10; cart++) {
-            temp_coef = 0;
-            for (int spher = 0; spher < 7; spher++) {
-              temp_coef += f_pure_2_cart[spher][cart] * f_temp[spher];
-            }
-            push_back_MO_coef(MO_run, temp_coef);
-            if (MO_run == 0) {
-              push_back_exponent(prims[basis_run].exp); // this will ony work with one shell yet
-              push_back_center(prims[basis_run].center);
-              push_back_type(11 + cart);
-              nex++;
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+            double temp_coef = 0;
+            for (int cart = 0; cart < 10; cart++) {
+              temp_coef = 0;
+              for (int spher = 0; spher < 7; spher++) {
+                temp_coef += f_pure_2_cart[spher][cart] * f_temp[spher][s];
+              }
+              //if (abs(temp_coef) < 1E-10) temp_coef = 0;
+              push_back_MO_coef(MO_run, temp_coef);
+              if (MO_run == 0) {
+                push_back_exponent(prims[basis_run].exp); // this will ony work with one shell yet
+                push_back_center(prims[basis_run].center);
+                push_back_type(11 + cart);
+                nex++;
+              }
             }
           }
           f_run = 0;
@@ -2139,20 +2164,20 @@ bool WFN::read_molden(string& filename, ofstream& file, bool debug)
       }
       case 5: {
         err_not_impl_f("G type", file);
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
-          if (MO_run == 0) {
-            push_back_exponent(prims[basis_run + s].exp);
-            push_back_center(prims[basis_run].center);
-            push_back_type(17 + g_run);
-            nex++;
-          }
-        }
-        g_run++;
-        if (g_run == 9) {
-          g_run = 0;
-          basis_run++;
-        }
+        //for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+        //  push_back_MO_coef(MO_run, stod(temp[1]) * prims[basis_run + s].coefficient);
+        //  if (MO_run == 0) {
+        //    push_back_exponent(prims[basis_run + s].exp);
+        //    push_back_center(prims[basis_run].center);
+        //    push_back_type(17 + g_run);
+        //    nex++;
+        //  }
+        //}
+        //g_run++;
+        //if (g_run == 9) {
+        //  g_run = 0;
+        //  basis_run++;
+        //}
         break;
       }
       }
