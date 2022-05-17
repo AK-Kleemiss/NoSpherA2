@@ -1,0 +1,163 @@
+   ########################################
+   #                                      #
+   #   WFX format file produced by ORCA   #
+   #                                      #
+   ########################################
+
+
+Warning: this subroutine still in the testing stage. 
+<Title> 
+Name  F_full    Run Type  SinglePoint    Method  DFGTO    Basis Set  Gauss 
+</Title> 
+ 
+<Keywords> 
+  GTO 
+</Keywords> 
+ 
+<Number of Nuclei> 
+1 
+</Number of Nuclei> 
+ 
+<Number of Primitives> 
+25 
+</Number of Primitives> 
+ 
+<Number of Occupied Molecular Orbitals> 
+5 
+</Number of Occupied Molecular Orbitals> 
+ 
+<Number of Perturbations> 
+0 
+</Number of Perturbations> 
+ 
+<Nuclear Names> 
+F1 
+</Nuclear Names> 
+ 
+<Atomic Numbers> 
+9 
+</Atomic Numbers> 
+ 
+<Nuclear Charges> 
+ 9.00000000000000E+00 
+</Nuclear Charges> 
+ 
+<Nuclear Cartesian Coordinates> 
+ 0.00000000000000E+00  0.00000000000000E+00  0.00000000000000E+00
+</Nuclear Cartesian Coordinates> 
+ 
+<Net Charge> 
+0.0 
+</Net Charge> 
+ 
+<Number of Electrons> 
+10 
+</Number of Electrons> 
+ 
+<Number of Alpha Electrons> 
+5 
+</Number of Alpha Electrons> 
+ 
+<Number of Beta Electrons> 
+5 
+</Number of Beta Electrons> 
+ 
+<Electronic Spin Multiplicity> 
+1 
+</Electronic Spin Multiplicity> 
+ 
+<Primitive Centers> 
+1  1  1  1  1  1  1  1  1  1   
+1  1  1  1  1  1  1  1  1  1   
+1  1  1  1  1  
+</Primitive Centers> 
+ 
+<Primitive Types> 
+1  1  1  1  1  1  1  4  2  3   
+4  2  3  4  2  3  4  2  3  5   
+6  7  8  9  10 
+</Primitive Types> 
+ 
+<Primitive Exponents> 
+ 2.89483259900000E+03  4.35419391200000E+02  9.88433288660000E+01  2.74851980010000E+01  
+ 8.54054981710000E+00  1.06545780380000E+00  3.32473467500000E-01  2.26966339240000E+01  
+ 2.26966339240000E+01  2.26966339240000E+01  4.98723392570000E+00  4.98723392570000E+00  
+ 4.98723392570000E+00  1.34916139540000E+00  1.34916139540000E+00  1.34916139540000E+00  
+ 3.48298819800000E-01  3.48298819800000E-01  3.48298819800000E-01  1.40000000000000E+00  
+ 1.40000000000000E+00  1.40000000000000E+00  1.40000000000000E+00  1.40000000000000E+00  
+ 1.40000000000000E+00 </Primitive Exponents> 
+ 
+<Molecular Orbital Occupation Numbers> 
+ 2.00000000000000E+00 
+ 2.00000000000000E+00 
+ 2.00000000000000E+00 
+ 2.00000000000000E+00 
+ 2.00000000000000E+00 
+</Molecular Orbital Occupation Numbers> 
+ 
+<Molecular Orbital Energies> 
+-2.38874171913038E+01 
+-4.92198894792419E-01 
+ 1.99512056945800E-01 
+ 1.99512130565225E-01 
+ 1.99512168541939E-01 
+</Molecular Orbital Energies> 
+ 
+<Molecular Orbital Spin Types> 
+Alpha and Beta 
+Alpha and Beta 
+Alpha and Beta 
+Alpha and Beta 
+Alpha and Beta 
+</Molecular Orbital Spin Types> 
+ 
+<Molecular Orbital Primitive Coefficients>
+<MO Number>
+1
+</MO Number>
+ -1.48845838E+00  -2.68602953E+00  -3.96537198E+00  -3.96361654E+00  -1.57534979E+00 
+ -2.63631785E-02   3.73012836E-03   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00  -1.50487543E-08 
+  8.25589640E-08  -6.75102097E-08   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+<MO Number>
+2
+</MO Number>
+ -4.60630058E-01  -8.31239860E-01  -1.22715525E+00  -1.22661200E+00  -4.87520156E-01 
+  4.32979077E-01   1.62579727E-01   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   2.73702248E-07 
+ -1.42189750E-06   1.14819526E-06   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+<MO Number>
+3
+</MO Number>
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00  -7.68135476E-08  -9.37450984E-08   2.86718161E+00 
+ -6.07143168E-08  -7.40972104E-08   2.26625352E+00  -2.55749069E-08  -3.12122306E-08 
+  9.54622005E-01  -5.41528917E-09  -6.60896904E-09   2.02135570E-01   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+<MO Number>
+4
+</MO Number>
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   6.31684329E-07  -2.86718869E+00  -9.37448526E-08 
+  4.99290603E-07  -2.26625911E+00  -7.40970161E-08   2.10317951E-07  -9.54624360E-01 
+ -3.12121488E-08   4.45332015E-08  -2.02134946E-01  -6.60898793E-09   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+<MO Number>
+5
+</MO Number>
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   2.86719253E+00   6.31683486E-07   7.68132805E-08 
+  2.26626215E+00   4.99289936E-07   6.07141056E-08   9.54625641E-01   2.10317670E-07 
+  2.55748180E-08   2.02134606E-01   4.45332762E-08   5.41531629E-09   0.00000000E+00 
+  0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00   0.00000000E+00 
+</Molecular Orbital Primitive Coefficients>
+<Energy = T + Vne + Vee + Vnn> 
+-9.96465012447792E+01 
+</Energy = T + Vne + Vee + Vnn> 
+
+<Virial Ratio (-V/T)> 
+ 2.00305469764474E+00 
+</Virial Ratio (-V/T)> 
+
