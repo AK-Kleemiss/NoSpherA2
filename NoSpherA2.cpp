@@ -42,6 +42,7 @@ int main(int argc, char** argv)
   double radius = 2.0;
   bool becke = false;
   bool electron_diffraction = false;
+  bool ECP = false;
   bool calc = false;
   bool eli = false;
   bool esp = false;
@@ -97,6 +98,8 @@ int main(int argc, char** argv)
       pbc = stoi(argv[i + 1]);
     else if (temp.find("-ED") < 1)
       electron_diffraction = true;
+    else if (temp.find("-ECP") < 1)
+      ECP = true;
     else if (temp.find("-Olex2_1_3") < 1)
       Olex2_1_3_switch = true;
     else if (temp.find("-v2") < 1)
@@ -292,6 +295,7 @@ int main(int argc, char** argv)
           known_scatterer,
           threads,
           electron_diffraction,
+          ECP,
           0,
           i == 0,
           i != 0
@@ -383,6 +387,7 @@ int main(int argc, char** argv)
           known_scatterer,
           threads,
           electron_diffraction,
+          ECP,
           0,
           i == 0,
           i != 0
@@ -534,6 +539,7 @@ int main(int argc, char** argv)
           twin_law,
           threads,
           electron_diffraction,
+          ECP,
           pbc,
           Olex2_1_3_switch,
           save_k_pts,

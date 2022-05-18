@@ -21,6 +21,13 @@ using namespace std;
 #include "CUDA_utilities.h"
 #endif
 
+const int ECP_electrons[] = { 0,                                                                                             0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
+ 0,  0,                                                          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+28, 28,                                                         28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
+46, 46, 46, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60 };
+
 bool merge_tscs(
   const string& mode,
   const vector<string>& files,
@@ -352,9 +359,9 @@ void save_k_points(vector<vector<double>>& k_pt, hkl_list& hkl)
   k_points_file.close();
 }
 
-void read_hkl(std::string& hkl_filename,
+void read_hkl(const string& hkl_filename,
   hkl_list& hkl,
-  vector<vector<double>>& twin_law,
+  const vector<vector<double>>& twin_law,
   cell& unit_cell,
   ofstream& file,
   bool debug = false)
@@ -458,8 +465,8 @@ void read_hkl(std::string& hkl_filename,
 }
 
 void read_atoms_from_CIF(ifstream& cif_input,
-  vector <int>& input_groups,
-  cell& unit_cell,
+  const vector <int>& input_groups,
+  const cell& unit_cell,
   WFN& wave,
   vector <string>& known_atoms,
   vector <int>& atom_type_list,
@@ -467,7 +474,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
   vector <int>& asym_atom_list,
   vector <bool>& needs_grid,
   ofstream& file,
-  bool debug = false)
+  const bool debug = false)
 {
   bool atoms_read = false;
   int count_fields = 0;
@@ -545,12 +552,12 @@ void read_atoms_from_CIF(ifstream& cif_input,
           if ( is_similar_abs(position[0], wave.atoms[i].x, max(min(precisions[0],1.0),0.01))
             && is_similar_abs(position[1], wave.atoms[i].y, max(min(precisions[1],1.0),0.01))
             && is_similar_abs(position[2], wave.atoms[i].z, max(min(precisions[2],1.0),0.01))) {
-            string element = atnr2letter(wave.atoms[i].charge);
+            string element = atnr2letter(wave.get_atom_charge(i));
             string label = fields[label_field];
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);
             std::transform(label.begin(), label.end(), label.begin(), asciitolower);
             if (debug) {
-              file << "ASYM:  " << setw(8) << fields[label_field] << " charge: " << setw(17) << wave.atoms[i].charge << "                          wfn cart. pos: "
+              file << "ASYM:  " << setw(8) << fields[label_field] << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
                   << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
                   << fixed << setprecision(3) << setw(16) << wave.atoms[i].y << " "
                   << fixed << setprecision(3) << setw(16) << wave.atoms[i].z << flush;
@@ -597,14 +604,14 @@ void read_atoms_from_CIF(ifstream& cif_input,
         if (nr != -1) {
           bool already_there = false;
           for (int i = 0; i < atom_type_list.size(); i++)
-            if (atom_type_list[i] == wave.atoms[nr].charge) {
+            if (atom_type_list[i] == wave.get_atom_charge(nr)) {
               already_there = true;
               asym_atom_to_type_list.push_back(i);
               break;
             }
-          if (already_there == false && wave.atoms[nr].charge != 119) {
+          if (already_there == false && wave.get_atom_charge(nr) != 119) {
             asym_atom_to_type_list.push_back(atom_type_list.size());
-            atom_type_list.push_back(wave.atoms[nr].charge);
+            atom_type_list.push_back(wave.get_atom_charge(nr));
           }
         }
         else if (!old_atom) {
@@ -621,13 +628,13 @@ void read_atoms_from_CIF(ifstream& cif_input,
   for (int nr = 0; nr < wave.get_ncen(); nr++) {
     bool already_there = false;
     for (int i = 0; i < atom_type_list.size(); i++) {
-      if (atom_type_list[i] == wave.atoms[nr].charge) {
+      if (atom_type_list[i] == wave.get_atom_charge(nr)) {
         already_there = true;
         break;
       }
     }
-    if (already_there == false && wave.atoms[nr].charge != 119) {
-      atom_type_list.push_back(wave.atoms[nr].charge);
+    if (already_there == false && wave.get_atom_charge(nr) != 119) {
+      atom_type_list.push_back(wave.get_atom_charge(nr));
     }
   }
 
@@ -647,7 +654,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
     file << endl;
     file << "Charges of atoms:" << endl;
     for (int i = 0; i < wave.get_ncen(); i++)
-      file << setw(4) << wave.atoms[i].charge;
+      file << setw(4) << wave.get_atom_charge(i);
     file << endl;
   }
 }
@@ -703,7 +710,7 @@ int make_hirshfeld_grids(const int& pbc,
   //Accumulate vectors with information about all atoms
 #pragma omp parallel for
   for (int i = 0; i < wave.get_ncen(); i++) {
-    atom_z[i] = wave.atoms[i].charge;
+    atom_z[i] = wave.get_atom_charge(i);
     x[i] = wave.atoms[i].x;
     y[i] = wave.atoms[i].y;
     z[i] = wave.atoms[i].z;
@@ -718,7 +725,7 @@ int make_hirshfeld_grids(const int& pbc,
               continue;
             else {
               j++;
-              atom_z[i + j * wave.get_ncen()] = wave.atoms[i].charge;
+              atom_z[i + j * wave.get_ncen()] = wave.get_atom_charge(i);
               x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
               y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
               z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
@@ -841,10 +848,10 @@ int make_hirshfeld_grids(const int& pbc,
     int max_l_temp;
     vector<double> alpha_min_temp(max_l_overall);
     for (int j = 0; j < wave.get_ncen(); j++) {
-      if (wave.atoms[j].charge == 119) {
+      if (wave.get_atom_charge(j) == 119) {
         continue;
       }
-      if (wave.atoms[j].charge == atom_type_list[i]) {
+      if (wave.get_atom_charge(j) == atom_type_list[i]) {
         if (debug) {
           file << alpha_max[j] << " " << max_l[j] - 1 << " ";
           for (int l = 0; l < max_l_overall; l++)
@@ -1237,7 +1244,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
     int type;
     for (int j = 0; j < atom_type_list.size(); j++)
-      if (atom_type_list[j] == wave.atoms[i].charge)
+      if (atom_type_list[j] == wave.get_atom_charge(i))
         type = j;
 
     int grid_number = 0;
@@ -1489,7 +1496,7 @@ int make_hirshfeld_grids(const int& pbc,
         type_list_number = -1;
         //Determine which type in the type list of sphericals to use
         for (int j = 0; j < atom_type_list.size(); j++)
-          if (wave.atoms[i].charge == atom_type_list[j])
+          if (wave.get_atom_charge(i) == atom_type_list[j])
             type_list_number = j;
         if (debug && type_list_number != -1) {
           file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
@@ -1532,7 +1539,7 @@ int make_hirshfeld_grids(const int& pbc,
             int type_list_number = -1;
             //int nr = all_atom_list[i];
             for (int j = 0; j < atom_type_list.size(); j++)
-              if (wave.atoms[i].charge == atom_type_list[j])
+              if (wave.get_atom_charge(i) == atom_type_list[j])
                 type_list_number = j;
             for (int g = 0; g < atoms_with_grids; g++) {
 #pragma omp parallel for
@@ -2036,10 +2043,10 @@ int make_hirshfeld_grids(const int& pbc,
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int a = asym_atom_list[i];
     file << setw(10) << wave.atoms[a].label
-      << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[0][counter]
-      << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[1][counter]
-      << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[2][counter];
-    if (debug) file << " " << setw(4) << wave.atoms[a].charge << " " << fixed << setw(10) << setprecision(3) << wave.atoms[a].charge - atom_els[0][counter]
+      << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
+      << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
+      << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
+    if (debug) file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
       << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
       << fixed << setw(10) << setprecision(3) << atom_els[2][counter];
     counter++;
@@ -2342,13 +2349,32 @@ void calc_SF(const int& points,
 #endif
 }
 
-void convert_to_ED(const vector <int>& asym_atom_list,
-  WFN& wave,
+void add_ECP_contribution(const vector <int>& asym_atom_list,
+  const WFN& wave,
   vector<vector<complex<double>>>& sf,
-  cell& unit_cell,
-  hkl_list& hkl,
+  const vector<vector<double>> &k_pt,
   ofstream& file,
-  bool debug = false)
+  const bool debug = false)
+{
+  double k2;
+#pragma omp parallel for private(k2)
+  for (int s = 0; s < sf[0].size(); s++) {
+    k2 = k_pt[0][s]*k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
+    for (int i = 0; i < asym_atom_list.size(); i++) {
+      double exponent = 1;
+      sf[i][s] += 8 * sqrt(PI / exponent) * ECP_electrons[wave.get_atom_charge(asym_atom_list[i])]
+        * exp(-PI * k2 / 4);
+    }
+  }
+}
+
+void convert_to_ED(const vector <int>& asym_atom_list,
+  const WFN& wave,
+  vector<vector<complex<double>>>& sf,
+  const cell& unit_cell,
+  const hkl_list& hkl,
+  ofstream& file,
+  const bool debug = false)
 {
   const double fact = 0.023934;
   double h2;
@@ -2358,22 +2384,22 @@ void convert_to_ED(const vector <int>& asym_atom_list,
     it = next(hkl.begin(), s);
     h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
-      sf[i][s] = complex<double>(fact * (wave.atoms[asym_atom_list[i]].charge - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
+      sf[i][s] = complex<double>(fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
   }
 }
 
 bool thakkar_sfac(
-  string& hkl_filename,
-  string& cif,
-  bool debug,
+  const string& hkl_filename,
+  const string& cif,
+  const bool debug,
   ofstream& file,
-  vector <int>& input_groups,
-  vector < vector <double> >& twin_law,
+  const vector <int>& input_groups,
+  const vector < vector <double> >& twin_law,
   WFN& wave,
-  int cpus,
-  bool electron_diffraction,
-  bool save_k_pts,
-  bool read_k_pts
+  const int cpus,
+  const bool electron_diffraction,
+  const bool save_k_pts,
+  const bool read_k_pts
 )
 {
   err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
@@ -2597,20 +2623,21 @@ tsc_block MTC_thakkar_sfac(
 }
 
 bool calculate_structure_factors_HF(
-  string& hkl_filename,
-  string& cif,
+  const string& hkl_filename,
+  const string& cif,
   WFN& wave,
-  bool debug,
-  int accuracy,
+  const bool debug,
+  const int accuracy,
   ofstream& file,
-  vector <int>& input_groups,
-  vector < vector <double> >& twin_law,
-  int cpus,
-  bool electron_diffraction,
-  int pbc,
-  bool Olex2_1_3_switch,
-  bool save_k_pts,
-  bool read_k_pts
+  const vector <int>& input_groups,
+  const vector < vector <double> >& twin_law,
+  const int cpus,
+  const bool electron_diffraction,
+  const bool ECPs_used,
+  const int pbc,
+  const bool Olex2_1_3_switch,
+  const bool save_k_pts,
+  const bool read_k_pts
 )
 {
 #ifdef FLO_CUDA
@@ -2721,6 +2748,17 @@ bool calculate_structure_factors_HF(
 #endif
     debug);
 
+  if (ECPs_used) {
+    add_ECP_contribution(
+      asym_atom_list,
+      wave,
+      sf,
+      k_pt,
+      file,
+      debug
+    );
+  }
+
   if (electron_diffraction) {
     convert_to_ED(asym_atom_list,
       wave,
@@ -2779,20 +2817,21 @@ bool calculate_structure_factors_HF(
 }
 
 tsc_block calculate_structure_factors_MTC(
-  string& hkl_filename,
-  string& cif,
+  const string& hkl_filename,
+  const string& cif,
   WFN& wave,
-  bool debug,
-  int accuracy,
+  const bool debug,
+  const int accuracy,
   ofstream& file,
-  vector <int>& input_groups,
-  vector < vector <double> >& twin_law,
+  const vector <int>& input_groups,
+  const vector < vector <double> >& twin_law,
   vector < string >& known_atoms,
-  int cpus,
-  bool electron_diffraction,
-  int pbc,
-  bool save_k_pts,
-  bool read_k_pts
+  const int cpus,
+  const bool electron_diffraction,
+  const bool ECPs_used,
+  const int pbc,
+  const bool save_k_pts,
+  const bool read_k_pts
 )
 {
 #ifdef FLO_CUDA
@@ -2905,6 +2944,17 @@ tsc_block calculate_structure_factors_MTC(
     t2,
 #endif
     debug);
+
+  if (ECPs_used) {
+    add_ECP_contribution(
+      asym_atom_list,
+      wave,
+      sf,
+      k_pt,
+      file,
+      debug
+    );
+  }
 
   if (electron_diffraction) {
     convert_to_ED(asym_atom_list,

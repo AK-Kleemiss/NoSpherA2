@@ -43,10 +43,10 @@ struct atom {
 	double x, y, z;
 	std::vector<double> frac_coords;
 	atom();
-	atom(std::string l, int n, double c1, double c2, double c3, int ch);
+	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
 	atom operator=(const atom &rhs);
 	void print_values();
-	bool push_back_basis_set(double coefficient, double exponent, int type, int shell);
+	bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
 	void print_values_long();
 	bool get_basis_set_loaded();
 	bool is_anharm();
@@ -74,7 +74,7 @@ inline atom::atom() {
 	frac_coords = { 0,0,0 };
 };
 
-inline atom::atom (std::string l, int n, double c1, double c2, double c3, int ch){
+inline atom::atom (const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch){
 	nr=n;
 	label=l;
 	x=c1;
@@ -119,7 +119,7 @@ inline void atom::print_values_long(){
 	}
 };
 
-inline bool atom::push_back_basis_set(double exponent, double coefficient, int type, int shell){
+inline bool atom::push_back_basis_set(const double &exponent, const double &coefficient, const int &type, const int &shell){
 	if(shell == shellcount.size())
 		shellcount.push_back(1);
 	else

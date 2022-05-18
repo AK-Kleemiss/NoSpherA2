@@ -66,7 +66,7 @@ WFN::WFN(int given_origin)
   fill_Afac_pre();
 };
 
-bool WFN::push_back_atom(string label, double x, double y, double z, int charge)
+bool WFN::push_back_atom(const string &label, const double x, const double y, const double z, const int charge)
 {
   ncen++;
   if (charge >= 1) atoms.push_back(atom(label, ncen, x, y, z, charge));
@@ -74,11 +74,11 @@ bool WFN::push_back_atom(string label, double x, double y, double z, int charge)
   return true;
 };
 
-bool WFN::erase_atom(int nr)
+bool WFN::erase_atom(const int nr)
 {
   if (ncen < 1) return false;
-  nr--;
-  atoms.erase(atoms.begin() + nr);
+  int n = nr-1;
+  atoms.erase(atoms.begin() + n);
   ncen--;
   return true;
 };
@@ -1284,7 +1284,7 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
   return true;
 };
 
-bool WFN::read_xyz(string& filename, ofstream& file, bool debug)
+bool WFN::read_xyz(const string& filename, ofstream& file, const bool debug)
 {
   if (ncen > 0) {
     file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
@@ -1350,7 +1350,7 @@ bool WFN::read_xyz(string& filename, ofstream& file, bool debug)
   return true;
 };
 
-bool WFN::read_xyz(string& filename, ostream& file, bool debug)
+bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
 {
   if (ncen > 0) {
     file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
@@ -1879,7 +1879,7 @@ bool WFN::read_wfx(string fileName, bool debug, ostream& file)
   return true;
 };
 
-bool WFN::read_molden(string& filename, ofstream& file, bool debug)
+bool WFN::read_molden(const string& filename, ofstream& file, const bool debug)
 {
   err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
   if (debug)
@@ -2601,7 +2601,7 @@ int WFN::get_nmo(const bool only_occ) const
   }
 };
 
-unsigned int WFN::get_nr_electrons(bool& debug)
+unsigned int WFN::get_nr_electrons(const bool& debug)
 {
   unsigned int count = 0;
   for (int i = 0; i < ncen; i++)
@@ -2794,7 +2794,7 @@ bool WFN::get_atom_basis_set_loaded(int nr)
   }
 };
 
-int WFN::get_atom_charge(int nr)
+int WFN::get_atom_charge(const int &nr) const
 {
   if (nr <= ncen && nr >= 0) return atoms[nr].charge;
   else {
@@ -3681,7 +3681,7 @@ double WFN::get_MO_occ(const int nr)
   else return MOs[nr].get_occ();
 };
 
-bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
+bool WFN::read_fchk(const string& filename, ofstream& log, const bool debug)
 {
   vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
   if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
@@ -4230,7 +4230,7 @@ bool WFN::read_fchk(string& filename, ofstream& log, bool debug)
   return true;
 };
 
-bool WFN::read_fchk(string& filename, ostream& log, bool debug)
+bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
 {
   vector<vector<double>> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
   if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h)) log << "Error during geenration of matrix" << endl;
