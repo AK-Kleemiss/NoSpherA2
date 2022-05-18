@@ -278,7 +278,7 @@ public:
       }
     }
   };
-  void write_tsc_file(std::string& cif)
+  void write_tsc_file(const std::string& cif)
   {
     std::ofstream tsc_file("experimental.tsc", std::ios::out);
 

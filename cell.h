@@ -24,7 +24,7 @@ public:
     for (int i = 0; i < 3; i++)
       sym[i].resize(3);
   };
-  cell(std::string filename)
+  cell(const std::string filename)
   {
     sym.resize(3);
     for (int i = 0; i < 3; i++)
@@ -32,7 +32,7 @@ public:
     read_CIF(filename);
     read_symm_CIF(filename);
   };
-  cell(std::string filename, std::ofstream& file)
+  cell(const std::string filename, std::ofstream& file)
   {
     file << "Reading: " << std::setw(44) << filename << std::flush;
     sym.resize(3);
@@ -41,7 +41,7 @@ public:
     read_CIF(filename, file);
     read_symm_CIF(filename, file);
   };
-  cell(std::string filename, std::ofstream& file, bool& debug)
+  cell(const std::string filename, std::ofstream& file, const bool& debug)
   {
     if (debug)
       file << "starting to read cif!" << std::endl;
@@ -83,7 +83,7 @@ public:
   double get_b() { return b; };
   double get_c() { return c; };
   double get_V() { return V; };
-  double get_angle(int i)
+  double get_angle(int i) const
   {
     switch (i) {
     case 0:
@@ -101,7 +101,7 @@ public:
       break;
     }
   }
-  double get_length(int i)
+  double get_length(int i) const
   {
     switch (i) {
     case 0:
@@ -132,12 +132,12 @@ public:
     }
   }
 
-  std::string get_crystal_system()
+  std::string get_crystal_system() const
   {
     return crystal_system;
   }
 
-  double get_d_of_hkl(const std::vector<int> hkl)
+  double get_d_of_hkl(const std::vector<int> hkl) const 
   {
     double d, upper, lower;
     // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
@@ -147,7 +147,7 @@ public:
     return d;
   }
 
-  double get_stl_of_hkl(const std::vector<int> hkl)
+  double get_stl_of_hkl(const std::vector<int> hkl) const
   {
     return 1.0 / (2 * get_d_of_hkl(hkl));
   }
@@ -162,7 +162,7 @@ public:
         positions_cart[i] /= 0.529177249;
   }
 
-  std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true)
+  std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
   {
     std::vector<double> positions_cart{ 0., 0., 0. };
     positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
