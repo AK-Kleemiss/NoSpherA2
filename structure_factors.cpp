@@ -685,6 +685,7 @@ int make_hirshfeld_grids(const int& pbc,
   timeval& t1,
   timeval& t2,
 #endif
+  bool ECPs = false,
   bool debug = false)
 {
   int atoms_with_grids = 0;
@@ -2018,6 +2019,12 @@ int make_hirshfeld_grids(const int& pbc,
     el_sum_becke += atom_els[0][i];
     el_sum_spherical += atom_els[1][i];
     el_sum_hirshfeld += atom_els[2][i];
+    if (ECPs) {
+      int n = wave.get_atom_charge(asym_atom_list[i]);
+      el_sum_becke += ECP_electrons[n];
+      el_sum_spherical += ECP_electrons[n];
+      el_sum_hirshfeld += ECP_electrons[n];
+    }
   }
 
   if (debug) {
@@ -2720,6 +2727,7 @@ bool calculate_structure_factors_HF(
     t1,
     t2,
 #endif
+    ECPs_used,
     debug);
 
   vector<vector<double>> k_pt;
@@ -2917,6 +2925,7 @@ tsc_block calculate_structure_factors_MTC(
     t1,
     t2,
 #endif
+    ECPs_used,
     debug);
 
   vector<vector<double>> k_pt;
