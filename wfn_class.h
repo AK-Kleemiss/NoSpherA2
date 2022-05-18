@@ -84,22 +84,22 @@ public:
   void change_basis_set_name(std::string name) { basis_set_name = name; };
   bool add_primitive(int cent, int type, double e, double* values);
   bool add_exp(int cent, int type, double e);
-  void read_known_wavefunction_format(std::string fileName, bool debug = false);
-  void read_known_wavefunction_format(std::string fileName, std::ofstream& file, bool debug = false);
-  bool read_wfn(std::string fileName, bool debug = false);
-  bool read_wfn(std::string fileName, bool debug, std::ofstream& file);
-  bool read_wfx(std::string fileName, bool debug, std::ofstream& file);
-  bool read_wfx(std::string fileName, bool debug, std::ostream& file);
-  bool read_fchk(std::string& filename, std::ostream& log, bool debug = false);
-  bool read_fchk(std::string& filename, std::ofstream& log, bool debug = false);
-  bool read_xyz(std::string& filename, std::ofstream& file, bool debug = false);
-  bool read_xyz(std::string& filename, std::ostream& file, bool debug = false);
-  bool read_molden(std::string& filename, std::ofstream& file, bool debug = false);
-  bool write_wfn(const std::string& fileName, bool debug, bool occupied);
+  void read_known_wavefunction_format(const std::string fileName, const bool debug = false);
+  void read_known_wavefunction_format(const std::string fileName, std::ofstream& file, const bool debug = false);
+  bool read_wfn(const std::string fileName, const bool debug = false);
+  bool read_wfn(const std::string fileName, const bool debug, std::ofstream& file);
+  bool read_wfx(const std::string fileName, const bool debug, std::ofstream& file);
+  bool read_wfx(const std::string fileName, const bool debug, std::ostream& file);
+  bool read_fchk(const std::string& filename, std::ostream& log, const bool debug = false);
+  bool read_fchk(const std::string& filename, std::ofstream& log, const bool debug = false);
+  bool read_xyz(const std::string& filename, std::ofstream& file, const bool debug = false);
+  bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
+  bool read_molden(const std::string& filename, std::ofstream& file, const bool debug = false);
+  bool write_wfn(const std::string& fileName, const bool debug, const bool occupied);
   bool set_path(std::string given_path) { path = given_path; return true; };
-  void print_primitive(int nr);
-  void assign_charge(int i_charge) { charge = i_charge; };
-  void assign_multi(int i_multi) { multi = i_multi; };
+  void print_primitive(const int nr);
+  void assign_charge(const int i_charge) { charge = i_charge; };
+  void assign_multi(const int i_multi) { multi = i_multi; };
   int get_charge() const { return charge; };
   int get_multi() const { return multi; };
   int get_nex() const { return nex; };
@@ -108,26 +108,26 @@ public:
   int get_nmo(const bool only_occ) const;
   int get_origin() const { return origin; };
   double get_exponent(int nr) const { return exponents[nr]; };
-  unsigned int get_nr_electrons(bool& debug);
+  unsigned int get_nr_electrons(const bool& debug);
   double count_nr_electrons(void);
   /*int get_type(int nr) { if(nr>types.size()||nr<0) return -1; else return types[nr]; };
   int get_center(int nr) { if(nr>centers.size()||nr<0) return -1; else return centers[nr]; };					NOT NEEDED AT THIS POINT!
   double get_exponent(int nr) { if(nr>exponents.size()||nr<0) return -1; else return exponents[nr]; }; */
-  std::string get_centers(bool bohr);
+  std::string get_centers(const bool bohr);
   std::string get_basis_set_name() { return basis_set_name; };
-  void set_basis_set_name(std::string input) { basis_set_name = input; };
+  void set_basis_set_name(const std::string input) { basis_set_name = input; };
   std::string get_path() { return path; };
-  std::string hdr(bool occupied);
-  void set_method(std::string input) { method = input; };
+  std::string hdr(const bool occupied);
+  void set_method(const std::string &input) { method = input; };
   std::string get_method() { return method; };
-  bool erase_atom(int nr);
+  bool erase_atom(const int nr);
   void list_primitives();
   void list_centers();
-  bool remove_center(int nr);
-  bool remove_primitive(int nr);
-  void change_center(int nr);
-  void change_type(int nr);
-  void change_exponent(int nr);
+  bool remove_center(const int nr);
+  bool remove_primitive(const int nr);
+  void change_center(const int nr);
+  void change_type(const int nr);
+  void change_exponent(const int nr);
   /*bool change_center(int nr, int value);
   bool change_type(int nr, int value);					NOT NEEDED AT THIS POINT!
   bool change_exponent(int nr, double value);*/
@@ -141,44 +141,44 @@ public:
   void operator=(const WFN& right);
   int calculate_charge();
   int calculate_charge(std::ofstream& file);
-  bool guess_multiplicity(bool expert = false);
-  bool guess_multiplicity(std::ofstream& file, bool expert = false);
-  std::vector<double> get_norm_const(std::ofstream& file, bool debug = false);
+  bool guess_multiplicity(const bool expert = false);
+  bool guess_multiplicity(std::ofstream& file, const bool expert = false);
+  std::vector<double> get_norm_const(std::ofstream& file, const bool debug = false);
   //-------------------atom handling--------------------------------------------------------------
-  double get_atom_coordinate(int nr, int axis, bool debug);
-  std::string get_atom_label(int nr);
+  double get_atom_coordinate(const int nr, const int axis, const bool debug);
+  std::string get_atom_label(const int nr);
   int get_nr_basis_set_loaded();
-  bool get_atom_basis_set_loaded(int nr);
-  double get_atom_basis_set_exponent(int nr_atom, int nr_prim);
-  double get_atom_basis_set_coefficient(int nr_atom, int nr_prim);
-  bool change_atom_basis_set_exponent(int nr_atom, int nr_prim, double value);
-  bool change_atom_basis_set_coefficient(int nr_atom, int nr_prim, double value);
-  int get_atom_primitive_count(int nr);
-  int get_atom_primitive_type(int nr_atom, int nr_prim)
+  bool get_atom_basis_set_loaded(const int nr);
+  double get_atom_basis_set_exponent(const int nr_atom, const int nr_prim);
+  double get_atom_basis_set_coefficient(const int nr_atom, const int nr_prim);
+  bool change_atom_basis_set_exponent(const int nr_atom, const int nr_prim, const double value);
+  bool change_atom_basis_set_coefficient(const int nr_atom, const int nr_prim, const double value);
+  int get_atom_primitive_count(const int nr);
+  int get_atom_primitive_type(const int nr_atom, const int nr_prim)
   {
     if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].basis_set.size() && nr_prim >= 0)
       return atoms[nr_atom].basis_set[nr_prim].type; else return -1;
   };
-  bool erase_atom_primitive(int nr, int nr_prim);
-  int get_atom_shell_count(int nr);
-  int get_atom_shell_primitives(int nr_atom, int nr_shell);
-  int get_shell_type(int nr_atom, int nr_shell);
-  int get_shell_center(int nr_atom, int nr_shell);
-  int get_basis_set_shell(int nr_atom, int nr_prim);
-  int get_shell_start(int nr_atom, int nr_shell, bool debug);
-  int get_shell_start_in_primitives(int nr_atom, int nr_shell);
-  int get_shell_end(int nr_atom, int nr_shell, bool debug);
-  bool push_back_atom(std::string label, double x, double y, double z, int charge);
+  bool erase_atom_primitive(const int nr, const int nr_prim);
+  int get_atom_shell_count(const int nr);
+  int get_atom_shell_primitives(const int nr_atom, const int nr_shell);
+  int get_shell_type(const int nr_atom, const int nr_shell);
+  int get_shell_center(const int nr_atom, const int nr_shell);
+  int get_basis_set_shell(const int nr_atom, const int nr_prim);
+  int get_shell_start(const int nr_atom, const int nr_shell, const bool debug = false);
+  int get_shell_start_in_primitives(const int nr_atom, const int nr_shell);
+  int get_shell_end(const int nr_atom, const int nr_shell, const bool debug = false);
+  bool push_back_atom(const std::string &label, const double x, const double y, const double z, const int charge);
   //atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
-  bool push_back_atom_basis_set(int nr, double exponent, double coefficient, int type, int shell)
+  bool push_back_atom_basis_set(const int nr, const double exponent, const double coefficient, const int type, const int shell)
   {
     if (nr <= ncen && nr >= 0) return atoms[nr].push_back_basis_set(exponent, coefficient, type, shell);
     else return false;
   };
-  void print_atom_long(int nr) { if (nr <= ncen && nr >= 0) atoms[nr].print_values_long(); };
-  int get_atom_charge(int nr);
-  unsigned int get_atom_integer_mass(unsigned int atomnr);
-  double get_atom_real_mass(int atomnr);
+  void print_atom_long(const int nr) { if (nr <= ncen && nr >= 0) atoms[nr].print_values_long(); };
+  int get_atom_charge(const int &nr) const;
+  unsigned int get_atom_integer_mass(const unsigned int atomnr);
+  double get_atom_real_mass(const int atomnr);
   //----------Calcualtion of Properties
   //double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones

@@ -19,12 +19,12 @@ bool merge_tscs_without_checks(
 );
 
 bool thakkar_sfac(
-  std::string& hkl_filename,
-  std::string& cif,
+  const std::string& hkl_filename,
+  const std::string& cif,
   bool debug,
   std::ofstream& file,
-  std::vector <int>& input_groups,
-  std::vector < std::vector <double> >& twin_law,
+  const std::vector <int>& input_groups,
+  const std::vector < std::vector <double> >& twin_law,
   WFN& wave,
   int cpus = -1,
   bool electron_diffraction = false,
@@ -32,12 +32,12 @@ bool thakkar_sfac(
   bool read_k_pts = false);
 
 tsc_block MTC_thakkar_sfac(
-  std::string& hkl_filename,
-  std::string& cif,
+  const std::string& hkl_filename,
+  const std::string& cif,
   bool debug,
   std::ofstream& file,
-  std::vector <int>& input_groups,
-  std::vector < std::vector <double> >& twin_law,
+  const std::vector <int>& input_groups,
+  const std::vector < std::vector <double> >& twin_law,
   std::vector < std::string >& known_atoms,
   WFN& wave,
   int cpus = -1,
@@ -46,37 +46,39 @@ tsc_block MTC_thakkar_sfac(
   bool read_k_pts = false);
 
 bool calculate_structure_factors_HF(
-  std::string& hkl_filename,
-  std::string& cif_file,
+  const std::string& hkl_filename,
+  const std::string& cif_file,
   WFN& wave,
   bool debug,
   int accuracy,
   std::ofstream& file,
-  std::vector <int>& input_groups,
-  std::vector <std::vector <double> >& twin_law,
+  const std::vector <int>& input_groups,
+  const std::vector <std::vector <double> >& twin_law,
 
-  int cpus = -1,
-  bool electron_diffraction = false,
-  int pbc = 0,
-  bool Olex2_1_3_switch = false,
-  bool save_k_pts = false,
-  bool read_k_pts = false);
+  const int cpus = -1,
+  const bool electron_diffraction = false,
+  const bool ECPs_used = false,
+  const int pbc = 0,
+  const bool Olex2_1_3_switch = false,
+  const bool save_k_pts = false,
+  const bool read_k_pts = false);
 
 tsc_block calculate_structure_factors_MTC(
-  std::string& hkl_filename,
-  std::string& cif_file,
+  const std::string& hkl_filename,
+  const std::string& cif_file,
   WFN& wave,
   bool debug,
   int accuracy,
   std::ofstream& file,
-  std::vector <int>& input_groups,
-  std::vector <std::vector <double> >& twin_law,
+  const std::vector <int>& input_groups,
+  const std::vector <std::vector <double> >& twin_law,
   std::vector <std::string>& known_atoms,
-  int cpus = -1,
-  bool electron_diffraction = false,
-  int pbc = 0,
-  bool save_k_pts = false,
-  bool read_k_pts = false);
+  const int cpus = -1,
+  const bool electron_diffraction = false,
+  const bool ECPs_used = false,
+  const int pbc = 0,
+  const bool save_k_pts = false,
+  const bool read_k_pts = false);
 /*
 bool calculate_structure_factors_RI(
   std::string& hkl_filename,
