@@ -71,6 +71,7 @@ int main(int argc, char** argv)
   bool all_mos = false;
   bool test = false;
   groups.resize(1);
+  //This loop figures out command line options
   for (int i = 0; i < argc; i++) {
     temp = argv[i];
     if (temp.find("-") > 0) continue;
@@ -232,6 +233,7 @@ int main(int argc, char** argv)
     omp_set_num_threads(threads);
     omp_set_dynamic(0);
   }
+  //See if use wants help
   if (argc > 1) {
     if (string(argv[1]).find("--help") != string::npos) {
       cout << NoSpherA2_message() << help_message() << endl;
@@ -474,6 +476,7 @@ int main(int argc, char** argv)
     }
     return 0;
   }
+  //This one has conversion to fchk and calcualtion of one singel tsc file
   else if (hkl != "" || basis_set != "" || fchk != "") {
     ofstream log_file("NoSpherA2.log", ios::out);
 
@@ -763,7 +766,7 @@ int main(int argc, char** argv)
     log_file.flush();
     err_checkf(wfn != "", "No wfn specified", log_file);
     err_checkf(exists(wfn), "wfn doesn't exist", log_file);
-    wavy.resize(5);
+    wavy.resize(6);
     wavy[0].read_known_wavefunction_format(wfn, log_file);
     cube Rho(100, 100, 100, wavy[0].get_ncen(), true);
     Rho.set_origin(0, -7), Rho.set_origin(1, -7), Rho.set_origin(2, -7);
@@ -774,7 +777,7 @@ int main(int argc, char** argv)
     log_file << "Calcualting Rho...";
     Calc_Rho_spherical_harmonics(Rho, wavy[0], threads, log_file);
     log_file << " ...done!" << endl;
-    Rho.write_file(wavy[0], true);
+    //Rho.write_file(wavy[0], true);
     log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho.sum() << endl;
     cube Rho2("test.eldens.cube", true);
     log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << Rho2.sum() << endl;
@@ -788,7 +791,7 @@ int main(int argc, char** argv)
       log_file << "Calcualting MO " + to_string(i) + "...";
       Calc_MO(MO,i, wavy[0], threads, 4.0, log_file);
       log_file << " ...done!" << endl;
-      MO.write_file(wavy[0], true);
+      //MO.write_file(wavy[0], true);
       string name("test.mo" + to_string(i) + "a.cube");
       cube MO2(name, true, log_file);
       log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
@@ -796,31 +799,50 @@ int main(int argc, char** argv)
     }
     wavy[1].read_known_wavefunction_format("F_full.molden", log_file);
     wavy[1].write_wfn("F_conv.wfn", false, true);
-    cube Rho_2(141, 141, 141, wavy[1].get_ncen(), true);
+    cube Rho_2(71, 71, 71, wavy[1].get_ncen(), true);
     Rho_2.set_origin(0, -7), Rho_2.set_origin(1, -7), Rho_2.set_origin(2, -7);
-    Rho_2.set_vector(0, 0, 0.1);
-    Rho_2.set_vector(1, 1, 0.1);
-    Rho_2.set_vector(2, 2, 0.1);
+    Rho_2.set_vector(0, 0, 0.2);
+    Rho_2.set_vector(1, 1, 0.2);
+    Rho_2.set_vector(2, 2, 0.2);
     Rho_2.path = get_basename_without_ending(wavy[1].get_path()) + "_rho.cube";
     log_file << "Calcualting Rho...";
     Calc_Rho_spherical_harmonics(Rho_2, wavy[1], threads, log_file);
     log_file << " ...done!" << endl;
-    Rho_2.write_file(wavy[1], true);
+    //Rho_2.write_file(wavy[1], true);
     log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho_2.sum() << endl;
     wavy[4].read_known_wavefunction_format("f_ref.wfx", log_file);
-    cube Rho_3(141, 141, 141, wavy[4].get_ncen(), true);
+    cube Rho_3(71, 71, 71, wavy[4].get_ncen(), true);
     Rho_3.set_origin(0, -7), Rho_3.set_origin(1, -7), Rho_3.set_origin(2, -7);
-    Rho_3.set_vector(0, 0, 0.1);
-    Rho_3.set_vector(1, 1, 0.1);
-    Rho_3.set_vector(2, 2, 0.1);
+    Rho_3.set_vector(0, 0, 0.2);
+    Rho_3.set_vector(1, 1, 0.2);
+    Rho_3.set_vector(2, 2, 0.2);
     Rho_3.path = get_basename_without_ending(wavy[4].get_path()) + "_rho.cube";
     log_file << "Calcualting Rho...";
     Calc_Rho_spherical_harmonics(Rho_3, wavy[4], threads, log_file);
     log_file << " ...done!" << endl;
-    Rho_3.write_file(wavy[1], true);
+    //Rho_3.write_file(wavy[1], true);
     log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << Rho_3.sum() << endl;
     wavy[2].read_known_wavefunction_format("Ce_full.molden", log_file);
     wavy[2].write_wfn("Ce_conv.wfn", false, true);
+    cube Rho_4(141, 141, 141, wavy[2].get_ncen(), true);
+    Rho_4.set_origin(0, -7), Rho_4.set_origin(1, -7), Rho_4.set_origin(2, -7);
+    Rho_4.set_vector(0, 0, 0.1);
+    Rho_4.set_vector(1, 1, 0.1);
+    Rho_4.set_vector(2, 2, 0.1);
+    Rho_4.path = get_basename_without_ending(wavy[2].get_path()) + "_rho.cube";
+    log_file << "Calcualting Rho...";
+    Calc_Rho(Rho_4, wavy[2], threads, 7.0, log_file);
+    log_file << " ...done!" << endl;
+    Rho_4.write_file(wavy[2], true);
+    log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Rho_4.sum() << endl;
+
+    Rho_4.set_zero();
+    wavy[5].read_known_wavefunction_format("Ce_full.wfn", log_file);
+    Calc_Rho(Rho_4, wavy[5], threads, 7.0, log_file);
+    Rho_4.path = get_basename_without_ending(wavy[5].get_path()) + "_reference_rho.cube";
+    Rho_4.write_file(wavy[5], true);
+    log_file << "Number of electrons in the ref cube: " << setprecision(4) << fixed << Rho_4.sum() << endl;
+
     wavy[3].read_known_wavefunction_format("Sc_full.molden", log_file);
     wavy[3].write_wfn("Sc_conv.wfn", false, true);
     return 0;
