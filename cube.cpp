@@ -4,13 +4,11 @@
 using namespace std;
 
 cube::cube(){
-	for(int i=0; i<3; i++) size.push_back(0);
-	origin.resize(3);
-	for(int i=0; i<3; i++) origin[i]=0.0;
+	size.resize(3,0.0);
+	origin.resize(3,0.0);
 	vectors.resize(3);
 	for(int i=0; i<3; i++){
-	       vectors[i].resize(3);
-	       for (int j=0; j<3; j++) vectors[i][j]=0.0;
+		vectors[i].resize(3,0.0);
 	}
 	loaded=false;
 	na=0;
@@ -20,10 +18,10 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 	size.push_back(x);
 	size.push_back(y);
 	size.push_back(z);
-	origin.resize(3);
+	origin.resize(3,0.0);
 	vectors.resize(3);
 	for(int i=0; i<3; i++) 
-		vectors[i].resize(3);
+		vectors[i].resize(3,0.0);
 	loaded=grow_values;
 	if(grow_values){
 		values.resize(x);
@@ -31,9 +29,8 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values){
 		for(int i=0; i<x; i++){
 			values[i].resize(y);
 			for (int j = 0; j < y; j++) 
-				values[i][j].resize(z);
+				values[i][j].resize(z,0.0);
 		}
-		set_zero();
 	}
 	na=g_na;
 };

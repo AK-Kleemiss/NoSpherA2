@@ -2145,7 +2145,7 @@ bool WFN::read_molden(const string& filename, ofstream& file, const bool debug)
             for (int cart = 0; cart < 10; cart++) {
               temp_coef = 0;
               for (int spher = 0; spher < 7; spher++) {
-                temp_coef += f_pure_2_cart[spher][cart] * f_temp[spher][s];
+                temp_coef += f_pure_2_cart[cart][spher] * f_temp[spher][s];
               }
               //if (abs(temp_coef) < 1E-10) temp_coef = 0;
               push_back_MO_coef(MO_run, temp_coef);
