@@ -3,13 +3,14 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include "convenience.h"
 
 //-----------------Definition of atoms and basis sets--------------------
 
 struct basis_set_entry{
 	double coefficient;
 	double exponent;
-	unsigned int type;
+	unsigned int type; //1=S; 2=P; 3=D; 4=F; 5=G
 	unsigned int shell;
 	basis_set_entry operator=(const basis_set_entry &rhs);
 	basis_set_entry();
@@ -39,11 +40,12 @@ inline basis_set_entry basis_set_entry::operator=(const basis_set_entry &rhs){
 
 struct atom {
 	std::string label;
-	int nr, charge;
+	int nr, charge, ECP_electrons;
 	double x, y, z;
 	std::vector<double> frac_coords;
 	atom();
 	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
+	atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
 	atom operator=(const atom &rhs);
 	void print_values();
 	bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
@@ -63,37 +65,52 @@ struct atom {
 };						  
 
 inline atom::atom() {
-	
-    label='?';
-	nr=0;
-	x=0.0;
-	y=0.0;
-	z=0.0;
-	charge=0;
+	label = '?';
+	nr = 0;
+	x = 0.0;
+	y = 0.0;
+	z = 0.0;
+	charge = 0;
+	ECP_electrons = 0;
 	frac_coords.resize(3);
 	frac_coords = { 0,0,0 };
 };
 
 inline atom::atom (const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch){
-	nr=n;
-	label=l;
-	x=c1;
-	y=c2;
-	z=c3;
-	charge=ch;
+	nr = n;
+	label = l;
+	x = c1;
+	y = c2;
+	z = c3;
+	charge = ch;
+	ECP_electrons = 0;
+	frac_coords.resize(3);
+	frac_coords = { 0,0,0 };
+};
+
+inline atom::atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els) {
+	nr = n;
+	label = l;
+	x = c1;
+	y = c2;
+	z = c3;
+	charge = ch;
+	ECP_electrons = ECP_els;
 	frac_coords.resize(3);
 	frac_coords = { 0,0,0 };
 };
 
 inline atom atom::operator= (const atom &rhs){
-	label=rhs.label;
-	nr=rhs.nr;
-	x=rhs.x;
-	y=rhs.y;
-	z=rhs.z;
-	charge=rhs.charge;
-	basis_set=rhs.basis_set;
-	shellcount=rhs.shellcount;
+	label = rhs.label;
+	nr = rhs.nr;
+	x = rhs.x;
+	y = rhs.y;
+	z = rhs.z;
+	charge = rhs.charge;
+	basis_set = rhs.basis_set;
+	shellcount = rhs.shellcount;
+	ECP_electrons = rhs.ECP_electrons;
+	frac_coords = rhs.frac_coords;
 	return *this;
 };
 
@@ -124,11 +141,12 @@ inline bool atom::push_back_basis_set(const double &exponent, const double &coef
 		shellcount.push_back(1);
 	else
 		shellcount[shell]++;
-	if( type >= 0 && type < 5 && shell>=0){
+	if( type >= 0 && type < 6 && shell>=0){
 		basis_set.push_back(basis_set_entry(coefficient, exponent, type, shell));
 		return true;
 	}
 	else{
+		if (type >= 6) err_checkc(false, "h and higher types are not yet supported!");
 		std::cout << "This is not a valid basis set entry!" << std::endl;
 		std::cout << "Exponent: " << exponent << " coefficient: "<< coefficient << " type: " << type << " shell: " << shell << std::endl;
 		return false;

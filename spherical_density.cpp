@@ -603,7 +603,7 @@ const double Thakkar_c[]{
 	//Sorry, i gave up with labelling...
 	//believe me when i say it's the c values in the Thakkar Slater Basis with:
 	//S in one block, below P if present, D afterwards and F is present in the end
-	2.54298387126949,				//H
+	2.761611124,				//H
 	0.098380109,					//He
 	0.994709459,
 	1.158109106,
@@ -4368,4 +4368,113 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 	}
 
 	return result/ local_k;
+};
+
+const double Thakkar::get_core_form_factor(const double &k_vector, const int &core_els, std::ofstream& file, bool debug) {
+	double result(0.0);
+	using namespace std;
+	const double local_k = cubic_ang2bohr(k_vector); // since the radial exponents are in a.u.
+
+	const int ns = Thakkar_ns[atomic_number - 1];
+	const int np = Thakkar_np[atomic_number - 1];
+	const int nd = Thakkar_nd[atomic_number - 1];
+	const int nf = Thakkar_nf[atomic_number - 1];
+
+	int nr_ex = first_ex();
+	if (nr_ex == 200000000)
+		return -20;
+	int nr_coef = previous_element_coef() + 1;
+	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
+	const int offset = (atomic_number - 1) * 19;
+	double temp;
+	int i_j_distance = 0;
+	for (int m = 0; m < 7; m++)
+		if (Thakkar_occ[offset + m] != 0)
+			i_j_distance++;
+	int max_s=0, max_p=0, max_d=0, max_f=0;
+	if (core_els == 28) {
+		max_s = 3; max_p = 2; max_d = 1; max_f = 0;
+	}
+	else if (core_els == 46) {
+		max_s = 4; max_p = 3; max_d = 2; max_f = 0;
+	}
+	else if (core_els == 60) {
+		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
+	}
+	for (int m = 0; m < max_s; m++) {
+		if (Thakkar_occ[offset + m] == 0) continue;
+		for (int i = 0; i < ns; i++) {
+			for (int j = 0; j < ns - i; j++) {
+				temp = Thakkar_occ[offset + m]
+					* Thakkar_c[nr_coef + m + i * i_j_distance] * Thakkar_c[nr_coef + m + (i + j) * i_j_distance]
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, (Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j]), local_k);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+	nr_coef += i_j_distance * ns;
+	nr_ex += ns;
+	i_j_distance = 0;
+	for (int m = 7; m < 13; m++)
+		if (Thakkar_occ[offset + m] != 0)
+			i_j_distance++;
+	for (int m = 7; m < 7+max_p; m++) {
+		if (Thakkar_occ[offset + m] == 0) continue;
+		for (int i = 0; i < np; i++) {
+			for (int j = 0; j < np - i; j++) {
+				temp = Thakkar_occ[offset + m]
+					* Thakkar_c[nr_coef + m - 7 + i * i_j_distance] * Thakkar_c[nr_coef + m - 7 + (i + j) * i_j_distance]
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+	nr_coef += i_j_distance * np;
+	nr_ex += np;
+	i_j_distance = 0;
+	for (int m = 13; m < 17; m++)
+		if (Thakkar_occ[offset + m] != 0)
+			i_j_distance++;
+	for (int m = 13; m < 13+max_d; m++) {
+		if (Thakkar_occ[offset + m] == 0) continue;
+		for (int i = 0; i < nd; i++) {
+			for (int j = 0; j < nd - i; j++) {
+				temp = Thakkar_occ[offset + m]
+					* Thakkar_c[nr_coef + m - 13 + i * i_j_distance] * Thakkar_c[nr_coef + m - 13 + (i + j) * i_j_distance]
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+	nr_coef += i_j_distance * nd;
+	nr_ex += nd;
+	i_j_distance = 0;
+	for (int m = 17; m < 19; m++)
+		if (Thakkar_occ[offset + m] != 0)
+			i_j_distance++;
+	for (int m = 17; m < 17+max_f; m++) {
+		if (Thakkar_occ[offset + m] == 0) continue;
+		for (int i = 0; i < nf; i++) {
+			for (int j = 0; j < nf - i; j++) {
+				temp = Thakkar_occ[offset + m]
+					* Thakkar_c[nr_coef + m - 17 + i * i_j_distance] * Thakkar_c[nr_coef + m - 17 + (i + j) * i_j_distance]
+					* sinus_integral(Thakkar_n[nr_ex + i] + Thakkar_n[nr_ex + i + j] - 1, Thakkar_z[nr_ex + i] + Thakkar_z[nr_ex + i + j], local_k);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+
+	return result / local_k;
 };

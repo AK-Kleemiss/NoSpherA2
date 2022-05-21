@@ -100,9 +100,9 @@ string MO::hdr()
   else if (nr < 100) temp.append("   ");
   else temp.append("  ");
   temp.append(to_string(nr));
-  temp.append("    MO 0.0        OCC NO =");
-  if (occ == 2.0) temp.append("    2.0000000  ORB. ENERGY =");
-  else if (occ == 0.0) temp.append("    0.0000000  ORB. ENERGY =");
+  temp.append("                  OCC NO =");
+  if (occ == 2.0) temp.append("    2.00000000 ORB. ENERGY =");
+  else if (occ == 0.0) temp.append("    0.00000000 ORB. ENERGY =");
   else if (occ < 2 && occ>0) {
     temp.append("    ");
     temp.append(to_string(occ));

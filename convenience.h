@@ -91,6 +91,11 @@ constexpr double cubic_ang2bohr(const double& inp)
   return inp / (0.529177249 * 0.529177249 * 0.529177249);
 }
 
+constexpr double cubic_bohr2ang(const double& inp)
+{
+  return inp * (0.529177249 * 0.529177249 * 0.529177249);
+}
+
 //------------------general functions for easy use of terminal input--------------------
 inline const double bragg_angstrom[114]{
   0.00, //DUMMY LINE
@@ -149,7 +154,7 @@ inline void not_implemented(const std::string& file, const int& line, const std:
 #define err_checkc(condition, error_message) error_check(condition, __FILE__, __LINE__, error_message, std::cout)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, error_message, file)
 
-bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f);
+bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
 bool generate_cart2sph_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
