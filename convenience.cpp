@@ -1230,7 +1230,7 @@ const double normgauss(const int& type, const double& exp)
   int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
   return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f) {
+bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g) {
   //                                                   
   //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
   //To 6D : 5  6  7  8  9 10                           
@@ -1291,6 +1291,53 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f)
 
   f[9][4] = 1.0;
 
+  g.resize(15);
+#pragma omp parallel for
+  for (int i = 0; i < 15; i++) {
+    g[i].resize(9, 0.0);
+  }
+  g[0][0] = 0.375 * sqrt(1.0 / 35.0);
+  g[0][3] = -0.25/sqrt(7);
+  g[0][7] = -0.125;
+  
+  g[1][0] = g[0][0];
+  g[1][3] = -g[0][3];
+  g[1][7] = g[0][7];
+  
+  g[2][0] = sqrt(1.0 / 35.0);
+  
+  g[3][4] = -sqrt(1.0 / 28.0);
+  g[3][8] = -0.5;
+  
+  g[4][1] = -0.5 / sqrt(98.0 / 63.0);
+  g[4][5] = -1.0/sqrt(8.0);
+  
+  g[5][4] = g[3][4];
+  g[5][8] = -g[3][8];
+  
+  g[6][2] = g[4][1];
+  g[6][6] = -g[4][5];
+  
+  g[7][1] = sqrt(2.0/7.0);
+  
+  g[8][2] = g[7][1];
+  
+  g[9][0] = 3.0/sqrt(560);
+  g[9][7] = 0.75;
+
+  g[10][0] = -3.0/sqrt(35);
+  g[10][3] = 1.5/sqrt(7);
+
+  g[11][0] = g[10][0];
+  g[11][3] = -g[10][3];
+
+  g[12][2] = g[4][1];
+  g[12][6] = -0.75 * sqrt(2);
+
+  g[13][1] = g[4][1];
+  g[13][5] = -g[12][6];
+
+  g[14][4] = 3.0 / sqrt(7);
   return true;
 }
 bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)

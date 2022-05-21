@@ -21,13 +21,6 @@ using namespace std;
 #include "CUDA_utilities.h"
 #endif
 
-const int ECP_electrons[] = { 0,                                                                                             0,
- 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
- 0,  0,                                                                                                  0,  0,  0,  0,  0,  0,
- 0,  0,                                                          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-28, 28,                                                         28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
-46, 46, 46, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60 };
-
 bool merge_tscs(
   const string& mode,
   const vector<string>& files,
@@ -685,7 +678,6 @@ int make_hirshfeld_grids(const int& pbc,
   timeval& t1,
   timeval& t2,
 #endif
-  bool ECPs = false,
   bool debug = false)
 {
   int atoms_with_grids = 0;
@@ -1929,7 +1921,8 @@ int make_hirshfeld_grids(const int& pbc,
         total_grid[1][i],
         total_grid[2][i],
         d_temp,
-        phi_temp
+        phi_temp,
+        false
       );
     }
     for (int i = 0; i < 4; i++)
@@ -1965,7 +1958,7 @@ int make_hirshfeld_grids(const int& pbc,
           for (int i = 0; i < total_grid[0].size(); i++) {
             periodic_grid[j][i] = wave.compute_dens(total_grid[0][i] + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2),
               total_grid[1][i] + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2),
-              total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2));
+              total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2), true);
           }
           j++;
         }
@@ -2003,7 +1996,7 @@ int make_hirshfeld_grids(const int& pbc,
   //Generate Electron sums
 #pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld)
   for (int i = 0; i < asym_atom_list.size(); i++) {
-    if (debug) file << "i=" << i << endl;
+    //if (debug) file << "i=" << i << endl;
     int start_p = 0;
     for (int a = 0; a < i; a++)
       start_p += num_points[a];
@@ -2019,11 +2012,13 @@ int make_hirshfeld_grids(const int& pbc,
     el_sum_becke += atom_els[0][i];
     el_sum_spherical += atom_els[1][i];
     el_sum_hirshfeld += atom_els[2][i];
-    if (ECPs) {
-      int n = wave.get_atom_charge(asym_atom_list[i]);
-      el_sum_becke += ECP_electrons[n];
-      el_sum_spherical += ECP_electrons[n];
-      el_sum_hirshfeld += ECP_electrons[n];
+    if (wave.get_has_ECPs()) {
+      int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
+      el_sum_becke += n;
+      el_sum_spherical += n;
+      el_sum_hirshfeld += n;
+      atom_els[0][i] += n;
+      atom_els[2][i] += n;
     }
   }
 
@@ -2368,12 +2363,36 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
   for (int s = 0; s < sf[0].size(); s++) {
     k2 = k_pt[0][s]*k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
     for (int i = 0; i < asym_atom_list.size(); i++) {
-      double exponent = 1;
-      sf[i][s] += 8 * sqrt(PI / exponent) * ECP_electrons[wave.get_atom_charge(asym_atom_list[i])]
-        * exp(-PI * k2 / 4);
+      sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons
+        * exp(-PI*bohr2ang(bohr2ang(k2))/4);
     }
   }
 }
+void add_ECP_contribution_Thakkar(const vector <int>& asym_atom_list,
+  const WFN& wave,
+  vector<vector<complex<double>>>& sf,
+  const vector<vector<double>>& k_pt,
+  ofstream& file,
+  const bool debug = false)
+{
+  vector<Thakkar> temp;
+  for (int i = 0; i < asym_atom_list.size(); i++) {
+    temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
+    if (debug) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: " 
+      << scientific << setw(14) << setprecision(8) 
+      << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) 
+      << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
+  }
+  double k;
+#pragma omp parallel for private(k)
+  for (int s = 0; s < sf[0].size(); s++) {
+    k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
+    for (int i = 0; i < asym_atom_list.size(); i++) {
+      sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+    }
+  }
+}
+
 
 void convert_to_ED(const vector <int>& asym_atom_list,
   const WFN& wave,
@@ -2640,7 +2659,6 @@ bool calculate_structure_factors_HF(
   const vector < vector <double> >& twin_law,
   const int cpus,
   const bool electron_diffraction,
-  const bool ECPs_used,
   const int pbc,
   const bool Olex2_1_3_switch,
   const bool save_k_pts,
@@ -2727,7 +2745,6 @@ bool calculate_structure_factors_HF(
     t1,
     t2,
 #endif
-    ECPs_used,
     debug);
 
   vector<vector<double>> k_pt;
@@ -2756,8 +2773,8 @@ bool calculate_structure_factors_HF(
 #endif
     debug);
 
-  if (ECPs_used) {
-    add_ECP_contribution(
+  if (wave.get_has_ECPs()) {
+    add_ECP_contribution_Thakkar(
       asym_atom_list,
       wave,
       sf,
@@ -2836,7 +2853,6 @@ tsc_block calculate_structure_factors_MTC(
   vector < string >& known_atoms,
   const int cpus,
   const bool electron_diffraction,
-  const bool ECPs_used,
   const int pbc,
   const bool save_k_pts,
   const bool read_k_pts
@@ -2925,7 +2941,6 @@ tsc_block calculate_structure_factors_MTC(
     t1,
     t2,
 #endif
-    ECPs_used,
     debug);
 
   vector<vector<double>> k_pt;
@@ -2954,8 +2969,8 @@ tsc_block calculate_structure_factors_MTC(
 #endif
     debug);
 
-  if (ECPs_used) {
-    add_ECP_contribution(
+  if (wave.get_has_ECPs()) {
+    add_ECP_contribution_Thakkar(
       asym_atom_list,
       wave,
       sf,
