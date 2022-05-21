@@ -53,6 +53,7 @@ private:
   bool modified;
   bool d_f_switch; //true if spherical harmonics are used for the basis set
   bool distance_switch;
+  bool has_ECPs;
   //precomputed factors and helper functions for ESP calc
   int pre[9][5][5][9];
   void fill_pre();
@@ -60,6 +61,8 @@ private:
   void fill_Afac_pre();
   double fj(int& j, int& l, int& m, double& aa, double& bb);
   double Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtmp);
+  double compute_dens_cartesian(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens);
+  double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens);
 public:
   WFN();
   WFN(int given_origin);
@@ -138,6 +141,8 @@ public:
   int check_order(bool debug);
   bool sort_wfn(int order, bool debug);
   void set_dist_switch() { distance_switch = true; };
+  void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true);
+  bool get_has_ECPs() { return has_ECPs; };
   void operator=(const WFN& right);
   int calculate_charge();
   int calculate_charge(std::ofstream& file);
@@ -182,11 +187,9 @@ public:
   //----------Calcualtion of Properties
   //double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
-  double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3);
-  double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
-  double compute_dens_cartesian(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
-  double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
-  void computeValues(const double* PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap);
+  double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, const bool& add_ECP_dens = true);
+  double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens = true);
+  void computeValues(const double* PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap, const bool& add_ECP_dens = true);
   void computeLapELIELF(const double* PosGrid, double& Elf, double& Eli, double& Lap);
   void computeELIELF(const double* PosGrid, double& Elf, double& Eli);
   void computeLapELI(const double* PosGrid, double& Eli, double& Lap);
