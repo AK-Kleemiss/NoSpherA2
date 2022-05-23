@@ -2356,43 +2356,47 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
   vector<vector<complex<double>>>& sf,
   const vector<vector<double>> &k_pt,
   ofstream& file,
+  const int& mode = 0,
   const bool debug = false)
 {
-  double k2;
+  if (mode == 0) { //Using a gaussian tight core function
+    double k2;
+    for (int i = 0; i < asym_atom_list.size(); i++) {
+      if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
+        << scientific << setw(14) << setprecision(8)
+        << exp(-bohr2ang_p(0.0, 4) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons
+        << " and at 1 angstrom: " << exp(-bohr2ang_p(1.0, 4) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+    }
 #pragma omp parallel for private(k2)
-  for (int s = 0; s < sf[0].size(); s++) {
-    k2 = k_pt[0][s]*k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
-    for (int i = 0; i < asym_atom_list.size(); i++) {
-      sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons
-        * exp(-PI*bohr2ang(bohr2ang(k2))/4);
+    for (int s = 0; s < sf[0].size(); s++) {
+      k2 = k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
+      for (int i = 0; i < asym_atom_list.size(); i++) {
+        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-bohr2ang_p(k2, 4) / 16 / PI);
+      }
     }
   }
-}
-void add_ECP_contribution_Thakkar(const vector <int>& asym_atom_list,
-  const WFN& wave,
-  vector<vector<complex<double>>>& sf,
-  const vector<vector<double>>& k_pt,
-  ofstream& file,
-  const bool debug = false)
-{
-  vector<Thakkar> temp;
-  for (int i = 0; i < asym_atom_list.size(); i++) {
-    temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
-    if (debug) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: " 
-      << scientific << setw(14) << setprecision(8) 
-      << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) 
-      << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
-  }
-  double k;
+  else if (mode == 1) { //Using a Thakkar core density
+    vector<Thakkar> temp;
+    for (int i = 0; i < asym_atom_list.size(); i++) {
+      temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
+      if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0.0001): "
+        << scientific << setw(14) << setprecision(8)
+        << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug)
+        << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
+    }
+    double k;
 #pragma omp parallel for private(k)
-  for (int s = 0; s < sf[0].size(); s++) {
-    k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
-    for (int i = 0; i < asym_atom_list.size(); i++) {
-      sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+    for (int s = 0; s < sf[0].size(); s++) {
+      k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
+      for (int i = 0; i < asym_atom_list.size(); i++) {
+        sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+      }
     }
   }
+  else {
+    err_not_impl_f("No higher ECP mode than 1 implemented!", file);
+  }
 }
-
 
 void convert_to_ED(const vector <int>& asym_atom_list,
   const WFN& wave,
@@ -2662,7 +2666,8 @@ bool calculate_structure_factors_HF(
   const int pbc,
   const bool Olex2_1_3_switch,
   const bool save_k_pts,
-  const bool read_k_pts
+  const bool read_k_pts,
+  const int& ECP_mode
 )
 {
 #ifdef FLO_CUDA
@@ -2674,6 +2679,7 @@ bool calculate_structure_factors_HF(
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
   err_checkf(exists(cif), "CIF does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
+  if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (cpus != -1) {
     omp_set_num_threads(cpus);
@@ -2774,12 +2780,13 @@ bool calculate_structure_factors_HF(
     debug);
 
   if (wave.get_has_ECPs()) {
-    add_ECP_contribution_Thakkar(
+    add_ECP_contribution(
       asym_atom_list,
       wave,
       sf,
       k_pt,
       file,
+      ECP_mode,
       debug
     );
   }
@@ -2855,7 +2862,8 @@ tsc_block calculate_structure_factors_MTC(
   const bool electron_diffraction,
   const int pbc,
   const bool save_k_pts,
-  const bool read_k_pts
+  const bool read_k_pts,
+  const int& ECP_mode
 )
 {
 #ifdef FLO_CUDA
@@ -2864,6 +2872,7 @@ tsc_block calculate_structure_factors_MTC(
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
   err_checkf(exists(cif), "CIF " +cif+" does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
+  if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (cpus != -1) {
     omp_set_num_threads(cpus);
@@ -2970,12 +2979,13 @@ tsc_block calculate_structure_factors_MTC(
     debug);
 
   if (wave.get_has_ECPs()) {
-    add_ECP_contribution_Thakkar(
+    add_ECP_contribution(
       asym_atom_list,
       wave,
       sf,
       k_pt,
       file,
+      ECP_mode,
       debug
     );
   }

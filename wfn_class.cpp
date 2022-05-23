@@ -2641,6 +2641,13 @@ unsigned int WFN::get_nr_electrons(const bool& debug)
   return count;
 };
 
+unsigned int WFN::get_nr_ECP_electrons() {
+  unsigned int count = 0;
+  for (int i = 0; i < ncen; i++)
+    count += atoms[i].ECP_electrons;
+  return count;
+}
+
 double WFN::count_nr_electrons(void)
 {
   double count = 0;
@@ -4945,9 +4952,9 @@ double WFN::compute_dens_cartesian(
     d[1][iat] = Pos2 - atoms[iat].y;
     d[2][iat] = Pos3 - atoms[iat].z;
     d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-    if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {
-      Rho += 8 * atoms[iat].ECP_electrons * exp(-4 * PI * d[3][iat]);
-    }
+    if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {  // This adds a tight core density based on 
+      Rho += 8 * atoms[iat].ECP_electrons * exp(-4 * PI * d[3][iat]); // a spherical gaussian to fill in the gap 
+    }                                                                 // left by ECPs integrating to the correct number of electrons
   }
 
   for (int j = 0; j < nex; j++) {

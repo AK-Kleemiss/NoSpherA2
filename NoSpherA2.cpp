@@ -43,6 +43,7 @@ int main(int argc, char** argv)
   bool becke = false;
   bool electron_diffraction = false;
   bool ECP = false;
+  int ECP_mode = 0;
   bool calc = false;
   bool eli = false;
   bool esp = false;
@@ -99,8 +100,12 @@ int main(int argc, char** argv)
       pbc = stoi(argv[i + 1]);
     else if (temp.find("-ED") < 1)
       electron_diffraction = true;
-    else if (temp.find("-ECP") < 1)
+    else if (temp.find("-ECP") < 1) {
       ECP = true;
+      if (argc >= i + 2 && string(argv[i + 1]).find("-") != 0) {
+        ECP_mode = stoi(argv[i + 1]);
+      }
+    }
     else if (temp.find("-Olex2_1_3") < 1)
       Olex2_1_3_switch = true;
     else if (temp.find("-v2") < 1)
@@ -303,7 +308,8 @@ int main(int argc, char** argv)
           electron_diffraction,
           0,
           i == 0,
-          i != 0
+          i != 0,
+          ECP_mode
         ), log_file);
       }
       else {
@@ -397,7 +403,8 @@ int main(int argc, char** argv)
           electron_diffraction,
           0,
           i == 0,
-          i != 0
+          i != 0,
+          ECP_mode
         ), log_file);
       }
       else {
@@ -553,7 +560,8 @@ int main(int argc, char** argv)
           pbc,
           Olex2_1_3_switch,
           save_k_pts,
-          read_k_pts), "Error during SF Calcualtion", log_file);
+          read_k_pts,
+          ECP_mode), "Error during SF Calcualtion", log_file);
       else
         err_checkf(thakkar_sfac(
           hkl,

@@ -52,7 +52,7 @@ public:
     read_CIF(filename, file, debug);
     read_symm_CIF(filename, file, debug);
     if (debug) {
-      file << "RCM done, now labels and asym atoms!" << std::endl;
+      file << "RCM done!" << std::endl;
       for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j)
           file << std::setw(10) << std::fixed << get_rcm(i, j) / 2 / PI / 0.529177249 << ' ';

@@ -112,6 +112,7 @@ public:
   int get_origin() const { return origin; };
   double get_exponent(int nr) const { return exponents[nr]; };
   unsigned int get_nr_electrons(const bool& debug);
+  unsigned int get_nr_ECP_electrons();
   double count_nr_electrons(void);
   /*int get_type(int nr) { if(nr>types.size()||nr<0) return -1; else return types[nr]; };
   int get_center(int nr) { if(nr>centers.size()||nr<0) return -1; else return centers[nr]; };					NOT NEEDED AT THIS POINT!

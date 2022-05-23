@@ -37,6 +37,10 @@
       <Configuration>Debug_SF_Disorder</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug_SF_ECP|x64">
+      <Configuration>Debug_SF_ECP</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SF_kpts_file|x64">
       <Configuration>Debug_SF_kpts_file</Configuration>
       <Platform>x64</Platform>
