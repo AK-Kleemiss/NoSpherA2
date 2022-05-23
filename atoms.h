@@ -146,7 +146,7 @@ inline bool atom::push_back_basis_set(const double &exponent, const double &coef
 		return true;
 	}
 	else{
-		if (type >= 6) err_checkc(false, "h and higher types are not yet supported!");
+		if (type >= 6) err_checkf(false, "h and higher types are not yet supported!", std::cout);
 		std::cout << "This is not a valid basis set entry!" << std::endl;
 		std::cout << "Exponent: " << exponent << " coefficient: "<< coefficient << " type: " << type << " shell: " << shell << std::endl;
 		return false;

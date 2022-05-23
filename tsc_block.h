@@ -118,7 +118,7 @@ public:
       }
     }
     tsc_file.close();
-    err_checkc(!tsc_file.bad(),"TSCB file wen bad!");
+    err_checkf(!tsc_file.bad(),"TSCB file went bad!", std::cout);
   };
   tsc_block() { anomalous_dispersion = false; };
   ~tsc_block()
@@ -135,7 +135,7 @@ public:
   };
   const std::vector<std::complex<double> > get_sf_for_scatterer(const unsigned int nr)
   {
-    err_checkc(nr < scatterer.size(), "Wrong number in get SF");
+    err_checkf(nr < scatterer.size(), "Wrong number in get SF", std::cout);
     return sf[nr];
   };
   const std::vector<std::complex<double> > get_sf_for_scatterer(const unsigned int nr, std::ofstream& log)
@@ -145,7 +145,7 @@ public:
   };
   const std::string get_scatterer(const unsigned int nr)
   {
-    err_checkc(nr < scatterer.size(), "Invalid nr of scatterer");
+    err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", std::cout);
     return scatterer[nr];
   };
   const std::string get_scatterer(const unsigned int nr, std::ofstream& log)
@@ -166,7 +166,7 @@ public:
   bool get_AD() { return anomalous_dispersion; };
   const std::vector<int> get_indices(const unsigned int nr)
   {
-    err_checkc(nr < index[0].size(), "Invalid nr of index");
+    err_checkf(nr < index[0].size(), "Invalid nr of index", std::cout);
     return { index[0][nr], index[1][nr], index[2][nr] };
   };
   const std::vector<int> get_indices(const unsigned int nr, std::ofstream& file)
@@ -176,8 +176,8 @@ public:
   };
   const int get_index(const unsigned int dim, const unsigned int nr)
   {
-    err_checkc(dim < 3, "invalid dimension for index");
-    err_checkc(nr < index[dim].size(), "invalid nr for index");
+    err_checkf(dim < 3, "invalid dimension for index", std::cout);
+    err_checkf(nr < index[dim].size(), "invalid nr for index", std::cout);
     return index[dim][nr];
   };
   const int get_index(const unsigned int dim, const unsigned int nr, std::ofstream& file)
@@ -299,7 +299,7 @@ public:
       tsc_file << std::endl;
     }
     tsc_file.close();
-    err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
+    err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
   void write_tscb_file()
   {
@@ -327,6 +327,6 @@ public:
     }
     tsc_file.flush();
     tsc_file.close();
-    err_checkc(!tsc_file.bad(), "Error during writing of tsc file!");
+    err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
 };

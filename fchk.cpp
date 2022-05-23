@@ -601,14 +601,14 @@ bool modify_fchk(const string &fchk_name, const string &basis_set_path, WFN &wav
 					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
 					const int temp1 = iu + (m * nao);
 					const int temp2 = iv + (m * nao);
-					err_checkc(
+					err_checkf(
 						wave.set_DM(iuv, wave.get_DM(iuv) + 2 * CMO[temp1] * CMO[temp2]), 
 						"Something went wrong while writing the DM! iuv=" + 
 						  to_string(iuv) + " while CMO has size: " + 
 						  to_string(CMO.size()) + "\nCMO[" + to_string(temp1) + "] = " +
 							to_string(CMO[temp1]) + "; CMO[" + to_string(temp2) + "] = " + 
 						  to_string(CMO[temp2]) + " DM: " + to_string(wave.get_DM(iuv)) + 
-						  "\nDM_size: " + to_string(wave.get_DM_size()));
+						  "\nDM_size: " + to_string(wave.get_DM_size()), std::cout);
 					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
@@ -1148,14 +1148,14 @@ bool free_fchk(const string &fchk_name, const string &basis_set_path, WFN &wave,
 					//if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
 					const int temp1 = iu + (m * nao);
 					const int temp2 = iv + (m * nao);
-					err_checkc(
+					err_checkf(
 						wave.set_DM(iuv, wave.get_DM(iuv) + 2 * CMO[temp1] * CMO[temp2]),
 						"Something went wrong while writing the DM! iuv=" +
 						to_string(iuv) + " while CMO has size: " +
 						to_string(CMO.size()) + "\nCMO[" + to_string(temp1) + "] = " +
 						to_string(CMO[temp1]) + "; CMO[" + to_string(temp2) + "] = " +
 						to_string(CMO[temp2]) + " DM: " + to_string(wave.get_DM(iuv)) +
-						"\nDM_size: " + to_string(wave.get_DM_size()));
+						"\nDM_size: " + to_string(wave.get_DM_size()), std::cout);
 					//else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
 				}
 			}
