@@ -2284,20 +2284,19 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
   const int& mode = 0,
   const bool debug = false)
 {
-  if(debug) 
+  double k = 1.0;
   if (mode == 0) { //Using a gaussian tight core function
-    double k2;
     for (int i = 0; i < asym_atom_list.size(); i++) {
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
         << scientific << setw(14) << setprecision(8)
-        << exp(-bohr2ang_p(0.0, 4) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons
-        << " and at 1 angstrom: " << exp(-bohr2ang_p(1.0, 4) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+        << wave.atoms[asym_atom_list[i]].ECP_electrons
+        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k),2) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
-#pragma omp parallel for private(k2)
+#pragma omp parallel for private(k)
     for (int s = 0; s < sf[0].size(); s++) {
-      k2 = k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
+      k = k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
       for (int i = 0; i < asym_atom_list.size(); i++) {
-        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-bohr2ang_p(k2, 4) / 16 / PI);
+        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16 / PI);
       }
     }
   }
@@ -2310,7 +2309,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
         << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug)
         << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
     }
-    double k;
+    
 #pragma omp parallel for private(k)
     for (int s = 0; s < sf[0].size(); s++) {
       k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
