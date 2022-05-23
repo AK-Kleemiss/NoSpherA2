@@ -136,27 +136,18 @@ inline char asciitolower(char in) {
     return in - ('Z' - 'z');
   return in;
 }
-inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& error_mesasge, std::ofstream& log_file)
-{
-  if (!condition) {
-    log_file << "Error at: " << file << ":" << line << " " << error_mesasge << std::endl;
-    log_file.close();
-    exit(-1);
-  }
-};
-inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& error_mesasge, std::ostream& log_file)
+inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& error_mesasge, std::ostream& log_file = std::cout)
 {
   if (!condition) {
     log_file << "Error at: " << file << ":" << line << " " << error_mesasge << std::endl;
     exit(-1);
   }
 };
-inline void not_implemented(const std::string& file, const int& line, const std::string& error_mesasge, std::ofstream& log_file) {
+inline void not_implemented(const std::string& file, const int& line, const std::string& error_mesasge, std::ostream& log_file) {
   log_file << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
   exit(-1);
 };
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, error_message, file)
-#define err_checkc(condition, error_message) error_check(condition, __FILE__, __LINE__, error_message, std::cout)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, error_message, file)
 
 bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);

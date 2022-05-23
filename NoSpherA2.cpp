@@ -269,6 +269,7 @@ int main(int argc, char** argv)
   }
   if (combined_tsc_calc) {
     ofstream log_file("NoSpherA2.log", ios::out);
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message();
     log_file.flush();
     err_checkf(hkl != "", "No hkl specified", log_file);
@@ -362,6 +363,7 @@ int main(int argc, char** argv)
   }
   if (cif_based_combined_tsc_calc) {
     ofstream log_file("NoSpherA2.log", ios::out);
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message();
     log_file.flush();
     err_checkf(hkl != "", "No hkl specified", log_file);
@@ -491,7 +493,7 @@ int main(int argc, char** argv)
   //This one has conversion to fchk and calcualtion of one singel tsc file
   else if (hkl != "" || basis_set != "" || fchk != "") {
     ofstream log_file("NoSpherA2.log", ios::out);
-
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message();
     //Lets print what was the command line, for debugging
     if (debug_main)
@@ -580,6 +582,7 @@ int main(int argc, char** argv)
   }
   if (calc) {
     ofstream log2("NoSpherA2_cube.log", ios::out);
+    auto coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
     if (debug_main)
       for (int i = 0; i < argc; i++)
         log2 << argv[i] << endl;
@@ -777,6 +780,7 @@ int main(int argc, char** argv)
   }
   if (density_test_cube) {
     ofstream log_file("NoSpherA2.log", ios::out);
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message();
     log_file.flush();
     wavy.resize(10);
