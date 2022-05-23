@@ -15,6 +15,18 @@ sucrose_SF:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
+malbac_SF_ECP:
+	@echo 'Running test: $@'
+	cd ECP_SF && ../../NoSpherA2 \
+		-cif malbac.cif \
+		-hkl malbac.hkl \
+		-wfn malbac_ECP.molden \
+		-acc 1\
+		-ECP 0\
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
 sucrose_IAM:
 	@echo 'Running test: $@'
 	cd sucrose_IAM_SF && ../../NoSpherA2 \
