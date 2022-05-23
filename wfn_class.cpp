@@ -102,13 +102,13 @@ bool WFN::push_back_MO(int nr, double occ, double ener)
 
 bool WFN::push_back_MO_coef(int nr, double value, int nr2)
 {
-  err_checkc(nr < nmo, "not enough MOs");
+  err_checkf(nr < nmo, "not enough MOs", std::cout);
   return MOs[nr].push_back_coef(value, nr2);
 };
 
 void WFN::push_back_MO_coef(int nr, double value)
 {
-  err_checkc(nr < nmo, "not enough MOs");
+  err_checkf(nr < nmo, "not enough MOs", std::cout);
   MOs[nr].push_back_coef(value);
 };
 
@@ -404,15 +404,15 @@ string WFN::hdr(bool occupied)
 
 void WFN::read_known_wavefunction_format(string fileName, bool debug)
 {
-  if (fileName.find(".wfn") != string::npos) origin = 2, err_checkc(read_wfn(fileName, debug), "Problem reading wfn");
-  else if (fileName.find(".ffn") != string::npos) origin = 4, err_checkc(read_wfn(fileName, debug), "Problem reading ffn");
-  else if (fileName.find(".wfx") != string::npos) origin = 6, err_checkc(read_wfx(fileName, debug, cout), "Problem reading wfx");
+  if (fileName.find(".wfn") != string::npos) origin = 2, err_checkf(read_wfn(fileName, debug), "Problem reading wfn", std::cout);
+  else if (fileName.find(".ffn") != string::npos) origin = 4, err_checkf(read_wfn(fileName, debug), "Problem reading ffn", std::cout);
+  else if (fileName.find(".wfx") != string::npos) origin = 6, err_checkf(read_wfx(fileName, debug, cout), "Problem reading wfx", std::cout);
   else if (fileName.find(".fch") != string::npos) {
-    origin = 4, err_checkc(read_fchk(fileName, cout, debug), "Problem reading fchk");
-    if (debug) err_checkc(write_wfn("test.wfn", debug, false), "Problem writing test.wfn");
+    origin = 4, err_checkf(read_fchk(fileName, cout, debug), "Problem reading fchk", std::cout);
+    if (debug) err_checkf(write_wfn("test.wfn", debug, false), "Problem writing test.wfn", std::cout);
   }
-  else if (fileName.find(".xyz") != string::npos) origin = 7, err_checkc(read_xyz(fileName, cout, debug), "Problem reading xyz");
-  else err_checkc(false, "Unknown filetype!");
+  else if (fileName.find(".xyz") != string::npos) origin = 7, err_checkf(read_xyz(fileName, cout, debug), "Problem reading xyz", std::cout);
+  else err_checkf(false, "Unknown filetype!", std::cout);
 };
 
 void WFN::read_known_wavefunction_format(string fileName, ofstream& file, bool debug)
@@ -4896,13 +4896,13 @@ double WFN::compute_dens(
 )
 {
   if (d_f_switch) {
-    err_checkc(d.size() >= 5, "d is too small!");
-    err_checkc(phi.size() >= get_nmo(true), "phi is too small!");
+    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
   else {
-    err_checkc(d.size() >= 4, "d is too small!");
-    err_checkc(phi.size() >= get_nmo(true), "phi is too small!");
+    err_checkf(d.size() >= 4, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
     return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
 };
@@ -4914,12 +4914,13 @@ double WFN::compute_dens(
   const bool& add_ECP_dens
 )
 {
-  int n = get_nmo(true);
+  const int n = get_nmo(true);
   if (d_f_switch) {
     vector<vector<double>> d(5);
     for (int i = 0; i < 5; i++)
       d[i].resize(ncen, 0.0);
     vector<double> phi(n, 0.0);
+    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
   else {
@@ -4999,7 +5000,7 @@ double WFN::compute_MO_spherical(
   const int& MO
 )
 {
-  err_checkc(d_f_switch, "Only works for spheriacl wavefunctions!");
+  err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   int iat;
   int l;
   //ex will carry information about radial function
@@ -5119,7 +5120,7 @@ double WFN::compute_MO_spherical(
       SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
     }
     default: {
-      err_checkc(false, "Not yet implemented!");
+      err_not_impl_f("Higher than G types", std::cout);
     }
     };
     SH *= ex; // multiply radial part with spherical harmonic
@@ -5139,7 +5140,7 @@ double WFN::compute_dens_spherical(
   const bool& add_ECP_dens
 )
 {
-  err_checkc(d_f_switch, "Only works for spheriacl wavefunctions!");
+  err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!",std::cout);
   std::fill(phi.begin(), phi.end(), 0.0);
   double Rho = 0.0;
   int iat;
@@ -5261,7 +5262,7 @@ double WFN::compute_dens_spherical(
       SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
     }
     default: {
-      err_checkc(false, "Not yet implemented!");
+      err_checkf(false, "Not yet implemented!", std::cout);
     }
     };
     SH *= ex; // multiply radial part with spherical harmonic

@@ -952,16 +952,6 @@ int make_hirshfeld_grids(const int& pbc,
     else if (end_prototypes - start < 3600) file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototypes - start) / 60) << " m " << (end_prototypes - start) % 60 << " s" << endl;
     else file << "Time until prototypes are done: " << fixed << setprecision(0) << floor((end_prototypes - start) / 3600) << " h " << ((end_prototypes - start) % 3600) / 60 << " m" << endl;
   }
-#else
-  if (debug) {
-    gettimeofday(&t2, 0);
-
-    double time3 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (time3 < 60) printf("Time to prepare: %4.1lf s\n", time3);
-    else if (time3 < 3600) printf("Time to prepare: %10.1lf m\n", time3 / 60);
-    else printf("Time to prepare: %10.1lf h\n", time3 / 3600);
-  }
 #endif
 
 #ifdef FLO_CUDA
@@ -1292,17 +1282,6 @@ int make_hirshfeld_grids(const int& pbc,
     file << "Taking time..." << endl;
   }
   end_becke = time(NULL);
-
-#else
-  if (debug) {
-    gettimeofday(&t2, 0);
-
-    double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
-    else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
-    else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
-  }
 #endif
 
   file << "Calculating spherical densities..." << flush;
@@ -1567,16 +1546,6 @@ int make_hirshfeld_grids(const int& pbc,
   }
   end_spherical = time(NULL);
 
-#else
-  if (debug) {
-    gettimeofday(&t2, 0);
-
-    double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
-    else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
-    else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
-  }
 #endif
   // Total grid as a sum of all atomic grids.
   // Dimensions: [c] [p]
@@ -1661,17 +1630,6 @@ int make_hirshfeld_grids(const int& pbc,
     file << "Taking time..." << endl;
   }
   end_prune = time(NULL);
-
-#else
-  if (debug) {
-    gettimeofday(&t2, 0);
-
-    double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
-    else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
-    else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
-  }
 #endif
 
   file << "Calculating non-spherical densities..." << flush;
@@ -2064,17 +2022,6 @@ int make_hirshfeld_grids(const int& pbc,
     file << "Taking time..." << endl;
   }
   end_aspherical = time(NULL);
-
-#else
-  if (debug) {
-    gettimeofday(&t2, 0);
-
-    double timeb = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-    if (timeb < 60) printf("Time to prepare: %4.1lf s\n", timeb);
-    else if (timeb < 3600) printf("Time to prepare: %10.1lf m\n", timeb / 60);
-    else printf("Time to prepare: %10.1lf h\n", timeb / 3600);
-  }
 #endif
 
   dens.resize(asym_atom_list.size());
@@ -2267,15 +2214,6 @@ void calc_SF(const int& points,
   if (end1 - start < 60) file << "Time to prepare: " << fixed << setprecision(0) << end1 - start << " s" << endl;
   else if (end1 - start < 3600) file << "Time to prepare: " << fixed << setprecision(0) << floor((end1 - start) / 60) << " m " << (end1 - start) % 60 << " s" << endl;
   else file << "Time to prepare: " << fixed << setprecision(0) << floor((end1 - start) / 3600) << " h " << ((end1 - start) % 3600) / 60 << " m" << endl;
-#else
-  gettimeofday(&t2, 0);
-
-  double timea = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-  if (timea < 60) printf("Time to prepare: %4.1lf s\n", timea);
-  else if (timea < 3600) printf("Time to prepare: %10.1lf m\n", timea / 60);
-  else printf("Time to prepare: %10.1lf h\n", timea / 3600);
-
 #endif
 
   //#ifdef FLO_CUDA
@@ -2336,19 +2274,6 @@ void calc_SF(const int& points,
   delete(progress);
 
   //#endif
-
-#ifdef _WIN64
-
-#else
-  gettimeofday(&t2, 0);
-
-  double time4 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-  if (time4 < 60) printf("Time to calculate: %4.1lf s\n", time4);
-  else if (time4 < 3600) printf("Time to calculate: %10.1lf m\n", time4 / 60);
-  else printf("Time to calculate: %10.1lf h\n", time4 / 3600);
-
-#endif
 }
 
 void add_ECP_contribution(const vector <int>& asym_atom_list,
@@ -2359,6 +2284,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
   const int& mode = 0,
   const bool debug = false)
 {
+  if(debug) 
   if (mode == 0) { //Using a gaussian tight core function
     double k2;
     for (int i = 0; i < asym_atom_list.size(); i++) {
@@ -2826,14 +2752,6 @@ bool calculate_structure_factors_HF(
   file << " ... for aspherical density:  " << setw(6) << end_aspherical - end_prune << " s" << endl;
   file << " ... for final preparation:   " << setw(6) << end1 - end_aspherical << " s" << endl;
   file << " ... for tsc calculation:     " << setw(6) << end - end1 << " s" << endl;
-#else
-  gettimeofday(&t2, 0);
-
-  double time2 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-  if (time2 < 60) cout << "Total Time: " << setw(4) << setprecision(1) << time2 << " s\n";
-  else if (time2 < 3600) cout << "Total Time: " << setw(4) << setprecision(1) << time2/60 << " s\n";
-  else cout << "Total Time: " << setw(4) << setprecision(1) << time2/3600 << " s\n";
 
 #endif
   file << "Writing tsc file... " << flush;
