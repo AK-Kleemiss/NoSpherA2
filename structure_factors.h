@@ -60,7 +60,8 @@ bool calculate_structure_factors_HF(
   const int pbc = 0,
   const bool Olex2_1_3_switch = false,
   const bool save_k_pts = false,
-  const bool read_k_pts = false);
+  const bool read_k_pts = false,
+  const int& ECP_mode = 0);
 
 tsc_block calculate_structure_factors_MTC(
   const std::string& hkl_filename,
@@ -77,7 +78,8 @@ tsc_block calculate_structure_factors_MTC(
   const bool electron_diffraction = false,
   const int pbc = 0,
   const bool save_k_pts = false,
-  const bool read_k_pts = false);
+  const bool read_k_pts = false,
+  const int& ECP_mode = 0);
 /*
 bool calculate_structure_factors_RI(
   std::string& hkl_filename,
