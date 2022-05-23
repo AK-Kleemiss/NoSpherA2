@@ -81,6 +81,11 @@ constexpr double bohr2ang(const double& inp)
   return inp * 0.529177249;
 }
 
+inline double bohr2ang_p(const double& inp, const int p)
+{
+  return inp * pow(0.529177249,p);
+}
+
 constexpr double ang2bohr(const double& inp)
 {
   return inp / 0.529177249;
