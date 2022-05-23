@@ -2110,17 +2110,10 @@ bool WFN::read_molden(const string& filename, ofstream& file, const bool debug)
           }
         }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          if (debug) {
-            file << "Read: " << stod(temp[1]);
-            file << "Result: " << stod(temp[1]) * prims[basis_run + s].coefficient << endl;
-          }
           d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         d_run++;
         if (d_run == 5) {
-          if (debug) {
-            file << "This is a complete D-shell now! Size: " << temp_shellsizes[basis_run] << endl;
-          }
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
             double temp_coef = 0;
             for (int cart = 0; cart < 6; cart++) {
