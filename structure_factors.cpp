@@ -2943,15 +2943,6 @@ tsc_block calculate_structure_factors_MTC(
   file << " ... for aspherical density:  " << setw(6) << end_aspherical - end_prune << " s" << endl;
   file << " ... for final preparation:   " << setw(6) << end1 - end_aspherical << " s" << endl;
   file << " ... for tsc calculation:     " << setw(6) << end - end1 << " s" << endl;
-#else
-  gettimeofday(&t2, 0);
-
-  double time2 = (1000000.0 * (t2.tv_sec - t1.tv_sec) + t2.tv_usec - t1.tv_usec) / 1000000.0;
-
-  if (time2 < 60) printf("Total Time: %4.1lf s\n", time2);
-  else if (time2 < 3600) printf("Total Time: %10.1lf m\n", time2 / 60);
-  else printf("Total Time: %10.1lf h\n", time2 / 3600);
-
 #endif
 
   return blocky;
