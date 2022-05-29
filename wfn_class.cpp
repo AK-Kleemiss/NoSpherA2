@@ -412,6 +412,7 @@ void WFN::read_known_wavefunction_format(string fileName, bool debug)
     if (debug) err_checkf(write_wfn("test.wfn", debug, false), "Problem writing test.wfn", std::cout);
   }
   else if (fileName.find(".xyz") != string::npos) origin = 7, err_checkf(read_xyz(fileName, cout, debug), "Problem reading xyz", std::cout);
+  else if (fileName.find(".molden") != string::npos) origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
   else err_checkf(false, "Unknown filetype!", std::cout);
 };
 
