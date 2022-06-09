@@ -2058,12 +2058,15 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
     precision = stoi(temp);
   }
   int digits = 0;
-  if (decimal_point != -1) {
-    digits = open_bracket - decimal_point - 1;
+  if (open_bracket != -1 && close_bracket != -1) {
+    if (decimal_point != -1) {
+      digits = open_bracket - decimal_point - 1;
+    }
+    else {
+      digits = close_bracket - open_bracket - 1;
+    }
+    result = abs(precision * pow(10, -digits));
+    return result;
   }
-  else {
-    digits = close_bracket - open_bracket - 1;
-  }
-  result = abs(precision * pow(10, -digits));
-  return result;
+  else return 0.001;
 };
