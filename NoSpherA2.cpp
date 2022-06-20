@@ -73,8 +73,10 @@ int main(int argc, char** argv)
   bool test = false;
   groups.resize(1);
   //This loop figures out command line options
+  vector<string> arguments;
   for (int i = 0; i < argc; i++) {
     temp = argv[i];
+    arguments.push_back(temp);
     if (temp.find("-") > 0) continue;
     if (temp.find("-wfn") < 1)
       wfn = argv[i + 1];
@@ -82,6 +84,10 @@ int main(int argc, char** argv)
       fchk = argv[i + 1];
     else if (temp.find("-b") < 1)
       basis_set = argv[i + 1];
+    else if (temp.find("-def") < 1)
+      def = calc = true;
+    else if (temp.find("-DEF") < 1)
+      def = calc = true;
     else if (temp.find("-d") < 1)
       basis_set_path = argv[i + 1];
     else if (temp.find("-hkl") < 1)
@@ -143,8 +149,6 @@ int main(int argc, char** argv)
       fract = true, fract_name = argv[i + 1];
     else if (temp.find("-HDEF") < 1)
       hdef = calc = true;
-    else if (temp.find("-def") < 1)
-      def = calc = true;
     else if (temp.find("-skpts") < 1)
       save_k_pts = true;
     else if (temp.find("-rkpts") < 1)
@@ -690,8 +694,10 @@ int main(int argc, char** argv)
     DEF.path = get_basename_without_ending(wavy[0].get_path()) + "_def.cube";
     Hirsh.path = get_basename_without_ending(wavy[0].get_path()) + "_hirsh.cube";
 
-    if (debug_main)
+    if (debug_main) {
+      log2 << "Status: " << hdef << def << hirsh << lap << eli << elf << rdg << esp << endl;
       log2 << "Everything is set up; starting calculation..." << endl;
+    }
 
     log2 << "Calculating for " << fixed << setprecision(0) << NbSteps[0] * NbSteps[1] * NbSteps[2] << " Gridpoints." << endl;
 
@@ -729,7 +735,7 @@ int main(int argc, char** argv)
         log2 << " ...done!" << endl;
       }
 
-      if (hdef)
+      if (hdef) {
         for (int a = 0; a < wavy[0].get_ncen(); a++) {
           log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
           HDEF.path = get_basename_without_ending(wavy[0].get_path()) + "_HDEF_" + to_string(a) + ".cube";
@@ -737,6 +743,7 @@ int main(int argc, char** argv)
           HDEF.write_file(wavy[0], true);
           HDEF.set_zero();
         }
+      }
 
       if (hirsh)
       {
@@ -810,7 +817,7 @@ int main(int argc, char** argv)
       MO.set_vector(2, 2, 0.141414);
       MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(i) + ".cube";
       log_file << "Calcualting MO " + to_string(i) + "...";
-      Calc_MO(MO,i, wavy[0], threads, 4.0, log_file);
+      Calc_MO(MO, i, wavy[0], threads, 4.0, log_file);
       log_file << " ...done!" << endl;
       //MO.write_file(wavy[0], true);
       string name("test.mo" + to_string(i) + "a.cube");
