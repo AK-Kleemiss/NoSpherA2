@@ -313,7 +313,6 @@ string get_basename_without_ending(const string& input)
 
 void write_template_confi()
 {
-  ofstream conf;
   string line;
   string programs = get_home_path();
   string filename = ".cuQCT.conf";
@@ -322,7 +321,7 @@ void write_template_confi()
     cout << "File already exist, do you want to overwrite it?" << endl;
     if (!yesno()) return;
   }
-  conf.open(programs.c_str(), ios::out);
+  ofstream conf(programs.c_str());
 #ifdef _WIN32
   conf << "gaussian=\"D:\\g09\\g09\\\"" << endl;
   conf << "turbomole=\"D:\\turbomole\\dscf7.1\\\"" << endl;
@@ -392,7 +391,7 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   conf.seekg(0);
   getline(conf, line);
   size_t length;
-  char tempchar[200];
+  char* tempchar = new char[200];
   int run = 0;
   int dump;
   while (!conf.eof()) {
@@ -1248,7 +1247,7 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f,
   d[1][0] = -0.5 / sqrt(3);
   d[1][3] = -0.5;
   //ZZ = SQRT(1/3) * D0
-  d[2][0] = sqrt(1.0/3.0);
+  d[2][0] = sqrt(1.0 / 3.0);
   //XY = D-2
   d[3][4] = 1.0;
   //XZ = D1
@@ -1263,15 +1262,15 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f,
   f.resize(10);
 #pragma omp parallel for
   for (int i = 0; i < 10; i++) {
-    f[i].resize(7,0.0);
+    f[i].resize(7, 0.0);
   }
   f[0][1] = -sqrt(0.025);
-  f[0][5] = -sqrt(1.0/24.0);
-  
-  f[1][2] = -sqrt(0.025);
-  f[1][6] = sqrt(1.0/24.0);
+  f[0][5] = -sqrt(1.0 / 24.0);
 
-  f[2][0] = sqrt(1.0/15.0);
+  f[1][2] = -sqrt(0.025);
+  f[1][6] = sqrt(1.0 / 24.0);
+
+  f[2][0] = sqrt(1.0 / 15.0);
 
   f[3][2] = -sqrt(0.025);
   f[3][6] = -sqrt(0.375);
@@ -1297,36 +1296,36 @@ bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f,
     g[i].resize(9, 0.0);
   }
   g[0][0] = 0.375 * sqrt(1.0 / 35.0);
-  g[0][3] = -0.25/sqrt(7);
+  g[0][3] = -0.25 / sqrt(7);
   g[0][7] = -0.125;
-  
+
   g[1][0] = g[0][0];
   g[1][3] = -g[0][3];
   g[1][7] = g[0][7];
-  
+
   g[2][0] = sqrt(1.0 / 35.0);
-  
+
   g[3][4] = -sqrt(1.0 / 28.0);
   g[3][8] = -0.5;
-  
+
   g[4][1] = -0.5 / sqrt(98.0 / 63.0);
-  g[4][5] = -1.0/sqrt(8.0);
-  
+  g[4][5] = -1.0 / sqrt(8.0);
+
   g[5][4] = g[3][4];
   g[5][8] = -g[3][8];
-  
+
   g[6][2] = g[4][1];
   g[6][6] = -g[4][5];
-  
-  g[7][1] = sqrt(2.0/7.0);
-  
+
+  g[7][1] = sqrt(2.0 / 7.0);
+
   g[8][2] = g[7][1];
-  
-  g[9][0] = 3.0/sqrt(560);
+
+  g[9][0] = 3.0 / sqrt(560);
   g[9][7] = 0.75;
 
-  g[10][0] = -3.0/sqrt(35);
-  g[10][3] = 1.5/sqrt(7);
+  g[10][0] = -3.0 / sqrt(35);
+  g[10][3] = 1.5 / sqrt(7);
 
   g[11][0] = g[10][0];
   g[11][3] = -g[10][3];
@@ -2052,7 +2051,7 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
   double result = 0;
   int precision = 1;
   int size_of_precision = 1;
-  if (open_bracket != -1 && close_bracket != -1){
+  if (open_bracket != -1 && close_bracket != -1) {
     size_of_precision = close_bracket - open_bracket - 1;
     string temp = given_string.substr(open_bracket + 1, size_of_precision);
     precision = stoi(temp);
