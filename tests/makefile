@@ -22,7 +22,7 @@ malbac_SF_ECP:
 		-hkl malbac.hkl \
 		-wfn malbac_ECP.molden \
 		-acc 1\
-		-ECP 0\
+		-ECP 1\
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
