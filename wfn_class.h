@@ -17,7 +17,7 @@ private:
   int nex;
   int charge;
   unsigned int multi;
-  int origin; //0=NOT_YET_DEFINED; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden
+  int origin; //0=NOT_YET_DEFINED; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
   double total_energy;
   double virial_ratio;
   std::string basis_set_name;
@@ -98,6 +98,7 @@ public:
   bool read_xyz(const std::string& filename, std::ofstream& file, const bool debug = false);
   bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_molden(const std::string& filename, std::ostream& file, const bool debug = false);
+  bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false);
   bool write_wfn(const std::string& fileName, const bool debug, const bool occupied);
   bool set_path(std::string given_path) { path = given_path; return true; };
   void print_primitive(const int nr);
@@ -122,7 +123,7 @@ public:
   void set_basis_set_name(const std::string input) { basis_set_name = input; };
   std::string get_path() { return path; };
   std::string hdr(const bool occupied);
-  void set_method(const std::string &input) { method = input; };
+  void set_method(const std::string& input) { method = input; };
   std::string get_method() { return method; };
   bool erase_atom(const int nr);
   void list_primitives();
@@ -174,7 +175,7 @@ public:
   int get_shell_start(const int nr_atom, const int nr_shell, const bool debug = false);
   int get_shell_start_in_primitives(const int nr_atom, const int nr_shell);
   int get_shell_end(const int nr_atom, const int nr_shell, const bool debug = false);
-  bool push_back_atom(const std::string &label, const double x, const double y, const double z, const int charge);
+  bool push_back_atom(const std::string& label, const double x, const double y, const double z, const int charge);
   //atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
   bool push_back_atom_basis_set(const int nr, const double exponent, const double coefficient, const int type, const int shell)
   {
@@ -182,7 +183,7 @@ public:
     else return false;
   };
   void print_atom_long(const int nr) { if (nr <= ncen && nr >= 0) atoms[nr].print_values_long(); };
-  int get_atom_charge(const int &nr) const;
+  int get_atom_charge(const int& nr) const;
   unsigned int get_atom_integer_mass(const unsigned int atomnr);
   double get_atom_real_mass(const int atomnr);
   //----------Calcualtion of Properties
