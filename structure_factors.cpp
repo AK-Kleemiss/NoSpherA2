@@ -385,10 +385,10 @@ void read_hkl(const string& hkl_filename,
     //if (debug) file << endl;
     hkl.emplace(hkl_);
   }
-  hkl_list_it found = hkl.find(vector<int> {0,0,0});
-  if(found != hkl.end()) {
+  hkl_list_it found = hkl.find(vector<int> {0, 0, 0});
+  if (found != hkl.end()) {
     if (debug) file << "popping back 0 0 0" << endl;
-    hkl.erase(vector<int>{0,0,0});
+    hkl.erase(vector<int>{0, 0, 0});
   }
   hkl_input.close();
   file << " done!\nNr of reflections read from file: " << hkl.size() << endl;
@@ -399,10 +399,10 @@ void read_hkl(const string& hkl_filename,
     for (const vector<int>& hkl__ : hkl)
       for (int i = 0; i < twin_law.size(); i++)
         hkl.emplace(vector<int>{
-          int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+        int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
           int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
           int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])
-        });
+      });
   }
   if (debug)
     file << "Number of reflections after twin: " << hkl.size() << endl;
@@ -513,17 +513,17 @@ void read_atoms_from_CIF(ifstream& cif_input,
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
         fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
-        if (debug) file << "label: " << setw(8) << fields[label_field] << " frac. pos: " 
-            << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
-            << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
-            << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+        if (debug) file << "label: " << setw(8) << fields[label_field] << " frac. pos: "
+          << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
+          << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
+          << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
         vector <double> position = unit_cell.get_coords_cartesian(
-          stod(fields[position_field[0]]), 
-          stod(fields[position_field[1]]), 
+          stod(fields[position_field[0]]),
+          stod(fields[position_field[1]]),
           stod(fields[position_field[2]]));
         vector <double> precisions = unit_cell.get_coords_cartesian(
-          get_decimal_precision_from_CIF_number(fields[position_field[0]]), 
-          get_decimal_precision_from_CIF_number(fields[position_field[1]]), 
+          get_decimal_precision_from_CIF_number(fields[position_field[0]]),
+          get_decimal_precision_from_CIF_number(fields[position_field[1]]),
           get_decimal_precision_from_CIF_number(fields[position_field[2]]));
         for (int i = 0; i < 3; i++) {
           precisions[i] = abs(precisions[i]);
@@ -542,18 +542,18 @@ void read_atoms_from_CIF(ifstream& cif_input,
           continue;
         }
         for (int i = 0; i < wave.get_ncen(); i++) {
-          if ( is_similar_abs(position[0], wave.atoms[i].x, max(min(precisions[0],1.0),0.01))
-            && is_similar_abs(position[1], wave.atoms[i].y, max(min(precisions[1],1.0),0.01))
-            && is_similar_abs(position[2], wave.atoms[i].z, max(min(precisions[2],1.0),0.01))) {
+          if (is_similar_abs(position[0], wave.atoms[i].x, max(min(precisions[0], 1.0), 0.01))
+            && is_similar_abs(position[1], wave.atoms[i].y, max(min(precisions[1], 1.0), 0.01))
+            && is_similar_abs(position[2], wave.atoms[i].z, max(min(precisions[2], 1.0), 0.01))) {
             string element = atnr2letter(wave.get_atom_charge(i));
             string label = fields[label_field];
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);
             std::transform(label.begin(), label.end(), label.begin(), asciitolower);
             if (debug) {
               file << "ASYM:  " << setw(8) << fields[label_field] << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
-                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
-                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].y << " "
-                  << fixed << setprecision(3) << setw(16) << wave.atoms[i].z << flush;
+                << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
+                << fixed << setprecision(3) << setw(16) << wave.atoms[i].y << " "
+                << fixed << setprecision(3) << setw(16) << wave.atoms[i].z << flush;
               if (input_groups.size() > 0) {
                 file << " checking disorder group: " << fields[group_field] << " vs. ";
                 for (int g = 0; g < input_groups.size(); g++)
@@ -1472,7 +1472,7 @@ int make_hirshfeld_grids(const int& pbc,
             type_list_number = j;
         if (debug && type_list_number != -1) {
           file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
-        } 
+        }
       }
       if (type_list_number == -1) {
 #pragma omp single
@@ -1570,7 +1570,7 @@ int make_hirshfeld_grids(const int& pbc,
   bool prune = true;
   if (prune) {
     file << "Pruning Grid..." << flush;
-    
+
 #pragma omp parallel for reduction(+:final_size)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
@@ -2118,10 +2118,10 @@ int make_hirshfeld_grids(const int& pbc,
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       if (abs(res) > cutoff) {
-        dens[i][run]=(res);
-        d1[i][run]=(total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-        d2[i][run]=(total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-        d3[i][run]=(total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+        dens[i][run] = (res);
+        d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
+        d2[i][run] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
+        d3[i][run] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
         run++;
       }
     }
@@ -2156,7 +2156,7 @@ void make_k_pts(const bool& read_k_pts,
     k_pt.resize(3);
 #pragma omp parallel for
     for (int i = 0; i < 3; i++)
-      k_pt[i].resize(size,0.0);
+      k_pt[i].resize(size, 0.0);
 
     if (debug)
       file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
@@ -2245,7 +2245,7 @@ void calc_SF(const int& points,
   //#else
 
   progress_bar* progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
-  const int step = max((int) floor(imax / 20), 1);
+  const int step = max((int)floor(imax / 20), 1);
   const int smax = k_pt[0].size();
   int pmax;
   double* dens_local, * d1_local, * d2_local, * d3_local;
@@ -2279,7 +2279,7 @@ void calc_SF(const int& points,
 void add_ECP_contribution(const vector <int>& asym_atom_list,
   const WFN& wave,
   vector<vector<complex<double>>>& sf,
-  const vector<vector<double>> &k_pt,
+  const vector<vector<double>>& k_pt,
   ofstream& file,
   const int& mode = 0,
   const bool debug = false)
@@ -2290,7 +2290,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
         << scientific << setw(14) << setprecision(8)
         << wave.atoms[asym_atom_list[i]].ECP_electrons
-        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k),2) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k), 2) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
 #pragma omp parallel for private(k)
     for (int s = 0; s < sf[0].size(); s++) {
@@ -2309,7 +2309,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
         << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug)
         << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
     }
-    
+
 #pragma omp parallel for private(k)
     for (int s = 0; s < sf[0].size(); s++) {
       k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
@@ -2755,7 +2755,7 @@ bool calculate_structure_factors_HF(
 #endif
   file << "Writing tsc file... " << flush;
   blocky.write_tscb_file();
-  blocky.write_tsc_file(cif);
+  //blocky.write_tsc_file(cif);
   file << " ... done!" << endl;
 
 #ifdef PEOJECT_NAME
@@ -2787,7 +2787,7 @@ tsc_block calculate_structure_factors_MTC(
 
 #endif
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-  err_checkf(exists(cif), "CIF " +cif+" does not exists!", file);
+  err_checkf(exists(cif), "CIF " + cif + " does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
