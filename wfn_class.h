@@ -87,15 +87,10 @@ public:
   void change_basis_set_name(std::string name) { basis_set_name = name; };
   bool add_primitive(int cent, int type, double e, double* values);
   bool add_exp(int cent, int type, double e);
-  void read_known_wavefunction_format(const std::string fileName, const bool debug = false);
-  void read_known_wavefunction_format(const std::string fileName, std::ofstream& file, const bool debug = false);
-  bool read_wfn(const std::string fileName, const bool debug = false);
-  bool read_wfn(const std::string fileName, const bool debug, std::ofstream& file);
-  bool read_wfx(const std::string fileName, const bool debug, std::ofstream& file);
+  void read_known_wavefunction_format(const std::string fileName, std::ostream& file, const bool debug = false);
+  bool read_wfn(const std::string fileName, const bool debug, std::ostream& file);
   bool read_wfx(const std::string fileName, const bool debug, std::ostream& file);
   bool read_fchk(const std::string& filename, std::ostream& log, const bool debug = false);
-  bool read_fchk(const std::string& filename, std::ofstream& log, const bool debug = false);
-  bool read_xyz(const std::string& filename, std::ofstream& file, const bool debug = false);
   bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_molden(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false);

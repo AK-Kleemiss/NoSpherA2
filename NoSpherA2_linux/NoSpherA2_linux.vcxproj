@@ -9,6 +9,10 @@
       <Configuration>Debug_Fractal</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug_gbw2wfn|x64">
+      <Configuration>Debug_gbw2wfn</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_IAM_SF|x64">
       <Configuration>Debug_IAM_SF</Configuration>
       <Platform>x64</Platform>
@@ -55,6 +59,10 @@
     </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_tsc_merge|x64">
       <Configuration>Debug_tsc_merge</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="D_gbw_SF|x64">
+      <Configuration>D_gbw_SF</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
     <ProjectConfiguration Include="Publish|x64">
