@@ -107,7 +107,6 @@ string MO::hdr()
     temp.append("    ");
     temp.append(to_string(occ));
     temp.append("  ORB. ENERGY =");
-    if (debug_mo) printf("MO occ lower than 2!");
   }
   if (ener<0 && ener>-10) {
     temp.append("   ");
