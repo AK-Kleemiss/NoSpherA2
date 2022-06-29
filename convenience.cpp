@@ -122,7 +122,11 @@ string atnr2letter(const int& nr)
     ,"Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn"
     ,"Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"
   };
-  if (nr > 113 || nr <= 0) {
+  if (nr == 0) {
+    //Exception for Q peaks in residual maps
+    return "Q";
+  }
+  if (nr > 113 || nr < 0) {
     if (nr == 119) {
       //Exception for Q in ECPs from ORCA
       return "Q";

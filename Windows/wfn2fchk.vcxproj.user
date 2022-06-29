@@ -11,8 +11,8 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">
-    <LocalDebuggerCommandArguments>-fractal Pd-OTf2-dppf_diff.cube</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>C:\Users\Florian\AppData\Roaming\Olex2Data\0e432fb3d57fe0fae1e32cfe1ccc90b3\samples\Pd-OTf2-dppf</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-fractal sucrose_diff.cube</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_fchk_SF\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">
