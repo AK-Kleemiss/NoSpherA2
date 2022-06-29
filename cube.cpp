@@ -222,7 +222,6 @@ bool cube::read_file(bool full, bool header, WFN& wave, bool expert) {
       cout << "This file ended before i read all expected values!" << endl;
       if (file.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (false);
     }
     file.close();
@@ -319,7 +318,6 @@ bool cube::read_file(bool full, bool header, bool expert) {
       cout << "This file ended before i read all expected values!" << endl;
       if (file.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (false);
     }
     file.close();
@@ -680,7 +678,6 @@ cube cube::operator+(cube& right) const {
       cout << "This file ended before i read all expected values!" << endl;
       if (file2.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (cube());
     }
     file2.close();
@@ -767,7 +764,6 @@ cube cube::operator-(cube& right) const {
       cout << "This file ended before i read all expected values!" << endl;
       if (file2.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (cube());
     }
     file2.close();
@@ -853,7 +849,6 @@ cube cube::operator*(cube& right) const {
       cout << "This file ended before i read all expected values!" << endl;
       if (file2.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (cube());
     }
     file2.close();
@@ -939,7 +934,6 @@ cube cube::operator/(cube& right) const {
       cout << "This file ended before i read all expected values!" << endl;
       if (file2.eof()) cout << "ENCOUNTERED EOF!" << endl;
       cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-      Enter();
       return (cube());
     }
     file2.close();

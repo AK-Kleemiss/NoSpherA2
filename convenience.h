@@ -34,7 +34,7 @@ class WFN;
 class cell;
 
 std::string help_message();
-std::string NoSpherA2_message();
+std::string NoSpherA2_message(bool no_date = false);
 //Constants for later use
 inline const int hardness = 3;
 inline const double cutoff = 1.0e-20;
@@ -83,7 +83,7 @@ constexpr double bohr2ang(const double& inp)
 
 inline double bohr2ang_p(const double& inp, const int p)
 {
-  return inp * pow(0.529177249,p);
+  return inp * pow(0.529177249, p);
 }
 
 constexpr double ang2bohr(const double& inp)
@@ -132,7 +132,6 @@ bool yesno();
 bool is_similar_rel(const double& first, const double& second, const double& tolerance);
 bool is_similar(const double& first, const double& second, const double& tolerance);
 bool is_similar_abs(const double& first, const double& second, const double& tolerance);
-void Enter();
 void cls();
 std::string get_home_path(void);
 void join_path(std::string& s1, std::string& s2);
@@ -141,19 +140,19 @@ inline char asciitolower(char in) {
     return in - ('Z' - 'z');
   return in;
 }
-inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& error_mesasge, std::ostream& log_file = std::cout)
+inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file = std::cout)
 {
   if (!condition) {
-    log_file << "Error at: " << file << ":" << line << " " << error_mesasge << std::endl;
+    log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
     exit(-1);
   }
 };
-inline void not_implemented(const std::string& file, const int& line, const std::string& error_mesasge, std::ostream& log_file) {
-  log_file << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+inline void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file) {
+  log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
   exit(-1);
 };
-#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, error_message, file)
-#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, error_message, file)
+#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
 
 bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
 bool generate_cart2sph_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
@@ -534,7 +533,7 @@ struct primitive
     );
   }
   primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
-  primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef){}
+  primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef) {}
 };
 
 typedef std::set<std::vector<int>> hkl_list;

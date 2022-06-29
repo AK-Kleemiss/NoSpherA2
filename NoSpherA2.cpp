@@ -62,6 +62,8 @@ int main(int argc, char** argv)
   bool binary_tsc = true;
   bool cif_based_combined_tsc_calc = false;
   bool density_test_cube = false;
+  bool no_date = false;
+  bool gbw2wfn = false;
   int hirsh_number = 0;
   double MinMax[6];
   double NbSteps[3];
@@ -72,87 +74,61 @@ int main(int argc, char** argv)
   bool all_mos = false;
   bool test = false;
   groups.resize(1);
-  //This loop figures out command line options
   vector<string> arguments;
+  //This loop figures out command line options
   for (int i = 0; i < argc; i++) {
     temp = argv[i];
     arguments.push_back(temp);
     if (temp.find("-") > 0) continue;
-    if (temp.find("-wfn") < 1)
-      wfn = argv[i + 1];
-    else if (temp.find("-fchk") < 1)
-      fchk = argv[i + 1];
+    if (temp.find("-acc") < 1)
+      accuracy = stoi(argv[i + 1]);
     else if (temp.find("-b") < 1)
       basis_set = argv[i + 1];
+    else if (temp.find("-cif") < 1)
+      cif = argv[i + 1];
+    else if (temp.find("-cpus") < 1)
+      threads = stoi(argv[i + 1]);
+    else if (temp.find("-cmtc") != string::npos) {
+      cif_based_combined_tsc_calc = true;
+      int n = 1;
+      string delimiter = ",";
+      groups.pop_back();
+      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+        combined_tsc_calc_files.push_back(argv[i + n]);
+        n++;
+        combined_tsc_calc_cifs.push_back(argv[i + n]);
+        n++;
+        const string temp = argv[i + n];
+        groups.push_back(split_string<int>(temp, delimiter));
+        n++;
+      }
+    }
     else if (temp.find("-def") < 1)
       def = calc = true;
     else if (temp.find("-DEF") < 1)
       def = calc = true;
     else if (temp.find("-d") < 1)
       basis_set_path = argv[i + 1];
-    else if (temp.find("-hkl") < 1)
-      hkl = argv[i + 1];
-    else if (temp.find("-cif") < 1)
-      cif = argv[i + 1];
-    else if (temp.find("-acc") < 1)
-      accuracy = stoi(argv[i + 1]);
-    else if (temp.find("-mult") < 1)
-      mult = stoi(argv[i + 1]);
-    else if (temp.find("-method") < 1)
-      method = argv[i + 1];
-    else if (temp.find("-cpus") < 1)
-      threads = stoi(argv[i + 1]);
-    else if (temp.find("-pbc") < 1)
-      pbc = stoi(argv[i + 1]);
-    else if (temp.find("-ED") < 1)
-      electron_diffraction = true;
     else if (temp.find("-ECP") < 1) {
       ECP = true;
       if (argc >= i + 2 && string(argv[i + 1]).find("-") != 0) {
         ECP_mode = stoi(argv[i + 1]);
       }
     }
-    else if (temp.find("-Olex2_1_3") < 1)
-      Olex2_1_3_switch = true;
-    else if (temp.find("-v2") < 1)
-      cout << "Turning on verbose mode 2!" << endl, debug_all = debug_main = true;
-    else if (temp.find("-v") < 1)
-      cout << "Turning on verbose mode!" << endl, debug_main = true;
-    else if (temp.find("-test") < 1)
-      cout << "Running in test mode!" << endl, test = true;
+    else if (temp.find("-ED") < 1)
+      electron_diffraction = true;
     else if (temp.find("-eli") < 1)
       calc = eli = true;
     else if (temp.find("-elf") < 1)
       calc = elf = true;
-    else if (temp.find("-lap") < 1)
-      calc = lap = true;
     else if (temp.find("-esp") < 1)
       calc = esp = true;
-    else if (temp.find("-rdg") < 1)
-      calc = rdg = true;
-    else if (temp.find("-rho_cube_test") != string::npos)
-      density_test_cube = true;
-    else if (temp.find("-hirsh") < 1)
-      calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
-    else if (temp.find("-resolution") < 1)
-      resolution = stod(argv[i + 1]);
-    else if (temp.find("-radius") < 1)
-      radius = stod(argv[i + 1]);
-    else if (temp.find("-MO") < 1) {
-      if (string(argv[i + 1]) != "all")
-        MOs.push_back(stoi(argv[i + 1]));
-      else
-        all_mos = true;
-      calc = true;
-    }
+    else if (temp.find("-fchk") < 1)
+      fchk = argv[i + 1];
     else if (temp.find("-fractal") < 1)
       fract = true, fract_name = argv[i + 1];
-    else if (temp.find("-HDEF") < 1)
-      hdef = calc = true;
-    else if (temp.find("-skpts") < 1)
-      save_k_pts = true;
-    else if (temp.find("-rkpts") < 1)
-      read_k_pts = true;
+    else if (temp.find("-gbw2wfn") < 1)
+      gbw2wfn = true;
     else if (temp.find("-group") < 1) {
       int n = 1;
       while (i + n < argc && string(argv[i + n]).find("-") == string::npos) {
@@ -165,23 +141,18 @@ int main(int argc, char** argv)
       }
       i += n;
     }
-    else if (temp.find("-twin") < 1) {
-      twin_law.resize(twin_law.size() + 1);
-      twin_law[twin_law.size() - 1].resize(9);
-      for (int twl = 0; twl < 9; twl++)
-        twin_law[twin_law.size() - 1][twl] = stod(argv[i + 1 + twl]);
-      if (debug_main) {
-        cout << "twin_law: ";
-        for (int twl = 0; twl < 9; twl++)
-          cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
-        cout << endl;
-      }
-      i += 9;
-    }
+    else if (temp.find("-HDEF") < 1)
+      hdef = calc = true;
+    else if (temp.find("-hirsh") < 1)
+      calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
+    else if (temp.find("-hkl") < 1)
+      hkl = argv[i + 1];
     else if (temp.find("-IAM") != string::npos)
       iam_switch = true;
-    else if (temp.find("-xyz") != string::npos)
-      xyz_file = argv[i + 1];
+    else if (temp.find("-lap") < 1)
+      calc = lap = true;
+    else if (temp.find("-method") < 1)
+      method = argv[i + 1];
     else if (temp.find("-merge") != string::npos) {
       vector<string> filenames;
       int n = 1;
@@ -202,6 +173,13 @@ int main(int argc, char** argv)
       merge_tscs_without_checks("combine", filenames, debug_all);
       return 0;
     }
+    else if (temp.find("-MO") < 1) {
+      if (string(argv[i + 1]) != "all")
+        MOs.push_back(stoi(argv[i + 1]));
+      else
+        all_mos = true;
+      calc = true;
+    }
     else if (temp.find("-mtc") != string::npos) {
       combined_tsc_calc = true;
       int n = 1;
@@ -215,20 +193,40 @@ int main(int argc, char** argv)
         n++;
       }
     }
-    else if (temp.find("-cmtc") != string::npos) {
-      cif_based_combined_tsc_calc = true;
-      int n = 1;
-      string delimiter = ",";
-      groups.pop_back();
-      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
-        combined_tsc_calc_files.push_back(argv[i + n]);
-        n++;
-        combined_tsc_calc_cifs.push_back(argv[i + n]);
-        n++;
-        const string temp = argv[i + n];
-        groups.push_back(split_string<int>(temp, delimiter));
-        n++;
+    else if (temp.find("-mult") < 1)
+      mult = stoi(argv[i + 1]);
+    else if (temp.find("-no-date") < 1)
+      no_date = true;
+    else if (temp.find("-Olex2_1_3") < 1)
+      Olex2_1_3_switch = true;
+    else if (temp.find("-pbc") < 1)
+      pbc = stoi(argv[i + 1]);
+    else if (temp.find("-radius") < 1)
+      radius = stod(argv[i + 1]);
+    else if (temp.find("-resolution") < 1)
+      resolution = stod(argv[i + 1]);
+    else if (temp.find("-rdg") < 1)
+      calc = rdg = true;
+    else if (temp.find("-rkpts") < 1)
+      read_k_pts = true;
+    else if (temp.find("-rho_cube_test") != string::npos)
+      density_test_cube = true;
+    else if (temp.find("-skpts") < 1)
+      save_k_pts = true;
+    else if (temp.find("-test") < 1)
+      cout << "Running in test mode!" << endl, test = true;
+    else if (temp.find("-twin") < 1) {
+      twin_law.resize(twin_law.size() + 1);
+      twin_law[twin_law.size() - 1].resize(9);
+      for (int twl = 0; twl < 9; twl++)
+        twin_law[twin_law.size() - 1][twl] = stod(argv[i + 1 + twl]);
+      if (debug_main) {
+        cout << "twin_law: ";
+        for (int twl = 0; twl < 9; twl++)
+          cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
+        cout << endl;
       }
+      i += 9;
     }
     else if (temp.find("-tscb") != string::npos) {
       string name = argv[i + 1];
@@ -237,22 +235,28 @@ int main(int argc, char** argv)
       blocky.write_tsc_file(name);
       return 0;
     }
+    else if (temp.find("-v2") < 1)
+      cout << "Turning on verbose mode 2!" << endl, debug_all = debug_main = true;
+    else if (temp.find("-v") < 1)
+      cout << "Turning on verbose mode!" << endl, debug_main = true;
+    else if (temp.find("-wfn") < 1) {
+      wfn = argv[i + 1];
+    }
+    else if (temp.find("-xyz") != string::npos) {
+      xyz_file = argv[i + 1];
+    }
   }
   if (threads != -1) {
     omp_set_num_threads(threads);
     omp_set_dynamic(0);
   }
-  //See if use wants help
+  //See if user wants help
   if (argc > 1) {
-    if (string(argv[1]).find("--help") != string::npos) {
-      cout << NoSpherA2_message() << help_message() << endl;
-      return 0;
-    }
     if (string(argv[1]).find("--h") != string::npos) {
       cout << NoSpherA2_message() << help_message() << endl;
       return 0;
     }
-    if (string(argv[1]).find("-help") != string::npos) {
+    if (string(argv[1]).find("-h") != string::npos) {
       cout << NoSpherA2_message() << help_message() << endl;
       return 0;
     }
@@ -274,14 +278,12 @@ int main(int argc, char** argv)
   if (combined_tsc_calc) {
     ofstream log_file("NoSpherA2.log", ios::out);
     auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(no_date);
     log_file.flush();
     err_checkf(hkl != "", "No hkl specified", log_file);
     err_checkf(exists(hkl), "hkl doesn't exist", log_file);
     err_checkf(cif != "", "No cif specified", log_file);
     err_checkf(exists(cif), "CIF doesn't exist", log_file);
-    //Make sure we have more than 2 files...
-    //err_checkf(combined_tsc_calc_files.size() > 1, "Need at least 2 wfn files", log_file);
     //First make sure all files exist
     for (int i = 0; i < combined_tsc_calc_files.size(); i++)
       err_checkf(exists(combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
@@ -368,17 +370,16 @@ int main(int argc, char** argv)
   if (cif_based_combined_tsc_calc) {
     ofstream log_file("NoSpherA2.log", ios::out);
     auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(no_date);
     log_file.flush();
     err_checkf(hkl != "", "No hkl specified", log_file);
     err_checkf(exists(hkl), "hkl doesn't exist", log_file);
-    //Make sure we have more than 2 files...
-    //err_checkf(combined_tsc_calc_files.size() > 1, "Need at least 2 wfn files", log_file);
     //First make sure all files exist
-    for (int i = 0; i < combined_tsc_calc_files.size(); i++)
+    err_checkf(combined_tsc_calc_files.size() == combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
+    for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
       err_checkf(exists(combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_files[i], log_file);
-    for (int i = 0; i < combined_tsc_calc_cifs.size(); i++)
       err_checkf(exists(combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + combined_tsc_calc_cifs[i], log_file);
+    }
 
     wavy.resize(combined_tsc_calc_files.size());
     for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
@@ -487,29 +488,25 @@ int main(int argc, char** argv)
 
     if (electron_diffraction && debug_main)
       log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-    if (cif != "" || hkl != "") {
-      if (debug_main)
-        log_file << "Entering Structure Factor Calculation!" << endl;
-      err_checkf(thakkar_sfac(hkl, cif, debug_main, log_file, groups[0], twin_law, wavy[0], threads, electron_diffraction), "Error during SF Calculation!", log_file);
-    }
+    if (debug_main)
+      log_file << "Entering Structure Factor Calculation!" << endl;
+    err_checkf(thakkar_sfac(hkl, cif, debug_main, log_file, groups[0], twin_law, wavy[0], threads, electron_diffraction), "Error during SF Calculation!", log_file);
     return 0;
   }
-  //This one has conversion to fchk and calcualtion of one singel tsc file
-  else if (hkl != "" || basis_set != "" || fchk != "") {
+  //This one has conversion to fchk and calculation of one single tsc file
+  if (hkl != "" && wfn != "") {
     ofstream log_file("NoSpherA2.log", ios::out);
     auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(no_date);
     //Lets print what was the command line, for debugging
     if (debug_main)
       for (int i = 0; i < argc; i++)
         log_file << argv[i] << endl;
-    err_checkf(argc >= 4, "Not enough arguments given, at least provide -wfn <FILENAME>.wfn/.wfx -b <basis_set>", log_file);
     if (debug_main) {
       log_file << "status:" << wfn << "&" << fchk << "&" << basis_set << "&" << basis_set_path << "&" << cif << "&" << hkl << "&" << groups.size();
       if (groups.size() != 0) log_file << "&" << groups[0].size();
       log_file << endl;
     }
-    err_checkf(wfn != "", "No wfn specified", log_file);
     wavy.push_back(WFN(0));
     log_file << "Reading: " << setw(44) << wfn << flush;
     wavy[0].read_known_wavefunction_format(wfn, log_file, debug_main);
@@ -518,11 +515,9 @@ int main(int argc, char** argv)
       wavy[0].set_has_ECPs(true);
     }
     log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
-    if (electron_diffraction)
-      log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
 
     if (basis_set != "" || fchk != "") {
-      //Make and fchk out of the wfn/wfx file
+      //Make a fchk out of the wfn/wfx file
       join_path(basis_set_path, basis_set);
       err_checkf(exists(basis_set_path), "Basis set file does not exist!", log_file);
       wavy[0].set_basis_set_name(basis_set_path);
@@ -546,11 +541,13 @@ int main(int argc, char** argv)
       free_fchk(log_file, outputname, "", wavy[0], debug_main, true);
     }
     if (cif != "" || hkl != "") {
-      // Calculate tsc fiel from given files
+      // Calculate tsc file from given files
       err_checkf(exists(hkl), "Hkl file doesn't exist!", log_file);
       err_checkf(exists(cif), "CIF doesn't exist!", log_file);
       if (debug_main)
         log_file << "Entering Structure Factor Calculation!" << endl;
+      if (electron_diffraction)
+        log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
       if (wavy[0].get_origin() != 7)
         err_checkf(calculate_structure_factors_HF(
           hkl,
@@ -936,6 +933,15 @@ int main(int argc, char** argv)
     err_checkf(abs(Ce_molden - Ce_ref) < 0.1, "Difference in Ce too big!", log_file);
     err_checkf(abs(Lu_molden - Lu_wfn) < 0.1, "Difference in Lu too big!", log_file);
     log_file << "All tests successfull!" << endl;
+    return 0;
+  }
+  if (gbw2wfn) {
+    ofstream log_file("NoSpherA2.log", ios::out);
+    err_checkf(wfn != "", "No Wavefunction given!", log_file);
+    err_checkf(exists(wfn), "Wavefunction dos not exist!", log_file);
+    wavy.push_back(WFN(9));
+    wavy[0].read_known_wavefunction_format(wfn);
+    wavy[0].write_wfn("converted.wfn", false, true);
     return 0;
   }
   cout << NoSpherA2_message() << "Did not understand the task to perform!\n" << help_message() << endl;

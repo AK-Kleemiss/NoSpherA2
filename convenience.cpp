@@ -21,19 +21,13 @@ bool yesno()
   return false;
 };
 
-void Enter()
-{
-  //cout << "press ENTER to continue... " << flush;
-  //cin.ignore();
-  //cin.get();
-};
-
 string help_message()
 {
   std::string t = "\n----------------------------------------------------------------------------\n";
   t.append("          These commands and arguments are known by NoSpherA2:\n");
   t.append("----------------------------------------------------------------------------\n\n");
-  t.append("   -wfn            <FILENAME>.wfn/wfx     Read the following file. (might even read fchk, not finally tested)\n");
+  t.append("   -wfn            <FILENAME>.xxx         Read the following wavefunction file.\n");
+  t.append("                                          Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; fch* (UNTESTED!)\n");
   t.append("   -fchk           <FILENAME>.fchk        Write a wavefunction to the given filename\n");
   t.append("   -b              <FILENAME>             Read this basis set\n");
   t.append("   -d              <PATH>                 Path to basis_sets directory with basis_sets in tonto style\n");
@@ -47,6 +41,8 @@ string help_message()
   t.append("   -xyz            <FILENAME>.xyz         Read atom positions from this xyz file for IAM\n");
   t.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
   t.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
+  t.append("   -gbw2wfn                               Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
+  t.append("   -tscb           <FILENAME>.tsb         Convert binary tsc file to bigger, less accurate human-readable form.\n");
   t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
   t.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
   t.append("   -merge          <List of .tsc files>   Names/Paths to .tsc files to be merged.\n");
@@ -62,7 +58,7 @@ string help_message()
   t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
   return t;
 }
-string NoSpherA2_message()
+string NoSpherA2_message(bool no_date)
 {
   string t = "    _   __     _____       __              ___   ___\n";
   t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
@@ -73,6 +69,9 @@ string NoSpherA2_message()
   t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
   t.append("Please give credit and cite corresponding pieces!\n");
   t.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
+  if (!no_date) {
+    t.append("This Executable was built on: " + string(__DATE__) + string(__TIME__) + "\n");
+  }
   return t;
 }
 
@@ -129,7 +128,6 @@ string atnr2letter(const int& nr)
       return "Q";
     }
     cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-113!" << endl;
-    Enter();
     return ("PROBLEM");
   }
   else return Labels[nr];

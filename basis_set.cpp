@@ -59,7 +59,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
     cout << "Number of elements in elements_list: " << elements_list.size() << endl;
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << endl;
-    Enter();
   }
   int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
@@ -68,7 +67,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
     elements_list[i].append(":");
     if (debug_dens) {
       cout << "after: " << elements_list[i] << " " << i << endl;
-      Enter();
     }
     //scan the tonto style basis set file for the entries we are looking or:
     string line;
@@ -114,11 +112,9 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
     if (debug_dens && line.find(elements_list[i]) != -1) {
       cout << "I found an entry i know from the element list!" << endl;
       cout << "The line is: " << line << endl;
-      Enter();
     }
     if (ifile.eof()) {
       cout << "Could not find the atom you were looking for in the basis set file... " << endl;
-      Enter();
       return false;
     }
     unsigned int shell = 0;
@@ -200,7 +196,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
             case 'S':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type S" << endl;
@@ -209,7 +204,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
             case 'P':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type P" << endl;
@@ -218,7 +212,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
             case 'D':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type D" << endl;
@@ -227,7 +220,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
             case 'F':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type F" << endl;
@@ -253,7 +245,6 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
   }//end for element_list.size()
   if (debug_dens) {
     cout << "FINISHED WITH READING BASIS SET!" << endl;
-    Enter();
   }
   ifile.close();
   return true;
@@ -309,7 +300,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     cout << "Number of elements in elements_list: " << elements_list.size() << endl;
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << "," << endl;
-    Enter();
   }
   int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
@@ -318,7 +308,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     elements_list[i].append(":");
     if (debug_dens) {
       cout << "after: " << elements_list[i] << " " << i << endl;
-      Enter();
     }
     //scan the tonto style basis set file for the entries we are looking or:
     string line;
@@ -363,11 +352,9 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     if (debug_dens && line.find(elements_list[i]) != -1) {
       cout << "I found an entry i know from the element list!" << endl;
       cout << "The line is: " << line << endl;
-      Enter();
     }
     if (ifile.eof()) {
       cout << "Could not find the atom you were looking for in the basis set file... " << endl;
-      Enter();
       return false;
     }
     unsigned int shell = 0;
@@ -375,7 +362,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
       getline(ifile, line);
       if (debug) {
         cout << "I read an additional line!" << endl;
-        //Enter();
       }
     }
     while (line.find("}") == string::npos && !ifile.eof()) {
@@ -424,7 +410,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
             case 'S':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type S" << endl;
@@ -433,7 +418,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
             case 'P':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type P" << endl;
@@ -442,7 +426,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
             case 'D':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type D" << endl;
@@ -451,7 +434,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
             case 'F':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type F" << endl;
@@ -477,7 +459,6 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
   }//end for element_list.size()
   if (debug_dens) {
     cout << "FINISHED WITH READING BASIS SET!" << endl;
-    Enter();
   }
   ifile.close();
   return true;
@@ -533,7 +514,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
     cout << "Number of elements in elements_list: " << elements_list.size() << endl;
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << endl;
-    Enter();
   }
   int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
@@ -542,7 +522,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
     elements_list[i].append(":");
     if (debug_dens) {
       cout << "after: " << elements_list[i] << " " << i << endl;
-      Enter();
     }
     //scan the tonto style basis set file for the entries we are looking or:
     string line;
@@ -587,11 +566,9 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
     if (debug_dens && line.find(elements_list[i]) != -1) {
       cout << "I found an entry i know from the element list!" << endl;
       cout << "The line is: " << line << endl;
-      Enter();
     }
     if (ifile.eof()) {
       cout << "Could not find the atom you were looking for in the basis set file... " << endl;
-      Enter();
       return false;
     }
     unsigned int shell = 0;
@@ -649,7 +626,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
             case 'S':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type S" << endl;
@@ -658,7 +634,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
             case 'P':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type P" << endl;
@@ -667,7 +642,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
             case 'D':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type D" << endl;
@@ -676,7 +650,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
             case 'F':
               if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell)) {
                 cout << "ERROR while pushing back atoms basis set" << endl;
-                Enter();
               }
               if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
                 << " and exp: " << temp[0] << " and type F" << endl;
@@ -702,7 +675,6 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
   }//end for element_list.size()
   if (debug_dens) {
     cout << "FINISHED WITH READING BASIS SET!" << endl;
-    Enter();
   }
   ifile.close();
   return true;
