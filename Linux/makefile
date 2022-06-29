@@ -1,9 +1,9 @@
-RM := rm
+RM := rm -f
 
 LIBS := -lgomp -static-libgcc -static-libstdc++
 #LIBS := -lgomp
 
-LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/10/libgomp.a
+LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 
 all: NoSpherA2
 
@@ -36,7 +36,7 @@ clean:
 	-${RM} NoSpherA2 ../NoSpherA2
 	-@echo ' '
 
-.PHONY: all clean dependents
+.PHONY: all
 .SECONDARY:
 
 

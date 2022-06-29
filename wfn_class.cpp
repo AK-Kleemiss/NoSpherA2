@@ -852,15 +852,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
 
 bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
 {
-  if (ncen > 0) {
-    file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
-    if (!yesno()) return false;
-    else file << "okay, carrying on then..." << endl;
-  }
-  if (exists(filename)) {
-    if (debug_wfn) file << "File is valid, continuing...\n";
-  }
-  else {
+  if (!exists(filename)) {
     file << "couldn't open or find " << filename << ", leaving" << endl;
     return false;
   }
@@ -892,10 +884,11 @@ bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
     if (debug) file << i << ".run, line:" << line << endl;
     dum_nr[i] = i;
     temp = split_string<string>(line, " ");
+    remove_empty_elements(temp);
     dum_label[i] = temp[0];
-    dum_x[i] = ang2bohr(stod(temp[2]));
-    dum_y[i] = ang2bohr(stod(temp[3]));
-    dum_z[i] = ang2bohr(stod(temp[4]));
+    dum_x[i] = ang2bohr(stod(temp[1]));
+    dum_y[i] = ang2bohr(stod(temp[2]));
+    dum_z[i] = ang2bohr(stod(temp[3]));
     dum_ch[i] = get_Z_from_label(dum_label[i].c_str()) + 1;
     if (debug) {
       file << "label:" << dum_label[i]
@@ -3918,6 +3911,7 @@ double WFN::compute_MO_spherical(
   const int& MO
 )
 {
+  err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
   err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   int iat;
   int l;
@@ -4058,6 +4052,7 @@ double WFN::compute_dens_spherical(
   const bool& add_ECP_dens
 )
 {
+  err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
   err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   std::fill(phi.begin(), phi.end(), 0.0);
   double Rho = 0.0;
