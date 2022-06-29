@@ -413,6 +413,7 @@ void WFN::read_known_wavefunction_format(string fileName, bool debug)
   }
   else if (fileName.find(".xyz") != string::npos) origin = 7, err_checkf(read_xyz(fileName, cout, debug), "Problem reading xyz", std::cout);
   else if (fileName.find(".molden") != string::npos) origin = 8, err_checkf(read_molden(fileName, cout, debug), "Problem reading molden file", std::cout);
+  else if (fileName.find(".gbw") != string::npos) origin = 9, err_checkf(read_gbw(fileName, cout, debug), "Problem reading gbw file", std::cout);
   else err_checkf(false, "Unknown filetype!", std::cout);
 };
 
@@ -427,6 +428,7 @@ void WFN::read_known_wavefunction_format(string fileName, ofstream& file, bool d
   }
   else if (fileName.find(".xyz") != string::npos) origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
   else if (fileName.find(".molden") != string::npos) origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
+  else if (fileName.find(".gbw") != string::npos) origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
   else err_checkf(false, "Unknown filetype!", file);
 };
 
@@ -506,7 +508,6 @@ bool WFN::read_wfn(string fileName, bool debug)
         << " charge: " << dum_ch[i] << endl;
     }
   }
-  if (debug) Enter();
   //------------------------------------ Read center assignements -------------------------------------------
   vector<unsigned int> dum_center;
   dum_center.resize(e_nex);
@@ -563,7 +564,6 @@ bool WFN::read_wfn(string fileName, bool debug)
   }
   if (debug) {
     cout << exnum << endl;
-    Enter();
   }
   if (exnum < e_nex) {
     printf("We have a problem adding center assignements!\n");
@@ -827,20 +827,11 @@ bool WFN::read_wfn(string fileName, bool debug)
   for (int i = 0; i < e_nuc; i++) if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) cout << "Error while making atoms!!\n";
   if (debug) {
     cout << "Starting to check whether it is bohr or Angstrom input!" << endl;
-    Enter();
   }
-  /*if(check_bohr(*this, debug)){
-    for(int i=0; i<e_nuc; i++){
-      atoms[i].x=atoms[i].x*0.529177;
-      atoms[i].y=atoms[i].y*0.529177;
-      atoms[i].z=atoms[i].z*0.529177;
-    }
-  }*/
   for (int j = 0; j < e_nex; j++) {
     //if(debug_wfn_deep) cout << j;
     if (!add_exp(dum_center[j], dum_type[j], dum_exp[j])) {
       cout << "Error while making primitive!!\n";
-      Enter();
     }
   }
   for (int i = 0; i < e_nmo; i++) {
@@ -848,12 +839,10 @@ bool WFN::read_wfn(string fileName, bool debug)
       //if(debug_wfn_deep) cout << "temp value: " << temp_val[i][j] << "  ";
       if (!MOs[i].push_back_coef(temp_val[i][j], nex)) {
         cout << "Error while writing MO coefficients...\n";
-        Enter();
       }
     }
     //if(debug_wfn_deep) cout << endl << endl;
   }
-  if (debug) Enter();
   return true;
 };
 
@@ -889,7 +878,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
   stream >> header_tmp >> e_nmo >> header_tmp >> header_tmp >> e_nex >> header_tmp >> e_nuc;
   if (debug) {
     file << "e_nmo: " << e_nmo << ", e_nex: " << e_nex << ", e_nuc : " << e_nuc << endl;
-    Enter();
   }
   //----------------------------- Read Atoms ------------------------------------------------------------
   vector<unsigned int> dum_nr, dum_ch;
@@ -933,7 +921,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
         << " charge: " << dum_ch[i] << endl;
     }
   }
-  if (debug) Enter();
   //------------------------------------ Read center assignements -------------------------------------------
   vector<unsigned int> dum_center;
   dum_center.resize(e_nex);
@@ -990,7 +977,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
   }
   if (debug) {
     file << exnum << endl;
-    Enter();
   }
   if (exnum < e_nex) {
     file << "We have a problem adding center assignements!\n";
@@ -1264,7 +1250,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
   for (int i = 0; i < e_nuc; i++) if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
   if (debug) {
     file << "Starting to check whether it is bohr or Angstrom input!" << endl;
-    Enter();
   }
   /*if(check_bohr(*this, debug)){
     for(int i=0; i<e_nuc; i++){
@@ -1277,7 +1262,6 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
     //if(debug_wfn_deep) file << j;
     if (!add_exp(dum_center[j], dum_type[j], dum_exp[j])) {
       file << "Error while making primitive!!\n";
-      Enter();
     }
   }
   for (int i = 0; i < e_nmo; i++) {
@@ -1285,12 +1269,10 @@ bool WFN::read_wfn(string fileName, bool debug, ofstream& file)
       //if(debug_wfn_deep) file << "temp value: " << temp_val[i][j] << "  ";
       if (!MOs[i].push_back_coef(temp_val[i][j], nex)) {
         file << "Error while writing MO coefficients...\n";
-        Enter();
       }
     }
     //if(debug_wfn_deep) file << endl << endl;
   }
-  if (debug) Enter();
   return true;
 };
 
@@ -2345,7 +2327,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   vector<vector<int>> irreps(operators);
   vector<vector<int>> cores(operators);
   for (int i = 0; i < operators; i++) {
-    coefficients[i].resize(dimension);
+    coefficients[i].resize(dimension * dimension);
     occupations[i].resize(dimension);
     energies[i].resize(dimension);
     irreps[i].resize(dimension);
@@ -2356,7 +2338,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     rf.read((char*)irreps[i].data(), 4 * dimension);
     rf.read((char*)cores[i].data(), 4 * dimension);
     for (int j = 0; j < dimension; j++) {
-      push_back_MO(i + 1, occupations[i][j], energies[i][j]);
+      push_back_MO(j + 1, occupations[i][j], energies[i][j]);
       int run_coef = 0;
       int p_run = 0;
       int d_run = 0;
@@ -2391,7 +2373,12 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
             if (MO_run == 0) {
               push_back_exponent(prims[basis_run + s].exp);
               push_back_center(prims[basis_run].center);
-              push_back_type(prims[basis_run].type + p_run);
+              if (p_run == 0)
+                push_back_type(prims[basis_run].type + 2);
+              else if (p_run == 1)
+                push_back_type(prims[basis_run].type);
+              else if (p_run == 2)
+                push_back_type(prims[basis_run].type + 1);
               nex++;
             }
           }
@@ -2554,7 +2541,6 @@ vector<double> WFN::get_norm_const(ofstream& file, bool debug)
         break;
       case -1:
         cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
-        Enter();
         break;
       }
     }
@@ -2565,7 +2551,6 @@ vector<double> WFN::get_norm_const(ofstream& file, bool debug)
       int type_temp = get_shell_type(a, s);
       if (type_temp == -1) {
         cout << "ERROR in type assignement!!" << endl;
-        Enter();
       }
       if (debug) {
         cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl;
@@ -3142,7 +3127,6 @@ double WFN::get_DM(int nr)
   if (nr >= 0 && nr < DensityMatrix.size()) return DensityMatrix[nr];
   else {
     cout << "Requested nr out of range! Size: " << DensityMatrix.size() << " nr: " << nr << endl;
-    Enter();
     return -1;
   }
 };
@@ -3169,7 +3153,6 @@ double WFN::get_SDM(int nr)
   if (nr >= 0 && nr < SpinDensityMatrix.size()) return SpinDensityMatrix[nr];
   else {
     cout << "Requested nr out of range! Size: " << SpinDensityMatrix.size() << " nr: " << nr << endl;
-    Enter();
     return -1;
   }
 };
@@ -3192,7 +3175,6 @@ int WFN::check_order(bool debug)
     if (!get_atom_basis_set_loaded(i)) {
       cout << "Sorry, consistency check only works if basis set is loaded for all atoms!" << endl
         << "Failing atom: " << i << " " << get_atom_label(i) << endl;
-      Enter();
       return -1;
     }
   }
@@ -3210,7 +3192,6 @@ int WFN::check_order(bool debug)
             order = -1;
             if (debug) {
               cout << "This should not happen, the order of your file is not ok for S-types! Checked #:" << primcounter << endl;
-              Enter();
               return -1;
             }
           }
@@ -3225,7 +3206,6 @@ int WFN::check_order(bool debug)
                 || types[primcounter + 2 * get_atom_shell_primitives(a, s)] != 4) {
                 if (debug) {
                   cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
-                  Enter();
                 }
                 return -1;
               }
@@ -3238,7 +3218,6 @@ int WFN::check_order(bool debug)
               if (types[primcounter] != 2 || types[primcounter + 1] != 3 || types[primcounter + 2] != 4) {
                 if (debug) {
                   cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
-                  Enter();
                 }
                 return -1;
               }
@@ -3251,7 +3230,6 @@ int WFN::check_order(bool debug)
               if (types[primcounter] != 4 || types[primcounter + 1] != 2 || types[primcounter + 2] != 3) {
                 if (debug) {
                   cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
-                  Enter();
                 }
                 return -1;
               }
@@ -3263,7 +3241,6 @@ int WFN::check_order(bool debug)
           if (types[primcounter] == 2) {
             if (debug && a == 0) {
               cout << "Seems to be either tonto or gaussian file..." << endl;
-              Enter();
             }
             order = 1;
             if (types[primcounter + 1] == 3) {
@@ -3271,7 +3248,6 @@ int WFN::check_order(bool debug)
               order_found = true;
               if (debug) {
                 cout << "This wfn file is in tonto order!" << endl;
-                Enter();
               }
             }
             else if (types[primcounter + 1] == 2 && get_atom_shell_primitives(a, s) > 1) {
@@ -3279,7 +3255,6 @@ int WFN::check_order(bool debug)
               order_found = true;
               if (debug) {
                 cout << "This wfn file is in gaussian order!" << endl;
-                Enter();
               }
             }
             else {
@@ -3288,20 +3263,17 @@ int WFN::check_order(bool debug)
               if (debug) {
                 cout << "Either some error or this shell only has 1 p-primitive and "
                   << "i didn't find any order yet... assuming gaussian" << endl;
-                Enter();
               }
             }
           }
           else if (types[primcounter] == 4) {
             if (debug && a == 0) {
               cout << "Seems as if this file was ORCA ordered..." << endl;
-              Enter();
             }
             order = 3;
             if (types[primcounter + 1] == 2) {
               if (debug) {
                 cout << "Yep, that's right! making it permanent now!" << endl;
-                Enter();
               }
               order_found = true;
             }
@@ -3309,7 +3281,6 @@ int WFN::check_order(bool debug)
           else {
             order = -1;
             cout << "I can't recognize this order of the .wfn file..." << endl;
-            Enter();
             return -1;
           }
           s--;
@@ -3332,7 +3303,6 @@ int WFN::check_order(bool debug)
                     << types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i] << " "
                     << types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i] << " "
                     << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << endl;
-                  Enter();
                   return -1;
                 }
                 cout << "Something seems to be wrong in the order of your D-Types..." << endl;
@@ -3356,7 +3326,6 @@ int WFN::check_order(bool debug)
                     << types[get_shell_start_in_primitives(a, s) + 3 + 6 * i] << " "
                     << types[get_shell_start_in_primitives(a, s) + 4 + 6 * i] << " "
                     << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << endl;
-                  Enter();
                   return -1;
                 }
                 cout << "Something seems to be wrong in the order of your D-Types..." << endl;
@@ -3396,7 +3365,6 @@ int WFN::check_order(bool debug)
                   << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
                   << types[primcounter + 9] << endl;
                 cout << "Something seems to be wrong in the order of your F-Types..." << endl;
-                Enter();
                 return -1;
               }
             }
@@ -3413,7 +3381,6 @@ int WFN::check_order(bool debug)
         break;
       default:
         cout << "ERROR in type assignement!!" << endl;
-        Enter();
         return -1;
         break;
 
@@ -3479,7 +3446,6 @@ bool WFN::sort_wfn(int order, bool debug)
               for (int m = 0; m < nmo; m++)
                 if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
                   cout << "Error while assigning new MO coefficient!" << endl;
-                  Enter();
                   return false;
                 }
             }
@@ -3513,7 +3479,6 @@ bool WFN::sort_wfn(int order, bool debug)
               for (int m = 0; m < nmo; m++)
                 if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
                   cout << "Error while assigning new MO coefficient!" << endl;
-                  Enter();
                   return false;
                 }
             }
@@ -3547,7 +3512,6 @@ bool WFN::sort_wfn(int order, bool debug)
               for (int m = 0; m < nmo; m++)
                 if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
                   cout << "Error while assigning new MO coefficient!" << endl;
-                  Enter();
                   return false;
                 }
             }
@@ -3560,7 +3524,6 @@ bool WFN::sort_wfn(int order, bool debug)
   case 2:
     if (debug) {
       cout << "Nothing to be done here, i like tonto type..." << endl;
-      Enter();
     }
     break;
   case 3:
@@ -3589,7 +3552,6 @@ bool WFN::sort_wfn(int order, bool debug)
               for (int m = 0; m < nmo; m++)
                 if (!MOs[m].change_coefficient(primcounter + j, MOs[m].get_coefficient(primcounter + 1 + j, false), false)) {
                   cout << "Error while assigning new MO coefficient!" << endl;
-                  Enter();
                   return false;
                 }
             }
@@ -3599,7 +3561,6 @@ bool WFN::sort_wfn(int order, bool debug)
             for (int m = 0; m < nmo; m++)
               if (!MOs[m].change_coefficient(primcounter + 2, temp_MO_coefficients[m], false)) {
                 cout << "Error while assigning new MO coefficient!" << endl;
-                Enter();
                 return false;
               }
             primcounter += 3;
@@ -3618,8 +3579,6 @@ bool WFN::sort_wfn(int order, bool debug)
     break;
   default:
     cout << "order type: " << f_order << " " << order << " not supported!" << endl;
-    Enter();
-    Enter();
     return false;
     break;
   }
@@ -3720,12 +3679,10 @@ bool WFN::sort_wfn(int order, bool debug)
   case 0:
     if (debug) {
       cout << "There seems to be no f-functions!" << endl;
-      Enter();
     }
     break;
   default:
     cout << "f-order type: " << f_order << " not supported!" << endl;
-    Enter();
     return false;
     break;
   }
@@ -3980,7 +3937,6 @@ unsigned int WFN::get_atom_integer_mass(unsigned int atomnr)
    132,137,139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222 };
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << endl;
-    Enter();
     return 0;
   }
   if (get_atom_charge(atomnr) <= 0) {
@@ -4002,7 +3958,6 @@ double WFN::get_atom_real_mass(int atomnr)
   //---1.&2. Group--------------------------------------------------------------------Lanthanoides and Actinoides--------------------------------------------------Transition metals----------------------------------------------------p-block elements
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << endl;
-    Enter();
     return 0;
   }
   if (get_atom_charge(atomnr) <= 0) {

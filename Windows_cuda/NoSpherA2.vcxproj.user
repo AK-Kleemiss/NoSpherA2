@@ -5,12 +5,23 @@
     <LocalDebuggerWorkingDirectory>E:\temp\epoxide</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_gbw2wfn|x64'">
+    <LocalDebuggerCommandArguments>-cif .\olex2\Wfn_job\epoxide.cif -asym_cif .\olex2\Wfn_job\epoxide.cif -wfn .\olex2\Wfn_job\epoxide.wfn -hkl .\olex2\Wfn_job\epoxide.hkl -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>E:\temp\epoxide</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">
     <LocalDebuggerCommandArguments>-cif .\olex2\Wfn_job\epoxide.cif -asym_cif .\olex2\Wfn_job\epoxide.cif -wfn .\olex2\Wfn_job\epoxide.wfn -hkl .\olex2\Wfn_job\epoxide.hkl -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>E:\temp\epoxide</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
+    <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">
     <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>

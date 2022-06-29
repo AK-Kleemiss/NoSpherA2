@@ -1,0 +1,102 @@
+data_epoxide
+_audit_creation_method            
+ 'Olex2: Jun 20 2022 10:33:58 MSC:193231329 on WIN64, Python: 3.8.6, wxWidgets: 3.1.5'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C2 H4 O'
+_chemical_formula_sum              'C2 H4 O'
+_chemical_formula_weight           44.05
+_chemical_melting_point            ?
+_space_group_crystal_system        'monoclinic'
+_space_group_IT_number             14
+_space_group_name_H-M_alt          'P 1 21/n 1'
+_space_group_name_Hall             '-P 2yn'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+ 2 1/2-X,1/2+Y,1/2-Z
+ 3 -X,-Y,-Z
+ 4 1/2+X,1/2-Y,1/2+Z
+
+_cell_length_a                     4.633(5)
+_cell_length_b                     8.400(1)
+_cell_length_c                     6.577(3)
+_cell_angle_alpha                  90
+_cell_angle_beta                   100.37(6)
+_cell_angle_gamma                  90
+_cell_volume                       251.8(3)
+_cell_formula_units_Z              4
+_diffrn_reflns_av_R_equivalents    0.0000
+_diffrn_reflns_av_unetI/netI       0.0400
+_diffrn_reflns_limit_h_max         6
+_diffrn_reflns_limit_h_min         -9
+_diffrn_reflns_limit_k_max         16
+_diffrn_reflns_limit_k_min         0
+_diffrn_reflns_limit_l_max         13
+_diffrn_reflns_limit_l_min         -6
+_diffrn_reflns_number              2081
+_diffrn_reflns_theta_max           45.00
+_diffrn_reflns_theta_min           3.98
+_diffrn_ambient_temperature        ?
+_diffrn_radiation_wavelength       0.71068
+_reflns_number_total               2081
+_refine_diff_density_max           0.19
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ O1 O 0.11641(6) 0.83111(3) 0.12468(4) 0.02958(7) Uani 1 . 1 .
+ C2 C 0.14850(8) 0.93865(4) 0.29592(5) 0.02826(7) Uani 1 . 1 .
+ H2a H 0.2832(16) 0.8925(8) 0.4371(10) 0.0585(19) Uani 1 . 1 .
+ H2b H 0.1748(15) 1.0634(7) 0.2569(10) 0.0504(18) Uani 1 . 1 .
+ C3 C -0.13428(9) 0.86467(5) 0.21809(6) 0.03225(8) Uani 1 . 1 .
+ H3a H -0.3066(16) 0.9323(9) 0.1213(11) 0.063(2) Uani 1 . 1 .
+ H3b H -0.2068(16) 0.7672(9) 0.3035(12) 0.067(2) Uani 1 . 1 .
+
+loop_
+  _atom_site_aniso_label
+  _atom_site_aniso_U_11
+  _atom_site_aniso_U_22
+  _atom_site_aniso_U_33
+  _atom_site_aniso_U_23
+  _atom_site_aniso_U_13
+  _atom_site_aniso_U_12
+ O1 0.03537(13) 0.02549(10) 0.02955(11) -0.00349(8) 0.01030(9) 0.00302(9)
+ C2 0.03275(16) 0.02496(12) 0.02714(13) -0.00195(10) 0.00554(11) 0.00035(11)
+ H2a 0.069(5) 0.059(5) 0.040(4) -0.001(4) -0.009(4) 0.017(4)
+ H2b 0.065(5) 0.031(3) 0.057(4) -0.004(3) 0.016(4) -0.011(3)
+ C3 0.03111(16) 0.03360(15) 0.03421(16) 0.00013(12) 0.01173(13) -0.00362(12)
+ H3a 0.040(4) 0.097(6) 0.050(4) 0.011(4) -0.002(3) 0.021(4)
+ H3b 0.068(5) 0.060(4) 0.077(5) 0.005(5) 0.027(5) -0.026(4)
+
+loop_
+  _geom_bond_atom_site_label_1
+  _geom_bond_atom_site_label_2
+  _geom_bond_distance
+  _geom_bond_site_symmetry_2
+  _geom_bond_publ_flag
+ O1 C2 1.4305(6) . ?
+ O1 C3 1.4362(13) . ?
+ C3 C2 1.4571(14) . ?
+
+loop_
+  _geom_angle_atom_site_label_1
+  _geom_angle_atom_site_label_2
+  _geom_angle_atom_site_label_3
+  _geom_angle
+  _geom_angle_site_symmetry_1
+  _geom_angle_site_symmetry_3
+  _geom_angle_publ_flag
+ C2 O1 C3 61.10(5) . . ?
+ O1 C2 C3 59.64(5) . . ?
+ O1 C3 C2 59.26(6) . . ?
+

@@ -11,9 +11,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NoSpherA2CUDA", "..\Windows
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		D_gbw_SF|x64 = D_gbw_SF|x64
 		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
 		Debug_Fchk|x64 = Debug_Fchk|x64
 		Debug_Fractal|x64 = Debug_Fractal|x64
+		Debug_gbw2wfn|x64 = Debug_gbw2wfn|x64
 		Debug_grown|x64 = Debug_grown|x64
 		Debug_IAM_SF|x64 = Debug_IAM_SF|x64
 		Debug_Molden|x64 = Debug_Molden|x64
@@ -31,12 +33,16 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_gbw_SF|x64.ActiveCfg = D_gbw_SF|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_gbw_SF|x64.Build.0 = D_gbw_SF|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fchk|x64.ActiveCfg = Debug_Fchk|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fchk|x64.Build.0 = Debug_Fchk|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.Build.0 = Debug_Fractal|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_gbw2wfn|x64.ActiveCfg = Debug_gbw2wfn|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_gbw2wfn|x64.Build.0 = Debug_gbw2wfn|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_grown|x64.ActiveCfg = Debug_grown|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_grown|x64.Build.0 = Debug_grown|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_IAM_SF|x64.ActiveCfg = Debug_IAM_SF|x64
@@ -67,9 +73,12 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|x64.Build.0 = Publish|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.ActiveCfg = Release|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.Build.0 = Release|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.D_gbw_SF|x64.ActiveCfg = D_gbw_SF|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.D_gbw_SF|x64.Deploy.0 = D_gbw_SF|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Fchk|x64.ActiveCfg = Debug_Fchk|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_gbw2wfn|x64.ActiveCfg = Debug_gbw2wfn|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_grown|x64.ActiveCfg = Debug_Fchk|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_IAM_SF|x64.ActiveCfg = Debug_Fchk|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_Molden|x64.ActiveCfg = Debug_PDF|x64
@@ -86,9 +95,11 @@ Global
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tscb|x64.ActiveCfg = Debug_tscb|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Publish|x64.ActiveCfg = Release|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Release|x64.ActiveCfg = Release|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_gbw_SF|x64.ActiveCfg = D_gbw_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|x64.ActiveCfg = Debug_Fractal|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fchk|x64.ActiveCfg = Debug|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_gbw2wfn|x64.ActiveCfg = Debug_gbw2wfn|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_grown|x64.ActiveCfg = Debug_Co110_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_IAM_SF|x64.ActiveCfg = Debug_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Molden|x64.ActiveCfg = Debug_Molden|x64
