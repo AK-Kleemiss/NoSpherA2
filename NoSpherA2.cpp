@@ -290,7 +290,7 @@ int main(int argc, char** argv)
 
     wavy.resize(combined_tsc_calc_files.size());
     for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
-      wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
+      wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i], log_file);
       if (ECP) {
         wavy[i].set_has_ECPs(true);
       }
@@ -384,7 +384,7 @@ int main(int argc, char** argv)
     wavy.resize(combined_tsc_calc_files.size());
     for (int i = 0; i < combined_tsc_calc_files.size(); i++) {
       log_file << "Reading: " << setw(44) << combined_tsc_calc_files[i] << flush;
-      wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i]);
+      wavy[i].read_known_wavefunction_format(combined_tsc_calc_files[i], log_file);
       if (ECP) {
         wavy[i].set_has_ECPs(true);
       }
@@ -940,7 +940,7 @@ int main(int argc, char** argv)
     err_checkf(wfn != "", "No Wavefunction given!", log_file);
     err_checkf(exists(wfn), "Wavefunction dos not exist!", log_file);
     wavy.push_back(WFN(9));
-    wavy[0].read_known_wavefunction_format(wfn);
+    wavy[0].read_known_wavefunction_format(wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, true);
     return 0;
   }
