@@ -420,7 +420,7 @@ void WFN::read_known_wavefunction_format(string fileName, ostream& file, bool de
   else err_checkf(false, "Unknown filetype!", file);
 };
 
-bool WFN::read_wfn(string fileName, bool debug, ostream& file)
+bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
 {
   if (ncen > 0) {
     file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
@@ -514,7 +514,7 @@ bool WFN::read_wfn(string fileName, bool debug, ostream& file)
         dump = sscanf(tempchar, "%d", &dum_center[exnum]);
         if (debug) file << dum_center[exnum] << " ";
         if (dum_center[exnum] > e_nuc) {
-          printf("this center doesn't exist.. some weird problem!\n");
+          cout << "this center doesn't exist.. some weird problem!\n";
           return false;
         }
         exnum++;
@@ -914,7 +914,7 @@ bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
   return true;
 };
 
-bool WFN::read_wfx(string fileName, bool debug, ostream& file)
+bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
 {
   if (exists(fileName)) {
     if (debug)
@@ -1956,13 +1956,13 @@ double WFN::get_atom_coordinate(int nr, int axis, bool debug)
   }
 };
 
-bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
+bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupied)
 {
   if (debug) {
     debug_wfn = true;
     debug_wfn_deep = true;
     if (exists(fileName)) {
-      printf("File already existed, do you want to overwrite it?");
+      cout << "File already existed, do you want to overwrite it?";
       if (!yesno()) return false;
     }
     else {
@@ -2010,7 +2010,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     for (int j = 0; j < 20; j++) {
       rf << setw(3) << centers[exnum];
       if (exnum > nex) {
-        printf("run is too big in center writing");
+        cout << "run is too big in center writing";
         if (debug_wfn) cout << "in 20er-lines...\n";
         return false;
       }
@@ -2025,7 +2025,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     for (int j = 0; j < nex % 20; j++) {
       rf << setw(3) << centers[exnum];
       if (exnum > nex) {
-        printf("run is too big in center writing");
+        cout << "run is too big in center writing";
         if (debug_wfn) cout << " in last line... trying to access # " << exnum << "\n";
         return false;
       }
@@ -2034,7 +2034,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     rf << '\n';
   }
   if (run * 20 < nex / 20 - 1) {
-    printf("Problem during writing of Centre assignments... stopping...\n");
+    cout << "Problem during writing of Centre assignments... stopping...\n";
     return false;
   }
   if (debug_wfn) cout << "center assignements written, now for the types..\n";
@@ -2045,7 +2045,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     for (int j = 0; j < 20; j++) {
       rf << setw(3) << types[exnum];
       if (exnum > nex) {
-        printf("run is too big in types writing\n");
+        cout << "run is too big in types writing\n";
         return false;
       }
       exnum++;
@@ -2059,7 +2059,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     for (int j = 0; j < nex % 20; j++) {
       rf << setw(3) << types[exnum];
       if (exnum > nex) {
-        printf("run is too big in types writing");
+        cout << "run is too big in types writing";
         return false;
       }
       final_j = j;
@@ -2069,7 +2069,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     rf << '\n';
   }
   if (run * 20 < nex / 20 - 1) {
-    printf("Problem during writing of Type assignments... stopping...");
+    cout << "Problem during writing of Type assignments... stopping...";
     return false;
   }
   if (debug_wfn) cout << "types assignements written, now for the exponents..\n";
@@ -2084,7 +2084,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
       temp = stream.str();
       rf << temp;
       if (exnum > nex) {
-        printf("run is too big in exponents writing");
+        cout << "run is too big in exponents writing";
         return false;
       }
       exnum++;
@@ -2101,7 +2101,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
       temp = stream.str();
       rf << temp;
       if (run > nex) {
-        printf("run is too big in exponents writing");
+        cout << "run is too big in exponents writing";
         return false;
       }
       exnum++;
@@ -2109,7 +2109,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     rf << '\n';
   }
   if (run * 5 < nex / 5 - 1) {
-    printf("Problem during writing of Exponents... stopping...");
+    cout << "Problem during writing of Exponents... stopping...";
     return false;
   }
   if (debug_wfn) cout << "exponents assignements written, now for the MOs.." << endl << "For informational purposes: ncen "
@@ -2155,7 +2155,7 @@ bool WFN::write_wfn(const string& fileName, bool debug, bool occupied)
     mo_run++;
   }
   if (run != nex) {
-    printf("Problem during writing of MOs... stopping...");
+    cout << "Problem during writing of MOs... stopping...";
     if (debug_wfn_deep) cout << "run: " << run << endl;
     return false;
   }

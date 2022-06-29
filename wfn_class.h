@@ -88,13 +88,13 @@ public:
   bool add_primitive(int cent, int type, double e, double* values);
   bool add_exp(int cent, int type, double e);
   void read_known_wavefunction_format(const std::string fileName, std::ostream& file, const bool debug = false);
-  bool read_wfn(const std::string fileName, const bool debug, std::ostream& file);
-  bool read_wfx(const std::string fileName, const bool debug, std::ostream& file);
+  bool read_wfn(const std::string& fileName, const bool& debug, std::ostream& file);
+  bool read_wfx(const std::string& fileName, const bool& debug, std::ostream& file);
   bool read_fchk(const std::string& filename, std::ostream& log, const bool debug = false);
   bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_molden(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false);
-  bool write_wfn(const std::string& fileName, const bool debug, const bool occupied);
+  bool write_wfn(const std::string& fileName, const bool& debug, const bool occupied);
   bool set_path(std::string given_path) { path = given_path; return true; };
   void print_primitive(const int nr);
   void assign_charge(const int i_charge) { charge = i_charge; };
