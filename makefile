@@ -26,4 +26,4 @@ ifeq ($(NAME),MAC)
 endif
 
 test: 
-	cd tests && make all -k
+	cd tests && make all -k -B

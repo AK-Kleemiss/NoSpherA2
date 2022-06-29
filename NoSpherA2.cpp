@@ -271,7 +271,8 @@ int main(int argc, char** argv)
     log.close();
   }
   if (fract) {
-    cube residual(fract_name, true, debug_all);
+    WFN wavy(6);
+    cube residual(fract_name, true, wavy, cout, debug_all);
     residual.fractal_dimension(0.01);
     return 0;
   }
@@ -636,6 +637,17 @@ int main(int argc, char** argv)
     cube DEF(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), def);
     cube Hirsh(NbSteps[0], NbSteps[1], NbSteps[2], wavy[0].get_ncen(), hirsh);
 
+    Rho.give_parent_wfn(wavy[0]);
+    RDG.give_parent_wfn(wavy[0]);
+    Elf.give_parent_wfn(wavy[0]);
+    Eli.give_parent_wfn(wavy[0]);
+    Lap.give_parent_wfn(wavy[0]);
+    ESP.give_parent_wfn(wavy[0]);
+    MO.give_parent_wfn(wavy[0]);
+    HDEF.give_parent_wfn(wavy[0]);
+    DEF.give_parent_wfn(wavy[0]);
+    Hirsh.give_parent_wfn(wavy[0]);
+
     for (int i = 0; i < 3; i++) {
       Rho.set_origin(i, MinMax[i]);
       RDG.set_origin(i, MinMax[i]);
@@ -704,7 +716,7 @@ int main(int argc, char** argv)
         MO.set_zero();
         MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(MOs[i]) + ".cube";
         Calc_MO(MO, MOs[i], wavy[0], ncpus, radius, log2);
-        MO.write_file(wavy[0], true);
+        MO.write_file(true);
       }
 
     if (hdef || def || hirsh) {
@@ -737,7 +749,7 @@ int main(int argc, char** argv)
           log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
           HDEF.path = get_basename_without_ending(wavy[0].get_path()) + "_HDEF_" + to_string(a) + ".cube";
           Calc_Hirshfeld(HDEF, Rho, temp, wavy[0], ncpus, radius, a, log2);
-          HDEF.write_file(wavy[0], true);
+          HDEF.write_file(true);
           HDEF.set_zero();
         }
       }
@@ -756,20 +768,20 @@ int main(int argc, char** argv)
     log2 << "Writing cubes to Disk..." << flush;
     if (rdg) {
       Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_signed_rho.cube";
-      Rho.write_file(wavy[0], true);
+      Rho.write_file(true);
       Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
-      Rho.write_file(wavy[0], true, true);
+      Rho.write_file(true, true);
     }
-    else if (lap || eli || elf || esp) Rho.write_file(wavy[0], true);
-    if (rdg) RDG.write_file(wavy[0], true);
-    if (lap) Lap.write_file(wavy[0], true);
-    if (elf) Elf.write_file(wavy[0], true);
-    if (eli) Eli.write_file(wavy[0], true);
+    else if (lap || eli || elf || esp) Rho.write_file(true);
+    if (rdg) RDG.write_file(true);
+    if (lap) Lap.write_file(true);
+    if (elf) Elf.write_file(true);
+    if (eli) Eli.write_file(true);
     if (def) {
-      DEF.write_file(wavy[0], true);
-      Rho.write_file(wavy[0], true);
+      DEF.write_file(true);
+      Rho.write_file(true);
     }
-    if (hirsh) Hirsh.write_file(wavy[0], true);
+    if (hirsh) Hirsh.write_file(true);
 
     log2 << " done!" << endl;
 
@@ -777,7 +789,7 @@ int main(int argc, char** argv)
       log2 << "Calculating ESP..." << flush;
       Calc_ESP(ESP, wavy[0], ncpus, radius, log2);
       log2 << "Writing cube to Disk..." << flush;
-      ESP.write_file(wavy[0], true);
+      ESP.write_file(true);
       log2 << "  done!" << endl;
     }
     return 0;
@@ -803,7 +815,7 @@ int main(int argc, char** argv)
     //Rho.write_file(wavy[0], true);
     const double test_molden = Rho.sum();
     log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << test_molden << endl;
-    cube Rho2("test.eldens.cube", true);
+    cube Rho2("test.eldens.cube", true, wavy[0], log_file);
     const double test_ref = Rho2.sum();
     log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << test_ref << endl;
     for (int i = 0; i < 1; i++) {
@@ -818,7 +830,7 @@ int main(int argc, char** argv)
       log_file << " ...done!" << endl;
       //MO.write_file(wavy[0], true);
       string name("test.mo" + to_string(i) + "a.cube");
-      cube MO2(name, true, log_file);
+      cube MO2(name, true, wavy[0], log_file);
       log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
       log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
     }
