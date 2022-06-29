@@ -256,7 +256,7 @@ int main(int argc, char** argv)
       cout << NoSpherA2_message() << help_message() << endl;
       return 0;
     }
-    if (string(argv[1]).find("-h") != string::npos) {
+    if (string(argv[1]).find("-help") != string::npos) {
       cout << NoSpherA2_message() << help_message() << endl;
       return 0;
     }
