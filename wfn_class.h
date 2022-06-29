@@ -206,7 +206,7 @@ public:
   double get_SDM(int nr);
   int get_SDM_size() { return SpinDensityMatrix.size(); };
   //-----------Cube handling-------------------------
-  bool push_back_cube(std::string filepath, bool full, bool expert = false);
+  bool push_back_cube(const std::string& filepath, bool full, bool expert = false);
   void push_back_cube(cube given) { cub.push_back(given); };
   void pop_back_cube();
 

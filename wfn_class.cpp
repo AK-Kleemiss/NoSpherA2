@@ -472,19 +472,19 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     temp = tempchar;
     length = line.copy(tempchar, 4, 5);
     tempchar[length] = '\0';
-    dump = sscanf(tempchar, "%d", &dum_nr[i]);
+    dump = sscanf(tempchar, "%2d", &dum_nr[i]);
     length = line.copy(tempchar, 12, 24);
     tempchar[length] = '\0';
-    dump = sscanf(tempchar, "%lf", &dum_x[i]);
+    dump = sscanf(tempchar, "%12lf", &dum_x[i]);
     length = line.copy(tempchar, 12, 36);
     tempchar[length] = '\0';
-    dump = sscanf(tempchar, "%lf", &dum_y[i]);
+    dump = sscanf(tempchar, "%12lf", &dum_y[i]);
     length = line.copy(tempchar, 12, 48);
     tempchar[length] = '\0';
-    dump = sscanf(tempchar, "%lf", &dum_z[i]);
+    dump = sscanf(tempchar, "%12lf", &dum_z[i]);
     length = line.copy(tempchar, 3, 70);
     tempchar[length] = '\0';
-    dump = sscanf(tempchar, "%d", &dum_ch[i]);
+    dump = sscanf(tempchar, "%3d", &dum_ch[i]);
     dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
     if (debug) {
       file << "label:" << dum_label[i]
@@ -511,7 +511,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         length = line.copy(tempchar, 3, 20 + 3 * i);
         tempchar[length] = '\0';
         //				if(debug) file << "tempchar: " << tempchar << endl;
-        dump = sscanf(tempchar, "%d", &dum_center[exnum]);
+        dump = sscanf(tempchar, "%3d", &dum_center[exnum]);
         if (debug) file << dum_center[exnum] << " ";
         if (dum_center[exnum] > e_nuc) {
           cout << "this center doesn't exist.. some weird problem!\n";
@@ -528,7 +528,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           length = line.copy(tempchar, 3, 20 + 3 * i);
           tempchar[length] = '\0';
           //					if(debug) file << "tempchar: " << tempchar << endl;
-          dump = sscanf(tempchar, "%d", &dum_center[exnum]);
+          dump = sscanf(tempchar, "%3d", &dum_center[exnum]);
           if (debug) file << dum_center[exnum] << endl;
           if (dum_center[exnum] > e_nuc) {
             file << "this center doesn't exist.. some weird problem!\n";
@@ -573,7 +573,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         length = line.copy(tempchar, 2, size_t(21 + 3 * i));
         tempchar[length] = '\0';
         //				if(debug_wfn_deep) file << "tempchar: " << tempchar << endl;
-        dump = sscanf(tempchar, "%d", &dum_type[exnum]);
+        dump = sscanf(tempchar, "%2d", &dum_type[exnum]);
         if (debug_wfn_deep) file << dum_type[exnum] << " ";
         exnum++;
       }
@@ -583,7 +583,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       for (int i = 0; i < e_nex % 20; i++) {
         length = line.copy(tempchar, 2, 21 + 3 * i);
         tempchar[length] = '\0';
-        dump = sscanf(tempchar, "%d", &dum_type[exnum]);
+        dump = sscanf(tempchar, "%2d", &dum_type[exnum]);
         exnum++;
       }
     }
@@ -632,7 +632,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           length = line.copy(tempchar, 13, 11 + 14 * i);
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
-          dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
+          dump = sscanf(tempchar, "%13lG", &dum_exp[exnum]);
           if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
@@ -641,7 +641,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           length = line.copy(tempchar, 14, 10 + 14 * i);
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-          dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
+          dump = sscanf(tempchar, "%14lG", &dum_exp[exnum]);
           if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
@@ -656,7 +656,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           length = line.copy(tempchar, 13, 11 + 14 * i);
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-          dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
+          dump = sscanf(tempchar, "%13lG", &dum_exp[exnum]);
           if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
@@ -665,7 +665,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           length = line.copy(tempchar, 14, 10 + 14 * i);
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
-          dump = sscanf(tempchar, "%lG", &dum_exp[exnum]);
+          dump = sscanf(tempchar, "%14lG", &dum_exp[exnum]);
           if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
@@ -722,12 +722,12 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     if (temp_nr == 0) {
       length = line.copy(tempchar, 6, 2);
       tempchar[length] = '\0';
-      dump = sscanf(tempchar, "%d", &temp_nr);
+      dump = sscanf(tempchar, "%6d", &temp_nr);
     }
     if (temp_occ == -1.0) {
       length = line.copy(tempchar, 12, 36);
       tempchar[length] = '\0';
-      dump = sscanf(tempchar, "%lf", &temp_occ);
+      dump = sscanf(tempchar, "%12lf", &temp_occ);
     }
     if (temp_ener == 0) {
       if (temp_orca % 10 == 3)
@@ -737,7 +737,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       else
         length = line.copy(tempchar, 12, 62);
       tempchar[length] = '\0';
-      dump = sscanf(tempchar, "%lf", &temp_ener);
+      dump = sscanf(tempchar, "%12lf", &temp_ener);
     }
     if (debug_wfn_deep)
       file << endl << "tempchar: " << tempchar << " temp_ener: " << temp_ener << endl;
@@ -765,7 +765,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           tempchar[length] = '\0';
           //if (debug_wfn_deep)
           //	file << "	tempchar: " << tempchar << " ";
-          dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+          dump = sscanf(tempchar, "%16lG", &temp_val[monum][exnum]);
           if (debug_wfn_deep)
             file << temp_val[monum][exnum];
           exnum++;
@@ -780,7 +780,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             tempchar[length] = '\0';
             //if (debug_wfn_deep)
               //file << "	tempchar: " << tempchar << " ";
-            dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+            dump = sscanf(tempchar, "%15lG", &temp_val[monum][exnum]);
             if (debug_wfn_deep)
               file << temp_val[monum][exnum];
           }
@@ -790,7 +790,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             tempchar[length] = '\0';
             //if (debug_wfn_deep)
               //file << "	tempchar: " << tempchar << " ";
-            dump = sscanf(tempchar, "%lG", &temp_val[monum][exnum]);
+            dump = sscanf(tempchar, "%16lG", &temp_val[monum][exnum]);
             if (debug_wfn_deep)
               file << temp_val[monum][exnum];
           }
@@ -1593,18 +1593,19 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   int operators, dimension;
   rf.read((char*)&operators, 4);
   rf.read((char*)&dimension, 4);
+  size_t coef_nr = size_t(dimension) * size_t(dimension);
   vector<vector<double>> coefficients(operators);
   vector<vector<double>> occupations(operators);
   vector<vector<double>> energies(operators);
   vector<vector<int>> irreps(operators);
   vector<vector<int>> cores(operators);
   for (int i = 0; i < operators; i++) {
-    coefficients[i].resize(dimension * dimension);
+    coefficients[i].resize(coef_nr);
     occupations[i].resize(dimension);
     energies[i].resize(dimension);
     irreps[i].resize(dimension);
     cores[i].resize(dimension);
-    rf.read((char*)coefficients[i].data(), 8 * dimension * dimension);
+    rf.read((char*)coefficients[i].data(), 8 * coef_nr);
     rf.read((char*)occupations[i].data(), 8 * dimension);
     rf.read((char*)energies[i].data(), 8 * dimension);
     rf.read((char*)irreps[i].data(), 4 * dimension);
@@ -3180,11 +3181,10 @@ bool WFN::change_exponent(int nr, double value){
 };
 */
 
-bool WFN::push_back_cube(string filepath, bool full, bool expert)
+bool WFN::push_back_cube(const string& filepath, bool full, bool expert)
 {
-  bool check_sucess = false;
-  cub.push_back(cube(filepath, full, *this, check_sucess, expert));
-  return check_sucess;
+  cub.push_back(cube(filepath, full, *this, cout, expert));
+  return true;
 };
 
 void WFN::pop_back_cube()

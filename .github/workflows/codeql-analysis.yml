@@ -6,8 +6,6 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ master ]
-  schedule:
-    - cron: '31 19 * * 3'
 
 jobs:
   analyze:
@@ -28,14 +26,14 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
+      uses: github/codeql-action/init@v2
       with:
         languages: ${{ matrix.language }}
     - name: Build
       run: cd Linux && make && cp NoSpherA2 ../
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@v2
 
 
   flawfinder:
@@ -59,6 +57,6 @@ jobs:
           name: flawfinder_result
           path: 'flawfinder_results.sarif'
       - name: Upload analysis results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
