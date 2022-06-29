@@ -97,9 +97,6 @@ properties:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
-clean:
-	-@echo ' '
-
 .PHONY: all clean dependents
 .SECONDARY:
 
