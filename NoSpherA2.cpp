@@ -471,12 +471,13 @@ int main(int argc, char** argv)
 
     log_file << NoSpherA2_message();
     log_file.flush();
-    if (argc > 1)
+    if (argc > 1) {
       if (string(argv[1]).find("--help") != string::npos) {
         log_file << help_message() << endl;
         log_file.close();
         return 0;
       }
+    }
 
     log_file.flush();
     if (debug_main)
