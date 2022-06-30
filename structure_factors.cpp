@@ -2457,7 +2457,7 @@ bool thakkar_sfac(
     hkl
   );
 
-  blocky.write_tsc_file(cif);
+  blocky.write_tscb_file();
   return true;
 }
 
