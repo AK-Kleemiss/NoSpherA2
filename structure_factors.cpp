@@ -1872,6 +1872,10 @@ int make_hirshfeld_grids(const int& pbc,
       d_temp[i].resize(wave.get_ncen());
     }
     vector<double> phi_temp(wave.get_nmo(true));
+    vector<bool> occupations(wave.get_nmo(false));
+    for (int i = 0; i < wave.get_nmo(false); i++) {
+      occupations[i] = (wave.get_MO_occ(i) > 0);
+    }
 #pragma omp for schedule(dynamic)
     for (int i = 0; i < total_grid[0].size(); i++) {
       total_grid[5][i] = wave.compute_dens(
@@ -1880,6 +1884,7 @@ int make_hirshfeld_grids(const int& pbc,
         total_grid[2][i],
         d_temp,
         phi_temp,
+        occupations,
         false
       );
     }
