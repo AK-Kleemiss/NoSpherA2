@@ -633,6 +633,10 @@ void Calc_Rho_spherical_harmonics(
       d[i].resize(wavy.get_ncen(), 0.0);
     const int n = wavy.get_nmo(true);
     vector<double> phi(n, 0.0);
+    vector<bool> occupations(wavy.get_nmo(false));
+    for (int i = 0; i < wavy.get_nmo(false); i++) {
+      occupations[i] = (wavy.get_MO_occ(i) > 0);
+    }
 //#pragma omp for schedule(dynamic)
     for (int i = 0; i < CubeRho.get_size(0); i++) {
       for (int j = 0; j < CubeRho.get_size(1); j++)
@@ -644,7 +648,7 @@ void Calc_Rho_spherical_harmonics(
           PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
           PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
 
-          CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+          CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi, occupations));
         }
       if (i != 0 && i % step == 0)
         progress->write((i) / double(CubeRho.get_size(0)));

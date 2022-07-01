@@ -3803,6 +3803,7 @@ double WFN::compute_dens(
   const double& Pos3,
   vector<vector<double>>& d,
   vector<double>& phi,
+  vector<bool>& occupations,
   const bool& add_ECP_dens
 )
 {
@@ -3814,7 +3815,7 @@ double WFN::compute_dens(
   else {
     err_checkf(d.size() >= 4, "d is too small!", std::cout);
     err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, occupations, add_ECP_dens);
   }
 };
 
@@ -3825,21 +3826,25 @@ double WFN::compute_dens(
   const bool& add_ECP_dens
 )
 {
+  vector<vector<double>> d;
+  vector<double> phi(nmo, 0.0);
   const int n = get_nmo(true);
   if (d_f_switch) {
-    vector<vector<double>> d(5);
+    d.resize(5);
     for (int i = 0; i < 5; i++)
       d[i].resize(ncen, 0.0);
-    vector<double> phi(n, 0.0);
     err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
   else {
-    vector<vector<double>> d(4);
+    d.resize(4);
     for (int i = 0; i < 4; i++)
       d[i].resize(ncen, 0.0);
-    vector<double> phi(n, 0.0);
-    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+    vector<bool> occupations(nmo);
+    for (int i = 0; i < nmo; i++) {
+      occupations[i] = (MOs[i].get_occ() > 0);
+    }
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, occupations, add_ECP_dens);
   }
 };
 
@@ -3849,6 +3854,7 @@ double WFN::compute_dens_cartesian(
   const double& Pos3,
   vector<vector<double>>& d,
   vector<double>& phi,
+  vector<bool>& occupations,
   const bool& add_ECP_dens
 )
 {
@@ -3888,15 +3894,23 @@ double WFN::compute_dens_cartesian(
     }
     auto run = phi.data();
     auto run2 = MOs.data();
-    for (mo = 0; mo < phi.size(); mo++) {
+    for (mo = 0; mo < nmo; mo++) {
+      if (!occupations[mo]) {
+        run2++;
+        continue;
+      }
       *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
-      run++, run2++;
+      run2++, run++;
     }
   }
 
   auto run = phi.data();
   auto run2 = MOs.data();
-  for (mo = 0; mo < phi.size(); mo++) {
+  for (mo = 0; mo < nmo; mo++) {
+    if (!occupations[mo]) {
+      run2++;
+      continue;
+    }
     Rho += (*run2).get_occ() * pow(*run, 2);
     run++, run2++;
   }
