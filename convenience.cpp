@@ -2066,6 +2066,9 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
     else {
       digits = close_bracket - open_bracket - 1;
     }
+    if (digits == 0) {
+      return 0.001;
+    }
     result = abs(precision * pow(10, -digits));
     return result;
   }
