@@ -541,10 +541,14 @@ void read_atoms_from_CIF(ifstream& cif_input,
           getline(cif_input, line);
           continue;
         }
+        vector<double> tolerances(3);
         for (int i = 0; i < wave.get_ncen(); i++) {
-          if (is_similar_abs(position[0], wave.atoms[i].x, max(min(precisions[0], 1.0), 0.01))
-            && is_similar_abs(position[1], wave.atoms[i].y, max(min(precisions[1], 1.0), 0.01))
-            && is_similar_abs(position[2], wave.atoms[i].z, max(min(precisions[2], 1.0), 0.01))) {
+          for (int j = 0; j < 3; j++) {
+            tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
+          }
+          if (is_similar_abs(position[0], wave.atoms[i].x, tolerances[0])
+            && is_similar_abs(position[1], wave.atoms[i].y, tolerances[1])
+            && is_similar_abs(position[2], wave.atoms[i].z, tolerances[2])) {
             string element = atnr2letter(wave.get_atom_charge(i));
             string label = fields[label_field];
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);
@@ -609,7 +613,11 @@ void read_atoms_from_CIF(ifstream& cif_input,
         }
         else if (!old_atom) {
           if (debug) {
-            file << "I did not find this atom!" << endl;
+            file << "I did not find this atom! Tolerances were: ";
+              for (int j = 0; j < 3; j++) {
+                file << setw(12) << fixed << setprecision(8) << tolerances[j];
+              }
+            file << endl;
           }
         }
         getline(cif_input, line);
