@@ -1495,9 +1495,11 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   for (int a = 0; a < at; a++) {
     for (int i = 0; i < 6; i++) {
       rf.read((char*)&(geo_vals[i]), 8);
+      err_checkf(rf.good(), "Error reading geo_val", file);
     }
     for (int i = 0; i < 5; i++) {
       rf.read((char*)&(geo_ints[i]), 4);
+      err_checkf(rf.good(), "Error reading geo_int", file);
     }
     err_checkf(push_back_atom(atnr2letter(geo_ints[0]),
       geo_vals[0],
@@ -1520,20 +1522,28 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   for (int a = 0; a < atoms2; a++) {
     int atom_based, nr_shells;
     rf.read((char*)&atom_based, 4);
+    err_checkf(rf.good(), "Error reading atom_based", file);
     rf.read((char*)&nr_shells, 4);
+    err_checkf(rf.good(), "Error reading nr_shells", file);
     int shell = 0;
     for (int p = 0; p < nr_shells; p++) {
       int ang_mom, coeff_ind, nr_funct, center;
       rf.read((char*)&ang_mom, 4);
+      err_checkf(rf.good(), "Error reading ang_mom", file);
       if (ang_mom >= 5) err_not_impl_f("Higher angular momentum basis functions than G", file);
       rf.read((char*)&coeff_ind, 4);
+      err_checkf(rf.good(), "Error reading ceof_ind", file);
       rf.read((char*)&nr_funct, 4);
+      err_checkf(rf.good(), "Error reading nr_func", file);
       rf.read((char*)&center, 4);
+      err_checkf(rf.good(), "Error reading center", file);
       for (int b = 0; b < 37; b++) {
         rf.read((char*)&(exp[b]), 8);
+        err_checkf(rf.good(), "Error reading exp", file);
       }
       for (int b = 0; b < 37; b++) {
         rf.read((char*)&(con[b]), 8);
+        err_checkf(rf.good(), "Error reading con", file);
         if (exp[b] != 0 && con[b] != 0) {
           err_checkf(atoms[atom_based].push_back_basis_set(exp[b], con[b], ang_mom + 1, shell), "Error pushing back basis", file);
         }
@@ -1589,11 +1599,14 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   rf.seekg(24, ios::beg);
   long int MOs_start;
   rf.read((char*)&MOs_start, 8);
+  err_checkf(rf.good(), "Error reading MO_start", file);
   err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
   rf.seekg(MOs_start, ios::beg);
   int operators, dimension;
   rf.read((char*)&operators, 4);
+  err_checkf(rf.good(), "Error reading operators", file);
   rf.read((char*)&dimension, 4);
+  err_checkf(rf.good(), "Error reading dimnesion", file);
   size_t coef_nr = size_t(dimension) * size_t(dimension);
   vector<vector<double>> coefficients(operators);
   vector<vector<double>> occupations(operators);
@@ -1607,10 +1620,15 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     irreps[i].resize(dimension);
     cores[i].resize(dimension);
     rf.read((char*)coefficients[i].data(), 8 * coef_nr);
+    err_checkf(rf.good(), "Error reading coefficients", file);
     rf.read((char*)occupations[i].data(), 8 * dimension);
+    err_checkf(rf.good(), "Error reading occupations", file);
     rf.read((char*)energies[i].data(), 8 * dimension);
+    err_checkf(rf.good(), "Error reading energies", file);
     rf.read((char*)irreps[i].data(), 4 * dimension);
+    err_checkf(rf.good(), "Error reading irreps", file);
     rf.read((char*)cores[i].data(), 4 * dimension);
+    err_checkf(rf.good(), "Error reading cores", file);
     for (int j = 0; j < dimension; j++) {
       push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
       int run_coef = 0;
