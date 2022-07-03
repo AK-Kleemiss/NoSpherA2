@@ -686,7 +686,8 @@ int make_hirshfeld_grids(const int& pbc,
   timeval& t1,
   timeval& t2,
 #endif
-  bool debug = false)
+  bool debug = false,
+  bool no_date = false)
 {
   int atoms_with_grids = 0;
   for (int i = 0; i < needs_grid.size(); i++) {
@@ -2121,7 +2122,8 @@ int make_hirshfeld_grids(const int& pbc,
     d2[i].resize(num_points[i]);
     d3[i].resize(num_points[i]);
   }
-#pragma omp parallel for reduction(+:points)
+  double upper = 0, lower = 0;
+#pragma omp parallel for reduction(+:points, upper, lower)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     int run = 0;
@@ -2130,6 +2132,8 @@ int make_hirshfeld_grids(const int& pbc,
       start_p += num_points[a];
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+      upper += abs(abs(total_grid[5][p]) * total_grid[3][p] - abs(total_grid[4][p]) * total_grid[3][p]);
+      lower += abs(total_grid[5][p] * total_grid[3][p]);
       if (abs(res) > cutoff) {
         dens[i][run] = (res);
         d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
@@ -2144,6 +2148,9 @@ int make_hirshfeld_grids(const int& pbc,
     d1[i].resize(run);
     d2[i].resize(run);
     d3[i].resize(run);
+  }
+  if (!no_date) {
+    file << "R value of density = " << setw(12) << setprecision(8) << fixed << upper / lower << endl;
   }
   shrink_vector<vector<double>>(spherical_density);
 #pragma omp parallel for
@@ -2605,7 +2612,8 @@ bool calculate_structure_factors_HF(
   const bool Olex2_1_3_switch,
   const bool save_k_pts,
   const bool read_k_pts,
-  const int& ECP_mode
+  const int& ECP_mode,
+  const bool no_date
 )
 {
 #ifdef FLO_CUDA
@@ -2689,7 +2697,8 @@ bool calculate_structure_factors_HF(
     t1,
     t2,
 #endif
-    debug);
+    debug,
+    no_date);
 
   vector<vector<double>> k_pt;
   make_k_pts(
@@ -2793,7 +2802,8 @@ tsc_block calculate_structure_factors_MTC(
   const int pbc,
   const bool save_k_pts,
   const bool read_k_pts,
-  const int& ECP_mode
+  const int& ECP_mode,
+  const bool no_date
 )
 {
 #ifdef FLO_CUDA
@@ -2880,7 +2890,8 @@ tsc_block calculate_structure_factors_MTC(
     t1,
     t2,
 #endif
-    debug);
+    debug,
+    no_date);
 
   vector<vector<double>> k_pt;
   make_k_pts(
