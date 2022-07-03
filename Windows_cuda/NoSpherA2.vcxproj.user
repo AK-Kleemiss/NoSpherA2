@@ -27,6 +27,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_OpenShell_gbw|x64'">
+    <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_ECP|x64'">
     <LocalDebuggerCommandArguments>-wfn Me4NPF6.wfn -cif Me4NPF6.cif -asym_cif olex2/Wfn_job/Me4NPF6.cif -hkl olex2/Wfn_job/Me4NPF6.hkl -acc 3 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>F:\debug\</LocalDebuggerWorkingDirectory>
