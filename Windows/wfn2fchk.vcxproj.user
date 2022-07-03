@@ -38,6 +38,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_OpenShell_gbw|x64'">
+    <LocalDebuggerCommandArguments>-wfn Fe.gbw -v2 -v -hkl Fe.hkl -cif Fe.cif -acc 1</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Fe_gbw\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_ECP|x64'">
     <LocalDebuggerCommandArguments>-wfn malbac_ECP.molden -cif malbac.cif -hkl malbac.hkl -cpus 24 -acc 2 -v -ECP 1</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF\</LocalDebuggerWorkingDirectory>
