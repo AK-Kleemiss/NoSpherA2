@@ -317,7 +317,8 @@ int main(int argc, char** argv)
           0,
           i == 0,
           i != 0,
-          ECP_mode
+          ECP_mode,
+          no_date
         ), log_file);
       }
       else {
@@ -412,7 +413,8 @@ int main(int argc, char** argv)
           0,
           i == 0,
           i != 0,
-          ECP_mode
+          ECP_mode,
+          no_date
         ), log_file);
       }
       else {
@@ -566,7 +568,8 @@ int main(int argc, char** argv)
           Olex2_1_3_switch,
           save_k_pts,
           read_k_pts,
-          ECP_mode), "Error during SF Calcualtion", log_file);
+          ECP_mode,
+          no_date), "Error during SF Calcualtion", log_file);
       else
         err_checkf(thakkar_sfac(
           hkl,

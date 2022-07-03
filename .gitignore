@@ -29,3 +29,4 @@ NoSpherA2_linux/bin/*/*/NoSpherA2*
 *.gpu
 Windows/*/*/unity_*.cpp
 Windows/.vs/NoSpherA2/project-colors.json
+*.enc
