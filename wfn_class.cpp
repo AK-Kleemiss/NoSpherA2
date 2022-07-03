@@ -486,14 +486,14 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     tempchar[length] = '\0';
     dump = sscanf(tempchar, "%3d", &dum_ch[i]);
     dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
-    if (debug) {
-      file << "label:" << dum_label[i]
-        << " nr: " << dum_nr[i]
-        << " x: " << dum_x[i]
-        << " y: " << dum_y[i]
-        << " z: " << dum_z[i]
-        << " charge: " << dum_ch[i] << endl;
-    }
+    //if (debug) {
+    //  file << "label:" << dum_label[i]
+    //    << " nr: " << dum_nr[i]
+    //    << " x: " << dum_x[i]
+    //    << " y: " << dum_y[i]
+    //    << " z: " << dum_z[i]
+    //    << " charge: " << dum_ch[i] << endl;
+    //}
   }
   //------------------------------------ Read center assignements -------------------------------------------
   vector<unsigned int> dum_center;
@@ -504,32 +504,32 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   int dump;
   getline(rf, line);
   while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof()) {
-    if (debug) file << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
+    //if (debug) file << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
     if (exnum + 20 <= e_nex) {
-      if (debug) file << "dum_center: ";
+      //if (debug) file << "dum_center: ";
       for (int i = 0; i < 20; i++) {
         length = line.copy(tempchar, 3, 20 + 3 * i);
         tempchar[length] = '\0';
         //				if(debug) file << "tempchar: " << tempchar << endl;
         dump = sscanf(tempchar, "%3d", &dum_center[exnum]);
-        if (debug) file << dum_center[exnum] << " ";
+        //if (debug) file << dum_center[exnum] << " ";
         if (dum_center[exnum] > e_nuc) {
           cout << "this center doesn't exist.. some weird problem!\n";
           return false;
         }
         exnum++;
       }
-      if (debug) file << endl << "run: " << run * 20 << "   center: " << dum_center[exnum - 1] << endl;
+      //if (debug) file << endl << "run: " << run * 20 << "   center: " << dum_center[exnum - 1] << endl;
     }
     else {
-      if (debug) file << "exnum+20>e_nex...\n";
+      //if (debug) file << "exnum+20>e_nex...\n";
       if (exnum < e_nex) {
         for (int i = 0; i < e_nex % 20; i++) {
           length = line.copy(tempchar, 3, 20 + 3 * i);
           tempchar[length] = '\0';
           //					if(debug) file << "tempchar: " << tempchar << endl;
           dump = sscanf(tempchar, "%3d", &dum_center[exnum]);
-          if (debug) file << dum_center[exnum] << endl;
+          //if (debug) file << dum_center[exnum] << endl;
           if (dum_center[exnum] > e_nuc) {
             file << "this center doesn't exist.. some weird problem!\n";
             return false;
@@ -563,21 +563,21 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   run = 0;
   exnum = 0;
   while (line.compare(0, 4, "TYPE") == 0 && !rf.eof()) {
-    if (debug_wfn_deep) file << "run: "
-      << run << " exnum: "
-      << exnum << " line: "
-      << line << endl;
+    //if (debug_wfn_deep) file << "run: "
+    //  << run << " exnum: "
+    //  << exnum << " line: "
+    //  << line << endl;
     if (exnum + 20 <= e_nex) {
-      if (debug_wfn_deep) file << "dum_type: ";
+      //if (debug_wfn_deep) file << "dum_type: ";
       for (int i = 0; i < 20; i++) {
         length = line.copy(tempchar, 2, size_t(21 + 3 * i));
         tempchar[length] = '\0';
         //				if(debug_wfn_deep) file << "tempchar: " << tempchar << endl;
         dump = sscanf(tempchar, "%2d", &dum_type[exnum]);
-        if (debug_wfn_deep) file << dum_type[exnum] << " ";
+        //if (debug_wfn_deep) file << dum_type[exnum] << " ";
         exnum++;
       }
-      if (debug_wfn_deep) file << endl << "run: " << run * 20 << "   type: " << dum_type[exnum - 1] << endl;
+      //if (debug_wfn_deep) file << endl << "run: " << run * 20 << "   type: " << dum_type[exnum - 1] << endl;
     }
     else if (exnum < e_nex) {
       for (int i = 0; i < e_nex % 20; i++) {
@@ -611,10 +611,10 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   string replace = "E";
   bool three_exponents = false;
   while (line.compare(0, 9, "EXPONENTS") == 0 && !rf.eof()) {
-    if (debug_wfn_deep) file << "run: "
-      << run << " exnum: "
-      << exnum << " line: "
-      << line << endl;
+    //if (debug_wfn_deep) file << "run: "
+    //  << run << " exnum: "
+    //  << exnum << " line: "
+    //  << line << endl;
     if (exnum + 5 <= e_nex) {
       if (exnum == 0) {
         const char test = line.at(10);
@@ -622,9 +622,9 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         const char empty = temp_str.at(0);
         if (test != empty)
           three_exponents = true;
-        if (debug_wfn) file << "Three exp: " << three_exponents << endl;
+        //if (debug_wfn) file << "Three exp: " << three_exponents << endl;
       }
-      if (debug_wfn_deep) file << "dum_exp:" << endl;
+      //if (debug_wfn_deep) file << "dum_exp:" << endl;
       for (int i = 0; i < 5; i++) {
 
         if (!three_exponents) {
@@ -633,7 +633,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
           dump = sscanf(tempchar, "%13lG", &dum_exp[exnum]);
-          if (debug_wfn_deep) file << dum_exp[exnum] << " ";
+          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
         else {
@@ -642,12 +642,12 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dump = sscanf(tempchar, "%14lG", &dum_exp[exnum]);
-          if (debug_wfn_deep) file << dum_exp[exnum] << " ";
+          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
       }
-      if (debug_wfn_deep) file << endl;
-      if (debug_wfn_deep) file << "run: " << run * 5 << "   exponent: " << dum_exp[exnum - 1] << endl;
+      //if (debug_wfn_deep) file << endl;
+      //if (debug_wfn_deep) file << "run: " << run * 5 << "   exponent: " << dum_exp[exnum - 1] << endl;
     }
     else if (exnum < e_nex) {
       for (int i = 0; i < e_nex % 5; i++) {
@@ -657,7 +657,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dump = sscanf(tempchar, "%13lG", &dum_exp[exnum]);
-          if (debug_wfn_deep) file << dum_exp[exnum] << " ";
+          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
         else {
@@ -666,7 +666,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           tempchar[length] = '\0';
           //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dump = sscanf(tempchar, "%14lG", &dum_exp[exnum]);
-          if (debug_wfn_deep) file << dum_exp[exnum] << " ";
+          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
       }
@@ -705,7 +705,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   while (!(line.compare(0, 3, "END") == 0) && !rf.eof()) {
     bool b = 0;
     if (monum == e_nmo) {
-      if (debug_wfn) file << "read all MOs I expected, finishing read...." << endl;
+      //if (debug_wfn) file << "read all MOs I expected, finishing read...." << endl;
       b = true;
       break;
     }
@@ -739,22 +739,22 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       tempchar[length] = '\0';
       dump = sscanf(tempchar, "%12lf", &temp_ener);
     }
-    if (debug_wfn_deep)
-      file << endl << "tempchar: " << tempchar << " temp_ener: " << temp_ener << endl;
+    //if (debug_wfn_deep)
+    //  file << endl << "tempchar: " << tempchar << " temp_ener: " << temp_ener << endl;
     push_back_MO(temp_nr, temp_occ, temp_ener);
-    if (debug_wfn_deep) {
-      file << endl << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
-    }
+    //if (debug_wfn_deep) {
+    //  file << endl << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
+    //}
     //---------------------------Start reading MO coefficients-----------------------
     getline(rf, line);
     linecount = 0;
     exnum = 0;
     while (!(line.compare(0, 2, "MO") == 0) && !rf.eof()) {
-      if (debug_wfn_deep) file << "linecount: "
-        << linecount << " exnum: "
-        << exnum << " monum: "
-        << monum << " line: "
-        << line << endl;
+      //if (debug_wfn_deep) file << "linecount: "
+      //  << linecount << " exnum: "
+      //  << exnum << " monum: "
+      //  << monum << " line: "
+      //  << line << endl;
       if (exnum + 5 <= e_nex) {
         for (int i = 0; i < 5; i++) {
           if (!three_exponents)
@@ -766,8 +766,8 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           //if (debug_wfn_deep)
           //	file << "	tempchar: " << tempchar << " ";
           dump = sscanf(tempchar, "%16lG", &temp_val[monum][exnum]);
-          if (debug_wfn_deep)
-            file << temp_val[monum][exnum];
+          //if (debug_wfn_deep)
+          //  file << temp_val[monum][exnum];
           exnum++;
         }
       }
@@ -781,8 +781,8 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             //if (debug_wfn_deep)
               //file << "	tempchar: " << tempchar << " ";
             dump = sscanf(tempchar, "%15lG", &temp_val[monum][exnum]);
-            if (debug_wfn_deep)
-              file << temp_val[monum][exnum];
+            //if (debug_wfn_deep)
+            //  file << temp_val[monum][exnum];
           }
           else {
             line.replace(11 + i * 16, 1, replace);
@@ -791,8 +791,8 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             //if (debug_wfn_deep)
               //file << "	tempchar: " << tempchar << " ";
             dump = sscanf(tempchar, "%16lG", &temp_val[monum][exnum]);
-            if (debug_wfn_deep)
-              file << temp_val[monum][exnum];
+            //if (debug_wfn_deep)
+            //  file << temp_val[monum][exnum];
           }
           exnum++;
         }
@@ -801,7 +801,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         getline(rf, line);
         continue;
       }
-      if (debug_wfn_deep) file << endl;
+      //if (debug_wfn_deep) file << endl;
       getline(rf, line);
       if (linecount * 5 > e_nex + 1) {
         file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -810,7 +810,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       run++;
     }
     monum++;
-    if (debug_wfn_deep) file << "monum after: " << monum << endl;
+    //if (debug_wfn_deep) file << "monum after: " << monum << endl;
     if (b == true) break;
   }
   if (monum + 1 < e_nmo) {
@@ -819,12 +819,13 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     return false;
   }
   //---------------------Start writing everything from the temp arrays into wave ---------------------
-  if (debug_wfn) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
+  //if (debug_wfn) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
 
-  for (int i = 0; i < e_nuc; i++) if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
-  if (debug) {
-    file << "Starting to check whether it is bohr or Angstrom input!" << endl;
-  }
+  for (int i = 0; i < e_nuc; i++) 
+    if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
+  //if (debug) {
+  //  file << "Starting to check whether it is bohr or Angstrom input!" << endl;
+  //}
   /*if(check_bohr(*this, debug)){
     for(int i=0; i<e_nuc; i++){
       atoms[i].x=atoms[i].x*0.529177;
@@ -951,7 +952,7 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
   vector <int> nrs;
   while (true) {
     getline(rf, line);
-    if (debug) file << "atom number line: " << line << endl;
+    //if (debug) file << "atom number line: " << line << endl;
     if (line.find("</Atomic Numbers>") != string::npos)
       break;
     nrs.push_back(stoi(line));
@@ -1109,13 +1110,13 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     while (line.find("<MO Number>") == string::npos)
       getline(rf, line);
     getline(rf, line);
-    if (debug) file << "mo Nr line: " << line << endl;
+    //if (debug) file << "mo Nr line: " << line << endl;
     int nr = stoi(line);
     while (line.find("</MO Number>") == string::npos)
       getline(rf, line);
     while (coef.size() != nex) {
       getline(rf, line);
-      if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
+      //if (nr == 1 && debug) file << "first MO Coef lines: " << line << endl;
       int number = CountWords(line.c_str());
       istringstream is(line);
       double temp;
