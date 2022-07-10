@@ -370,7 +370,7 @@ bool cube::fractal_dimension(const double stepsize) {
   vector<double> iso;
   bins.resize(steps), df.resize(steps), iso.resize(steps);
   for (int i = 0; i < steps; i++)
-    iso[i] = round((min + i * stepsize) * 1000) / 1000;
+    iso[i] = round((min + i * stepsize) * 100) / 100;
   const int comparisons = size[0] * size[1] * (size[2] - 1) + size[0] * size[2] * (size[1] - 1) + size[2] * size[1] * (size[0] - 1);
   double lv1, lv2;
   for (int x = 0; x < size[0]; x++)
