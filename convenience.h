@@ -41,6 +41,7 @@ inline const double cutoff = 1.0e-20;
 inline const double PI = 3.14159265358979323846;
 inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
 inline const double PI2 = pow(PI, 2);
+inline const double PI_180 = PI / 180.0;
 inline const double TG32 = tgamma(3.0 / 2.0);
 inline const int max_LT = 33;
 inline const int MAG = 5810;
