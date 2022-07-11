@@ -229,12 +229,12 @@ public:
       if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
         break;
     }
-    ca = cos(0.0174532925199432944444444444444 * alpha);
-    cb = cos(0.0174532925199432944444444444444 * beta);
-    cg = cos(0.0174532925199432944444444444444 * gamma);
-    sa = sin(0.0174532925199432944444444444444 * alpha);
-    sb = sin(0.0174532925199432944444444444444 * beta);
-    sg = sin(0.0174532925199432944444444444444 * gamma);
+    ca = cos(PI_180 * alpha);
+    cb = cos(PI_180 * beta);
+    cg = cos(PI_180 * gamma);
+    sa = sin(PI_180 * alpha);
+    sb = sin(PI_180 * beta);
+    sg = sin(PI_180 * gamma);
     V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
     if (V / v > 1.1 || V / v < 0.9) {
       file << "Volume computed is more than 10% off, please check!" << std::endl;
