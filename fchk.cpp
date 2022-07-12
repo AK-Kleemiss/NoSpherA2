@@ -430,13 +430,13 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       if (debug) norm_cprim << m << ". MO:" << endl;
       for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
         if (debug) cout << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
-        double temp = wave.get_MO_coef(m, p, debug) / norm_const[p];
+        double temp = wave.get_MO_coef(m, p) / norm_const[p];
         if (debug) {
           cout << " temp after normalization: " << temp << endl;
           norm_cprim << " " << temp << endl;
         }
         run++;
-        if (!wave.change_MO_coef(m, p, temp, debug)) {
+        if (!wave.change_MO_coef(m, p, temp)) {
           cout << "ERROR in changing the coefficients after normalising!";
           if (debug) cout << "m:" << m << " p: " << p << " temp:" << temp;
           cout << endl;
@@ -458,31 +458,31 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           if (debug) cout << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value" << endl;
           switch (wave.get_shell_type(a, s)) {
           case 1:
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s), false));
+            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s)));
             if (m == 0) nao++;
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               cout << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
             break;
           case 2:
-            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i, false));
+            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               cout << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 3;
             break;
           case 3:
-            for (int i = 0; i < 6; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i, false));
+            for (int i = 0; i < 6; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               cout << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 6;
             break;
           case 4:
             //this hardcoded piece is due to the order of f-type functions in the fchk
-            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i, false));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 6, false));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 3, false));
-            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 7, false));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 5, false));
-            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 9, false));
+            for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
+            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 6));
+            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 3));
+            for (int i = 0; i < 2; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i + 7));
+            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 5));
+            CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 9));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               cout << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 10;
@@ -981,7 +981,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       if (debug) norm_cprim << m << ". MO:" << endl;
       for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
         if (debug) file << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
-        changed_coefs[m].push_back(wave.get_MO_coef(m, p, debug) / norm_const[p]);
+        changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
         if (debug) {
           file << " temp after normalization: " << changed_coefs[m][p] << endl;
           norm_cprim << " " << changed_coefs[m][p] << endl;
@@ -1277,7 +1277,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     unsigned int runs = 0;
     for (int i = 0; i < wave.get_ncen(); i++) {
       for (int j = 0; j < 3; j++) {
-        st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(i, j, debug);
+        st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(i, j);
         runs++;
         if (runs % 5 == 0 || (i == wave.get_ncen() - 1 && j == 2)) st_s << endl;
       }
@@ -1435,7 +1435,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     for (int a = 0; a < wave.get_ncen(); a++)
       for (int sh = 0; sh < wave.get_atom_shell_count(a); sh++)
         for (int i = 0; i < 3; i++) {
-          st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(a, i, false);
+          st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(a, i);
           runs++;
           if ((runs % 5 == 0 && runs != 0) || (a == wave.get_ncen() - 1 && sh == wave.get_atom_shell_count(a) - 1 && i == 2)) st_s << endl;
         }
@@ -1448,7 +1448,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     runs = 0;
     for (int a = 0; a < wave.get_ncen(); a++)
       for (int i = 0; i < 3; i++) {
-        st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(a, i, false);
+        st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_coordinate(a, i);
         runs++;
         if ((runs % 5 == 0 && runs != 0) || (a == wave.get_ncen() - 1 && i == 2)) st_s << endl;
       }

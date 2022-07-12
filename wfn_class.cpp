@@ -75,7 +75,28 @@ WFN::WFN(int given_origin)
   fill_Afac_pre();
 };
 
-bool WFN::push_back_atom(const string& label, const double x, const double y, const double z, const int charge)
+WFN::WFN(const WFN& given_wfn, const bool& occ_only)
+{
+  origin = given_wfn.get_origin();
+  charge = given_wfn.get_charge();
+  multi = given_wfn.get_multi();
+
+  for (int i = 0; i < given_wfn.get_ncen(); i++) {
+    push_back_atom(given_wfn.atoms[i]);
+  }
+  for (int i = 0; i < given_wfn.get_nex(); i++) {
+    add_exp(given_wfn.get_center(i), given_wfn.get_type(i), given_wfn.get_exponent(i));
+  }
+  for (int i = 0; i < given_wfn.get_nmo(); i++) {
+    if (occ_only && given_wfn.get_MO_occ(i) == 0.0) {
+      continue;
+    }
+    MO temp(given_wfn.get_MO(i));
+    push_back_MO(temp);
+  }
+};
+
+bool WFN::push_back_atom(const string& label, const double& x, const double& y, const double& z, const int& charge)
 {
   ncen++;
   if (charge >= 1) atoms.push_back(atom(label, ncen, x, y, z, charge));
@@ -83,7 +104,14 @@ bool WFN::push_back_atom(const string& label, const double x, const double y, co
   return true;
 };
 
-bool WFN::erase_atom(const int nr)
+bool WFN::push_back_atom(const atom& given)
+{
+  ncen++;
+  atoms.push_back(given);
+  return true;
+};
+
+bool WFN::erase_atom(const int& nr)
 {
   if (ncen < 1) return false;
   int n = nr - 1;
@@ -92,7 +120,7 @@ bool WFN::erase_atom(const int nr)
   return true;
 };
 
-bool WFN::push_back_MO(int nr, double occ, double ener)
+bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener)
 {
   nmo++;
   //hier fehlen noch sinnhaftigkeitsfragen
@@ -100,48 +128,52 @@ bool WFN::push_back_MO(int nr, double occ, double ener)
   return true;
 };
 
-bool WFN::push_back_MO_coef(int nr, double value, int nr2)
+bool WFN::push_back_MO(MO& given)
+{
+  nmo++;
+  //hier fehlen noch sinnhaftigkeitsfragen
+  MOs.push_back(given);
+  return true;
+};
+
+bool WFN::push_back_MO_coef(const int& nr, const double& value, const int& nr2)
 {
   err_checkf(nr < nmo, "not enough MOs", std::cout);
   return MOs[nr].push_back_coef(value, nr2);
 };
 
-void WFN::push_back_MO_coef(int nr, double value)
+void WFN::push_back_MO_coef(const int& nr, const double& value)
 {
   err_checkf(nr < nmo, "not enough MOs", std::cout);
   MOs[nr].push_back_coef(value);
 };
 
-void WFN::assign_MO_coefs(int nr, vector<double>& values)
+void WFN::assign_MO_coefs(const int& nr, vector<double>& values)
 {
-  if (nr < nmo) {
-    cout << "not enough MOs" << endl;
-    return;
-  }
+  err_checkf(nr < nmo, "not enough MOs", std::cout);
   MOs[nr].assign_coefs(values);
 };
 
-double WFN::get_MO_energy(const int mo)const
+double WFN::get_MO_energy(const int& mo)const
 {
   if (mo > nmo) return -1;
   else return MOs[mo].get_energy();
 }
 
-bool WFN::push_back_center(int cent)
+bool WFN::push_back_center(const int& cent)
 {
   if (cent <= ncen && cent > 0) centers.push_back(cent);
   else return false;
   return true;
 };
 
-bool WFN::erase_center(int nr)
+bool WFN::erase_center(const int& g_nr)
 {
-  nr--;
-  centers.erase(centers.begin() + nr);
+  centers.erase(centers.begin() + g_nr - 1);
   return true;
 };
 
-string WFN::get_centers(bool bohr)
+string WFN::get_centers(const bool& bohr)
 {
   string temp;
   for (int i = 0; i < ncen; i++) {
@@ -169,35 +201,34 @@ void WFN::list_centers()
   }
 };
 
-bool WFN::push_back_type(int type)
+bool WFN::push_back_type(const int& type)
 {
   types.push_back(type);
   return true;
 };
 
-bool WFN::erase_type(int nr)
+bool WFN::erase_type(const int& nr)
 {
-  if (nr < 1) return false;
-  nr--;
-  types.erase(types.begin() + nr);
+  err_checkf(nr >= 1, "Wrong type to erase!", std::cout);
+  types.erase(types.begin() + nr-1);
   return true;
 };
 
-bool WFN::push_back_exponent(double e)
+bool WFN::push_back_exponent(const double& e)
 {
   exponents.push_back(e);
   return true;
 
 };
 
-bool WFN::erase_exponent(int nr)
+bool WFN::erase_exponent(const int& nr)
 {
   if (nr < 1) return false;
   exponents.erase(exponents.begin() + (nr - 1));
   return true;
 };
 
-bool WFN::remove_primitive(int nr)
+bool WFN::remove_primitive(const int& nr)
 {
   nex--;
   if (erase_center(nr) && erase_exponent(nr) && erase_type(nr)) {
@@ -207,7 +238,7 @@ bool WFN::remove_primitive(int nr)
   else return false;
 };
 
-bool WFN::add_primitive(int cent, int type, double e, double* values)
+bool WFN::add_primitive(const int& cent, const int& type, const double& e, double* values)
 {
   nex++;
   if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
@@ -216,7 +247,7 @@ bool WFN::add_primitive(int cent, int type, double e, double* values)
   return true;
 };
 
-void WFN::change_type(int nr)
+void WFN::change_type(const int& nr)
 {
   bool end = false;
   while (!end) {
@@ -233,7 +264,7 @@ void WFN::change_type(int nr)
   }
 };
 
-void WFN::change_exponent(int nr)
+void WFN::change_exponent(const int& nr)
 {
   bool end = false;
   while (!end) {
@@ -250,7 +281,7 @@ void WFN::change_exponent(int nr)
   }
 };
 
-void WFN::change_center(int nr)
+void WFN::change_center(const int& nr)
 {
   bool end = false;
   while (!end) {
@@ -267,7 +298,7 @@ void WFN::change_center(int nr)
   }
 };
 
-void WFN::change_MO_coef(int nr)
+void WFN::change_MO_coef(const int& nr)
 {
   cout << "Which coefficient out of " << nex << " do you want to change?\n";
   int sel = 0;
@@ -284,21 +315,20 @@ void WFN::change_MO_coef(int nr)
   set_modified();
 };
 
-bool WFN::change_MO_coef(int nr_mo, int nr_primitive, double value, bool debug)
+bool WFN::change_MO_coef(const int& nr_mo, const int& nr_primitive, const double& value)
 {
-  if (nr_mo >= MOs.size()) {
-    cout << "MO doesn't exist!" << endl;
-    return false;
-  }
-  return MOs[nr_mo].change_coefficient(nr_primitive, value, debug);
+  err_checkf(nr_mo >= MOs.size(), "MO doesn't exist!", std::cout);
+  return MOs[nr_mo].change_coefficient(nr_primitive, value);
 };
 
 void WFN::list_primitives()
 {
-  for (int i = 0; i < nex; i++) cout << i << " center: " << centers[i] << " type: " << types[i] << " exponent: " << exponents[i] << endl;
+  for (int i = 0; i < nex; i++) {
+    cout << i << " center: " << centers[i] << " type: " << types[i] << " exponent: " << exponents[i] << endl;
+  }
 };
 
-bool WFN::remove_center(int nr)
+bool WFN::remove_center(const int& nr)
 {
   erase_center(nr);
   try {
@@ -311,43 +341,36 @@ bool WFN::remove_center(int nr)
   return true;
 }
 
-bool WFN::add_exp(int cent, int type, double e)
+bool WFN::add_exp(const int& cent, const int& type, const double& e)
 {
   nex++;
   if (!push_back_center(cent) || !push_back_type(type) || !push_back_exponent(e)) return false;
   else return true;
 };
 
-double WFN::get_MO_coef(const int nr_mo, const int nr_primitive, const bool debug) const
+double WFN::get_MO_coef(const int& nr_mo, const int& nr_primitive) const
 {
-  if (debug) {
-    if (nr_mo < MOs.size() && nr_mo >= 0) return MOs[nr_mo].get_coefficient(nr_primitive, debug);
-    else {
-      if (debug) cout << "WRONG INPUT TO get_MO_coef!" << endl;
-      return -1;
-    }
-  }
-  else
-    return MOs[nr_mo].get_coefficient(nr_primitive, debug);
+  err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
+  return MOs[nr_mo].get_coefficient(nr_primitive);
 };
 
-double WFN::get_MO_coef_f(const int nr_mo, const int nr_primitive) const
+double WFN::get_MO_coef_f(const int& nr_mo, const int& nr_primitive) const
 {
   return MOs[nr_mo].get_coefficient_f(nr_primitive);
 };
 
-double* WFN::get_MO_coef_ptr(const int nr_mo)
+double* WFN::get_MO_coef_ptr(const int& nr_mo)
 {
   return MOs[nr_mo].get_coefficient_ptr();
 };
 
-int WFN::get_MO_primitive_count(const int nr_mo) const
+int WFN::get_MO_primitive_count(const int& nr_mo) const
 {
-  if (nr_mo <= MOs.size() && nr_mo >= 0) return MOs[nr_mo].get_primitive_count();
-  else return -1;
+  err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
+  return MOs[nr_mo].get_primitive_count();
 };
 
-string WFN::hdr(bool occupied)
+string WFN::hdr(const bool& occupied)
 {
   string temp = "GAUSSIAN            ";
   if (!occupied) {
@@ -405,7 +428,7 @@ string WFN::hdr(bool occupied)
   return temp;
 };
 
-void WFN::read_known_wavefunction_format(string fileName, ostream& file, bool debug)
+void WFN::read_known_wavefunction_format(const string& fileName, ostream& file, const bool debug)
 {
   if (fileName.find(".wfn") != string::npos) origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
   else if (fileName.find(".ffn") != string::npos) origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
@@ -821,7 +844,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   //---------------------Start writing everything from the temp arrays into wave ---------------------
   //if (debug_wfn) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
 
-  for (int i = 0; i < e_nuc; i++) 
+  for (int i = 0; i < e_nuc; i++)
     if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
   //if (debug) {
   //  file << "Starting to check whether it is bohr or Angstrom input!" << endl;
@@ -1953,19 +1976,14 @@ vector<double> WFN::get_norm_const(ofstream& file, bool debug)
   return norm_const;
 }
 
-double WFN::get_atom_coordinate(int nr, int axis, bool debug)
+double WFN::get_atom_coordinate(const int& nr, const int& axis)
 {
-  if (nr < 0 || nr >= ncen || axis < 0 || axis>2) {
-    cout << "This input is invalid for get_atom_coordinate!" << endl;
-    return -1;
-  }
-  else {
-    switch (axis) {
-    case 0: return atoms[nr].x; break;
-    case 1: return atoms[nr].y; break;
-    case 2: return atoms[nr].z; break;
-    default: return -2;
-    }
+  err_checkf(!(nr < 0 || nr >= ncen || axis < 0 || axis>2), "This input is invalid for get_atom_coordinate!", std::cout);
+  switch (axis) {
+  case 0: return atoms[nr].x; break;
+  case 1: return atoms[nr].y; break;
+  case 2: return atoms[nr].z; break;
+  default: return -2;
   }
 };
 
@@ -2138,7 +2156,7 @@ bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupi
       for (int j = 0; j < 5; j++) {
         stringstream stream;
         string temp;
-        stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run, debug);
+        stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
         temp = stream.str();
         rf << temp;
         if (run > nex) {
@@ -2154,7 +2172,7 @@ bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupi
       for (int j = 0; j < nex % 5; j++) {
         stringstream stream;
         string temp;
-        stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run, debug);
+        stream << uppercase << scientific << showpoint << setprecision(8) << setw(16) << MOs[mo_counter].get_coefficient(run);
         temp = stream.str();
         rf << temp;
         if (run > nex) {
@@ -2178,23 +2196,27 @@ bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupi
   return true;
 };
 
-void WFN::print_primitive(int nr)
+void WFN::print_primitive(const int& nr)
 {
   cout << "center assignement: " << centers[nr] << " type: " << types[nr]
     << " exponent: " << exponents[nr] << endl << "MO coefficients:";
   for (int i = 0; i < nmo; i++) {
-    cout << MOs[nr].get_coefficient(i, false) << "   ";
+    cout << MOs[nr].get_coefficient(i) << "   ";
     if (i % 5 == 0) cout << endl;
   }
 };
 
-int WFN::get_nmo(const bool only_occ) const
+int WFN::get_nmo(const bool& only_occ) const
 {
   if (!only_occ) return nmo;
   else {
     int count = 0;
-    for (int i = 0; i < nmo; i++)
-      if (MOs[i].get_occ() != 0.0) count++;
+#pragma omp parallel for reduction(+:count)
+    for (int i = 0; i < MOs.size(); i++) {
+      if (MOs[i].get_occ() != 0.0) {
+        count++;
+      }
+    }
     return count;
   }
 };
@@ -2223,21 +2245,21 @@ double WFN::count_nr_electrons(void)
   return count;
 };
 
-double WFN::get_atom_basis_set_exponent(int nr_atom, int nr_prim)
+double WFN::get_atom_basis_set_exponent(const int& nr_atom, const int& nr_prim)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
     return atoms[nr_atom].basis_set[nr_prim].exponent;
   else return -1;
 };
 
-double WFN::get_atom_basis_set_coefficient(int nr_atom, int nr_prim)
+double WFN::get_atom_basis_set_coefficient(const int& nr_atom, const int& nr_prim)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
     return atoms[nr_atom].basis_set[nr_prim].coefficient;
   else return -1;
 };
 
-bool WFN::change_atom_basis_set_exponent(int nr_atom, int nr_prim, double value)
+bool WFN::change_atom_basis_set_exponent(const int& nr_atom, const int& nr_prim, const double& value)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0) {
     atoms[nr_atom].basis_set[nr_prim].exponent = value;
@@ -2247,23 +2269,21 @@ bool WFN::change_atom_basis_set_exponent(int nr_atom, int nr_prim, double value)
   else return false;
 };
 
-bool WFN::change_atom_basis_set_coefficient(int nr_atom, int nr_prim, double value)
+bool WFN::change_atom_basis_set_coefficient(const int& nr_atom, const int& nr_prim, const double& value)
 {
-  if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0) {
-    atoms[nr_atom].basis_set[nr_prim].coefficient = value;
-    set_modified();
-    return true;
-  }
-  else return false;
+  err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0, "Wrong input!", cout);
+  atoms[nr_atom].basis_set[nr_prim].coefficient = value;
+  set_modified();
+  return true;
 };
 
-int WFN::get_atom_primitive_count(int nr)
+int WFN::get_atom_primitive_count(const int& nr)
 {
   if (nr <= ncen && nr >= 0) return atoms[nr].basis_set.size();
   else return -1;
 };
 
-bool WFN::erase_atom_primitive(int nr, int nr_prim)
+bool WFN::erase_atom_primitive(const int& nr, const int& nr_prim)
 {
   if (nr <= ncen && nr >= 0 && nr_prim >= 0 && nr_prim < atoms[nr].basis_set.size()) {
     atoms[nr].basis_set.erase(atoms[nr].basis_set.begin() + nr_prim);
@@ -2272,7 +2292,7 @@ bool WFN::erase_atom_primitive(int nr, int nr_prim)
   else return false;
 };
 
-int WFN::get_basis_set_shell(int nr_atom, int nr_prim)
+int WFN::get_basis_set_shell(const int& nr_atom, const int& nr_prim)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0) {
     return atoms[nr_atom].basis_set[nr_prim].shell;
@@ -2280,20 +2300,20 @@ int WFN::get_basis_set_shell(int nr_atom, int nr_prim)
   else return -1;
 };
 
-int WFN::get_atom_shell_count(int nr)
+int WFN::get_atom_shell_count(const int& nr)
 {
   if (nr <= ncen && nr >= 0) return atoms[nr].shellcount.size();
   else return -1;
 };
 
-int WFN::get_atom_shell_primitives(int nr_atom, int nr_shell)
+int WFN::get_atom_shell_primitives(const int& nr_atom, const int& nr_shell)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell < atoms[nr_atom].shellcount.size() && nr_shell >= 0)
     return atoms[nr_atom].shellcount[nr_shell];
   else return -1;
 };
 
-int WFN::get_shell_type(int nr_atom, int nr_shell)
+int WFN::get_shell_type(const int& nr_atom, const int& nr_shell)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && nr_shell >= 0) {
     int primitive_counter = 0;
@@ -2304,14 +2324,14 @@ int WFN::get_shell_type(int nr_atom, int nr_shell)
   else return -1;
 };
 
-int WFN::get_shell_center(int nr_atom, int nr_shell)
+int WFN::get_shell_center(const int& nr_atom, const int& nr_shell)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && nr_shell >= 0)
     return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
   else return -1;
 };
 
-int WFN::get_shell_start(int nr_atom, int nr_shell, bool debug)
+int WFN::get_shell_start(const int& nr_atom, const int& nr_shell, const bool& debug)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() - 1 && nr_shell >= 0) {
     int primitive_counter = 0;
@@ -2323,7 +2343,7 @@ int WFN::get_shell_start(int nr_atom, int nr_shell, bool debug)
   else return -1;
 };
 
-int WFN::get_shell_start_in_primitives(int nr_atom, int nr_shell)
+int WFN::get_shell_start_in_primitives(const int& nr_atom, const int& nr_shell)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() - 1 && nr_shell >= 0) {
     int primitive_counter = 0;
@@ -2364,7 +2384,7 @@ int WFN::get_shell_start_in_primitives(int nr_atom, int nr_shell)
   else return -1;
 };
 
-int WFN::get_shell_end(int nr_atom, int nr_shell, bool debug)
+int WFN::get_shell_end(const int& nr_atom, const int& nr_shell, const bool& debug)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && nr_shell >= 0) {
     if (nr_shell == atoms[nr_atom].shellcount.size() - 1) return atoms[nr_atom].basis_set.size() - 1;
@@ -2375,7 +2395,7 @@ int WFN::get_shell_end(int nr_atom, int nr_shell, bool debug)
   else return -1;
 };
 
-string WFN::get_atom_label(int nr)
+string WFN::get_atom_label(const int& nr)
 {
   string error_return;
   error_return = '?';
@@ -2390,7 +2410,7 @@ int WFN::get_nr_basis_set_loaded()
   return count;
 };
 
-bool WFN::get_atom_basis_set_loaded(int nr)
+bool WFN::get_atom_basis_set_loaded(const int& nr)
 {
   if (nr <= ncen && nr >= 0) return atoms[nr].get_basis_set_loaded();
   else {
@@ -2408,12 +2428,12 @@ int WFN::get_atom_charge(const int& nr) const
   }
 };
 
-void WFN::push_back_DM(double value)
+void WFN::push_back_DM(const double& value)
 {
   DensityMatrix.push_back(value);
 };
 
-double WFN::get_DM(int nr)
+double WFN::get_DM(const int& nr)
 {
   if (nr >= 0 && nr < DensityMatrix.size()) return DensityMatrix[nr];
   else {
@@ -2422,7 +2442,7 @@ double WFN::get_DM(int nr)
   }
 };
 
-bool WFN::set_DM(int nr, double value)
+bool WFN::set_DM(const int& nr, const double& value)
 {
   if (nr >= 0 && nr < DensityMatrix.size()) {
     DensityMatrix[nr] = value;
@@ -2434,12 +2454,12 @@ bool WFN::set_DM(int nr, double value)
   }
 };
 
-void WFN::push_back_SDM(double value)
+void WFN::push_back_SDM(const double& value)
 {
   SpinDensityMatrix.push_back(value);
 };
 
-double WFN::get_SDM(int nr)
+double WFN::get_SDM(const int& nr)
 {
   if (nr >= 0 && nr < SpinDensityMatrix.size()) return SpinDensityMatrix[nr];
   else {
@@ -2448,7 +2468,7 @@ double WFN::get_SDM(int nr)
   }
 };
 
-bool WFN::set_SDM(int nr, double value)
+bool WFN::set_SDM(const int& nr, const double& value)
 {
   if (nr >= 0 && nr < SpinDensityMatrix.size()) {
     SpinDensityMatrix[nr] = value;
@@ -2460,7 +2480,7 @@ bool WFN::set_SDM(int nr, double value)
   }
 };
 
-int WFN::check_order(bool debug)
+int WFN::check_order(const bool& debug)
 {
   for (int i = 0; i < ncen; i++) {
     if (!get_atom_basis_set_loaded(i)) {
@@ -2685,11 +2705,12 @@ int WFN::check_order(bool debug)
   return (f_order * 10 + order);
 };
 
-bool WFN::sort_wfn(int order, bool debug)
+bool WFN::sort_wfn(const int& g_order, const bool& debug)
 {
   set_modified();
   int primcounter = 0;
   int f_order = 0;
+  int order = g_order;
   //Sorry for this way of forwarding the order, i think 2 switches would have been more nicely
   if (order >= 10 && order < 20) {
     f_order = 1;
@@ -2728,17 +2749,14 @@ bool WFN::sort_wfn(int order, bool debug)
                 temp_types[3 * i + c] = types[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 temp_exponents[3 * i + c] = exponents[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 for (int m = 0; m < nmo; m++)
-                  temp_MO_coefficients[3 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s), false);
+                  temp_MO_coefficients[3 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s));
               }
             for (int i = 0; i < 3 * get_atom_shell_primitives(a, s); i++) {
               centers[primcounter + i] = temp_centers[i];
               types[primcounter + i] = temp_types[i];
               exponents[primcounter + i] = temp_exponents[i];
               for (int m = 0; m < nmo; m++)
-                if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
-                  cout << "Error while assigning new MO coefficient!" << endl;
-                  return false;
-                }
+                err_checkf(MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m]), "Error while assigning new MO coefficient!", std::cout);
             }
           }
           primcounter += get_atom_shell_primitives(a, s) * 3;
@@ -2761,14 +2779,14 @@ bool WFN::sort_wfn(int order, bool debug)
                 temp_types[6 * i + c] = types[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 temp_exponents[6 * i + c] = exponents[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 for (int m = 0; m < nmo; m++)
-                  temp_MO_coefficients[6 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s), false);
+                  temp_MO_coefficients[6 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s));
               }
             for (int i = 0; i < 6 * get_atom_shell_primitives(a, s); i++) {
               centers[primcounter + i] = temp_centers[i];
               types[primcounter + i] = temp_types[i];
               exponents[primcounter + i] = temp_exponents[i];
               for (int m = 0; m < nmo; m++)
-                if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
+                if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m])) {
                   cout << "Error while assigning new MO coefficient!" << endl;
                   return false;
                 }
@@ -2794,14 +2812,14 @@ bool WFN::sort_wfn(int order, bool debug)
                 temp_types[10 * i + c] = types[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 temp_exponents[10 * i + c] = exponents[primcounter + i + c * get_atom_shell_primitives(a, s)];
                 for (int m = 0; m < nmo; m++)
-                  temp_MO_coefficients[10 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s), false);
+                  temp_MO_coefficients[10 * i + c][m] = MOs[m].get_coefficient(primcounter + i + c * get_atom_shell_primitives(a, s));
               }
             for (int i = 0; i < 10 * get_atom_shell_primitives(a, s); i++) {
               centers[primcounter + i] = temp_centers[i];
               types[primcounter + i] = temp_types[i];
               exponents[primcounter + i] = temp_exponents[i];
               for (int m = 0; m < nmo; m++)
-                if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m], false)) {
+                if (!MOs[m].change_coefficient(primcounter + i, temp_MO_coefficients[i][m])) {
                   cout << "Error while assigning new MO coefficient!" << endl;
                   return false;
                 }
@@ -2835,22 +2853,20 @@ bool WFN::sort_wfn(int order, bool debug)
             temp_type = types[primcounter];
             temp_exponent = exponents[primcounter];
             for (int m = 0; m < nmo; m++)
-              temp_MO_coefficients[m] = MOs[m].get_coefficient(primcounter, false);
+              temp_MO_coefficients[m] = MOs[m].get_coefficient(primcounter);
             for (int j = 0; j < 2; j++) {
               centers[primcounter + j] = centers[primcounter + 1 + j];
               types[primcounter + j] = types[primcounter + 1 + j];
               exponents[primcounter + j] = exponents[primcounter + 1 + j];
-              for (int m = 0; m < nmo; m++)
-                if (!MOs[m].change_coefficient(primcounter + j, MOs[m].get_coefficient(primcounter + 1 + j, false), false)) {
-                  cout << "Error while assigning new MO coefficient!" << endl;
-                  return false;
-                }
+              for (int m = 0; m < nmo; m++) {
+                err_checkf(MOs[m].change_coefficient(primcounter + j, MOs[m].get_coefficient(primcounter + 1 + j)), "Error while assigning new MO coefficient!", std::cout);
+              }
             }
             centers[primcounter + 2] = temp_center;
             types[primcounter + 2] = temp_type;
             exponents[primcounter + 2] = temp_exponent;
             for (int m = 0; m < nmo; m++)
-              if (!MOs[m].change_coefficient(primcounter + 2, temp_MO_coefficients[m], false)) {
+              if (!MOs[m].change_coefficient(primcounter + 2, temp_MO_coefficients[m])) {
                 cout << "Error while assigning new MO coefficient!" << endl;
                 return false;
               }
@@ -2905,7 +2921,7 @@ bool WFN::sort_wfn(int order, bool debug)
               temp_type[j] = types[get_shell_start_in_primitives(a, s) + 10 * i + j];
               temp_exponent[j] = exponents[get_shell_start_in_primitives(a, s) + 10 * i + j];
               for (int m = 0; m < nmo; m++)
-                temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j, false);
+                temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
             }
             vector <int> mask{ 0,1,2,6,3,4,7,8,5,9 };
             for (int j = 0; j < 10; j++) {
@@ -2913,7 +2929,7 @@ bool WFN::sort_wfn(int order, bool debug)
               types[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_type[mask[j]];
               exponents[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_exponent[mask[j]];
               for (int m = 0; m < nmo; m++)
-                MOs[m].change_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + mask[j], temp_MO_coefficients[m][j], false);
+                MOs[m].change_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + mask[j], temp_MO_coefficients[m][j]);
             }
           }
           primcounter += 10;
@@ -2951,7 +2967,7 @@ bool WFN::sort_wfn(int order, bool debug)
               temp_type[j] = types[get_shell_start_in_primitives(a, s) + 10 * i + j];
               temp_exponent[j] = exponents[get_shell_start_in_primitives(a, s) + 10 * i + j];
               for (int m = 0; m < nmo; m++)
-                temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j, false);
+                temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
             }
             vector <int> mask{ 0,1,2,3,4,6,5,7,8,9 };
             for (int j = 0; j < 10; j++) {
@@ -2959,7 +2975,7 @@ bool WFN::sort_wfn(int order, bool debug)
               types[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_type[mask[j]];
               exponents[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_exponent[mask[j]];
               for (int m = 0; m < nmo; m++)
-                MOs[m].change_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + mask[j], temp_MO_coefficients[m][j], false);
+                MOs[m].change_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + mask[j], temp_MO_coefficients[m][j]);
             }
           }
           primcounter += 10;
@@ -3007,7 +3023,7 @@ void WFN::operator=(const WFN& right)
   }
   for (int i = 0; i < nmo; i++) {
     push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
-    for (int j = 0; j < right.get_MO_primitive_count(i); j++) push_back_MO_coef(i, right.get_MO_coef(i, j, false), j);
+    for (int j = 0; j < right.get_MO_primitive_count(i); j++) push_back_MO_coef(i, right.get_MO_coef(i, j), j);
   }
   for (int c = 0; c < right.cub.size(); c++) {
     cub.push_back(right.cub[c]);
@@ -3200,7 +3216,7 @@ bool WFN::change_exponent(int nr, double value){
 };
 */
 
-bool WFN::push_back_cube(const string& filepath, bool full, bool expert)
+bool WFN::push_back_cube(const string& filepath, const bool& full, const bool& expert)
 {
   cub.push_back(cube(filepath, full, *this, cout, expert));
   return true;
@@ -3211,20 +3227,13 @@ void WFN::pop_back_cube()
   cub.pop_back();
 }
 
-double* WFN::get_ptr_mo_coefficients(int mo)
+double* WFN::get_ptr_mo_coefficients(const int& mo)
 {
   return MOs[mo].get_ptr_coefficients();
 };
 
-unsigned int WFN::get_atom_integer_mass(unsigned int atomnr)
+unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr)
 {
-  vector <unsigned int> masses
-  { 1,																																																	4,
-   7,  9,																																												11,12,14,16,19,20,
-   23,24,																																												27,28,31,32,35,40,
-   39,40,																																		45,48,51,52,55,56,59,58,63,64,			69,74,75,80,79,84,
-   85, 87,																																	88, 91, 92, 96, 98, 101, 103, 106, 108, 112, 115, 119, 122, 128, 127, 131,
-   132,137,139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222 };
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << endl;
     return 0;
@@ -3233,19 +3242,11 @@ unsigned int WFN::get_atom_integer_mass(unsigned int atomnr)
     cout << "sorry, something seems wrong with the atoms you requested!" << endl;
     return 0;
   }
-  return masses[get_atom_charge(atomnr) - 1];
+  return integer_masses[get_atom_charge(atomnr) - 1];
 };
 
-double WFN::get_atom_real_mass(int atomnr)
+double WFN::get_atom_real_mass(const int& atomnr)
 {
-  vector <double> masses
-  { 1.0079,																																																																	4.0026,
-   6.941,		9.0122,																																											                            			10.811,	12.011,	14.007,	15.999,	18.998,	20.18,
-   22.99,		24.305,        																																											                  				26.986,	28.086,	30.974,	32.065,	35.453,	39.948,
-   39.098,	40.078,																																44.956,	47.867,	50.942,	51.996,	54.938,	55.845,	58.933,	58.693,	63.546,	65.38,		69.723,	72.64,	74.922,	78.96,	79.904,	83.798,
-   85.468,	87.62,																																88.906, 91.224,	92.906, 95.96,	97.90,	101.07,	102.91,	106.42,	107.87,	112.41,		114.82, 118.71,	121.76,	127.6,	126.9,	131.29,
-   132.91,	137.33,		139.91, 140.12, 140.91, 144.24, 144.9, 150.36, 151.96, 157.25, 158.93, 162.5, 164.93, 167.26, 168.93, 173.05, 174.97,			178.49, 180.95, 183.84, 186.21, 190.23, 192.22, 195.08, 196.97, 200.59,		204.38, 207.2,	208.98, 208.9,	209.9,	222.0 };
-  //---1.&2. Group--------------------------------------------------------------------Lanthanoides and Actinoides--------------------------------------------------Transition metals----------------------------------------------------p-block elements
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << endl;
     return 0;
@@ -3254,17 +3255,22 @@ double WFN::get_atom_real_mass(int atomnr)
     cout << "sorry, something seems wrong with the atoms you requested!" << endl;
     return 0;
   }
-  return masses[get_atom_charge(atomnr) - 1];
+  return real_masses[get_atom_charge(atomnr) - 1];
 }
 
-double WFN::get_MO_occ(const int nr)
+double WFN::get_MO_occ(const int& nr) const
 {
   return MOs[nr].get_occ();
-  if (nr >= nmo || nr < 0) {
-    cout << "WRONG INPUT! No Negative or bigger number than available MOs" << endl;
-    return -1;
+};
+
+void WFN::delete_unoccupied_MOs()
+{
+  for (int i = MOs.size() - 1; i >= 0; i--) {
+    if (get_MO_occ(i) == 0.0) {
+      MOs.erase(MOs.begin() + i);
+      nmo--;
+    }
   }
-  else return MOs[nr].get_occ();
 };
 
 bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
@@ -3822,7 +3828,6 @@ double WFN::compute_dens(
   const double& Pos3,
   vector<vector<double>>& d,
   vector<double>& phi,
-  vector<bool>& occupations,
   const bool& add_ECP_dens
 )
 {
@@ -3834,7 +3839,7 @@ double WFN::compute_dens(
   else {
     err_checkf(d.size() >= 4, "d is too small!", std::cout);
     err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, occupations, add_ECP_dens);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
 };
 
@@ -3859,11 +3864,7 @@ double WFN::compute_dens(
     d.resize(4);
     for (int i = 0; i < 4; i++)
       d[i].resize(ncen, 0.0);
-    vector<bool> occupations(nmo);
-    for (int i = 0; i < nmo; i++) {
-      occupations[i] = (MOs[i].get_occ() > 0);
-    }
-    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, occupations, add_ECP_dens);
+    return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
 };
 
@@ -3873,7 +3874,6 @@ double WFN::compute_dens_cartesian(
   const double& Pos3,
   vector<vector<double>>& d,
   vector<double>& phi,
-  vector<bool>& occupations,
   const bool& add_ECP_dens
 )
 {
@@ -3914,10 +3914,6 @@ double WFN::compute_dens_cartesian(
     auto run = phi.data();
     auto run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++) {
-      if (!occupations[mo]) {
-        run2++;
-        continue;
-      }
       *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
       run2++, run++;
     }
@@ -3926,10 +3922,6 @@ double WFN::compute_dens_cartesian(
   auto run = phi.data();
   auto run2 = MOs.data();
   for (mo = 0; mo < nmo; mo++) {
-    if (!occupations[mo]) {
-      run2++;
-      continue;
-    }
     Rho += (*run2).get_occ() * pow(*run, 2);
     run++, run2++;
   }
@@ -4996,7 +4988,7 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
     coef[i] = new double[nprim];
     occ[i] = get_MO_occ(i);
     for (int j = 0; j < nprim; j++)
-      coef[i][j] = get_MO_coef(i, j, false);
+      coef[i][j] = get_MO_coef(i, j);
   }
 
   for (int iat = 0; iat < get_ncen(); iat++)
