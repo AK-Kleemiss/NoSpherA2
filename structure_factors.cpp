@@ -1874,33 +1874,31 @@ int make_hirshfeld_grids(const int& pbc,
   file << " done!" << endl;
   file << "Number of points evaluated: " << MaxGrid;
 #else
-#pragma omp parallel
   {
-    vector<vector<double>> d_temp(4);
-    for (int i = 0; i < 4; i++) {
-      d_temp[i].resize(wave.get_ncen());
-    }
-    vector<double> phi_temp(wave.get_nmo(true));
-    vector<bool> occupations(wave.get_nmo(false));
-    for (int i = 0; i < wave.get_nmo(false); i++) {
-      occupations[i] = (wave.get_MO_occ(i) > 0);
-    }
+    WFN temp(wave, true);
+#pragma omp parallel
+    {
+      vector<vector<double>> d_temp(4);
+      for (int i = 0; i < 4; i++) {
+        d_temp[i].resize(wave.get_ncen());
+      }
+      vector<double> phi_temp(wave.get_nmo(true));
 #pragma omp for schedule(dynamic)
-    for (int i = 0; i < total_grid[0].size(); i++) {
-      total_grid[5][i] = wave.compute_dens(
-        total_grid[0][i],
-        total_grid[1][i],
-        total_grid[2][i],
-        d_temp,
-        phi_temp,
-        occupations,
-        false
-      );
+      for (int i = 0; i < total_grid[0].size(); i++) {
+        total_grid[5][i] = temp.compute_dens(
+          total_grid[0][i],
+          total_grid[1][i],
+          total_grid[2][i],
+          d_temp,
+          phi_temp,
+          false
+        );
+      }
+      for (int i = 0; i < 4; i++)
+        shrink_vector<double>(d_temp[i]);
+      shrink_vector<vector<double>>(d_temp);
+      shrink_vector<double>(phi_temp);
     }
-    for (int i = 0; i < 4; i++)
-      shrink_vector<double>(d_temp[i]);
-    shrink_vector<vector<double>>(d_temp);
-    shrink_vector<double>(phi_temp);
   }
   //if (debug) {
   //	//Copy grid from GPU to print:

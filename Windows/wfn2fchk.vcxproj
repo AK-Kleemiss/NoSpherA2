@@ -1124,7 +1124,6 @@
     <ClCompile Include="../convenience.cpp" />
     <ClCompile Include="../cube.cpp" />
     <ClCompile Include="../fchk.cpp" />
-    <ClCompile Include="../mo_class.cpp" />
     <ClCompile Include="../sphere_lebedev_rule.cpp" />
     <ClCompile Include="../structure_factors.cpp" />
     <ClCompile Include="..\NoSpherA2.cpp" />
