@@ -239,7 +239,7 @@ bool cube::write_file(bool force, bool absolute) {
   for (int i = 0; i < na; i++) {
     of << setw(5) << parent_wavefunction->get_atom_charge(i) << setw(5) << parent_wavefunction->get_atom_charge(i) << ".000000";
     for (int j = 0; j < 3; j++)
-      of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j, false);
+      of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j);
     of << endl;
   }
   for (int run_x = 0; run_x < size[0]; run_x++) {
@@ -278,7 +278,7 @@ bool cube::write_file(string& given_path, bool debug) {
   for (int i = 0; i < na; i++) {
     of << setw(5) << parent_wavefunction->get_atom_charge(i) << setw(5) << parent_wavefunction->get_atom_charge(i) << ".000000";
     for (int j = 0; j < 3; j++)
-      of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j, false);
+      of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j);
     of << endl;
   }
   if (debug) cout << "Finished atoms!" << endl;
@@ -329,7 +329,7 @@ bool cube::write_xdgraph(string& given_path, bool debug) {
     of << parent_wavefunction->atoms[i].label;
     of << "    ";
     for (int j = 0; j < 3; j++)
-      of << setw(10) << setprecision(5) << parent_wavefunction->get_atom_coordinate(i, j, false);
+      of << setw(10) << setprecision(5) << parent_wavefunction->get_atom_coordinate(i, j);
     of << " ATOM" << endl;
   }
   if (debug) cout << "Finished atoms!" << endl;
@@ -1020,7 +1020,7 @@ string cube::super_cube() {
         for (int a = 0; a < parent_wavefunction->get_ncen(); a++) {
           for (int i = 0; i < 2; i++) stream << setw(5) << parent_wavefunction->get_atom_charge(a);
           stream << ".000000";
-          for (int i = 0; i < 3; i++) stream << setw(12) << setprecision(6) << fixed << parent_wavefunction->get_atom_coordinate(a, i, false) + h * size[0] * vectors[0][i] + j * size[1] * vectors[1][i] + k * size[2] * vectors[2][i];
+          for (int i = 0; i < 3; i++) stream << setw(12) << setprecision(6) << fixed << parent_wavefunction->get_atom_coordinate(a, i) + h * size[0] * vectors[0][i] + j * size[1] * vectors[1][i] + k * size[2] * vectors[2][i];
           stream << endl;
         }
   of << stream.str();

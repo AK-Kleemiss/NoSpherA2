@@ -30,9 +30,6 @@
     <ClCompile Include="../fchk.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../mo_class.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../sphere_lebedev_rule.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
