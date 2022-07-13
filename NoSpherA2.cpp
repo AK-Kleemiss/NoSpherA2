@@ -197,8 +197,6 @@ int main(int argc, char** argv)
       mult = stoi(argv[i + 1]);
     else if (temp.find("-no-date") < 1)
       no_date = true;
-    else if (temp.find("-Olex2_1_3") < 1)
-      Olex2_1_3_switch = true;
     else if (temp.find("-pbc") < 1)
       pbc = stoi(argv[i + 1]);
     else if (temp.find("-radius") < 1)
