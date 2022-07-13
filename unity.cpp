@@ -8,5 +8,4 @@
 #include "./structure_factors.cpp"
 #include "./cube.cpp"
 #include "./fchk.cpp"
-#include "./mo_class.cpp"
 #include "./NoSpherA2.cpp"
