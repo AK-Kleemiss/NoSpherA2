@@ -665,7 +665,7 @@ int make_hirshfeld_grids(const int& pbc,
   const int& accuracy,
   const vector <int>& input_groups,
   cell& unit_cell,
-  WFN& wave,
+  const WFN& wave,
   const vector <int>& atom_type_list,
   const vector <int>& asym_atom_to_type_list,
   const vector <int>& asym_atom_list,
@@ -1875,14 +1875,16 @@ int make_hirshfeld_grids(const int& pbc,
   file << "Number of points evaluated: " << MaxGrid;
 #else
   {
-    WFN temp(wave, true);
+    WFN temp = wave;
+    temp.delete_unoccupied_MOs();
+    if (debug) file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
 #pragma omp parallel
     {
       vector<vector<double>> d_temp(4);
       for (int i = 0; i < 4; i++) {
-        d_temp[i].resize(wave.get_ncen());
+        d_temp[i].resize(temp.get_ncen());
       }
-      vector<double> phi_temp(wave.get_nmo(true));
+      vector<double> phi_temp(temp.get_nmo(true));
 #pragma omp for schedule(dynamic)
       for (int i = 0; i < total_grid[0].size(); i++) {
         total_grid[5][i] = temp.compute_dens(
@@ -1899,50 +1901,50 @@ int make_hirshfeld_grids(const int& pbc,
       shrink_vector<vector<double>>(d_temp);
       shrink_vector<double>(phi_temp);
     }
-  }
-  //if (debug) {
-  //	//Copy grid from GPU to print:
-  //	// Dimensions: [c] [p]
-  //	// p = the number of gridpoint
-  //	// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-  //	ofstream grid("grid.file", ios::out);
-  //	for (int i = 0; i < total_grid[0].size(); i++) {
-  //		for (int j = 0; j < 7; j++)
-  //			grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
-  //		grid << "\n";
-  //	}
-  //	grid.flush();
-  //	grid.close();
-  //}
-  if (pbc != 0) {
-    periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
-    int j = 0;
-    for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
-      periodic_grid[d].resize(total_grid[5].size());
-    for (int x = -pbc; x < pbc + 1; x++)
-      for (int y = -pbc; y < pbc + 1; y++)
-        for (int z = -pbc; z < pbc + 1; z++) {
-          if (x == 0 && y == 0 && z == 0)
-            continue;
+    //if (debug) {
+    //	//Copy grid from GPU to print:
+    //	// Dimensions: [c] [p]
+    //	// p = the number of gridpoint
+    //	// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    //	ofstream grid("grid.file", ios::out);
+    //	for (int i = 0; i < total_grid[0].size(); i++) {
+    //		for (int j = 0; j < 7; j++)
+    //			grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
+    //		grid << "\n";
+    //	}
+    //	grid.flush();
+    //	grid.close();
+    //}
+    if (pbc != 0) {
+      periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
+      int j = 0;
+      for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
+        periodic_grid[d].resize(total_grid[5].size());
+      for (int x = -pbc; x < pbc + 1; x++)
+        for (int y = -pbc; y < pbc + 1; y++)
+          for (int z = -pbc; z < pbc + 1; z++) {
+            if (x == 0 && y == 0 && z == 0)
+              continue;
 #pragma omp parallel for
-          for (int i = 0; i < total_grid[0].size(); i++) {
-            periodic_grid[j][i] = wave.compute_dens(total_grid[0][i] + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2),
-              total_grid[1][i] + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2),
-              total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2), true);
+            for (int i = 0; i < total_grid[0].size(); i++) {
+              periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2),
+                total_grid[1][i] + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2),
+                total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2), true);
+            }
+            j++;
           }
-          j++;
-        }
-    if (debug) {
-      for (int i = 0; i < total_grid[0].size(); i++) {
-        if (i % 1000 == 0)
-          file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:";
-        for (int j = 0; j < pow(pbc * 2 + 1, 3) - 1; j++) {
+      if (debug) {
+        for (int i = 0; i < total_grid[0].size(); i++) {
           if (i % 1000 == 0)
-            file << " " << periodic_grid[j][i];
-          total_grid[5][i] += periodic_grid[j][i];
+            file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:";
+          for (int j = 0; j < pow(pbc * 2 + 1, 3) - 1; j++) {
+            if (i % 1000 == 0)
+              file << " " << periodic_grid[j][i];
+            total_grid[5][i] += periodic_grid[j][i];
+          }
+          if (i % 1000 == 0)
+            file << endl;
         }
-        if (i % 1000 == 0)
-          file << endl;
       }
     }
   }
@@ -2163,7 +2165,7 @@ int make_hirshfeld_grids(const int& pbc,
 void make_k_pts(const bool& read_k_pts,
   const bool& save_k_pts,
   const int gridsize,
-  cell& unit_cell,
+  const cell& unit_cell,
   hkl_list& hkl,
   vector<vector<double>>& k_pt,
   ofstream& file,
@@ -2192,7 +2194,7 @@ void make_k_pts(const bool& read_k_pts,
     file << endl << "Number of k-points to evaluate: ";
     file << k_pt[0].size();
     file << " for " << gridsize << " gridpoints." << endl;
-    save_k_points(k_pt, hkl);
+    if (save_k_points) save_k_points(k_pt, hkl);
   }
   else {
     read_k_points(k_pt, hkl, file);
