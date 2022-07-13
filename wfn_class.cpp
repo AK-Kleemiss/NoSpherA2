@@ -75,32 +75,14 @@ WFN::WFN(int given_origin)
   fill_Afac_pre();
 };
 
-WFN::WFN(const WFN& given_wfn, const bool& occ_only)
-{
-  origin = given_wfn.get_origin();
-  charge = given_wfn.get_charge();
-  multi = given_wfn.get_multi();
-
-  for (int i = 0; i < given_wfn.get_ncen(); i++) {
-    push_back_atom(given_wfn.atoms[i]);
-  }
-  for (int i = 0; i < given_wfn.get_nex(); i++) {
-    add_exp(given_wfn.get_center(i), given_wfn.get_type(i), given_wfn.get_exponent(i));
-  }
-  for (int i = 0; i < given_wfn.get_nmo(); i++) {
-    if (occ_only && given_wfn.get_MO_occ(i) == 0.0) {
-      continue;
-    }
-    MO temp(given_wfn.get_MO(i));
-    push_back_MO(temp);
-  }
-};
-
 bool WFN::push_back_atom(const string& label, const double& x, const double& y, const double& z, const int& charge)
 {
   ncen++;
   if (charge >= 1) atoms.push_back(atom(label, ncen, x, y, z, charge));
-  else atoms.push_back(atom());
+  else {
+    atoms.push_back(atom());
+    return false;
+  }
   return true;
 };
 
@@ -134,12 +116,6 @@ bool WFN::push_back_MO(MO& given)
   //hier fehlen noch sinnhaftigkeitsfragen
   MOs.push_back(given);
   return true;
-};
-
-bool WFN::push_back_MO_coef(const int& nr, const double& value, const int& nr2)
-{
-  err_checkf(nr < nmo, "not enough MOs", std::cout);
-  return MOs[nr].push_back_coef(value, nr2);
 };
 
 void WFN::push_back_MO_coef(const int& nr, const double& value)
@@ -242,7 +218,7 @@ bool WFN::add_primitive(const int& cent, const int& type, const double& e, doubl
 {
   nex++;
   if (push_back_center(cent) && push_back_type(type) && push_back_exponent(e))
-    for (int n = 0; n < nmo; n++) MOs[n].push_back_coef(values[n], nex);
+    for (int n = 0; n < nmo; n++) MOs[n].push_back_coef(values[n]);
   else return false;
   return true;
 };
@@ -454,13 +430,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     debug_wfn = true;
     debug_wfn_deep = true;
   }
-  if (exists(fileName)) {
-    if (debug_wfn) file << "File is valid, continuing...\n";
-  }
-  else {
-    file << "couldn't open or find " << fileName << ", leaving" << endl;
-    return false;
-  }
+  err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
   ifstream rf(fileName.c_str());
   if (rf.good())
     path = fileName;
@@ -836,50 +806,25 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     //if (debug_wfn_deep) file << "monum after: " << monum << endl;
     if (b == true) break;
   }
-  if (monum + 1 < e_nmo) {
-    file << "less MOs than expected, quitting...\n";
-    if (debug_wfn_deep) file << "monum: " << monum << " e_nmo: " << e_nmo << endl;
-    return false;
-  }
+  err_checkf(monum + 1 >= e_nmo, "less MOs than expected, quitting...\nmonum: " + to_string(monum) + " e_nmo : " + to_string(e_nmo), file);
   //---------------------Start writing everything from the temp arrays into wave ---------------------
-  //if (debug_wfn) file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
 
   for (int i = 0; i < e_nuc; i++)
-    if (!push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i])) file << "Error while making atoms!!\n";
-  //if (debug) {
-  //  file << "Starting to check whether it is bohr or Angstrom input!" << endl;
-  //}
-  /*if(check_bohr(*this, debug)){
-    for(int i=0; i<e_nuc; i++){
-      atoms[i].x=atoms[i].x*0.529177;
-      atoms[i].y=atoms[i].y*0.529177;
-      atoms[i].z=atoms[i].z*0.529177;
-    }
-  }*/
+    err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!\n", file);
   for (int j = 0; j < e_nex; j++) {
-    //if(debug_wfn_deep) file << j;
-    if (!add_exp(dum_center[j], dum_type[j], dum_exp[j])) {
-      file << "Error while making primitive!!\n";
-    }
+    err_checkf(add_exp(dum_center[j], dum_type[j], dum_exp[j]), "Error while writing MO coefficients...\n", file);
   }
   for (int i = 0; i < e_nmo; i++) {
     for (int j = 0; j < e_nex; j++) {
-      //if(debug_wfn_deep) file << "temp value: " << temp_val[i][j] << "  ";
-      if (!MOs[i].push_back_coef(temp_val[i][j], nex)) {
-        file << "Error while writing MO coefficients...\n";
-      }
+      MOs[i].push_back_coef(temp_val[i][j]);
     }
-    //if(debug_wfn_deep) file << endl << endl;
   }
   return true;
 };
 
 bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
 {
-  if (!exists(filename)) {
-    file << "couldn't open or find " << filename << ", leaving" << endl;
-    return false;
-  }
+  err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", file);
   origin = 7;
   ifstream rf(filename.c_str());
   if (rf.good())
@@ -933,14 +878,7 @@ bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
 
 bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
 {
-  if (exists(fileName)) {
-    if (debug)
-      file << "File is valid, continuing...\n";
-  }
-  else {
-    file << "couldn't open or find " << fileName << ", leaving" << endl;
-    return false;
-  }
+  err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
   ifstream rf(fileName.c_str());
   path = fileName;
   string line;
@@ -980,8 +918,7 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
       break;
     nrs.push_back(stoi(line));
   }
-  if (nrs.size() != temp_ncen)
-    return false;
+  err_checkf(nrs.size() == temp_ncen, "Mismatch in atom number size", file);
   rf.seekg(0);
   while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
     getline(rf, line);
@@ -997,12 +934,10 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     for (int i = 0; i < 3; i++)
       pos[i].push_back(temp[i]);
   }
-  if (pos[0].size() != temp_ncen)
-    return false;
+  err_checkf(pos[0].size() == temp_ncen, "Mismatch in atom position size", file);
   for (int i = 0; i < temp_ncen; i++)
-    push_back_atom(atnr2letter(nrs[i]) + to_string(i), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
-  if (ncen != temp_ncen)
-    return false;
+    push_back_atom(atnr2letter(nrs[i]) + to_string(i+1), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
+  err_checkf(ncen == temp_ncen, "Mismatch in atom position size", file);
   for (int i = 0; i < 3; i++)
     pos[i].resize(0);
   pos.resize(0);
@@ -1070,10 +1005,8 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     if (please_break)
       break;
   }
-  if (exponents.size() == temp_nex && centers.size() == temp_nex && types.size() == temp_nex)
-    nex = temp_nex;
-  else
-    return false;
+  err_checkf(exponents.size() == temp_nex && centers.size() == temp_nex && types.size() == temp_nex, "Mismatch in numbers! aborting!", file);
+  nex = temp_nex;
   rf.seekg(0);
   while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
     getline(rf, line);
@@ -1120,9 +1053,9 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     if (please_break)
       break;
   }
-  for (int i = 0; i < temp_nmo; i++)
-    if (!push_back_MO(i + 1, occ[i], ener[i]))
-      return false;
+  for (int i = 0; i < temp_nmo; i++) {
+    err_checkf(push_back_MO(i + 1, occ[i], ener[i]), "Error poshing back MO! MO: " + to_string(i), file);
+  }
   occ.resize(0);
   ener.resize(0);
   rf.seekg(0);
@@ -1147,11 +1080,10 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
         is >> temp;
         coef.push_back(temp);
       }
-      if (coef.size() > nex)
-        return false;
+      err_checkf(coef.size() <= nex, "Error reading coefficients! MO: " + to_string(MOs.size()), file);
     }
     for (int i = 0; i < nex; i++)
-      MOs[nr - 1].push_back_coef(coef[i], nex);
+      MOs[nr - 1].push_back_coef(coef[i]);
     coef.resize(0);
     getline(rf, line);
   }
@@ -3023,7 +2955,8 @@ void WFN::operator=(const WFN& right)
   }
   for (int i = 0; i < nmo; i++) {
     push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
-    for (int j = 0; j < right.get_MO_primitive_count(i); j++) push_back_MO_coef(i, right.get_MO_coef(i, j), j);
+    for (int j = 0; j < right.get_MO_primitive_count(i); j++) 
+      push_back_MO_coef(i, right.get_MO_coef(i, j));
   }
   for (int c = 0; c < right.cub.size(); c++) {
     cub.push_back(right.cub[c]);
