@@ -58,7 +58,7 @@ string help_message()
   t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
   return t;
 }
-string NoSpherA2_message(bool no_date)
+string NoSpherA2_message(const bool no_date)
 {
   string t = "    _   __     _____       __              ___   ___\n";
   t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
@@ -69,7 +69,7 @@ string NoSpherA2_message(bool no_date)
   t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
   t.append("Please give credit and cite corresponding pieces!\n");
   t.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
-  if (!no_date) {
+  if (no_date == false) {
     t.append("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
   }
   return t;

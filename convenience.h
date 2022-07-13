@@ -34,7 +34,7 @@ class WFN;
 class cell;
 
 std::string help_message();
-std::string NoSpherA2_message(bool no_date = false);
+std::string NoSpherA2_message(const bool no_date = false);
 //Constants for later use
 inline const int hardness = 3;
 inline const double cutoff = 1.0e-20;

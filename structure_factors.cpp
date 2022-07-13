@@ -2133,7 +2133,7 @@ int make_hirshfeld_grids(const int& pbc,
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       upper += abs(abs(total_grid[5][p]) * total_grid[3][p] - abs(total_grid[4][p]) * total_grid[3][p]);
-      lower += abs(total_grid[5][p] * total_grid[3][p]);
+      lower += abs(total_grid[5][p]) * total_grid[3][p] + abs(total_grid[4][p]) * total_grid[3][p];
       if (abs(res) > cutoff) {
         dens[i][run] = (res);
         d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
@@ -2149,7 +2149,7 @@ int make_hirshfeld_grids(const int& pbc,
     d2[i].resize(run);
     d3[i].resize(run);
   }
-  if (!no_date) {
+  if (no_date == false) {
     file << "R value of density = " << setw(12) << setprecision(8) << fixed << upper / lower << endl;
   }
   shrink_vector<vector<double>>(spherical_density);
@@ -2194,7 +2194,7 @@ void make_k_pts(const bool& read_k_pts,
     file << endl << "Number of k-points to evaluate: ";
     file << k_pt[0].size();
     file << " for " << gridsize << " gridpoints." << endl;
-    if (save_k_points) save_k_points(k_pt, hkl);
+    if (save_k_pts) save_k_points(k_pt, hkl);
   }
   else {
     read_k_points(k_pt, hkl, file);
