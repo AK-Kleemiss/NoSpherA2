@@ -21,18 +21,6 @@ public:
     occ = occupation;
     ener = energy;
   };
-  MO(const MO& given) {
-    nr = given.get_nr();
-    occ = given.get_occ();
-    ener = given.get_energy();
-    assign_coefs(given.get_ptr_coef_vector());
-  };
-  bool push_back_coef(const double &val, const int &nex) {
-    // consistencycheck with WFN
-    err_checkf(nex < coefficients.size(), "nr too small", std::cout);
-    coefficients.push_back(val);
-    return true;
-  };
   void push_back_coef(const double &val){
     coefficients.push_back(val);
   };

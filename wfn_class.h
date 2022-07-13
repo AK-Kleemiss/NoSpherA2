@@ -67,7 +67,6 @@ private:
 public:
   WFN();
   WFN(int given_origin);
-  WFN(const WFN& given_wfn, const bool& occ_only = false);
   std::vector<cube> cub;
   std::vector<atom> atoms;
 
@@ -80,7 +79,6 @@ public:
   int get_MO_primitive_count(const int& nr_mo) const;
   bool push_back_MO(const int& nr, const double& occ, const double& ener);
   bool push_back_MO(MO& given);
-  bool push_back_MO_coef(const int& nr, const double& value, const int& nr2);
   double get_MO_energy(const int& mo) const;
   int get_center(const int& nr) const { return centers[nr]; };
   int get_type(const int& nr) const { return types[nr]; };
@@ -114,6 +112,7 @@ public:
   int get_nmo() const { return nmo; };
   int get_nmo(const bool& only_occ) const;
   int get_origin() const { return origin; };
+  std::string get_comment() { return comment; };
   double get_exponent(int nr) const { return exponents[nr]; };
   unsigned int get_nr_electrons(const bool& debug);
   unsigned int get_nr_ECP_electrons();
@@ -140,8 +139,10 @@ public:
   int check_order(const bool& debug);
   bool sort_wfn(const int& g_order, const bool& debug);
   void set_dist_switch() { distance_switch = true; };
+  void set_dist_switch(const bool& g) { distance_switch = g; };
+  bool get_dist_switch() { return distance_switch; };
   void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true);
-  bool get_has_ECPs() { return has_ECPs; };
+  bool get_has_ECPs() const { return has_ECPs; };
   void operator=(const WFN& right);
   int calculate_charge();
   int calculate_charge(std::ofstream& file);

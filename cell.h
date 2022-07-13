@@ -75,14 +75,14 @@ public:
   double get_sa() { return sa; };
   double get_sb() { return sb; };
   double get_sg() { return sg; };
-  double get_rcm(int i, int j) { return rcm[i][j]; };
-  double get_cm(int i, int j) { return cm[i][j]; };
-  double get_sym(int i, int j, int k) { return sym[i][j][k]; };
-  std::vector <std::vector < std::vector<int>>> get_sym() { return sym; };
-  double get_a() { return a; };
-  double get_b() { return b; };
-  double get_c() { return c; };
-  double get_V() { return V; };
+  double get_rcm(int i, int j) const { return rcm[i][j]; };
+  double get_cm(int i, int j) const { return cm[i][j]; };
+  double get_sym(int i, int j, int k) const  { return sym[i][j][k]; };
+  std::vector <std::vector < std::vector<int>>> get_sym() const { return sym; };
+  double get_a() const { return a; };
+  double get_b() const { return b; };
+  double get_c() const { return c; };
+  double get_V() const { return V; };
   double get_angle(int i) const
   {
     switch (i) {
@@ -152,7 +152,7 @@ public:
     return 1.0 / (2 * get_d_of_hkl(hkl));
   }
 
-  void make_coords_cartesian(double* positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true)
+  void make_coords_cartesian(double* positions_cart, const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
   {
     positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
     positions_cart[1] = (b * sg * frac_y + c * (ca - cb * cg) / sg * frac_z);
