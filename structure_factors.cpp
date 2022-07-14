@@ -21,265 +21,6 @@ using namespace std;
 #include "CUDA_utilities.h"
 #endif
 
-bool merge_tscs(
-  const string& mode,
-  const vector<string>& files,
-  const bool debug
-)
-{
-  //Currently only for Mode "pure merge"
-  if (files.size() == 0)
-    return false;
-  vector <string> labels;
-  vector <vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
-  vector <vector <complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
-
-  vector<string> header;
-
-  size_t offset = 0;
-  indices.resize(3);
-  for (int f = 0; f < files.size(); f++) {
-    cout << "Reading file number: " << f + 1 << ": " << files[f] << endl;
-    ifstream inf(files[f].c_str(), ios::in);
-    string line;
-    bool data = false;
-    vector<bool> is_a_new_scatterer;
-    int nr_scatterers = 0;
-    int nr_new_scatterers;
-    while (!data) {
-      getline(inf, line);
-      if (line.find("SCATTERERS:") != string::npos) {
-        string temp_labels = line.substr(12, line.size()) + " ";
-        const string delimiter = " ";
-        size_t pos = 0;
-        string new_label;
-        while ((pos = temp_labels.find(delimiter)) != std::string::npos) {
-          nr_scatterers++;
-          new_label = temp_labels.substr(0, pos);
-          bool is_new = true;
-          for (int i = 0; i < labels.size(); i++)
-            if (labels[i] == new_label)	is_new = false;
-          is_a_new_scatterer.push_back(is_new);
-          if (is_new) labels.push_back(new_label);
-          temp_labels.erase(0, pos + delimiter.length());
-        }
-        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
-        cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << endl;
-        form_fact.resize(labels.size());
-      }
-      else if (line.find("DATA:") != string::npos)
-        data = true;
-      else if (f == 0) {
-        if (line.find("AD: ") != string::npos)
-          continue;
-        header.push_back(line);
-      }
-    }
-    cout << "Reading Data Block..." << endl;
-    while (!inf.eof()) {
-      getline(inf, line);
-      vector<string> digest = split_string<string>(line, " ");
-      if (digest.size() == 1 && digest[0] == "")
-        continue;
-      const int l_indices[3] = { stoi(digest[0]), stoi(digest[1]), stoi(digest[2]) };
-      if (l_indices[0] == 0 && l_indices[1] == 0 && l_indices[2] == 0) continue;
-      if (f == 0) {
-        // For the first file we only read what is not Freidel mates
-        bool new_index = true;
-#pragma omp parallel for reduction(&&:new_index)
-        for (int run = 0; run < indices[0].size(); run++) {
-          if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run])
-            new_index = false;
-          else if (stoi(digest[0]) == -indices[0][run] && stoi(digest[1]) == -indices[1][run] && stoi(digest[2]) == -indices[2][run])
-            new_index = false;
-        }
-        if (!new_index)
-          continue;
-        for (int i = 0; i < 3; i++)
-          indices[i].push_back(l_indices[i]);
-#pragma omp parallel for
-        for (int i = 0; i < nr_scatterers; i++) {
-          if (!is_a_new_scatterer[i]) continue;
-          size_t nr_in_new_scats = 0;
-          for (int p = 0; p < i; p++)
-            if (is_a_new_scatterer[p]) nr_in_new_scats++;
-          vector<string> re_im = split_string<string>(digest[i + 3], ",");
-          form_fact[offset + nr_in_new_scats].push_back(complex<double>(stod(re_im[0]), stod(re_im[1])));
-        }
-      }
-      else {
-        //Otherwise we put stuff where it belongs
-#pragma omp parallel for
-        for (int i = 0; i < nr_scatterers; i++) {
-          if (!is_a_new_scatterer[i]) continue;
-          size_t nr_in_new_scats = 0;
-          for (int p = 0; p < i; p++)
-            if (is_a_new_scatterer[p]) nr_in_new_scats++;
-          form_fact[offset + nr_in_new_scats].resize(form_fact[0].size());
-        }
-        bool found = false;
-        for (int run = 0; run < indices[0].size(); run++) {
-          if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) {
-#pragma omp parallel for
-            for (int i = 0; i < nr_scatterers; i++) {
-              if (!is_a_new_scatterer[i]) continue;
-              size_t nr_in_new_scats = 0;
-              for (int p = 0; p < i; p++)
-                if (is_a_new_scatterer[p]) nr_in_new_scats++;
-              vector<string> re_im = split_string<string>(digest[i + 3], ",");
-              form_fact[offset + nr_in_new_scats][run] = complex<double>(stod(re_im[0]), stod(re_im[1]));
-            }
-            found = true;
-          }
-          else if (l_indices[0] == -indices[0][run] && l_indices[1] == -indices[1][run] && l_indices[2] == -indices[2][run]) {
-#pragma omp parallel for
-            for (int i = 0; i < nr_scatterers; i++) {
-              if (!is_a_new_scatterer[i]) continue;
-              size_t nr_in_new_scats = 0;
-              for (int p = 0; p < i; p++)
-                if (is_a_new_scatterer[p]) nr_in_new_scats++;
-              vector<string> re_im = split_string<string>(digest[i + 3], ",");
-              form_fact[offset + nr_in_new_scats][run] = complex<double>(stod(re_im[0]), -stod(re_im[1]));
-            }
-            found = true;
-          }
-          if (found)
-            break;
-        }
-      }
-    }
-    cout << "Data for " << form_fact[0].size() << " indices read." << endl;
-    offset = labels.size();
-  }
-  cout << "Writing combined file..." << endl;
-  ofstream tsc_file("combined.tsc", ios::out);
-
-  for (size_t h = 0; h < header.size(); h++)
-    tsc_file << header[h] << endl;
-  tsc_file << "    PARTS: " << files.size() << endl;
-  tsc_file << "SCATTERERS:";
-  for (int i = 0; i < labels.size(); i++)
-    tsc_file << " " << labels[i];
-  tsc_file << endl << "DATA:" << endl;
-
-  for (int r = 0; r < indices[0].size(); r++) {
-    for (int h = 0; h < 3; h++)
-      tsc_file << indices[h][r] << " ";
-    for (int i = 0; i < labels.size(); i++)
-      tsc_file << scientific << setprecision(8) << real(form_fact[i][r]) << ","
-      << scientific << setprecision(8) << imag(form_fact[i][r]) << " ";
-    tsc_file << endl;
-  }
-  tsc_file.flush();
-  tsc_file.close();
-  cout << "Done!" << endl;
-
-  return true;
-}
-
-bool merge_tscs_without_checks(
-  const string& mode,
-  const vector<string>& files,
-  const bool debug
-)
-{
-  //Currently only for Mode "pure merge"
-  if (files.size() == 0)
-    return false;
-  vector <string> labels;
-  vector <vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
-  vector <vector <complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
-
-  vector<string> header;
-
-  size_t offset = 0;
-  indices.resize(3);
-  for (int f = 0; f < files.size(); f++) {
-    cout << "Reading file number: " << f + 1 << ": " << files[f] << endl;
-    ifstream inf(files[f].c_str(), ios::in);
-    string line;
-    bool data = false;
-    vector<bool> is_a_new_scatterer;
-    int nr_scatterers = 0;
-    int nr_new_scatterers;
-    while (!data) {
-      getline(inf, line);
-      if (line.find("SCATTERERS:") != string::npos) {
-        string temp_labels = line.substr(12, line.size()) + " ";
-        const string delimiter = " ";
-        size_t pos = 0;
-        string new_label;
-        while ((pos = temp_labels.find(delimiter)) != std::string::npos) {
-          nr_scatterers++;
-          new_label = temp_labels.substr(0, pos);
-          bool is_new = true;
-          for (int i = 0; i < labels.size(); i++)
-            if (labels[i] == new_label)	is_new = false;
-          is_a_new_scatterer.push_back(is_new);
-          if (is_new) labels.push_back(new_label);
-          temp_labels.erase(0, pos + delimiter.length());
-        }
-        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
-        cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << endl;
-        form_fact.resize(labels.size());
-      }
-      else if (line.find("DATA:") != string::npos)
-        data = true;
-      else if (f == 0) {
-        if (line.find("AD: ") != string::npos)
-          continue;
-        header.push_back(line);
-      }
-    }
-    cout << "Reading Data Block..." << endl;
-    while (!inf.eof()) {
-      getline(inf, line);
-      vector<string> digest = split_string<string>(line, " ");
-      if (digest.size() == 1 && digest[0] == "")
-        continue;
-      if (f == 0)
-        for (int i = 0; i < 3; i++)
-          indices[i].push_back(stoi(digest[i]));
-#pragma omp parallel for
-      for (int i = 0; i < nr_scatterers; i++) {
-        if (!is_a_new_scatterer[i]) continue;
-        size_t nr_in_new_scats = 0;
-        for (int p = 0; p < i; p++)
-          if (is_a_new_scatterer[p]) nr_in_new_scats++;
-        vector<string> re_im = split_string<string>(digest[i + 3], ",");
-        form_fact[offset + nr_in_new_scats].push_back(complex<double>(stod(re_im[0]), stod(re_im[1])));
-      }
-    }
-    cout << "Data for " << form_fact[form_fact.size() - 1].size() << " indices read." << endl;
-    offset = labels.size();
-    inf.close();
-  }
-  cout << "Writing combined file..." << endl;
-  ofstream tsc_file("combined.tsc", ios::out);
-
-  for (size_t h = 0; h < header.size(); h++)
-    tsc_file << header[h] << endl;
-  tsc_file << "    PARTS: " << files.size() << endl;
-  tsc_file << "SCATTERERS:";
-  for (int i = 0; i < labels.size(); i++)
-    tsc_file << " " << labels[i];
-  tsc_file << endl << "DATA:" << endl;
-
-  for (int r = 0; r < indices[0].size(); r++) {
-    for (int h = 0; h < 3; h++)
-      tsc_file << indices[h][r] << " ";
-    for (int i = 0; i < labels.size(); i++)
-      tsc_file << scientific << setprecision(8) << real(form_fact[i][r]) << ","
-      << scientific << setprecision(8) << imag(form_fact[i][r]) << " ";
-    tsc_file << endl;
-  }
-  tsc_file.flush();
-  tsc_file.close();
-  cout << "Done!" << endl;
-
-  return true;
-}
-
 #ifdef FLO_CUDA
 
 #else
@@ -2364,28 +2105,20 @@ void convert_to_ED(const vector <int>& asym_atom_list,
 }
 
 bool thakkar_sfac(
-  const string& hkl_filename,
-  const string& cif,
-  const bool debug,
+  const options& opt,
   ofstream& file,
-  const vector <int>& input_groups,
-  const vector < vector <double> >& twin_law,
-  WFN& wave,
-  const int cpus,
-  const bool electron_diffraction,
-  const bool save_k_pts,
-  const bool read_k_pts
+  WFN& wave
 )
 {
-  err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
-  err_checkf(exists(cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(debug) << endl;
-  file << "Reading: " << hkl_filename;
+  err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
+  err_checkf(exists(opt.cif), "CIF does not exists!", file);
+  file << "Number of protons: " << wave.get_nr_electrons(opt.debug) << endl;
+  file << "Reading: " << opt.hkl;
   file.flush();
 
-  cell unit_cell(cif, file, debug);
+  cell unit_cell(opt.cif, file, opt.debug);
 
-  ifstream cif_input(cif.c_str(), std::ios::in);
+  ifstream cif_input(opt.cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
   vector <int> asym_atom_list;
@@ -2393,7 +2126,7 @@ bool thakkar_sfac(
   vector<string> known_atoms;
 
   read_atoms_from_CIF(cif_input,
-    input_groups,
+    opt.groups[0],
     unit_cell,
     wave,
     known_atoms,
@@ -2402,19 +2135,17 @@ bool thakkar_sfac(
     asym_atom_list,
     needs_grid,
     file,
-    debug);
+    opt.debug);
 
   cif_input.close();
 
-  if (debug)
-    file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-  if (debug)
-    file << "made it post CIF, now make grids!" << endl;
+  if (opt.debug)
+    file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" 
+    << endl << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  if (!opt.read_k_pts) {
+    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
   vector <Thakkar> spherical_atoms;
@@ -2423,14 +2154,14 @@ bool thakkar_sfac(
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    read_k_pts,
-    save_k_pts,
+    opt.read_k_pts,
+    opt.save_k_pts,
     0,
     unit_cell,
     hkl,
     k_pt,
     file,
-    debug);
+    opt.debug);
 
   const int smax = k_pt[0].size();
   const int imax = asym_atom_list.size();
@@ -2450,7 +2181,7 @@ bool thakkar_sfac(
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
 
-  if (electron_diffraction) {
+  if (opt.electron_diffraction) {
     const double fact = 0.023934;
     double h2;
 #pragma omp parallel for private(h2, it)
@@ -2462,7 +2193,7 @@ bool thakkar_sfac(
     }
   }
 
-  if (debug)
+  if (opt.debug)
     file << endl << "SFs are made, now just write them!" << endl;
   else
     file << endl << "Writing tsc file..." << endl;
@@ -2482,56 +2213,49 @@ bool thakkar_sfac(
 }
 
 tsc_block MTC_thakkar_sfac(
-  string& hkl_filename,
-  string& cif,
-  bool debug,
+  const options& opt,
   ofstream& file,
-  vector <int>& input_groups,
-  vector < vector <double> >& twin_law,
   vector < string >& known_atoms,
-  WFN& wave,
-  int cpus,
-  bool electron_diffraction,
-  bool save_k_pts,
-  bool read_k_pts
+  vector<WFN>& wave,
+  const int& nr
 )
 {
-  err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
-  err_checkf(exists(cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(debug) << endl;
-  file << "Reading: " << hkl_filename;
+  err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
+  err_checkf(exists(opt.cif), "CIF does not exists!", file);
+  file << "Number of protons: " << wave[nr].get_nr_electrons(opt.debug) << endl;
+  file << "Reading: " << opt.hkl;
   file.flush();
 
-  cell unit_cell(cif, file, debug);
-  ifstream cif_input(cif.c_str(), std::ios::in);
+  cell unit_cell(opt.cif, file, opt.debug);
+  ifstream cif_input(opt.cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
   vector <int> asym_atom_list;
-  vector <bool> needs_grid(wave.get_ncen(), false);
+  vector <bool> needs_grid(wave[nr].get_ncen(), false);
 
   read_atoms_from_CIF(cif_input,
-    input_groups,
+    opt.groups[nr],
     unit_cell,
-    wave,
+    wave[nr],
     known_atoms,
     atom_type_list,
     asym_atom_to_type_list,
     asym_atom_list,
     needs_grid,
     file,
-    debug);
+    opt.debug);
 
   cif_input.close();
 
-  if (debug)
+  if (opt.debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
-  if (debug)
+  if (opt.debug)
     file << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  if (nr != 0) {
+    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
   vector <Thakkar> spherical_atoms;
@@ -2540,14 +2264,14 @@ tsc_block MTC_thakkar_sfac(
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    read_k_pts,
-    save_k_pts,
+    nr != 0,
+    nr == 0,
     0,
     unit_cell,
     hkl,
     k_pt,
     file,
-    debug);
+    opt.debug);
 
   const int smax = k_pt[0].size();
   const int imax = asym_atom_list.size();
@@ -2567,7 +2291,7 @@ tsc_block MTC_thakkar_sfac(
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
 
-  if (electron_diffraction) {
+  if (opt.electron_diffraction) {
     const double fact = 0.023934;
     double h2;
 #pragma omp parallel for private(h2, it)
@@ -2579,14 +2303,14 @@ tsc_block MTC_thakkar_sfac(
     }
   }
 
-  if (debug)
+  if (opt.debug)
     file << endl << "SFs are made, now just write them!" << endl;
   else
     file << endl << "Writing tsc file..." << endl;
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
-    labels.push_back(wave.atoms[asym_atom_list[i]].label);
+    labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
 
   tsc_block blocky(
     sf,
@@ -2598,22 +2322,9 @@ tsc_block MTC_thakkar_sfac(
 }
 
 bool calculate_structure_factors_HF(
-  const string& hkl_filename,
-  const string& cif,
+  const options& opt,
   WFN& wave,
-  const bool debug,
-  const int accuracy,
-  ofstream& file,
-  const vector <int>& input_groups,
-  const vector < vector <double> >& twin_law,
-  const int cpus,
-  const bool electron_diffraction,
-  const int pbc,
-  const bool Olex2_1_3_switch,
-  const bool save_k_pts,
-  const bool read_k_pts,
-  const int& ECP_mode,
-  const bool no_date
+  ofstream& file
 )
 {
 #ifdef FLO_CUDA
@@ -2623,12 +2334,12 @@ bool calculate_structure_factors_HF(
   }
 #endif
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
-  err_checkf(exists(cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
+  err_checkf(exists(opt.cif), "CIF does not exists!", file);
+  file << "Number of protons: " << wave.get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (cpus != -1) {
-    omp_set_num_threads(cpus);
+  if (opt.ncpus != -1) {
+    omp_set_num_threads(opt.ncpus);
     omp_set_dynamic(0);
   }
 
@@ -2641,8 +2352,8 @@ bool calculate_structure_factors_HF(
   gettimeofday(&t1, 0);
 #endif
 
-  cell unit_cell(cif, file, debug);
-  ifstream cif_input(cif.c_str(), std::ios::in);
+  cell unit_cell(opt.cif, file, opt.debug);
+  ifstream cif_input(opt.cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
   vector <int> asym_atom_list;
@@ -2650,7 +2361,7 @@ bool calculate_structure_factors_HF(
   vector<string> known_atoms;
 
   read_atoms_from_CIF(cif_input,
-    input_groups,
+    opt.groups[0],
     unit_cell,
     wave,
     known_atoms,
@@ -2659,25 +2370,25 @@ bool calculate_structure_factors_HF(
     asym_atom_list,
     needs_grid,
     file,
-    debug);
+    opt.debug);
 
   cif_input.close();
 
-  if (debug)
+  if (opt.debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
   hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  if (!opt.read_k_pts) {
+    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
-  if (debug)
+  if (opt.debug)
     file << "made it post CIF, now make grids!" << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
-  int points = make_hirshfeld_grids(pbc,
-    accuracy,
-    input_groups,
+  int points = make_hirshfeld_grids(opt.pbc,
+    opt.accuracy,
+    opt.groups[0],
     unit_cell,
     wave,
     atom_type_list,
@@ -2697,19 +2408,19 @@ bool calculate_structure_factors_HF(
     t1,
     t2,
 #endif
-    debug,
-    no_date);
+    opt.debug,
+    opt.no_date);
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    read_k_pts,
-    save_k_pts,
+    opt.read_k_pts,
+    opt.save_k_pts,
     points,
     unit_cell,
     hkl,
     k_pt,
     file,
-    debug);
+    opt.debug);
 
   vector<vector<complex<double>>> sf;
   calc_SF(points,
@@ -2724,7 +2435,7 @@ bool calculate_structure_factors_HF(
     t1,
     t2,
 #endif
-    debug);
+    opt.debug);
 
   if (wave.get_has_ECPs()) {
     add_ECP_contribution(
@@ -2733,19 +2444,19 @@ bool calculate_structure_factors_HF(
       sf,
       k_pt,
       file,
-      ECP_mode,
-      debug
+      opt.ECP_mode,
+      opt.debug
     );
   }
 
-  if (electron_diffraction) {
+  if (opt.electron_diffraction) {
     convert_to_ED(asym_atom_list,
       wave,
       sf,
       unit_cell,
       hkl,
       file,
-      debug);
+      opt.debug);
   }
 
   vector<string> labels;
@@ -2788,43 +2499,32 @@ bool calculate_structure_factors_HF(
 }
 
 tsc_block calculate_structure_factors_MTC(
-  const string& hkl_filename,
-  const string& cif,
-  WFN& wave,
-  const bool debug,
-  const int accuracy,
+  const options& opt,
+  vector<WFN>& wave,
   ofstream& file,
-  const vector <int>& input_groups,
-  const vector < vector <double> >& twin_law,
   vector < string >& known_atoms,
-  const int cpus,
-  const bool electron_diffraction,
-  const int pbc,
-  const bool save_k_pts,
-  const bool read_k_pts,
-  const int& ECP_mode,
-  const bool no_date
+  const int& nr
 )
 {
 #ifdef FLO_CUDA
 
 #endif
-  err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-  err_checkf(exists(cif), "CIF " + cif + " does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
-  if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
+  err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
+  err_checkf(exists(opt.cif), "CIF " + opt.cif + " does not exists!", file);
+  file << "Number of protons: " << wave[nr].get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
+  if (wave[nr].get_has_ECPs()) file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (cpus != -1) {
-    omp_set_num_threads(cpus);
+  if (opt.ncpus != -1) {
+    omp_set_num_threads(opt.ncpus);
     omp_set_dynamic(0);
   }
-  if (debug) file << "Working with: " << wave.get_path() << endl;
-  vector<double> x, y, z;
-  vector<int> atom_z;
-  x.resize(wave.get_ncen()), y.resize(wave.get_ncen()), z.resize(wave.get_ncen()), atom_z.resize(wave.get_ncen());
-  double* alpha_max = new double[wave.get_ncen()];
-  int* max_l = new int[wave.get_ncen()];
-  int max_l_overall = 0;
+  if (opt.debug) file << "Working with: " << wave[nr].get_path() << endl;
+  //vector<double> x, y, z;
+  //vector<int> atom_z;
+  //x.resize(wave[nr].get_ncen()), y.resize(wave[nr].get_ncen()), z.resize(wave[nr].get_ncen()), atom_z.resize(wave[nr].get_ncen());
+  //double* alpha_max = new double[wave.get_ncen()];
+  //int* max_l = new int[wave.get_ncen()];
+  //int max_l_overall = 0;
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -2835,44 +2535,44 @@ tsc_block calculate_structure_factors_MTC(
   gettimeofday(&t1, 0);
 #endif
 
-  cell unit_cell(cif, file, debug);
-  ifstream cif_input(cif.c_str(), std::ios::in);
+  cell unit_cell(opt.cif, file, opt.debug);
+  ifstream cif_input(opt.cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
   vector <int> asym_atom_list;
-  vector <bool> needs_grid(wave.get_ncen(), false);
+  vector <bool> needs_grid(wave[nr].get_ncen(), false);
 
   read_atoms_from_CIF(cif_input,
-    input_groups,
+    opt.groups[nr],
     unit_cell,
-    wave,
+    wave[nr],
     known_atoms,
     atom_type_list,
     asym_atom_to_type_list,
     asym_atom_list,
     needs_grid,
     file,
-    debug);
+    opt.debug);
 
   cif_input.close();
 
-  if (debug)
+  if (opt.debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
   hkl_list hkl;
-  if (!read_k_pts) {
-    read_hkl(hkl_filename, hkl, twin_law, unit_cell, file, debug);
+  if (nr != 0) {
+    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
-  if (debug)
+  if (opt.debug)
     file << "made it post CIF, now make grids!" << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
-  int points = make_hirshfeld_grids(pbc,
-    accuracy,
-    input_groups,
+  int points = make_hirshfeld_grids(opt.pbc,
+    opt.accuracy,
+    opt.groups[nr],
     unit_cell,
-    wave,
+    wave[nr],
     atom_type_list,
     asym_atom_to_type_list,
     asym_atom_list,
@@ -2890,19 +2590,19 @@ tsc_block calculate_structure_factors_MTC(
     t1,
     t2,
 #endif
-    debug,
-    no_date);
+    opt.debug,
+    opt.no_date);
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    read_k_pts,
-    save_k_pts,
+    nr != 0,
+    nr == 0,
     points,
     unit_cell,
     hkl,
     k_pt,
     file,
-    debug);
+    opt.debug);
 
   vector<vector<complex<double>>> sf;
   calc_SF(points,
@@ -2917,33 +2617,33 @@ tsc_block calculate_structure_factors_MTC(
     t1,
     t2,
 #endif
-    debug);
+    opt.debug);
 
-  if (wave.get_has_ECPs()) {
+  if (wave[nr].get_has_ECPs()) {
     add_ECP_contribution(
       asym_atom_list,
-      wave,
+      wave[nr],
       sf,
       k_pt,
       file,
-      ECP_mode,
-      debug
+      opt.ECP_mode,
+      opt.debug
     );
   }
 
-  if (electron_diffraction) {
+  if (opt.electron_diffraction) {
     convert_to_ED(asym_atom_list,
-      wave,
+      wave[nr],
       sf,
       unit_cell,
       hkl,
       file,
-      debug);
+      opt.debug);
   }
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
-    labels.push_back(wave.atoms[asym_atom_list[i]].label);
+    labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
 
   tsc_block blocky(
     sf,

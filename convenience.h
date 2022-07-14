@@ -559,4 +559,74 @@ struct primitive
 typedef std::set<std::vector<int>> hkl_list;
 typedef std::set<std::vector<int>>::const_iterator hkl_list_it;
 
+//---------------- Object for handling all input options -------------------------------
+struct options {
+  options() {
+    groups.resize(1);
+  };
+  options(int& argc, char** argv) {
+    groups.resize(1);
+    digest_options(argc, argv);
+  };
+  void digest_options(int& argc, char** argv);
+  int accuracy = 2;
+  int threads = -1;
+  int pbc = 0;
+  double resolution = 0.1;
+  double radius = 2.0;
+  bool becke = false;
+  bool electron_diffraction = false;
+  bool ECP = false;
+  int ECP_mode = 0;
+  bool calc = false;
+  bool eli = false;
+  bool esp = false;
+  bool elf = false;
+  bool lap = false;
+  bool rdg = false;
+  bool hdef = false;
+  bool def = false;
+  bool fract = false;
+  bool hirsh = false;
+  bool Olex2_1_3_switch = false;
+  bool iam_switch = false;
+  bool read_k_pts = false;
+  bool save_k_pts = false;
+  bool combined_tsc_calc = false;
+  bool binary_tsc = true;
+  bool cif_based_combined_tsc_calc = false;
+  bool density_test_cube = false;
+  bool no_date = false;
+  bool gbw2wfn = false;
+  int hirsh_number = 0;
+  double MinMax[6]{ 0,0,0,0,0,0 };
+  double NbSteps[3]{ 0,0,0 };
+  std::vector <int> MOs;
+  std::vector < std::vector <int> > groups;
+  std::vector < std::vector <double> > twin_law;
+  std::vector < std::vector <int> > combined_tsc_groups;
+  bool all_mos = false;
+  bool test = false;
+  std::string wfn;
+  std::string fchk;
+  std::string basis_set;
+  std::string hkl;
+  std::string cif;
+  std::string method;
+  std::string xyz_file;
+  std::string temp;
+  std::string fract_name;
+  std::vector<std::string> combined_tsc_calc_files;
+  std::vector<std::string> combined_tsc_calc_cifs;
+  std::string wavename;
+  std::string gaussian_path;
+  std::string turbomole_path;
+  std::string basis_set_path;
+  std::vector<std::string> arguments;
+  int ncpus = 0;
+  double mem = 0.0;
+  int mult = 0;
+  bool debug=false;
+};
+
 #include "wfn_class.h"
