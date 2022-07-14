@@ -1,5 +1,6 @@
 #include "convenience.h"
 #include "cell.h"
+#include "tsc_block.h"
 
 using namespace std;
 
@@ -2073,4 +2074,174 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
     return result;
   }
   else return 0.001;
+};
+
+void options::digest_options(int& argc, char** argv) {
+  //This loop figures out command line options
+  for (int i = 0; i < argc; i++) {
+    temp = argv[i];
+    arguments.push_back(temp);
+    if (temp.find("-") > 0) continue;
+    if (temp.find("-acc") < 1)
+      accuracy = stoi(argv[i + 1]);
+    else if (temp.find("-b") < 1)
+      basis_set = argv[i + 1];
+    else if (temp.find("-cif") < 1)
+      cif = argv[i + 1];
+    else if (temp.find("-cpus") < 1)
+      threads = stoi(argv[i + 1]);
+    else if (temp.find("-cmtc") != string::npos) {
+      cif_based_combined_tsc_calc = true;
+      int n = 1;
+      string delimiter = ",";
+      groups.pop_back();
+      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+        combined_tsc_calc_files.push_back(argv[i + n]);
+        n++;
+        combined_tsc_calc_cifs.push_back(argv[i + n]);
+        n++;
+        const string temp = argv[i + n];
+        groups.push_back(split_string<int>(temp, delimiter));
+        n++;
+      }
+    }
+    else if (temp.find("-def") < 1)
+      def = calc = true;
+    else if (temp.find("-DEF") < 1)
+      def = calc = true;
+    else if (temp.find("-d") < 1)
+      basis_set_path = argv[i + 1];
+    else if (temp.find("-ECP") < 1) {
+      ECP = true;
+      if (argc >= i + 2 && string(argv[i + 1]).find("-") != 0) {
+        ECP_mode = stoi(argv[i + 1]);
+      }
+    }
+    else if (temp.find("-ED") < 1)
+      electron_diffraction = true;
+    else if (temp.find("-eli") < 1)
+      calc = eli = true;
+    else if (temp.find("-elf") < 1)
+      calc = elf = true;
+    else if (temp.find("-esp") < 1)
+      calc = esp = true;
+    else if (temp.find("-fchk") < 1)
+      fchk = argv[i + 1];
+    else if (temp.find("-fractal") < 1)
+      fract = true, fract_name = argv[i + 1];
+    else if (temp.find("-gbw2wfn") < 1)
+      gbw2wfn = true;
+    else if (temp.find("-group") < 1) {
+      int n = 1;
+      while (i + n < argc && string(argv[i + n]).find("-") == string::npos) {
+        int group;
+        if (argv[i + 1][0] == '+')
+          group = -stoi(argv[i + n]);
+        else
+          group = stoi(argv[i + n]);
+        groups[0].push_back(group), n++;
+      }
+      i += n;
+    }
+    else if (temp.find("-HDEF") < 1)
+      hdef = calc = true;
+    else if (temp.find("-hirsh") < 1)
+      calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
+    else if (temp.find("-hkl") < 1)
+      hkl = argv[i + 1];
+    else if (temp.find("-IAM") != string::npos)
+      iam_switch = true;
+    else if (temp.find("-lap") < 1)
+      calc = lap = true;
+    else if (temp.find("-method") < 1)
+      method = argv[i + 1];
+    else if (temp.find("-merge") != string::npos) {
+      vector<string> filenames;
+      int n = 1;
+      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+        filenames.push_back(argv[i + n]);
+        n++;
+      }
+      merge_tscs("combine", filenames, debug);
+      exit(0);
+    }
+    else if (temp.find("-merge_nocheck") != string::npos) {
+      vector<string> filenames;
+      int n = 1;
+      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+        filenames.push_back(argv[i + n]);
+        n++;
+      }
+      merge_tscs_without_checks("combine", filenames, debug);
+      exit(0);
+    }
+    else if (temp.find("-MO") < 1) {
+      if (string(argv[i + 1]) != "all")
+        MOs.push_back(stoi(argv[i + 1]));
+      else
+        all_mos = true;
+      calc = true;
+    }
+    else if (temp.find("-mtc") != string::npos) {
+      combined_tsc_calc = true;
+      int n = 1;
+      string delimiter = ",";
+      groups.pop_back();
+      while (i + n < argc && string(argv[i + n]).find("-") > 0) {
+        combined_tsc_calc_files.push_back(argv[i + n]);
+        n++;
+        const string temp = argv[i + n];
+        groups.push_back(split_string<int>(temp, delimiter));
+        n++;
+      }
+    }
+    else if (temp.find("-mult") < 1)
+      mult = stoi(argv[i + 1]);
+    else if (temp.find("-no-date") < 1)
+      no_date = true;
+    else if (temp.find("-pbc") < 1)
+      pbc = stoi(argv[i + 1]);
+    else if (temp.find("-radius") < 1)
+      radius = stod(argv[i + 1]);
+    else if (temp.find("-resolution") < 1)
+      resolution = stod(argv[i + 1]);
+    else if (temp.find("-rdg") < 1)
+      calc = rdg = true;
+    else if (temp.find("-rkpts") < 1)
+      read_k_pts = true;
+    else if (temp.find("-rho_cube_test") != string::npos)
+      density_test_cube = true;
+    else if (temp.find("-skpts") < 1)
+      save_k_pts = true;
+    else if (temp.find("-test") < 1)
+      cout << "Running in test mode!" << endl, test = true;
+    else if (temp.find("-twin") < 1) {
+      twin_law.resize(twin_law.size() + 1);
+      twin_law[twin_law.size() - 1].resize(9);
+      for (int twl = 0; twl < 9; twl++)
+        twin_law[twin_law.size() - 1][twl] = stod(argv[i + 1 + twl]);
+      if (debug) {
+        cout << "twin_law: ";
+        for (int twl = 0; twl < 9; twl++)
+          cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
+        cout << endl;
+      }
+      i += 9;
+    }
+    else if (temp.find("-tscb") != string::npos) {
+      string name = argv[i + 1];
+      tsc_block blocky = tsc_block(name);
+      name = "test.cif";
+      blocky.write_tsc_file(name);
+      exit(0);
+    }
+    else if (temp.find("-v") < 1)
+      cout << "Turning on verbose mode!" << endl, debug = true;
+    else if (temp.find("-wfn") < 1) {
+      wfn = argv[i + 1];
+    }
+    else if (temp.find("-xyz") != string::npos) {
+      xyz_file = argv[i + 1];
+    }
+  }
 };

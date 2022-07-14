@@ -330,3 +330,261 @@ public:
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
 };
+
+inline bool merge_tscs(
+  const std::string& mode,
+  const std::vector<std::string>& files,
+  const bool debug
+)
+{
+  //Currently only for Mode "pure merge"
+  if (files.size() == 0)
+    return false;
+  std::vector <std::string> labels;
+  std::vector <std::vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
+  std::vector <std::vector <std::complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
+
+  std::vector<std::string> header;
+
+  size_t offset = 0;
+  indices.resize(3);
+  for (int f = 0; f < files.size(); f++) {
+    std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
+    std::ifstream inf(files[f].c_str(), std::ios::in);
+    std::string line;
+    bool data = false;
+    std::vector<bool> is_a_new_scatterer;
+    int nr_scatterers = 0;
+    int nr_new_scatterers;
+    while (!data) {
+      getline(inf, line);
+      if (line.find("SCATTERERS:") != std::string::npos) {
+        std::string temp_labels = line.substr(12, line.size()) + " ";
+        const std::string delimiter = " ";
+        size_t pos = 0;
+        std::string new_label;
+        while ((pos = temp_labels.find(delimiter)) != std::string::npos) {
+          nr_scatterers++;
+          new_label = temp_labels.substr(0, pos);
+          bool is_new = true;
+          for (int i = 0; i < labels.size(); i++)
+            if (labels[i] == new_label)	is_new = false;
+          is_a_new_scatterer.push_back(is_new);
+          if (is_new) labels.push_back(new_label);
+          temp_labels.erase(0, pos + delimiter.length());
+        }
+        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
+        std::cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << std::endl;
+        form_fact.resize(labels.size());
+      }
+      else if (line.find("DATA:") != std::string::npos)
+        data = true;
+      else if (f == 0) {
+        if (line.find("AD: ") != std::string::npos)
+          continue;
+        header.push_back(line);
+      }
+    }
+    std::cout << "Reading Data Block..." << std::endl;
+    while (!inf.eof()) {
+      getline(inf, line);
+      std::vector<std::string> digest = split_string<std::string>(line, " ");
+      if (digest.size() == 1 && digest[0] == "")
+        continue;
+      const int l_indices[3] = { stoi(digest[0]), stoi(digest[1]), stoi(digest[2]) };
+      if (l_indices[0] == 0 && l_indices[1] == 0 && l_indices[2] == 0) continue;
+      if (f == 0) {
+        // For the first file we only read what is not Freidel mates
+        bool new_index = true;
+#pragma omp parallel for reduction(&&:new_index)
+        for (int run = 0; run < indices[0].size(); run++) {
+          if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run])
+            new_index = false;
+          else if (stoi(digest[0]) == -indices[0][run] && stoi(digest[1]) == -indices[1][run] && stoi(digest[2]) == -indices[2][run])
+            new_index = false;
+        }
+        if (!new_index)
+          continue;
+        for (int i = 0; i < 3; i++)
+          indices[i].push_back(l_indices[i]);
+#pragma omp parallel for
+        for (int i = 0; i < nr_scatterers; i++) {
+          if (!is_a_new_scatterer[i]) continue;
+          size_t nr_in_new_scats = 0;
+          for (int p = 0; p < i; p++)
+            if (is_a_new_scatterer[p]) nr_in_new_scats++;
+          std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+          form_fact[offset + nr_in_new_scats].push_back(std::complex<double>(stod(re_im[0]), stod(re_im[1])));
+        }
+      }
+      else {
+        //Otherwise we put stuff where it belongs
+#pragma omp parallel for
+        for (int i = 0; i < nr_scatterers; i++) {
+          if (!is_a_new_scatterer[i]) continue;
+          size_t nr_in_new_scats = 0;
+          for (int p = 0; p < i; p++)
+            if (is_a_new_scatterer[p]) nr_in_new_scats++;
+          form_fact[offset + nr_in_new_scats].resize(form_fact[0].size());
+        }
+        bool found = false;
+        for (int run = 0; run < indices[0].size(); run++) {
+          if (l_indices[0] == indices[0][run] && l_indices[1] == indices[1][run] && l_indices[2] == indices[2][run]) {
+#pragma omp parallel for
+            for (int i = 0; i < nr_scatterers; i++) {
+              if (!is_a_new_scatterer[i]) continue;
+              size_t nr_in_new_scats = 0;
+              for (int p = 0; p < i; p++)
+                if (is_a_new_scatterer[p]) nr_in_new_scats++;
+              std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+              form_fact[offset + nr_in_new_scats][run] = std::complex<double>(stod(re_im[0]), stod(re_im[1]));
+            }
+            found = true;
+          }
+          else if (l_indices[0] == -indices[0][run] && l_indices[1] == -indices[1][run] && l_indices[2] == -indices[2][run]) {
+#pragma omp parallel for
+            for (int i = 0; i < nr_scatterers; i++) {
+              if (!is_a_new_scatterer[i]) continue;
+              size_t nr_in_new_scats = 0;
+              for (int p = 0; p < i; p++)
+                if (is_a_new_scatterer[p]) nr_in_new_scats++;
+              std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+              form_fact[offset + nr_in_new_scats][run] = std::complex<double>(stod(re_im[0]), -stod(re_im[1]));
+            }
+            found = true;
+          }
+          if (found)
+            break;
+        }
+      }
+    }
+    std::cout << "Data for " << form_fact[0].size() << " indices read." << std::endl;
+    offset = labels.size();
+  }
+  std::cout << "Writing combined file..." << std::endl;
+  std::ofstream tsc_file("combined.tsc", std::ios::out);
+
+  for (size_t h = 0; h < header.size(); h++)
+    tsc_file << header[h] << std::endl;
+  tsc_file << "    PARTS: " << files.size() << std::endl;
+  tsc_file << "SCATTERERS:";
+  for (int i = 0; i < labels.size(); i++)
+    tsc_file << " " << labels[i];
+  tsc_file << std::endl << "DATA:" << std::endl;
+
+  for (int r = 0; r < indices[0].size(); r++) {
+    for (int h = 0; h < 3; h++)
+      tsc_file << indices[h][r] << " ";
+    for (int i = 0; i < labels.size(); i++)
+      tsc_file << std::scientific << std::setprecision(8) << real(form_fact[i][r]) << ","
+      << std::scientific << std::setprecision(8) << imag(form_fact[i][r]) << " ";
+    tsc_file << std::endl;
+  }
+  tsc_file.flush();
+  tsc_file.close();
+  std::cout << "Done!" << std::endl;
+
+  return true;
+}
+
+inline bool merge_tscs_without_checks(
+  const std::string& mode,
+  const std::vector<std::string>& files,
+  const bool debug
+)
+{
+  //Currently only for Mode "pure merge"
+  if (files.size() == 0)
+    return false;
+  std::vector <std::string> labels;
+  std::vector <std::vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
+  std::vector <std::vector <std::complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
+  std::vector<std::string> header;
+
+  size_t offset = 0;
+  indices.resize(3);
+  for (int f = 0; f < files.size(); f++) {
+    std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
+    std::ifstream inf(files[f].c_str(), std::ios::in);
+    std::string line;
+    bool data = false;
+    std::vector<bool> is_a_new_scatterer;
+    int nr_scatterers = 0;
+    int nr_new_scatterers;
+    while (!data) {
+      getline(inf, line);
+      if (line.find("SCATTERERS:") != std::string::npos) {
+        std::string temp_labels = line.substr(12, line.size()) + " ";
+        const std::string delimiter = " ";
+        size_t pos = 0;
+        std::string new_label;
+        while ((pos = temp_labels.find(delimiter)) != std::string::npos) {
+          nr_scatterers++;
+          new_label = temp_labels.substr(0, pos);
+          bool is_new = true;
+          for (int i = 0; i < labels.size(); i++)
+            if (labels[i] == new_label)	is_new = false;
+          is_a_new_scatterer.push_back(is_new);
+          if (is_new) labels.push_back(new_label);
+          temp_labels.erase(0, pos + delimiter.length());
+        }
+        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
+        std::cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << std::endl;
+        form_fact.resize(labels.size());
+      }
+      else if (line.find("DATA:") != std::string::npos)
+        data = true;
+      else if (f == 0) {
+        if (line.find("AD: ") != std::string::npos)
+          continue;
+        header.push_back(line);
+      }
+    }
+    std::cout << "Reading Data Block..." << std::endl;
+    while (!inf.eof()) {
+      getline(inf, line);
+      std::vector<std::string> digest = split_string<std::string>(line, " ");
+      if (digest.size() == 1 && digest[0] == "")
+        continue;
+      if (f == 0)
+        for (int i = 0; i < 3; i++)
+          indices[i].push_back(stoi(digest[i]));
+#pragma omp parallel for
+      for (int i = 0; i < nr_scatterers; i++) {
+        if (!is_a_new_scatterer[i]) continue;
+        size_t nr_in_new_scats = 0;
+        for (int p = 0; p < i; p++)
+          if (is_a_new_scatterer[p]) nr_in_new_scats++;
+        std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+        form_fact[offset + nr_in_new_scats].push_back(std::complex<double>(stod(re_im[0]), stod(re_im[1])));
+      }
+    }
+    std::cout << "Data for " << form_fact[form_fact.size() - 1].size() << " indices read." << std::endl;
+    offset = labels.size();
+    inf.close();
+  }
+  std::cout << "Writing combined file..." << std::endl;
+  std::ofstream tsc_file("combined.tsc", std::ios::out);
+
+  for (size_t h = 0; h < header.size(); h++)
+    tsc_file << header[h] << std::endl;
+  tsc_file << "    PARTS: " << files.size() << std::endl;
+  tsc_file << "SCATTERERS:";
+  for (int i = 0; i < labels.size(); i++)
+    tsc_file << " " << labels[i];
+  tsc_file << std::endl << "DATA:" << std::endl;
+
+  for (int r = 0; r < indices[0].size(); r++) {
+    for (int h = 0; h < 3; h++)
+      tsc_file << indices[h][r] << " ";
+    for (int i = 0; i < labels.size(); i++)
+      tsc_file << std::scientific << std::setprecision(8) << real(form_fact[i][r]) << ","
+      << std::scientific << std::setprecision(8) << imag(form_fact[i][r]) << " ";
+    tsc_file << std::endl;
+  }
+  tsc_file.flush();
+  tsc_file.close();
+  std::cout << "Done!" << std::endl;
+
+  return true;
+}
