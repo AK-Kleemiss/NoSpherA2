@@ -25,11 +25,11 @@ int main(int argc, char** argv)
   //See if user wants help
   if (argc > 1) {
     if (string(argv[1]).find("--h") != string::npos) {
-      cout << NoSpherA2_message() << help_message() << endl;
+      cout << NoSpherA2_message(opt.no_date) << help_message() << endl;
       return 0;
     }
     if (string(argv[1]).find("-help") != string::npos) {
-      cout << NoSpherA2_message() << help_message() << endl;
+      cout << NoSpherA2_message(opt.no_date) << help_message() << endl;
       return 0;
     }
   }
@@ -200,7 +200,7 @@ int main(int argc, char** argv)
       for (int i = 0; i < argc; i++)
         log_file << argv[i] << endl;
 
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(opt.no_date);
     log_file.flush();
     if (argc > 1) {
       if (string(argv[1]).find("--help") != string::npos) {
@@ -295,7 +295,7 @@ int main(int argc, char** argv)
     if (opt.debug)
       for (int i = 0; i < argc; i++)
         log2 << argv[i] << endl;
-    log2 << NoSpherA2_message();
+    log2 << NoSpherA2_message(opt.no_date);
     log2.flush();
 
     err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
@@ -502,7 +502,7 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.density_test_cube) {
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(opt.no_date);
     log_file.flush();
     wavy.resize(10);
     //ScF2+ test file against ORCA calcualted cubes
@@ -659,6 +659,6 @@ int main(int argc, char** argv)
     wavy[0].write_wfn("converted.wfn", false, true);
     return 0;
   }
-  cout << NoSpherA2_message() << "Did not understand the task to perform!\n" << help_message() << endl;
+  cout << NoSpherA2_message(opt.no_date) << "Did not understand the task to perform!\n" << help_message() << endl;
   return 0;
 }

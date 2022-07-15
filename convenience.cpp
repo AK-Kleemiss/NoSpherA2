@@ -2203,6 +2203,8 @@ void options::digest_options(int& argc, char** argv) {
       mult = stoi(argv[i + 1]);
     else if (temp.find("-no-date") < 1)
       no_date = true;
+    else if (temp.find("-no_date") < 1)
+      no_date = true;
     else if (temp.find("-pbc") < 1)
       pbc = stoi(argv[i + 1]);
     else if (temp.find("-radius") < 1)
