@@ -1,7 +1,7 @@
 #pragma once
 
-int gen_oh ( int code, double a, double b, double v, double *x, double *y, double *z, double *w );
-void ld_by_order ( int order, double *x, double *y, double *z, double *w );
+int gen_oh ( const int& code, double& a, double& b, const double& v, double *x, double *y, double *z, double *w );
+void ld_by_order ( const int& order, double *x, double *y, double *z, double *w );
 void ld0006 ( double *x, double *y, double *z, double *w );
 void ld0014 ( double *x, double *y, double *z, double *w );
 void ld0026 ( double *x, double *y, double *z, double *w );
