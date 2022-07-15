@@ -4,7 +4,7 @@
 #define NMAX 65
 #define MMAX ((NMAX*2+3)*(NMAX*2+3)/3)
 
-int gen_oh ( int code, double a, double b, double v, double *x, double *y, double *z, double *w )
+int gen_oh ( const int& code, double& a, double& b, const double& v, double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -221,7 +221,7 @@ int gen_oh ( int code, double a, double b, double v, double *x, double *y, doubl
 }
 /******************************************************************************/
 
-void ld_by_order ( int order, double *x, double *y, double *z, double *w )
+void ld_by_order ( const int& order, double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
