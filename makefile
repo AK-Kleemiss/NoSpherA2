@@ -29,3 +29,5 @@ test:
 	cd tests && make all -k -B
 tests: 
 	cd tests && make all -k -B
+
+.PHONY: test tests
