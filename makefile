@@ -27,3 +27,5 @@ endif
 
 test: 
 	cd tests && make all -k -B
+tests: 
+	cd tests && make all -k -B
