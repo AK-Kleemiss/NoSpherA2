@@ -2254,7 +2254,7 @@ tsc_block MTC_thakkar_sfac(
     file << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
-  if (nr != 0) {
+  if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
@@ -2560,7 +2560,7 @@ tsc_block calculate_structure_factors_MTC(
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
   hkl_list hkl;
-  if (nr != 0) {
+  if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
