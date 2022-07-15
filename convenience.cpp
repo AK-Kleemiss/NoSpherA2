@@ -416,11 +416,11 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
       break;
     case 3: length = line.copy(tempchar, line.size() - 3, 4);
       tempchar[length] = '\0';
-      dump = sscanf(tempchar, "%d", &ncpus);
+      ncpus = stoi(tempchar);
       break;
     case 4: length = line.copy(tempchar, line.size() - 3, 4);
       tempchar[length] = '\0';
-      dump = sscanf(tempchar, "%f", &mem);
+      mem = stod(tempchar);
       break;
     default:
       if (debug) cout << "found everything i was looking for, if you miss something check the switch" << endl;

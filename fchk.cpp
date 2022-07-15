@@ -582,7 +582,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
         size_t length;
         length = line.copy(tempchar, 11, 50);
         tempchar[length] = '\0';
-        sscanf(tempchar, "%11d", &dum_nao);
+        dum_nao = stoi(tempchar);
         if (debug) {
           cout << "nao read from fchk: " << dum_nao << " and from basis set: " << nao << endl;
         }
@@ -602,14 +602,12 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           temp.replace(12 + j * 16, 1, "E");
         }
         else if (counter + j < dum_nao) {
-          double dum_ener = 0.0;
           char tempchar[100];
           size_t length;
           length = line.copy(tempchar, 15, 1 + j * 16);
           tempchar[length] = '\0';
-          sscanf(tempchar, "%15lf", &dum_ener);
           stringstream stream;
-          stream << scientific << setw(15) << setprecision(8) << dum_ener;
+          stream << scientific << setw(15) << setprecision(8) << stod(tempchar);
           if (j < 4) stream << " ";
           temp += stream.str();
           temp.replace(12 + j * 16, 1, "E");
