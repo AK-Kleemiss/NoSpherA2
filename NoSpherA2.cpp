@@ -12,6 +12,8 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
+  ofstream log_file("NoSpherA2.log", ios::out);
+  auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
   vector<WFN> wavy;
   options opt(argc, argv);
   if (opt.debug)
@@ -47,14 +49,10 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.combined_tsc_calc) {
-    ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message(opt.no_date);
     log_file.flush();
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
-    err_checkf(exists(opt.hkl), "hkl doesn't exist", log_file);
     err_checkf(opt.cif != "", "No cif specified", log_file);
-    err_checkf(exists(opt.cif), "CIF doesn't exist", log_file);
     //First make sure all files exist
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
       err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
@@ -122,12 +120,9 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.cif_based_combined_tsc_calc) {
-    ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message(opt.no_date);
     log_file.flush();
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
-    err_checkf(exists(opt.hkl), "hkl doesn't exist", log_file);
     //First make sure all files exist
     err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
@@ -218,7 +213,6 @@ int main(int argc, char** argv)
     log_file.flush();
     if (opt.debug)
       log_file << "status: " << opt.cif << "&" << opt.hkl << "&" << opt.xyz_file << endl;
-    err_checkf(exists(opt.cif), "CIF doesn't exist", log_file);
     err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
     err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
     wavy.push_back(WFN(0));
@@ -233,8 +227,6 @@ int main(int argc, char** argv)
   }
   //This one has conversion to fchk and calculation of one single tsc file
   if (opt.hkl != "" && opt.wfn != "") {
-    ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message(opt.no_date);
     //Lets print what was the command line, for debugging
     if (opt.debug)
@@ -280,8 +272,6 @@ int main(int argc, char** argv)
     }
     if (opt.cif != "" || opt.hkl != "") {
       // Calculate tsc file from given files
-      err_checkf(exists(opt.hkl), "Hkl file doesn't exist!", log_file);
-      err_checkf(exists(opt.cif), "CIF doesn't exist!", log_file);
       if (opt.debug)
         log_file << "Entering Structure Factor Calculation!" << endl;
       if (opt.electron_diffraction)
@@ -512,8 +502,6 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.density_test_cube) {
-    ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
     log_file << NoSpherA2_message();
     log_file.flush();
     wavy.resize(10);
@@ -665,9 +653,7 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.gbw2wfn) {
-    ofstream log_file("NoSpherA2.log", ios::out);
     err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
-    err_checkf(exists(opt.wfn), "Wavefunction dos not exist!", log_file);
     wavy.push_back(WFN(9));
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, true);
