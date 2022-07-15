@@ -2086,8 +2086,10 @@ void options::digest_options(int& argc, char** argv) {
       accuracy = stoi(argv[i + 1]);
     else if (temp.find("-b") < 1)
       basis_set = argv[i + 1];
-    else if (temp.find("-cif") < 1)
+    else if (temp.find("-cif") < 1) {
       cif = argv[i + 1];
+      err_checkf(exists(cif), "CIF doesn't exist", cout);
+    }
     else if (temp.find("-cpus") < 1)
       threads = stoi(argv[i + 1]);
     else if (temp.find("-cmtc") != string::npos) {
@@ -2147,8 +2149,10 @@ void options::digest_options(int& argc, char** argv) {
       hdef = calc = true;
     else if (temp.find("-hirsh") < 1)
       calc = hirsh = true, hirsh_number = stoi(argv[i + 1]);
-    else if (temp.find("-hkl") < 1)
+    else if (temp.find("-hkl") < 1) {
       hkl = argv[i + 1];
+      err_checkf(exists(hkl), "hkl doesn't exist", cout);
+    }
     else if (temp.find("-IAM") != string::npos)
       iam_switch = true;
     else if (temp.find("-lap") < 1)
@@ -2239,6 +2243,7 @@ void options::digest_options(int& argc, char** argv) {
       cout << "Turning on verbose mode!" << endl, debug = true;
     else if (temp.find("-wfn") < 1) {
       wfn = argv[i + 1];
+      err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
     }
     else if (temp.find("-xyz") != string::npos) {
       xyz_file = argv[i + 1];
