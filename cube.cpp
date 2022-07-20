@@ -119,7 +119,7 @@ bool cube::read_file(bool full, bool header, bool expert) {
     getline(file, line);
     dump = sscanf(line.c_str(), "%d%lf%lf%lf", &size[2], &vectors[2][0], &vectors[2][1], &vectors[2][2]);
     int atnr;
-    double atp[3];
+    double atp[3] = { 0,0,0 };
     bool read_atoms = true;
     if (!expert && parent_wavefunction->get_ncen() != 0) read_atoms = false;
     if (read_atoms)
@@ -145,7 +145,7 @@ bool cube::read_file(bool full, bool header, bool expert) {
     int rest2 = 0;
     int run_x = 0;
     int run_y = 0;
-    double tmp[6];
+    double tmp[6] = { 0,0,0,0,0,0 };
     while (run_x < size[0] && run_y < size[1] && !file.eof()) {
       reads2 = rest2;
       while (reads2 < size[2] && !file.eof()) {

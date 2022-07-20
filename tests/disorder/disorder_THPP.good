@@ -7,6 +7,10 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692
+Reading:                olex2/Wfn_job/Part_1/thpp.wfx done!
+Number of atoms in Wavefunction file: 26 Number of MOs: 58
+Reading:                olex2/Wfn_job/Part_2/thpp.wfx done!
+Number of atoms in Wavefunction file: 26 Number of MOs: 58
 Number of protons: 116
 Number of electrons: 116
 Reading:                                     thpp.cif done!
@@ -84,8 +88,8 @@ Table of Charges in electrons
       H7BB     0.101     0.042     0.061
 Total number of electrons in the wavefunction: 15.839
  and Hirshfeld electrons (asym unit): 15.796
-Reading: kpts.dat expecting 5832 k points...  done!
-Size of k_points: 5832
+
+Number of k-points to evaluate: 5832 for 7880 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors =============         [ 65%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
 Final number of atoms in .tsc file: 32
 Writing tsc file...  ... done!

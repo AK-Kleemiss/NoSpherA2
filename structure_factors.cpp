@@ -202,7 +202,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
   const vector <int>& input_groups,
   const cell& unit_cell,
   WFN& wave,
-  vector <string>& known_atoms,
+  const vector <string>& known_atoms,
   vector <int>& atom_type_list,
   vector <int>& asym_atom_to_type_list,
   vector <int>& asym_atom_list,
@@ -1874,7 +1874,7 @@ int make_hirshfeld_grids(const int& pbc,
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       upper += abs(abs(total_grid[5][p]) * total_grid[3][p] - abs(total_grid[4][p]) * total_grid[3][p]);
-      lower += abs(total_grid[5][p]) * total_grid[3][p] + abs(total_grid[4][p]) * total_grid[3][p];
+      lower += abs(total_grid[5][p]) * total_grid[3][p];
       if (abs(res) > cutoff) {
         dens[i][run] = (res);
         d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
@@ -1921,7 +1921,7 @@ void make_k_pts(const bool& read_k_pts,
 
     if (debug)
       file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-    int hkl_temp[3];
+
 #pragma omp parallel for
     for (int ref = 0; ref < size; ref++) {
       hkl_list_it hkl_ = next(hkl.begin(), ref);
@@ -2216,6 +2216,7 @@ tsc_block MTC_thakkar_sfac(
   const options& opt,
   ofstream& file,
   vector < string >& known_atoms,
+  vector<vector<int>>& known_indices,
   vector<WFN>& wave,
   const int& nr
 )
@@ -2254,7 +2255,15 @@ tsc_block MTC_thakkar_sfac(
     file << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
-  if (nr == 0 && opt.read_k_pts == false) {
+  if (known_indices.size() != 0) {
+#pragma omp parallel for
+    for (int i = 0; i < known_indices[0].size(); i++) {
+      vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
+#pragma omp critical
+      hkl.emplace(temp_hkl);
+    }
+  }
+  else if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
@@ -2264,8 +2273,8 @@ tsc_block MTC_thakkar_sfac(
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    nr != 0,
-    nr == 0,
+    nr != 0 && hkl.size() == 0,
+    opt.save_k_pts,
     0,
     unit_cell,
     hkl,
@@ -2503,6 +2512,7 @@ tsc_block calculate_structure_factors_MTC(
   vector<WFN>& wave,
   ofstream& file,
   vector < string >& known_atoms,
+  vector<vector<int>>& known_indices,
   const int& nr
 )
 {
@@ -2560,12 +2570,20 @@ tsc_block calculate_structure_factors_MTC(
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
   hkl_list hkl;
-  if (nr == 0 && opt.read_k_pts == false) {
+  if (known_indices.size() != 0) {
+#pragma omp parallel for
+    for (int i = 0; i < known_indices[0].size(); i++) {
+      vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i]};
+#pragma omp critical
+      hkl.emplace(temp_hkl);
+    }
+  }
+  else if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
   if (opt.debug)
-    file << "made it post CIF, now make grids!" << endl;
+    file << "made it post CIF & hkl, now make grids! hkl size: " << hkl.size() << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
   int points = make_hirshfeld_grids(opt.pbc,
@@ -2595,8 +2613,8 @@ tsc_block calculate_structure_factors_MTC(
 
   vector<vector<double>> k_pt;
   make_k_pts(
-    nr != 0,
-    nr == 0,
+    nr != 0 && hkl.size() == 0,
+    opt.save_k_pts,
     points,
     unit_cell,
     hkl,
