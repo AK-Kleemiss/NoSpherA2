@@ -78,7 +78,7 @@ public:
     ifstream tsc_file(file_name.c_str(), ios::binary);
 
     auto charsize = sizeof(char);
-    int head[1];
+    int head[1]{ 0 };
     auto intsize = sizeof(head);
     tsc_file.read((char*)&head, intsize);
     char* cheader;
@@ -87,11 +87,11 @@ public:
       cheader = new char[head[0]];
       tsc_file.read(cheader, head[0] * charsize);
       header_str = cheader;
-      delete(cheader);
+      delete [] cheader;
     }
     header = header_str;
     //read scatterer labels and map onto scattterers list
-    int sc_len[1];
+    int sc_len[1]{ 0 };
     tsc_file.read((char*)&sc_len, intsize);
     vector<char> scat_line(sc_len[0]);
     tsc_file.read((char*)scat_line.data(), sc_len[0] * charsize);
@@ -100,10 +100,10 @@ public:
     scatterer = split_string<string>(scat_str,string(" "));
     const int nr_scatterers = scatterer.size();
     //read number of indices in tscb file
-    int nr_hkl[1];
+    int nr_hkl[1]{ 0 };
     tsc_file.read((char*)&nr_hkl, intsize);
     //read indices and scattering factors row by row
-    int rindex[3];
+    int rindex[3]{ 0, 0, 0 };
     sf.resize(nr_scatterers);
     index.resize(3);
     for (int run = 0; run < *nr_hkl; run++) {
@@ -153,7 +153,7 @@ public:
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", log);
     return scatterer[nr];
   };
-  const std::vector<std::string> get_scatterers() { return scatterer; }
+  const std::vector<std::string> get_scatterers() const { return scatterer; }
   const std::string scatterers_string() {
     std::string result;
     for (int i = 0; i < scatterer.size(); i++) {
@@ -204,6 +204,7 @@ public:
       return 0;
     }
   }
+  const std::vector<std::vector<int>> get_index_vector() const { return index; };
   void append(tsc_block& rhs, std::ofstream& log)
   {
     if (reflection_size() == 0) {

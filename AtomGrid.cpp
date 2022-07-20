@@ -46,19 +46,19 @@ AtomGrid::AtomGrid(const double radial_precision,
     get_closest_num_angular(max_num_angular_points);
   err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
-  double* angular_x = new double[max_LT * MAG];
-  double* angular_y = new double[max_LT * MAG];
-  double* angular_z = new double[max_LT * MAG];
-  double* angular_w = new double[max_LT * MAG];
+  vector<double> angular_x(max_LT * MAG, 0.0);
+  vector<double> angular_y(max_LT * MAG, 0.0);
+  vector<double> angular_z(max_LT * MAG, 0.0);
+  vector<double> angular_w(max_LT * MAG, 0.0);
   int angular_off;
 
   for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
     angular_off = i * MAG;
     ld_by_order(lebedev_table[i],
-      &angular_x[angular_off],
-      &angular_y[angular_off],
-      &angular_z[angular_off],
-      &angular_w[angular_off]);
+      angular_x.data() + angular_off,
+      angular_y.data() + angular_off,
+      angular_z.data() + angular_off,
+      angular_w.data() + angular_off);
   }
 
   // radial parameters
@@ -68,11 +68,11 @@ AtomGrid::AtomGrid(const double radial_precision,
 
   for (int l = 0; l <= max_l_quantum_number; l++) {
     if (alpha_min[l] > 0.0) {
-      if (debug) 
-          file << "ATOM GRID: " 
-             << "l= " << l 
-             << " r_inner: " << r_inner 
-             << " alpha_min: " << alpha_min[l] << endl;
+      //if (debug) 
+      //    file << "ATOM GRID: " 
+      //       << "l= " << l 
+      //       << " r_inner: " << r_inner 
+      //       << " alpha_min: " << alpha_min[l] << endl;
       r_outer = std::max(r_outer,
         get_r_outer(radial_precision,
           alpha_min[l],
@@ -86,11 +86,11 @@ AtomGrid::AtomGrid(const double radial_precision,
     }
   }
 
-  if (debug)
-    file << "ATOM GRID: "
-    << "r_inner: " << r_inner
-    << " h: " << h
-    << " r_outer: " << r_outer << endl;
+  //if (debug)
+  //  file << "ATOM GRID: "
+  //  << "r_inner: " << r_inner
+  //  << " h: " << h
+  //  << " r_outer: " << r_outer << endl;
 
   num_radial_grid_points_ = 0;
 
@@ -98,11 +98,11 @@ AtomGrid::AtomGrid(const double radial_precision,
   double c = r_inner / (exp(h) - 1.0);
   int num_radial = int(log(1.0 + (r_outer / c)) / h);
 
-  if (debug)
-    file << "ATOM GRID: "
-    << "rb: " << rb
-    << " c: " << c
-    << " num_radial: " << num_radial << endl;
+  //if (debug)
+  //  file << "ATOM GRID: "
+  //  << "rb: " << rb
+  //  << " c: " << c
+  //  << " num_radial: " << num_radial << endl;
 
   for (int irad = 0; irad < num_radial; irad++) {
     double radial_r = c * (exp(double(irad + 1.0) * h) - 1.0);
@@ -139,11 +139,6 @@ AtomGrid::AtomGrid(const double radial_precision,
       atom_grid_w_[iang] = 4.0 * PI * angular_w[angular_off + iang - start] * radial_w;
     }
   }
-
-  delete[] angular_x;
-  delete[] angular_y;
-  delete[] angular_z;
-  delete[] angular_w;
 }
 
 AtomGrid::~AtomGrid() {}

@@ -59,22 +59,27 @@ int main(int argc, char** argv)
 
     wavy.resize(opt.combined_tsc_calc_files.size());
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
+      log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
       wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file);
       if (opt.ECP) {
         wavy[i].set_has_ECPs(true);
       }
+      log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
     }
 
     vector<string> known_scatterer;
+    vector<vector<int>> known_indices;
     tsc_block result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
+      known_indices = result.get_index_vector();
       if (wavy[i].get_origin() != 7) {
         result.append(calculate_structure_factors_MTC(
           opt,
           wavy,
           log_file,
           known_scatterer,
+          known_indices,
           i
         ), log_file);
       }
@@ -83,6 +88,7 @@ int main(int argc, char** argv)
           opt,
           log_file,
           known_scatterer,
+          known_indices,
           wavy,
           i
         ), log_file);
@@ -141,15 +147,18 @@ int main(int argc, char** argv)
     }
 
     vector<string> known_scatterer;
+    vector<vector<int>> known_indices;
     tsc_block result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
+      known_indices = result.get_index_vector();
       if (wavy[i].get_origin() != 7) {
         result.append(calculate_structure_factors_MTC(
           opt,
           wavy,
           log_file,
           known_scatterer,
+          known_indices,
           i
         ), log_file);
       }
@@ -158,6 +167,7 @@ int main(int argc, char** argv)
           opt,
           log_file,
           known_scatterer,
+          known_indices,
           wavy,
           i
         ), log_file);
