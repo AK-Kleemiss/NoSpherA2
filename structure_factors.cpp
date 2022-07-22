@@ -2520,7 +2520,14 @@ tsc_block calculate_structure_factors_MTC(
 
 #endif
   err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-  err_checkf(exists(opt.cif), "CIF " + opt.cif + " does not exists!", file);
+  if (!opt.cif_based_combined_tsc_calc) {
+    err_checkf(exists(opt.cif), "CIF " + opt.cif + " does not exists!", file);
+  }
+  else {
+    for (int i = 0; i < opt.combined_tsc_calc_cifs.size(); i++) {
+      err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i] + " does not exists!", file);
+    }
+  }
   file << "Number of protons: " << wave[nr].get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
   if (wave[nr].get_has_ECPs()) file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
@@ -2545,8 +2552,12 @@ tsc_block calculate_structure_factors_MTC(
   gettimeofday(&t1, 0);
 #endif
 
-  cell unit_cell(opt.cif, file, opt.debug);
-  ifstream cif_input(opt.cif.c_str(), std::ios::in);
+  string cif;
+  if (opt.cif_based_combined_tsc_calc) cif = opt.combined_tsc_calc_cifs[nr];
+  else cif = opt.cif;
+
+  cell unit_cell(cif, file, opt.debug);
+  ifstream cif_input(cif.c_str(), std::ios::in);
   vector <int> atom_type_list;
   vector <int> asym_atom_to_type_list;
   vector <int> asym_atom_list;

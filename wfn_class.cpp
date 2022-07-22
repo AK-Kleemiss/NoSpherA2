@@ -3911,7 +3911,7 @@ double WFN::compute_MO_spherical(
       else if (l <= 36)	ex *= pow(d[4][iat], 5);
     }
     //calc spherical harmonic
-    double SH;
+    double SH = 0;
     switch (l) {
     case 1: { //S
       SH = c_1_4p; break;
@@ -4054,7 +4054,7 @@ double WFN::compute_dens_spherical(
       else if (l <= 36)	ex *= pow(d[4][iat], 5);
     }
     //calc spherical harmonic
-    double SH;
+    double SH = 0;
     switch (l) {
     case 1: { //S
       SH = c_1_4p; break;
