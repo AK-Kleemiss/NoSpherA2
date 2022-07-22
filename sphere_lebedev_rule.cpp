@@ -4,7 +4,7 @@
 #define NMAX 65
 #define MMAX ((NMAX*2+3)*(NMAX*2+3)/3)
 
-int gen_oh ( const int& code, double& a, double& b, const double& v, double *x, double *y, double *z, double *w )
+int lebedev_sphere::gen_oh ( const int& code, double& a, double& b, const double& v, double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -221,7 +221,7 @@ int gen_oh ( const int& code, double& a, double& b, const double& v, double *x, 
 }
 /******************************************************************************/
 
-void ld_by_order ( const int& order, double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld_by_order ( const int& order, double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -332,7 +332,7 @@ void ld_by_order ( const int& order, double *x, double *y, double *z, double *w 
 }
 /******************************************************************************/
 
-void ld0006 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0006 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -375,7 +375,7 @@ void ld0006 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0014 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0014 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -421,7 +421,7 @@ void ld0014 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0026 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0026 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -469,7 +469,7 @@ void ld0026 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0038 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0038 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -518,7 +518,7 @@ void ld0038 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0050 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0050 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -569,7 +569,7 @@ void ld0050 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0074 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0074 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -623,7 +623,7 @@ void ld0074 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0086 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0086 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -678,7 +678,7 @@ void ld0086 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0110 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0110 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -736,7 +736,7 @@ void ld0110 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0146 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0146 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -797,7 +797,7 @@ void ld0146 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0170 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0170 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -861,7 +861,7 @@ void ld0170 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0194 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0194 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -928,7 +928,7 @@ void ld0194 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0230 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0230 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -999,7 +999,7 @@ void ld0230 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0266 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0266 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1073,7 +1073,7 @@ void ld0266 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0302 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0302 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1151,7 +1151,7 @@ void ld0302 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0350 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0350 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1233,7 +1233,7 @@ void ld0350 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0434 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0434 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1324,7 +1324,7 @@ void ld0434 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0590 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0590 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1430,7 +1430,7 @@ void ld0590 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0770 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0770 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1553,7 +1553,7 @@ void ld0770 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld0974 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld0974 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1695,7 +1695,7 @@ void ld0974 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld1202 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld1202 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -1858,7 +1858,7 @@ void ld1202 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld1454 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld1454 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -2044,7 +2044,7 @@ void ld1454 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld1730 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld1730 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -2255,7 +2255,7 @@ void ld1730 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld2030 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld2030 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -2493,7 +2493,7 @@ void ld2030 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld2354 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld2354 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -2760,7 +2760,7 @@ void ld2354 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld2702 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld2702 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -3058,7 +3058,7 @@ void ld2702 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld3074 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld3074 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -3389,7 +3389,7 @@ void ld3074 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld3470 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld3470 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -3755,7 +3755,7 @@ void ld3470 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld3890 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld3890 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -4158,7 +4158,7 @@ void ld3890 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld4334 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld4334 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -4600,7 +4600,7 @@ void ld4334 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld4802 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld4802 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -5083,7 +5083,7 @@ void ld4802 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld5294 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld5294 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
@@ -5609,7 +5609,7 @@ void ld5294 ( double *x, double *y, double *z, double *w )
 }
 /******************************************************************************/
 
-void ld5810 ( double *x, double *y, double *z, double *w )
+void lebedev_sphere::ld5810 ( double *x, double *y, double *z, double *w )
 
 /******************************************************************************/
 /*
