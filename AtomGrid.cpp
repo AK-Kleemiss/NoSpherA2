@@ -51,10 +51,11 @@ AtomGrid::AtomGrid(const double radial_precision,
   vector<double> angular_z(max_LT * MAG, 0.0);
   vector<double> angular_w(max_LT * MAG, 0.0);
   int angular_off;
+  lebedev_sphere ls;
 
   for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
     angular_off = i * MAG;
-    ld_by_order(lebedev_table[i],
+    ls.ld_by_order(lebedev_table[i],
       angular_x.data() + angular_off,
       angular_y.data() + angular_off,
       angular_z.data() + angular_off,

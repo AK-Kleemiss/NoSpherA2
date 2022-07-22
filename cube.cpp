@@ -48,6 +48,7 @@ cube::cube(const string& filepath, bool read, WFN& wave, ostream& file, bool exp
 
 cube::cube(int g_na, const vector<int>& g_size, const vector< double >& g_origin, const vector< vector<double> >& g_vectors, const vector<vector<vector<double> > >& g_values) {
   na = g_na;
+  parent_wavefunction = new WFN(6);
   cout << "Assigned Nr of Atoms" << endl;
   vectors.resize(3);
   size.resize(3);
