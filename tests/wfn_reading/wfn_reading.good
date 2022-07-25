@@ -1,0 +1,56 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692
+Reading:                                     test.wfn done!
+Number of atoms in Wavefunction file: 18 Number of MOs: 135
+Number of protons: 135
+Number of electrons: 135
+Reading:                                     test.cif done!
+Reading:                                     test.hkl done!
+Nr of reflections read from file: 22695
+Number of symmetry operations: 4
+Nr of reflections to be used: 14988
+There are:
+  18 atoms read from the wavefunction, of which 
+  18 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 1770
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 1728
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 1728 with 135.063979 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+      Cu01    -1.534    -1.636     0.897
+      Cl02    -0.053     0.636    -0.487
+      S003     0.110     0.601    -0.274
+      Cl04    -0.024     0.630    -0.387
+      S005    -0.330    -0.241     0.095
+      N006     0.144     0.257     0.025
+      N007     0.535     0.589     0.031
+      H00a     0.194     0.014     0.169
+      H00b     0.161    -0.022     0.168
+      C008     0.201     0.208     0.112
+      C009    -0.161     0.055    -0.018
+      H00c     0.153     0.077     0.078
+      H00d     0.112     0.022     0.086
+      H00e     0.125     0.040     0.084
+      C00A     0.030     0.282    -0.105
+      H00f     0.099     0.026     0.054
+      H00g     0.110     0.035     0.061
+      H00h     0.066    -0.020     0.078
+Total number of electrons in the wavefunction: 135.064
+ and Hirshfeld electrons (asym unit): 134.333
+
+Number of k-points to evaluate: 14988 for 1728 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Writing tsc file...  ... done!
