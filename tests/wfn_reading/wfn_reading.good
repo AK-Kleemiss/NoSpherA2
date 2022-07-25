@@ -13,9 +13,9 @@ Number of protons: 135
 Number of electrons: 135
 Reading:                                     test.cif done!
 Reading:                                     test.hkl done!
-Nr of reflections read from file: 22695
+Nr of reflections read from file: 23
 Number of symmetry operations: 4
-Nr of reflections to be used: 14988
+Nr of reflections to be used: 12
 There are:
   18 atoms read from the wavefunction, of which 
   18 are identified as asymmetric unit atoms!
@@ -51,6 +51,6 @@ Table of Charges in electrons
 Total number of electrons in the wavefunction: 135.064
  and Hirshfeld electrons (asym unit): 134.333
 
-Number of k-points to evaluate: 14988 for 1728 gridpoints.
+Number of k-points to evaluate: 12 for 1728 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Writing tsc file...  ... done!
