@@ -1,0 +1,183 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692
+Reading:                               residues/1.gbw done!
+Number of atoms in Wavefunction file: 18 Number of MOs: 364
+Reading:                               residues/2.gbw done!
+Number of atoms in Wavefunction file: 34 Number of MOs: 700
+Reading:                               residues/3.gbw done!
+Number of atoms in Wavefunction file: 34 Number of MOs: 700
+Reading:                               residues/4.gbw done!
+Number of atoms in Wavefunction file: 31 Number of MOs: 642
+Number of protons: 57
+Number of electrons: 56
+Reading:                               residues/1.cif done!
+Reading:                                   1yk4_h.hkl done!
+Nr of reflections read from file: 200
+Number of symmetry operations: 4
+Nr of reflections to be used: 800
+There are:
+  18 atoms read from the wavefunction, of which 
+  12 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 2758
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 2758
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 2758 with  39.029819 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+       N_2     0.219     0.249     0.127
+      Ha_2     0.250     0.027     0.235
+      Hb_2     0.242     0.016     0.232
+      Hc_2     0.256     0.019     0.241
+      CA_2    -0.075    -0.091     0.076
+     HAa_2     0.172     0.065     0.115
+      CB_2    -0.133     0.087    -0.081
+     HBa_2     0.114     0.033     0.088
+     HBb_2     0.132     0.056     0.086
+     HBc_2     0.130     0.050     0.090
+       C_2    -0.125    -0.199     0.142
+       O_2    -0.212     0.265    -0.353
+Total number of electrons in the wavefunction: 39.030
+ and Hirshfeld electrons (asym unit): 39.001
+
+Number of k-points to evaluate: 800 for 2758 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================== [100%] 
+Number of protons: 111
+Number of electrons: 110.000
+Reading:                               residues/2.cif done!
+There are:
+  34 atoms read from the wavefunction, of which 
+  22 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 4998
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 4998
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 4998 with  69.941427 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+       N_3    -0.032     0.130    -0.048
+       C_3    -0.160    -0.202     0.099
+       O_3    -0.225     0.279    -0.373
+      Ha_3     0.186    -0.012     0.188
+      CA_3    -0.119    -0.029     0.009
+     HAa_3     0.129     0.049     0.077
+      CB_3    -0.132     0.079    -0.078
+     HBa_3     0.115     0.055     0.065
+     HBb_3     0.148     0.085     0.062
+      CG_3    -0.165     0.051    -0.081
+     HGa_3     0.118     0.060     0.059
+     HGb_3     0.144     0.084     0.062
+      CD_3    -0.181     0.061    -0.103
+     HDa_3     0.122     0.058     0.064
+     HDb_3     0.124     0.061     0.062
+      CE_3    -0.196    -0.028    -0.041
+     HEa_3     0.139     0.050     0.086
+     HEb_3     0.140     0.050     0.084
+      NZ_3     0.186     0.276     0.097
+     HZa_3     0.244     0.005     0.234
+     HZb_3     0.246     0.032     0.217
+     HZc_3     0.227    -0.014     0.235
+Total number of electrons in the wavefunction: 69.941
+ and Hirshfeld electrons (asym unit): 70.024
+
+Number of k-points to evaluate: 800 for 4998 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Number of protons: 111
+Number of electrons: 110.000
+Reading:                               residues/3.cif done!
+There are:
+  34 atoms read from the wavefunction, of which 
+  19 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 3696
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 3696
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 3696 with  48.468742 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+      Hb_3     0.182    -0.012     0.181
+      C1_3    -0.073    -0.012     0.043
+      H1_3     0.129     0.022     0.099
+      C2_3    -0.113     0.112    -0.115
+     H2a_3     0.136     0.081     0.058
+     H2b_3     0.059     0.016     0.050
+      C3_3    -0.116    -0.005    -0.031
+     H3a_3     0.076     0.012     0.064
+     H3b_3     0.125     0.060     0.059
+      C4_3    -0.119     0.043    -0.052
+     H4a_3     0.105     0.025     0.075
+     H4b_3     0.146     0.062     0.077
+      C5_3    -0.132     0.005    -0.015
+     H5a_3     0.081    -0.007     0.080
+     H5b_3     0.118     0.027     0.083
+      N1_3     0.181     0.196     0.130
+     H1a_3     0.249     0.031     0.232
+     H1b_3     0.256     0.023     0.240
+     H1c_3     0.243     0.008     0.238
+Total number of electrons in the wavefunction: 48.469
+ and Hirshfeld electrons (asym unit): 48.503
+
+Number of k-points to evaluate: 800 for 3696 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Number of protons: 102
+Number of electrons: 102.000
+Reading:                               residues/4.cif done!
+There are:
+  31 atoms read from the wavefunction, of which 
+  19 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 4396
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 4396
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 4396 with  61.846708 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+       N_4     0.015     0.211    -0.061
+       H_4     0.186     0.003     0.181
+      CA_4    -0.118    -0.041     0.017
+      HA_4     0.113     0.024     0.082
+      CB_4    -0.115     0.067    -0.069
+     HBa_4     0.072     0.011     0.063
+     HBb_4     0.086     0.020     0.062
+      CG_4    -0.139    -0.001    -0.057
+      HG_4     0.111     0.059     0.066
+     CD1_4    -0.123     0.109    -0.125
+    HD1a_4     0.103     0.057     0.058
+    HD1b_4     0.085     0.034     0.063
+    HD1c_4     0.093     0.038     0.067
+     CD2_4    -0.126     0.150    -0.131
+    HD2a_4     0.082     0.035     0.063
+    HD2b_4     0.109     0.061     0.055
+    HD2c_4     0.085     0.029     0.064
+       C_4    -0.148    -0.218     0.145
+       O_4    -0.219     0.277    -0.361
+Total number of electrons in the wavefunction: 61.847
+ and Hirshfeld electrons (asym unit): 61.816
+
+Number of k-points to evaluate: 800 for 4396 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Final number of atoms in .tsc file: 72
+Writing tsc file...  ... done!

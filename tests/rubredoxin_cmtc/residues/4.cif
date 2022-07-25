@@ -1,0 +1,81 @@
+data_1yk4_h
+_audit_creation_method            
+ 'Olex2: Jun 27 2022 09:56:08 MSC:193231329 on WIN64, Python: 3.8.6, wxWidgets: 3.1.5'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C252 H367 Fe N61 O86 S4, 6(H2 O)'
+_chemical_formula_sum              'C252 H379 Fe N61 O92 S4'
+_chemical_formula_weight           5919.28
+_chemical_melting_point            ?
+_space_group_crystal_system        'orthorhombic'
+_space_group_IT_number             19
+_space_group_name_H-M_alt          'P 21 21 21'
+_space_group_name_Hall             'P 2ac 2ab'
+
+_cell_length_a                     25.14(3)
+_cell_length_b                     39.50(4)
+_cell_length_c                     45.07(5)
+_cell_angle_alpha                  90
+_cell_angle_beta                   90
+_cell_angle_gamma                  90
+_cell_volume                       44756(78)
+_cell_formula_units_Z              4
+_diffrn_reflns_av_R_equivalents    0.0000
+_diffrn_reflns_av_unetI/netI       0.0417
+_diffrn_reflns_limit_h_max         34
+_diffrn_reflns_limit_h_min         -34
+_diffrn_reflns_limit_k_max         57
+_diffrn_reflns_limit_k_min         -57
+_diffrn_reflns_limit_l_max         65
+_diffrn_reflns_limit_l_min         -65
+_diffrn_reflns_number              104069
+_diffrn_reflns_theta_max           29.13
+_diffrn_reflns_theta_min           1.07
+_diffrn_ambient_temperature        ?
+_diffrn_radiation_wavelength       0.7301
+_reflns_number_total               104069
+_refine_diff_density_max           0.83
+
+
+
+
+
+loop_
+   _space_group_symop_id
+   _space_group_symop_operation_xyz 
+ 1 +X,+Y,+Z
+ 2 1/2-X,-Y,1/2+Z
+ 3 1/2+X,1/2-Y,-Z
+ 4 -X,1/2+Y,1/2-Z
+
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+N_4 N -0.10641 0.46801 0.12287 0.0354 Uani 1 . 1 0
+H_4 H -0.1193 0.44335 0.12214 0.0425 Uiso 1 R 1 0
+CA_4 C -0.05109 0.47511 0.1165 0.0346 Uani 1 . 1 0
+HA_4 H -0.04663 0.50197 0.11239 0.0415 Uiso 1 R 1 0
+CB_4 C -0.01378 0.46486 0.14178 0.0392 Uani 1 . 1 0
+HBa_4 H -0.0149 0.43738 0.14418 0.0470 Uiso 1 R 1 0
+HBb_4 H 0.02678 0.47192 0.1358 0.0470 Uiso 1 R 1 0
+CG_4 C -0.02767 0.48118 0.17198 0.0498 Uani 1 . 1 0
+HG_4 H -0.04643 0.5053 0.16738 0.0598 Uiso 1 R 1 0
+CD1_4 C -0.06672 0.46045 0.19121 0.0572 Uani 1 . 1 0
+HD1a_4 H -0.1006 0.4532 0.17803 0.0858 Uiso 1 R 1 0
+HD1b_4 H -0.047 0.4381 0.1993 0.0858 Uiso 1 R 1 0
+HD1c_4 H -0.0798 0.4756 0.2097 0.0858 Uiso 1 R 1 0
+CD2_4 C 0.02225 0.48833 0.18909 0.0711 Uani 1 . 1 0
+HD2a_4 H 0.0392 0.46486 0.1967 0.1067 Uiso 1 R 1 0
+HD2b_4 H 0.0504 0.5011 0.175 0.1067 Uiso 1 R 1 0
+HD2c_4 H 0.013 0.5042 0.2079 0.1067 Uiso 1 R 1 0
+C_4 C -0.0343 0.45569 0.08872 0.0382 Uani 1 . 1 0
+O_4 O -0.04382 0.42556 0.08588 0.0665 Uani 1 . 1 0
