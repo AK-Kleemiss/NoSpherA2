@@ -8,8 +8,8 @@ on:
 
 jobs:
   build_Mac:
-
     runs-on: macos-latest
+    needs: tests
 
     steps:
     - uses: actions/checkout@v2
@@ -22,8 +22,8 @@ jobs:
         path: |
           Mac/NoSpherA2_Mac
   build_windows:
-
     runs-on: windows-2022
+    needs: tests
 
     steps:
     - uses: actions/checkout@v2
@@ -38,7 +38,6 @@ jobs:
         path: |
           Windows/x64/Release/NoSpherA2.exe
   build_Linux:
-
     runs-on: ubuntu-latest
 
     steps:

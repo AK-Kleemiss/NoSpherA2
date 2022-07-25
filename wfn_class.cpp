@@ -465,7 +465,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     temp = tempchar;
     length = line.copy(tempchar, 4, 5);
     tempchar[length] = '\0';
-    dum_nr[i] = stoi(tempchar);
+    dum_nr[i] = i;
     length = line.copy(tempchar, 12, 24);
     tempchar[length] = '\0';
     dum_x[i] = stod(tempchar);
