@@ -2347,8 +2347,8 @@ bool calculate_structure_factors_HF(
   file << "Number of protons: " << wave.get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.ncpus != -1) {
-    omp_set_num_threads(opt.ncpus);
+  if (opt.threads != -1) {
+    omp_set_num_threads(opt.threads);
     omp_set_dynamic(0);
   }
 
