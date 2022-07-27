@@ -2234,6 +2234,9 @@ void options::digest_options(int& argc, char** argv) {
       }
       i += 9;
     }
+    else if (temp.find("-old_tsc") != string::npos) {
+      old_tsc = true;
+    }
     else if (temp.find("-tscb") != string::npos) {
       string name = argv[i + 1];
       tsc_block blocky = tsc_block(name);
