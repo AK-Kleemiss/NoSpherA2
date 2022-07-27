@@ -2208,7 +2208,11 @@ bool thakkar_sfac(
     hkl
   );
 
-  blocky.write_tscb_file();
+  if (opt.binary_tsc)
+    blocky.write_tscb_file();
+  if (opt.old_tsc) {
+    blocky.write_tsc_file(opt.cif);
+  }
   return true;
 }
 
@@ -2497,7 +2501,9 @@ bool calculate_structure_factors_HF(
 #endif
   file << "Writing tsc file... " << flush;
   blocky.write_tscb_file();
-  //blocky.write_tsc_file(cif);
+  if (opt.old_tsc) {
+    blocky.write_tsc_file("test");
+  }
   file << " ... done!" << endl;
 
 #ifdef PEOJECT_NAME
