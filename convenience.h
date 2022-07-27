@@ -598,6 +598,7 @@ struct options {
   bool density_test_cube = false;
   bool no_date = false;
   bool gbw2wfn = false;
+  bool old_tsc = false;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
   double NbSteps[3]{ 0,0,0 };
