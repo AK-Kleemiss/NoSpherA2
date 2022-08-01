@@ -81,6 +81,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ESP|x64'">
+    <LocalDebuggerCommandArguments>-wfn alanine.wfn -cif alanine.cif -v -pdf 2 3 4 -resolution 0.3</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>D:\temp\Ala\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Co110_SF|x64'">
     <LocalDebuggerCommandArguments>-wfn ND_Ni2.wfn -cif ND_Ni2.cif -asym_cif olex2/Wfn_job/ND_Ni2.cif -hkl olex2/Wfn_job/ND_Ni2.hkl -acc 1 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>E:\temp\John\ND</LocalDebuggerWorkingDirectory>

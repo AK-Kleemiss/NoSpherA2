@@ -911,10 +911,11 @@ void Calc_ESP(
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeESP.get_size(0); i < 2 * CubeESP.get_size(0); i++) {
+    double temp;
+    int temp_i, temp_j, temp_k;
+    double PosGrid[3];
     for (int j = -CubeESP.get_size(1); j < 2 * CubeESP.get_size(1); j++)
       for (int k = -CubeESP.get_size(2); k < 2 * CubeESP.get_size(2); k++) {
-
-        double PosGrid[3];
 
         PosGrid[0] = i * CubeESP.get_vector(0, 0) + j * CubeESP.get_vector(0, 1) + k * CubeESP.get_vector(0, 2) + CubeESP.get_origin(0);
         PosGrid[1] = i * CubeESP.get_vector(1, 0) + j * CubeESP.get_vector(1, 1) + k * CubeESP.get_vector(1, 2) + CubeESP.get_origin(1);
@@ -927,7 +928,6 @@ void Calc_ESP(
         if (skip)
           continue;
 
-        int temp_i, temp_j, temp_k;
         if (i < 0)
           temp_i = i + CubeESP.get_size(0);
         else if (i < CubeESP.get_size(0))
@@ -949,7 +949,8 @@ void Calc_ESP(
         else
           temp_k = k - CubeESP.get_size(2);
 
-        CubeESP.set_value(temp_i, temp_j, temp_k, CubeESP.get_value(temp_i, temp_j, temp_k) + wavy.computeESP(PosGrid, d2));
+        temp = wavy.computeESP(PosGrid, d2);
+        CubeESP.set_value(temp_i, temp_j, temp_k, CubeESP.get_value(temp_i, temp_j, temp_k) + temp);
         //CubeESP.set_value(i, j, k, computeESP(PosGrid, d2, wavy));
       }
     if (i != 0 && i % step == 0)

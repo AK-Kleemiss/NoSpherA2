@@ -434,13 +434,13 @@ int main(int argc, char** argv)
         log2 << "Calcualting MO: " << opt.MOs[i] << endl;
         MO.set_zero();
         MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(opt.MOs[i]) + ".cube";
-        Calc_MO(MO, opt.MOs[i], wavy[0], opt.ncpus, opt.radius, log2);
+        Calc_MO(MO, opt.MOs[i], wavy[0], opt.threads, opt.radius, log2);
         MO.write_file(true);
       }
 
     if (opt.hdef || opt.def || opt.hirsh) {
       log2 << "Calcualting Rho...";
-      Calc_Rho(Rho, wavy[0], opt.ncpus, opt.radius, log2);
+      Calc_Rho(Rho, wavy[0], opt.threads, opt.radius, log2);
       log2 << " ...done!" << endl;
       cube temp(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), opt.hdef || opt.hirsh);
       for (int i = 0; i < 3; i++) {
@@ -450,16 +450,16 @@ int main(int argc, char** argv)
       }
       if (opt.hdef || opt.hirsh) {
         log2 << "Calcualting spherical Rho...";
-        Calc_Spherical_Dens(temp, wavy[0], opt.ncpus, opt.radius, log2);
+        Calc_Spherical_Dens(temp, wavy[0], opt.threads, opt.radius, log2);
         log2 << " ...done!" << endl;
       }
 
       if (opt.def) {
         log2 << "Calculating static deformation density...";
         if (opt.hdef)
-          Calc_Static_Def(DEF, Rho, temp, wavy[0], opt.ncpus, opt.radius, log2);
+          Calc_Static_Def(DEF, Rho, temp, wavy[0], opt.threads, opt.radius, log2);
         else
-          Calc_Static_Def(DEF, Rho, wavy[0], opt.ncpus, opt.radius, log2);
+          Calc_Static_Def(DEF, Rho, wavy[0], opt.threads, opt.radius, log2);
         log2 << " ...done!" << endl;
       }
 
@@ -467,7 +467,7 @@ int main(int argc, char** argv)
         for (int a = 0; a < wavy[0].get_ncen(); a++) {
           log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
           HDEF.path = get_basename_without_ending(wavy[0].get_path()) + "_HDEF_" + to_string(a) + ".cube";
-          Calc_Hirshfeld(HDEF, Rho, temp, wavy[0], opt.ncpus, opt.radius, a, log2);
+          Calc_Hirshfeld(HDEF, Rho, temp, wavy[0], opt.threads, opt.radius, a, log2);
           HDEF.write_file(true);
           HDEF.set_zero();
         }
@@ -476,13 +476,13 @@ int main(int argc, char** argv)
       if (opt.hirsh)
       {
         log2 << "Calcualting Hirshfeld density for atom: " << opt.hirsh_number << endl;
-        Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy[0], opt.ncpus, opt.radius, opt.hirsh_number, log2);
+        Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy[0], opt.threads, opt.radius, opt.hirsh_number, log2);
         log2 << "..done!" << endl;
       }
     }
 
     if (opt.lap || opt.eli || opt.elf || opt.rdg || opt.esp)
-      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], opt.ncpus, opt.radius, log2, opt.test);
+      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], opt.threads, opt.radius, log2, opt.test);
 
     log2 << "Writing cubes to Disk..." << flush;
     if (opt.rdg) {
@@ -506,7 +506,9 @@ int main(int argc, char** argv)
 
     if (opt.esp) {
       log2 << "Calculating ESP..." << flush;
-      Calc_ESP(ESP, wavy[0], opt.ncpus, opt.radius, log2);
+      WFN temp = wavy[0];
+      temp.delete_unoccupied_MOs();
+      Calc_ESP(ESP, temp, opt.threads, opt.radius, log2);
       log2 << "Writing cube to Disk..." << flush;
       ESP.write_file(true);
       log2 << "  done!" << endl;
