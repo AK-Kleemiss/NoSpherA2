@@ -482,7 +482,7 @@ int main(int argc, char** argv)
     }
 
     if (opt.lap || opt.eli || opt.elf || opt.rdg || opt.esp)
-      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], opt.threads, opt.radius, log2, opt.test);
+      Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy[0], opt.threads, opt.radius, log2, opt.no_date);
 
     log2 << "Writing cubes to Disk..." << flush;
     if (opt.rdg) {
@@ -508,7 +508,7 @@ int main(int argc, char** argv)
       log2 << "Calculating ESP..." << flush;
       WFN temp = wavy[0];
       temp.delete_unoccupied_MOs();
-      Calc_ESP(ESP, temp, opt.threads, opt.radius, log2);
+      Calc_ESP(ESP, temp, opt.threads, opt.radius, opt.no_date, log2);
       log2 << "Writing cube to Disk..." << flush;
       ESP.write_file(true);
       log2 << "  done!" << endl;
