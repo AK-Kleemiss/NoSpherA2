@@ -36,3 +36,5 @@ tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
 tests/epoxide_gbw/converted.wfn
 *.FileListAbsolute.txt
+tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
+Windows/.vs/NoSpherA2/v16/.suo
