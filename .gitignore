@@ -1,4 +1,3 @@
-
 *.obj
 *.lastbuildstate
 *.tlog
@@ -28,8 +27,12 @@ NoSpherA2_linux/bin/*/*/NoSpherA2*
 *.cache
 *.gpu
 Windows/*/*/unity_*.cpp
-Windows/.vs/NoSpherA2/project-colors.json
 *.enc
 Linux/NoSpherA2
 NoSpherA2
 *.tscb
+tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
+tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
+tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
+tests/epoxide_gbw/converted.wfn
+*.FileListAbsolute.txt
