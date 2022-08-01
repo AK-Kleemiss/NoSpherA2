@@ -4912,20 +4912,17 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
   const int MO = get_nmo();
   const int nprim = get_nex();
 
-  double* occ = new double[MO];
-  double** coef = new double* [MO];
   double temp;
   int maxl, maxm, maxn;
+  vector<vector<double> > pos(3);
+  for (int i = 0; i < 3; i++) pos[i].resize(get_ncen());
 
-  for (int i = 0; i < MO; i++) {
-    coef[i] = new double[nprim];
-    occ[i] = get_MO_occ(i);
-    for (int j = 0; j < nprim; j++)
-      coef[i][j] = get_MO_coef(i, j);
+  for (int iat = 0; iat < get_ncen(); iat++) {
+    pos[0][iat] = atoms[iat].x;
+    pos[1][iat] = atoms[iat].y;
+    pos[2][iat] = atoms[iat].z;
+    ESP += get_atom_charge(iat) * pow(sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2)), -1);
   }
-
-  for (int iat = 0; iat < get_ncen(); iat++)
-    ESP += get_atom_charge(iat) * pow(sqrt(pow(PosGrid[0] - atoms[iat].x, 2) + pow(PosGrid[1] - atoms[iat].y, 2) + pow(PosGrid[2] - atoms[iat].z, 2)), -1);
 
   for (int iprim = 0; iprim < nprim; iprim++) {
     iat = get_center(iprim) - 1;
@@ -4939,22 +4936,15 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
 
       sqd = d2[iat][jat];
 
-      prefac = 2 * 3.141592653589793 / ex_sum * exp(-iex * jex * sqd / ex_sum);
+      prefac = TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
       if (prefac < 1E-10) continue;
 
-      P[0] = (atoms[iat].x * iex + atoms[jat].x * jex) / ex_sum;
-      P[1] = (atoms[iat].y * iex + atoms[jat].y * jex) / ex_sum;
-      P[2] = (atoms[iat].z * iex + atoms[jat].z * jex) / ex_sum;
-
-      Pi[0] = P[0] - atoms[iat].x;
-      Pi[1] = P[1] - atoms[iat].y;
-      Pi[2] = P[2] - atoms[iat].z;
-
-      Pj[0] = P[0] - atoms[jat].x;
-      Pj[1] = P[1] - atoms[jat].y;
-      Pj[2] = P[2] - atoms[jat].z;
-      for (int k = 0; k < 3; k++)
-        PC[k] = P[k] - PosGrid[k];
+      for (int i = 0; i < 3; i++) {
+        P[i] = (pos[i][iat] * iex + pos[i][jat] * jex) / ex_sum;
+        Pi[i] = P[i] - pos[i][iat];
+        Pj[i] = P[i] - pos[i][jat];
+        PC[i] = P[i] - PosGrid[i];
+      }
 
       sqpc = pow(PC[0], 2) + pow(PC[1], 2) + pow(PC[2], 2);
 
@@ -5032,7 +5022,7 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
       term *= prefac;
       addesp = 0.0;
       for (int mo = 0; mo < MO; mo++)
-        addesp += occ[mo] * coef[mo][iprim] * coef[mo][jprim];
+        addesp += get_MO_occ(mo) * get_MO_coef_f(mo, iprim) * get_MO_coef_f(mo, jprim);
       ESP -= addesp * term;
     }
   }
