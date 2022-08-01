@@ -733,7 +733,8 @@ void Calc_Prop(
   time_t start;
   time(&start);
 
-  progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
+  progress_bar* progress = NULL;
+  if(!test) progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -862,11 +863,13 @@ void Calc_Prop(
           CubeEli.set_value(temp_i, temp_j, temp_k, CubeEli.get_value(temp_i, temp_j, temp_k) + Eli);
         }
       }
-    if (i != 0 && i % step == 0)
-      progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+    if (!test) {
+      if (i != 0 && i % step == 0)
+        progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+    }
   }
-  delete(progress);
   if (!test) {
+    delete(progress);
     time_t end;
     time(&end);
     if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
@@ -880,6 +883,7 @@ void Calc_ESP(
   WFN& wavy,
   int cpus,
   double radius,
+  bool no_date,
   ofstream& file
 )
 {
@@ -906,7 +910,8 @@ void Calc_ESP(
     }
   }
 
-  progress_bar* progress = new progress_bar{ file, 50u, "Calculating ESP" };
+  progress_bar* progress = NULL;
+  if (!no_date) progress = new progress_bar{file, 50u, "Calculating ESP"};
   const int step = max(floor(CubeESP.get_size(0) * 3 / 20), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -953,16 +958,20 @@ void Calc_ESP(
         CubeESP.set_value(temp_i, temp_j, temp_k, CubeESP.get_value(temp_i, temp_j, temp_k) + temp);
         //CubeESP.set_value(i, j, k, computeESP(PosGrid, d2, wavy));
       }
-    if (i != 0 && i % step == 0)
-      progress->write((i + CubeESP.get_size(0)) / double(CubeESP.get_size(0) * 3));
+    if (!no_date) {
+      if (i != 0 && i % step == 0)
+        progress->write((i + CubeESP.get_size(0)) / double(CubeESP.get_size(0) * 3));
+    }
   }
-  delete(progress);
+  if (!no_date) {
+    delete(progress);
 
-  time_t end;
-  time(&end);
-  if (difftime(end, start) < 60) file << "Time to calculate ESP: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600) file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
-  else file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    time_t end;
+    time(&end);
+    if (difftime(end, start) < 60) file << "Time to calculate ESP: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
+    else if (difftime(end, start) < 3600) file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+    else file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+  }
 };
 
 void Calc_MO(
