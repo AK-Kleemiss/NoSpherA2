@@ -165,11 +165,13 @@ inline void error_check(const bool condition, const std::string& file, const int
 {
   if (!condition) {
     log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
+    log_file.flush();
     exit(-1);
   }
 };
 inline void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file) {
   log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+  log_file.flush();
   exit(-1);
 };
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
