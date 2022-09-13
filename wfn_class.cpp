@@ -1442,6 +1442,8 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   long int geo_start;
   rf.read((char*)&geo_start, sizeof(geo_start));
   err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
+  if (debug)
+    file << "I read the pointer of geometry succesfully" << endl;
   rf.seekg(geo_start, ios::beg);
   int at;
   rf.read((char*)&at, 4);
@@ -1462,11 +1464,15 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
       geo_vals[2],
       geo_ints[0]), "Error pushing back atom", file);
   }
+  if (debug)
+    file << "I read the geometry of " << at << " atoms succesfully" << endl;
 
   rf.seekg(16, ios::beg);
   long int basis_start;
   rf.read((char*)&basis_start, 8);
   err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
+  if (debug)
+    file << "I read the pointer of basis set succesfully" << endl;
   rf.seekg(basis_start, ios::beg);
   int atoms2, temp;
   rf.read((char*)&temp, 4);
@@ -1512,28 +1518,22 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   vector<int> temp_shellsizes;
   for (int a = 0; a < ncen; a++) {
     int current_shell = -1;
-    int l = 0;
     for (int s = 0; s < atoms[a].basis_set.size(); s++) {
       if (atoms[a].basis_set[s].shell != current_shell) {
         if (atoms[a].basis_set[s].type == 1) {
           expected_coefs++;
-          l = 0;
         }
         else if (atoms[a].basis_set[s].type == 2) {
           expected_coefs += 3;
-          l = 1;
         }
         else if (atoms[a].basis_set[s].type == 3) {
           expected_coefs += 5;
-          l = 2;
         }
         else if (atoms[a].basis_set[s].type == 4) {
           expected_coefs += 7;
-          l = 3;
         }
         else if (atoms[a].basis_set[s].type == 5) {
           expected_coefs += 9;
-          l = 4;
         }
         current_shell++;
       }
@@ -1550,12 +1550,16 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   vector<vector<double>> f_pure_2_cart;
   vector<vector<double>> g_pure_2_cart;
   err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
+  if (debug)
+    file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
 
   rf.seekg(24, ios::beg);
   long int MOs_start;
   rf.read((char*)&MOs_start, 8);
   err_checkf(rf.good(), "Error reading MO_start", file);
   err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
+  if (debug)
+    file << "I read the pointer of MOs succesfully" << endl;
   rf.seekg(MOs_start, ios::beg);
   int operators, dimension;
   rf.read((char*)&operators, 4);
@@ -1574,16 +1578,28 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     energies[i].resize(dimension);
     irreps[i].resize(dimension);
     cores[i].resize(dimension);
+    if (debug) file << "coef_nr: " << coef_nr << " dimension: " << dimension << endl;
     rf.read((char*)coefficients[i].data(), 8 * coef_nr);
     err_checkf(rf.good(), "Error reading coefficients", file);
+    if (debug)
+      file << "I read the coefficients succesfully" << endl;
     rf.read((char*)occupations[i].data(), 8 * dimension);
     err_checkf(rf.good(), "Error reading occupations", file);
+    if (debug)
+      file << "I read the occupations succesfully" << endl;
     rf.read((char*)energies[i].data(), 8 * dimension);
     err_checkf(rf.good(), "Error reading energies", file);
+    if (debug)
+      file << "I read the energies succesfully" << endl;
     rf.read((char*)irreps[i].data(), 4 * dimension);
     err_checkf(rf.good(), "Error reading irreps", file);
+    if (debug)
+      file << "I read the irreps succesfully" << endl;
     rf.read((char*)cores[i].data(), 4 * dimension);
     err_checkf(rf.good(), "Error reading cores", file);
+    if (debug) {
+      file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
+    }
     for (int j = 0; j < dimension; j++) {
       push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
       int run_coef = 0;
@@ -1738,12 +1754,19 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
           }
           break;
         }
+        default: {
+          err_not_impl_f("Types higher than g type in gbws", file);
+          break;
+        }
         }
       }
-      err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+      err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading gbw file after MO " + to_string(MO_run) + "!\nStatus (p,d,f,g): "
+        + to_string(p_run) + " " + to_string(d_run) + " " + to_string(f_run) + " " + to_string(g_run), file);
       MO_run++;
     }
   }
+  if (debug)
+    file << "I read " << operators << " MOs succesfully" << endl;
   return true;
 };
 
