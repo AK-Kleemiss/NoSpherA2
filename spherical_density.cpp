@@ -4367,7 +4367,7 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 		}
 	}
 
-	return result/ local_k;
+	return result / local_k;
 };
 
 const double Thakkar::get_core_form_factor(const double &k_vector, const int &core_els, std::ofstream& file, bool debug) {
