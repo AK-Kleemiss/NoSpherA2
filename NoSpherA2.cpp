@@ -6,6 +6,7 @@
 #include "structure_factors.h"
 #include "properties.h"
 #include "cell.h"
+#include "spherical_density.h"
 
 using namespace std;
 //bool expert = false;
@@ -35,14 +36,13 @@ int main(int argc, char** argv)
   }
   //Lets print what was the command line, for debugging
   if (opt.debug) {
-    ofstream log("NoSpherA2.log", ios::out);
-    log << " Recap of input:\n";
+    log_file << " Recap of input:\n";
     for (int i = 0; i < argc; i++) {
       //cout << argv[i] << endl;
-      log << argv[i] << "\n";
+      log_file << argv[i] << "\n";
     }
-    log.flush();
-    log.close();
+    log_file.flush();
+    log_file.close();
   }
   if (opt.fract) {
     WFN wavy(6);
@@ -675,6 +675,24 @@ int main(int argc, char** argv)
     wavy[0].write_wfn("converted.wfn", false, true);
     return 0;
   }
+  if (opt.thakkar_d_plot) {
+    ofstream result("thakkar.dat", ios::out);
+    Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
+    for (float i = 0.001; i <= 4.0; i+=0.001) {
+      result << setw(6) << setprecision(3) << fixed << i;
+      result << setw(15) << setprecision(8) << scientific << H.get_form_factor(i, log_file, false);
+      result << setw(15) << setprecision(8) << scientific << C.get_form_factor(i, log_file, false);
+      result << setw(15) << setprecision(8) << scientific << O.get_form_factor(i, log_file, false);
+      result << setw(15) << setprecision(8) << scientific << P.get_form_factor(i, log_file, false);
+      result << setw(15) << setprecision(8) << scientific << Ca.get_form_factor(i, log_file, false);
+      result << setw(15) << setprecision(8) << scientific << Os.get_form_factor(i, log_file, false);
+      result << endl;
+    }
+    result.flush();
+    result.close();
+  }
   cout << NoSpherA2_message(opt.no_date) << "Did not understand the task to perform!\n" << help_message() << endl;
+  log_file.flush();
+  log_file.close();
   return 0;
 }

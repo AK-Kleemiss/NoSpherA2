@@ -2221,6 +2221,8 @@ void options::digest_options(int& argc, char** argv) {
       save_k_pts = true;
     else if (temp.find("-test") < 1)
       cout << "Running in test mode!" << endl, test = true;
+    else if (temp.find("-thakkar_d_plot") < 1)
+      cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_plot = true;
     else if (temp.find("-twin") < 1) {
       twin_law.resize(twin_law.size() + 1);
       twin_law[twin_law.size() - 1].resize(9);
