@@ -228,9 +228,9 @@ public:
       if (is_new[s] == false) continue;
       new_scatterers++;
     }
-    const unsigned int old_size = sf.size();
-    sf.resize(old_size + new_scatterers);
-    scatterer.resize(old_size + new_scatterers);
+    const int old_size = sf.size();
+    sf.resize(size_t(old_size + new_scatterers));
+    scatterer.resize(size_t(old_size + new_scatterers));
 #pragma omp parallel for
     for (int s = 0; s < rhs.scatterer_size(); s++) {
       if (is_new[s]) {

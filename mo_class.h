@@ -28,7 +28,7 @@ public:
     // Check, if Element (nr) is a valid Vector-Entry
     if (nr - 1 < 0)
       return false;
-    if (nr - 1 >= coefficients.size())
+    if (size_t(nr) - 1 >= coefficients.size())
       return false;
 
     // consistencycheck with WFN
@@ -36,7 +36,7 @@ public:
       return false;
 
     // delete Vector-Entry and rearrange
-    coefficients.erase(coefficients.begin() + (nr - 1));
+    coefficients.erase(coefficients.begin() + (size_t(nr) - 1));
 
     return true;
   };
@@ -62,7 +62,7 @@ public:
     // Check, if Element (nr) is a valid Vector-Entry
     if (nr - 1 < 0)
       return;
-    if (nr - 1 >= coefficients.size())
+    if (size_t(nr) - 1 >= coefficients.size())
       return;
 
     bool end = false;
@@ -74,7 +74,7 @@ public:
         std::cout << "That's suspiciusly big for a MO-coefficient, please select something smaler...\n";
         continue;
       }
-      coefficients[nr - 1] = temp_coef;
+      coefficients[size_t(nr) - 1] = temp_coef;
       end = true;
     }
     cls();

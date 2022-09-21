@@ -455,7 +455,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   char tempchar[20];
   size_t length;
   for (int i = 0; i < e_nuc; i++) {
-    int dump;
+    int dump = 0;
     getline(rf, line);
     if (debug) file << i << ".run, line:" << line << endl;
     length = line.copy(tempchar, 4, 0);
@@ -494,7 +494,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   if (debug) for (int i = 0; i < e_nex; i++) dum_center[i] = 99;
   int run = 0;
   int exnum = 0;
-  int dump;
+  int dump = 0;
   getline(rf, line);
   while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof()) {
     //if (debug) file << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
@@ -924,7 +924,7 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     getline(rf, line);
   vector < vector <double> > pos;
   pos.resize(3);
-  double temp[3];
+  double temp[3]{0,0,0};
   while (true) {
     getline(rf, line);
     if (line.find("</Nuclear Cartesian Coordinates>") != string::npos)
@@ -1439,16 +1439,16 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
 
   //Reading geometry
   rf.seekg(8, ios::beg);
-  long int geo_start;
+  long int geo_start = 0;
   rf.read((char*)&geo_start, sizeof(geo_start));
   err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
   if (debug)
     file << "I read the pointer of geometry succesfully" << endl;
   rf.seekg(geo_start, ios::beg);
-  int at;
+  int at = 0;
   rf.read((char*)&at, 4);
-  double geo_vals[6]; //x,y,z, ch, exp_fin_nuc, mass
-  int geo_ints[5];
+  double geo_vals[6]{0,0,0,0,0,0}; //x,y,z, ch, exp_fin_nuc, mass
+  int geo_ints[5]{0,0,0,0,0};
   for (int a = 0; a < at; a++) {
     for (int i = 0; i < 6; i++) {
       rf.read((char*)&(geo_vals[i]), 8);
@@ -1468,27 +1468,27 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     file << "I read the geometry of " << at << " atoms succesfully" << endl;
 
   rf.seekg(16, ios::beg);
-  long int basis_start;
+  long int basis_start = 0;
   rf.read((char*)&basis_start, 8);
   err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
   if (debug)
     file << "I read the pointer of basis set succesfully" << endl;
   rf.seekg(basis_start, ios::beg);
-  int atoms2, temp;
+  int atoms2 = 0, temp = 0;
   rf.read((char*)&temp, 4);
   rf.read((char*)&atoms2, 4);
   long unsigned int atoms_with_basis = 0;
-  double exp[37];
-  double con[37];
+  vector<double> exp(37,0);
+  vector<double> con(37,0);
   for (int a = 0; a < atoms2; a++) {
-    int atom_based, nr_shells;
+    int atom_based = 0, nr_shells = 0;
     rf.read((char*)&atom_based, 4);
     err_checkf(rf.good(), "Error reading atom_based", file);
     rf.read((char*)&nr_shells, 4);
     err_checkf(rf.good(), "Error reading nr_shells", file);
     int shell = 0;
     for (int p = 0; p < nr_shells; p++) {
-      int ang_mom, coeff_ind, nr_funct, center;
+      int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
       rf.read((char*)&ang_mom, 4);
       err_checkf(rf.good(), "Error reading ang_mom", file);
       if (ang_mom >= 5) err_not_impl_f("Higher angular momentum basis functions than G", file);
@@ -1554,14 +1554,14 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
 
   rf.seekg(24, ios::beg);
-  long int MOs_start;
+  long int MOs_start = 0;
   rf.read((char*)&MOs_start, 8);
   err_checkf(rf.good(), "Error reading MO_start", file);
   err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
   if (debug)
     file << "I read the pointer of MOs succesfully" << endl;
   rf.seekg(MOs_start, ios::beg);
-  int operators, dimension;
+  int operators = 0, dimension = 0;
   rf.read((char*)&operators, 4);
   err_checkf(rf.good(), "Error reading operators", file);
   rf.read((char*)&dimension, 4);
@@ -4192,17 +4192,16 @@ void WFN::computeValues(
   const int nmo = get_nmo(false);
   vector<double> phi(10 * nmo, 0.0);
   double* phi_temp;
-  double chi[10];
-  double d[4];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[10]{ 0,0,0,0,0,0,0,0,0,0 };
+  double d[4]{ 0,0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
-  double Grad[3];
-  double tau;
+  double Grad[3]{ 0,0,0 };
+  double tau = 0;
 
-  Rho = 0; tau = 0; Elf = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
+  Rho = 0; Elf = 0;
   Hess[0] = 0; Hess[1] = 0; Hess[2] = 0;
   Hess[8] = 0; Hess[4] = 0; Hess[5] = 0;
 
@@ -4312,11 +4311,11 @@ void WFN::computeELIELF(
   const int nmo = get_nmo(false);
   vector<double> phi(4 * nmo, 0.0);
   double* phi_temp;
-  double chi[4];
-  double d[3];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[4]{ 0,0,0,0 };
+  double d[3]{ 0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
 
   for (int j = 0; j < nex; j++) {
@@ -4375,12 +4374,9 @@ void WFN::computeELIELF(
     }
   }
 
-  double Grad[3];
-  double tau;
-  double Rho;
-
-  Rho = 0; tau = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
+  double Grad[3]{ 0,0,0 };
+  double tau = 0;
+  double Rho = 0;
 
   for (int mo = 0; mo < nmo; mo++) {
     const double occ = get_MO_occ(mo);
@@ -4408,11 +4404,11 @@ void WFN::computeELI(
   const int nmo = get_nmo(false);
   vector<double> phi(4 * nmo, 0.0);
   double* phi_temp;
-  double chi[4];
-  double d[3];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[4]{ 0,0,0,0 };
+  double d[3]{ 0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
 
   for (int j = 0; j < nex; j++) {
@@ -4471,12 +4467,9 @@ void WFN::computeELI(
     }
   }
 
-  double Grad[3];
-  double tau;
-  double Rho;
-
-  Rho = 0; tau = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
+  double Grad[3]{ 0,0,0 };
+  double tau = 0;
+  double Rho = 0;
 
   for (int mo = 0; mo < nmo; mo++) {
     const double occ = get_MO_occ(mo);
@@ -4501,11 +4494,11 @@ void WFN::computeELF(
   const int nmo = get_nmo(false);
   vector<double> phi(4 * nmo, 0.0);
   double* phi_temp;
-  double chi[4];
-  double d[3];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[4]{ 0,0,0,0 };
+  double d[3]{ 0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
 
   for (int j = 0; j < nex; j++) {
@@ -4564,12 +4557,9 @@ void WFN::computeELF(
     }
   }
 
-  double Grad[3];
-  double tau;
-  double Rho;
-
-  Rho = 0; tau = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
+  double Grad[3]{ 0,0,0 };
+  double tau = 0;
+  double Rho = 0;
 
   for (int mo = 0; mo < nmo; mo++) {
     const double occ = get_MO_occ(mo);
@@ -4596,11 +4586,11 @@ void WFN::computeLapELIELF(
   const int nmo = get_nmo(false);
   vector<double> phi(7 * nmo, 0.0);
   double* phi_temp;
-  double chi[7];
-  double d[3];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[7]{ 0,0,0,0,0,0,0 };
+  double d[3]{ 0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
 
   for (int j = 0; j < nex; j++) {
@@ -4663,14 +4653,12 @@ void WFN::computeLapELIELF(
     }
   }
 
-  double Grad[3];
-  double Hess[3];
-  double tau;
-  double Rho;
+  double Grad[3]{ 0,0,0 };
+  double Hess[3]{ 0,0,0 };
+  double tau = 0;
+  double Rho = 0;
 
-  Rho = 0; tau = 0; Elf = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
-  Hess[0] = 0; Hess[1] = 0; Hess[2] = 0;
+  Elf = 0;
 
   for (int mo = 0; mo < nmo; mo++) {
     const double occ = get_MO_occ(mo);
@@ -4701,11 +4689,11 @@ void WFN::computeLapELI(
   const int nmo = get_nmo(false);
   vector<double> phi(7 * nmo, 0.0);
   double* phi_temp;
-  double chi[7];
-  double d[3];
-  int iat;
-  int l[3];
-  double ex;
+  double chi[7]{ 0,0,0,0,0,0,0 };
+  double d[3]{ 0,0,0 };
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
   double xl[3][3];
 
   for (int j = 0; j < nex; j++) {
@@ -4768,14 +4756,10 @@ void WFN::computeLapELI(
     }
   }
 
-  double Grad[3];
-  double Hess[3];
-  double tau;
-  double Rho;
-
-  Rho = 0; tau = 0;
-  Grad[0] = 0; Grad[1] = 0; Grad[2] = 0;
-  Hess[0] = 0; Hess[1] = 0; Hess[2] = 0;
+  double Grad[3]{ 0,0,0 };
+  double Hess[3]{ 0,0,0 };
+  double tau = 0;
+  double Rho = 0;
 
   for (int mo = 0; mo < nmo; mo++) {
     const double occ = get_MO_occ(mo);
@@ -4802,10 +4786,10 @@ double WFN::computeMO(
 )
 {
   double result = 0.0;
-  int iat;
-  int l[3];
-  double ex;
-  double temp;
+  int iat = 0;
+  int l[3]{ 0,0,0 };
+  double ex = 0;
+  double temp = 0;
 
   // x, y, z and dsqd
   vector<vector<double> > d(4);
@@ -4887,8 +4871,8 @@ double Integrate(int& m, double i, double& expn)
 double WFN::fj(int& j, int& l, int& m, double& aa, double& bb)
 {
   double temp = 0.0;
-  double temp2;
-  int a, b;
+  double temp2 = 0.0;
+  int a = 0, b = 0;
   for (int i = max(0, j - m); i <= min(j, l); i++) {
     //pre = factorial[l] / factorial[l - i] / factorial[i] * factorial[m] / factorial[m - j + i] / factorial[j - i];
     temp2 = pre[j][l][m][i];
@@ -4916,10 +4900,10 @@ double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtm
 double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
 {
   double ESP = 0;
-  double P[3];
-  double Pi[3];
-  double Pj[3];
-  double PC[3];
+  double P[3]{ 0,0,0 };
+  double Pi[3]{ 0,0,0 };
+  double Pj[3]{ 0,0,0 };
+  double PC[3]{ 0,0,0 };
   double Fn[11];
   double Al[54];
   double Am[54];
@@ -4927,10 +4911,21 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
   int maplrsl[54];
   int maplrsm[54];
   int maplrsn[54];
-  int l_i[3];
-  int l_j[3];
-  int iat, jat, MaxFn;
-  double ex_sum, sqd, sqpc, prefac, expc, term, addesp, fjtmp, c, twoexpc, iex, jex;
+  int l_i[3]{ 0,0,0 };
+  int l_j[3]{ 0,0,0 };
+  int iat = 0, jat = 0, MaxFn = 0;
+  double ex_sum=0,
+    sqd = 0,
+    sqpc = 0,
+    prefac = 0,
+    expc = 0,
+    term = 0,
+    addesp = 0,
+    fjtmp = 0,
+    c = 0,
+    twoexpc = 0,
+    iex = 0, 
+    jex = 0;
 
   const int MO = get_nmo();
   const int nprim = get_nex();
