@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <set>
 #include <numeric>
+#include <complex>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)

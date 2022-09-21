@@ -2084,13 +2084,11 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
   }
 }
 
-void convert_to_ED(const vector <int>& asym_atom_list,
+void convert_to_ED(const std::vector <int>& asym_atom_list,
   const WFN& wave,
-  vector<vector<complex<double>>>& sf,
+  std::vector<std::vector<std::complex<double>>>& sf,
   const cell& unit_cell,
-  const hkl_list& hkl,
-  ofstream& file,
-  const bool debug = false)
+  const hkl_list& hkl)
 {
   const double fact = 0.023934;
   double h2;
@@ -2100,7 +2098,7 @@ void convert_to_ED(const vector <int>& asym_atom_list,
     it = next(hkl.begin(), s);
     h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
-      sf[i][s] = complex<double>(fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
+      sf[i][s] = std::complex<double>(fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
   }
 }
 
@@ -2467,9 +2465,7 @@ bool calculate_structure_factors_HF(
       wave,
       sf,
       unit_cell,
-      hkl,
-      file,
-      opt.debug);
+      hkl);
   }
 
   vector<string> labels;
@@ -2671,9 +2667,7 @@ tsc_block calculate_structure_factors_MTC(
       wave[nr],
       sf,
       unit_cell,
-      hkl,
-      file,
-      opt.debug);
+      hkl);
   }
 
   vector<string> labels;
