@@ -602,6 +602,7 @@ struct options {
   bool no_date = false;
   bool gbw2wfn = false;
   bool old_tsc = false;
+  bool thakkar_d_plot = false;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
   double NbSteps[3]{ 0,0,0 };
