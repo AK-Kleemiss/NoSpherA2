@@ -36,10 +36,12 @@ int main(int argc, char** argv)
   //Lets print what was the command line, for debugging
   if (opt.debug) {
     ofstream log("NoSpherA2.log", ios::out);
+    log << " Recap of input:\n";
     for (int i = 0; i < argc; i++) {
       //cout << argv[i] << endl;
-      log << argv[i] << endl;
+      log << argv[i] << "\n";
     }
+    log.flush();
     log.close();
   }
   if (opt.fract) {
