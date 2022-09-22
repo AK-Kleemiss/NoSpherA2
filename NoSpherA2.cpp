@@ -725,6 +725,8 @@ int main(int argc, char** argv)
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
         temp = P_cat.get_form_factor(i, log_file, false);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
+        temp = Ca_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i).real();
         temp = H_an.get_form_factor(i, log_file, false);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i).real();
         temp = C_an.get_form_factor(i, log_file, false);
@@ -738,8 +740,7 @@ int main(int argc, char** argv)
       result.flush();
       result.close();
     }
-
-    
+    return 0;
   }
   cout << NoSpherA2_message(opt.no_date) << "Did not understand the task to perform!\n" << help_message() << endl;
   log_file.flush();
