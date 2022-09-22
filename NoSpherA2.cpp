@@ -735,6 +735,14 @@ int main(int argc, char** argv)
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
         temp = P_an.get_form_factor(i, log_file, false);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
+        temp = C.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(5, temp, i).real();
+        temp = O.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7, temp, i).real();
+        temp = C.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7, temp, i).real();
+        temp = O.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(9, temp, i).real();
         result << endl;
       }
       result.flush();
