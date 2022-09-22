@@ -2137,9 +2137,6 @@ bool thakkar_sfac(
 
   cif_input.close();
 
-  if (opt.debug)
-    file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" 
-    << endl << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
   if (!opt.read_k_pts) {
@@ -2164,6 +2161,9 @@ bool thakkar_sfac(
   const int smax = k_pt[0].size();
   const int imax = asym_atom_list.size();
   const int amax = atom_type_list.size();
+
+  file << "Calculating scattering factors for " << amax << " types of atoms with " << imax << " atoms in the asymmetric unit." << endl;
+
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for
@@ -2187,7 +2187,7 @@ bool thakkar_sfac(
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
+        sf[i][s] = fact * (atom_type_list[asym_atom_to_type_list[i]] - sf[i][s]) / h2;
     }
   }
 

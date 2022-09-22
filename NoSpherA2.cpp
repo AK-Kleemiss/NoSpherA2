@@ -678,16 +678,26 @@ int main(int argc, char** argv)
   if (opt.thakkar_d_plot) {
     
     Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
+    Thakkar_Cation C_cat(6), O_cat(8), P_cat(15), Ca_cat(20);
+    Thakkar_Anion C_an(6), O_an(8), H_an(1), P_an(15);
     if (!opt.electron_diffraction) {
       ofstream result("thakkar.dat", ios::out);
       for (float i = 0.001; i <= 4.0; i += 0.001) {
-        result << setw(6) << setprecision(3) << fixed << i;
-        result << setw(15) << setprecision(8) << scientific << H.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << C.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << O.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << P.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << Ca.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << Os.get_form_factor(i, log_file, false);
+        result << showpos << setw(6) << setprecision(3) << fixed << i;
+        result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << P.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << Ca.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << Os.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << C_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << P_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << Ca_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << H_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << C_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << P_an.get_form_factor(i, log_file, false);
         result << endl;
       }
       result.flush();
@@ -696,19 +706,33 @@ int main(int argc, char** argv)
     else {
       ofstream result("thakkar_ED.dat", ios::out);
       for (float i = 0.001; i <= 4.0; i += 0.001) {
-        result << setw(6) << setprecision(3) << fixed << i;
+        result << showpos << setw(6) << setprecision(3) << fixed << i;
         complex<double> temp = H.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(1, temp,i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp,i).real();
         temp = C.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
         temp = O.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
         temp = P.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
         temp = Ca.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i).real();
         temp = Os.get_form_factor(i, log_file, false);
-        result << setw(15) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i).real();
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i).real();
+        temp = C_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
+        temp = O_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
+        temp = P_cat.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
+        temp = H_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i).real();
+        temp = C_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
+        temp = O_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
+        temp = P_an.get_form_factor(i, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
         result << endl;
       }
       result.flush();
