@@ -2085,24 +2085,32 @@ void options::digest_options(int& argc, char** argv) {
     if (temp.find("-acc") < 1)
       accuracy = stoi(argv[i + 1]);
     else if (temp.find("-Anion") < 1) {
-      int n = 0;
+      int n = 1;
+      string store;
       if (debug) cout << "Looking for Anions!" << endl;
       while (i + n < argc && string(argv[i + n]).find("-") != 0) {
-        int Z = stoi(argv[i + n]);
-        err_checkf(Z > 0 && Z < 56, "Anion not known!", cout);
-        Anions.push_back(Z);
+        store = argv[i + n];
+        vector<string> Z = split_string<string>(store," ");
+        for (int r = 0; r < Z.size(); r++) {
+          if (debug) cout << Z[r] << endl;
+          Anions.push_back(Z[r]);
+        }
         n++;
       }
     }
     else if (temp.find("-b") < 1)
       basis_set = argv[i + 1];
     else if (temp.find("-Cation") < 1) {
-      int n = 0;
+      int n = 1;
+      string store;
       if (debug) cout << "Looking for Cations!" << endl;
       while (i + n < argc && string(argv[i + n]).find("-") != 0) {
-        int Z = stoi(argv[i + n]);
-        err_checkf(Z > 0 && Z < 56, "Cation not known!", cout);
-        Cations.push_back(Z);
+        store = argv[i + n];
+        vector<string> Z = split_string<string>(store, " ");
+        for (int r = 0; r < Z.size(); r++) {
+          if (debug) cout << Z[r] << endl;
+          Cations.push_back(Z[r]);
+        }
         n++;
       }
     }
@@ -2274,6 +2282,7 @@ void options::digest_options(int& argc, char** argv) {
     }
     else if (temp.find("-xyz") != string::npos) {
       xyz_file = argv[i + 1];
+      iam_switch = true;
     }
   }
 };
