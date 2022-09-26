@@ -629,6 +629,8 @@ struct options {
   std::string turbomole_path;
   std::string basis_set_path;
   std::vector<std::string> arguments;
+  std::vector<int> Cations;
+  std::vector<int> Anions;
   int ncpus = 0;
   double mem = 0.0;
   int mult = 0;

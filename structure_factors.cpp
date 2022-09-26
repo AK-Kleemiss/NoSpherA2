@@ -2143,9 +2143,22 @@ bool thakkar_sfac(
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
+  if (opt.debug) {
+    for (int i = 0; i < opt.Cations.size(); i++) file << "Cation: " << opt.Cations[i] << endl;
+    for (int i = 0; i < opt.Anions.size(); i++) file << "Anion: " << opt.Anions[i] << endl;
+  }
   vector <Thakkar> spherical_atoms;
-  for (int i = 0; i < atom_type_list.size(); i++)
-    spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+  for (int i = 0; i < atom_type_list.size(); i++) {
+    if (find(opt.Cations.begin(), opt.Cations.end(), atom_type_list[i]) != opt.Cations.end()) {
+      spherical_atoms.push_back(Thakkar_Cation(atom_type_list[i]));
+    }
+    else if (find(opt.Anions.begin(), opt.Anions.end(), atom_type_list[i]) != opt.Anions.end()) {
+      spherical_atoms.push_back(Thakkar_Anion(atom_type_list[i]));
+    }
+    else {
+      spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+    }
+  }
 
   vector<vector<double>> k_pt;
   make_k_pts(
