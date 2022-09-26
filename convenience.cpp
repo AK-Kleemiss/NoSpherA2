@@ -2084,8 +2084,28 @@ void options::digest_options(int& argc, char** argv) {
     if (temp.find("-") > 0) continue;
     if (temp.find("-acc") < 1)
       accuracy = stoi(argv[i + 1]);
+    else if (temp.find("-Anion") < 1) {
+      int n = 0;
+      if (debug) cout << "Looking for Anions!" << endl;
+      while (i + n < argc && string(argv[i + n]).find("-") != 0) {
+        int Z = stoi(argv[i + n]);
+        err_checkf(Z > 0 && Z < 56, "Anion not known!", cout);
+        Anions.push_back(Z);
+        n++;
+      }
+    }
     else if (temp.find("-b") < 1)
       basis_set = argv[i + 1];
+    else if (temp.find("-Cation") < 1) {
+      int n = 0;
+      if (debug) cout << "Looking for Cations!" << endl;
+      while (i + n < argc && string(argv[i + n]).find("-") != 0) {
+        int Z = stoi(argv[i + n]);
+        err_checkf(Z > 0 && Z < 56, "Cation not known!", cout);
+        Cations.push_back(Z);
+        n++;
+      }
+    }
     else if (temp.find("-cif") < 1) {
       cif = argv[i + 1];
       err_checkf(exists(cif), "CIF doesn't exist", cout);
