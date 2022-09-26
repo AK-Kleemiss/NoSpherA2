@@ -370,6 +370,7 @@ Thakkar_Anion::Thakkar_Anion(int g_atom_number) {
 	n = &(Anion_n[0]);
 	z = &(Anion_z[0]);
 	c = &(Anion_c[0]);
+	charge = -1;
 };
 
 Thakkar_Cation::Thakkar_Cation(int g_atom_number) {
@@ -384,4 +385,5 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) {
 	n = &(Cation_n[0]);
 	z = &(Cation_z[0]);
 	c = &(Cation_c[0]);
+	charge = +1;
 };

@@ -2149,15 +2149,95 @@ bool thakkar_sfac(
   }
   vector <Thakkar> spherical_atoms;
   for (int i = 0; i < atom_type_list.size(); i++) {
-    if (find(opt.Cations.begin(), opt.Cations.end(), atom_type_list[i]) != opt.Cations.end()) {
-      spherical_atoms.push_back(Thakkar_Cation(atom_type_list[i]));
+    spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+  }
+  //For all elements of Cations
+  for (int i = 0; i < opt.Cations.size(); i++) {
+    // look for atom that has matching label
+    for (int j = 0; j < wave.atoms.size(); j++) {
+      if (wave.atoms[j].label == opt.Cations[i]) {
+        //Look whether we already have this ion in our list
+        int nr = -1;
+        for (int k = 0; k < spherical_atoms.size(); k++)
+          if (spherical_atoms[k].get_atomic_number() == wave.atoms[j].charge && spherical_atoms[k].get_atomic_number() == 1) {
+            nr = k;
+          }
+        //If yes look for position in asym_atom_list
+        if (nr > -1) {
+          for (int k = 0; k < asym_atom_list.size(); k++) {
+            if (asym_atom_list[k] == j) {
+              // and asign the nr in the type list accordingly.
+              asym_atom_to_type_list[k] = nr;
+            }
+          }
+        }
+        //If not append a new Cation
+        else{
+          spherical_atoms.push_back(Thakkar_Cation(wave.atoms[j].charge));
+          atom_type_list.push_back(wave.atoms[j].charge);
+          nr = spherical_atoms.size() - 1;
+          //and look for the new atom
+          for (int k = 0; k < asym_atom_list.size(); k++) {
+            if (asym_atom_list[k] == j) {
+              //And change the matching asym_atom_to_type entry
+              asym_atom_to_type_list[k] = nr;
+            }
+          }
+        }
+      }
     }
-    else if (find(opt.Anions.begin(), opt.Anions.end(), atom_type_list[i]) != opt.Anions.end()) {
-      spherical_atoms.push_back(Thakkar_Anion(atom_type_list[i]));
+  }
+  //For all elements of Cations
+  for (int i = 0; i < opt.Anions.size(); i++) {
+    // look for atom that has matching label
+    for (int j = 0; j < wave.atoms.size(); j++) {
+      if (wave.atoms[j].label == opt.Anions[i]) {
+        //Look whether we already have this ion in our list
+        int nr = -1;
+        for (int k = 0; k < spherical_atoms.size(); k++)
+          if (spherical_atoms[k].get_atomic_number() == wave.atoms[j].charge && spherical_atoms[k].get_atomic_number() == -1) {
+            nr = k;
+          }
+        //If yes look for position in asym_atom_list
+        if (nr > -1) {
+          for (int k = 0; k < asym_atom_list.size(); k++) {
+            if (asym_atom_list[k] == j) {
+              // and asign the nr in the type list accordingly.
+              asym_atom_to_type_list[k] = nr;
+            }
+          }
+        }
+        //If not append a new Anion
+        else {
+          spherical_atoms.push_back(Thakkar_Anion(wave.atoms[j].charge));
+          atom_type_list.push_back(wave.atoms[j].charge);
+          nr = spherical_atoms.size() - 1;
+          //and look for the new atom
+          for (int k = 0; k < asym_atom_list.size(); k++) {
+            if (asym_atom_list[k] == j) {
+              //And change the matching asym_atom_to_type entry
+              asym_atom_to_type_list[k] = nr;
+            }
+          }
+        }
+      }
     }
-    else {
-      spherical_atoms.push_back(Thakkar(atom_type_list[i]));
-    }
+  }
+  if (opt.debug) {
+    file << "AFTER ADDING IONS:" << endl;
+    file << "There are " << atom_type_list.size() << " types of atoms" << endl;
+    for (int i = 0; i < atom_type_list.size(); i++)
+      file << setw(4) << atom_type_list[i];
+    file << endl << "asym_atoms_to_type_list: " << endl;
+    for (int i = 0; i < asym_atom_to_type_list.size(); i++)
+      file << setw(4) << asym_atom_to_type_list[i];
+    file << endl << "Charges of atoms:" << endl;
+    for (int i = 0; i < wave.get_ncen(); i++)
+      file << setw(4) << wave.get_atom_charge(i);
+    file << endl << "Labels of atoms:" << endl;
+    for (int i = 0; i < wave.get_ncen(); i++)
+      file << setw(4) << wave.atoms[i].label;
+    file << endl;
   }
 
   vector<vector<double>> k_pt;
@@ -2206,8 +2286,7 @@ bool thakkar_sfac(
 
   if (opt.debug)
     file << endl << "SFs are made, now just write them!" << endl;
-  else
-    file << endl << "Writing tsc file..." << endl;
+  file << endl << "Writing tsc file..." << endl;
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
@@ -2224,6 +2303,7 @@ bool thakkar_sfac(
   if (opt.old_tsc) {
     blocky.write_tsc_file(opt.cif);
   }
+  file << " ... done!" << endl;
   return true;
 }
 
@@ -2329,8 +2409,7 @@ tsc_block MTC_thakkar_sfac(
 
   if (opt.debug)
     file << endl << "SFs are made, now just write them!" << endl;
-  else
-    file << endl << "Writing tsc file..." << endl;
+  file << endl << "Writing tsc file..." << endl;
 
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
