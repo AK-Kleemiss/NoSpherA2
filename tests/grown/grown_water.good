@@ -30,34 +30,34 @@ Number of points evaluated: 3722 with 149.193047 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-       Mn1    -2.645    -2.251     0.151
-        S1    -0.578    -0.962     0.531
-        C7    -0.133     0.067    -0.053
-        N2     0.605     0.911    -0.205
-        C6    -0.181    -0.028    -0.094
-        H6     0.134     0.046     0.087
-        C5    -0.025     0.187    -0.046
-        H5     0.070    -0.021     0.080
-        C4     0.005     0.068     0.035
-        C3    -0.131    -0.194     0.154
-        C2    -0.150    -0.013    -0.061
-        H2     0.133     0.047     0.092
-        C1    -0.126     0.031    -0.086
-        H1     0.158     0.068     0.091
-        O2     0.110     0.550    -0.306
-        O3     0.109     0.562    -0.315
-        O1    -0.156     0.243    -0.247
-        O4     0.776     1.114    -0.121
-       H4a     0.085    -0.135     0.205
-       H4b     0.073    -0.105     0.165
-        O5     0.263     0.569    -0.142
-       H5a     0.113    -0.083     0.186
-       H5b     0.102    -0.096     0.189
-       O10     0.128     0.627    -0.326
-      H10a     0.047    -0.127     0.153
-      H10b     0.019    -0.147     0.136
+       Mn1    -2.645    -2.467     0.219
+        S1    -0.578    -0.996     0.549
+        C7    -0.133     0.061    -0.044
+        N2     0.605     0.907    -0.193
+        C6    -0.181    -0.138    -0.020
+        H6     0.134     0.095     0.052
+        C5    -0.025     0.166    -0.087
+        H5     0.070     0.043     0.047
+        C4     0.005     0.066     0.037
+        C3    -0.131    -0.210     0.171
+        C2    -0.150    -0.089     0.010
+        H2     0.133     0.107     0.061
+        C1    -0.126    -0.072    -0.016
+        H1     0.158     0.131     0.055
+        O2     0.110     0.536    -0.299
+        O3     0.109     0.545    -0.307
+        O1    -0.156     0.189    -0.209
+        O4     0.776     1.088    -0.237
+       H4a     0.085    -0.066     0.195
+       H4b     0.073    -0.012     0.132
+        O5     0.263     0.509    -0.063
+       H5a     0.113    -0.016     0.170
+       H5b     0.102    -0.035     0.182
+       O10     0.128     0.545    -0.366
+      H10a     0.047    -0.080     0.145
+      H10b     0.019    -0.085     0.111
 Total number of electrons in the wavefunction: 149.193
- and Hirshfeld electrons (asym unit): 147.743
+ and Hirshfeld electrons (asym unit): 147.704
 
 Number of k-points to evaluate: 5928 for 3722 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 

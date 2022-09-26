@@ -30,53 +30,53 @@ Number of points evaluated: 4902 with 181.514305 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-        O1    -0.025     0.249    -0.162
-        O2    -0.034     0.436    -0.317
-        H2     0.247     0.002     0.249
-        O3    -0.321     0.154    -0.341
-        H3     0.230     0.013     0.212
-        O4    -0.123     0.288    -0.248
-        H4     0.264     0.018     0.243
-        O5    -0.294     0.027    -0.168
-        H5     0.270     0.019     0.243
-        O6     0.014     0.323    -0.175
-        O7    -0.206     0.288    -0.354
-        H7     0.254     0.065     0.196
-        O8    -0.113     0.286    -0.236
-        H8     0.229    -0.009     0.234
-        O9    -0.193     0.270    -0.298
-        H9     0.233     0.011     0.212
-       O10    -0.192     0.234    -0.268
-       H10     0.227     0.043     0.170
-       O11    -0.123     0.263    -0.268
-        C1    -0.097     0.034    -0.009
-        H1     0.120     0.052     0.064
-        C2    -0.326    -0.097    -0.109
-       H2a     0.111     0.033     0.077
-       H2b     0.125     0.071     0.048
-        C3    -0.036     0.068     0.040
-       H3a     0.098     0.038     0.062
-        C4    -0.057     0.107    -0.084
-       H4a     0.104     0.036     0.069
-        C5     0.025     0.117     0.019
-       H5a     0.115     0.036     0.085
-        C6    -0.136    -0.045     0.020
-        H6     0.136     0.053     0.084
-        C7    -0.160    -0.210     0.125
-        C8    -0.060     0.069    -0.028
-       H8a     0.093     0.042     0.062
-       H8b     0.101     0.031     0.077
-        C9    -0.172    -0.046     0.025
-       H9a     0.143     0.073     0.085
-       C10    -0.136    -0.042    -0.011
-      H10a     0.122     0.062     0.065
-       C11    -0.086     0.073    -0.034
-       H11     0.091     0.025     0.062
-       C12    -0.164    -0.008    -0.038
-      H12a     0.089     0.023     0.073
-      H12b     0.101     0.062     0.044
+        O1    -0.025     0.169    -0.112
+        O2    -0.034     0.375    -0.333
+        H2     0.247     0.061     0.225
+        O3    -0.321     0.052    -0.261
+        H3     0.230     0.086     0.163
+        O4    -0.123     0.222    -0.194
+        H4     0.264     0.078     0.205
+        O5    -0.294    -0.115    -0.069
+        H5     0.270     0.078     0.209
+        O6     0.014     0.274    -0.146
+        O7    -0.206     0.198    -0.308
+        H7     0.254     0.165     0.132
+        O8    -0.113     0.238    -0.197
+        H8     0.229     0.052     0.201
+        O9    -0.193     0.225    -0.257
+        H9     0.233     0.085     0.163
+       O10    -0.192     0.183    -0.214
+       H10     0.227     0.143     0.100
+       O11    -0.123     0.196    -0.234
+        C1    -0.097     0.016    -0.011
+        H1     0.120     0.129     0.022
+        C2    -0.326    -0.214    -0.053
+       H2a     0.111     0.101     0.039
+       H2b     0.125     0.147     0.002
+        C3    -0.036     0.047     0.009
+       H3a     0.098     0.122     0.021
+        C4    -0.057     0.075    -0.100
+       H4a     0.104     0.114     0.034
+        C5     0.025     0.089     0.008
+       H5a     0.115     0.103     0.056
+        C6    -0.136    -0.064     0.029
+        H6     0.136     0.126     0.051
+        C7    -0.160    -0.240     0.159
+        C8    -0.060     0.016     0.011
+       H8a     0.093     0.095     0.040
+       H8b     0.101     0.094     0.055
+        C9    -0.172    -0.091     0.067
+       H9a     0.143     0.142     0.047
+       C10    -0.136    -0.094     0.034
+      H10a     0.122     0.125     0.026
+       C11    -0.086     0.039    -0.057
+       H11     0.091     0.104     0.024
+       C12    -0.164    -0.106     0.014
+      H12a     0.089     0.086     0.041
+      H12b     0.101     0.126     0.009
 Total number of electrons in the wavefunction: 181.514
- and Hirshfeld electrons (asym unit): 182.199
+ and Hirshfeld electrons (asym unit): 182.351
 
 Number of k-points to evaluate: 4021 for 4902 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] Calculating scattering factors ===================== [100%] 
