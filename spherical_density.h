@@ -4004,6 +4004,7 @@ protected:
 	const int previous_element_coef();
 	const int *nex, *ns, *np, *nd, *nf, *occ, *n;
 	const double *z, *c;
+	int charge;
 public:
 	Thakkar(const int g_atom_number) { 
 		atomic_number = g_atom_number; 
@@ -4016,6 +4017,7 @@ public:
 		n = &(Thakkar_n[0]);
 		z = &(Thakkar_z[0]);
 		c = &(Thakkar_c[0]);
+		charge = 0;
 	};
 	Thakkar() {
 		atomic_number = 1;
@@ -4028,10 +4030,13 @@ public:
 		n = &(Thakkar_n[0]);
 		z = &(Thakkar_z[0]);
 		c = &(Thakkar_c[0]);
+		charge = 0;
 	}
 	const double get_radial_density(double dist);
 	const double get_form_factor(const double k_vector, std::ofstream &file, bool debug = false);
 	const double get_core_form_factor(const double& k_vector, const int& core_els, std::ofstream& file, bool debug);
+	const int get_atomic_number() { return atomic_number; };
+	const int get_charge() { return charge; };
 };
 
 const int Anion_nex[53] = { 6,                                                                                            5,

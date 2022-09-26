@@ -42,12 +42,13 @@ int main(int argc, char** argv)
       log_file << argv[i] << "\n";
     }
     log_file.flush();
-    log_file.close();
   }
   if (opt.fract) {
     WFN wavy(6);
     cube residual(opt.fract_name, true, wavy, cout, opt.debug);
     residual.fractal_dimension(0.01);
+    log_file.flush();
+    log_file.close();
     return 0;
   }
   if (opt.combined_tsc_calc) {
@@ -125,6 +126,7 @@ int main(int argc, char** argv)
     else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
     log_file << endl;
 #endif
+    log_file.flush();
     log_file.close();
     return 0;
   }
@@ -205,28 +207,20 @@ int main(int argc, char** argv)
     else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
     log_file << endl;
 #endif
+    log_file.flush();
     log_file.close();
     return 0;
   }
   if (opt.iam_switch) {
     ofstream log_file("NoSpherA2.log", ios::out);
-    if (opt.debug)
+    if (opt.debug) {
+      log_file << "I am doin IAM!" << endl;
       for (int i = 0; i < argc; i++)
         log_file << argv[i] << endl;
+    }
 
     log_file << NoSpherA2_message(opt.no_date);
     log_file.flush();
-    if (argc > 1) {
-      if (string(argv[1]).find("--help") != string::npos) {
-        log_file << help_message() << endl;
-        log_file.close();
-        return 0;
-      }
-    }
-
-    log_file.flush();
-    if (opt.debug)
-      log_file << "status: " << opt.cif << "&" << opt.hkl << "&" << opt.xyz_file << endl;
     err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
     err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
     wavy.push_back(WFN(0));
@@ -237,6 +231,8 @@ int main(int argc, char** argv)
     if (opt.debug)
       log_file << "Entering Structure Factor Calculation!" << endl;
     err_checkf(thakkar_sfac(opt, log_file, wavy[0]), "Error during SF Calculation!", log_file);
+    log_file.flush();
+    log_file.close();
     return 0;
   }
   //This one has conversion to fchk and calculation of one single tsc file
@@ -301,6 +297,8 @@ int main(int argc, char** argv)
           log_file,
           wavy[0]), "Error during SF Calcualtion", log_file);
     }
+    log_file.flush();
+    log_file.close();
     return 0;
   }
   if (opt.calc) {
@@ -515,6 +513,8 @@ int main(int argc, char** argv)
       ESP.write_file(true);
       log2 << "  done!" << endl;
     }
+    log_file.flush();
+    log_file.close();
     return 0;
   }
   if (opt.density_test_cube) {
@@ -673,6 +673,8 @@ int main(int argc, char** argv)
     wavy.push_back(WFN(9));
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, true);
+    log_file.flush();
+    log_file.close();
     return 0;
   }
   if (opt.thakkar_d_plot) {
