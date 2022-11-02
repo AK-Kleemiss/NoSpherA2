@@ -131,7 +131,7 @@ double cosinus_integral(const int N, const double z, const double k) {
 const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file, bool debug) {
 	double result(0.0);
 	using namespace std;
-	const double local_k = ang2bohr(k_vector); // since the radial exponents are in a.u.
+	const double local_k = k_vector;
 
 	const int l_ns = ns[atomic_number - 1];
 	const int l_np = np[atomic_number - 1];
