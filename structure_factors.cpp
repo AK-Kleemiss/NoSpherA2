@@ -2073,7 +2073,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
 
 #pragma omp parallel for private(k)
     for (int s = 0; s < sf[0].size(); s++) {
-      k = cubic_bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
+      k = TWO_PI * bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
       for (int i = 0; i < asym_atom_list.size(); i++) {
         sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
       }
@@ -2267,7 +2267,7 @@ bool thakkar_sfac(
 #pragma omp parallel for private(it)
   for (int s = 0; s < smax; s++) {
     it = next(hkl.begin(), s);
-    double k = unit_cell.get_stl_of_hkl(*it);
+    double k = TWO_PI*unit_cell.get_stl_of_hkl(*it);
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
   }
