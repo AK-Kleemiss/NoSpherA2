@@ -12,11 +12,11 @@ jobs:
     needs: tests
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: make_MacOS
       run: brew install libomp && cd Mac && make && cp NoSpherA2 NoSpherA2_Mac
     - name: Archive executable
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: executable_MacOS
         path: |
@@ -26,13 +26,13 @@ jobs:
     needs: tests
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.1
     - name: make_Windows
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
     - name: Upload .exe
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: executable_Windows
         path: |
@@ -41,11 +41,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: make_Linux
       run: cd Linux && make
     - name: Archive executable
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: executable_Linux
         path: |
@@ -55,9 +55,9 @@ jobs:
     needs: build_Linux
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Get executable
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: executable_Linux
     - name: Run tests
@@ -70,19 +70,19 @@ jobs:
     
     steps:
     - name: gather executables
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: executable_Linux
     - name: gather executables
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: executable_MacOS
     - name: gather executables
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v3
       with:
         name: executable_Windows
     - name: Archive all executable
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: executables
         path: |
