@@ -33,7 +33,7 @@ const int Thakkar::previous_element_coef() {
 const double Thakkar::get_radial_density(double dist){
 	//Speedup things for H
 	if (atomic_number == 1)
-		return pow(exp(-dist) * 2.0, 2) / (4 * PI);
+		return exp(-2*dist) / PI;
 
 	double Rho = 0.0;
 	int nr_ex = first_ex();
@@ -113,7 +113,7 @@ const double Thakkar::get_radial_density(double dist){
 double cosinus_integral(const int N, const double z, const double k);
 
 double sinus_integral(const int N, const double z, const double k) {
-	//Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int[0-inf] e^ax sin(bx) dx = e^ax/(a^2+b^2) * (a sin(bx) - b cos(bx)) and partial integration
+	//Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
 	if (N == 0)
 		return k / (z * z + k * k);
 	else
@@ -121,7 +121,7 @@ double sinus_integral(const int N, const double z, const double k) {
 };
 
 double cosinus_integral(const int N, const double z, const double k) {
-	//Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int[0-inf] e^ax cos(bx) dx = e^ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
+	//Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
 	if (N == 0)
 		return z / (z * z + k * k);
 	else
@@ -131,7 +131,7 @@ double cosinus_integral(const int N, const double z, const double k) {
 const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file, bool debug) {
 	double result(0.0);
 	using namespace std;
-	const double local_k = cubic_ang2bohr(k_vector); // since the radial exponents are in a.u.
+	const double local_k = ang2bohr(k_vector); // since the radial exponents are in a.u.
 
 	const int l_ns = ns[atomic_number - 1];
 	const int l_np = np[atomic_number - 1];
@@ -252,7 +252,7 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 const double Thakkar::get_core_form_factor(const double &k_vector, const int &core_els, std::ofstream& file, bool debug) {
 	double result(0.0);
 	using namespace std;
-	const double local_k = cubic_ang2bohr(k_vector); // since the radial exponents are in a.u.
+	const double local_k = ang2bohr(k_vector); // since the radial exponents are in a.u.
 
 	const int l_ns = ns[atomic_number - 1];
 	const int l_np = np[atomic_number - 1];
