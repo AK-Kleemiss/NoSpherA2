@@ -159,7 +159,7 @@ public:
     positions_cart[2] = V / (a * b * sg) * frac_z;
     if (in_bohr)
       for (int i = 0; i < 3; i++)
-        positions_cart[i] /= 0.529177249;
+        positions_cart[i] = ang2bohr(positions_cart[i]);
   }
 
   std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
@@ -170,7 +170,7 @@ public:
     positions_cart[2] = V / (a * b * sg) * frac_z;
     if (in_bohr)
       for (int i = 0; i < 3; i++)
-        positions_cart[i] /= 0.529177249;
+        positions_cart[i] = ang2bohr(positions_cart[i]);
     return positions_cart;
   }
 
@@ -249,29 +249,29 @@ public:
       << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
       << as << " " << bs << " " << cs << std::endl;
 
-    cm[0][0] = a / 0.529177249;
-    cm[0][1] = sqrt(abs(a * b * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[0][2] = sqrt(abs(a * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
+    cm[0][0] = a;
+    cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+    cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
 
-    cm[1][0] = sqrt(abs(a * b * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[1][1] = b / 0.529177249;
-    cm[1][2] = sqrt(abs(b * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
+    cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+    cm[1][1] = b;
+    cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
 
-    cm[2][0] = sqrt(abs(a * c * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[2][1] = sqrt(abs(b * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
-    cm[2][2] = c / 0.529177249;
+    cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+    cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+    cm[2][2] = c;
 
-    rcm[0][0] = 2 * PI / a;
+    rcm[0][0] = TWO_PI / a;
     rcm[0][1] = 0;
     rcm[0][2] = 0;
 
-    rcm[1][0] = 2 * PI * -cg / (a * sg);
-    rcm[1][1] = 2 * PI * 1 / (b * sg);
+    rcm[1][0] = TWO_PI * -cg / (a * sg);
+    rcm[1][1] = TWO_PI * 1 / (b * sg);
     rcm[1][2] = 0;
 
-    rcm[2][0] = 2 * PI * b * c * (ca * cg - cb) / V / sg;
-    rcm[2][1] = 2 * PI * a * c * (cb * cg - ca) / V / sg;
-    rcm[2][2] = 2 * PI * a * b * sg / V;
+    rcm[2][0] = TWO_PI * b * c * (ca * cg - cb) / V / sg;
+    rcm[2][1] = TWO_PI * a * c * (cb * cg - ca) / V / sg;
+    rcm[2][2] = TWO_PI * a * b * sg / V;
 
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
@@ -281,7 +281,7 @@ public:
         }
         else {
           rcm[i][j] = bohr2ang(rcm[i][j]);
-          //cm[i][j] *= 0.529177249;
+          cm[i][j] = bohr2ang(cm[i][j]);
         }
 
     cif_input.close();
@@ -342,12 +342,12 @@ public:
       if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
         break;
     }
-    ca = cos(0.0174532925199432944444444444444 * alpha);
-    cb = cos(0.0174532925199432944444444444444 * beta);
-    cg = cos(0.0174532925199432944444444444444 * gamma);
-    sa = sin(0.0174532925199432944444444444444 * alpha);
-    sb = sin(0.0174532925199432944444444444444 * beta);
-    sg = sin(0.0174532925199432944444444444444 * gamma);
+    ca = cos(PI_180 * alpha);
+    cb = cos(PI_180 * beta);
+    cg = cos(PI_180 * gamma);
+    sa = sin(PI_180 * alpha);
+    sb = sin(PI_180 * beta);
+    sg = sin(PI_180 * gamma);
     V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
     if (V / v > 1.1 || V / v < 0.9) {
       std::cout << "Volume computed is more than 10% off, please check!" << std::endl;
@@ -362,29 +362,29 @@ public:
       << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
       << as << " " << bs << " " << cs << std::endl;
 
-    cm[0][0] = a / 0.529177249;
-    cm[0][1] = sqrt(abs(a * b * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[0][2] = sqrt(abs(a * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
+    cm[0][0] = a;
+    cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+    cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
 
-    cm[1][0] = sqrt(abs(a * b * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[1][1] = b / 0.529177249;
-    cm[1][2] = sqrt(abs(b * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
+    cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
+    cm[1][1] = b;
+    cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
 
-    cm[2][0] = sqrt(abs(a * c * cg)) / 0.529177249 * pow(-1, 1 + (cg > 0));
-    cm[2][1] = sqrt(abs(b * c * cb)) / 0.529177249 * pow(-1, 1 + (cb > 0));
-    cm[2][2] = c / 0.529177249;
+    cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
+    cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
+    cm[2][2] = c;
 
-    rcm[0][0] = 2 * PI / a;
+    rcm[0][0] = TWO_PI / a;
     rcm[0][1] = 0;
     rcm[0][2] = 0;
 
-    rcm[1][0] = 2 * PI * -cg / (a * sg);
-    rcm[1][1] = 2 * PI * 1 / (b * sg);
+    rcm[1][0] = TWO_PI * -cg / (a * sg);
+    rcm[1][1] = TWO_PI * 1 / (b * sg);
     rcm[1][2] = 0;
 
-    rcm[2][0] = 2 * PI * b * c * (ca * cg - cb) / V / sg;
-    rcm[2][1] = 2 * PI * a * c * (cb * cg - ca) / V / sg;
-    rcm[2][2] = 2 * PI * a * b * sg / V;
+    rcm[2][0] = TWO_PI * b * c * (ca * cg - cb) / V / sg;
+    rcm[2][1] = TWO_PI * a * c * (cb * cg - ca) / V / sg;
+    rcm[2][2] = TWO_PI * a * b * sg / V;
 
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)
@@ -394,7 +394,7 @@ public:
         }
         else {
           rcm[i][j] = bohr2ang(rcm[i][j]);
-          //cm[i][j] *= 0.529177249;
+          cm[i][j] = bohr2ang(cm[i][j]);
         }
 
     cif_input.close();
