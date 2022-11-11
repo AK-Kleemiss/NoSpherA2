@@ -86,7 +86,10 @@ public:
   void delete_unoccupied_MOs();
   const MO& get_MO(const int& n) const { 
     if (n < nmo) return MOs[n]; 
-    else err_not_impl_f("Wrong MO number",std::cout); 
+    else {
+      err_not_impl_f("Wrong MO number", std::cout);
+      return MO();
+    }
   };
 
   //--------------------in and output----------------------------------------
