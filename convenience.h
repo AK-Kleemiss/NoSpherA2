@@ -41,6 +41,7 @@ inline const int hardness = 3;
 inline const double cutoff = 1.0e-20;
 inline const double PI = 3.14159265358979323846;
 inline const double TWO_PI = 2 * PI;
+inline const double FOUR_PI = 4 * PI;
 inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
 inline const double PI2 = pow(PI, 2);
 inline const double PI_180 = PI / 180.0;
