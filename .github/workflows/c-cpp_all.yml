@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: give me infor
+      run: cd /usr/local && ls -lhrt && cd /usr/local/lib && ls -lhrt && cd /usr/local/opt/lib && ls -lhrt && cd /usr/local/lib/libomp && ls -lhrt && cd /usr/local/opt/lib/libomp && ls -lhrt
     - name: make_MacOS
       run: cd Mac && make && cp NoSpherA2 NoSpherA2_Mac
     - name: tmate session if tests fail
@@ -47,27 +49,20 @@ jobs:
     - uses: actions/checkout@v3
     - name: make_Linux
       run: cd Linux && make
+    - name: tmate session if tests fail build
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
     - name: Archive executable
       uses: actions/upload-artifact@v3
       with:
         name: executable_Linux
         path: |
           Linux/NoSpherA2
-    - name: tmate session if tests fail
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-  tests:
-    runs-on: ubuntu-latest
-    needs: build_Linux
-
-    steps:
-    - uses: actions/checkout@v3
-    - name: Get executable
-      uses: actions/download-artifact@v3
-      with:
-        name: executable_Linux
     - name: Run tests
       run: chmod +x NoSpherA2 && cd tests && make all -k
+    - name: tmate session if tests fail tests
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
 
   combine_all:
     
