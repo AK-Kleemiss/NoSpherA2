@@ -177,6 +177,14 @@ void WFN::list_centers()
   }
 };
 
+const MO& WFN::get_MO(const int& n) const {
+  if (n < nmo) return MOs[n];
+  else {
+    err_not_impl_f("Wrong MO number", std::cout);
+    return MOs[0];
+  }
+};
+
 bool WFN::push_back_type(const int& type)
 {
   types.push_back(type);
