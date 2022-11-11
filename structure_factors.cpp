@@ -348,7 +348,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
               break;
             }
           if (already_there == false && wave.get_atom_charge(nr) != 119) {
-            asym_atom_to_type_list.push_back(atom_type_list.size());
+            asym_atom_to_type_list.push_back((int) atom_type_list.size());
             atom_type_list.push_back(wave.get_atom_charge(nr));
           }
         }
@@ -1912,7 +1912,7 @@ void make_k_pts(const bool& read_k_pts,
   ofstream& file,
   bool debug = false)
 {
-  const int size = hkl.size();
+  const int size = (int) hkl.size();
   if (!read_k_pts) {
     k_pt.resize(3);
 #pragma omp parallel for
@@ -1959,7 +1959,7 @@ void calc_SF(const int& points,
 #endif
   bool debug = false)
 {
-  const int imax = dens.size();
+  const int imax = (int) dens.size();
   sf.resize(imax);
 #pragma omp parallel for
   for (int i = 0; i < imax; i++)
@@ -2007,7 +2007,7 @@ void calc_SF(const int& points,
 
   progress_bar* progress = new progress_bar{ file, 60u, "Calculating scattering factors" };
   const int step = max((int)floor(imax / 20), 1);
-  const int smax = k_pt[0].size();
+  const int smax = (int) k_pt[0].size();
   int pmax;
   double* dens_local, * d1_local, * d2_local, * d3_local;
   complex<double>* sf_local;
@@ -2016,7 +2016,7 @@ void calc_SF(const int& points,
   const double* k3_local = k_pt[2].data();
   double work, rho;
   for (int i = 0; i < imax; i++) {
-    pmax = dens[i].size();
+    pmax = (int) dens[i].size();
     dens_local = dens[i].data();
     d1_local = d1[i].data();
     d2_local = d2[i].data();
@@ -2175,7 +2175,7 @@ bool thakkar_sfac(
         else{
           spherical_atoms.push_back(Thakkar_Cation(wave.atoms[j].charge));
           atom_type_list.push_back(wave.atoms[j].charge);
-          nr = spherical_atoms.size() - 1;
+          nr = (int) spherical_atoms.size() - 1;
           //and look for the new atom
           for (int k = 0; k < asym_atom_list.size(); k++) {
             if (asym_atom_list[k] == j) {
@@ -2211,7 +2211,7 @@ bool thakkar_sfac(
         else {
           spherical_atoms.push_back(Thakkar_Anion(wave.atoms[j].charge));
           atom_type_list.push_back(wave.atoms[j].charge);
-          nr = spherical_atoms.size() - 1;
+          nr = (int) spherical_atoms.size() - 1;
           //and look for the new atom
           for (int k = 0; k < asym_atom_list.size(); k++) {
             if (asym_atom_list[k] == j) {
@@ -2251,9 +2251,9 @@ bool thakkar_sfac(
     file,
     opt.debug);
 
-  const int smax = k_pt[0].size();
-  const int imax = asym_atom_list.size();
-  const int amax = atom_type_list.size();
+  const int smax = (int) k_pt[0].size();
+  const int imax = (int) asym_atom_list.size();
+  const int amax = (int) atom_type_list.size();
 
   file << "Calculating scattering factors for " << amax << " types of atoms with " << imax << " atoms in the asymmetric unit." << endl;
 
@@ -2377,9 +2377,9 @@ tsc_block MTC_thakkar_sfac(
     file,
     opt.debug);
 
-  const int smax = k_pt[0].size();
-  const int imax = asym_atom_list.size();
-  const int amax = atom_type_list.size();
+  const int smax = (int) k_pt[0].size();
+  const int imax = (int) asym_atom_list.size();
+  const int amax = (int) atom_type_list.size();
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for
