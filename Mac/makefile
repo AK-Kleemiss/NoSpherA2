@@ -1,7 +1,7 @@
 #THIS IS THE MACOS MAKEFILE!#
 RM := rm
 
-LIBOMP := /usr/local/lib/libomp.a
+LIBOMP := /usr/local/opt/lib/libomp.a
 
 all: NoSpherA2
 
