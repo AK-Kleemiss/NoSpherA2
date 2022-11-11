@@ -255,7 +255,7 @@ public:
     for (int i = 0; i < rhs.reflection_size(); i++)
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
-    int new_scatterers = 0;
+    unsigned int new_scatterers = 0;
     std::vector<bool> is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+:new_scatterers)
     for (int s = 0; s < rhs.scatterer_size(); s++) {

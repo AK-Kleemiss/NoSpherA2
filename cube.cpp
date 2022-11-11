@@ -4,7 +4,7 @@
 using namespace std;
 
 cube::cube() {
-  size.resize(3, 0.0);
+  size.resize(3, 0);
   origin.resize(3, 0.0);
   vectors.resize(3);
   for (int i = 0; i < 3; i++) {

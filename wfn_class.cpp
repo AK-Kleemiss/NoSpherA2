@@ -3012,7 +3012,7 @@ int WFN::calculate_charge()
   for (int mo = 0; mo < nmo; mo++) {
     mo_charges += get_MO_occ(mo);
   }
-  return atomic_charges - mo_charges;
+  return atomic_charges - (int) mo_charges;
 };
 
 int WFN::calculate_charge(ofstream& file)
@@ -3030,7 +3030,7 @@ int WFN::calculate_charge(ofstream& file)
   for (int mo = 0; mo < nmo; mo++) {
     mo_charges += get_MO_occ(mo);
   }
-  return atomic_charges - mo_charges;
+  return atomic_charges - (int) mo_charges;
 };
 
 bool WFN::guess_multiplicity(bool expert)
@@ -3296,7 +3296,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
     return false;
   }
   for (int i = 0; i < charges.size(); i++)
-    atoms[i].charge = charges[i];
+    atoms[i].charge = (int) charges[i];
   vector<double> coords;
   if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords)) {
     log << "Error reading coordinates" << endl;

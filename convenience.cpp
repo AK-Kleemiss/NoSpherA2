@@ -1029,7 +1029,7 @@ void progress_bar::write(double fraction)
 void readxyzMinMax_fromWFN(
   WFN& wavy,
   double* CoordMinMax,
-  double* NbSteps,
+  int* NbSteps,
   double Radius,
   double Increments
 )
@@ -1093,15 +1093,15 @@ void readxyzMinMax_fromWFN(
   CoordMinMax[2] -= Radius / bohrtoa;
   CoordMinMax[5] += Radius / bohrtoa;
 
-  NbSteps[0] = ceil((CoordMinMax[3] - CoordMinMax[0]) / Increments * bohrtoa);
-  NbSteps[1] = ceil((CoordMinMax[4] - CoordMinMax[1]) / Increments * bohrtoa);
-  NbSteps[2] = ceil((CoordMinMax[5] - CoordMinMax[2]) / Increments * bohrtoa);
+  NbSteps[0] = (int) ceil((CoordMinMax[3] - CoordMinMax[0]) / Increments * bohrtoa);
+  NbSteps[1] = (int) ceil((CoordMinMax[4] - CoordMinMax[1]) / Increments * bohrtoa);
+  NbSteps[2] = (int) ceil((CoordMinMax[5] - CoordMinMax[2]) / Increments * bohrtoa);
 }
 
 void readxyzMinMax_fromCIF(
   string cif,
   double* CoordMinMax,
-  double* NbSteps,
+  int* NbSteps,
   vector < vector < double > >& cm,
   double Resolution,
   ofstream& file,
@@ -1177,12 +1177,12 @@ void readxyzMinMax_fromCIF(
     if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
       break;
   }
-  double ca = cos(0.0174532925199432944444444444444 * alpha);
-  double cb = cos(0.0174532925199432944444444444444 * beta);
-  double cg = cos(0.0174532925199432944444444444444 * gamma);
-  double sa = sin(0.0174532925199432944444444444444 * alpha);
-  double sb = sin(0.0174532925199432944444444444444 * beta);
-  double sg = sin(0.0174532925199432944444444444444 * gamma);
+  double ca = cos(PI_180 * alpha);
+  double cb = cos(PI_180 * beta);
+  double cg = cos(PI_180 * gamma);
+  double sa = sin(PI_180 * alpha);
+  double sb = sin(PI_180 * beta);
+  double sg = sin(PI_180 * gamma);
   double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
   double V = a * b * c * Vp;
 
@@ -1210,9 +1210,9 @@ void readxyzMinMax_fromCIF(
   CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
   CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
 
-  NbSteps[0] = ceil(a / Resolution);
-  NbSteps[1] = ceil(b / Resolution);
-  NbSteps[2] = ceil(c / Resolution);
+  NbSteps[0] = (int) ceil(a / Resolution);
+  NbSteps[1] = (int) ceil(b / Resolution);
+  NbSteps[2] = (int) ceil(c / Resolution);
 
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++)
