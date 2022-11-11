@@ -13,8 +13,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    - name: give me infor
-      run: cd /usr/local && ls -lhrt && cd /usr/local/lib && ls -lhrt && cd /usr/local/opt/lib && ls -lhrt && cd /usr/local/lib/libomp && ls -lhrt && cd /usr/local/opt/lib/libomp && ls -lhrt
     - name: make_MacOS
       run: cd Mac && make && cp NoSpherA2 NoSpherA2_Mac
     - name: tmate session if tests fail
