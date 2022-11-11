@@ -443,14 +443,14 @@ struct cosinus
 void readxyzMinMax_fromWFN(
   WFN& wavy,
   double* CoordMinMax,
-  double* NbSteps,
+  int* NbSteps,
   double Radius,
   double Increments);
 
 void readxyzMinMax_fromCIF(
   std::string cif,
   double* CoordMinMax,
-  double* NbSteps,
+  int* NbSteps,
   std::vector < std::vector < double > >& cm,
   double Resolution,
   std::ofstream& file,
@@ -607,7 +607,7 @@ struct options {
   bool thakkar_d_plot = false;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
-  double NbSteps[3]{ 0,0,0 };
+  int NbSteps[3]{ 0,0,0 };
   std::vector <int> MOs;
   std::vector < std::vector <int> > groups;
   std::vector < std::vector <double> > twin_law;

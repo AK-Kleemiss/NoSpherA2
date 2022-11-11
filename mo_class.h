@@ -24,7 +24,7 @@ public:
   void push_back_coef(const double &val){
     coefficients.push_back(val);
   };
-  bool erase_coef(const int &nr, const int &nex) {
+  const bool erase_coef(const int &nr, const int &nex) {
     // Check, if Element (nr) is a valid Vector-Entry
     if (nr - 1 < 0)
       return false;
@@ -40,7 +40,7 @@ public:
 
     return true;
   };
-  double get_coefficient(const int& nr) const {
+  const double get_coefficient(const int& nr) const {
     if (nr >= coefficients.size()) {
       err_checkf(false, "Requested element outside of range!", std::cout);
     }
@@ -49,10 +49,7 @@ public:
     }
     return coefficients[nr];
   }; 
-  double get_coefficient_f(const int& nr) const {
-    return coefficients[nr];
-  };
-  int get_nr() const {
+  const double get_coefficient_f(const int& nr) const {
     return coefficients[nr];
   };
   double* get_coefficient_ptr() {
@@ -79,7 +76,7 @@ public:
     }
     cls();
   };
-  bool change_coefficient(int nr, double value) {
+  const bool change_coefficient(int nr, double value) {
     // Check, if Element (nr) is a valid Vector-Entry
     if (nr < 0) {
       err_checkf(false,"nr below 0!", std::cout);
@@ -94,6 +91,7 @@ public:
   };
   void set_nr(const int inr) { nr = inr; };
   void set_occ(const int iocc) { occ = iocc; };
+  void set_occ(const double iocc) { occ = iocc; };
   double get_occ() const { return occ; };
   void set_ener(const double iener) { ener = iener; };
   int get_primitive_count() const { return coefficients.size(); };
@@ -134,7 +132,7 @@ public:
     }
     return temp;
   }
-  double get_energy() const {
+  const double get_energy() const {
     return ener;
   };
   double* get_ptr_coefficients() { return &coefficients[0]; };

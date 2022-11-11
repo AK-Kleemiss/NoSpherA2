@@ -27,7 +27,7 @@ void Calc_Spherical_Dens(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Spherical Density" };
-  const int step = max(floor(3 * CubeSpher.get_size(0) / 20), 1.0);
+  const int step = (int) max( floor(3 * CubeSpher.get_size(0) / 20.0), 1.0);
 
   vector<Thakkar> atoms;
   for (int a = 0; a < wavy.get_ncen(); a++)
@@ -117,7 +117,7 @@ void Calc_Static_Def(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Deformation Density" };
-  const int step = max(floor(3 * CubeDEF.get_size(0) / 20), 1.0);
+  const int step = (int) max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
 
   vector<Thakkar> atoms;
   for (int a = 0; a < wavy.get_ncen(); a++)
@@ -208,7 +208,7 @@ void Calc_Static_Def(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Deformation Density" };
-  const int step = max(floor(3 * CubeDEF.get_size(0) / 20), 1.0);
+  const int step = (int) max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeDEF.get_size(0); i < 2 * CubeDEF.get_size(0); i++) {
@@ -290,7 +290,7 @@ void Calc_Hirshfeld(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
-  const int step = max(floor(3 * CubeHDEF.get_size(0) / 20), 1.0);
+  const int step = (int) max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
 
   vector<Thakkar> atoms;
   for (int a = 0; a < wavy.get_ncen(); a++)
@@ -385,7 +385,7 @@ void Calc_Hirshfeld(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
-  const int step = max(floor(3 * CubeHDEF.get_size(0) / 20), 1.0);
+  const int step = (int) max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
 
   Thakkar atom(wavy.get_atom_charge(ignore));
 
@@ -467,7 +467,7 @@ void Calc_Hirshfeld_atom(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
-  const int step = max(floor(3 * CubeHirsh.get_size(0) / 20), 1.0);
+  const int step = (int) max(floor(3 * CubeHirsh.get_size(0) / 20.0), 1.0);
 
   Thakkar atom(wavy.get_atom_charge(ignore));
 
@@ -546,7 +546,7 @@ void Calc_Rho(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
-  const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeRho.get_size(0); i < 2 * CubeRho.get_size(0); i++) {
@@ -623,7 +623,7 @@ void Calc_Rho_spherical_harmonics(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Rho" };
-  const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
 //#pragma omp parallel shared(CubeRho)
   {
@@ -680,7 +680,7 @@ void Calc_MO_spherical_harmonics(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
-  const int step = max(floor(CubeMO.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < CubeMO.get_size(0); i++) {
@@ -735,7 +735,7 @@ void Calc_Prop(
 
   progress_bar* progress = NULL;
   if(!test) progress = new progress_bar{file, 50u, "Calculating Values"};
-  const int step = max(floor(CubeRho.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeRho.get_size(0); i < 2 * CubeRho.get_size(0); i++) {
@@ -912,7 +912,7 @@ void Calc_ESP(
 
   progress_bar* progress = NULL;
   if (!no_date) progress = new progress_bar{file, 50u, "Calculating ESP"};
-  const int step = max(floor(CubeESP.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeESP.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeESP.get_size(0); i < 2 * CubeESP.get_size(0); i++) {
@@ -995,7 +995,7 @@ void Calc_MO(
   time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating MO" };
-  const int step = max(floor(CubeMO.get_size(0) * 3 / 20), 1.0);
+  const int step = (int) max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeMO.get_size(0); i < 2 * CubeMO.get_size(0); i++) {
