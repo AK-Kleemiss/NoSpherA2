@@ -21,6 +21,9 @@ jobs:
         name: executable_MacOS
         path: |
           Mac/NoSpherA2_Mac
+    - name: tmate session if tests fail
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
   build_windows:
     runs-on: windows-2022
     needs: tests
@@ -50,6 +53,9 @@ jobs:
         name: executable_Linux
         path: |
           Linux/NoSpherA2
+    - name: tmate session if tests fail
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
   tests:
     runs-on: ubuntu-latest
     needs: build_Linux
@@ -69,15 +75,15 @@ jobs:
     needs: [build_Linux,build_Mac,build_windows]
     
     steps:
-    - name: gather executables
+    - name: gather executables Linux
       uses: actions/download-artifact@v3
       with:
         name: executable_Linux
-    - name: gather executables
+    - name: gather executables Mac
       uses: actions/download-artifact@v3
       with:
         name: executable_MacOS
-    - name: gather executables
+    - name: gather executables Windows
       uses: actions/download-artifact@v3
       with:
         name: executable_Windows
