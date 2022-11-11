@@ -9,7 +9,7 @@ on:
 jobs:
   build_Mac:
     runs-on: macos-latest
-    needs: tests
+    needs: build_Linux
 
     steps:
     - uses: actions/checkout@v3
@@ -28,7 +28,7 @@ jobs:
           Mac/NoSpherA2_Mac
   build_windows:
     runs-on: windows-2022
-    needs: tests
+    needs: build_Linux
 
     steps:
     - uses: actions/checkout@v3
