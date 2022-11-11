@@ -271,7 +271,7 @@ template <class T> std::vector<T> split_string(const std::string& input, const s
 
 inline void remove_empty_elements(std::vector <std::string>& input, const std::string& empty = " ")
 {
-  for (int i = input.size() - 1; i >= 0; i--)
+  for (int i = (int) input.size() - 1; i >= 0; i--)
     if (input[i] == empty || input[i] == "")
       input.erase(input.begin() + i);
 }
@@ -325,7 +325,7 @@ double read_fchk_double(std::ifstream& in, std::string search, bool rewind = tru
 //------------------Functions to work with configuration files--------------------------
 void write_template_confi();
 int program_confi(std::string& gaussian_path, std::string& turbomole_path,
-  std::string& basis, int& ncpus, float& mem, bool debug = false, bool expert = false, unsigned int counter = 0);
+  std::string& basis, int& ncpus, double& mem, bool debug = false, bool expert = false, unsigned int counter = 0);
 bool check_bohr(WFN& wave, bool interactive, bool debug);
 int filetype_identifier(std::string& file, bool debug = false);
 

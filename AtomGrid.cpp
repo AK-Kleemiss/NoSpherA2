@@ -126,7 +126,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 
     angular_off = get_angular_order(num_angular) * MAG;
     err_checkf(angular_off != -MAG, "Invalid angular order!", file);
-    int start = atom_grid_x_bohr_.size();
+    int start = (int) atom_grid_x_bohr_.size();
     atom_grid_x_bohr_.resize(start + num_angular);
     atom_grid_y_bohr_.resize(start + num_angular);
     atom_grid_z_bohr_.resize(start + num_angular);
@@ -144,7 +144,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 
 AtomGrid::~AtomGrid() {}
 
-int AtomGrid::get_num_grid_points() const { return atom_grid_x_bohr_.size(); }
+int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(); }
 
 int AtomGrid::get_num_radial_grid_points() const
 {

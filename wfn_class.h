@@ -200,12 +200,12 @@ public:
   void push_back_DM(const double& value);
   bool set_DM(const int& nr, const double& value);
   double get_DM(const int& nr);
-  int get_DM_size() { return DensityMatrix.size(); };
+  int get_DM_size() { return (int) DensityMatrix.size(); };
   //----------S_DM Handling--------------------------------
   void push_back_SDM(const double& value);
   bool set_SDM(const int& nr, const double& value);
   double get_SDM(const int& nr);
-  int get_SDM_size() { return SpinDensityMatrix.size(); };
+  int get_SDM_size() { return (int) SpinDensityMatrix.size(); };
   //-----------Cube handling-------------------------
   bool push_back_cube(const std::string& filepath, const bool& full, const bool& expert = false);
   void push_back_cube(cube given) { cub.push_back(given); };

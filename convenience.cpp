@@ -358,7 +358,7 @@ void write_template_confi()
   return;
 };
 
-int program_confi(string& gaussian_path, string& turbomole_path, string& basis, int& ncpus, float& mem, bool debug, bool expert, unsigned int counter)
+int program_confi(string& gaussian_path, string& turbomole_path, string& basis, int& ncpus, double& mem, bool debug, bool expert, unsigned int counter)
 {
   counter++;
   if (counter == 3) {
@@ -396,7 +396,6 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   size_t length;
   char* tempchar = new char[200];
   int run = 0;
-  int dump;
   while (!conf.eof()) {
     switch (run) {
     case 0:
@@ -1036,7 +1035,7 @@ void readxyzMinMax_fromWFN(
 {
   const double bohrtoa = 0.52917720859;
   int iAtoms, j;
-  int NbAtoms = wavy.atoms.size();
+  int NbAtoms = (int) wavy.atoms.size();
 
   vector < vector <double > > PosAtoms;
   PosAtoms.resize(wavy.get_ncen());
@@ -2035,7 +2034,7 @@ double get_lambda_1(double* a)
 };
 
 double get_decimal_precision_from_CIF_number(string& given_string) {
-  int len = given_string.length();
+  int len = (int) given_string.length();
   int open_bracket = -1;
   int close_bracket = -1;
   int decimal_point = -1;

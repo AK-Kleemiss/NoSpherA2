@@ -81,7 +81,7 @@ class AtomGrid
     std::vector<double> atom_grid_z_bohr_;
     std::vector<double> atom_grid_w_;
 
-    std::size_t num_radial_grid_points_;
+    int num_radial_grid_points_;
 
     std::vector<double> radial_atom_grid_r_bohr_;
     std::vector<double> radial_atom_grid_w_;
