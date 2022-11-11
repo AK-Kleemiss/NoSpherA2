@@ -1966,7 +1966,6 @@ bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupi
 
   ofstream rf(fileName.c_str(), ios::out);
   string line;
-  char choice;
   if (!rf.is_open()) {
     cout << "Sorry, can't open the file...\n";
     return false;
@@ -2242,7 +2241,7 @@ bool WFN::change_atom_basis_set_coefficient(const int& nr_atom, const int& nr_pr
 
 int WFN::get_atom_primitive_count(const int& nr)
 {
-  if (nr <= ncen && nr >= 0) return atoms[nr].basis_set.size();
+  if (nr <= ncen && nr >= 0) return (int) atoms[nr].basis_set.size();
   else return -1;
 };
 
@@ -2265,7 +2264,7 @@ int WFN::get_basis_set_shell(const int& nr_atom, const int& nr_prim)
 
 int WFN::get_atom_shell_count(const int& nr)
 {
-  if (nr <= ncen && nr >= 0) return atoms[nr].shellcount.size();
+  if (nr <= ncen && nr >= 0) return (int) atoms[nr].shellcount.size();
   else return -1;
 };
 
@@ -2350,7 +2349,7 @@ int WFN::get_shell_start_in_primitives(const int& nr_atom, const int& nr_shell)
 int WFN::get_shell_end(const int& nr_atom, const int& nr_shell, const bool& debug)
 {
   if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && nr_shell >= 0) {
-    if (nr_shell == atoms[nr_atom].shellcount.size() - 1) return atoms[nr_atom].basis_set.size() - 1;
+    if (nr_shell == atoms[nr_atom].shellcount.size() - 1) return (int) atoms[nr_atom].basis_set.size() - 1;
     int primitive_counter = 0;
     while (atoms[nr_atom].basis_set[primitive_counter].shell != (nr_shell + 1))	primitive_counter++;
     return primitive_counter - 1;
@@ -3229,7 +3228,7 @@ double WFN::get_MO_occ(const int& nr) const
 
 void WFN::delete_unoccupied_MOs()
 {
-  for (int i = MOs.size() - 1; i >= 0; i--) {
+  for (int i = (int) MOs.size() - 1; i >= 0; i--) {
     if (get_MO_occ(i) == 0.0) {
       MOs.erase(MOs.begin() + i);
       nmo--;
@@ -3286,7 +3285,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
     log << "Error reading atnbrs" << endl;
     return false;
   }
-  ncen = atnbrs.size();
+  ncen = (int) atnbrs.size();
   atoms.resize(ncen);
   for (int i = 0; i < ncen; i++)
     atoms[i].label = atnr2letter(atnbrs[i]);
@@ -3392,7 +3391,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
       else MOocc[i] = 0.0;
     }
 #pragma omp parallel for
-    for (int i = aMOene.size(); i < aMOene.size() + bMOene.size(); i++) {
+    for (int i = (int) aMOene.size(); i < int(aMOene.size() + bMOene.size()); i++) {
       if (i - aMOene.size() < bel) MOocc[i] = 1.0;
       else MOocc[i] = 0.0;
     }
@@ -3401,7 +3400,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
   vector<int> shelltypesspherical;
   int nbas5D;
   nmo = nbas;
-  int nshell = shell_types.size();
+  int nshell = (int) shell_types.size();
   if (is_spherical) {
     shelltypesspherical.resize(shell_types.size());
     if (debug) {
@@ -3775,8 +3774,8 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
   }
   if (r_u_ro_switch == 1) {
 #pragma omp parallel for
-    for (int i = aMOene.size(); i < aMOene.size() + bMOene.size(); i++) {
-      const int b_step = i - aMOene.size();
+    for (int i = (int) aMOene.size(); i < int(aMOene.size() + bMOene.size()); i++) {
+      const int b_step = i - (int) aMOene.size();
       MOs[i].set_ener(bMOene[b_step]);
       MOs[i].set_nr(i + 1);
       MOs[i].set_occ(MOocc[i]);

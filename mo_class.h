@@ -82,7 +82,7 @@ public:
       err_checkf(false,"nr below 0!", std::cout);
       return false;
     }
-    if (nr >= coefficients.size()) {
+    if (nr >= (int) coefficients.size()) {
       err_checkf(false, "nr above size of MO!", std::cout);
       return false;
     }
@@ -94,7 +94,7 @@ public:
   void set_occ(const double iocc) { occ = iocc; };
   double get_occ() const { return occ; };
   void set_ener(const double iener) { ener = iener; };
-  int get_primitive_count() const { return coefficients.size(); };
+  int get_primitive_count() const { return (int) coefficients.size(); };
   std::string hdr() {
     std::string temp;
     temp = "MO";

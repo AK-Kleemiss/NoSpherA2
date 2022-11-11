@@ -98,7 +98,7 @@ public:
     string scat_str(scat_line.begin(), scat_line.end());
     //scat_str.resize(sc_len[0]);
     scatterer = split_string<string>(scat_str,string(" "));
-    const int nr_scatterers = scatterer.size();
+    const int nr_scatterers = (int) scatterer.size();
     //read number of indices in tscb file
     int nr_hkl[1]{ 0 };
     tsc_file.read((char*)&nr_hkl, intsize);
@@ -189,7 +189,7 @@ public:
   const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
   const unsigned int scatterer_size() { 
     if (sf.size() == scatterer.size()) 
-      return sf.size(); 
+      return (int) sf.size(); 
     else 
       return 0; 
   };
@@ -198,7 +198,7 @@ public:
       return 0;
     }
     else if (sf[0].size() == index[0].size() && index[0].size() == index[1].size() && index[1].size() == index[2].size()) {
-      return index[0].size();
+      return (int) index[0].size();
     }
     else {
       return 0;
@@ -228,7 +228,7 @@ public:
       if (is_new[s] == false) continue;
       new_scatterers++;
     }
-    const int old_size = sf.size();
+    const int old_size = (int) sf.size();
     sf.resize(size_t(old_size + new_scatterers));
     scatterer.resize(size_t(old_size + new_scatterers));
 #pragma omp parallel for
@@ -265,7 +265,7 @@ public:
       if (is_new[s] == false) continue;
       new_scatterers++;
     }
-    const unsigned int old_size = sf.size();
+    const unsigned int old_size = (int) sf.size();
     sf.resize(old_size + new_scatterers);
     scatterer.resize(old_size + new_scatterers);
 #pragma omp parallel for
@@ -310,7 +310,7 @@ public:
     tsc_file.write((char*)&head, sizeof(head));
     tsc_file.write(header.c_str(), head[0] * sizeof(char));
     std::string sc = scatterers_string();
-    head[0] = sc.size();
+    head[0] = (int) sc.size();
     tsc_file.write((char*)&head, sizeof(head));
     tsc_file.write(sc.c_str(), head[0] * sizeof(char));
     
