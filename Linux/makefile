@@ -1,3 +1,4 @@
+#THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
 LIBS := -lgomp -static-libgcc -static-libstdc++
