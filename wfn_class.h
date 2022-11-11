@@ -84,13 +84,7 @@ public:
   int get_type(const int& nr) const { return types[nr]; };
   double get_MO_occ(const int& nr) const;
   void delete_unoccupied_MOs();
-  const MO& get_MO(const int& n) const { 
-    if (n < nmo) return MOs[n]; 
-    else {
-      err_not_impl_f("Wrong MO number", std::cout);
-      return MO();
-    }
-  };
+  const MO& get_MO(const int& n) const;
 
   //--------------------in and output----------------------------------------
   void change_basis_set_name(std::string name) { basis_set_name = name; };

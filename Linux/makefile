@@ -6,7 +6,7 @@ LIBS := -lgomp -static-libgcc -static-libstdc++
 
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 
-all: NoSpherA2
+all: clean NoSpherA2
 
 CPP_SRCS += \
 ../unity.cpp 
