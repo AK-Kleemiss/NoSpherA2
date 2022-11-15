@@ -279,9 +279,9 @@ public:
       }
     }
   };
-  void write_tsc_file(const std::string& cif)
+  void write_tsc_file(const std::string& cif, std::string name = "experimental.tsc")
   {
-    std::ofstream tsc_file("experimental.tsc", std::ios::out);
+    std::ofstream tsc_file(name, std::ios::out);
 
     tsc_file << "TITLE: " << get_filename_from_path(cif).substr(0, cif.find(".cif")) << std::endl << "SYMM: ";
     tsc_file << "expanded";
@@ -302,9 +302,9 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
-  void write_tscb_file()
+  void write_tscb_file(std::string name = "experimental.tscb")
   {
-    std::ofstream tsc_file("experimental.tscb", std::ios::out | std::ios::binary | std::ios::trunc);
+    std::ofstream tsc_file(name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 
     int head[1] = { static_cast<int>(header.size()) };
     tsc_file.write((char*)&head, sizeof(head));
@@ -498,15 +498,23 @@ inline bool merge_tscs_without_checks(
   if (files.size() == 0)
     return false;
   std::vector <std::string> labels;
+  std::vector <std::string> local_files(files);
   std::vector <std::vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
   std::vector <std::vector <std::complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
-  std::vector<std::string> header;
+  std::vector <std::string> header;
 
   size_t offset = 0;
   indices.resize(3);
   for (int f = 0; f < files.size(); f++) {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    std::ifstream inf(files[f].c_str(), std::ios::in);
+    if (files[f].ends_with(".tscb")) {
+      std::string name = files[f];
+      tsc_block blocky(name);
+      std::string new_name = get_basename_without_ending(name) + ".tsc";
+      blocky.write_tsc_file(new_name);
+      local_files[f] = new_name;
+    }
+    std::ifstream inf(local_files[f].c_str(), std::ios::in);
     std::string line;
     bool data = false;
     std::vector<bool> is_a_new_scatterer;
@@ -565,26 +573,11 @@ inline bool merge_tscs_without_checks(
     inf.close();
   }
   std::cout << "Writing combined file..." << std::endl;
-  std::ofstream tsc_file("combined.tsc", std::ios::out);
-
+  std::string header_string("");
   for (size_t h = 0; h < header.size(); h++)
-    tsc_file << header[h] << std::endl;
-  tsc_file << "    PARTS: " << files.size() << std::endl;
-  tsc_file << "SCATTERERS:";
-  for (int i = 0; i < labels.size(); i++)
-    tsc_file << " " << labels[i];
-  tsc_file << std::endl << "DATA:" << std::endl;
-
-  for (int r = 0; r < indices[0].size(); r++) {
-    for (int h = 0; h < 3; h++)
-      tsc_file << indices[h][r] << " ";
-    for (int i = 0; i < labels.size(); i++)
-      tsc_file << std::scientific << std::setprecision(8) << real(form_fact[i][r]) << ","
-      << std::scientific << std::setprecision(8) << imag(form_fact[i][r]) << " ";
-    tsc_file << std::endl;
-  }
-  tsc_file.flush();
-  tsc_file.close();
+    header_string += header[h] + "\n";
+  tsc_block combined(form_fact, labels, indices, header_string);
+  combined.write_tscb_file("combined.tscb");
   std::cout << "Done!" << std::endl;
 
   return true;
