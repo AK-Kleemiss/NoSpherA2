@@ -155,7 +155,7 @@ const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file
 		if (debug) file << endl << "m=" << m << " occ= " << occ[offset + m] << endl;
 		for (int i = 0; i < l_ns; i++) {
 			if (debug) file << "i=" << i << "\n  c = " << c[nr_coef + m + i * i_j_distance] << " n = " << n[nr_ex + i] << " z = " << z[nr_ex + i] << endl;
-			for (int j = 0; j < l_ns-i; j++) {
+			for (int j = 0; j < l_ns - i; j++) {
 				temp = occ[offset + m] 
 					* c[nr_coef + m + i * i_j_distance] * c[nr_coef + m + (i + j) * i_j_distance]
 					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, (z[nr_ex + i] + z[nr_ex + i + j]), k_vector);

@@ -295,7 +295,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);
             std::transform(label.begin(), label.end(), label.begin(), asciitolower);
             if (debug) {
-              file << "ASYM:  " << setw(8) << fields[label_field] << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
+              file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
                 << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
                 << fixed << setprecision(3) << setw(16) << wave.atoms[i].y << " "
                 << fixed << setprecision(3) << setw(16) << wave.atoms[i].z << flush;
@@ -326,7 +326,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
                 if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
                 continue;
               }
-              else if (label.find("d") == string::npos) {
+              else if (label.find("d") == string::npos && label.find("t") == string::npos) {
                 if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
                 continue;
               }
