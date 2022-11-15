@@ -2040,12 +2040,14 @@ void calc_SF(const int& points,
 void add_ECP_contribution(const vector <int>& asym_atom_list,
   const WFN& wave,
   vector<vector<complex<double>>>& sf,
-  const vector<vector<double>>& k_pt,
+  const cell &cell,
+  hkl_list& hkl,
   ofstream& file,
   const int& mode = 0,
   const bool debug = false)
 {
   double k = 1.0;
+  hkl_list_it it = hkl.begin();
   if (mode == 0) { //Using a gaussian tight core function
     for (int i = 0; i < asym_atom_list.size(); i++) {
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
@@ -2053,9 +2055,10 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
         << wave.atoms[asym_atom_list[i]].ECP_electrons
         << " and at 1 angstrom: " << exp(-pow(bohr2ang(k), 2) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
-#pragma omp parallel for private(k)
+#pragma omp parallel for private(it, k)
     for (int s = 0; s < sf[0].size(); s++) {
-      k = k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s];
+      it = next(hkl.begin(), s);
+      k = FOUR_PI * cell.get_stl_of_hkl(*it);
       for (int i = 0; i < asym_atom_list.size(); i++) {
         sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16 / PI);
       }
@@ -2071,9 +2074,10 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
         << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
     }
 
-#pragma omp parallel for private(k)
+#pragma omp parallel for private(it, k)
     for (int s = 0; s < sf[0].size(); s++) {
-      k = TWO_PI * bohr2ang(sqrt(k_pt[0][s] * k_pt[0][s] + k_pt[1][s] * k_pt[1][s] + k_pt[2][s] * k_pt[2][s]));
+      it = next(hkl.begin(), s);
+      k = FOUR_PI * bohr2ang(cell.get_stl_of_hkl(*it));
       for (int i = 0; i < asym_atom_list.size(); i++) {
         sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
       }
@@ -2545,7 +2549,8 @@ bool calculate_structure_factors_HF(
       asym_atom_list,
       wave,
       sf,
-      k_pt,
+      unit_cell,
+      hkl,
       file,
       opt.ECP_mode,
       opt.debug
@@ -2747,7 +2752,8 @@ tsc_block calculate_structure_factors_MTC(
       asym_atom_list,
       wave[nr],
       sf,
-      k_pt,
+      unit_cell,
+      hkl,
       file,
       opt.ECP_mode,
       opt.debug
