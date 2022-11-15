@@ -2072,7 +2072,7 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
     result = abs(precision * pow(10, -digits));
     return result;
   }
-  else return 0.001;
+  else return 0.005;
 };
 
 void options::digest_options(int& argc, char** argv) {
