@@ -2,8 +2,6 @@
 RM := rm -f
 
 LIBS := -lgomp -static-libgcc -static-libstdc++
-#LIBS := -lgomp
-
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 
 all: clean NoSpherA2
