@@ -342,6 +342,7 @@ inline bool merge_tscs(
   if (files.size() == 0)
     return false;
   std::vector <std::string> labels;
+  std::vector <std::string> local_files(files);
   std::vector <std::vector <int>> indices; //[i] is h,k or l, [j] is the number of the reflection
   std::vector <std::vector <std::complex<double>>> form_fact;   //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
 
@@ -351,7 +352,16 @@ inline bool merge_tscs(
   indices.resize(3);
   for (int f = 0; f < files.size(); f++) {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    std::ifstream inf(files[f].c_str(), std::ios::in);
+    if (files[f].ends_with(".tscb")) {
+      std::string name = files[f];
+      std::string new_name = get_basename_without_ending(name) + ".tsc";
+      std::cout << "Converting to: " << new_name << std::endl;
+      tsc_block blocky(name);
+      blocky.write_tsc_file(new_name, new_name);
+      local_files[f] = new_name;
+      std::cout << "Now reading converted: " << new_name << std::endl;
+    }
+    std::ifstream inf(local_files[f].c_str(), std::ios::in);
     std::string line;
     bool data = false;
     std::vector<bool> is_a_new_scatterer;
@@ -463,26 +473,11 @@ inline bool merge_tscs(
     offset = labels.size();
   }
   std::cout << "Writing combined file..." << std::endl;
-  std::ofstream tsc_file("combined.tsc", std::ios::out);
-
+  std::string header_string("");
   for (size_t h = 0; h < header.size(); h++)
-    tsc_file << header[h] << std::endl;
-  tsc_file << "    PARTS: " << files.size() << std::endl;
-  tsc_file << "SCATTERERS:";
-  for (int i = 0; i < labels.size(); i++)
-    tsc_file << " " << labels[i];
-  tsc_file << std::endl << "DATA:" << std::endl;
-
-  for (int r = 0; r < indices[0].size(); r++) {
-    for (int h = 0; h < 3; h++)
-      tsc_file << indices[h][r] << " ";
-    for (int i = 0; i < labels.size(); i++)
-      tsc_file << std::scientific << std::setprecision(8) << real(form_fact[i][r]) << ","
-      << std::scientific << std::setprecision(8) << imag(form_fact[i][r]) << " ";
-    tsc_file << std::endl;
-  }
-  tsc_file.flush();
-  tsc_file.close();
+    header_string += header[h] + "\n";
+  tsc_block combined(form_fact, labels, indices, header_string);
+  combined.write_tscb_file("combined.tscb");
   std::cout << "Done!" << std::endl;
 
   return true;
@@ -509,10 +504,12 @@ inline bool merge_tscs_without_checks(
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
     if (files[f].ends_with(".tscb")) {
       std::string name = files[f];
-      tsc_block blocky(name);
       std::string new_name = get_basename_without_ending(name) + ".tsc";
-      blocky.write_tsc_file(new_name);
+      std::cout << "Converting to: " << new_name << std::endl;
+      tsc_block blocky(name);
+      blocky.write_tsc_file(new_name,new_name);
       local_files[f] = new_name;
+      std::cout << "Now reading converted: " << new_name << std::endl;
     }
     std::ifstream inf(local_files[f].c_str(), std::ios::in);
     std::string line;
