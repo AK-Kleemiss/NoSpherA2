@@ -19,11 +19,11 @@ CPP_DEPS += \
 
 -include ${CPP_DEPS}
 
-GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
+GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../ -L../
+	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} ${LIBS} -I../
 	${RM} ${CPP_DEPS} ${OBJS}
 	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
