@@ -16,14 +16,16 @@ CPP_DEPS += \
 
 -include ${CPP_DEPS}
 
+GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP
+
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../ -L../ -L/usr/local/opt/libomp/lib
+	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib
 	@echo 'Finished building target: $@'
 
 ./unity.o: ../unity.cpp
 	@echo 'Building file: $<'
-	g++ -std=c++17 -O3 -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -I/usr/local/opt/libomp/include -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GGC_OPTS} -I/usr/local/opt/libomp/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 clean:
