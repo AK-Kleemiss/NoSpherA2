@@ -16,7 +16,7 @@ CPP_DEPS += \
 
 -include ${CPP_DEPS}
 
-GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP
+GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0  -Xpreprocessor -fopenmp -static -MMD -MP
 
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
