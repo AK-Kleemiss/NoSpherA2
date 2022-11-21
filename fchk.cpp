@@ -1107,11 +1107,9 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     //------------------ make the DM -----------------------------
     naotr = nao * (nao + 1) / 2;
     vector<double> kp;
-    for (int i = 0; i < naotr; i++) {
-      wave.push_back_DM(0.0);
-      if (alpha != beta)
-        wave.push_back_SDM(0.0);
-    }
+    wave.resize_DM(naotr, 0.0);
+    if (alpha != beta)
+      wave.resize_SDM(naotr,0.0);
     if (debug) file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
     if (debug) cout << "Making DM now!" << endl;
     for (int iu = 0; iu < nao; iu++) {

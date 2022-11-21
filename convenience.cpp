@@ -2193,7 +2193,7 @@ void options::digest_options(int& argc, char** argv) {
         filenames.push_back(argv[i + n]);
         n++;
       }
-      merge_tscs("combine", filenames, debug);
+      merge_tscs("combine", filenames, debug, old_tsc);
       exit(0);
     }
     else if (temp.find("-merge_nocheck") != string::npos) {
@@ -2203,7 +2203,7 @@ void options::digest_options(int& argc, char** argv) {
         filenames.push_back(argv[i + n]);
         n++;
       }
-      merge_tscs_without_checks("combine", filenames, debug);
+      merge_tscs_without_checks("combine", filenames, debug, old_tsc);
       exit(0);
     }
     else if (temp.find("-MO") < 1) {

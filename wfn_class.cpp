@@ -514,7 +514,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         //				if(debug) file << "tempchar: " << tempchar << endl;
         dum_center[exnum] = stoi(tempchar);
         //if (debug) file << dum_center[exnum] << " ";
-        if (dum_center[exnum] > e_nuc) {
+        if (dum_center[exnum] > (unsigned int) e_nuc) {
           cout << "this center doesn't exist.. some weird problem!\n";
           return false;
         }
@@ -531,7 +531,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           //					if(debug) file << "tempchar: " << tempchar << endl;
           dum_center[exnum] = stoi(tempchar);
           //if (debug) file << dum_center[exnum] << endl;
-          if (dum_center[exnum] > e_nuc) {
+          if (dum_center[exnum] > (unsigned int) e_nuc) {
             file << "this center doesn't exist.. some weird problem!\n";
             return false;
           }
@@ -1151,7 +1151,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
   }
   err_checkf(line.find("[STO]") == string::npos, "ERROR: STOs are not yet suupported!", file);
   getline(rf, line);
-  unsigned int atoms_with_basis = 0;
+  int atoms_with_basis = 0;
   while (atoms_with_basis < ncen && line.find("[") == string::npos) {
     vector <string> line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
@@ -2395,6 +2395,11 @@ void WFN::push_back_DM(const double& value)
   DensityMatrix.push_back(value);
 };
 
+void WFN::resize_DM(const int& size, const double &value)
+{
+  DensityMatrix.resize(size,value);
+};
+
 double WFN::get_DM(const int& nr)
 {
   if (nr >= 0 && nr < DensityMatrix.size()) return DensityMatrix[nr];
@@ -2419,6 +2424,11 @@ bool WFN::set_DM(const int& nr, const double& value)
 void WFN::push_back_SDM(const double& value)
 {
   SpinDensityMatrix.push_back(value);
+};
+
+void WFN::resize_SDM(const int& size, const double& value)
+{
+  SpinDensityMatrix.resize(size, value);
 };
 
 double WFN::get_SDM(const int& nr)
