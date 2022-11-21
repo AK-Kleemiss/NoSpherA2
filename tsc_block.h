@@ -187,13 +187,13 @@ public:
     return index[dim][nr];
   };
   const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
-  const unsigned int scatterer_size() { 
+  const int scatterer_size() { 
     if (sf.size() == scatterer.size()) 
       return (int) sf.size(); 
     else 
       return 0; 
   };
-  const unsigned int reflection_size() { 
+  const int reflection_size() { 
     if (sf.size() == 0 || index.size() == 0) {
       return 0;
     }
@@ -221,8 +221,8 @@ public:
     int new_scatterers = 0;
     std::vector<bool> is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+:new_scatterers)
-    for (int s = 0; s < rhs.scatterer_size(); s++) {
-      for (unsigned int run = 0; run < scatterer_size(); run++)
+    for (int s = 0; s < (int) rhs.scatterer_size(); s++) {
+      for (int run = 0; run < scatterer_size(); run++)
         if (rhs.get_scatterer(s) == scatterer[run])
           is_new[s] = false;
       if (is_new[s] == false) continue;
@@ -259,7 +259,7 @@ public:
     std::vector<bool> is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+:new_scatterers)
     for (int s = 0; s < rhs.scatterer_size(); s++) {
-      for (unsigned int run = 0; run < scatterer_size(); run++)
+      for (int run = 0; run < scatterer_size(); run++)
         if (rhs.get_scatterer(s) == scatterer[run])
           is_new[s] = false;
       if (is_new[s] == false) continue;
@@ -335,7 +335,8 @@ public:
 inline bool merge_tscs(
   const std::string& mode,
   const std::vector<std::string>& files,
-  const bool debug
+  const bool debug,
+  const bool old_tsc
 )
 {
   //Currently only for Mode "pure merge"
@@ -477,7 +478,13 @@ inline bool merge_tscs(
   for (size_t h = 0; h < header.size(); h++)
     header_string += header[h] + "\n";
   tsc_block combined(form_fact, labels, indices, header_string);
-  combined.write_tscb_file("combined.tscb");
+  if (!old_tsc) {
+    combined.write_tscb_file("combined.tscb");
+  }
+  else
+  {
+    combined.write_tsc_file("combined", "combined.tsc");
+  }
   std::cout << "Done!" << std::endl;
 
   return true;
@@ -486,7 +493,8 @@ inline bool merge_tscs(
 inline bool merge_tscs_without_checks(
   const std::string& mode,
   const std::vector<std::string>& files,
-  const bool debug
+  const bool debug,
+  const bool old_tsc
 )
 {
   //Currently only for Mode "pure merge"
@@ -574,7 +582,13 @@ inline bool merge_tscs_without_checks(
   for (size_t h = 0; h < header.size(); h++)
     header_string += header[h] + "\n";
   tsc_block combined(form_fact, labels, indices, header_string);
-  combined.write_tscb_file("combined.tscb");
+  if (!old_tsc) {
+    combined.write_tscb_file("combined.tscb");
+  }
+  else
+  {
+    combined.write_tsc_file("combined", "combined.tsc");
+  }
   std::cout << "Done!" << std::endl;
 
   return true;

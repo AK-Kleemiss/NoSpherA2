@@ -197,20 +197,21 @@ public:
   double compute_MO_spherical(const double& Pos1, const double& Pos2, const double& Pos3, const int& MO);
   double computeESP(double* PosGrid, std::vector<std::vector<double> >& d2);
   //----------DM Handling--------------------------------
-  void push_back_DM(const double& value);
-  bool set_DM(const int& nr, const double& value);
+  void push_back_DM(const double& value = 0.0);
+  bool set_DM(const int& nr, const double& value = 0.0);
   double get_DM(const int& nr);
   int get_DM_size() { return (int) DensityMatrix.size(); };
+  void resize_DM(const int& size, const double& value = 0.0);
   //----------S_DM Handling--------------------------------
-  void push_back_SDM(const double& value);
-  bool set_SDM(const int& nr, const double& value);
+  void push_back_SDM(const double& value = 0.0);
+  bool set_SDM(const int& nr, const double& value = 0.0);
   double get_SDM(const int& nr);
   int get_SDM_size() { return (int) SpinDensityMatrix.size(); };
+  void resize_SDM(const int& size, const double& value = 0.0);
   //-----------Cube handling-------------------------
   bool push_back_cube(const std::string& filepath, const bool& full, const bool& expert = false);
   void push_back_cube(cube given) { cub.push_back(given); };
   void pop_back_cube();
-
   //-----------Pointer to members---------------------
   int* get_ptr_types() { return &types[0]; };
   int* get_ptr_centers() { return &centers[0]; };
