@@ -143,6 +143,7 @@ int get_Z_from_label(const char* tmp)
 {
   if (strcmp(tmp, "H") == 0)  return 0;
   else  if (strcmp(tmp, "D") == 0)  return 0;
+  else  if (strcmp(tmp, "T") == 0)  return 0;
   else 	if (strcmp(tmp, "He") == 0)  return 1;
   else 	if (strcmp(tmp, "Li") == 0)  return 2;
   else 	if (strcmp(tmp, "Be") == 0)  return 3;
@@ -228,6 +229,32 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Po") == 0)  return 83;
   else 	if (strcmp(tmp, "At") == 0)  return 84;
   else 	if (strcmp(tmp, "Rn") == 0)  return 85;
+
+  else 	if (strcmp(tmp, "Fr") == 0)  return 86;
+  else 	if (strcmp(tmp, "Ra") == 0)  return 87;
+  else 	if (strcmp(tmp, "Ac") == 0)  return 88;
+  else 	if (strcmp(tmp, "Th") == 0)  return 89;
+  else 	if (strcmp(tmp, "Pa") == 0)  return 90;
+  else 	if (strcmp(tmp, "U") == 0)  return 91;
+  else 	if (strcmp(tmp, "Np") == 0)  return 92;
+  else 	if (strcmp(tmp, "Pu") == 0)  return 93;
+  else 	if (strcmp(tmp, "Am") == 0)  return 94;
+  else 	if (strcmp(tmp, "Cm") == 0)  return 95;
+  else 	if (strcmp(tmp, "Bk") == 0)  return 96;
+  else 	if (strcmp(tmp, "Cf") == 0)  return 97;
+  else 	if (strcmp(tmp, "Es") == 0)  return 98;
+  else 	if (strcmp(tmp, "Fm") == 0)  return 99;
+  else 	if (strcmp(tmp, "Md") == 0)  return 100;
+  else 	if (strcmp(tmp, "No") == 0)  return 101;
+  else 	if (strcmp(tmp, "Lr") == 0)  return 102;
+  else 	if (strcmp(tmp, "Rf") == 0)  return 103;
+  else 	if (strcmp(tmp, "Db") == 0)  return 104;
+  else 	if (strcmp(tmp, "Sg") == 0)  return 105;
+  else 	if (strcmp(tmp, "Bh") == 0)  return 106;
+  else 	if (strcmp(tmp, "Hs") == 0)  return 107;
+  else 	if (strcmp(tmp, "Mt") == 0)  return 108;
+  else 	if (strcmp(tmp, "Ds") == 0)  return 109;
+  else 	if (strcmp(tmp, "Rg") == 0)  return 110;
   else                                 return -1;
 }
 /*
