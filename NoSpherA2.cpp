@@ -9,40 +9,23 @@
 #include "spherical_density.h"
 
 using namespace std;
-//bool expert = false;
 
 int main(int argc, char** argv)
 {
   ofstream log_file("NoSpherA2.log", ios::out);
-  auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
+  auto coutbuf = cout.rdbuf(log_file.rdbuf()); //save and redirect
   vector<WFN> wavy;
   options opt(argc, argv);
-  if (opt.debug)
-    cout << "argc:" << argc << endl;
+  opt.digest_options();
   if (opt.threads != -1) {
     omp_set_num_threads(opt.threads);
     omp_set_dynamic(0);
   }
-  //See if user wants help
-  if (argc > 1) {
-    if (string(argv[1]).find("--h") != string::npos) {
-      cout << NoSpherA2_message(opt.no_date) << help_message() << endl;
-      return 0;
-    }
-    if (string(argv[1]).find("-help") != string::npos) {
-      cout << NoSpherA2_message(opt.no_date) << help_message() << endl;
-      return 0;
-    }
+  log_file << NoSpherA2_message();
+  if (!opt.no_date) {
+    log_file << build_date();
   }
-  //Lets print what was the command line, for debugging
-  if (opt.debug) {
-    log_file << " Recap of input:\n";
-    for (int i = 0; i < argc; i++) {
-      //cout << argv[i] << endl;
-      log_file << argv[i] << "\n";
-    }
-    log_file.flush();
-  }
+  log_file.flush();
   if (opt.fract) {
     WFN wavy(6);
     cube residual(opt.fract_name, true, wavy, cout, opt.debug);
@@ -52,8 +35,6 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.combined_tsc_calc) {
-    log_file << NoSpherA2_message(opt.no_date);
-    log_file.flush();
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
     err_checkf(opt.cif != "", "No cif specified", log_file);
     //First make sure all files exist
@@ -131,8 +112,6 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.cif_based_combined_tsc_calc) {
-    log_file << NoSpherA2_message(opt.no_date);
-    log_file.flush();
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
     //First make sure all files exist
     err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
@@ -212,15 +191,9 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.iam_switch) {
-    ofstream log_file("NoSpherA2.log", ios::out);
     if (opt.debug) {
       log_file << "I am doin IAM!" << endl;
-      for (int i = 0; i < argc; i++)
-        log_file << argv[i] << endl;
     }
-
-    log_file << NoSpherA2_message(opt.no_date);
-    log_file.flush();
     err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
     err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
     wavy.push_back(WFN(0));
@@ -237,11 +210,6 @@ int main(int argc, char** argv)
   }
   //This one has conversion to fchk and calculation of one single tsc file
   if (opt.hkl != "" && opt.wfn != "") {
-    log_file << NoSpherA2_message(opt.no_date);
-    //Lets print what was the command line, for debugging
-    if (opt.debug)
-      for (int i = 0; i < argc; i++)
-        log_file << argv[i] << endl;
     if (opt.debug) {
       log_file << "status:" << opt.wfn << "&" << opt.fchk << "&" << opt.basis_set << "&" << opt.basis_set_path << "&" << opt.cif << "&" << opt.hkl << "&" << opt.groups.size();
       if (opt.groups.size() != 0) log_file << "&" << opt.groups[0].size();
@@ -304,10 +272,10 @@ int main(int argc, char** argv)
   if (opt.calc) {
     ofstream log2("NoSpherA2_cube.log", ios::out);
     auto coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
-    if (opt.debug)
-      for (int i = 0; i < argc; i++)
-        log2 << argv[i] << endl;
-    log2 << NoSpherA2_message(opt.no_date);
+    log2 << NoSpherA2_message();
+    if (!opt.no_date) {
+      log2 << build_date();
+    }
     log2.flush();
 
     err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
@@ -518,8 +486,6 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.density_test_cube) {
-    log_file << NoSpherA2_message(opt.no_date);
-    log_file.flush();
     wavy.resize(10);
     //ScF2+ test file against ORCA calcualted cubes
     log_file << "====================ScF2+ Test===============================" << endl;
@@ -757,7 +723,9 @@ int main(int argc, char** argv)
     }
     return 0;
   }
-  cout << NoSpherA2_message(opt.no_date) << "Did not understand the task to perform!\n" << help_message() << endl;
+  cout << NoSpherA2_message();
+  if (!opt.no_date) cout << build_date();
+  cout << "Did not understand the task to perform!\n" << help_message() << endl;
   log_file.flush();
   log_file.close();
   return 0;
