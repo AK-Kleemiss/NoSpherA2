@@ -35,7 +35,8 @@ class WFN;
 class cell;
 
 std::string help_message();
-std::string NoSpherA2_message(const bool no_date = false);
+std::string NoSpherA2_message();
+std::string build_date();
 //Constants for later use
 inline const int hardness = 3;
 inline const double cutoff = 1.0e-20;
@@ -571,9 +572,10 @@ struct options {
   };
   options(int& argc, char** argv) {
     groups.resize(1);
-    digest_options(argc, argv);
+    look_for_debug(argc, argv);
   };
-  void digest_options(int& argc, char** argv);
+  void look_for_debug(int& argc, char** argv);
+  void digest_options();
   int accuracy = 2;
   int threads = -1;
   int pbc = 0;

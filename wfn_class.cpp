@@ -487,14 +487,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     tempchar[length] = '\0';
     dum_ch[i] = stoi(tempchar);
     dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
-    //if (debug) {
-    //  file << "label:" << dum_label[i]
-    //    << " nr: " << dum_nr[i]
-    //    << " x: " << dum_x[i]
-    //    << " y: " << dum_y[i]
-    //    << " z: " << dum_z[i]
-    //    << " charge: " << dum_ch[i] << endl;
-    //}
   }
   //------------------------------------ Read center assignements -------------------------------------------
   vector<unsigned int> dum_center;
@@ -505,32 +497,24 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   int dump = 0;
   getline(rf, line);
   while (line.compare(0, 6, "CENTRE") == 0 && !rf.eof()) {
-    //if (debug) file << "run: " << run << " exnum: " << exnum << " line: " << line << endl;
     if (exnum + 20 <= e_nex) {
-      //if (debug) file << "dum_center: ";
       for (int i = 0; i < 20; i++) {
         length = line.copy(tempchar, 3, 20 + 3 * i);
         tempchar[length] = '\0';
-        //				if(debug) file << "tempchar: " << tempchar << endl;
         dum_center[exnum] = stoi(tempchar);
-        //if (debug) file << dum_center[exnum] << " ";
         if (dum_center[exnum] > (unsigned int) e_nuc) {
           cout << "this center doesn't exist.. some weird problem!\n";
           return false;
         }
         exnum++;
       }
-      //if (debug) file << endl << "run: " << run * 20 << "   center: " << dum_center[exnum - 1] << endl;
     }
     else {
-      //if (debug) file << "exnum+20>e_nex...\n";
       if (exnum < e_nex) {
         for (int i = 0; i < e_nex % 20; i++) {
           length = line.copy(tempchar, 3, 20 + 3 * i);
           tempchar[length] = '\0';
-          //					if(debug) file << "tempchar: " << tempchar << endl;
           dum_center[exnum] = stoi(tempchar);
-          //if (debug) file << dum_center[exnum] << endl;
           if (dum_center[exnum] > (unsigned int) e_nuc) {
             file << "this center doesn't exist.. some weird problem!\n";
             return false;
@@ -564,21 +548,13 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   run = 0;
   exnum = 0;
   while (line.compare(0, 4, "TYPE") == 0 && !rf.eof()) {
-    //if (debug_wfn_deep) file << "run: "
-    //  << run << " exnum: "
-    //  << exnum << " line: "
-    //  << line << endl;
     if (exnum + 20 <= e_nex) {
-      //if (debug_wfn_deep) file << "dum_type: ";
       for (int i = 0; i < 20; i++) {
         length = line.copy(tempchar, 2, size_t(21 + 3 * i));
         tempchar[length] = '\0';
-        //				if(debug_wfn_deep) file << "tempchar: " << tempchar << endl;
         dum_type[exnum] = stoi(tempchar);
-        //if (debug_wfn_deep) file << dum_type[exnum] << " ";
         exnum++;
       }
-      //if (debug_wfn_deep) file << endl << "run: " << run * 20 << "   type: " << dum_type[exnum - 1] << endl;
     }
     else if (exnum < e_nex) {
       for (int i = 0; i < e_nex % 20; i++) {
@@ -612,10 +588,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   string replace = "E";
   bool three_exponents = false;
   while (line.compare(0, 9, "EXPONENTS") == 0 && !rf.eof()) {
-    //if (debug_wfn_deep) file << "run: "
-    //  << run << " exnum: "
-    //  << exnum << " line: "
-    //  << line << endl;
     if (exnum + 5 <= e_nex) {
       if (exnum == 0) {
         const char test = line.at(10);
@@ -623,32 +595,24 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         const char empty = temp_str.at(0);
         if (test != empty)
           three_exponents = true;
-        //if (debug_wfn) file << "Three exp: " << three_exponents << endl;
       }
-      //if (debug_wfn_deep) file << "dum_exp:" << endl;
       for (int i = 0; i < 5; i++) {
 
         if (!three_exponents) {
           line.replace(20 + i * 14, 1, replace);
           length = line.copy(tempchar, 13, 11 + 14 * i);
           tempchar[length] = '\0';
-          //if (debug_wfn_deep) file << "	tempchar: " << tempchar << " ";
           dum_exp[exnum] = stod(tempchar);
-          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
         else {
           line.replace(19 + i * 14, 1, replace);
           length = line.copy(tempchar, 14, 10 + 14 * i);
           tempchar[length] = '\0';
-          //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dum_exp[exnum] = stod(tempchar);
-          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
       }
-      //if (debug_wfn_deep) file << endl;
-      //if (debug_wfn_deep) file << "run: " << run * 5 << "   exponent: " << dum_exp[exnum - 1] << endl;
     }
     else if (exnum < e_nex) {
       for (int i = 0; i < e_nex % 5; i++) {
@@ -656,18 +620,14 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
           line.replace(20 + i * 14, 1, replace);
           length = line.copy(tempchar, 13, 11 + 14 * i);
           tempchar[length] = '\0';
-          //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dum_exp[exnum] = stod(tempchar);
-          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
         else {
           line.replace(19 + i * 14, 1, replace);
           length = line.copy(tempchar, 14, 10 + 14 * i);
           tempchar[length] = '\0';
-          //if (debug_wfn_deep) file << "	tempchar: " << tempchar << endl;
           dum_exp[exnum] = stod(tempchar);
-          //if (debug_wfn_deep) file << dum_exp[exnum] << " ";
           exnum++;
         }
       }
@@ -700,7 +660,8 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     temp_val[i].resize(e_nex);
   //-------------------------------- Read MOs --------------------------------------
   bool orca_switch;
-  int temp_orca = check_order(debug_wfn);
+  int temp_orca = check_order(debug_wfn), temp_nr = 0;
+  double temp_occ = -1.0, temp_ener = 0.0;
   if (temp_orca % 10 == 3)
     orca_switch = true;
   while (!(line.compare(0, 3, "END") == 0) && !rf.eof()) {
@@ -712,9 +673,9 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     }
     stringstream stream(line);
     string tmp;
-    int temp_nr = 0;
-    double temp_occ = -1.0;
-    double temp_ener = 0.0;
+    temp_nr = 0;
+    temp_occ = -1.0;
+    temp_ener = 0.0;
     /*if(!orca_switch)
       stream >> tmp >> temp_nr >> tmp >> tmp >> tmp >> tmp >> tmp >> temp_occ >> tmp >> tmp >> tmp >> temp_ener;
     else
@@ -740,22 +701,12 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       tempchar[length] = '\0';
       temp_ener = stod(tempchar);
     }
-    //if (debug_wfn_deep)
-    //  file << endl << "tempchar: " << tempchar << " temp_ener: " << temp_ener << endl;
     push_back_MO(temp_nr, temp_occ, temp_ener);
-    //if (debug_wfn_deep) {
-    //  file << endl << "This is the header for the new MO: " << MOs[monum].hdr() << endl;
-    //}
     //---------------------------Start reading MO coefficients-----------------------
     getline(rf, line);
     linecount = 0;
     exnum = 0;
     while (!(line.compare(0, 2, "MO") == 0) && !rf.eof()) {
-      //if (debug_wfn_deep) file << "linecount: "
-      //  << linecount << " exnum: "
-      //  << exnum << " monum: "
-      //  << monum << " line: "
-      //  << line << endl;
       if (exnum + 5 <= e_nex) {
         for (int i = 0; i < 5; i++) {
           if (!three_exponents)
@@ -764,11 +715,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             line.replace(11 + i * 16, 1, replace);
           length = line.copy(tempchar, 16, 16 * i);
           tempchar[length] = '\0';
-          //if (debug_wfn_deep)
-          //	file << "	tempchar: " << tempchar << " ";
           temp_val[monum][exnum] = stod(tempchar);
-          //if (debug_wfn_deep)
-          //  file << temp_val[monum][exnum];
           exnum++;
         }
       }
@@ -779,21 +726,13 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
             line.replace(12 + i * 16, 1, replace);
             length = line.copy(tempchar, 15, 1 + 16 * i);
             tempchar[length] = '\0';
-            //if (debug_wfn_deep)
-              //file << "	tempchar: " << tempchar << " ";
             temp_val[monum][exnum] = stod(tempchar);
-            //if (debug_wfn_deep)
-            //  file << temp_val[monum][exnum];
           }
           else {
             line.replace(11 + i * 16, 1, replace);
             length = line.copy(tempchar, 16, 16 * i);
             tempchar[length] = '\0';
-            //if (debug_wfn_deep)
-              //file << "	tempchar: " << tempchar << " ";
             temp_val[monum][exnum] = stod(tempchar);
-            //if (debug_wfn_deep)
-            //  file << temp_val[monum][exnum];
           }
           exnum++;
         }
@@ -802,7 +741,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         getline(rf, line);
         continue;
       }
-      //if (debug_wfn_deep) file << endl;
       getline(rf, line);
       if (linecount * 5 > e_nex + 1) {
         file << "linecount went higher than expected values in exponent reading, thats suspicius, lets stop here...\n";
@@ -811,7 +749,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       run++;
     }
     monum++;
-    //if (debug_wfn_deep) file << "monum after: " << monum << endl;
     if (b == true) break;
   }
   err_checkf(monum + 1 >= e_nmo, "less MOs than expected, quitting...\nmonum: " + to_string(monum) + " e_nmo : " + to_string(e_nmo), file);
