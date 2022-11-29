@@ -1,4 +1,4 @@
-
+#define WIN32_LEAN_AND_MEAN
 #include "convenience.h"
 #include "fchk.h"
 #include "cube.h"
