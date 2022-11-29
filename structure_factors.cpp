@@ -2068,10 +2068,12 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
     vector<Thakkar> temp;
     for (int i = 0; i < asym_atom_list.size(); i++) {
       temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
-      if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0.0001): "
-        << scientific << setw(14) << setprecision(8)
-        << temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug)
-        << " and at 1 angstrom: " << temp[i].get_core_form_factor(1.0, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug) << endl;
+      if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) {
+        double k_0001 = temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+        double k_1 = temp[i].get_core_form_factor(FOUR_PI * bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+        file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0.0001): "
+          << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+      }
     }
 
 #pragma omp parallel for private(it, k)
