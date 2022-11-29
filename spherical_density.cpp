@@ -270,7 +270,16 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 		if (occ[offset + m] != 0)
 			i_j_distance++;
 	int max_s=0, max_p=0, max_d=0, max_f=0;
-	if (core_els == 28) {
+	if (core_els == 2) {
+		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
+	}
+	else if (core_els == 10) {
+		max_s = 2; max_p = 1; max_d = 0; max_f = 0;
+	}
+	else if (core_els == 18) {
+		max_s = 3; max_p = 2; max_d = 0; max_f = 0;
+	}
+	else if (core_els == 28) {
 		max_s = 3; max_p = 2; max_d = 1; max_f = 0;
 	}
 	else if (core_els == 46) {
