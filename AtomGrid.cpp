@@ -37,7 +37,7 @@ AtomGrid::AtomGrid(const double radial_precision,
   const int max_l_quantum_number,
   const double alpha_min[],
   const bool debug,
-  std::ofstream& file)
+  std::ostream& file)
 {
   using namespace std;
   int min_num_angular_points_closest =

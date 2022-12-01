@@ -367,13 +367,13 @@ class progress_bar
 {
   static const auto overhead = sizeof " [100%]";
 
-  std::ofstream& os;
+  std::ostream& os;
   const std::size_t bar_width;
   std::string message;
   const std::string full_bar;
 
 public:
-  progress_bar(std::ofstream& os, std::size_t line_width,
+  progress_bar(std::ostream& os, std::size_t line_width,
     std::string message_, const char symbol = '=')
     : os{ os },
     bar_width{ line_width - overhead },
@@ -607,6 +607,7 @@ struct options {
   bool gbw2wfn = false;
   bool old_tsc = false;
   bool thakkar_d_plot = false;
+  double sfac_scan = 0.0;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
   int NbSteps[3]{ 0,0,0 };

@@ -32,7 +32,7 @@ public:
     read_CIF(filename);
     read_symm_CIF(filename);
   };
-  cell(const std::string filename, std::ofstream& file)
+  cell(const std::string filename, std::ostream& file)
   {
     file << "Reading: " << std::setw(44) << filename << std::flush;
     sym.resize(3);
@@ -41,7 +41,7 @@ public:
     read_CIF(filename, file);
     read_symm_CIF(filename, file);
   };
-  cell(const std::string filename, std::ofstream& file, const bool& debug)
+  cell(const std::string filename, std::ostream& file, const bool& debug)
   {
     if (debug)
       file << "starting to read cif!" << std::endl;
@@ -176,7 +176,7 @@ public:
     return positions_cart;
   }
 
-  bool read_CIF(std::string filename, std::ofstream& file, const bool& debug = false)
+  bool read_CIF(std::string filename, std::ostream& file, const bool& debug = false)
   {
     std::ifstream cif_input(filename.c_str(), std::ios::in);
     std::vector<bool> found;
@@ -403,7 +403,7 @@ public:
     return true;
   }
 
-  void read_symm_CIF(std::string filename, std::ofstream& file, const bool& debug = false)
+  void read_symm_CIF(std::string filename, std::ostream& file, const bool& debug = false)
   {
     std::ifstream cif_input(filename.c_str(), std::ios::in);
     std::string line;
