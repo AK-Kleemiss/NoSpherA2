@@ -45,7 +45,7 @@ double linear_interpolate_spherical_density(
 }
 #endif
 
-void read_k_points(vector<vector<double>>& k_pt, hkl_list& hkl, ofstream& file)
+void read_k_points(vector<vector<double>>& k_pt, hkl_list& hkl, ostream& file)
 {
   err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
   file << "Reading: kpts.dat" << flush;
@@ -97,7 +97,7 @@ void read_hkl(const string& hkl_filename,
   hkl_list& hkl,
   const vector<vector<double>>& twin_law,
   cell& unit_cell,
-  ofstream& file,
+  ostream& file,
   bool debug = false)
 {
   file << "Reading: " << setw(44) << hkl_filename << flush;
@@ -207,8 +207,8 @@ void read_atoms_from_CIF(ifstream& cif_input,
   vector <int>& asym_atom_to_type_list,
   vector <int>& asym_atom_list,
   vector <bool>& needs_grid,
-  ofstream& file,
-  const bool debug = false)
+  ostream& file,
+  const bool debug)
 {
   bool atoms_read = false;
   int count_fields = 0;
@@ -415,7 +415,7 @@ int make_hirshfeld_grids(const int& pbc,
   vector<vector<double>>& d2,
   vector<vector<double>>& d3,
   vector<vector<double>>& dens,
-  ofstream& file,
+  ostream& file,
 #ifdef _WIN64
   time_t& start,
   time_t& end_becke,
@@ -427,8 +427,8 @@ int make_hirshfeld_grids(const int& pbc,
   timeval& t1,
   timeval& t2,
 #endif
-  bool debug = false,
-  bool no_date = false)
+  bool debug,
+  bool no_date)
 {
   int atoms_with_grids = 0;
   for (int i = 0; i < needs_grid.size(); i++) {
@@ -1909,7 +1909,7 @@ void make_k_pts(const bool& read_k_pts,
   const cell& unit_cell,
   hkl_list& hkl,
   vector<vector<double>>& k_pt,
-  ofstream& file,
+  ostream& file,
   bool debug = false)
 {
   const int size = (int) hkl.size();
@@ -1949,7 +1949,7 @@ void calc_SF(const int& points,
   vector<vector<double>>& d3,
   vector<vector<double>>& dens,
   vector<vector<complex<double>>>& sf,
-  ofstream& file,
+  ostream& file,
 #ifdef _WIN64
   time_t& start,
   time_t& end1,
@@ -1957,7 +1957,7 @@ void calc_SF(const int& points,
   timeval& t1,
   timeval& t2,
 #endif
-  bool debug = false)
+  bool debug)
 {
   const int imax = (int) dens.size();
   sf.resize(imax);
