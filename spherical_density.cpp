@@ -128,147 +128,11 @@ double cosinus_integral(const int N, const double z, const double k) {
 		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
-const double Thakkar::get_form_factor(const double k_vector, std::ofstream& file, bool debug) {
-	double result(0.0);
-	using namespace std;
-	const double local_k = k_vector;
-
-	const int l_ns = ns[atomic_number - 1];
-	const int l_np = np[atomic_number - 1];
-	const int l_nd = nd[atomic_number - 1];
-	const int l_nf = nf[atomic_number - 1];
-	
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
-		return -20;
-	int nr_coef = previous_element_coef();
-	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
-	const int offset = (atomic_number - 1) * 19;
-	double temp;
-	int i_j_distance = 0;
-	for (int m = 0; m < 7; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	if (debug) file << "s type i-j-dist: " << i_j_distance << endl;
-	for (int m = 0; m < 7; m++) {
-		if (occ[offset + m] == 0) continue;
-		if (debug) file << endl << "m=" << m << " occ= " << occ[offset + m] << endl;
-		for (int i = 0; i < l_ns; i++) {
-			if (debug) file << "i=" << i << "\n  c = " << c[nr_coef + m + i * i_j_distance] << " n = " << n[nr_ex + i] << " z = " << z[nr_ex + i] << endl;
-			for (int j = 0; j < l_ns - i; j++) {
-				temp = occ[offset + m] 
-					* c[nr_coef + m + i * i_j_distance] * c[nr_coef + m + (i + j) * i_j_distance]
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, (z[nr_ex + i] + z[nr_ex + i + j]), k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-				if (debug) file << " result=" << result / (k_vector * 2* PI) << endl;
-			}
-		}
-	}
-	if (debug) file << "old coef:" << nr_coef << " nr_coef += " << l_ns * i_j_distance;
-	nr_coef += i_j_distance * l_ns;
-	if (debug) file << " new coef:" << nr_coef << endl;
-	nr_ex += l_ns;
-	i_j_distance = 0;
-	for (int m = 7; m < 13; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	if (debug) file << "p type i-j-dist: " << i_j_distance << " np=" << l_np << endl;
-	for (int m = 7; m < 13; m++) {
-		if (occ[offset + m] == 0) continue;
-		if (debug) file << endl << "m=" << m << " occ= " << occ[offset + m]  << endl;
-		for (int i = 0; i < l_np; i++) {
-			if (debug) file << "i=" << i << "\n  c = " << c[nr_coef + m-7 + i * i_j_distance] << " n = " << n[nr_ex + i] << " z = " << z[nr_ex + i] << endl;
-			for (int j = 0; j < l_np - i; j++) {
-				if (debug) file << "    j=" << j << "\n      c = " << c[nr_coef + m-7 + (i + j) * i_j_distance] << " n = " << n[nr_ex + i + j] << " z = " << z[nr_ex + i + j] << endl;
-				temp = occ[offset + m] 
-					* c[nr_coef + m-7 + i*i_j_distance] * c[nr_coef + m-7 + (i + j) * i_j_distance] 
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-	if (debug) file << "old coef:" << nr_coef << " nr_coef += " << l_np * i_j_distance;
-	nr_coef += i_j_distance * l_np;
-	if (debug) file << " new coef:" << nr_coef << endl;
-	nr_ex += l_np;
-	i_j_distance = 0;
-	for (int m = 13; m < 17; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	if (debug) file << "d type i-j-dist: " << i_j_distance << " nd=" << l_nd << endl;
-	for (int m = 13; m < 17; m++) {
-		if (occ[offset + m] == 0) continue;
-		if (debug) file << endl << "m=" << m << " occ= " << occ[offset + m] << endl;
-		for (int i = 0; i < l_nd; i++) {
-			if (debug) file << "i=" << i << "\n  c = " << c[nr_coef + m - 13 + i * i_j_distance] << " n = " << n[nr_ex + i] << " z = " << z[nr_ex + i] << endl;
-			for (int j = 0; j < l_nd - i; j++) {
-				if (debug) file << "    j=" << j << "\n      c = " << c[nr_coef + m - 13 + (i + j) * i_j_distance] << " n = " << n[nr_ex + i + j] << " z = " << z[nr_ex + i + j] << endl;
-				temp = occ[offset + m] 
-					* c[nr_coef + m - 13 + i * i_j_distance] * c[nr_coef + m - 13 + (i + j) * i_j_distance] 
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-	if (debug) file << "old coef:" << nr_coef << " nr_coef += " << l_nd * i_j_distance;
-	nr_coef += i_j_distance * l_nd;
-	if (debug) file << " new coef:" << nr_coef << endl;
-	nr_ex += l_nd;
-	i_j_distance = 0;
-	for (int m = 17; m < 19; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	if (debug) file << "d type i-j-dist: " << i_j_distance << " nd=" << l_nd << endl;
-	for (int m = 17; m < 19; m++) {
-		if (occ[offset + m] == 0) continue;
-		if (debug) file << endl << "m=" << m << " occ= " << occ[offset + m] << endl;
-		for (int i = 0; i < l_nf; i++) {
-			if (debug) file << "i=" << i << "\n  c = " << c[nr_coef + m - 17 + i * i_j_distance] << " n = " << n[nr_ex + i] << " z = " << z[nr_ex + i] << endl;
-			for (int j = 0; j < l_nf - i; j++) {
-				if (debug) file << "    j=" << j << "\n      c = " << c[nr_coef + m - 17 + (i + j) * i_j_distance] << " n = " << n[nr_ex + i + j] << " z = " << z[nr_ex + i + j] << endl;
-				temp = occ[offset + m] 
-					* c[nr_coef + m - 17 + i * i_j_distance] * c[nr_coef + m - 17 + (i + j) * i_j_distance] 
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-
-	return result / k_vector;
+const double Thakkar::get_form_factor(const double k_vector, std::ostream& file, bool debug) {
+	return get_custom_form_factor(k_vector, file, 7, 6, 4, 2, 0,0,0,0, debug);
 };
 
-const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els, std::ofstream& file, bool debug) {
-	double result(0.0);
-	using namespace std;
-
-	const int l_ns = ns[atomic_number - 1];
-	const int l_np = np[atomic_number - 1];
-	const int l_nd = nd[atomic_number - 1];
-	const int l_nf = nf[atomic_number - 1];
-
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
-		return -20;
-	int nr_coef = previous_element_coef();
-	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
-	const int offset = (atomic_number - 1) * 19;
-	double temp;
-	int i_j_distance = 0;
-	for (int m = 0; m < 7; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
+const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els, std::ostream& file, bool debug) {
 	int max_s=0, max_p=0, max_d=0, max_f=0;
 	if (core_els == 2) {
 		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
@@ -288,7 +152,43 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 	else if (core_els == 60) {
 		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
 	}
-	for (int m = 0; m < max_s; m++) {
+
+	return get_custom_form_factor(k_vector, file, max_s,max_p,max_d,max_f,0,0,0,0,debug);
+};
+
+const double Thakkar::get_custom_form_factor(
+	const double& k_vector, 
+	std::ostream& file,
+	int max_s,
+	int max_p,
+	int max_d,
+	int max_f,
+	int min_s,
+	int min_p,
+	int min_d,
+	int min_f,
+	bool debug) {
+	double result(0.0);
+	using namespace std;
+
+	const int l_ns = ns[atomic_number - 1];
+	const int l_np = np[atomic_number - 1];
+	const int l_nd = nd[atomic_number - 1];
+	const int l_nf = nf[atomic_number - 1];
+
+	int nr_ex = first_ex();
+	if (nr_ex == 200000000)
+		return -20;
+	int nr_coef = previous_element_coef();
+	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
+	const int offset = (atomic_number - 1) * 19;
+	double temp;
+	int i_j_distance = 0;
+	for (int m = 0; m < 7; m++)
+		if (occ[offset + m] != 0)
+			i_j_distance++;
+
+	for (int m = min_s; m < max_s; m++) {
 		if (occ[offset + m] == 0) continue;
 		for (int i = 0; i < l_ns; i++) {
 			for (int j = 0; j < l_ns - i; j++) {
@@ -308,7 +208,7 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 	for (int m = 7; m < 13; m++)
 		if (occ[offset + m] != 0)
 			i_j_distance++;
-	for (int m = 7; m < 7+max_p; m++) {
+	for (int m = 7+min_p; m < 7 + max_p; m++) {
 		if (occ[offset + m] == 0) continue;
 		for (int i = 0; i < l_np; i++) {
 			for (int j = 0; j < l_np - i; j++) {
@@ -328,7 +228,7 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 	for (int m = 13; m < 17; m++)
 		if (occ[offset + m] != 0)
 			i_j_distance++;
-	for (int m = 13; m < 13+max_d; m++) {
+	for (int m = 13+min_d; m < 13 + max_d; m++) {
 		if (occ[offset + m] == 0) continue;
 		for (int i = 0; i < l_nd; i++) {
 			for (int j = 0; j < l_nd - i; j++) {
@@ -348,7 +248,7 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 	for (int m = 17; m < 19; m++)
 		if (occ[offset + m] != 0)
 			i_j_distance++;
-	for (int m = 17; m < 17+max_f; m++) {
+	for (int m = 17+min_f; m < 17 + max_f; m++) {
 		if (occ[offset + m] == 0) continue;
 		for (int i = 0; i < l_nf; i++) {
 			for (int j = 0; j < l_nf - i; j++) {

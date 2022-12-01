@@ -29,6 +29,7 @@ Global
 		Debug_SF_MTC_Disorder|x64 = Debug_SF_MTC_Disorder|x64
 		Debug_SF_twin|x64 = Debug_SF_twin|x64
 		Debug_SF|x64 = Debug_SF|x64
+		Debug_SFAC_scan|x64 = Debug_SFAC_scan|x64
 		Debug_tsc_merge|x64 = Debug_tsc_merge|x64
 		Debug_tscb|x64 = Debug_tscb|x64
 		Debug|x64 = Debug|x64
@@ -72,6 +73,8 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF_twin|x64.Build.0 = Debug_SFAC|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x64.ActiveCfg = Debug_SF|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF|x64.Build.0 = Debug_SF|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SFAC_scan|x64.ActiveCfg = Debug_SFAC_scan|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SFAC_scan|x64.Build.0 = Debug_SFAC_scan|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x64.ActiveCfg = Debug_tsc_merge|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tsc_merge|x64.Build.0 = Debug_tsc_merge|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_tscb|x64.ActiveCfg = Debug_tscb|x64
@@ -105,6 +108,8 @@ Global
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF_MTC_Disorder|x64.ActiveCfg = Debug_PDF|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF_twin|x64.ActiveCfg = Debug_PDF|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SF|x64.ActiveCfg = Debug_SF|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SFAC_scan|x64.ActiveCfg = Debug_SFAC_scan|x64
+		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_SFAC_scan|x64.Deploy.0 = Debug_SFAC_scan|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tsc_merge|x64.ActiveCfg = Debug_PDF|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug_tscb|x64.ActiveCfg = Debug_tscb|x64
 		{9DF56911-4827-4BEB-A536-2D058542CFB8}.Debug|x64.ActiveCfg = Debug|x64
@@ -128,6 +133,7 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF_MTC_Disorder|x64.ActiveCfg = Debug_SF_MTC_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF_twin|x64.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SF|x64.ActiveCfg = Debug_SF|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_SFAC_scan|x64.ActiveCfg = Debug_SF_MTC_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tsc_merge|x64.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_tscb|x64.ActiveCfg = Debug_SF_MTC_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug|x64.ActiveCfg = Debug|x64

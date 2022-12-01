@@ -4033,8 +4033,20 @@ public:
 		charge = 0;
 	}
 	const double get_radial_density(double dist);
-	const double get_form_factor(const double k_vector, std::ofstream &file, bool debug = false);
-	const double get_core_form_factor(const double& k_vector, const int& core_els, std::ofstream& file, bool debug);
+	const double get_form_factor(const double k_vector, std::ostream &file, bool debug = false);
+	const double get_core_form_factor(const double& k_vector, const int& core_els, std::ostream& file, bool debug);
+	const double get_custom_form_factor(
+		const double& k_vector,
+		std::ostream& file,
+		int max_s,
+		int max_p,
+		int max_d,
+		int max_f,
+		int min_s,
+		int min_p,
+		int min_d,
+		int min_f,
+		bool debug);
 	const int get_atomic_number() { return atomic_number; };
 	const int get_charge() { return charge; };
 };
