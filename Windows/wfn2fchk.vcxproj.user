@@ -144,4 +144,9 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments>-sfac_scan 2.0 epoxide.cif epoxide.gbw -acc 3</LocalDebuggerCommandArguments>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
+    <LocalDebuggerWorkingDirectory>..\tests\sfac_scan\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>-sfac_scan 2.0 epoxide.cif epoxide.gbw -acc 2</LocalDebuggerCommandArguments>
+  </PropertyGroup>
 </Project>

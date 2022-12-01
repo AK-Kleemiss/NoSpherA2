@@ -33,6 +33,10 @@
       <Configuration>Debug_properties</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug_SFAC_scan|x64">
+      <Configuration>Debug_SFAC_scan</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Debug_SFAC|x64">
       <Configuration>Debug_SFAC</Configuration>
       <Platform>x64</Platform>
@@ -85,6 +89,10 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="Release + Copy|x64">
+      <Configuration>Release + Copy</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64">
       <Configuration>Release</Configuration>
       <Platform>x64</Platform>
@@ -102,6 +110,9 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|ARM'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|ARM'" Label="Configuration">
@@ -128,7 +139,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|ARM'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x86'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x86'" Label="Configuration">
@@ -155,7 +172,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x86'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x64'" Label="Configuration">
@@ -183,10 +206,20 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <UseOfStl>libstdc++_static</UseOfStl>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <UseOfStl>libstdc++_static</UseOfStl>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|ARM64'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|ARM64'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|ARM64'" Label="Configuration">
@@ -220,7 +253,15 @@
     <RemoteTargetPath>NoSpherA2</RemoteTargetPath>
     <MultiProcNumber>10</MultiProcNumber>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
+    <IncludePath>/usr/lib/gcc/x86_64-linux-gnu/7/</IncludePath>
+    <RemoteTargetPath>NoSpherA2</RemoteTargetPath>
+    <MultiProcNumber>10</MultiProcNumber>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <MultiProcNumber>10</MultiProcNumber>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
     <MultiProcNumber>10</MultiProcNumber>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x64'">
@@ -284,6 +325,11 @@
       <UnrollLoops>true</UnrollLoops>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
+    <ClCompile>
+      <UnrollLoops>true</UnrollLoops>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <LinkTimeOptimization>true</LinkTimeOptimization>
@@ -298,7 +344,26 @@
       <Command>copy D:\git\wfn2fchk\NoSpherA2_linux\bin\x64\Release\NoSpherA2_linux.out D:\Dropbox\HARt_Olex_Executables\HAR_SF_Printout\NoSpherA2_linux</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
+    <ClCompile>
+      <LinkTimeOptimization>true</LinkTimeOptimization>
+      <RelaxIEEE>true</RelaxIEEE>
+      <CppLanguageStandard>c++17</CppLanguageStandard>
+      <AdditionalOptions>-fopenmp -static -MMD -MP %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <LibraryDependencies>gomp</LibraryDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy D:\git\wfn2fchk\NoSpherA2_linux\bin\x64\Release\NoSpherA2_linux.out D:\Dropbox\HARt_Olex_Executables\HAR_SF_Printout\NoSpherA2_linux</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalOptions>-fopenmp -static -MMD -MP %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
     <ClCompile>
       <AdditionalOptions>-fopenmp -static -MMD -MP %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
