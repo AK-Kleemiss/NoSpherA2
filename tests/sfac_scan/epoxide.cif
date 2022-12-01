@@ -1,0 +1,58 @@
+data_epoxide
+_audit_creation_method            
+ 'Olex2: Nov 29 2022 10:07:36 MSC:193431933 on WIN64, Python: 3.8.6, wxWidgets: 3.1.5'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C2 H4 O'
+_chemical_formula_sum              'C2 H4 O'
+_chemical_formula_weight           44.05
+_chemical_melting_point            ?
+_space_group_crystal_system        'monoclinic'
+_space_group_IT_number             14
+_space_group_name_H-M_alt          'P 1 21/n 1'
+_space_group_name_Hall             '-P 2yn'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+ 2 1/2-X,1/2+Y,1/2-Z
+ 3 -X,-Y,-Z
+ 4 1/2+X,1/2-Y,1/2+Z
+
+_cell_length_a                     4.633(5)
+_cell_length_b                     8.400(1)
+_cell_length_c                     6.577(3)
+_cell_angle_alpha                  90
+_cell_angle_beta                   100.37(6)
+_cell_angle_gamma                  90
+_cell_volume                       251.8(3)
+_cell_formula_units_Z              4
+_diffrn_reflns_av_R_equivalents    0.0000
+_diffrn_reflns_av_unetI/netI       0.0400
+_diffrn_reflns_limit_h_max         6
+_diffrn_reflns_limit_h_min         -9
+_diffrn_reflns_limit_k_max         16
+_diffrn_reflns_limit_k_min         0
+_diffrn_reflns_limit_l_max         13
+_diffrn_reflns_limit_l_min         -6
+_diffrn_reflns_number              2081
+_diffrn_reflns_theta_max           45.00
+_diffrn_reflns_theta_min           3.98
+_diffrn_ambient_temperature        ?
+_diffrn_radiation_wavelength       0.71068
+_reflns_number_total               2081
+_refine_diff_density_max           0.18
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ O1 O 0.116443 0.831124 0.12464 0.029367 Uani 1 . 1 .
+
