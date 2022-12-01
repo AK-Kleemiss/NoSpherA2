@@ -2280,6 +2280,11 @@ void options::digest_options() {
       density_test_cube = true;
     else if (temp.find("-skpts") < 1)
       save_k_pts = true;
+    else if (temp.find("-sfac_scan") < 1) {
+      sfac_scan = fromString<double> (arguments[i+1]);
+      cif = arguments[i + 2];
+      wfn = arguments[i + 3];
+    }
     else if (temp.find("-test") < 1)
       cout << "Running in test mode!" << endl, test = true;
     else if (temp.find("-thakkar_d_plot") < 1)

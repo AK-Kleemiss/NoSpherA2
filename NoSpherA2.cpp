@@ -723,6 +723,160 @@ int main(int argc, char** argv)
     }
     return 0;
   }
+  if (opt.sfac_scan > 0.0) {
+    Thakkar O(8);
+    Thakkar_Cation O_cat(8);
+    Thakkar_Anion O_an(8);
+    ofstream result("sfacs.dat", ios::out);
+    wavy.push_back(WFN(1));
+    wavy[0].read_known_wavefunction_format(opt.wfn,std::cout, opt.debug);
+    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", result);
+    err_checkf(exists(opt.cif), "CIF does not exists!", result);
+    //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+    if (opt.threads != -1) {
+      omp_set_num_threads(opt.threads);
+      omp_set_dynamic(0);
+    }
+
+#ifdef _WIN64
+    time_t start = time(NULL);
+    time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+#else
+    struct timeval t1, t2;
+
+    gettimeofday(&t1, 0);
+#endif
+
+    cell unit_cell(opt.cif, std::cout, opt.debug);
+    ifstream cif_input(opt.cif.c_str(), std::ios::in);
+    vector <int> atom_type_list;
+    vector <int> asym_atom_to_type_list;
+    vector <int> asym_atom_list;
+    vector <bool> needs_grid(wavy[0].get_ncen(), false);
+    vector<string> known_atoms;
+
+    read_atoms_from_CIF(cif_input,
+      opt.groups[0],
+      unit_cell,
+      wavy[0],
+      known_atoms,
+      atom_type_list,
+      asym_atom_to_type_list,
+      asym_atom_list,
+      needs_grid,
+      std::cout,
+      opt.debug);
+
+    cif_input.close();
+    vector<vector<double>> d1, d2, d3, dens;
+
+    int points = make_hirshfeld_grids(opt.pbc,
+      opt.accuracy,
+      opt.groups[0],
+      unit_cell,
+      wavy[0],
+      atom_type_list,
+      asym_atom_to_type_list,
+      asym_atom_list,
+      needs_grid,
+      d1, d2, d3, dens,
+      std::cout,
+#ifdef _WIN64
+      start,
+      end_becke,
+      end_prototypes,
+      end_spherical,
+      end_prune,
+      end_aspherical,
+#else
+      t1,
+      t2,
+#endif
+      opt.debug,
+      opt.no_date);
+
+
+    cout << "finished partitioning" << endl;
+    const int size = 1000;
+    const int phi_size = 100;
+    const int theta_size = 100;
+    const double phi_step = 360.0 / phi_size * PI_180;
+    const double theta_step = 180.0 / phi_size * PI_180;
+    
+    //This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
+    // by iterating over both spherical angles by a fixed step defined above
+    vector<vector<double>> k_pt;
+    k_pt.resize(4);
+#pragma omp parallel for
+    for (int i = 0; i < 4; i++)
+      k_pt[i].resize(size*phi_size*theta_size, 0.0);
+
+    int null = 0;
+#pragma omp parallel for
+    for (int ref = 1; ref <= size; ref++) {
+      for (int p = 0; p < phi_size; p++) {
+        for (int t = 0; t < theta_size; t++) {
+          int ind = t + (p + (ref-1) * phi_size) * theta_size;
+          double k_length = bohr2ang(FOUR_PI * ref / size * opt.sfac_scan);
+          k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
+          k_pt[1][ind] = k_length * sin(t * theta_step) * sin(p * phi_step);
+          k_pt[2][ind] = k_length * cos(t * theta_step);
+          k_pt[3][ind] = k_length;
+        }
+      }
+    }
+    // below is a strip of Calc_SF without the file IO or progress bar
+    vector<vector<complex<double>>> sf;
+
+    const int imax = (int)dens.size();
+    const int smax = (int)k_pt[0].size();
+    int pmax = dens[0].size();
+    const int step = max((int)floor(imax / 20), 1);
+    cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
+    sf.resize(imax);
+#pragma omp parallel for
+    for (int i = 0; i < imax; i++)
+      sf[i].resize(k_pt[0].size());
+    double* dens_local, * d1_local, * d2_local, * d3_local;
+    complex<double>* sf_local;
+    const double* k1_local = k_pt[0].data();
+    const double* k2_local = k_pt[1].data();
+    const double* k3_local = k_pt[2].data();
+    double work, rho;
+    progress_bar* progress = new progress_bar{ cout, 60u, "Calculating scattering factors" };
+    for (int i = 0; i < imax; i++) {
+      pmax = (int)dens[i].size();
+      dens_local = dens[i].data();
+      d1_local = d1[i].data();
+      d2_local = d2[i].data();
+      d3_local = d3[i].data();
+      sf_local = sf[i].data();
+#pragma omp parallel for private(work,rho)
+      for (int s = 0; s < smax; s++) {
+        for (int p = pmax - 1; p >= 0; p--) {
+          rho = dens_local[p];
+          work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+          sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
+        }
+      }
+      if (i != 0 && i % step == 0)
+        progress->write(i / double(imax));
+    }
+    delete(progress);
+    //Now we jsut need to write the result to a file, together with the spherical results
+    for (int i = 0; i < k_pt[0].size(); i++) {
+      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
+      result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]), log_file, false);
+      result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]), log_file, false);
+      result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]), log_file, false);
+      result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
+      result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 1, 0, 0, 0, 0, 0, 0, 0, false);
+      result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 2, 1, 0, 0, 1, 0, 0, 0, false);
+      result << "\n";
+    }
+    result.flush();
+    result.close();
+  }
   cout << NoSpherA2_message();
   if (!opt.no_date) cout << build_date();
   cout << "Did not understand the task to perform!\n" << help_message() << endl;
