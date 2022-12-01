@@ -727,11 +727,10 @@ int main(int argc, char** argv)
     Thakkar O(8);
     Thakkar_Cation O_cat(8);
     Thakkar_Anion O_an(8);
-    ofstream result("sfacs.dat", ios::out);
     wavy.push_back(WFN(1));
     wavy[0].read_known_wavefunction_format(opt.wfn,std::cout, opt.debug);
-    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", result);
-    err_checkf(exists(opt.cif), "CIF does not exists!", result);
+    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", cout);
+    err_checkf(exists(opt.cif), "CIF does not exists!", cout);
     //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
     if (opt.threads != -1) {
       omp_set_num_threads(opt.threads);
@@ -831,7 +830,7 @@ int main(int argc, char** argv)
     const int imax = (int)dens.size();
     const int smax = (int)k_pt[0].size();
     int pmax = dens[0].size();
-    const int step = max((int)floor(imax / 20), 1);
+    const int step = max((int)floor(smax / 20), 1);
     cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.resize(imax);
 #pragma omp parallel for
@@ -858,12 +857,13 @@ int main(int argc, char** argv)
           work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
           sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
         }
+        if (s != 0 && s % step == 0)
+          progress->write(s / double(smax));
       }
-      if (i != 0 && i % step == 0)
-        progress->write(i / double(imax));
     }
     delete(progress);
-    //Now we jsut need to write the result to a file, together with the spherical results
+    //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
+    ofstream result("sfacs.dat", ios::out);
     for (int i = 0; i < k_pt[0].size(); i++) {
       result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
       result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]), log_file, false);
@@ -876,6 +876,7 @@ int main(int argc, char** argv)
     }
     result.flush();
     result.close();
+    return 0;
   }
   cout << NoSpherA2_message();
   if (!opt.no_date) cout << build_date();
