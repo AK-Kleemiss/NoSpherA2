@@ -7,6 +7,7 @@
 
 class WFN;
 class tsc_block;
+class cell;
 struct options;
 
 bool thakkar_sfac(
@@ -43,6 +44,63 @@ inline std::complex<double> convert_to_ED_single(const int& charge,
   const double h2 = pow(k_vector, 2);
   return std::complex<double>(fact * (charge - sf.real()) / h2, -fact * sf.imag() / h2);
 }
+
+void read_atoms_from_CIF(std::ifstream& cif_input,
+  const std::vector <int>& input_groups,
+  const cell& unit_cell,
+  WFN& wave,
+  const std::vector <std::string>& known_atoms,
+  std::vector <int>& atom_type_list,
+  std::vector <int>& asym_atom_to_type_list,
+  std::vector <int>& asym_atom_list,
+  std::vector <bool>& needs_grid,
+  std::ostream& file,
+  const bool debug = false);
+
+int make_hirshfeld_grids(const int& pbc,
+  const int& accuracy,
+  const std::vector <int>& input_groups,
+  cell& unit_cell,
+  const WFN& wave,
+  const std::vector <int>& atom_type_list,
+  const std::vector <int>& asym_atom_to_type_list,
+  const std::vector <int>& asym_atom_list,
+  std::vector <bool>& needs_grid,
+  std::vector<std::vector<double>>& d1,
+  std::vector<std::vector<double>>& d2,
+  std::vector<std::vector<double>>& d3,
+  std::vector<std::vector<double>>& dens,
+  std::ostream& file,
+#ifdef _WIN64
+  time_t& start,
+  time_t& end_becke,
+  time_t& end_prototypes,
+  time_t& end_spherical,
+  time_t& end_prune,
+  time_t& end_aspherical,
+#else
+  timeval& t1,
+  timeval& t2,
+#endif
+  bool debug = false,
+  bool no_date = false);
+
+void calc_SF(const int& points,
+  std::vector<std::vector<double>>& k_pt,
+  std::vector<std::vector<double>>& d1,
+  std::vector<std::vector<double>>& d2,
+  std::vector<std::vector<double>>& d3,
+  std::vector<std::vector<double>>& dens,
+  std::vector<std::vector<std::complex<double>>>& sf,
+  std::ostream& file,
+#ifdef _WIN64
+  time_t& start,
+  time_t& end1,
+#else
+  timeval& t1,
+  timeval& t2,
+#endif
+  bool debug = false);
 
 #include "wfn_class.h"
 #include "tsc_block.h"

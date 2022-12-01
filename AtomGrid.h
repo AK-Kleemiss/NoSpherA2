@@ -13,7 +13,7 @@ class AtomGrid
         const int max_l_quantum_number,
         const double alpha_min[],
         const bool debug,
-        std::ofstream& file);
+        std::ostream& file);
 
     ~AtomGrid();
 
