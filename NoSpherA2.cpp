@@ -829,7 +829,7 @@ int main(int argc, char** argv)
 
     const int imax = (int)dens.size();
     const int smax = (int)k_pt[0].size();
-    int pmax = dens[0].size();
+    int pmax = (int) dens[0].size();
     const int step = max((int)floor(smax / 20), 1);
     cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.resize(imax);
@@ -844,7 +844,7 @@ int main(int argc, char** argv)
     double work, rho;
     progress_bar* progress = new progress_bar{ cout, 60u, "Calculating scattering factors" };
     for (int i = 0; i < imax; i++) {
-      pmax = (int)dens[i].size();
+      pmax = (int) dens[i].size();
       dens_local = dens[i].data();
       d1_local = d1[i].data();
       d2_local = d2[i].data();
@@ -862,6 +862,8 @@ int main(int argc, char** argv)
       }
     }
     delete(progress);
+    log_file << "Writing X-ray sfacs...";
+    log_file.flush();
     //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
     ofstream result("sfacs.dat", ios::out);
     for (int i = 0; i < k_pt[0].size(); i++) {
@@ -874,8 +876,38 @@ int main(int argc, char** argv)
       result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 2, 1, 0, 0, 1, 0, 0, 0, false);
       result << "\n";
     }
+    log_file << " ... done!" << endl;
     result.flush();
     result.close();
+
+    log_file << "Writing ED sfacs...";
+    log_file.flush();
+    result = ofstream("sfacs_ED.dat", ios::out);
+    const double fact = 0.023934;
+    double h2;
+    for (int s = 0; s < k_pt[0].size(); s++) {
+      h2 = k_pt[3][s];
+      sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
+      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][s] / FOUR_PI);
+      double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s], log_file, false) ) / h2;
+      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+      temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+      temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+
+      result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
+
+      temp = fact * (wavy[0].get_atom_charge(0) - O.get_custom_form_factor(k_pt[3][s], log_file, 1, 0, 0, 0, 0, 0, 0, 0, false)) / h2;
+      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+      temp = fact * (wavy[0].get_atom_charge(0) - O.get_custom_form_factor(k_pt[3][s], log_file, 2, 1, 0, 0, 1, 0, 0, 0, false)) / h2;
+      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+      result << "\n";
+    }
+    result.flush();
+    result.close();
+    log_file << " ... done!" << endl;
+    log_file.close();
     return 0;
   }
   cout << NoSpherA2_message();
