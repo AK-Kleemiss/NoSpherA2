@@ -1618,16 +1618,19 @@ int make_hirshfeld_grids(const int& pbc,
   {
     WFN temp = wave;
     temp.delete_unoccupied_MOs();
+    const int nr_atoms = (int) total_grid[0].size();
+    const int nr_mos = temp.get_nmo(true);
+    const int nr_cen = temp.get_ncen();
     if (debug) file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
 #pragma omp parallel
     {
       vector<vector<double>> d_temp(4);
       for (int i = 0; i < 4; i++) {
-        d_temp[i].resize(temp.get_ncen());
+        d_temp[i].resize(nr_cen);
       }
-      vector<double> phi_temp(temp.get_nmo(true));
-#pragma omp for schedule(dynamic)
-      for (int i = 0; i < total_grid[0].size(); i++) {
+      vector<double> phi_temp(nr_mos);
+#pragma omp for
+      for (int i = 0; i < nr_atoms; i++) {
         total_grid[5][i] = temp.compute_dens(
           total_grid[0][i],
           total_grid[1][i],
@@ -1963,7 +1966,7 @@ void calc_SF(const int& points,
   sf.resize(imax);
 #pragma omp parallel for
   for (int i = 0; i < imax; i++)
-    sf[i].resize(k_pt[0].size());
+    sf[i].resize(k_pt[0].size(), complex<double>(0.0, 0.0));
 
   if (debug)
     file << "Initialized FFs" << endl
@@ -2023,12 +2026,13 @@ void calc_SF(const int& points,
     d3_local = d3[i].data();
     sf_local = sf[i].data();
 #pragma omp parallel for private(work,rho)
-    for (int s = 0; s < smax; s++)
+    for (int s = 0; s < smax; s++) {
       for (int p = pmax - 1; p >= 0; p--) {
         rho = dens_local[p];
         work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-        sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
+        sf_local[s] += polar(rho, work);
       }
+    }
     if (i != 0 && i % step == 0)
       progress->write(i / double(imax));
   }
@@ -2614,7 +2618,8 @@ tsc_block calculate_structure_factors_MTC(
   ofstream& file,
   vector < string >& known_atoms,
   vector<vector<int>>& known_indices,
-  const int& nr
+  const int& nr,
+  vector<vector<double>>* kpts
 )
 {
 #ifdef FLO_CUDA
@@ -2637,12 +2642,6 @@ tsc_block calculate_structure_factors_MTC(
     omp_set_dynamic(0);
   }
   if (opt.debug) file << "Working with: " << wave[nr].get_path() << endl;
-  //vector<double> x, y, z;
-  //vector<int> atom_z;
-  //x.resize(wave[nr].get_ncen()), y.resize(wave[nr].get_ncen()), z.resize(wave[nr].get_ncen()), atom_z.resize(wave[nr].get_ncen());
-  //double* alpha_max = new double[wave.get_ncen()];
-  //int* max_l = new int[wave.get_ncen()];
-  //int max_l_overall = 0;
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -2681,21 +2680,8 @@ tsc_block calculate_structure_factors_MTC(
   if (opt.debug)
     file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
 
-  hkl_list hkl;
-  if (known_indices.size() != 0) {
-#pragma omp parallel for
-    for (int i = 0; i < known_indices[0].size(); i++) {
-      vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i]};
-#pragma omp critical
-      hkl.emplace(temp_hkl);
-    }
-  }
-  else if (nr == 0 && opt.read_k_pts == false) {
-    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-  }
-
   if (opt.debug)
-    file << "made it post CIF & hkl, now make grids! hkl size: " << hkl.size() << endl;
+    file << "made it post CIF now make grids!" << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
   int points = make_hirshfeld_grids(opt.pbc,
@@ -2724,15 +2710,33 @@ tsc_block calculate_structure_factors_MTC(
     opt.no_date);
 
   vector<vector<double>> k_pt;
-  make_k_pts(
-    nr != 0 && hkl.size() == 0,
-    opt.save_k_pts,
-    points,
-    unit_cell,
-    hkl,
-    k_pt,
-    file,
-    opt.debug);
+  hkl_list hkl;
+  if (known_indices.size() != 0) {
+#pragma omp parallel for
+    for (int i = 0; i < known_indices[0].size(); i++) {
+      vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
+#pragma omp critical
+      hkl.emplace(temp_hkl);
+    }
+    }
+  else if (nr == 0 && opt.read_k_pts == false) {
+    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+  }
+  if (kpts == NULL || kpts->size() == 0) { 
+    make_k_pts(
+      nr != 0 && hkl.size() == 0,
+      opt.save_k_pts,
+      points,
+      unit_cell,
+      hkl,
+      k_pt,
+      file,
+      opt.debug);
+    *kpts = k_pt;
+  }
+  else {
+    k_pt = *kpts;
+  }
 
   vector<vector<complex<double>>> sf;
   calc_SF(points,
