@@ -796,9 +796,9 @@ int main(int argc, char** argv)
 
 
     cout << "finished partitioning" << endl;
-    const int size = 1000;
-    const int phi_size = 100;
-    const int theta_size = 100;
+    const int size = 4000;
+    const int phi_size = 50;
+    const int theta_size = 50;
     const double phi_step = 360.0 / phi_size * PI_180;
     const double theta_step = 180.0 / phi_size * PI_180;
     
@@ -862,51 +862,55 @@ int main(int argc, char** argv)
       }
     }
     delete(progress);
-    log_file << "Writing X-ray sfacs...";
-    log_file.flush();
-    //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
-    ofstream result("sfacs.dat", ios::out);
-    for (int i = 0; i < k_pt[0].size(); i++) {
-      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
-      result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]), log_file, false);
-      result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]), log_file, false);
-      result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]), log_file, false);
-      result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-      result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 1, 0, 0, 0, 0, 0, 0, 0, false);
-      result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 2, 1, 0, 0, 1, 0, 0, 0, false);
-      result << "\n";
+    if (true) { //Change if oyu do not want X-ray
+      ofstream result("sfacs.dat", ios::out);
+      log_file << "Writing X-ray sfacs...";
+      log_file.flush();
+      //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
+      for (int i = 0; i < k_pt[0].size(); i++) {
+        result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]), log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]), log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]), log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 1, 0, 0, 0, 0, 0, 0, 0, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 2, 1, 0, 0, 1, 0, 0, 0, false);
+        result << "\n";
+      }
+      log_file << " ... done!" << endl;
+      result.flush();
+      result.close();
     }
-    log_file << " ... done!" << endl;
-    result.flush();
-    result.close();
+    if (true) { //change if you do not want ED sfacs
+      log_file << "Writing ED sfacs...";
+      log_file.flush();
+      ofstream result = ofstream("sfacs_ED.dat", ios::out);
+      const double fact = 0.023934;
+      double h2;
+      for (int s = 0; s < k_pt[0].size(); s++) {
+        h2 = pow(ang2bohr(k_pt[3][s] / FOUR_PI), 2);
+        sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
 
-    log_file << "Writing ED sfacs...";
-    log_file.flush();
-    result = ofstream("sfacs_ED.dat", ios::out);
-    const double fact = 0.023934;
-    double h2;
-    for (int s = 0; s < k_pt[0].size(); s++) {
-      h2 = k_pt[3][s];
-      sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
-      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][s] / FOUR_PI);
-      double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s], log_file, false) ) / h2;
-      result << showpos << setw(16) << setprecision(8) << scientific << temp;
-      temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s], log_file, false)) / h2;
-      result << showpos << setw(16) << setprecision(8) << scientific << temp;
-      temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s], log_file, false)) / h2;
-      result << showpos << setw(16) << setprecision(8) << scientific << temp;
+        result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][s] / FOUR_PI);
+        double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        result << showpos << setw(16) << setprecision(8) << scientific << temp;
+        temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        result << showpos << setw(16) << setprecision(8) << scientific << temp;
+        temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        result << showpos << setw(16) << setprecision(8) << scientific << temp;
 
-      result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
+        result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
 
-      temp = fact * (wavy[0].get_atom_charge(0) - O.get_custom_form_factor(k_pt[3][s], log_file, 1, 0, 0, 0, 0, 0, 0, 0, false)) / h2;
-      result << showpos << setw(16) << setprecision(8) << scientific << temp;
-      temp = fact * (wavy[0].get_atom_charge(0) - O.get_custom_form_factor(k_pt[3][s], log_file, 2, 1, 0, 0, 1, 0, 0, 0, false)) / h2;
-      result << showpos << setw(16) << setprecision(8) << scientific << temp;
-      result << "\n";
+        temp = fact * (2 - O.get_custom_form_factor(k_pt[3][s], log_file, 1, 0, 0, 0, 0, 0, 0, 0, false)) / h2;
+        result << showpos << setw(16) << setprecision(8) << scientific << temp;
+        temp = fact * (6 - O.get_custom_form_factor(k_pt[3][s], log_file, 2, 1, 0, 0, 1, 0, 0, 0, false)) / h2;
+        result << showpos << setw(16) << setprecision(8) << scientific << temp;
+        result << "\n";
+      }
+      result.flush();
+      result.close();
+      log_file << " ... done!" << endl;
     }
-    result.flush();
-    result.close();
-    log_file << " ... done!" << endl;
     log_file.close();
     return 0;
   }
