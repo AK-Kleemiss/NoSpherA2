@@ -18,10 +18,6 @@ Number of atoms in Wavefunction file: 31 Number of MOs: 642
 Number of protons: 57
 Number of electrons: 56
 Reading:                               residues/1.cif done!
-Reading:                                   1yk4_h.hkl done!
-Nr of reflections read from file: 200
-Number of symmetry operations: 4
-Nr of reflections to be used: 800
 There are:
   18 atoms read from the wavefunction, of which 
   12 are identified as asymmetric unit atoms!
@@ -50,6 +46,10 @@ Table of Charges in electrons
        O_2    -0.212     0.223    -0.326
 Total number of electrons in the wavefunction: 39.030
  and Hirshfeld electrons (asym unit): 39.004
+Reading:                                   1yk4_h.hkl done!
+Nr of reflections read from file: 200
+Number of symmetry operations: 4
+Nr of reflections to be used: 800
 
 Number of k-points to evaluate: 800 for 2758 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================== [100%] 
@@ -94,8 +94,6 @@ Table of Charges in electrons
      HZc_3     0.227     0.036     0.230
 Total number of electrons in the wavefunction: 69.941
  and Hirshfeld electrons (asym unit): 70.137
-
-Number of k-points to evaluate: 800 for 4998 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 111
 Number of electrons: 110.000
@@ -135,8 +133,6 @@ Table of Charges in electrons
      H1c_3     0.243     0.057     0.236
 Total number of electrons in the wavefunction: 48.469
  and Hirshfeld electrons (asym unit): 48.660
-
-Number of k-points to evaluate: 800 for 3696 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 102
 Number of electrons: 102.000
@@ -176,8 +172,6 @@ Table of Charges in electrons
        O_4    -0.219     0.243    -0.338
 Total number of electrons in the wavefunction: 61.847
  and Hirshfeld electrons (asym unit): 61.836
-
-Number of k-points to evaluate: 800 for 4396 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Final number of atoms in .tsc file: 72
 Writing tsc file...  ... done!

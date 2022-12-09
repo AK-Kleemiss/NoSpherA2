@@ -2718,7 +2718,7 @@ tsc_block calculate_structure_factors_MTC(
 #pragma omp critical
       hkl.emplace(temp_hkl);
     }
-    }
+  }
   else if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
@@ -2732,7 +2732,9 @@ tsc_block calculate_structure_factors_MTC(
       k_pt,
       file,
       opt.debug);
-    *kpts = k_pt;
+    if (kpts != NULL) {
+      *kpts = k_pt;
+    }
   }
   else {
     k_pt = *kpts;
