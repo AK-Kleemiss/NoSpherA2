@@ -4,7 +4,7 @@ import os
 import math
 import matplotlib.font_manager as font_manager
 
-xray = True
+xray = False
 ED = True
 
 font = font_manager.FontProperties(style='normal', size=9)
@@ -130,7 +130,8 @@ if ED == True:
   axes.plot(k_vectors,thakkars[2],label="O+")
   
   subax = add_subplot_axes(axes,[0.3,0.45,0.68,0.4])
-  subax.set_xlim(0,0.5)
+  subax.set_xlim(0,0.3)
+  subax.set_ylim(-2,6.0)
   subax.plot(k_vectors,thakkars[0])
   subax.plot(k_vectors,thakkars[1])
   subax.plot(k_vectors,thakkars[2])
@@ -152,6 +153,7 @@ if ED == True:
   
   subax = add_subplot_axes(axes,[0.3,0.45,0.68,0.4])
   subax.set_xlim(0,0.5)
+  subax.set_ylim(-1,3.0)
   subax.plot(k_vectors,thakkars[0])
   subax.plot(k_vectors,thakkars[1])
   subax.plot(k_vectors,thakkars[2])
@@ -173,6 +175,7 @@ if ED == True:
   
   subax = add_subplot_axes(axes,[0.3,0.45,0.68,0.4])
   subax.set_xlim(0,0.5)
+  subax.set_ylim(-1,3.0)
   subax.plot(k_vectors,thakkars[0])
   subax.plot(k_vectors,thakkars[4])
   subax.plot(k_vectors,thakkars[5])
