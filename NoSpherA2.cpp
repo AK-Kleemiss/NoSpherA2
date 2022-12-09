@@ -13,7 +13,7 @@ using namespace std;
 int main(int argc, char** argv)
 {
   ofstream log_file("NoSpherA2.log", ios::out);
-  auto coutbuf = cout.rdbuf(log_file.rdbuf()); //save and redirect
+  auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
   vector<WFN> wavy;
   options opt(argc, argv);
   opt.digest_options();
@@ -26,6 +26,7 @@ int main(int argc, char** argv)
     log_file << build_date();
   }
   log_file.flush();
+  //Perform fractal dimensional analysis and quit 
   if (opt.fract) {
     WFN wavy(6);
     cube residual(opt.fract_name, true, wavy, cout, opt.debug);
@@ -34,6 +35,7 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
   if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc) {
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
     if (opt.combined_tsc_calc) err_checkf(opt.cif != "", "No cif specified", log_file);
@@ -115,9 +117,10 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //Performs the Thakkar IAM
   if (opt.iam_switch) {
     if (opt.debug) {
-      log_file << "I am doin IAM!" << endl;
+      log_file << "I am doing a Thakkar IAM!" << endl;
     }
     err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
     err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
@@ -135,11 +138,6 @@ int main(int argc, char** argv)
   }
   //This one has conversion to fchk and calculation of one single tsc file
   if (opt.hkl != "" && opt.wfn != "") {
-    if (opt.debug) {
-      log_file << "status:" << opt.wfn << "&" << opt.fchk << "&" << opt.basis_set << "&" << opt.basis_set_path << "&" << opt.cif << "&" << opt.hkl << "&" << opt.groups.size();
-      if (opt.groups.size() != 0) log_file << "&" << opt.groups[0].size();
-      log_file << endl;
-    }
     wavy.push_back(WFN(0));
     log_file << "Reading: " << setw(44) << opt.wfn << flush;
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file, opt.debug);
@@ -164,7 +162,9 @@ int main(int argc, char** argv)
         size_t where;
         if (wavy[0].get_origin() == 2) where = outputname.find("wfn");
         else if (wavy[0].get_origin() == 4) where = outputname.find("ffn");
-        else if (wavy[0].get_origin() == 4) where = outputname.find(".wfx");
+        else if (wavy[0].get_origin() == 6) where = outputname.find(".wfx");
+        else if (wavy[0].get_origin() == 8) where = outputname.find(".molden");
+        else if (wavy[0].get_origin() == 9) where = outputname.find(".gbw");
         if (where >= outputname.length() && where != string::npos) err_checkf(false, "Cannot make output file name!", log_file);
         else outputname.erase(where, 3);
       }
@@ -194,6 +194,7 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //Contains all calculations of properties and cubes
   if (opt.calc) {
     ofstream log2("NoSpherA2_cube.log", ios::out);
     auto coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
@@ -410,6 +411,7 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //Test for molden and ECP files
   if (opt.density_test_cube) {
     wavy.resize(10);
     //ScF2+ test file against ORCA calcualted cubes
@@ -559,6 +561,7 @@ int main(int argc, char** argv)
     log_file << "All tests successfull!" << endl;
     return 0;
   }
+  //Converts gbw file to wfn file and leaves
   if (opt.gbw2wfn) {
     err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
     wavy.push_back(WFN(9));
@@ -568,6 +571,7 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //Calcualtes data for Thakkar IAM Paper
   if (opt.thakkar_d_plot) {
     
     Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
@@ -648,14 +652,16 @@ int main(int argc, char** argv)
     }
     return 0;
   }
+  //Calcualtes data sampling a full sphere for the first atom in a wavefunction and tries to compare to 
+  //Thakkar densities. Make sure Thakkar ions are present if your selected atom
   if (opt.sfac_scan > 0.0) {
-    Thakkar O(8);
-    Thakkar_Cation O_cat(8);
-    Thakkar_Anion O_an(8);
     wavy.push_back(WFN(1));
     wavy[0].read_known_wavefunction_format(opt.wfn,std::cout, opt.debug);
-    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", cout);
-    err_checkf(exists(opt.cif), "CIF does not exists!", cout);
+    Thakkar O(wavy[0].atoms[0].charge);
+    Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
+    Thakkar_Anion O_an(wavy[0].atoms[0].charge);
+    err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+    err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
     if (opt.threads != -1) {
       omp_set_num_threads(opt.threads);
@@ -839,9 +845,9 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
-  cout << NoSpherA2_message();
-  if (!opt.no_date) cout << build_date();
-  cout << "Did not understand the task to perform!\n" << help_message() << endl;
+  std::cout << NoSpherA2_message();
+  if (!opt.no_date) std::cout << build_date();
+  std::cout << "Did not understand the task to perform!\n" << help_message() << endl;
   log_file.flush();
   log_file.close();
   return 0;
