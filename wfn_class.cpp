@@ -370,11 +370,7 @@ string WFN::hdr(const bool& occupied)
     else if (nmo < 0) return "PROBLEM";
   }
   else {
-    unsigned long int occupied_mos = 0;
-#pragma omp parallel for reduction(+:occupied_mos)
-    for (int i = 0; i < nmo; i++) {
-      if (MOs[i].get_occ() > 0) occupied_mos++;
-    }
+    const int occupied_mos = get_nmo(true);
     if (occupied_mos > 100) temp.append(to_string(occupied_mos));
     else if (occupied_mos < 100 && occupied_mos>10) {
       temp.append(" ");
