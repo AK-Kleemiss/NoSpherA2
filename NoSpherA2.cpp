@@ -34,92 +34,15 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
-  if (opt.combined_tsc_calc) {
+  if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc) {
     err_checkf(opt.hkl != "", "No hkl specified", log_file);
-    err_checkf(opt.cif != "", "No cif specified", log_file);
+    if (opt.combined_tsc_calc) err_checkf(opt.cif != "", "No cif specified", log_file);
     //First make sure all files exist
-    for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-      err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
-
-    wavy.resize(opt.combined_tsc_calc_files.size());
-    for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
-      log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
-      wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file);
-      if (opt.ECP) {
-        wavy[i].set_has_ECPs(true);
-      }
-      log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
-    }
-
-    vector<string> known_scatterer;
-    vector<vector<int>> known_indices;
-    tsc_block result;
-    for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
-      known_scatterer = result.get_scatterers();
-      known_indices = result.get_index_vector();
-      if (wavy[i].get_origin() != 7) {
-        result.append(calculate_structure_factors_MTC(
-          opt,
-          wavy,
-          log_file,
-          known_scatterer,
-          known_indices,
-          i
-        ), log_file);
-      }
-      else {
-        result.append(MTC_thakkar_sfac(
-          opt,
-          log_file,
-          known_scatterer,
-          known_indices,
-          wavy,
-          i
-        ), log_file);
-      }
-    }
-
-    if (opt.debug) {
-      for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
-        log_file << opt.combined_tsc_calc_files[i] << " ";
-        for (int j = 0; j < opt.groups[i].size(); j++) log_file << opt.groups[i][j] << " ";
-        log_file << endl;
-      }
-    }
-    known_scatterer = result.get_scatterers();
-    log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
-#ifdef _WIN64
-    time_t start = time(NULL);
-    time_t end_write;
-#endif
-    log_file << "Writing tsc file... " << flush;
-    if (opt.binary_tsc)
-      result.write_tscb_file();
-    if (opt.old_tsc) {
-      result.write_tsc_file(opt.cif);
-    }
-    log_file << " ... done!" << endl;
-#ifdef _WIN64
-    end_write = time(NULL);
-
-    if (end_write - start < 60) log_file << "Writing Time: " << fixed << setprecision(0) << end_write - start << " s\n";
-    else if (end_write - start < 3600) log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 60) << " m " << (end_write - start) % 60 << " s\n";
-    else log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
-    log_file << endl;
-#endif
-    log_file.flush();
-    log_file.close();
-    return 0;
-  }
-  if (opt.cif_based_combined_tsc_calc) {
-    err_checkf(opt.hkl != "", "No hkl specified", log_file);
-    //First make sure all files exist
-    err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
+    if (opt.cif_based_combined_tsc_calc) err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
-      err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i], log_file);
+      if(opt.cif_based_combined_tsc_calc) err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i], log_file);
     }
-
     wavy.resize(opt.combined_tsc_calc_files.size());
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
