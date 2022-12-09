@@ -29,7 +29,7 @@ int main(int argc, char** argv)
   //Perform fractal dimensional analysis and quit 
   if (opt.fract) {
     WFN wavy(6);
-    cube residual(opt.fract_name, true, wavy, cout, opt.debug);
+    cube residual(opt.fract_name, true, wavy, std::cout, opt.debug);
     residual.fractal_dimension(0.01);
     log_file.flush();
     log_file.close();
@@ -726,7 +726,7 @@ int main(int argc, char** argv)
       opt.no_date);
 
 
-    cout << "finished partitioning" << endl;
+    std::cout << "finished partitioning" << endl;
     const int size = 4000;
     const int phi_size = 50;
     const int theta_size = 50;
@@ -762,7 +762,7 @@ int main(int argc, char** argv)
     const int smax = (int)k_pt[0].size();
     int pmax = (int) dens[0].size();
     const int step = max((int)floor(smax / 20), 1);
-    cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
+    std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.resize(imax);
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
@@ -773,7 +773,7 @@ int main(int argc, char** argv)
     const double* k2_local = k_pt[1].data();
     const double* k3_local = k_pt[2].data();
     double work, rho;
-    progress_bar* progress = new progress_bar{ cout, 60u, "Calculating scattering factors" };
+    progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
     for (int i = 0; i < imax; i++) {
       pmax = (int) dens[i].size();
       dens_local = dens[i].data();
