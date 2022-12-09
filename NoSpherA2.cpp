@@ -132,6 +132,7 @@ int main(int argc, char** argv)
 
     vector<string> known_scatterer;
     vector<vector<int>> known_indices;
+    vector<vector<double>> known_kpts;
     tsc_block result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
@@ -143,7 +144,8 @@ int main(int argc, char** argv)
           log_file,
           known_scatterer,
           known_indices,
-          i
+          i,
+          &known_kpts
         ), log_file);
       }
       else {

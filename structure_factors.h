@@ -34,7 +34,8 @@ tsc_block calculate_structure_factors_MTC(
   std::ofstream& file,
   std::vector <std::string>& known_atoms,
   std::vector<std::vector<int>>& known_indices,
-  const int& nr);
+  const int& nr,
+  std::vector<std::vector<double>>* kpts=NULL);
 
 inline std::complex<double> convert_to_ED_single(const int& charge,
   std::complex<double>& sf,
