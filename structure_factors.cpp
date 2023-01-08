@@ -1036,7 +1036,12 @@ int make_hirshfeld_grids(const int& pbc,
 
   file << "Calculating spherical densities..." << flush;
 
+// Total grid as a sum of all atomic grids.
+// Dimensions: [c] [p]
+// p = the number of gridpoint
+// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
 #ifdef FLO_CUDA
+  vector < vector < float > > total_grid(7);
   float*** gpu_spherical_density = NULL,
     *** gpu_radial_density = NULL,
     *** gpu_radial_dist = NULL,
@@ -1139,7 +1144,7 @@ int make_hirshfeld_grids(const int& pbc,
   }
 
 #else
-
+  vector < vector < double > > total_grid(7);
   // density of spherical atom at each
   // Dimensions: [a] [d]
   // a = atom number in atom type list for which the weight is calcualted
@@ -1297,15 +1302,7 @@ int make_hirshfeld_grids(const int& pbc,
   end_spherical = time(NULL);
 
 #endif
-  // Total grid as a sum of all atomic grids.
-  // Dimensions: [c] [p]
-  // p = the number of gridpoint
-  // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-#ifdef FLO_CUDA
-  vector < vector < float > > total_grid(7);
-#else
-  vector < vector < double > > total_grid(7);
-#endif
+
   double cutoff;
   if (accuracy < 3)
     cutoff = 1E-10;
@@ -1413,7 +1410,7 @@ int make_hirshfeld_grids(const int& pbc,
     for (int mo = 0; mo < wave.get_nmo(false); mo++)
       for (int i = 0; i < nex_temp; i++)
         if (wave.get_MO_occ(mo) != 0)
-          coef.push_back(wave.get_MO_coef(mo, i, debug));
+          coef.push_back(wave.get_MO_coef(mo, i));
     if (debug) file << "Number of coefs: " << coef.size() << endl;
     gpuErrchk(cudaMalloc((void**)&gpu_coefficients[0], sizeof(float) * nex_temp));
     gpuErrchk(cudaMemset(gpu_GridRho[0], 0.0, sizeof(float) * MaxGrid));
@@ -1483,7 +1480,7 @@ int make_hirshfeld_grids(const int& pbc,
     for (int i = 0; i < nex_temp; i++)
       for (int mo = 0; mo < wave.get_nmo(false); mo++)
         if (wave.get_MO_occ(mo) != 0)
-          coef.push_back(wave.get_MO_coef(mo, i, debug));
+          coef.push_back(wave.get_MO_coef(mo, i));
     //seems broken and is slower, especially if L1 is sufficient for coefficients with size nex_temp
     gpuErrchk(cudaMalloc((void**)&gpu_coefficients[0], sizeof(float) * nex_temp * nmo_temp));
     gpuErrchk(cudaMemcpy(gpu_coefficients[0], coef.data(), sizeof(float) * nex_temp * nmo_temp, cudaMemcpyHostToDevice));
@@ -1596,7 +1593,7 @@ int make_hirshfeld_grids(const int& pbc,
     gridSize = (MaxGrid + blocks - 1) / blocks;
     //file << i << ": blocks: " << gridSize << " threads: " << blocks << endl;
 
-    gpu_apply_weights << < gridSize, blocks, 0, streams[i] >> > (
+    gpu_apply_weights <<< gridSize, blocks, 0, streams[i] >>> (
       offset,
       gpu_GridRho[0],
       gpu_Grids[0],
@@ -2441,7 +2438,7 @@ bool calculate_structure_factors_HF(
 )
 {
 #ifdef FLO_CUDA
-  if (pbc != 0) {
+  if (opt.pbc != 0) {
     file << "PERIODIC CALCULATIONS NOT IMPLEMENTED WITH CUDA YET!" << endl;
     exit(false);
   }
