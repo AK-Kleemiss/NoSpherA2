@@ -545,7 +545,7 @@ struct primitive
     coefficient *= c;
   };
   void unnormalize() {
-    const int l = type - 1;
+//    const int l = type - 1;
     double c = normalization_constant();
     coefficient /= c;
   };
