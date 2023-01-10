@@ -291,6 +291,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
             && is_similar_abs(position[1], wave.atoms[i].y, tolerances[1])
             && is_similar_abs(position[2], wave.atoms[i].z, tolerances[2])) {
             string element = atnr2letter(wave.get_atom_charge(i));
+            err_checkf(element == "PROBLEM", "Problem identifying atoms!", std::cout);
             string label = fields[label_field];
             std::transform(element.begin(), element.end(), element.begin(), asciitolower);
             std::transform(label.begin(), label.end(), label.begin(), asciitolower);

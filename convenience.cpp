@@ -671,6 +671,7 @@ string shrink_string_to_atom(string& input, const int& atom_number)
   while (input.find("(") != -1) { input.erase(input.find("("), 1); }
   while (input.find(")") != -1) { input.erase(input.find(")"), 1); }
   string temp = atnr2letter(atom_number);
+  err_checkf(temp == "PROBLEM", "Problem identifying atoms!", std::cout);
   if (input.find(temp) != 1) return temp;
   if (temp != "PROBLEM")
     while (input.size() > temp.size())
