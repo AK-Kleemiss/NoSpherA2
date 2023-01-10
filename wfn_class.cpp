@@ -1399,7 +1399,9 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
       rf.read((char*)&(geo_ints[i]), 4);
       err_checkf(rf.good(), "Error reading geo_int", file);
     }
-    err_checkf(push_back_atom(atnr2letter(geo_ints[0]),
+    string temp = atnr2letter(geo_ints[0]);
+    err_checkf(temp == "PROBLEM", "Problem identifying atoms!", std::cout);
+    err_checkf(push_back_atom(temp,
       geo_vals[0],
       geo_vals[1],
       geo_vals[2],
