@@ -39,3 +39,4 @@ tests/epoxide_gbw/converted.wfn
 tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
 Windows/.vs/NoSpherA2/v16/.suo
 *.deps
+*.pch

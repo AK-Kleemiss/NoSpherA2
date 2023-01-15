@@ -45,6 +45,11 @@ double linear_interpolate_spherical_density(
 }
 #endif
 
+std::complex<double> convert_to_ED_single(const int& charge, std::complex<double>& sf, const double& k_vector) {
+  const double h2 = pow(k_vector, 2);
+  return std::complex<double>(ED_fact * (charge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
+}
+
 void read_k_points(vector<vector<double>>& k_pt, hkl_list& hkl, ostream& file)
 {
   err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
@@ -2248,18 +2253,6 @@ bool thakkar_sfac(
     file << endl;
   }
 
-  vector<vector<double>> k_pt;
-  make_k_pts(
-    opt.read_k_pts,
-    opt.save_k_pts,
-    0,
-    unit_cell,
-    hkl,
-    k_pt,
-    file,
-    opt.debug);
-
-  const int smax = (int) k_pt[0].size();
   const int imax = (int) asym_atom_list.size();
   const int amax = (int) atom_type_list.size();
 
@@ -2273,7 +2266,7 @@ bool thakkar_sfac(
 
   hkl_list_it it = hkl.begin();
 #pragma omp parallel for private(it)
-  for (int s = 0; s < smax; s++) {
+  for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
     double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
@@ -2281,14 +2274,13 @@ bool thakkar_sfac(
   }
 
   if (opt.electron_diffraction) {
-    const double fact = 0.023934;
     double h2;
 #pragma omp parallel for private(h2, it)
-    for (int s = 0; s < smax; s++) {
+    for (int s = 0; s < hkl.size(); s++) {
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = fact * (atom_type_list[asym_atom_to_type_list[i]] - sf[i][s]) / h2;
+        sf[i][s] = ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf[i][s]) / h2;
     }
   }
 
@@ -2316,10 +2308,9 @@ bool thakkar_sfac(
 }
 
 tsc_block MTC_thakkar_sfac(
-  const options& opt,
+  options& opt,
   ofstream& file,
   vector < string >& known_atoms,
-  vector<vector<int>>& known_indices,
   vector<WFN>& wave,
   const int& nr
 )
@@ -2358,34 +2349,25 @@ tsc_block MTC_thakkar_sfac(
     file << "made it post CIF, now make grids!" << endl;
 
   hkl_list hkl;
-  if (known_indices.size() != 0) {
+  if (opt.m_hkl_list.size() != 0) {
+    hkl = opt.m_hkl_list;
+    /*
 #pragma omp parallel for
     for (int i = 0; i < known_indices[0].size(); i++) {
       vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
 #pragma omp critical
       hkl.emplace(temp_hkl);
-    }
+    }*/
   }
   else if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    opt.m_hkl_list = hkl;
   }
 
   vector <Thakkar> spherical_atoms;
   for (int i = 0; i < atom_type_list.size(); i++)
     spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
-  vector<vector<double>> k_pt;
-  make_k_pts(
-    nr != 0 && hkl.size() == 0,
-    opt.save_k_pts,
-    0,
-    unit_cell,
-    hkl,
-    k_pt,
-    file,
-    opt.debug);
-
-  const int smax = (int) k_pt[0].size();
   const int imax = (int) asym_atom_list.size();
   const int amax = (int) atom_type_list.size();
   vector< vector < double> > sf;
@@ -2396,7 +2378,7 @@ tsc_block MTC_thakkar_sfac(
 
   hkl_list_it it = hkl.begin();
 #pragma omp parallel for private(it)
-  for (int s = 0; s < smax; s++) {
+  for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
     double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
@@ -2404,14 +2386,13 @@ tsc_block MTC_thakkar_sfac(
   }
 
   if (opt.electron_diffraction) {
-    const double fact = 0.023934;
     double h2;
 #pragma omp parallel for private(h2, it)
-    for (int s = 0; s < smax; s++) {
+    for (int s = 0; s < hkl.size(); s++) {
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = fact * (atom_type_list[i] - sf[i][s]) / h2;
+        sf[i][s] = ED_fact * (atom_type_list[i] - sf[i][s]) / h2;
     }
   }
 
@@ -2522,6 +2503,10 @@ bool calculate_structure_factors_HF(
     opt.debug,
     opt.no_date);
 
+#ifdef _WIN64
+  time_t before_kpts = time(NULL);
+#endif
+
   vector<vector<double>> k_pt;
   make_k_pts(
     opt.read_k_pts,
@@ -2532,6 +2517,10 @@ bool calculate_structure_factors_HF(
     k_pt,
     file,
     opt.debug);
+
+#ifdef _WIN64
+  time_t after_kpts = time(NULL);
+#endif
 
   vector<vector<complex<double>>> sf;
   calc_SF(points,
@@ -2592,7 +2581,9 @@ bool calculate_structure_factors_HF(
   file << " ... for spherical density:   " << setw(6) << end_spherical - end_becke << " s" << endl;
   file << " ... for Grid Pruning:        " << setw(6) << end_prune - end_spherical << " s" << endl;
   file << " ... for aspherical density:  " << setw(6) << end_aspherical - end_prune << " s" << endl;
-  file << " ... for final preparation:   " << setw(6) << end1 - end_aspherical << " s" << endl;
+  file << " ... for density vectors:     " << setw(6) << before_kpts - end_aspherical << " s" << endl;
+  file << " ... for k-points preparation:" << setw(6) << after_kpts - before_kpts << " s" << endl;
+  file << " ... for final preparation:   " << setw(6) << end1 - after_kpts << " s" << endl;
   file << " ... for tsc calculation:     " << setw(6) << end - end1 << " s" << endl;
 
 #endif
@@ -2611,11 +2602,10 @@ bool calculate_structure_factors_HF(
 }
 
 tsc_block calculate_structure_factors_MTC(
-  const options& opt,
+  options& opt,
   vector<WFN>& wave,
   ofstream& file,
   vector < string >& known_atoms,
-  vector<vector<int>>& known_indices,
   const int& nr,
   vector<vector<double>>* kpts
 )
@@ -2682,7 +2672,7 @@ tsc_block calculate_structure_factors_MTC(
     file << "made it post CIF now make grids!" << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
-  int points = make_hirshfeld_grids(opt.pbc,
+  const int points = make_hirshfeld_grids(opt.pbc,
     opt.accuracy,
     opt.groups[nr],
     unit_cell,
@@ -2707,18 +2697,25 @@ tsc_block calculate_structure_factors_MTC(
     opt.debug,
     opt.no_date);
 
+#ifdef _WIN64
+  time_t before_kpts = time(NULL);
+#endif
+
   vector<vector<double>> k_pt;
   hkl_list hkl;
-  if (known_indices.size() != 0) {
+  if (opt.m_hkl_list.size() != 0) {
+    hkl = opt.m_hkl_list;/*
 #pragma omp parallel for
     for (int i = 0; i < known_indices[0].size(); i++) {
       vector<int>temp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
 #pragma omp critical
       hkl.emplace(temp_hkl);
     }
+    */
   }
   else if (nr == 0 && opt.read_k_pts == false) {
     read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    opt.m_hkl_list = hkl;
   }
   if (kpts == NULL || kpts->size() == 0) { 
     make_k_pts(
@@ -2737,6 +2734,10 @@ tsc_block calculate_structure_factors_MTC(
   else {
     k_pt = *kpts;
   }
+
+#ifdef _WIN64
+  time_t after_kpts = time(NULL);
+#endif
 
   vector<vector<complex<double>>> sf;
   calc_SF(points,
@@ -2797,7 +2798,9 @@ tsc_block calculate_structure_factors_MTC(
   file << " ... for spherical density:   " << setw(6) << end_spherical - end_becke << " s" << endl;
   file << " ... for Grid Pruning:        " << setw(6) << end_prune - end_spherical << " s" << endl;
   file << " ... for aspherical density:  " << setw(6) << end_aspherical - end_prune << " s" << endl;
-  file << " ... for final preparation:   " << setw(6) << end1 - end_aspherical << " s" << endl;
+  file << " ... for density vectors:     " << setw(6) << before_kpts - end_aspherical << " s" << endl;
+  file << " ... for k-points preparation:" << setw(6) << after_kpts - before_kpts << " s" << endl;
+  file << " ... for final preparation:   " << setw(6) << end1 - after_kpts << " s" << endl;
   file << " ... for tsc calculation:     " << setw(6) << end - end1 << " s" << endl;
 #endif
 

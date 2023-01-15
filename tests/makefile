@@ -109,6 +109,17 @@ rubredoxin_cmtc:
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
+
+rubredoxin_cmtc_full:
+	@echo 'Running test: $@'
+	cd rubredoxin_cmtc && ../../NoSpherA2 \
+		-hkl 1yk4_h_full.hkl -acc 0 \
+		-cmtc residues/1.gbw residues/1.cif 0 \
+		residues/2.gbw residues/2.cif 0,1 \
+		residues/3.gbw residues/3.cif 0,2 \
+		residues/4.gbw residues/4.cif 0 \
+		-cpus 24
+	@echo 'Finished running: $@'
 	
 wfn_reading:
 	@echo 'Running test: $@'
