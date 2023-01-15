@@ -16,10 +16,9 @@ bool thakkar_sfac(
   WFN& wave);
 
 tsc_block MTC_thakkar_sfac(
-  const options& opt,
+  options& opt,
   std::ofstream& file,
   std::vector < std::string >& known_atoms,
-  std::vector<std::vector<int>>& known_indices,
   std::vector<WFN>& wave,
   const int& nr);
 
@@ -29,22 +28,16 @@ bool calculate_structure_factors_HF(
   std::ofstream& file);
 
 tsc_block calculate_structure_factors_MTC(
-  const options& opt,
+  options& opt,
   std::vector<WFN>& wave,
   std::ofstream& file,
   std::vector <std::string>& known_atoms,
-  std::vector<std::vector<int>>& known_indices,
   const int& nr,
   std::vector<std::vector<double>>* kpts=NULL);
 
-inline std::complex<double> convert_to_ED_single(const int& charge,
+std::complex<double> convert_to_ED_single(const int& charge,
   std::complex<double>& sf,
-  const double& k_vector)
-{
-  const double fact = 0.023934;
-  const double h2 = pow(k_vector, 2);
-  return std::complex<double>(fact * (charge - sf.real()) / h2, -fact * sf.imag() / h2);
-}
+  const double& k_vector);
 
 void read_atoms_from_CIF(std::ifstream& cif_input,
   const std::vector <int>& input_groups,

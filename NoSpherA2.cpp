@@ -56,19 +56,16 @@ int main(int argc, char** argv)
     }
 
     vector<string> known_scatterer;
-    vector<vector<int>> known_indices;
     vector<vector<double>> known_kpts;
     tsc_block result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
-      known_indices = result.get_index_vector();
       if (wavy[i].get_origin() != 7) {
         result.append(calculate_structure_factors_MTC(
           opt,
           wavy,
           log_file,
           known_scatterer,
-          known_indices,
           i,
           &known_kpts
         ), log_file);
@@ -78,7 +75,6 @@ int main(int argc, char** argv)
           opt,
           log_file,
           known_scatterer,
-          known_indices,
           wavy,
           i
         ), log_file);
@@ -670,7 +666,7 @@ int main(int argc, char** argv)
 
 #ifdef _WIN64
     time_t start = time(NULL);
-    time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
 #else
     struct timeval t1, t2;
 
