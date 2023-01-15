@@ -47,6 +47,7 @@ inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
 inline const double PI2 = pow(PI, 2);
 inline const double PI_180 = PI / 180.0;
 inline const double TG32 = tgamma(3.0 / 2.0);
+inline const double ED_fact = 0.023934;
 inline const int max_LT = 33;
 inline const int MAG = 5810;
 //                       3,     5     7,    9,    11,   13,   15,   17
@@ -636,7 +637,8 @@ struct options {
   int ncpus = 0;
   double mem = 0.0;
   int mult = 0;
-  bool debug=false;
+  bool debug = false;
+  hkl_list m_hkl_list;
 };
 
 #include "wfn_class.h"

@@ -96,4 +96,21 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.github\workflows\c-cpp_all.yml">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\Mac\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\Linux\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\.github\workflows\codeql-analysis.yml">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\tests\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+  </ItemGroup>
 </Project>
