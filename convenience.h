@@ -370,6 +370,7 @@ class progress_bar
   const std::size_t bar_width;
   std::string message;
   const std::string full_bar;
+  const double precision;
 
 public:
   progress_bar(std::ostream& os, std::size_t line_width,
@@ -377,7 +378,8 @@ public:
     : os{ os },
     bar_width{ line_width - overhead },
     message{ std::move(message_) },
-    full_bar{ std::string(bar_width, symbol) + std::string(bar_width, ' ') }
+    full_bar{ std::string(bar_width, symbol) + std::string(bar_width, ' ') },
+    precision{ p }
   {
     if (message.size() + 1 >= bar_width || message.find('\n') != message.npos) {
       os << message << '\n';

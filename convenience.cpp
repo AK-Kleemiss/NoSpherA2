@@ -1047,11 +1047,11 @@ void progress_bar::write(double fraction)
     fraction = 1;
 
   auto width = bar_width - message.size();
-  auto offset = bar_width - static_cast<unsigned>(width * round(fraction * 20) * 0.05);
+  auto offset = bar_width - static_cast<unsigned>(width * round(fraction / precision) * precision);
 
-  os << '\r' << message.c_str();
+  os << '\r' << message;
   os.write(full_bar.data() + offset, width);
-  os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction * 20) * 0.05) << "%] " << std::flush;
+  os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction / precision) * precision) << "%] " << std::flush;
 }
 
 void readxyzMinMax_fromWFN(
