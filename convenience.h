@@ -374,7 +374,7 @@ class progress_bar
 
 public:
   progress_bar(std::ostream& os, std::size_t line_width,
-    std::string message_, const char symbol = '=')
+    std::string message_, const char symbol = '=', const double p = 0.05)
     : os{ os },
     bar_width{ line_width - overhead },
     message{ std::move(message_) },
