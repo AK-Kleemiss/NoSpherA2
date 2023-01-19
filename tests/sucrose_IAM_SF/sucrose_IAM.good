@@ -13,8 +13,6 @@ Reading:                                  sucrose.hkl done!
 Nr of reflections read from file: 3318
 Number of symmetry operations: 2
 Nr of reflections to be used: 3726
-
-Number of k-points to evaluate: 3726 for 0 gridpoints.
 Calculating scattering factors for 3 types of atoms with 45 atoms in the asymmetric unit.
 
 Writing tsc file...
