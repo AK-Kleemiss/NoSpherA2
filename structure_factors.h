@@ -39,6 +39,16 @@ std::complex<double> convert_to_ED_single(const int& charge,
   std::complex<double>& sf,
   const double& k_vector);
 
+std::complex<double> convert_to_ED_single(const int& neutralcharge,
+  const int& charge,
+  std::complex<double>& sf,
+  const double& k_vector);
+
+std::complex<double> convert_to_ED_single(const int& neutralcharge,
+  const double& charge,
+  std::complex<double>& sf,
+  const double& k_vector);
+
 void read_atoms_from_CIF(std::ifstream& cif_input,
   const std::vector <int>& input_groups,
   const cell& unit_cell,

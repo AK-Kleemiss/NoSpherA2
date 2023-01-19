@@ -50,6 +50,17 @@ std::complex<double> convert_to_ED_single(const int& charge, std::complex<double
   return std::complex<double>(ED_fact * (charge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
 }
 
+std::complex<double> convert_to_ED_single(const int& neutralcharge, const int& charge, std::complex<double>& sf, const double& k_vector) {
+  const double h2 = pow(k_vector, 2);
+  std::complex<double> neutral(ED_fact * (neutralcharge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
+  return neutral + ED_fact*charge/h2;
+}
+std::complex<double> convert_to_ED_single(const int& neutralcharge, const double& charge, std::complex<double>& sf, const double& k_vector) {
+  const double h2 = pow(k_vector, 2);
+  std::complex<double> neutral(ED_fact * (neutralcharge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
+  return neutral + ED_fact * charge / h2;
+}
+
 void read_k_points(vector<vector<double>>& k_pt, hkl_list& hkl, ostream& file)
 {
   err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
@@ -2103,7 +2114,6 @@ void convert_to_ED(const std::vector <int>& asym_atom_list,
   const cell& unit_cell,
   const hkl_list& hkl)
 {
-  const double fact = 0.023934;
   double h2;
   hkl_list_it it;
 #pragma omp parallel for private(h2,it)
@@ -2111,7 +2121,7 @@ void convert_to_ED(const std::vector <int>& asym_atom_list,
     it = next(hkl.begin(), s);
     h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
-      sf[i][s] = std::complex<double>(fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -fact * sf[i][s].imag() / h2);
+      sf[i][s] = std::complex<double>(ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -ED_fact * sf[i][s].imag() / h2);
   }
 }
 
