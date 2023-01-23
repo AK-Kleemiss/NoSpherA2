@@ -426,9 +426,11 @@ void WFN::read_known_wavefunction_format(const string& fileName, ostream& file, 
 bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
 {
   if (ncen > 0) {
-    file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
-    if (!yesno()) return false;
-    else file << "okay, carrying on then..." << endl;
+    //file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
+    //if (!yesno()) return false;
+    //else file << "okay, carrying on then..." << endl;
+    file << "There is already a wavefunction loaded, aborting!" << endl;
+    return false;
   }
   if (debug) {
     debug_wfn = true;
@@ -1713,7 +1715,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   return true;
 };
 
-vector<double> WFN::get_norm_const(ofstream& file, bool debug)
+vector<double> WFN::get_norm_const(ostream& file, bool debug)
 {
   err_checkf(get_nr_basis_set_loaded() != 0, "No basis set loaded!", file);
   err_checkf(get_nr_basis_set_loaded() == get_ncen(), "Not all atoms have a basis set loaded!", file);
@@ -1891,8 +1893,8 @@ bool WFN::write_wfn(const string& fileName, const bool& debug, const bool occupi
     debug_wfn = true;
     debug_wfn_deep = true;
     if (exists(fileName)) {
-      cout << "File already existed, do you want to overwrite it?";
-      if (!yesno()) return false;
+      cout << "File already existed!";
+      return false;
     }
     else {
       if (debug_wfn) cout << "File didn't exist before, writing comment to it now." << endl;
@@ -2959,7 +2961,7 @@ int WFN::calculate_charge()
   return atomic_charges - (int) mo_charges;
 };
 
-int WFN::calculate_charge(ofstream& file)
+int WFN::calculate_charge(ostream& file)
 {
   int atomic_charges = 0;
   double mo_charges = 0;
@@ -2977,119 +2979,20 @@ int WFN::calculate_charge(ofstream& file)
   return atomic_charges - (int) mo_charges;
 };
 
-bool WFN::guess_multiplicity(bool expert)
+bool WFN::guess_multiplicity(ostream& file)
 {
   bool f = false;
-  if (get_nr_electrons(f) % 2 == 0 && !expert) {
-    bool temp = true;
-    cout << "With " << get_nr_electrons(f) << " electrons your system appears to have multiplicity 1." << endl;
-    assign_multi(1);
-  }
-  else if (get_nr_electrons(f) % 2 == 0) {
-    cout << "With " << get_nr_electrons(f) << " electrons your system appears to have multiplicity 1. Do you agree?" << endl;
-    if (yesno()) assign_multi(1);
-    else {
-      bool end = false;
-      while (!end) {
-        cout << "What is the multiplicity of your molecule? ";
-        int temp = 0;
-        cin >> temp;
-        if (temp % 2 != 1) {
-          cout << "This multiplicity does not match your number of electrons! Try again!" << endl;
-          continue;
-        }
-        else {
-          assign_multi(temp);
-          end = true;
-        }
-      }
-    }
-  }
-  else if (get_nr_electrons(f) % 2 == 1 && !expert) {
-    cout << "With " << get_nr_electrons(f) % 2 << " electron this seems to be open shell, assuming multiplicity 2." << endl;
-    assign_multi(2);
-  }
-  else if (get_nr_electrons(f) % 2 == 1) {
-    cout << "With " << get_nr_electrons(f) % 2 << " electron this seems to be open shell, assuming multiplicity 2. Do you agree?" << endl;
-    if (yesno()) assign_multi(2);
-    else {
-      bool end = false;
-      while (!end) {
-        cout << "What is the multiplicity of your molecule? ";
-        int tmp = 0;
-        cin >> tmp;
-        if (tmp % 2 != 1) {
-          cout << "This Multiplicity and electron count does not match! Try again!" << endl;
-          continue;
-        }
-        else {
-          assign_multi(tmp);
-          end = true;
-        }
-      }
-    }
-  }
-  else {
-    cout << "This is awkward... i dind't think of this case yet, contact florian to implement it!" << endl;
-    return false;
-  }
-  return true;
-};
-
-bool WFN::guess_multiplicity(ofstream& file, bool expert)
-{
-  bool f = false;
-  if (get_nr_electrons(f) % 2 == 0 && !expert) {
+  if (get_nr_electrons(f) % 2 == 0) {
     bool temp = true;
     file << "With " << get_nr_electrons(f) << " electrons your system appears to have multiplicity 1." << endl;
     assign_multi(1);
   }
-  else if (get_nr_electrons(f) % 2 == 0) {
-    file << "With " << get_nr_electrons(f) << " electrons your system appears to have multiplicity 1. Do you agree?" << endl;
-    if (yesno()) assign_multi(1);
-    else {
-      bool end = false;
-      while (!end) {
-        file << "What is the multiplicity of your molecule? ";
-        int temp = 0;
-        cin >> temp;
-        if (temp % 2 != 1) {
-          file << "This multiplicity does not match your number of electrons! Try again!" << endl;
-          continue;
-        }
-        else {
-          assign_multi(temp);
-          end = true;
-        }
-      }
-    }
-  }
-  else if (get_nr_electrons(f) % 2 == 1 && !expert) {
+  else if (get_nr_electrons(f) % 2 == 1) {
     file << "With " << get_nr_electrons(f) % 2 << " electron this seems to be open shell, assuming multiplicity 2." << endl;
     assign_multi(2);
   }
-  else if (get_nr_electrons(f) % 2 == 1) {
-    file << "With " << get_nr_electrons(f) % 2 << " electron this seems to be open shell, assuming multiplicity 2. Do you agree?" << endl;
-    if (yesno()) assign_multi(2);
-    else {
-      bool end = false;
-      while (!end) {
-        file << "What is the multiplicity of your molecule? ";
-        int tmp = 0;
-        cin >> tmp;
-        if (tmp % 2 != 1) {
-          file << "This Multiplicity and electron count does not match! Try again!" << endl;
-          continue;
-        }
-        else {
-          assign_multi(tmp);
-          end = true;
-        }
-      }
-    }
-  }
   else {
-    file << "This is awkward... i dind't think of this case yet, contact florian to implement it!" << endl;
+    file << "This is awkward... i dind't think of this case yet, contact Florian to implement it!" << endl;
     return false;
   }
   return true;

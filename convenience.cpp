@@ -5,22 +5,22 @@
 using namespace std;
 
 //--------------------------General convenience terminal functions---------------------------------
-bool yesno()
-{
-  bool end = false;
-  while (!end) {
-    char dum = '?';
-    cout << "(Y/N)?";
-    cin >> dum;
-    if (dum == 'y' || dum == 'Y') {
-      cout << "Okay..." << endl;
-      return true;
-    }
-    else if (dum == 'N' || dum == 'n') return false;
-    else cout << "Sorry, i did not understand that!" << endl;
-  }
-  return false;
-};
+//bool yesno()
+//{
+//  bool end = false;
+//  while (!end) {
+//    char dum = '?';
+//    cout << "(Y/N)?";
+//    cin >> dum;
+//    if (dum == 'y' || dum == 'Y') {
+//      cout << "Okay..." << endl;
+//      return true;
+//    }
+//    else if (dum == 'N' || dum == 'n') return false;
+//    else cout << "Sorry, i did not understand that!" << endl;
+//  }
+//  return false;
+//};
 
 string help_message()
 {
@@ -128,12 +128,12 @@ string atnr2letter(const int& nr)
     //Exception for Q peaks in residual maps
     return "Q";
   }
-  if (nr > 113 || nr < 0) {
+  if (nr > 103 || nr < 0) {
     if (nr == 119) {
       //Exception for Q in ECPs from ORCA
       return "Q";
     }
-    cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-113!" << endl;
+    cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-103!" << endl;
     return ("PROBLEM");
   }
   else return Labels[nr];
@@ -142,30 +142,30 @@ string atnr2letter(const int& nr)
 int get_Z_from_label(const char* tmp)
 {
   if (strcmp(tmp, "H") == 0)  return 0;
-  else  if (strcmp(tmp, "D") == 0)  return 0;
-  else  if (strcmp(tmp, "T") == 0)  return 0;
+  else  if (strcmp(tmp, "D") == 0)   return 0;
+  else  if (strcmp(tmp, "T") == 0)   return 0;
   else 	if (strcmp(tmp, "He") == 0)  return 1;
   else 	if (strcmp(tmp, "Li") == 0)  return 2;
   else 	if (strcmp(tmp, "Be") == 0)  return 3;
-  else 	if (strcmp(tmp, "B") == 0)  return 4;
-  else 	if (strcmp(tmp, "C") == 0)  return 5;
-  else 	if (strcmp(tmp, "N") == 0)  return 6;
-  else 	if (strcmp(tmp, "O") == 0)  return 7;
-  else 	if (strcmp(tmp, "F") == 0)  return 8;
+  else 	if (strcmp(tmp, "B") == 0)   return 4;
+  else 	if (strcmp(tmp, "C") == 0)   return 5;
+  else 	if (strcmp(tmp, "N") == 0)   return 6;
+  else 	if (strcmp(tmp, "O") == 0)   return 7;
+  else 	if (strcmp(tmp, "F") == 0)   return 8;
   else 	if (strcmp(tmp, "Ne") == 0)  return 9;
   else 	if (strcmp(tmp, "Na") == 0)  return 10;
   else 	if (strcmp(tmp, "Mg") == 0)  return 11;
   else 	if (strcmp(tmp, "Al") == 0)  return 12;
   else 	if (strcmp(tmp, "Si") == 0)  return 13;
-  else 	if (strcmp(tmp, "P") == 0)  return 14;
-  else 	if (strcmp(tmp, "S") == 0)  return 15;
+  else 	if (strcmp(tmp, "P") == 0)   return 14;
+  else 	if (strcmp(tmp, "S") == 0)   return 15;
   else 	if (strcmp(tmp, "Cl") == 0)  return 16;
   else 	if (strcmp(tmp, "Ar") == 0)  return 17;
-  else 	if (strcmp(tmp, "K") == 0)  return 18;
+  else 	if (strcmp(tmp, "K") == 0)   return 18;
   else 	if (strcmp(tmp, "Ca") == 0)  return 19;
   else 	if (strcmp(tmp, "Sc") == 0)  return 20;
   else 	if (strcmp(tmp, "Ti") == 0)  return 21;
-  else 	if (strcmp(tmp, "V") == 0)  return 22;
+  else 	if (strcmp(tmp, "V") == 0)   return 22;
   else 	if (strcmp(tmp, "Cr") == 0)  return 23;
   else 	if (strcmp(tmp, "Mn") == 0)  return 24;
   else 	if (strcmp(tmp, "Fe") == 0)  return 25;
@@ -181,7 +181,7 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Kr") == 0)  return 35;
   else 	if (strcmp(tmp, "Rb") == 0)  return 36;
   else 	if (strcmp(tmp, "Sr") == 0)  return 37;
-  else 	if (strcmp(tmp, "Y") == 0)  return 38;
+  else 	if (strcmp(tmp, "Y") == 0)   return 38;
   else 	if (strcmp(tmp, "Zr") == 0)  return 39;
   else 	if (strcmp(tmp, "Nb") == 0)  return 40;
   else 	if (strcmp(tmp, "Mo") == 0)  return 41;
@@ -195,7 +195,7 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Sn") == 0)  return 49;
   else 	if (strcmp(tmp, "Sb") == 0)  return 50;
   else 	if (strcmp(tmp, "Te") == 0)  return 51;
-  else 	if (strcmp(tmp, "I") == 0)  return 52;
+  else 	if (strcmp(tmp, "I") == 0)   return 52;
   else 	if (strcmp(tmp, "Xe") == 0)  return 53;
   else 	if (strcmp(tmp, "Cs") == 0)  return 54;
   else 	if (strcmp(tmp, "Ba") == 0)  return 55;
@@ -216,7 +216,7 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Lu") == 0)  return 70;
   else 	if (strcmp(tmp, "Hf") == 0)  return 71;
   else 	if (strcmp(tmp, "Ta") == 0)  return 72;
-  else 	if (strcmp(tmp, "W") == 0)  return 73;
+  else 	if (strcmp(tmp, "W") == 0)   return 73;
   else 	if (strcmp(tmp, "Re") == 0)  return 74;
   else 	if (strcmp(tmp, "Os") == 0)  return 75;
   else 	if (strcmp(tmp, "Ir") == 0)  return 76;
@@ -235,7 +235,7 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Ac") == 0)  return 88;
   else 	if (strcmp(tmp, "Th") == 0)  return 89;
   else 	if (strcmp(tmp, "Pa") == 0)  return 90;
-  else 	if (strcmp(tmp, "U") == 0)  return 91;
+  else 	if (strcmp(tmp, "U") == 0)   return 91;
   else 	if (strcmp(tmp, "Np") == 0)  return 92;
   else 	if (strcmp(tmp, "Pu") == 0)  return 93;
   else 	if (strcmp(tmp, "Am") == 0)  return 94;
@@ -255,7 +255,7 @@ int get_Z_from_label(const char* tmp)
   else 	if (strcmp(tmp, "Mt") == 0)  return 108;
   else 	if (strcmp(tmp, "Ds") == 0)  return 109;
   else 	if (strcmp(tmp, "Rg") == 0)  return 110;
-  else                                 return -1;
+  else                               return -1;
 }
 /*
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
@@ -349,8 +349,8 @@ void write_template_confi()
   string filename = ".cuQCT.conf";
   join_path(programs, filename);
   if (exists(programs)) {
-    cout << "File already exist, do you want to overwrite it?" << endl;
-    if (!yesno()) return;
+    cout << "File already exists! Aborting!" << endl;
+    return;
   }
   ofstream conf(programs.c_str());
 #ifdef _WIN32
@@ -404,14 +404,11 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   }
   else {
     if (expert) {
-      cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", do you want me to write a template for you?" << endl;
-      if (yesno()) {
-        write_template_confi();
-        if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1) return -1;
-        cout << "Wrote a template for you, read default values!" << endl;
-        return 0;
-      }
-      else return -1;
+      cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", writing a template for you!" << endl;
+      write_template_confi();
+      if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1) return -1;
+      cout << "Wrote a template for you, read default values!" << endl;
+      return 0;
     }
     else {
       write_template_confi();
@@ -460,7 +457,7 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   return 1;
 };
 
-bool check_bohr(WFN& wave, bool interactive, bool debug)
+bool check_bohr(WFN& wave, bool debug)
 {
   double min_length = 300.0;
   for (int i = 0; i < wave.get_ncen(); i++) {
@@ -480,19 +477,11 @@ bool check_bohr(WFN& wave, bool interactive, bool debug)
       if (length < min_length) min_length = length;
     }
   }
-  if (debug || interactive) {
+  if (debug) {
     if (min_length < 2)
       cout << "Decided it's written in Angstrom" << endl;
     else
       cout << "Decided it's written in Bohr" << endl;
-  }
-  if (interactive) {
-    cout << "Do you agree ";
-    if (yesno()) return (!(min_length < 2));
-    else {
-      wave.set_dist_switch();
-      return (min_length < 2);
-    }
   }
   else return (!(min_length < 2));
 };
@@ -1070,7 +1059,7 @@ void readxyzMinMax_fromWFN(
   PosAtoms.resize(wavy.get_ncen());
   for (int i = 0; i < wavy.get_ncen(); i++)
     PosAtoms[i].resize(3);
-  bool bohrang = !check_bohr(wavy, false, false);
+  bool bohrang = !check_bohr(wavy, false);
   j = 0;
   for (iAtoms = 0; iAtoms < wavy.get_ncen(); iAtoms++)
   {

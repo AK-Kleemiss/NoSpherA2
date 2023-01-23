@@ -151,7 +151,7 @@ inline const double real_masses[]{
  132.91,	137.33,		139.91, 140.12, 140.91, 144.24, 144.9, 150.36, 151.96, 157.25, 158.93, 162.5, 164.93, 167.26, 168.93, 173.05, 174.97,			178.49, 180.95, 183.84, 186.21, 190.23, 192.22, 195.08, 196.97, 200.59,		204.38, 207.2,	208.98, 208.9,	209.9,	222.0 };
 
 
-bool yesno();
+//bool yesno();
 bool is_similar_rel(const double& first, const double& second, const double& tolerance);
 bool is_similar(const double& first, const double& second, const double& tolerance);
 bool is_similar_abs(const double& first, const double& second, const double& tolerance);
@@ -326,7 +326,7 @@ double read_fchk_double(std::ifstream& in, std::string search, bool rewind = tru
 void write_template_confi();
 int program_confi(std::string& gaussian_path, std::string& turbomole_path,
   std::string& basis, int& ncpus, double& mem, bool debug = false, bool expert = false, unsigned int counter = 0);
-bool check_bohr(WFN& wave, bool interactive, bool debug);
+bool check_bohr(WFN& wave, bool debug);
 int filetype_identifier(std::string& file, bool debug = false);
 
 /*bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);

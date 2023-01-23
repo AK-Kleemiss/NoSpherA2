@@ -682,10 +682,8 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   ofchk.close();
   ifchk.close();
   if (debug) {
-    cout << "Do you want me to keep the old fchk file and the new temp.fchk?";
-    if (!yesno()) {
-      copy_file(tfn, temp_fchk);
-    }
+    cout << "Keeping the old fchk file and the new temp.fchk" << endl;
+    copy_file(tfn, temp_fchk);
   }
   else copy_file(tfn, temp_fchk);
   if (remove("temp.fchk") != 0) cout << "error deleting temp.fchk!" << endl;
@@ -718,51 +716,36 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
   }
   else if (wave.get_nr_basis_set_loaded() < wave.get_ncen()) {
     file << "Not all atoms have a basis set loaded!" << endl
-      << "Do you want to laod the missing atoms?" << flush;
-    if (!yesno()) {
-      file << "Do you want to load a new basis set?" << flush;
-      if (!yesno()) {
-        file << "Okay, aborting then!!!" << endl;
-        return "WRONG";
-      }
-      file << "deleting old one..." << endl;
-      if (!delete_basis_set_vanilla(basis_set_path, wave, debug)) {
-        file << "ERROR while deleting a basis set!" << endl;
-        return "WRONG";
-      }
-      else if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
-        file << "ERROR during reading of the new basis set!" << endl;
-        return "WRONG";
-      }
+      << "Laoding the missing atoms..." << flush;
+    if (!read_basis_set_missing(basis_set_path, wave, debug)) {
+      file << "ERROR during reading of missing basis set!" << endl;
+      return "WRONG";
     }
-    else {
-      file << "okay, loading the missing atoms.." << endl;
-      if (!read_basis_set_missing(basis_set_path, wave, debug)) {
-        file << "ERROR during reading of missing basis set!" << endl;
-        return "WRONG";
-      }
-    }
+    //if (!yesno()) {
+    //  file << "Do you want to load a new basis set?" << flush;
+    //  if (!yesno()) {
+    //    file << "Okay, aborting then!!!" << endl;
+    //    return "WRONG";
+    //  }
+    //  file << "deleting old one..." << endl;
+    //  if (!delete_basis_set_vanilla(basis_set_path, wave, debug)) {
+    //    file << "ERROR while deleting a basis set!" << endl;
+    //    return "WRONG";
+    //  }
+    //  else if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
+    //    file << "ERROR during reading of the new basis set!" << endl;
+    //    return "WRONG";
+    //  }
+    //}
+    //else {
+    //  file << "okay, loading the missing atoms.." << endl;
+    //  if (!read_basis_set_missing(basis_set_path, wave, debug)) {
+    //    file << "ERROR during reading of missing basis set!" << endl;
+    //    return "WRONG";
+    //  }
+    //}
   }
-  else if (wave.get_nr_basis_set_loaded() == wave.get_ncen()) {
-    file << "There already is a basis set loaded!" << endl
-      << "Do you want me to delete the old one and load a new one?" << flush;
-    if (!yesno()) {
-      file << "Okay, continuing with the old one..." << endl;
-    }
-    else {
-      file << "Deleting the old basis set!" << endl;
-      if (!delete_basis_set_vanilla(basis_set_path, wave, debug)) {
-        file << "ERROR during deleting of the basis set!";
-        return "WRONG";
-      }
-      file << "Going to load a new one now!" << endl;
-      if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
-        file << "Problem during reading of the basis set!" << endl;
-        return "WRONG";
-      }
-    }
-  }
-  else {
+  else if (wave.get_nr_basis_set_loaded() > wave.get_ncen()) {
     file << "# of loaded > # atoms" << endl
       << "Sorry, this should not happen... aborting!!!" << endl;
     return "WRONG";
@@ -1184,8 +1167,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     string temp_fchk = fchk_name;
     temp_fchk.append(".fchk");
     if (exists(temp_fchk) && !force_overwrite) {
-      file << "The fchk already exists, do you want me to overwrite it?" << endl;
-      if (!yesno()) return false;
+      file << "The fchk already exists!" << endl;
+      return false;
     }
     ofstream fchk(temp_fchk.c_str());
     if (!fchk.is_open()) {
