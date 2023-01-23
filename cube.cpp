@@ -202,7 +202,15 @@ bool cube::read_file(bool full, bool header, bool expert) {
 }
 
 bool cube::write_file(bool force, bool absolute) {
-  bool end = false;
+  if (exists(path)) {
+    if (force)
+      remove(path.c_str());
+    else {
+      cout << "File already exists, aborting!" << endl;
+      return false;
+    }
+  }
+  /*bool end = false;
   if (!force) {
     while (exists(path) && !end) {
       cout << "File already exists, do you want to overwrite it? ";
@@ -223,7 +231,7 @@ bool cube::write_file(bool force, bool absolute) {
   else {
     if (exists(path))
       remove(path.c_str());
-  }
+  }*/
   stringstream stream;
   string temp;
   ofstream of(path.c_str(), ios::out);

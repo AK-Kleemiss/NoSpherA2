@@ -142,10 +142,9 @@ public:
   bool get_has_ECPs() const { return has_ECPs; };
   void operator=(const WFN& right);
   int calculate_charge();
-  int calculate_charge(std::ofstream& file);
-  bool guess_multiplicity(const bool expert = false);
-  bool guess_multiplicity(std::ofstream& file, const bool expert = false);
-  std::vector<double> get_norm_const(std::ofstream& file, const bool debug = false);
+  int calculate_charge(std::ostream& file);
+  bool guess_multiplicity(std::ostream& file);
+  std::vector<double> get_norm_const(std::ostream& file, const bool debug = false);
   //-------------------atom handling--------------------------------------------------------------
   double get_atom_coordinate(const int& nr, const int& axis);
   std::string get_atom_label(const int& nr);

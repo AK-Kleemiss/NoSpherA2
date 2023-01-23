@@ -30,12 +30,11 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
       end = true;
     }
     else {
-      cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl
-        << "Do you want to speify a new name?" << endl;
-      if (!yesno()) return false;
-      manual = true;
-      cout << "What is the name of the basis set in the directory: ";
-      cin >> basis_set_name;
+      cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl;
+      return false;
+      //manual = true;
+      //cout << "What is the name of the basis set in the directory: ";
+      //cin >> basis_set_name;
     }
   }
   if (debug_dens) cout << "File of basis set to load: " << temp << endl;
@@ -270,12 +269,10 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
       end = true;
     }
     else {
-      cout << "sorry, could not find this basis set in the basis set directory specified in the ~/.cuQCT file!" << endl
-        << "Do you want to specify a new name?" << endl;
-      if (!yesno()) return false;
-      manual = true;
-      cout << "What is the name of the basis set in the directory: ";
-      cin >> basis_set_name;
+      cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl;
+      return false;
+      //cout << "What is the name of the basis set in the directory: ";
+      //cin >> basis_set_name;
     }
   }
   wave.set_basis_set_name(basis_set_name);
@@ -485,12 +482,11 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
       end = true;
     }
     else {
-      cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl
-        << "Do you want to speify a new name?" << endl;
-      if (!yesno()) return false;
-      manual = true;
-      cout << "What is the name of the basis set in the directory: ";
-      cin >> basis_set_name;
+      cout << "sorry, could not find this basis set in the basis set directory specified in the programs.config file!" << endl;
+      return false;
+      //manual = true;
+      //cout << "What is the name of the basis set in the directory: ";
+      //cin >> basis_set_name;
     }
   }
   if (debug_dens) cout << "File of basis set to load: " << temp << endl;
