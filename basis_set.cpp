@@ -253,7 +253,7 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
 {
   if (debug) debug_dens = true;
   string basis_set_name;
-  string temp;
+  string temp_name;
   bool end = false;
   while (!end) {
     if (wave.get_basis_set_name().length() < 3 || manual) {
@@ -262,9 +262,9 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     }
     else if (!manual) basis_set_name = wave.get_basis_set_name();
     //assemble basis set name and look if file exists
-    temp = basis_set_path;
-    temp.append(basis_set_name);
-    if (exists(temp)) {
+    temp_name = basis_set_path;
+    temp_name.append(basis_set_name);
+    if (exists(temp_name)) {
       if (debug_dens) cout << "basis set is valid, continuing..." << endl;
       end = true;
     }
@@ -276,8 +276,8 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     }
   }
   wave.set_basis_set_name(basis_set_name);
-  if (debug_dens) cout << "File of basis set to load: " << temp << endl;
-  ifstream ifile(temp.c_str(), ios::in);
+  if (debug_dens) cout << "File of basis set to load: " << temp_name << endl;
+  ifstream ifile(temp_name.c_str(), ios::in);
   //  Looking for all the types of atoms we need to find
   vector<string> elements_list;
   bool found = false;
@@ -376,11 +376,7 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
         stream >> count >> c_temp;
         if (debug_dens) cout << "count: " << count << " type: " << c_temp << endl;
       }
-      else if (file_type == 2) {
-        stream >> c_temp >> count;
-        if (debug_dens) cout << "count: " << count << " type: " << c_temp << endl;
-      }
-      else if (file_type == 3) {
+      else if (file_type == 2 || file_type == 3) {
         stream >> c_temp >> count;
         if (debug_dens) cout << "count: " << count << " type: " << c_temp << endl;
       }
@@ -402,47 +398,37 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
             temp_label.erase(temp_label.find(" "), 1);
           temp_label.append(":");
           if (elements_list[i].find(temp_label) != -1) {
+            int type = 0;
             switch (c_temp) {
             case 's':
             case 'S':
-              if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell)) {
-                cout << "ERROR while pushing back atoms basis set" << endl;
-              }
-              if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                << " and exp: " << temp[0] << " and type S" << endl;
+              type = 1;
               break;
             case 'p':
             case 'P':
-              if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell)) {
-                cout << "ERROR while pushing back atoms basis set" << endl;
-              }
-              if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                << " and exp: " << temp[0] << " and type P" << endl;
+              type = 2;
               break;
             case 'd':
             case 'D':
-              if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell)) {
-                cout << "ERROR while pushing back atoms basis set" << endl;
-              }
-              if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                << " and exp: " << temp[0] << " and type D" << endl;
+              type = 3;
               break;
             case 'f':
             case 'F':
-              if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell)) {
-                cout << "ERROR while pushing back atoms basis set" << endl;
-              }
-              if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                << " and exp: " << temp[0] << " and type F" << endl;
+              type = 4;
               break;
             default:
               cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
               return false;
             } // end switch of types
+            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], type, shell)) {
+              cout << "ERROR while pushing back atoms basis set" << endl;
+            }
+            if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+              << " and exp: " << temp_vals[0] << " and type F" << endl;
           } // end if(find atom_label + : 
         }//end for h = ncen
         nr_exp++;
-        if (debug_dens) cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
+        if (debug_dens) cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
         if (dum > count) {
           cout << "this should not happen, lets stop before i do something silly!" << endl;
           return false;
