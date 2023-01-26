@@ -133,11 +133,12 @@ int main(int argc, char** argv)
     return 0;
   }
   //This one has conversion to fchk and calculation of one single tsc file
-  if (opt.hkl != "" && opt.wfn != "") {
+  if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.sfac_scan == 0.0) {
     wavy.push_back(WFN(0));
     log_file << "Reading: " << setw(44) << opt.wfn << flush;
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file, opt.debug);
     wavy[0].set_method(opt.method);
+    wavy[0].set_multi(opt.mult);
     if (opt.ECP) {
       wavy[0].set_has_ECPs(true);
     }

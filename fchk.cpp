@@ -694,7 +694,9 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
 bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, bool force_overwrite) {
   int elcount = 0;
   elcount -= wave.get_charge();
-  for (int i = 0; i < wave.get_ncen(); i++) elcount += wave.get_atom_charge(i);
+  for (int i = 0; i < wave.get_ncen(); i++) {
+    elcount += wave.get_atom_charge(i);
+  }
   int alpha = 0, beta = 0, temp = elcount;
   while (temp > 1) {
     alpha++;
@@ -706,6 +708,9 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
   while (alpha - beta != diff) {
     alpha++;
     beta--;
+  }
+  if (debug) {
+    file << "alpha, beta, elcount: " << setw(5) << alpha << setw(5) << beta << setw(5) << elcount << endl;
   }
   if (wave.get_nr_basis_set_loaded() == 0) {
     if (debug) file << "No basis set loaded, will load a complete basis set now!" << endl;
@@ -751,7 +756,6 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     return "WRONG";
   }
   //wave.set_modified();
-  if (debug) debug_fchk = true;
   vector < double > CMO;
   vector < double > CMO_beta;
   int nao = 0;
@@ -765,7 +769,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     wave.sort_wfn(wave.check_order(debug), debug);
     //---------------normalize basis set---------------------------------
     if (debug) file << "starting to normalize the basis set" << endl;
-    vector<double> norm_const;
+    vector<double> norm_const(wave.get_ncen());
     //-----------debug output---------------------------------------------------------
     if (debug) {
       file << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
@@ -780,10 +784,9 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     }
 
     //-------------------normalize the basis set shell wise into a copy vector---------
-    vector <vector <double> > basis_coefficients;
-    basis_coefficients.resize(wave.get_ncen());
-    vector <vector <double> > contraction_coefficients;
-    contraction_coefficients.resize(wave.get_ncen());
+    vector <vector <double> > basis_coefficients(wave.get_ncen());
+    vector <vector <double> > contraction_coefficients(wave.get_ncen());
+#pragma omp parallel for
     for (int a = 0; a < wave.get_ncen(); a++) {
       contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
       for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
@@ -842,7 +845,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = (PI / aiaj);
               term = pow(term, 1.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
@@ -865,7 +868,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 4 * pow(aiaj, 5);
               term = pow(PI, 3) / term;
               term = pow(term, 0.5);
@@ -889,7 +892,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 16 * pow(aiaj, 7);
               term = pow(PI, 3) / term;
               term = pow(term, 0.5);
@@ -914,7 +917,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 64 * pow((aiaj), 9);
               term = pow(PI, 3) / term;
               term = pow(term, 0.5);
@@ -956,25 +959,30 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     int run = 0;
     vector <vector <double> > changed_coefs;
     changed_coefs.resize(wave.get_nmo());
-    ofstream norm_cprim;
-    if (debug) norm_cprim.open("norm_prim.debug", ofstream::out);
-    for (int m = 0; m < wave.get_nmo(); m++) {
-      if (debug) norm_cprim << m << ". MO:" << endl;
-      for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
-        if (debug) file << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
-        changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
-        if (debug) {
+    if(debug){
+      ofstream norm_cprim("norm_prim.debug", ofstream::out);
+      for (int m = 0; m < wave.get_nmo(); m++) {
+        norm_cprim << m << ". MO:" << endl;
+        for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
+          file << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
+          changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
           file << " temp after normalization: " << changed_coefs[m][p] << endl;
           norm_cprim << " " << changed_coefs[m][p] << endl;
+          run++;
         }
-        run++;
       }
-    }
-    if (debug) {
       norm_cprim.flush();
       norm_cprim.close();
       file << "See norm_cprim.debug for the CPRIM vectors" << endl;
       file << "Total count in CPRIM: " << run << endl;
+    }
+    else {
+#pragma omp parallel for
+      for (int m = 0; m < wave.get_nmo(); m++) {
+        for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
+          changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
+        }
+      }
     }
     //--------------Build CMO of alessandro from the first elements of each shell-------------
     for (int m = 0; m < alpha; m++) {
@@ -1093,8 +1101,10 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     wave.resize_DM(naotr, 0.0);
     if (alpha != beta)
       wave.resize_SDM(naotr,0.0);
-    if (debug) file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
-    if (debug) cout << "Making DM now!" << endl;
+    if (debug) {
+      file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
+      cout << "Making DM now!" << endl;
+    }
     for (int iu = 0; iu < nao; iu++) {
       for (int iv = 0; iv <= iu; iv++) {
         int iuv = (iu * (iu + 1) / 2) + iv;
@@ -1161,11 +1171,12 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
         sdm.flush();
         sdm.close();
       }
+      file << "Starting to write fchk now!" << endl;
     }
-    if (debug) file << "Starting to write fchk now!" << endl;
     // open fchk for writing
     string temp_fchk = fchk_name;
     temp_fchk.append(".fchk");
+    file << "Writing " << temp_fchk << " ..." << flush;
     if (exists(temp_fchk) && !force_overwrite) {
       file << "The fchk already exists!" << endl;
       return false;
@@ -1548,6 +1559,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     fchk << s;
     fchk.flush();
     fchk.close();
+    file << " ...done!" << endl;
   }
   if (debug) file << "Finished writing fchk!" << endl;
   return true;
