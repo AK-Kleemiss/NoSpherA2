@@ -424,7 +424,7 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
               cout << "ERROR while pushing back atoms basis set" << endl;
             }
             if (debug_dens) cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
-              << " and exp: " << temp_vals[0] << " and type F" << endl;
+              << " and exp: " << temp_vals[0] << " and type " << type << endl;
           } // end if(find atom_label + : 
         }//end for h = ncen
         nr_exp++;
