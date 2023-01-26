@@ -4782,7 +4782,7 @@ double WFN::computeESP(double* PosGrid, vector<vector<double> >& d2)
     iex = 0, 
     jex = 0;
 
-  const int MO = get_nmo();
+  const int MO = get_nmo(true);
   const int nprim = get_nex();
 
   double temp;

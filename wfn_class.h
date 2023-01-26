@@ -104,6 +104,7 @@ public:
   void assign_multi(const int& i_multi) { multi = i_multi; };
   int get_charge() const { return charge; };
   int get_multi() const { return multi; };
+  void set_multi(unsigned int& in) { multi = in; };
   int get_nex() const { return nex; };
   int get_ncen() const { return ncen; };
   int get_nmo() const { return nmo; };

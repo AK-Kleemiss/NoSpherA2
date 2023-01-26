@@ -638,7 +638,7 @@ struct options {
   std::vector<std::string> Anions;
   int ncpus = 0;
   double mem = 0.0;
-  int mult = 0;
+  unsigned int mult = 0;
   bool debug = false;
   hkl_list m_hkl_list;
 };
