@@ -414,7 +414,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     if (debug) {
       cout << "exemplary output of the first atom with all it's properties: " << endl;
       wave.print_atom_long(0);
-      cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+      cout << "ended normalizing the basis setnow for norm_cprim" << endl;
       cout << "Status report:" << endl;
       cout << "size of norm_const: " << norm_const.size() << endl;
       cout << "WFN MO counter: " << wave.get_nmo() << endl;
@@ -785,10 +785,10 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
 
     //-------------------normalize the basis set shell wise into a copy vector---------
     vector <vector <double> > basis_coefficients(wave.get_ncen());
-    vector <vector <double> > contraction_coefficients(wave.get_ncen());
+    //vector <vector <double> > contraction_coefficients(wave.get_ncen());
 #pragma omp parallel for
     for (int a = 0; a < wave.get_ncen(); a++) {
-      contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
+      //contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
       for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
         double temp = wave.get_atom_basis_set_exponent(a, p);
         switch (wave.get_atom_primitive_type(a, p)) {
@@ -859,7 +859,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
               file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
-            contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
+            //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
             norm_const.push_back(basis_coefficients[a][i]);
           }
@@ -883,7 +883,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
               file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
-            contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
+            //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
             for (int k = 0; k < 3; k++) norm_const.push_back(basis_coefficients[a][i]);
           }
@@ -907,7 +907,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
               file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
-            contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
+            //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
             for (int k = 0; k < 3; k++) norm_const.push_back(basis_coefficients[a][i]);
             for (int k = 0; k < 3; k++) norm_const.push_back(sqrt(3) * basis_coefficients[a][i]);
@@ -932,7 +932,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
               file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
-            contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
+            //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
             for (int l = 0; l < 3; l++) 	norm_const.push_back(basis_coefficients[a][i]);
             for (int l = 0; l < 6; l++) 	norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
@@ -960,6 +960,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     vector <vector <double> > changed_coefs;
     changed_coefs.resize(wave.get_nmo());
     if(debug){
+      file << "Opening nurm_cprim!" << endl;
       ofstream norm_cprim("norm_prim.debug", ofstream::out);
       for (int m = 0; m < wave.get_nmo(); m++) {
         norm_cprim << m << ". MO:" << endl;
@@ -979,8 +980,9 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     else {
 #pragma omp parallel for
       for (int m = 0; m < wave.get_nmo(); m++) {
+        changed_coefs[m].resize(wave.get_MO_primitive_count(m));
         for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
-          changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
+          changed_coefs[m][p] = wave.get_MO_coef(m, p) / norm_const[p];
         }
       }
     }
@@ -1011,12 +1013,12 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
             break;
           case 4:
             //this hardcoded piece is due to the order of f-type functions in the fchk
-            for (int i = 0; i < 3; i++) 	CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
-            for (int i = 0; i < 2; i++) 	CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
-            for (int i = 0; i < 2; i++) 	CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
-            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
-            CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
+            for (int i = 0; i < 3; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
+                                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 6]);
+            for (int i = 0; i < 2; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 3]);
+            for (int i = 0; i < 2; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
+                                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
+                                        CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 10;
@@ -1100,7 +1102,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     vector<double> kp;
     wave.resize_DM(naotr, 0.0);
     if (alpha != beta)
-      wave.resize_SDM(naotr,0.0);
+      wave.resize_SDM(naotr, 0.0);
     if (debug) {
       file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
       cout << "Making DM now!" << endl;
@@ -1409,7 +1411,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       int p_run = 0;
       for (int sh = 0; sh < wave.get_atom_shell_count(a); sh++)
         for (int p = 0; p < wave.get_atom_shell_primitives(a, sh); p++) {
-          st_s << uppercase << scientific << setw(16) << setprecision(8) << contraction_coefficients[a][p_run];
+          st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_atom_basis_set_coefficient(a,p_run);
           runs++;
           p_run++;
           if ((runs % 5 == 0 && runs != 0) || (a == wave.get_ncen() - 1 && sh == wave.get_atom_shell_count(a) - 1 && p == wave.get_atom_shell_primitives(a, sh) - 1)) st_s << endl;
