@@ -466,7 +466,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     if (debug) file << i << ".run, line:" << line << endl;
     length = line.copy(tempchar, 4, 0);
     tempchar[length] = '\0';
-    if (debug) file << "First line-copy succesfull" << endl;
     string temp;
     temp = tempchar;
     length = line.copy(tempchar, 4, 5);
@@ -718,7 +717,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
         }
       }
       else if (exnum < e_nex) {
-        if (debug_wfn) file << "This should be the last line! e_nex: " << e_nex << " exnum: " << exnum << endl;
         for (int i = 0; i < (e_nex % 5); i++) {
           if (!three_exponents) {
             line.replace(12 + i * 16, 1, replace);
