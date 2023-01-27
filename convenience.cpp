@@ -42,6 +42,8 @@ string help_message()
   t.append("   -xyz            <FILENAME>.xyz         Read atom positions from this xyz file for IAM\n");
   t.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
   t.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
+  t.append("   -acc            0,1,2,3,4...           Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
+  t.append("                                          anything above will most likely introduce numberical error and is just implemented for testing purposes.");
   t.append("   -gbw2wfn                               Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
   t.append("   -tscb           <FILENAME>.tsb         Convert binary tsc file to bigger, less accurate human-readable form.\n");
   t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
