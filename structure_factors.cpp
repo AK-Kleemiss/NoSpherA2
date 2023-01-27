@@ -634,6 +634,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
     int lebedev_high, lebedev_low;
     double radial_acc;
+    err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
     if (accuracy == 0) {
       if (atom_type_list[i] != 1) {
         lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
@@ -682,7 +683,7 @@ int make_hirshfeld_grids(const int& pbc,
         radial_acc = 1e-11;
       }
     }
-    else if (accuracy > 3) {
+    else if (accuracy == 4) {
       if (atom_type_list[i] != 1) {
         lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
         lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
@@ -691,6 +692,18 @@ int make_hirshfeld_grids(const int& pbc,
       else {
         lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
         lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+        radial_acc = 1e-15;
+      }
+    }
+    else {
+      if (atom_type_list[i] != 1) {
+        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[33];
+        lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
+        radial_acc = 1e-20;
+      }
+      else {
+        lebedev_high = (max_l_temp < 3) ? lebedev_table[30] : lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? lebedev_table[28] : lebedev_table[30];
         radial_acc = 1e-15;
       }
     }
