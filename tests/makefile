@@ -2,7 +2,7 @@ RM := rm
 
 DIFF := diff -q -i
 
-all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP
+all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP fchk_conversion
 
 sucrose_SF:
 	@echo 'Running test: $@'
@@ -129,6 +129,14 @@ wfn_reading:
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
+fchk_conversion:
+	@echo 'Running test: $@'
+	cd NiP3_fchk && ../../NoSpherA2 \
+	    -b def2-TZVP .d ./ \
+		-wfn in.ffn -no-date \
+		&& ${DIFF} in.fchk good.fchk
 	@echo 'Finished running: $@'
 
 .PHONY: all clean dependents

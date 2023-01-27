@@ -221,7 +221,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   }
   return temp;
 };
-*/
+
 bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, const bool& read) {
   wave.set_modified();
   if (debug) debug_fchk = true;
@@ -305,18 +305,17 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           cout << "ERROR in type assignement!!" << endl;
         }
         if (debug) {
-          cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl;
-          int testcount = 0;
-          cout << "start: " << wave.get_shell_start(a, s, false) << flush;
-          cout << " stop: " << wave.get_shell_end(a, s, false) << flush << endl;
-          cout << "factor: ";
+          cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+          << "start: " << wave.get_shell_start(a, s, false) << flush
+          << " stop: " << wave.get_shell_end(a, s, false) << flush << endl
+          << "factor: ";
         }
         switch (type_temp) {
         case 1:
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = (pi / aiaj);
               term = pow(term, 1.5);
               factor += wave.get_atom_basis_set_coefficient(a, i) * wave.get_atom_basis_set_coefficient(a, j) * term;
@@ -327,8 +326,8 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           if (debug) cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              cout << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
             norm_const.push_back(wave.get_atom_basis_set_coefficient(a, i));
@@ -338,7 +337,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 4 * pow(aiaj, 5);
               term = pow(pi, 3) / term;
               term = pow(term, 0.5);
@@ -350,8 +349,8 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           if (debug) cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              cout << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
             for (int k = 0; k < 3; k++) norm_const.push_back(wave.get_atom_basis_set_coefficient(a, i));
@@ -361,7 +360,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 16 * pow(aiaj, 7);
               term = pow(pi, 3) / term;
               term = pow(term, 0.5);
@@ -373,8 +372,8 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           if (debug) cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              cout << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
             for (int k = 0; k < 3; k++) norm_const.push_back(wave.get_atom_basis_set_coefficient(a, i));
@@ -385,7 +384,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           factor = 0;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
-              double aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
+              aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 64 * pow((aiaj), 9);
               term = pow(pi, 3) / term;
               term = pow(term, 0.5);
@@ -397,8 +396,8 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           if (debug) cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              cout << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
             for (int l = 0; l < 3; l++) norm_const.push_back(wave.get_atom_basis_set_coefficient(a, i));
@@ -690,7 +689,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   cls();
   return true;
 };
-
+*/
 bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, bool force_overwrite) {
   int elcount = 0;
   elcount -= wave.get_charge();
@@ -769,7 +768,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     wave.sort_wfn(wave.check_order(debug), debug);
     //---------------normalize basis set---------------------------------
     if (debug) file << "starting to normalize the basis set" << endl;
-    vector<double> norm_const(wave.get_ncen());
+    vector<double> norm_const;
     //-----------debug output---------------------------------------------------------
     if (debug) {
       file << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
@@ -834,11 +833,10 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           file << "ERROR in type assignement!!" << endl;
         }
         if (debug) {
-          file << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl;
-          int testcount = 0;
-          file << "start: " << wave.get_shell_start(a, s, false) << flush;
-          file << " stop: " << wave.get_shell_end(a, s, false) << flush << endl;
-          file << "factor: ";
+          file << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+            << "start: " << wave.get_shell_start(a, s, false)
+            << " stop: " << wave.get_shell_end(a, s, false) << endl
+            << "factor: ";
         }
         switch (type_temp) {
         case 1:
@@ -856,8 +854,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (debug) file << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) 
+                << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
@@ -880,8 +878,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (debug) file << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) 
+                << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
@@ -904,8 +902,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (debug) file << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
@@ -929,14 +927,14 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (debug) file << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) << endl;
-              file << "Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
+              file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+                << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             //contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
             basis_coefficients[a][i] *= factor;
             for (int l = 0; l < 3; l++) 	norm_const.push_back(basis_coefficients[a][i]);
             for (int l = 0; l < 6; l++) 	norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
-            norm_const.push_back(sqrt(15) * basis_coefficients[a][i]);
+                                          norm_const.push_back(sqrt(15) * basis_coefficients[a][i]);
           }
           break;
         }
@@ -947,7 +945,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     if (debug) {
       file << "exemplary output of the first atom with all it's properties: " << endl;
       wave.print_atom_long(0);
-      file << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+      file << "ended normalizing the basis set, now for the norm_cprims" << endl;
       file << "Status report:" << endl;
       file << "size of norm_const: " << norm_const.size() << endl;
       file << "WFN MO counter: " << wave.get_nmo() << endl;
@@ -1192,7 +1190,6 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     string s;
     st_s.str("");
     fchk << "TITLE\n";
-    fchk.flush();
 
     if (wave.get_method() == "rhf" && wave.get_multi() == 1)
       fchk << "SP        RHF                                                         Gen\n";
@@ -1204,7 +1201,6 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       fchk << "SP        UB3LYP                                                      Gen\n";
     else
       fchk << "SP        B3LYP                                                       Gen\n";
-    fchk.flush();
     s = "Number of atoms                            I";
     st_s << setw(17) << wave.get_ncen();
     s += st_s.str();
@@ -1212,7 +1208,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += "\nInfo1-9                                    I   N=           9\n";
     s += "          53          51           0           0           0         111\n           1           1           2\n";  //I have NO CLUE what the fuck this means...
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
     s = "Charge                                     I";
     st_s << setw(17) << wave.get_charge();
     s += st_s.str();
@@ -1244,7 +1240,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += "Number of point charges in /Mol/           I                0\nNumber of translation vectors              I                0\n";
 
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
 
     s = "Atomic numbers                             I   N=";
     st_s << setw(12) << wave.get_ncen() << endl;
@@ -1298,7 +1294,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
 
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
 
     unsigned int n_contracted_shells = 0;
     for (int a = 0; a < wave.get_ncen(); a++)
@@ -1383,7 +1379,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
 
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
 
     s = "Primitive exponents                        R   N=";
     st_s << setw(12) << n_prim_shells << endl;
@@ -1466,7 +1462,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
 
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
 
     s = "Alpha Orbital Energies                     R   N=";
     st_s << setw(12) << nao << endl;
@@ -1482,7 +1478,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += st_s.str();
     st_s.str("");
     fchk << s;
-    fchk.flush();
+    //fchk.flush();
 
     if (alpha != beta) {
       s = "Beta Orbital Energies                      R   N=";
@@ -1499,7 +1495,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       s += st_s.str();
       st_s.str("");
       fchk << s;
-      fchk.flush();
+      //fchk.flush();
     }
 
     s = "Alpha MO coefficients                      R   N=";

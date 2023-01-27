@@ -694,7 +694,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       else if (temp_orca % 10 == 1)
         length = line.copy(tempchar, 12, 62);
       else
-        length = line.copy(tempchar, 12, 62);
+        length = line.copy(tempchar, 12, 61);
       tempchar[length] = '\0';
       temp_ener = stod(tempchar);
     }

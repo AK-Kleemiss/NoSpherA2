@@ -157,13 +157,14 @@ int main(int argc, char** argv)
         outputname = wavy[0].get_path();
         if (opt.debug) log_file << "Loaded path..." << endl;
         size_t where;
-        if (wavy[0].get_origin() == 2) where = outputname.find("wfn");
-        else if (wavy[0].get_origin() == 4) where = outputname.find("ffn");
+        int len = 4;
+        if (wavy[0].get_origin() == 2) where = outputname.find(".wfn");
+        else if (wavy[0].get_origin() == 4) where = outputname.find(".ffn");
         else if (wavy[0].get_origin() == 6) where = outputname.find(".wfx");
-        else if (wavy[0].get_origin() == 8) where = outputname.find(".molden");
+        else if (wavy[0].get_origin() == 8) where = outputname.find(".molden"), len = 7;
         else if (wavy[0].get_origin() == 9) where = outputname.find(".gbw");
         if (where >= outputname.length() && where != string::npos) err_checkf(false, "Cannot make output file name!", log_file);
-        else outputname.erase(where, 3);
+        else outputname.erase(where, len);
       }
       wavy[0].assign_charge(wavy[0].calculate_charge());
       if (opt.mult == 0) err_checkf(wavy[0].guess_multiplicity(log_file), "Error guessing multiplicity", log_file);
