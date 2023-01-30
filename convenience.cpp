@@ -485,7 +485,7 @@ bool check_bohr(WFN& wave, bool debug)
     else
       cout << "Decided it's written in Bohr" << endl;
   }
-  else return (!(min_length < 2));
+  return (!(min_length < 2));
 };
 
 int filetype_identifier(string& file, bool debug)

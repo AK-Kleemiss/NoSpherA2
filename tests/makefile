@@ -134,7 +134,7 @@ wfn_reading:
 fchk_conversion:
 	@echo 'Running test: $@'
 	cd NiP3_fchk && ../../NoSpherA2 \
-	    -b def2-TZVP .d ./ \
+	    -b def2-TZVP -d ./ \
 		-wfn in.ffn -no-date \
 		&& ${DIFF} in.fchk good.fchk
 	@echo 'Finished running: $@'
