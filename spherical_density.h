@@ -4005,6 +4005,24 @@ protected:
 	const int *nex, *ns, *np, *nd, *nf, *occ, *n;
 	const double *z, *c;
 	int charge;
+	void calc_orbs(int& nr_ex, 
+		             int& nr_coef, 
+		             const double& dist, 
+		             const int& offset,
+								 const int* n_vector,
+		             const int lower_m,
+		             const int upper_m,
+		             double* Orb);
+	double calc_type(
+		int& nr_ex,
+		int& nr_coef,
+		const double& k_vector,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		const int& max,
+		const int& min);
 public:
 	Thakkar(const int g_atom_number) { 
 		atomic_number = g_atom_number; 
@@ -4032,21 +4050,21 @@ public:
 		c = &(Thakkar_c[0]);
 		charge = 0;
 	}
-	const double get_radial_density(double dist);
-	const double get_form_factor(const double k_vector, std::ostream &file, bool debug = false);
-	const double get_core_form_factor(const double& k_vector, const int& core_els, std::ostream& file, bool debug);
+	const double get_radial_density(double& dist);
+	const double get_form_factor(const double& k_vector, std::ostream &file, const bool& debug = false);
+	const double get_core_form_factor(const double& k_vector, const int& core_els, std::ostream& file, const bool& debug);
 	const double get_custom_form_factor(
 		const double& k_vector,
 		std::ostream& file,
-		int max_s,
-		int max_p,
-		int max_d,
-		int max_f,
-		int min_s,
-		int min_p,
-		int min_d,
-		int min_f,
-		bool debug);
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f,
+		const bool& debug);
 	const int get_atomic_number() { return atomic_number; };
 	const int get_charge() { return charge; };
 };
