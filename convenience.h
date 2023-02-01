@@ -14,6 +14,7 @@
 #include <set>
 #include <numeric>
 #include <complex>
+#include <functional>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
@@ -56,7 +57,7 @@ inline const int lebedev_table[33] = { 6,    14,   26,   38,   50,   74,   86,  
              146,  170,  194,  230,  266,  302,  350,  434,
              590,  770,  974,  1202, 1454, 1730, 2030, 2354,
              2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
-inline const int ft[11] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800 };
+inline const int ft[13] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600 };
 inline const double alpha = 0.1616204596739954813316614;
 inline const double c_43 = 4.0 / 3.0;
 inline const double c_38 = 3.0 / 8.0;
