@@ -30,10 +30,36 @@ const int Thakkar::previous_element_coef() {
 	return counter;
 };
 
-const double Thakkar::get_radial_density(double dist){
+void Thakkar::calc_orbs(
+	                int& nr_ex,
+	                int& nr_coef,
+	                const double& dist,
+	                const int& offset,
+									const int* n_vector,
+	                const int lower_m, 
+	                const int upper_m,
+	                double* Orb) {
+	double exponent;
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+		for (int m = lower_m; m < upper_m; m++) {
+			if (occ[offset + m] == 0) continue;
+			exponent = -z[nr_ex] * dist;
+			if (exponent > -46.5) { // Corresponds to at least 1E-20
+				if (n[nr_ex] == 1)
+					Orb[m] += c[nr_coef] * exp(exponent);
+				else
+					Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+			}
+			nr_coef++;
+		}
+		nr_ex++;
+	}
+}
+
+const double Thakkar::get_radial_density(double& dist){
 	//Speedup things for H
 	if (atomic_number == 1)
-		return exp(-2*dist) / PI;
+		return 6.0835 * exp(-2.3*dist) / FOUR_PI;
 
 	double Rho = 0.0;
 	int nr_ex = first_ex();
@@ -44,75 +70,22 @@ const double Thakkar::get_radial_density(double dist){
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	const int offset = (atomic_number - 1) * 19;
 
-	double exponent;
-	for (int ex = 0; ex < ns[atomic_number - 1]; ex++) {
-		for (int m = 0; m < 7; m++) {
-			if (occ[offset + m] == 0) continue;
-			exponent = -z[nr_ex] * dist;
-			if(exponent > -46.5) { // Corresponds to at least 1E-20
-				if (n[nr_ex] == 1)
-					Orb[m] += c[nr_coef] * exp(exponent);
-				else
-					Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
-			}
-			nr_coef++;
-		}
-		nr_ex++;
-	}
-	for (int ex = 0; ex < np[atomic_number - 1]; ex++) {
-		for (int m = 0; m < 6; m++) {
-			if (occ[offset + m + 7] == 0) continue;
-			exponent = -z[nr_ex] * dist;
-			if (exponent > -46.5) {
-				if (n[nr_ex] == 1)
-					Orb[m + 7] += c[nr_coef] * exp(exponent);
-				else
-					Orb[m + 7] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
-			}
-			nr_coef++;
-		}
-		nr_ex++;
-	}
-	for (int ex = 0; ex < nd[atomic_number - 1]; ex++) {
-		for (int m = 0; m < 4; m++) {
-			if (occ[offset + m + 13] == 0) continue;
-			exponent = -z[nr_ex] * dist;
-			if (exponent > -46.5) {
-				if (n[nr_ex] == 1)
-					Orb[m + 13] += c[nr_coef] * exp(exponent);
-				else
-					Orb[m + 13] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
-			}
-			nr_coef++;
-		}
-		nr_ex++;
-	}
-	for (int ex = 0; ex < nf[atomic_number - 1]; ex++) {
-		for (int m = 0; m < 2; m++) {
-			if (occ[offset + m + 17] == 0) continue;
-			exponent = -z[nr_ex] * dist;
-			if (ex > -46.5) {
-				if (n[nr_ex] == 1)
-					Orb[m + 17] += c[nr_coef] * exp(exponent);
-				else
-					Orb[m + 17] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
-			}
-			nr_coef++;
-		}
-		nr_ex++;
-	}
+	calc_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, Orb);
 
 	for (int m = 0; m < 19; m++) {
 		if (Orb[m] == 0 || occ[offset + m] == 0)
 			continue;
 		Rho += occ[offset + m] * pow(Orb[m], 2);
 	}
-	return Rho / (4 * PI);
+	return Rho / (FOUR_PI);
 };
 
-double cosinus_integral(const int N, const double z, const double k);
+constexpr double cosinus_integral(const int N, const double z, const double k);
 
-double sinus_integral(const int N, const double z, const double k) {
+constexpr double sinus_integral(const int N, const double z, const double k) {
 	//Calculates the integral 0 - inf r ^ N e ^ -zr sin(kr) dr through recursion using the general integral int e^ax sin(bx) dx = -e^-ax/(a^2+b^2) * (a sin(bx) + b cos(bx)) and partial integration
 	if (N == 0)
 		return k / (z * z + k * k);
@@ -120,7 +93,7 @@ double sinus_integral(const int N, const double z, const double k) {
 		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
 };
 
-double cosinus_integral(const int N, const double z, const double k) {
+constexpr double cosinus_integral(const int N, const double z, const double k) {
 	//Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
 	if (N == 0)
 		return z / (z * z + k * k);
@@ -128,11 +101,11 @@ double cosinus_integral(const int N, const double z, const double k) {
 		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
-const double Thakkar::get_form_factor(const double k_vector, std::ostream& file, bool debug) {
+const double Thakkar::get_form_factor(const double &k_vector, std::ostream& file, const bool &debug) {
 	return get_custom_form_factor(k_vector, file, 7, 6, 4, 2, 0,0,0,0, debug);
 };
 
-const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els, std::ostream& file, bool debug) {
+const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els, std::ostream& file, const bool& debug) {
 	int max_s=0, max_p=0, max_d=0, max_f=0;
 	if (core_els == 2) {
 		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
@@ -156,25 +129,72 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 	return get_custom_form_factor(k_vector, file, max_s,max_p,max_d,max_f,0,0,0,0,debug);
 };
 
+double calc_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
+	return occ * coef * sinus_integral(radial_exp, exp, k_vector);
+}
+
+double calc_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
+	return occ * coef * ft[radial_exp] / pow(exp, radial_exp + 1);
+}
+
+double Thakkar::calc_type(
+	int& nr_ex,
+	int& nr_coef,
+	const double& k_vector,
+	const int& offset,
+	const int* n_vector,
+	const int lower_m,
+	const int upper_m,
+	const int& max,
+	const int& min) {
+
+	std::function<double(const int&, const double&, const double&, const int&, const double&)> func;
+	if (k_vector == 0)
+		func = calc_int_at_k0;
+	else
+		func = calc_int;
+	const int l_n = n_vector[atomic_number - 1];
+	double temp, result = 0;
+	int i_j_distance = 0;
+	for (int m = lower_m; m < upper_m; m++)
+		if (occ[offset + m] != 0)
+			i_j_distance++;
+	for (int m = lower_m + min; m < lower_m + max; m++) {
+		if (occ[offset + m] == 0) continue;
+		for (int i = 0; i < l_n; i++) {
+			for (int j = 0; j < l_n - i; j++) {
+				temp = func(occ[offset + m],
+					c[nr_coef + m - lower_m + i * i_j_distance] * c[nr_coef + m - lower_m + (i + j) * i_j_distance],
+					z[nr_ex + i] + z[nr_ex + i + j],
+					n[nr_ex + i] + n[nr_ex + i + j] - 1,
+					k_vector);
+				if (j != 0)
+					result += 2 * temp;
+				else
+					result += temp;
+			}
+		}
+	}
+	nr_coef += i_j_distance * l_n;
+	nr_ex += l_n;
+	return result;
+}
+
 const double Thakkar::get_custom_form_factor(
 	const double& k_vector, 
 	std::ostream& file,
-	int max_s,
-	int max_p,
-	int max_d,
-	int max_f,
-	int min_s,
-	int min_p,
-	int min_d,
-	int min_f,
-	bool debug) {
+	const int& max_s,
+	const int& max_p,
+	const int& max_d,
+	const int& max_f,
+	const int& min_s,
+	const int& min_p,
+	const int& min_d,
+	const int& min_f,
+	const bool& debug) {
+
 	double result(0.0);
 	using namespace std;
-
-	const int l_ns = ns[atomic_number - 1];
-	const int l_np = np[atomic_number - 1];
-	const int l_nd = nd[atomic_number - 1];
-	const int l_nf = nf[atomic_number - 1];
 
 	int nr_ex = first_ex();
 	if (nr_ex == 200000000)
@@ -182,88 +202,15 @@ const double Thakkar::get_custom_form_factor(
 	int nr_coef = previous_element_coef();
 	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
 	const int offset = (atomic_number - 1) * 19;
-	double temp;
-	int i_j_distance = 0;
-	for (int m = 0; m < 7; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
 
-	for (int m = min_s; m < max_s; m++) {
-		if (occ[offset + m] == 0) continue;
-		for (int i = 0; i < l_ns; i++) {
-			for (int j = 0; j < l_ns - i; j++) {
-				temp = occ[offset + m]
-					* c[nr_coef + m + i * i_j_distance] * c[nr_coef + m + (i + j) * i_j_distance]
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, (z[nr_ex + i] + z[nr_ex + i + j]), k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-	nr_coef += i_j_distance * l_ns;
-	nr_ex += l_ns;
-	i_j_distance = 0;
-	for (int m = 7; m < 13; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	for (int m = 7+min_p; m < 7 + max_p; m++) {
-		if (occ[offset + m] == 0) continue;
-		for (int i = 0; i < l_np; i++) {
-			for (int j = 0; j < l_np - i; j++) {
-				temp = occ[offset + m]
-					* c[nr_coef + m - 7 + i * i_j_distance] * c[nr_coef + m - 7 + (i + j) * i_j_distance]
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-	nr_coef += i_j_distance * l_np;
-	nr_ex += l_np;
-	i_j_distance = 0;
-	for (int m = 13; m < 17; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	for (int m = 13+min_d; m < 13 + max_d; m++) {
-		if (occ[offset + m] == 0) continue;
-		for (int i = 0; i < l_nd; i++) {
-			for (int j = 0; j < l_nd - i; j++) {
-				temp = occ[offset + m]
-					* c[nr_coef + m - 13 + i * i_j_distance] * c[nr_coef + m - 13 + (i + j) * i_j_distance]
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
-	nr_coef += i_j_distance * l_nd;
-	nr_ex += l_nd;
-	i_j_distance = 0;
-	for (int m = 17; m < 19; m++)
-		if (occ[offset + m] != 0)
-			i_j_distance++;
-	for (int m = 17+min_f; m < 17 + max_f; m++) {
-		if (occ[offset + m] == 0) continue;
-		for (int i = 0; i < l_nf; i++) {
-			for (int j = 0; j < l_nf - i; j++) {
-				temp = occ[offset + m]
-					* c[nr_coef + m - 17 + i * i_j_distance] * c[nr_coef + m - 17 + (i + j) * i_j_distance]
-					* sinus_integral(n[nr_ex + i] + n[nr_ex + i + j] - 1, z[nr_ex + i] + z[nr_ex + i + j], k_vector);
-				if (j != 0)
-					result += 2 * temp;
-				else
-					result += temp;
-			}
-		}
-	}
+	result += calc_type(nr_ex, nr_coef, k_vector, offset, ns, 0, 7, max_s, min_s);
+	result += calc_type(nr_ex, nr_coef, k_vector, offset, np, 7, 13, max_p, min_p);
+	result += calc_type(nr_ex, nr_coef, k_vector, offset, nd, 13, 17, max_d, min_d);
+	result += calc_type(nr_ex, nr_coef, k_vector, offset, nf, 17, 19, max_f, min_f);
 
-	return result / k_vector;
+	if (k_vector != 0)
+		return result / k_vector;
+	else return result;
 };
 
 Thakkar_Anion::Thakkar_Anion(int g_atom_number) {

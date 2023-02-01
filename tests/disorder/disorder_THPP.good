@@ -30,32 +30,32 @@ Table of Charges in electrons
     Atom       Becke   Spherical Hirshfeld
         F1     0.318     0.514    -0.054
         F2     0.283     0.489    -0.083
-        N8     0.002     0.141    -0.089
-        N3     0.077     0.292    -0.192
-        C9     0.040     0.075     0.028
-        C4     0.110     0.059     0.135
-        N5    -0.001     0.122    -0.104
-        C2    -0.359    -0.371     0.047
-       C10     0.076     0.163    -0.060
+        N8     0.002     0.180    -0.116
+        N3     0.077     0.300    -0.197
+        C9     0.040     0.078     0.026
+        C4     0.110     0.063     0.132
+        N5    -0.001     0.173    -0.130
+        C2    -0.359    -0.371     0.046
+       C10     0.076     0.168    -0.062
         C1    -0.336    -0.236    -0.013
-       C11    -0.029    -0.020     0.063
-       C13     0.061     0.180    -0.011
-      H13A     0.088     0.070     0.045
-      H13B     0.053     0.039     0.046
-      H13C     0.102     0.094     0.031
-        C6     0.154     0.242    -0.131
-       H6A     0.075     0.069     0.058
-       H6B     0.100     0.081     0.038
-       N12     0.009     0.223    -0.162
-       C7A     0.139     0.215    -0.129
-      H7AA     0.084     0.080     0.058
-      H7AB     0.105     0.084     0.044
-       C14    -0.221    -0.155     0.099
-      H14A     0.129     0.136     0.050
-      H14B     0.098     0.094     0.039
-      H14C     0.111     0.112     0.058
+       C11    -0.029    -0.001     0.055
+       C13     0.061     0.220    -0.001
+      H13A     0.088     0.034     0.059
+      H13B     0.053     0.005     0.054
+      H13C     0.102     0.057     0.046
+        C6     0.154     0.274    -0.047
+       H6A     0.075     0.025     0.067
+       H6B     0.100     0.046     0.053
+       N12     0.009     0.228    -0.163
+       C7A     0.139     0.247    -0.045
+      H7AA     0.084     0.036     0.067
+      H7AB     0.105     0.049     0.058
+       C14    -0.221    -0.073     0.036
+      H14A     0.129     0.086     0.061
+      H14B     0.098     0.059     0.046
+      H14C     0.111     0.074     0.065
 Total number of electrons in the wavefunction: 114.734
- and Hirshfeld electrons (asym unit): 116.189
+ and Hirshfeld electrons (asym unit): 116.040
 Reading:                                     thpp.hkl done!
 Nr of reflections read from file: 2975
 Number of symmetry operations: 2
@@ -80,14 +80,14 @@ Number of points evaluated: 408 with  15.378523 electrons in Becke Grid in total
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-       C6A     0.075     0.136    -0.008
-      H6AA     0.102     0.083     0.041
-      H6AB     0.082     0.080     0.045
-       C7B     0.206     0.253    -0.105
-      H7BA     0.087     0.066     0.048
-      H7BB     0.070     0.066     0.056
+       C6A     0.075     0.172     0.019
+      H6AA     0.102     0.048     0.055
+      H6AB     0.082     0.043     0.055
+       C7B     0.206     0.279    -0.006
+      H7BA     0.087     0.029     0.060
+      H7BB     0.070     0.023     0.064
 Total number of electrons in the wavefunction: 15.379
- and Hirshfeld electrons (asym unit): 15.922
+ and Hirshfeld electrons (asym unit): 15.753
 Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors =============         [ 65%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
 Final number of atoms in .tsc file: 32
 Writing tsc file...  ... done!
