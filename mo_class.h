@@ -24,11 +24,11 @@ public:
   void push_back_coef(const double &val){
     coefficients.push_back(val);
   };
-  const bool erase_coef(const int &nr, const int &nex) {
+  const bool erase_coef(const int &_nr, const int &nex) {
     // Check, if Element (nr) is a valid Vector-Entry
-    if (nr - 1 < 0)
+    if (_nr - 1 < 0)
       return false;
-    if (size_t(nr) - 1 >= coefficients.size())
+    if (size_t(_nr) - 1 >= coefficients.size())
       return false;
 
     // consistencycheck with WFN
@@ -36,30 +36,30 @@ public:
       return false;
 
     // delete Vector-Entry and rearrange
-    coefficients.erase(coefficients.begin() + (size_t(nr) - 1));
+    coefficients.erase(coefficients.begin() + (size_t(_nr) - 1));
 
     return true;
   };
-  const double get_coefficient(const int& nr) const {
-    if (nr >= coefficients.size()) {
+  const double get_coefficient(const int& _nr) const {
+    if (_nr >= coefficients.size()) {
       err_checkf(false, "Requested element outside of range!", std::cout);
     }
-    if (nr < 0) {
+    if (_nr < 0) {
       err_checkf(false, "Number below zero!", std::cout);
     }
-    return coefficients[nr];
+    return coefficients[_nr];
   }; 
-  const double get_coefficient_f(const int& nr) const {
-    return coefficients[nr];
+  const double get_coefficient_f(const int& _nr) const {
+    return coefficients[_nr];
   };
   double* get_coefficient_ptr() {
     return coefficients.data();
   };
-  void change_coefficient(int nr) {
+  void change_coefficient(int _nr) {
     // Check, if Element (nr) is a valid Vector-Entry
-    if (nr - 1 < 0)
+    if (_nr - 1 < 0)
       return;
-    if (size_t(nr) - 1 >= coefficients.size())
+    if (size_t(_nr) - 1 >= coefficients.size())
       return;
 
     bool end = false;
@@ -71,29 +71,29 @@ public:
         std::cout << "That's suspiciusly big for a MO-coefficient, please select something smaler...\n";
         continue;
       }
-      coefficients[size_t(nr) - 1] = temp_coef;
+      coefficients[size_t(_nr) - 1] = temp_coef;
       end = true;
     }
     cls();
   };
-  const bool change_coefficient(int nr, double value) {
+  const bool change_coefficient(const int& _nr, const double& value) {
     // Check, if Element (nr) is a valid Vector-Entry
-    if (nr < 0) {
+    if (_nr < 0) {
       err_checkf(false,"nr below 0!", std::cout);
       return false;
     }
-    if (nr >= (int) coefficients.size()) {
+    if (_nr >= (int) coefficients.size()) {
       err_checkf(false, "nr above size of MO!", std::cout);
       return false;
     }
-    coefficients[nr] = value;
+    coefficients[_nr] = value;
     return true;
   };
-  void set_nr(const int inr) { nr = inr; };
-  void set_occ(const int iocc) { occ = iocc; };
-  void set_occ(const double iocc) { occ = iocc; };
+  void set_nr(const int& inr) { nr = inr; };
+  void set_occ(const int& iocc) { occ = iocc; };
+  void set_occ(const double& iocc) { occ = iocc; };
   double get_occ() const { return occ; };
-  void set_ener(const double iener) { ener = iener; };
+  void set_ener(const double& iener) { ener = iener; };
   int get_primitive_count() const { return (int) coefficients.size(); };
   std::string hdr() {
     std::string temp;

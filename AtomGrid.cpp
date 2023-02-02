@@ -36,7 +36,6 @@ AtomGrid::AtomGrid(const double radial_precision,
   const double alpha_max,
   const int max_l_quantum_number,
   const double alpha_min[],
-  const bool debug,
   std::ostream& file)
 {
   using namespace std;
