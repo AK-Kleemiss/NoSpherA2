@@ -30,26 +30,26 @@ Number of points evaluated: 1728 with 135.063979 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-      Cu01    -1.534    -1.650     0.905
-      Cl02    -0.053     0.607    -0.471
-      S003     0.110     0.558    -0.248
+      Cu01    -1.534    -1.640     0.899
+      Cl02    -0.053     0.628    -0.483
+      S003     0.110     0.587    -0.265
       Cl04    -0.024     0.630    -0.387
-      S005    -0.330    -0.333     0.155
-      N006     0.144     0.210     0.052
-      N007     0.535     0.544    -0.008
-      H00a     0.194     0.075     0.141
-      H00b     0.161     0.041     0.141
-      C008     0.201     0.199     0.123
-      C009    -0.161    -0.095     0.131
-      H00c     0.153     0.147     0.051
-      H00d     0.112     0.079     0.069
-      H00e     0.125     0.093     0.062
-      C00A     0.030     0.146    -0.082
-      H00f     0.099     0.070     0.020
-      H00g     0.110     0.076     0.032
-      H00h     0.066     0.043     0.053
+      S005    -0.330    -0.267     0.113
+      N006     0.144     0.242     0.035
+      N007     0.535     0.571     0.025
+      H00a     0.194     0.036     0.156
+      H00b     0.161    -0.001     0.155
+      C008     0.201     0.206     0.115
+      C009    -0.161    -0.006     0.047
+      H00c     0.153     0.102     0.064
+      H00d     0.112     0.043     0.075
+      H00e     0.125     0.059     0.072
+      C00A     0.030     0.233    -0.083
+      H00f     0.099     0.043     0.039
+      H00g     0.110     0.052     0.048
+      H00h     0.066     0.002     0.065
 Total number of electrons in the wavefunction: 135.064
- and Hirshfeld electrons (asym unit): 134.263
+ and Hirshfeld electrons (asym unit): 134.310
 
 Number of k-points to evaluate: 12 for 1728 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
