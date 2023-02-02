@@ -1516,11 +1516,11 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   vector<vector<int>> irreps(operators);
   vector<vector<int>> cores(operators);
   for (int i = 0; i < operators; i++) {
-    coefficients[i].resize(coef_nr);
-    occupations[i].resize(dimension);
-    energies[i].resize(dimension);
-    irreps[i].resize(dimension);
-    cores[i].resize(dimension);
+    coefficients[i].resize(coef_nr,0);
+    occupations[i].resize(dimension,0);
+    energies[i].resize(dimension,0);
+    irreps[i].resize(dimension,0);
+    cores[i].resize(dimension,0);
     if (debug) file << "coef_nr: " << coef_nr << " dimension: " << dimension << endl;
     rf.read((char*)coefficients[i].data(), 8 * coef_nr);
     err_checkf(rf.good(), "Error reading coefficients", file);
@@ -1708,8 +1708,10 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
       MO_run++;
     }
   }
-  if (debug)
-    file << "I read " << operators << " MOs succesfully" << endl;
+  if (debug) {
+    file << "I read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
+    file << "There are " << nex << " primitives afetr conversion" << endl;
+  }
   return true;
 };
 
@@ -4753,13 +4755,13 @@ double WFN::computeESP(const double* PosGrid, vector<vector<double> >& d2)
   double Pi[3]{ 0,0,0 };
   double Pj[3]{ 0,0,0 };
   double PC[3]{ 0,0,0 };
-  double Fn[11](0);
-  double Al[54](0);
-  double Am[54](0);
-  double An[54](0);
-  int maplrsl[54](0);
-  int maplrsm[54](0);
-  int maplrsn[54](0);
+  double Fn[11]{ 0,0,0,0,0,0,0,0,0,0,0 };
+  double Al[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  double Am[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  double An[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  int maplrsl[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  int maplrsm[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  int maplrsn[54]{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
   int l_i[3]{ 0,0,0 };
   int l_j[3]{ 0,0,0 };
   int iat = 0, jat = 0, MaxFn = 0;

@@ -463,14 +463,14 @@ bool check_bohr(WFN& wave, bool debug)
 {
   double min_length = 300.0;
   for (int i = 0; i < wave.get_ncen(); i++) {
-    double atom1[3](0);
+    double atom1[3]{ 0,0,0 };
     for (int x = 0; x < 3; x++)
       atom1[x] = wave.get_atom_coordinate(i, x);
     for (int j = i + 1; j < wave.get_ncen(); j++) {
-      double atom2[3](0);
+      double atom2[3]{ 0,0,0 };
       for (int x = 0; x < 3; x++)
         atom2[x] = wave.get_atom_coordinate(j, x);
-      double d[3](0);
+      double d[3]{ 0,0,0 };
       d[0] = atom1[0] - atom2[0];
       d[1] = atom1[1] - atom2[1];
       d[2] = atom1[2] - atom2[2];
