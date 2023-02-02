@@ -101,11 +101,11 @@ constexpr double cosinus_integral(const int N, const double z, const double k) {
 		return N / (z * z + k * k) * (z * cosinus_integral(N - 1, z, k) - k * sinus_integral(N - 1, z, k));
 };
 
-const double Thakkar::get_form_factor(const double &k_vector, std::ostream& file, const bool &debug) {
-	return get_custom_form_factor(k_vector, file, 7, 6, 4, 2, 0,0,0,0, debug);
+const double Thakkar::get_form_factor(const double &k_vector) {
+	return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0,0,0,0);
 };
 
-const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els, std::ostream& file, const bool& debug) {
+const double Thakkar::get_core_form_factor (const double &k_vector, const int &core_els) {
 	int max_s=0, max_p=0, max_d=0, max_f=0;
 	if (core_els == 2) {
 		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
@@ -126,7 +126,7 @@ const double Thakkar::get_core_form_factor (const double &k_vector, const int &c
 		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
 	}
 
-	return get_custom_form_factor(k_vector, file, max_s,max_p,max_d,max_f,0,0,0,0,debug);
+	return get_custom_form_factor(k_vector, max_s,max_p,max_d,max_f,0,0,0,0);
 };
 
 double calc_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
@@ -181,8 +181,7 @@ double Thakkar::calc_type(
 }
 
 const double Thakkar::get_custom_form_factor(
-	const double& k_vector, 
-	std::ostream& file,
+	const double& k_vector,
 	const int& max_s,
 	const int& max_p,
 	const int& max_d,
@@ -190,8 +189,7 @@ const double Thakkar::get_custom_form_factor(
 	const int& min_s,
 	const int& min_p,
 	const int& min_d,
-	const int& min_f,
-	const bool& debug) {
+	const int& min_f) {
 
 	double result(0.0);
 	using namespace std;

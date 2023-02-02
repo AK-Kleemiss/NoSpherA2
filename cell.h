@@ -434,7 +434,7 @@ public:
           std::stringstream s(line);
           std::vector <std::string> fields;
           fields.resize(count_fields);
-          int sym_from_cif[3][3];
+          int sym_from_cif[3][3](0);
           for (int x = 0; x < 3; x++)
             for (int y = 0; y < 3; y++)
               sym_from_cif[x][y] = 0;
@@ -572,7 +572,7 @@ public:
           std::stringstream s(line);
           std::vector <std::string> fields;
           fields.resize(count_fields);
-          int sym_from_cif[3][3];
+          int sym_from_cif[3][3](0);
           for (int x = 0; x < 3; x++)
             for (int y = 0; y < 3; y++)
               sym_from_cif[x][y] = 0;
@@ -581,9 +581,9 @@ public:
           std::vector<std::string> vectors;
           vectors.resize(3);
           int column = 0;
-          for (int c = 0; c < fields[operation_field].length(); c++) {
-            if (fields[operation_field][c] != ',')
-              vectors[column].push_back(fields[operation_field][c]);
+          for (int _c = 0; _c < fields[operation_field].length(); _c++) {
+            if (fields[operation_field][_c] != ',')
+              vectors[column].push_back(fields[operation_field][_c]);
             else column++;
           }
 
@@ -642,17 +642,17 @@ public:
             std::cout << std::endl;
           }
           bool already_known = false;
-          for (int s = 0; s < sym[0][0].size(); s++) {
+          for (int _s = 0; _s < sym[0][0].size(); _s++) {
             bool identical = true;
             bool inverse = true;
             for (int x = 0; x < 3; x++)
               for (int y = 0; y < 3; y++)
-                if (sym[y][x][s] != sym_from_cif[x][y])
+                if (sym[y][x][_s] != sym_from_cif[x][y])
                   identical = false;
             if (!identical)
               for (int x = 0; x < 3; x++)
                 for (int y = 0; y < 3; y++)
-                  if (sym[y][x][s] != sym_from_cif[x][y] * -1)
+                  if (sym[y][x][_s] != sym_from_cif[x][y] * -1)
                     inverse = false;
             /*if (debug) {
               file << "Comparison with ";

@@ -335,11 +335,13 @@ public:
 inline bool merge_tscs(
   const std::string& mode,
   const std::vector<std::string>& files,
-  const bool debug,
   const bool old_tsc
 )
 {
   //Currently only for Mode "pure merge"
+  if (mode.empty() || false) {
+    return false;
+  }
   if (files.size() == 0)
     return false;
   std::vector <std::string> labels;
@@ -493,11 +495,13 @@ inline bool merge_tscs(
 inline bool merge_tscs_without_checks(
   const std::string& mode,
   const std::vector<std::string>& files,
-  const bool debug,
   const bool old_tsc
 )
 {
   //Currently only for Mode "pure merge"
+  if (mode.empty() || false) {
+    return false;
+  }
   if (files.size() == 0)
     return false;
   std::vector <std::string> labels;
