@@ -32,20 +32,20 @@ Number of points evaluated: 2758 with  39.029819 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-       N_2     0.219     0.123     0.103
-      Ha_2     0.250     0.091     0.225
-      Hb_2     0.242     0.071     0.223
-      Hc_2     0.256     0.063     0.235
-      CA_2    -0.075    -0.221     0.106
-     HAa_2     0.172     0.123     0.095
-      CB_2    -0.133    -0.057    -0.057
-     HBa_2     0.114     0.087     0.074
-     HBb_2     0.132     0.104     0.068
-     HBc_2     0.130     0.108     0.071
-       C_2    -0.125    -0.242     0.177
-       O_2    -0.212     0.223    -0.326
+       N_2     0.219     0.202     0.130
+      Ha_2     0.250     0.050     0.228
+      Hb_2     0.242     0.036     0.225
+      Hc_2     0.256     0.036     0.235
+      CA_2    -0.075    -0.135     0.090
+     HAa_2     0.172     0.087     0.104
+      CB_2    -0.133     0.033    -0.059
+     HBa_2     0.114     0.053     0.077
+     HBb_2     0.132     0.075     0.075
+     HBc_2     0.130     0.071     0.079
+       C_2    -0.125    -0.212     0.154
+       O_2    -0.212     0.253    -0.345
 Total number of electrons in the wavefunction: 39.030
- and Hirshfeld electrons (asym unit): 39.004
+ and Hirshfeld electrons (asym unit): 39.007
 Reading:                                   1yk4_h.hkl done!
 Nr of reflections read from file: 200
 Number of symmetry operations: 4
@@ -70,30 +70,30 @@ Number of points evaluated: 4998 with  69.941427 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-       N_3    -0.032     0.049    -0.044
-       C_3    -0.160    -0.240     0.131
-       O_3    -0.225     0.249    -0.349
-      Ha_3     0.186     0.069     0.153
-      CA_3    -0.119    -0.090     0.040
-     HAa_3     0.129     0.136     0.028
-      CB_3    -0.132    -0.029    -0.041
-     HBa_3     0.115     0.121     0.026
-     HBb_3     0.148     0.150     0.016
-      CG_3    -0.165    -0.051    -0.030
-     HGa_3     0.118     0.134     0.015
-     HGb_3     0.144     0.155     0.018
-      CD_3    -0.181    -0.045    -0.037
-     HDa_3     0.122     0.121     0.025
-     HDb_3     0.124     0.113     0.023
-      CE_3    -0.196    -0.147     0.029
-     HEa_3     0.139     0.103     0.054
-     HEb_3     0.140     0.101     0.052
-      NZ_3     0.186     0.155     0.101
-     HZa_3     0.244     0.047     0.222
-     HZb_3     0.246     0.089     0.199
-     HZc_3     0.227     0.036     0.230
+       N_3    -0.032     0.102    -0.043
+       C_3    -0.160    -0.213     0.110
+       O_3    -0.225     0.271    -0.365
+      Ha_3     0.186     0.015     0.173
+      CA_3    -0.119    -0.051     0.023
+     HAa_3     0.129     0.079     0.057
+      CB_3    -0.132     0.039    -0.056
+     HBa_3     0.115     0.079     0.048
+     HBb_3     0.148     0.109     0.043
+      CG_3    -0.165     0.013    -0.055
+     HGa_3     0.118     0.086     0.041
+     HGb_3     0.144     0.109     0.044
+      CD_3    -0.181     0.022    -0.071
+     HDa_3     0.122     0.081     0.047
+     HDb_3     0.124     0.081     0.045
+      CE_3    -0.196    -0.072    -0.008
+     HEa_3     0.139     0.070     0.072
+     HEb_3     0.140     0.069     0.069
+      NZ_3     0.186     0.230     0.111
+     HZa_3     0.244     0.021     0.226
+     HZb_3     0.246     0.053     0.207
+     HZc_3     0.227     0.005     0.229
 Total number of electrons in the wavefunction: 69.941
- and Hirshfeld electrons (asym unit): 70.137
+ and Hirshfeld electrons (asym unit): 70.053
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 111
 Number of electrons: 110.000
@@ -112,27 +112,27 @@ Number of points evaluated: 3696 with  48.468742 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-      Hb_3     0.182     0.063     0.146
-      C1_3    -0.073    -0.094     0.076
-      H1_3     0.129     0.102     0.061
-      C2_3    -0.113     0.034    -0.072
-     H2a_3     0.136     0.162     0.020
-     H2b_3     0.059     0.084     0.012
-      C3_3    -0.116    -0.169    -0.022
-     H3a_3     0.076     0.081     0.038
-     H3b_3     0.125     0.118     0.026
-      C4_3    -0.119    -0.087    -0.003
-     H4a_3     0.105     0.081     0.049
-     H4b_3     0.146     0.115     0.044
-      C5_3    -0.132    -0.113     0.055
-     H5a_3     0.081     0.043     0.062
-     H5b_3     0.118     0.074     0.060
-      N1_3     0.181     0.029     0.090
-     H1a_3     0.249     0.086     0.227
-     H1b_3     0.256     0.067     0.235
-     H1c_3     0.243     0.057     0.236
+      Hb_3     0.182     0.013     0.166
+      C1_3    -0.073    -0.042     0.059
+      H1_3     0.129     0.049     0.083
+      C2_3    -0.113     0.083    -0.093
+     H2a_3     0.136     0.111     0.041
+     H2b_3     0.059     0.040     0.032
+      C3_3    -0.116    -0.061    -0.019
+     H3a_3     0.076     0.036     0.050
+     H3b_3     0.125     0.081     0.043
+      C4_3    -0.119    -0.004    -0.026
+     H4a_3     0.105     0.046     0.061
+     H4b_3     0.146     0.082     0.062
+      C5_3    -0.132    -0.037     0.018
+     H5a_3     0.081     0.012     0.068
+     H5b_3     0.118     0.045     0.071
+      N1_3     0.181     0.136     0.129
+     H1a_3     0.249     0.052     0.226
+     H1b_3     0.256     0.040     0.234
+     H1c_3     0.243     0.026     0.233
 Total number of electrons in the wavefunction: 48.469
- and Hirshfeld electrons (asym unit): 48.660
+ and Hirshfeld electrons (asym unit): 48.562
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 102
 Number of electrons: 102.000
@@ -151,27 +151,27 @@ Number of points evaluated: 4396 with  61.846708 electrons in Becke Grid in tota
 Table of Charges in electrons
 
     Atom       Becke   Spherical Hirshfeld
-       N_4     0.015     0.153    -0.037
-       H_4     0.186     0.079     0.148
-      CA_4    -0.118    -0.110     0.033
-      HA_4     0.113     0.106     0.045
-      CB_4    -0.115    -0.050    -0.057
-     HBa_4     0.072     0.086     0.032
-     HBb_4     0.086     0.085     0.029
-      CG_4    -0.139    -0.107     0.018
-      HG_4     0.111     0.141     0.030
-     CD1_4    -0.123    -0.020    -0.076
-    HD1a_4     0.103     0.124     0.029
-    HD1b_4     0.085     0.086     0.045
-    HD1c_4     0.093     0.086     0.050
-     CD2_4    -0.126     0.013    -0.090
-    HD2a_4     0.082     0.078     0.042
-    HD2b_4     0.109     0.117     0.032
-    HD2c_4     0.085     0.086     0.046
-       C_4    -0.148    -0.262     0.183
-       O_4    -0.219     0.243    -0.338
+       N_4     0.015     0.190    -0.049
+       H_4     0.186     0.029     0.166
+      CA_4    -0.118    -0.066     0.026
+      HA_4     0.113     0.052     0.066
+      CB_4    -0.115     0.026    -0.056
+     HBa_4     0.072     0.037     0.048
+     HBb_4     0.086     0.043     0.047
+      CG_4    -0.139    -0.037    -0.027
+      HG_4     0.111     0.087     0.050
+     CD1_4    -0.123     0.060    -0.095
+    HD1a_4     0.103     0.082     0.043
+    HD1b_4     0.085     0.053     0.052
+    HD1c_4     0.093     0.057     0.056
+     CD2_4    -0.126     0.099    -0.102
+    HD2a_4     0.082     0.052     0.051
+    HD2b_4     0.109     0.082     0.042
+    HD2c_4     0.085     0.050     0.053
+       C_4    -0.148    -0.231     0.157
+       O_4    -0.219     0.267    -0.354
 Total number of electrons in the wavefunction: 61.847
- and Hirshfeld electrons (asym unit): 61.836
+ and Hirshfeld electrons (asym unit): 61.826
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Final number of atoms in .tsc file: 72
 Writing tsc file...  ... done!
