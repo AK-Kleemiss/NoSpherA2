@@ -4046,7 +4046,7 @@ void WFN::computeValues(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
   double Grad[3]{ 0,0,0 };
   double tau = 0;
 
@@ -4165,7 +4165,7 @@ void WFN::computeELIELF(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (int j = 0; j < nex; j++) {
     iat = get_center(j) - 1;
@@ -4258,7 +4258,7 @@ void WFN::computeELI(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (int j = 0; j < nex; j++) {
     iat = get_center(j) - 1;
@@ -4348,7 +4348,7 @@ void WFN::computeELF(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (int j = 0; j < nex; j++) {
     iat = get_center(j) - 1;
@@ -4440,7 +4440,7 @@ void WFN::computeLapELIELF(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (int j = 0; j < nex; j++) {
     iat = get_center(j) - 1;
@@ -4543,7 +4543,7 @@ void WFN::computeLapELI(
   int iat = 0;
   int l[3]{ 0,0,0 };
   double ex = 0;
-  double xl[3][3](0);
+  double xl[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
   for (int j = 0; j < nex; j++) {
     iat = get_center(j) - 1;
