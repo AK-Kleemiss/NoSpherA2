@@ -2640,6 +2640,7 @@ tsc_block calculate_structure_factors_MTC(
       err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i] + " does not exists!", file);
     }
   }
+  err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
   file << "Number of protons: " << wave[nr].get_nr_electrons() << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
   if (wave[nr].get_has_ECPs()) file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
