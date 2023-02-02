@@ -943,7 +943,7 @@ double cube::diff_sum() {
 vector<double> cube::double_sum() {
   for (int i = 0; i < 3; i++) {
     if (size[i] == 0) 
-      return (vector<double>(-1.0));
+      return (vector<double>(1,0));
   }
   double s = 0.0;
   double s2 = 0.0;
