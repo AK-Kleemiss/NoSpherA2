@@ -740,7 +740,7 @@ void Calc_Prop(
           Elf=0,
           Eli=0,
           Lap=0,
-          Hess[9](0);
+          Hess[9]{ 0,0,0,0,0,0,0,0,0 };
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
