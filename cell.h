@@ -434,10 +434,7 @@ public:
           std::stringstream s(line);
           std::vector <std::string> fields;
           fields.resize(count_fields);
-          int sym_from_cif[3][3](0);
-          for (int x = 0; x < 3; x++)
-            for (int y = 0; y < 3; y++)
-              sym_from_cif[x][y] = 0;
+          int sym_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };
           for (int i = 0; i < count_fields; i++)
             s >> fields[i];
           std::vector<std::string> vectors;
@@ -572,10 +569,7 @@ public:
           std::stringstream s(line);
           std::vector <std::string> fields;
           fields.resize(count_fields);
-          int sym_from_cif[3][3](0);
-          for (int x = 0; x < 3; x++)
-            for (int y = 0; y < 3; y++)
-              sym_from_cif[x][y] = 0;
+          int sym_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };;
           for (int i = 0; i < count_fields; i++)
             s >> fields[i];
           std::vector<std::string> vectors;
