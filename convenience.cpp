@@ -463,14 +463,14 @@ bool check_bohr(WFN& wave, bool debug)
 {
   double min_length = 300.0;
   for (int i = 0; i < wave.get_ncen(); i++) {
-    double atom1[3];
+    double atom1[3](0);
     for (int x = 0; x < 3; x++)
       atom1[x] = wave.get_atom_coordinate(i, x);
     for (int j = i + 1; j < wave.get_ncen(); j++) {
-      double atom2[3];
+      double atom2[3](0);
       for (int x = 0; x < 3; x++)
         atom2[x] = wave.get_atom_coordinate(j, x);
-      double d[3];
+      double d[3](0);
       d[0] = atom1[0] - atom2[0];
       d[1] = atom1[1] - atom2[1];
       d[2] = atom1[2] - atom2[2];
@@ -1053,29 +1053,23 @@ void readxyzMinMax_fromWFN(
   double Increments
 )
 {
-  const double bohrtoa = 0.52917720859;
-  int iAtoms, j;
-  int NbAtoms = (int) wavy.atoms.size();
-
   vector < vector <double > > PosAtoms;
   PosAtoms.resize(wavy.get_ncen());
   for (int i = 0; i < wavy.get_ncen(); i++)
     PosAtoms[i].resize(3);
   bool bohrang = !check_bohr(wavy, false);
-  j = 0;
-  for (iAtoms = 0; iAtoms < wavy.get_ncen(); iAtoms++)
+  for (int j = 0; j < wavy.get_ncen(); j++)
   {
 
-    PosAtoms[j][0] = wavy.atoms[iAtoms].x;
-    PosAtoms[j][1] = wavy.atoms[iAtoms].y;
-    PosAtoms[j][2] = wavy.atoms[iAtoms].z;
+    PosAtoms[j][0] = wavy.atoms[j].x;
+    PosAtoms[j][1] = wavy.atoms[j].y;
+    PosAtoms[j][2] = wavy.atoms[j].z;
     if (!bohrang) {
       cout << "Dividing atom positions!" << endl;
-      PosAtoms[j][0] /= bohrtoa;
-      PosAtoms[j][1] /= bohrtoa;
-      PosAtoms[j][2] /= bohrtoa;
+      for(int i=0; i<3; i++)
+        PosAtoms[j][i] = ang2bohr(PosAtoms[j][i]);
     }
-    if (iAtoms == 0)
+    if (j == 0)
     {
       CoordMinMax[0] = PosAtoms[j][0];
       CoordMinMax[3] = PosAtoms[j][0];
@@ -1104,17 +1098,17 @@ void readxyzMinMax_fromWFN(
     }
     j++;
   }
+  double temp_rad = ang2bohr(Radius);
+  CoordMinMax[0] -= temp_rad;
+  CoordMinMax[3] += temp_rad;
+  CoordMinMax[1] -= temp_rad;
+  CoordMinMax[4] += temp_rad;
+  CoordMinMax[2] -= temp_rad;
+  CoordMinMax[5] += temp_rad;
 
-  CoordMinMax[0] -= Radius / bohrtoa;
-  CoordMinMax[3] += Radius / bohrtoa;
-  CoordMinMax[1] -= Radius / bohrtoa;
-  CoordMinMax[4] += Radius / bohrtoa;
-  CoordMinMax[2] -= Radius / bohrtoa;
-  CoordMinMax[5] += Radius / bohrtoa;
-
-  NbSteps[0] = (int) ceil((CoordMinMax[3] - CoordMinMax[0]) / Increments * bohrtoa);
-  NbSteps[1] = (int) ceil((CoordMinMax[4] - CoordMinMax[1]) / Increments * bohrtoa);
-  NbSteps[2] = (int) ceil((CoordMinMax[5] - CoordMinMax[2]) / Increments * bohrtoa);
+  NbSteps[0] = (int) ceil(bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
+  NbSteps[1] = (int) ceil(bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
+  NbSteps[2] = (int) ceil(bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
 
 void readxyzMinMax_fromCIF(
@@ -1995,9 +1989,9 @@ void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
 double get_lambda_1(double* a)
 {
   vector<double> bw, zw;
-  int run = 0;
+  //int run = 0;
   double eig1, eig2, eig3;
-  double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
+  const double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
   if (p1 == 0) {
     eig1 = a[0];
     eig2 = a[4];
@@ -2012,20 +2006,20 @@ double get_lambda_1(double* a)
       return eig3;
   }
   else {
-    double q = (a[0] + a[4] + a[8]) / 3;
-    double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
-    double p = sqrt(p2 / 6);
-    double B[9];
-    B[0] = a[0] - q;
-    B[1] = a[1];
-    B[2] = a[2];
-    B[3] = a[3];
-    B[4] = a[4] - q;
-    B[5] = a[5];
-    B[6] = a[6];
-    B[7] = a[7];
-    B[8] = a[8] - q;
-    double r = (B[0] * B[4] * B[8]
+    const double q = (a[0] + a[4] + a[8]) / 3;
+    const double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
+    const double p = sqrt(p2 / 6);
+    const double B[9]{
+    a[0] - q,
+    a[1],
+    a[2],
+    a[3],
+    a[4] - q,
+    a[5],
+    a[6],
+    a[7],
+    a[8] - q };
+    const double r = (B[0] * B[4] * B[8]
       + B[1] * B[5] * B[6]
       + B[3] * B[4] * B[7]
       - B[0] * B[5] * B[7]
@@ -2058,7 +2052,7 @@ double get_decimal_precision_from_CIF_number(string& given_string) {
   int open_bracket = -1;
   int close_bracket = -1;
   int decimal_point = -1;
-  const char* gs = given_string.c_str();
+  //const char* gs = given_string.c_str();
   for (int i = 0; i < len; i++) {
     if (given_string[i] == '(' && open_bracket == -1) {
       open_bracket = i;
@@ -2105,7 +2099,7 @@ void options::digest_options() {
   for (int i = 0; i < arguments.size(); i++) {
     if (debug)
       cout << arguments[i] << endl;
-    temp = arguments[i];
+    string temp = arguments[i];
     if (temp.find("-") > 0) continue;
     if (temp.find("-acc") < 1)
       accuracy = stoi(arguments[i + 1]);
@@ -2155,8 +2149,8 @@ void options::digest_options() {
         n++;
         combined_tsc_calc_cifs.push_back(arguments[i + n]);
         n++;
-        const string temp = arguments[i + n];
-        groups.push_back(split_string<int>(temp, delimiter));
+        const string _temp = arguments[i + n];
+        groups.push_back(split_string<int>(_temp, delimiter));
         n++;
       }
     }
@@ -2219,7 +2213,7 @@ void options::digest_options() {
         filenames.push_back(arguments[i + n]);
         n++;
       }
-      merge_tscs("combine", filenames, debug, old_tsc);
+      merge_tscs("combine", filenames, old_tsc);
       exit(0);
     }
     else if (temp.find("-merge_nocheck") != string::npos) {
@@ -2229,7 +2223,7 @@ void options::digest_options() {
         filenames.push_back(arguments[i + n]);
         n++;
       }
-      merge_tscs_without_checks("combine", filenames, debug, old_tsc);
+      merge_tscs_without_checks("combine", filenames, old_tsc);
       exit(0);
     }
     else if (temp.find("-MO") < 1) {
@@ -2247,8 +2241,8 @@ void options::digest_options() {
       while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
         combined_tsc_calc_files.push_back(arguments[i + n]);
         n++;
-        const string temp = arguments[i + n];
-        groups.push_back(split_string<int>(temp, delimiter));
+        const string _temp = arguments[i + n];
+        groups.push_back(split_string<int>(_temp, delimiter));
         n++;
       }
     }
@@ -2318,7 +2312,7 @@ void options::digest_options() {
 void options::look_for_debug(int& argc, char** argv) {
   //This loop figures out command line options
   for (int i = 0; i < argc; i++) {
-    temp = argv[i];
+    string temp = argv[i];
     arguments.push_back(temp);
     if (temp.find("-") > 0) continue;
     else if (temp.find("-v") < 1)

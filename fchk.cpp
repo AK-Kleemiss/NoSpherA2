@@ -696,20 +696,20 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
   for (int i = 0; i < wave.get_ncen(); i++) {
     elcount += wave.get_atom_charge(i);
   }
-  int alpha = 0, beta = 0, temp = elcount;
-  while (temp > 1) {
-    alpha++;
-    beta++;
-    temp -= 2;
+  int alpha_els = 0, beta_els = 0, temp_els = elcount;
+  while (temp_els > 1) {
+    alpha_els++;
+    beta_els++;
+    temp_els -= 2;
   }
-  alpha += temp;
+  alpha_els += temp_els;
   int diff = wave.get_multi() - 1;
-  while (alpha - beta != diff) {
-    alpha++;
-    beta--;
+  while (alpha_els - beta_els != diff) {
+    alpha_els++;
+    beta_els--;
   }
   if (debug) {
-    file << "alpha, beta, elcount: " << setw(5) << alpha << setw(5) << beta << setw(5) << elcount << endl;
+    file << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
   }
   if (wave.get_nr_basis_set_loaded() == 0) {
     if (debug) file << "No basis set loaded, will load a complete basis set now!" << endl;
@@ -789,34 +789,34 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     for (int a = 0; a < wave.get_ncen(); a++) {
       //contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
       for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
-        double temp = wave.get_atom_basis_set_exponent(a, p);
+        double temp_c = wave.get_atom_basis_set_exponent(a, p);
         switch (wave.get_atom_primitive_type(a, p)) {
         case 1:
-          temp = 2 * temp / PI;
-          temp = pow(temp, 0.75);
-          temp = temp * wave.get_atom_basis_set_coefficient(a, p);
-          basis_coefficients[a].push_back(temp);
+          temp_c = 2 * temp_c / PI;
+          temp_c = pow(temp_c, 0.75);
+          temp_c = temp_c * wave.get_atom_basis_set_coefficient(a, p);
+          basis_coefficients[a].push_back(temp_c);
           break;
         case 2:
-          temp = 128 * pow(temp, 5);
-          temp = temp / pow(PI, 3);
-          temp = pow(temp, 0.25);
-          temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
-          basis_coefficients[a].push_back(temp);
+          temp_c = 128 * pow(temp_c, 5);
+          temp_c = temp_c / pow(PI, 3);
+          temp_c = pow(temp_c, 0.25);
+          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
+          basis_coefficients[a].push_back(temp_c);
           break;
         case 3:
-          temp = 2048 * pow(temp, 7);
-          temp = temp / (9 * pow(PI, 3));
-          temp = pow(temp, 0.25);
-          temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
-          basis_coefficients[a].push_back(temp);
+          temp_c = 2048 * pow(temp_c, 7);
+          temp_c = temp_c / (9 * pow(PI, 3));
+          temp_c = pow(temp_c, 0.25);
+          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
+          basis_coefficients[a].push_back(temp_c);
           break;
         case 4:
-          temp = 32768 * pow(temp, 9);
-          temp = temp / (225 * pow(PI, 3));
-          temp = pow(temp, 0.25);
-          temp = wave.get_atom_basis_set_coefficient(a, p) * temp;
-          basis_coefficients[a].push_back(temp);
+          temp_c = 32768 * pow(temp_c, 9);
+          temp_c = temp_c / (225 * pow(PI, 3));
+          temp_c = pow(temp_c, 0.25);
+          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
+          basis_coefficients[a].push_back(temp_c);
           break;
         case -1:
           file << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
@@ -834,15 +834,15 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
         }
         if (debug) {
           file << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
-            << "start: " << wave.get_shell_start(a, s, false)
-            << " stop: " << wave.get_shell_end(a, s, false) << endl
+            << "start: " << wave.get_shell_start(a, s)
+            << " stop: " << wave.get_shell_end(a, s) << endl
             << "factor: ";
         }
         switch (type_temp) {
         case 1:
           factor = 0;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
-            for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
+            for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = (PI / aiaj);
               term = pow(term, 1.5);
@@ -852,7 +852,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (factor == 0) return false;
           factor = pow(factor, -0.5);
           if (debug) file << factor << endl;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             if (debug) {
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) 
                 << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
@@ -864,8 +864,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           break;
         case 2:
           factor = 0;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
-            for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
+            for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 4 * pow(aiaj, 5);
               term = pow(PI, 3) / term;
@@ -876,7 +876,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (factor == 0) return false;
           factor = pow(factor, -0.5);
           if (debug) file << factor << endl;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             if (debug) {
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i) 
                 << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
@@ -888,8 +888,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           break;
         case 3:
           factor = 0;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
-            for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
+            for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 16 * pow(aiaj, 7);
               term = pow(PI, 3) / term;
@@ -900,7 +900,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (factor == 0) return false;
           factor = (pow(factor, -0.5)) / sqrt(3);
           if (debug) file << factor << endl;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             if (debug) {
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
@@ -913,8 +913,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           break;
         case 4:
           factor = 0;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
-            for (int j = wave.get_shell_start(a, s, false); j <= wave.get_shell_end(a, s, false); j++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
+            for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
               double term = 64 * pow((aiaj), 9);
               term = pow(PI, 3) / term;
@@ -925,7 +925,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           if (factor == 0) return false;
           factor = pow(factor, -0.5) / sqrt(15);
           if (debug) file << factor << endl;
-          for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
+          for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             if (debug) {
               file << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " Contraction coefficient after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
@@ -938,7 +938,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           }
           break;
         }
-        if (debug)	file << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
+        if (debug)	file << "This shell has: " << wave.get_shell_end(a, s) - wave.get_shell_start(a, s) + 1 << " primitives" << endl;
       }
     }
     //-----------debug output---------------------------------------------------------
@@ -985,7 +985,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       }
     }
     //--------------Build CMO of alessandro from the first elements of each shell-------------
-    for (int m = 0; m < alpha; m++) {
+    for (int m = 0; m < alpha_els; m++) {
       int run_2 = 0;
       for (int a = 0; a < wave.get_ncen(); a++) {
         for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
@@ -995,7 +995,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
             CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s)]);
             if (m == 0) nao++;
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-              file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
+              file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s) << endl;
             break;
           case 2:
             for (int i = 0; i < 3; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
@@ -1029,8 +1029,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       if (debug) file << "finished with MO!" << endl;
       if (nshell != run_2) nshell = run_2;
     }
-    if (alpha != beta) {
-      for (int m = alpha; m < alpha + beta; m++) {
+    if (alpha_els != beta_els) {
+      for (int m = alpha_els; m < alpha_els + beta_els; m++) {
         int run_2 = 0;
         for (int a = 0; a < wave.get_ncen(); a++) {
           for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
@@ -1040,7 +1040,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
               CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s)]);
               if (m == 0) nao++;
               if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-                file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
+                file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s) << endl;
               break;
             case 2:
               for (int i = 0; i < 3; i++) CMO_beta.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
@@ -1079,14 +1079,14 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     if (debug) {
       ofstream cmo("cmo.debug", ofstream::out);
       for (int p = 0; p < CMO.size(); p++) {
-        string temp;
+        string temp_s;
         for (int i = 0; i < 5; i++) {
           stringstream stream;
           stream << scientific << setw(14) << setprecision(7) << CMO[p + i] << " ";
-          temp += stream.str();
+          temp_s += stream.str();
         }
         p += 4;
-        cmo << temp << endl;
+        cmo << temp_s << endl;
       }
       cmo.flush();
       cmo.close();
@@ -1099,7 +1099,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     naotr = nao * (nao + 1) / 2;
     vector<double> kp;
     wave.resize_DM(naotr, 0.0);
-    if (alpha != beta)
+    if (alpha_els != beta_els)
       wave.resize_SDM(naotr, 0.0);
     if (debug) {
       file << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
@@ -1113,14 +1113,14 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
         if (debug) file << "Working on MO: ";
         for (int m = 0; m < wave.get_nmo(); m++) {
           if (debug) file << m << " " << flush;
-          if (alpha != beta) {
-            if (m < alpha) {
+          if (alpha_els != beta_els) {
+            if (m < alpha_els) {
               temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
               err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), file);
               err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
             }
             else {
-              temp = wave.get_MO_occ(m) * CMO_beta[iu + ((m - alpha) * nao)] * CMO_beta[iv + ((m - alpha) * nao)];
+              temp = wave.get_MO_occ(m) * CMO_beta[iu + ((m - alpha_els) * nao)] * CMO_beta[iv + ((m - alpha_els) * nao)];
               err_checkf(wave.set_SDM(iuv, wave.get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), file);
               err_checkf(wave.set_DM(iuv, wave.get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), file);
             }
@@ -1153,7 +1153,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       file << wave.get_DM_size() << " Elements in DM" << endl;
       dm.flush();
       dm.close();
-      if (alpha != beta) {
+      if (alpha_els != beta_els) {
         ofstream sdm("sdm.debug", ofstream::out);
         file << "SDM is in sdm.debug" << endl;
         for (int p = 0; p < wave.get_SDM_size(); p++) {
@@ -1222,11 +1222,11 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += st_s.str();
     st_s.str("");
     s += "\nNumber of alpha electrons                  I";
-    st_s << setw(17) << alpha;
+    st_s << setw(17) << alpha_els;
     s += st_s.str();
     st_s.str("");
     s += "\nNumber of beta electrons                   I";
-    st_s << setw(17) << beta;
+    st_s << setw(17) << beta_els;
     s += st_s.str();
     st_s.str("");
     s += "\nNumber of basis functions                  I";
@@ -1318,10 +1318,10 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     int f_count = 0;
     int max_contraction = 0;
     for (int a = 0; a < wave.get_ncen(); a++)
-      for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
-        if (wave.get_atom_shell_primitives(a, s) > max_contraction) max_contraction = wave.get_atom_shell_primitives(a, s);
-        if (wave.get_shell_type(a, s) == 3) d_count++;
-        else if (wave.get_shell_type(a, s) == 4) f_count++;
+      for (int _s = 0; _s < wave.get_atom_shell_count(a); _s++) {
+        if (wave.get_atom_shell_primitives(a, _s) > max_contraction) max_contraction = wave.get_atom_shell_primitives(a, _s);
+        if (wave.get_shell_type(a, _s) == 3) d_count++;
+        else if (wave.get_shell_type(a, _s) == 4) f_count++;
       }
     st_s << setw(17) << 1;
     s += st_s.str();
@@ -1470,8 +1470,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
     runs = 0;
     for (int m = 0; m < nao; m++) {
-      if (m < alpha) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
-      else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(alpha - 1) + m;
+      if (m < alpha_els) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
+      else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(alpha_els - 1) + m;
       runs++;
       if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
     }
@@ -1480,14 +1480,14 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     fchk << s;
     //fchk.flush();
 
-    if (alpha != beta) {
+    if (alpha_els != beta_els) {
       s = "Beta Orbital Energies                      R   N=";
       st_s << setw(12) << nao << endl;
       s += st_s.str();
       st_s.str("");
       runs = 0;
       for (int m = 0; m < nao; m++) {
-        if (m < beta) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha);
+        if (m < beta_els) st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha_els);
         else st_s << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
         runs++;
         if ((runs % 5 == 0 && runs != 0) || m == nao - 1) st_s << endl;
@@ -1504,7 +1504,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
     runs = 0;
     for (int i = 0; i < nao * nao; i++) {
-      if (i < nao * alpha) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
+      if (i < nao * alpha_els) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
       else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
       runs++;
       if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
@@ -1512,14 +1512,14 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += st_s.str();
     st_s.str("");
 
-    if (alpha != beta) {
+    if (alpha_els != beta_els) {
       s += "Beta MO coefficients                       R   N=";
       st_s << setw(12) << nao * nao << endl;
       s += st_s.str();
       st_s.str("");
       runs = 0;
       for (int i = 0; i < nao * nao; i++) {
-        if (i < nao * beta) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO_beta[i];
+        if (i < nao * beta_els) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO_beta[i];
         else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
         runs++;
         if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
@@ -1540,7 +1540,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     }
     s += st_s.str();
     st_s.str("");
-    if (alpha != beta) {
+    if (alpha_els != beta_els) {
       s += "Spin SCF Density                           R   N=";
       st_s << setw(12) << wave.get_SDM_size() << endl;
       s += st_s.str();

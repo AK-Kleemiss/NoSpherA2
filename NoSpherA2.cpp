@@ -28,8 +28,8 @@ int main(int argc, char** argv)
   log_file.flush();
   //Perform fractal dimensional analysis and quit 
   if (opt.fract) {
-    WFN wavy(6);
-    cube residual(opt.fract_name, true, wavy, std::cout, opt.debug);
+    WFN wav(6);
+    cube residual(opt.fract_name, true, wav, std::cout, opt.debug);
     residual.fractal_dimension(0.01);
     log_file.flush();
     log_file.close();
@@ -156,7 +156,7 @@ int main(int argc, char** argv)
       else {
         outputname = wavy[0].get_path();
         if (opt.debug) log_file << "Loaded path..." << endl;
-        size_t where;
+        size_t where(0);
         int len = 4;
         if (wavy[0].get_origin() == 2) where = outputname.find(".wfn");
         else if (wavy[0].get_origin() == 4) where = outputname.find(".ffn");
@@ -195,7 +195,7 @@ int main(int argc, char** argv)
   //Contains all calculations of properties and cubes
   if (opt.calc) {
     ofstream log2("NoSpherA2_cube.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
+    coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
     log2 << NoSpherA2_message();
     if (!opt.no_date) {
       log2 << build_date();
@@ -578,23 +578,23 @@ int main(int argc, char** argv)
     double k_value = 0.0;
     if (!opt.electron_diffraction) {
       ofstream result("thakkar.dat", ios::out);
-      for (float i = 0.001; i <= 4.0; i += 0.001) {
+      for (double i = 0.001; i <= 4.0; i += 0.001) {
         k_value = bohr2ang(FOUR_PI*i);
         result << showpos << setw(6) << setprecision(3) << fixed << i;
-        result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor     (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor     (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor     (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << P.get_form_factor     (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << Ca.get_form_factor    (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << Os.get_form_factor    (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << C_cat.get_form_factor (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << P_cat.get_form_factor (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << Ca_cat.get_form_factor(k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << H_an.get_form_factor  (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << C_an.get_form_factor  (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor  (k_value, log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << P_an.get_form_factor  (k_value, log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor     (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor     (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor     (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << P.get_form_factor     (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << Ca.get_form_factor    (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << Os.get_form_factor    (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << C_cat.get_form_factor (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << P_cat.get_form_factor (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << Ca_cat.get_form_factor(k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << H_an.get_form_factor  (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << C_an.get_form_factor  (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor  (k_value);
+        result << showpos << setw(16) << setprecision(8) << scientific << P_an.get_form_factor  (k_value);
         result << endl;
       }
       result.flush();
@@ -602,46 +602,46 @@ int main(int argc, char** argv)
     }
     else {
       ofstream result("thakkar_ED.dat", ios::out);
-      for (float i = 0.001; i <= 4.0; i += 0.001) {
+      for (double i = 0.001; i <= 4.0; i += 0.001) {
         k_value = bohr2ang(FOUR_PI * i);
         result << showpos << setw(6) << setprecision(3) << fixed << i;
-        complex<double> temp = H.get_form_factor(k_value, log_file, false);
+        complex<double> temp = H.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp,i).real();
-        temp = C.get_form_factor(k_value, log_file, false);
+        temp = C.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
-        temp = O.get_form_factor(k_value, log_file, false);
+        temp = O.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
-        temp = P.get_form_factor(k_value, log_file, false);
+        temp = P.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
-        temp = Ca.get_form_factor(k_value, log_file, false);
+        temp = Ca.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i).real();
-        temp = Os.get_form_factor(k_value, log_file, false);
+        temp = Os.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i).real();
         temp = 0.0;
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i).real();
-        temp = C_cat.get_form_factor(k_value, log_file, false);
+        temp = C_cat.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
-        temp = O_cat.get_form_factor(k_value, log_file, false);
+        temp = O_cat.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
-        temp = P_cat.get_form_factor(k_value, log_file, false);
+        temp = P_cat.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
-        temp = Ca_cat.get_form_factor(k_value, log_file, false);
+        temp = Ca_cat.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i).real();
-        temp = H_an.get_form_factor(k_value, log_file, false);
+        temp = H_an.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i).real();
-        temp = C_an.get_form_factor(k_value, log_file, false);
+        temp = C_an.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i).real();
-        temp = O_an.get_form_factor(k_value, log_file, false);
+        temp = O_an.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i).real();
-        temp = P_an.get_form_factor(k_value, log_file, false);
+        temp = P_an.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i).real();
-        temp = C.get_form_factor(k_value, log_file, false);
+        temp = C.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6,1, temp, i).real();
-        temp = O.get_form_factor(k_value, log_file, false);
+        temp = O.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8,1, temp, i).real();
-        temp = C.get_form_factor(k_value, log_file, false);
+        temp = C.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6,-1, temp, i).real();
-        temp = O.get_form_factor(k_value, log_file, false);
+        temp = O.get_form_factor(k_value);
         result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7,-1, temp, i).real();
         result << endl;
       }
@@ -698,13 +698,11 @@ int main(int argc, char** argv)
     cif_input.close();
     vector<vector<double>> d1, d2, d3, dens;
 
-    int points = make_hirshfeld_grids(opt.pbc,
+    make_hirshfeld_grids(opt.pbc,
       opt.accuracy,
-      opt.groups[0],
       unit_cell,
       wavy[0],
       atom_type_list,
-      asym_atom_to_type_list,
       asym_atom_list,
       needs_grid,
       d1, d2, d3, dens,
@@ -739,7 +737,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < 4; i++)
       k_pt[i].resize(size*phi_size*theta_size, 0.0);
 
-    int null = 0;
+    //int null = 0;
 #pragma omp parallel for
     for (int ref = 1; ref <= size; ref++) {
       for (int p = 0; p < phi_size; p++) {
@@ -798,12 +796,12 @@ int main(int argc, char** argv)
       //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
       for (int i = 0; i < k_pt[0].size(); i++) {
         result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
-        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]), log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]), log_file, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]), log_file, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]));
+        result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]));
+        result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]));
         result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 1, 0, 0, 0, 0, 0, 0, 0, false);
-        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), log_file, 2, 1, 0, 0, 1, 0, 0, 0, false);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 1, 0, 0, 0, 0, 0, 0, 0);
+        result << showpos << setw(16) << setprecision(8) << scientific << O.get_custom_form_factor((k_pt[3][i]), 2, 1, 0, 0, 1, 0, 0, 0);
         result << "\n";
       }
       log_file << " ... done!" << endl;
@@ -821,18 +819,18 @@ int main(int argc, char** argv)
         sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
 
         result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][s] / FOUR_PI);
-        double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s])) / h2;
         result << showpos << setw(16) << setprecision(8) << scientific << temp;
-        temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s])) / h2;
         result << showpos << setw(16) << setprecision(8) << scientific << temp;
-        temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s], log_file, false)) / h2;
+        temp = fact * (wavy[0].get_atom_charge(0) - O_cat.get_form_factor(k_pt[3][s])) / h2;
         result << showpos << setw(16) << setprecision(8) << scientific << temp;
 
         result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][s].real(), 2) + pow(sf[0][s].imag(), 2));
 
-        temp = fact * (2 - O.get_custom_form_factor(k_pt[3][s], log_file, 1, 0, 0, 0, 0, 0, 0, 0, false)) / h2;
+        temp = fact * (2 - O.get_custom_form_factor(k_pt[3][s], 1, 0, 0, 0, 0, 0, 0, 0)) / h2;
         result << showpos << setw(16) << setprecision(8) << scientific << temp;
-        temp = fact * (6 - O.get_custom_form_factor(k_pt[3][s], log_file, 2, 1, 0, 0, 1, 0, 0, 0, false)) / h2;
+        temp = fact * (6 - O.get_custom_form_factor(k_pt[3][s], 2, 1, 0, 0, 1, 0, 0, 0)) / h2;
         result << showpos << setw(16) << setprecision(8) << scientific << temp;
         result << "\n";
       }

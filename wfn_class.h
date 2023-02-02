@@ -112,7 +112,7 @@ public:
   int get_origin() const { return origin; };
   std::string get_comment() { return comment; };
   double get_exponent(int nr) const { return exponents[nr]; };
-  unsigned int get_nr_electrons(const bool& debug);
+  unsigned int get_nr_electrons();
   unsigned int get_nr_ECP_electrons();
   double count_nr_electrons(void);
   std::string get_centers(const bool& bohr);
@@ -167,9 +167,9 @@ public:
   int get_shell_type(const int& nr_atom, const int& nr_shell);
   int get_shell_center(const int& nr_atom, const int& nr_shell);
   int get_basis_set_shell(const int& nr_atom, const int& nr_prim);
-  int get_shell_start(const int& nr_atom, const int& nr_shell, const bool &debug = false);
+  int get_shell_start(const int& nr_atom, const int& nr_shell);
   int get_shell_start_in_primitives(const int& nr_atom, const int& nr_shell);
-  int get_shell_end(const int& nr_atom, const int& nr_shell, const bool &debug = false);
+  int get_shell_end(const int& nr_atom, const int& nr_shell);
   bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge);
   bool push_back_atom(const atom& given);
   //atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
@@ -195,7 +195,7 @@ public:
   void computeELF(const double* PosGrid, double& Elf);
   double computeMO(const double* PosGrid, const int& mo);
   double compute_MO_spherical(const double& Pos1, const double& Pos2, const double& Pos3, const int& MO);
-  double computeESP(double* PosGrid, std::vector<std::vector<double> >& d2);
+  double computeESP(const double* PosGrid, std::vector<std::vector<double> >& d2);
   //----------DM Handling--------------------------------
   void push_back_DM(const double& value = 0.0);
   bool set_DM(const int& nr, const double& value = 0.0);

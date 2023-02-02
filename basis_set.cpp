@@ -59,7 +59,7 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << endl;
   }
-  int found_counter = 0;
+  //int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
     if (debug_dens) cout << "before: " << elements_list[i] << " " << i << endl;
     while (elements_list[i].find(" ") != -1) elements_list[i].erase(elements_list[i].find(" "), 1);
@@ -134,7 +134,7 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
       int nr_exp = 0;
       double pi = 3.14159265358979;
       char c_temp = '?';
-      double temp_vals[2];
+      double temp_vals[2](0);
       int dum = 0;
       if (file_type == 1) {
         stream >> count >> c_temp;
@@ -298,7 +298,7 @@ bool read_basis_set_vanilla(const string& basis_set_path, WFN& wave, const bool&
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << "," << endl;
   }
-  int found_counter = 0;
+  //int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
     if (debug_dens) cout << "before: " << elements_list[i] << " " << i << endl;
     while (elements_list[i].find(" ") != -1) { elements_list[i].erase(elements_list[i].find(" "), 1); } //Cut out spaces
@@ -497,7 +497,7 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
     cout << "This is the elements list:" << endl;
     for (int l = 0; l < elements_list.size(); l++) cout << l << ": " << elements_list[l] << endl;
   }
-  int found_counter = 0;
+  //int found_counter = 0;
   for (int i = 0; i < elements_list.size(); i++) {
     if (debug_dens) cout << "before: " << elements_list[i] << " " << i << endl;
     if (elements_list[i].find(" ")) elements_list[i].erase(elements_list[i].find(" "), 1);
@@ -564,9 +564,8 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
       stream << line;
       int count = 0;
       int nr_exp = 0;
-      double pi = 3.14159265358979;
       char c_temp = '?';
-      double temp[2];
+      double temp_num[2](0);
       int dum = 0;
       if (file_type == 1) {
         stream >> count >> c_temp;
@@ -587,9 +586,9 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
         }
         stringstream stream2;
         stream2 << line;
-        if (file_type == 1) stream2 >> temp[0] >> temp[1];
-        else if (file_type == 2) stream2 >> dum >> temp[0] >> temp[1];
-        else if (file_type == 3) stream2 >> temp[0] >> temp[1];
+        if (file_type == 1) stream2 >> temp_num[0] >> temp_num[1];
+        else if (file_type == 2) stream2 >> dum >> temp_num[0] >> temp_num[1];
+        else if (file_type == 3) stream2 >> temp_num[0] >> temp_num[1];
         //this is where i started copying
         for (int h = 0; h < wave.get_ncen(); h++) {
           //skip atoms taht already have a basis set!
@@ -662,7 +661,7 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
   return true;
 };
 
-bool delete_basis_set_vanilla(const string& basis_set_path, WFN& wave, bool debug)
+bool delete_basis_set_vanilla(WFN& wave)
 {
   for (int a = 0; a < wave.get_ncen(); a++) {
     int nr_prim = wave.get_atom_primitive_count(a);

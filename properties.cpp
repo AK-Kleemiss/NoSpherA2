@@ -24,7 +24,7 @@ void Calc_Spherical_Dens(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Spherical Density" };
   const int step = (int) max( floor(3 * CubeSpher.get_size(0) / 20.0), 1.0);
@@ -38,11 +38,9 @@ void Calc_Spherical_Dens(
     for (int j = -CubeSpher.get_size(1); j < 2 * CubeSpher.get_size(1); j++)
       for (int k = -CubeSpher.get_size(2); k < 2 * CubeSpher.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0);
-        PosGrid[1] = i * CubeSpher.get_vector(1, 0) + j * CubeSpher.get_vector(1, 1) + k * CubeSpher.get_vector(1, 2) + CubeSpher.get_origin(1);
-        PosGrid[2] = i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2);
+        const double PosGrid[3]{ i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
+                                 i * CubeSpher.get_vector(1, 0) + j * CubeSpher.get_vector(1, 1) + k * CubeSpher.get_vector(1, 2) + CubeSpher.get_origin(1),
+                                 i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2) };
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++) {
@@ -89,7 +87,7 @@ void Calc_Spherical_Dens(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -114,7 +112,7 @@ void Calc_Static_Def(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Deformation Density" };
   const int step = (int) max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
@@ -128,11 +126,9 @@ void Calc_Static_Def(
     for (int j = -CubeDEF.get_size(1); j < 2 * CubeDEF.get_size(1); j++)
       for (int k = -CubeDEF.get_size(2); k < 2 * CubeDEF.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0);
-        PosGrid[1] = i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1);
-        PosGrid[2] = i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2);
+        const double PosGrid[3]{ i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
+                                 i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1),
+                                 i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2) };
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -179,7 +175,7 @@ void Calc_Static_Def(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -205,7 +201,7 @@ void Calc_Static_Def(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Deformation Density" };
   const int step = (int) max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
@@ -215,11 +211,9 @@ void Calc_Static_Def(
     for (int j = -CubeDEF.get_size(1); j < 2 * CubeDEF.get_size(1); j++)
       for (int k = -CubeDEF.get_size(2); k < 2 * CubeDEF.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0);
-        PosGrid[1] = i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1);
-        PosGrid[2] = i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2);
+        const double PosGrid[3]{ i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
+                                 i * CubeDEF.get_vector(1, 0) + j * CubeDEF.get_vector(1, 1) + k * CubeDEF.get_vector(1, 2) + CubeDEF.get_origin(1),
+                                 i * CubeDEF.get_vector(2, 0) + j * CubeDEF.get_vector(2, 1) + k * CubeDEF.get_vector(2, 2) + CubeDEF.get_origin(2) };
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -261,7 +255,7 @@ void Calc_Static_Def(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -273,7 +267,7 @@ void Calc_Hirshfeld(
   WFN& wavy,
   int cpus,
   double radius,
-  int ignore,
+  int ignore_atom,
   ofstream& file
 )
 {
@@ -287,7 +281,7 @@ void Calc_Hirshfeld(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
   const int step = (int) max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
@@ -301,14 +295,12 @@ void Calc_Hirshfeld(
     for (int j = -CubeHDEF.get_size(1); j < 2 * CubeHDEF.get_size(1); j++)
       for (int k = -CubeHDEF.get_size(2); k < 2 * CubeHDEF.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0);
-        PosGrid[1] = i * CubeHDEF.get_vector(1, 0) + j * CubeHDEF.get_vector(1, 1) + k * CubeHDEF.get_vector(1, 2) + CubeHDEF.get_origin(1);
-        PosGrid[2] = i * CubeHDEF.get_vector(2, 0) + j * CubeHDEF.get_vector(2, 1) + k * CubeHDEF.get_vector(2, 2) + CubeHDEF.get_origin(2);
+        const double PosGrid[3]{ i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0),
+                                 i * CubeHDEF.get_vector(1, 0) + j * CubeHDEF.get_vector(1, 1) + k * CubeHDEF.get_vector(1, 2) + CubeHDEF.get_origin(1),
+                                 i * CubeHDEF.get_vector(2, 0) + j * CubeHDEF.get_vector(2, 1) + k * CubeHDEF.get_vector(2, 2) + CubeHDEF.get_origin(2) };
 
         bool skip = true;
-        if (sqrt(pow(PosGrid[0] - wavy.atoms[ignore].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore].z, 2)) < radius / 0.52)
+        if (sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2)) < radius / 0.52)
           skip = false;
         if (skip)
           continue;
@@ -319,7 +311,7 @@ void Calc_Hirshfeld(
         for (int a = 0; a < wavy.get_ncen(); a++) {
           dist = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
           temp = atoms[a].get_radial_density(dist);
-          if (ignore == a)
+          if (ignore_atom == a)
             dens_choice = temp;
           dens_all += temp;
         }
@@ -355,7 +347,7 @@ void Calc_Hirshfeld(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -368,7 +360,7 @@ void Calc_Hirshfeld(
   WFN& wavy,
   int cpus,
   double radius,
-  int ignore,
+  int ignore_atom,
   ofstream& file
 )
 {
@@ -382,26 +374,24 @@ void Calc_Hirshfeld(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
   const int step = (int) max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
 
-  Thakkar atom(wavy.get_atom_charge(ignore));
+  Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeHDEF.get_size(0); i < 2 * CubeHDEF.get_size(0); i++) {
     for (int j = -CubeHDEF.get_size(1); j < 2 * CubeHDEF.get_size(1); j++)
       for (int k = -CubeHDEF.get_size(2); k < 2 * CubeHDEF.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0);
-        PosGrid[1] = i * CubeHDEF.get_vector(1, 0) + j * CubeHDEF.get_vector(1, 1) + k * CubeHDEF.get_vector(1, 2) + CubeHDEF.get_origin(1);
-        PosGrid[2] = i * CubeHDEF.get_vector(2, 0) + j * CubeHDEF.get_vector(2, 1) + k * CubeHDEF.get_vector(2, 2) + CubeHDEF.get_origin(2);
+        const double PosGrid[3]{ i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0),
+                                 i * CubeHDEF.get_vector(1, 0) + j * CubeHDEF.get_vector(1, 1) + k * CubeHDEF.get_vector(1, 2) + CubeHDEF.get_origin(1),
+                                 i * CubeHDEF.get_vector(2, 0) + j * CubeHDEF.get_vector(2, 1) + k * CubeHDEF.get_vector(2, 2) + CubeHDEF.get_origin(2) };
 
         bool skip = true;
-        double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore].z, 2));
+        double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2));
         if (dist < radius / 0.52)
           skip = false;
         if (skip)
@@ -437,7 +427,7 @@ void Calc_Hirshfeld(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -450,7 +440,7 @@ void Calc_Hirshfeld_atom(
   WFN& wavy,
   int cpus,
   double radius,
-  int ignore,
+  int ignore_atom,
   ofstream& file
 )
 {
@@ -464,26 +454,24 @@ void Calc_Hirshfeld_atom(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
   const int step = (int) max(floor(3 * CubeHirsh.get_size(0) / 20.0), 1.0);
 
-  Thakkar atom(wavy.get_atom_charge(ignore));
+  Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = -CubeHirsh.get_size(0); i < 2 * CubeHirsh.get_size(0); i++) {
     for (int j = -CubeHirsh.get_size(1); j < 2 * CubeHirsh.get_size(1); j++)
       for (int k = -CubeHirsh.get_size(2); k < 2 * CubeHirsh.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0);
-        PosGrid[1] = i * CubeHirsh.get_vector(1, 0) + j * CubeHirsh.get_vector(1, 1) + k * CubeHirsh.get_vector(1, 2) + CubeHirsh.get_origin(1);
-        PosGrid[2] = i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2);
+        const double PosGrid[3]{ i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
+                                 i * CubeHirsh.get_vector(1, 0) + j * CubeHirsh.get_vector(1, 1) + k * CubeHirsh.get_vector(1, 2) + CubeHirsh.get_origin(1),
+                                 i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2) };
 
         bool skip = true;
-        double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore].z, 2));
+        double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2));
         if (dist < radius / 0.52)
           skip = false;
         if (skip)
@@ -519,7 +507,7 @@ void Calc_Hirshfeld_atom(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -543,7 +531,7 @@ void Calc_Rho(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
   const int step = (int) max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
@@ -553,12 +541,12 @@ void Calc_Rho(
     for (int j = -CubeRho.get_size(1); j < 2 * CubeRho.get_size(1); j++)
       for (int k = -CubeRho.get_size(2); k < 2 * CubeRho.get_size(2); k++) {
 
-        double PosGrid[3],
-          Rho;
-
-        PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
-        PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
-        PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
+        double PosGrid[3]{ 
+          i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
+          i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
+          i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) 
+        },
+        Rho = 0;
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -599,7 +587,7 @@ void Calc_Rho(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -620,7 +608,7 @@ void Calc_Rho_spherical_harmonics(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Rho" };
   const int step = (int) max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
@@ -638,11 +626,11 @@ void Calc_Rho_spherical_harmonics(
       for (int j = 0; j < CubeRho.get_size(1); j++)
         for (int k = 0; k < CubeRho.get_size(2); k++) {
 
-          double PosGrid[3];
-
-          PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
-          PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
-          PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
+          double PosGrid[3]{
+          i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
+          i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
+          i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) 
+          };
 
           CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
         }
@@ -653,7 +641,7 @@ void Calc_Rho_spherical_harmonics(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -677,7 +665,7 @@ void Calc_MO_spherical_harmonics(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
   const int step = (int) max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
@@ -687,11 +675,11 @@ void Calc_MO_spherical_harmonics(
     for (int j = 0; j < CubeMO.get_size(1); j++)
       for (int k = 0; k < CubeMO.get_size(2); k++) {
 
-        double PosGrid[3];
-
-        PosGrid[0] = i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0);
-        PosGrid[1] = i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1);
-        PosGrid[2] = i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2);
+        double PosGrid[3]{
+        i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
+        i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
+        i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)
+        };
 
         CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(PosGrid[0], PosGrid[1], PosGrid[2], MO));
       }
@@ -701,7 +689,7 @@ void Calc_MO_spherical_harmonics(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -731,7 +719,7 @@ void Calc_Prop(
 #endif
 
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = NULL;
   if(!test) progress = new progress_bar{file, 50u, "Calculating Values"};
@@ -742,17 +730,17 @@ void Calc_Prop(
     for (int j = -CubeRho.get_size(1); j < 2 * CubeRho.get_size(1); j++)
       for (int k = -CubeRho.get_size(2); k < 2 * CubeRho.get_size(2); k++) {
 
-        double PosGrid[3],
-          Rho,
-          Grad,
-          Elf,
-          Eli,
-          Lap,
-          Hess[9];
-
-        PosGrid[0] = i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0);
-        PosGrid[1] = i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1);
-        PosGrid[2] = i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2);
+        double PosGrid[3]{
+          i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
+          i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
+          i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)
+        },
+          Rho=0,
+          Grad=0,
+          Elf=0,
+          Eli=0,
+          Lap=0,
+          Hess[9](0);
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -871,7 +859,7 @@ void Calc_Prop(
   if (!test) {
     delete(progress);
     time_t end;
-    time(&end);
+    std::time(&end);
     if (difftime(end, start) < 60) file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
     else if (difftime(end, start) < 3600) file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
     else file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -896,7 +884,7 @@ void Calc_ESP(
   }
 #endif
   time_t start;
-  time(&start);
+  std::time(&start);
   vector < vector <double> > d2;
   d2.resize(wavy.get_ncen());
   for (int i = 0; i < wavy.get_ncen(); i++) {
@@ -918,13 +906,14 @@ void Calc_ESP(
   for (int i = -CubeESP.get_size(0); i < 2 * CubeESP.get_size(0); i++) {
     double temp;
     int temp_i, temp_j, temp_k;
-    double PosGrid[3];
+    
     for (int j = -CubeESP.get_size(1); j < 2 * CubeESP.get_size(1); j++)
       for (int k = -CubeESP.get_size(2); k < 2 * CubeESP.get_size(2); k++) {
-
-        PosGrid[0] = i * CubeESP.get_vector(0, 0) + j * CubeESP.get_vector(0, 1) + k * CubeESP.get_vector(0, 2) + CubeESP.get_origin(0);
-        PosGrid[1] = i * CubeESP.get_vector(1, 0) + j * CubeESP.get_vector(1, 1) + k * CubeESP.get_vector(1, 2) + CubeESP.get_origin(1);
-        PosGrid[2] = i * CubeESP.get_vector(2, 0) + j * CubeESP.get_vector(2, 1) + k * CubeESP.get_vector(2, 2) + CubeESP.get_origin(2);
+        const double PosGrid[3]{
+        i * CubeESP.get_vector(0, 0) + j * CubeESP.get_vector(0, 1) + k * CubeESP.get_vector(0, 2) + CubeESP.get_origin(0),
+        i * CubeESP.get_vector(1, 0) + j * CubeESP.get_vector(1, 1) + k * CubeESP.get_vector(1, 2) + CubeESP.get_origin(1),
+        i * CubeESP.get_vector(2, 0) + j * CubeESP.get_vector(2, 1) + k * CubeESP.get_vector(2, 2) + CubeESP.get_origin(2)
+        };
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -967,7 +956,7 @@ void Calc_ESP(
     delete(progress);
 
     time_t end;
-    time(&end);
+    std::time(&end);
     if (difftime(end, start) < 60) file << "Time to calculate ESP: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
     else if (difftime(end, start) < 3600) file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
     else file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
@@ -992,7 +981,7 @@ void Calc_MO(
   }
 #endif
   time_t start;
-  time(&start);
+  std::time(&start);
 
   progress_bar* progress = new progress_bar{ file, 50u, "Calculating MO" };
   const int step = (int) max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
@@ -1002,12 +991,12 @@ void Calc_MO(
     for (int j = -CubeMO.get_size(1); j < 2 * CubeMO.get_size(1); j++)
       for (int k = -CubeMO.get_size(2); k < 2 * CubeMO.get_size(2); k++) {
 
-        double PosGrid[3];
-        double MO;
-
-        PosGrid[0] = i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0);
-        PosGrid[1] = i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1);
-        PosGrid[2] = i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2);
+        const double PosGrid[3]{
+          i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
+          i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
+          i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)
+        };
+        double MO = 0;
 
         bool skip = true;
         for (int a = 0; a < wavy.get_ncen(); a++)
@@ -1051,7 +1040,7 @@ void Calc_MO(
   delete(progress);
 
   time_t end;
-  time(&end);
+  std::time(&end);
   if (difftime(end, start) < 60) file << "Time to calculate MO: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
   else if (difftime(end, start) < 3600) file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;

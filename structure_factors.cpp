@@ -421,11 +421,9 @@ void read_atoms_from_CIF(ifstream& cif_input,
 //returns number of gridpoints in the final total grid
 int make_hirshfeld_grids(const int& pbc,
   const int& accuracy,
-  const vector <int>& input_groups,
   cell& unit_cell,
   const WFN& wave,
   const vector <int>& atom_type_list,
-  const vector <int>& asym_atom_to_type_list,
   const vector <int>& asym_atom_list,
   vector <bool>& needs_grid,
   vector<vector<double>>& d1,
@@ -604,8 +602,8 @@ int make_hirshfeld_grids(const int& pbc,
 
   for (int i = 0; i < atom_type_list.size(); i++) {
     if (debug) file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
-    double alpha_max_temp;
-    int max_l_temp;
+    double alpha_max_temp(0);
+    int max_l_temp(0);
     vector<double> alpha_min_temp(max_l_overall);
     for (int j = 0; j < wave.get_ncen(); j++) {
       if (wave.get_atom_charge(j) == 119) {
@@ -714,7 +712,6 @@ int make_hirshfeld_grids(const int& pbc,
       alpha_max_temp,
       max_l_temp,
       alpha_min_temp.data(),
-      debug,
       file));
 
   }
@@ -1005,7 +1002,7 @@ int make_hirshfeld_grids(const int& pbc,
     if (debug) {
       file << "Making grid for atom " << i << endl;
     }
-    int type;
+    int type = 0;
     for (int j = 0; j < atom_type_list.size(); j++)
       if (atom_type_list[j] == wave.get_atom_charge(i))
         type = j;
@@ -1287,13 +1284,13 @@ int make_hirshfeld_grids(const int& pbc,
   }
   //fill out with priodic information
   if (pbc != 0) {
-    for (int x = -pbc; x < pbc + 1; x++)
-      for (int y = -pbc; y < pbc + 1; y++)
-        for (int z = -pbc; z < pbc + 1; z++) {
-          if (x == 0 && y == 0 && z == 0)
+    for (int _x = -pbc; _x < pbc + 1; _x++)
+      for (int _y = -pbc; _y < pbc + 1; _y++)
+        for (int _z = -pbc; _z < pbc + 1; _z++) {
+          if (_x == 0 && _y == 0 && _z == 0)
             continue;
           for (int i = 0; i < wave.get_ncen(); i++) {
-            int type_list_number = -1;
+            type_list_number = -1;
             //int nr = all_atom_list[i];
             for (int j = 0; j < atom_type_list.size(); j++)
               if (wave.get_atom_charge(i) == atom_type_list[j])
@@ -1305,9 +1302,9 @@ int make_hirshfeld_grids(const int& pbc,
                   radial_density[type_list_number],
                   radial_dist[type_list_number],
                   sqrt(
-                    pow(grid[g][0][p] - (wave.atoms[i].x + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2)), 2)
-                    + pow(grid[g][1][p] - (wave.atoms[i].y + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2)), 2)
-                    + pow(grid[g][2][p] - (wave.atoms[i].z + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2)), 2)
+                      pow(grid[g][0][p] - (wave.atoms[i].x + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2)
+                    + pow(grid[g][1][p] - (wave.atoms[i].y + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2)
+                    + pow(grid[g][2][p] - (wave.atoms[i].z + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)
                   ),
                   lincr,
                   min_dist
@@ -1333,13 +1330,13 @@ int make_hirshfeld_grids(const int& pbc,
 
 #endif
 
-  double cutoff;
+  double _cutoff;
   if (accuracy < 3)
-    cutoff = 1E-10;
+    _cutoff = 1E-10;
   else if (accuracy == 3)
-    cutoff = 1E-14;
+    _cutoff = 1E-14;
   else
-    cutoff = 1E-30;
+    _cutoff = 1E-30;
 #ifndef FLO_CUDA
   vector<int> new_gridsize(atoms_with_grids, 0);
   vector<int> reductions(atoms_with_grids, 0);
@@ -1691,16 +1688,16 @@ int make_hirshfeld_grids(const int& pbc,
       int j = 0;
       for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
         periodic_grid[d].resize(total_grid[5].size());
-      for (int x = -pbc; x < pbc + 1; x++)
-        for (int y = -pbc; y < pbc + 1; y++)
-          for (int z = -pbc; z < pbc + 1; z++) {
-            if (x == 0 && y == 0 && z == 0)
+      for (int _x = -pbc; _x < pbc + 1; _x++)
+        for (int _y = -pbc; _y < pbc + 1; _y++)
+          for (int _z = -pbc; _z < pbc + 1; _z++) {
+            if (_x == 0 && _y == 0 && _z == 0)
               continue;
 #pragma omp parallel for
             for (int i = 0; i < total_grid[0].size(); i++) {
-              periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + x * unit_cell.get_cm(0, 0) + y * unit_cell.get_cm(0, 1) + z * unit_cell.get_cm(0, 2),
-                total_grid[1][i] + x * unit_cell.get_cm(1, 0) + y * unit_cell.get_cm(1, 1) + z * unit_cell.get_cm(1, 2),
-                total_grid[2][i] + x * unit_cell.get_cm(2, 0) + y * unit_cell.get_cm(2, 1) + z * unit_cell.get_cm(2, 2), true);
+              periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
+                                                      total_grid[1][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
+                                                      total_grid[2][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2), true);
             }
             j++;
           }
@@ -1708,10 +1705,10 @@ int make_hirshfeld_grids(const int& pbc,
         for (int i = 0; i < total_grid[0].size(); i++) {
           if (i % 1000 == 0)
             file << "Old dens: " << total_grid[5][i] << " contributions of neighbour-cells:";
-          for (int j = 0; j < pow(pbc * 2 + 1, 3) - 1; j++) {
+          for (int _j = 0; _j < pow(pbc * 2 + 1, 3) - 1; _j++) {
             if (i % 1000 == 0)
-              file << " " << periodic_grid[j][i];
-            total_grid[5][i] += periodic_grid[j][i];
+              file << " " << periodic_grid[_j][i];
+            total_grid[5][i] += periodic_grid[_j][i];
           }
           if (i % 1000 == 0)
             file << endl;
@@ -1925,8 +1922,8 @@ int make_hirshfeld_grids(const int& pbc,
   }
   shrink_vector<vector<double>>(spherical_density);
 #pragma omp parallel for
-  for (int grid = 0; grid < total_grid.size(); grid++)
-    shrink_vector<double>(total_grid[grid]);
+  for (int _grid = 0; _grid < total_grid.size(); _grid++)
+    shrink_vector<double>(total_grid[_grid]);
   shrink_vector<vector<double>>(total_grid);
 #endif
   return points;
@@ -2100,8 +2097,8 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
     for (int i = 0; i < asym_atom_list.size(); i++) {
       temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) {
-        double k_0001 = temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
-        double k_1 = temp[i].get_core_form_factor(FOUR_PI * bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+        double k_0001 = temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons);
+        double k_1 = temp[i].get_core_form_factor(FOUR_PI * bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons);
         file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0.0001): "
           << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
       }
@@ -2112,7 +2109,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       it = next(hkl.begin(), s);
       k = FOUR_PI * bohr2ang(cell.get_stl_of_hkl(*it));
       for (int i = 0; i < asym_atom_list.size(); i++) {
-        sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons, file, debug);
+        sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
       }
     }
   }
@@ -2146,7 +2143,7 @@ bool thakkar_sfac(
 {
   err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(opt.debug) << endl;
+  file << "Number of protons: " << wave.get_nr_electrons() << endl;
   file << "Reading: " << opt.hkl;
   file.flush();
 
@@ -2293,7 +2290,7 @@ bool thakkar_sfac(
     it = next(hkl.begin(), s);
     double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
-      sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
+      sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
   }
 
   if (opt.electron_diffraction) {
@@ -2340,7 +2337,7 @@ tsc_block MTC_thakkar_sfac(
 {
   err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave[nr].get_nr_electrons(opt.debug) << endl;
+  file << "Number of protons: " << wave[nr].get_nr_electrons() << endl;
   file << "Reading: " << opt.hkl;
   file.flush();
 
@@ -2392,7 +2389,7 @@ tsc_block MTC_thakkar_sfac(
     spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
   const int imax = (int) asym_atom_list.size();
-  const int amax = (int) atom_type_list.size();
+  //const int amax = (int) atom_type_list.size();
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for
@@ -2405,7 +2402,7 @@ tsc_block MTC_thakkar_sfac(
     it = next(hkl.begin(), s);
     double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
-      sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k, file, false);
+      sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
   }
 
   if (opt.electron_diffraction) {
@@ -2450,7 +2447,7 @@ bool calculate_structure_factors_HF(
 #endif
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
+  file << "Number of protons: " << wave.get_nr_electrons() << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (opt.threads != -1) {
@@ -2503,11 +2500,9 @@ bool calculate_structure_factors_HF(
 
   int points = make_hirshfeld_grids(opt.pbc,
     opt.accuracy,
-    opt.groups[0],
     unit_cell,
     wave,
     atom_type_list,
-    asym_atom_to_type_list,
     asym_atom_list,
     needs_grid,
     d1, d2, d3, dens,
@@ -2645,7 +2640,7 @@ tsc_block calculate_structure_factors_MTC(
       err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i] + " does not exists!", file);
     }
   }
-  file << "Number of protons: " << wave[nr].get_nr_electrons(opt.debug) << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
+  file << "Number of protons: " << wave[nr].get_nr_electrons() << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
   if (wave[nr].get_has_ECPs()) file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (opt.ncpus != -1) {
@@ -2697,11 +2692,9 @@ tsc_block calculate_structure_factors_MTC(
 
   const int points = make_hirshfeld_grids(opt.pbc,
     opt.accuracy,
-    opt.groups[nr],
     unit_cell,
     wave[nr],
     atom_type_list,
-    asym_atom_to_type_list,
     asym_atom_list,
     needs_grid,
     d1, d2, d3, dens,
