@@ -1258,7 +1258,6 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
         if (d_run == 0) {
           for (int _i = 0; _i < 5; _i++) {
             d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            fill(d_temp[_i].begin(), d_temp[_i].end(), 0.0);
           }
         }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
@@ -1292,7 +1291,6 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
         if (f_run == 0) {
           for (int _i = 0; _i < 7; _i++) {
             f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            fill(f_temp[_i].begin(), f_temp[_i].end(), 0.0);
           }
         }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
@@ -1326,7 +1324,6 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
         if (g_run == 0) {
           for (int _i = 0; _i < 9; _i++) {
             g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            fill(g_temp[_i].begin(), g_temp[_i].end(), 0.0);
           }
         }
         for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
@@ -1599,7 +1596,6 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
           if (d_run == 0) {
             for (int _i = 0; _i < 5; _i++) {
               d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-              fill(d_temp[_i].begin(), d_temp[_i].end(), 0.0);
             }
           }
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
@@ -1633,7 +1629,6 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
           if (f_run == 0) {
             for (int _i = 0; _i < 7; _i++) {
               f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-              fill(f_temp[_i].begin(), f_temp[_i].end(), 0.0);
             }
           }
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
@@ -1665,9 +1660,8 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
         }
         case 5: {
           if (g_run == 0) {
-            for (int _i = 0; _i < 9; i++) {
+            for (int _i = 0; _i < 9; _i++) {
               g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-              fill(g_temp[_i].begin(), g_temp[_i].end(), 0.0);
             }
           }
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
