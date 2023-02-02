@@ -134,7 +134,7 @@ bool read_basis_set(const string& basis_set_path, WFN& wave, bool debug)
       int nr_exp = 0;
       double pi = 3.14159265358979;
       char c_temp = '?';
-      double temp_vals[2](0);
+      double temp_vals[2]{ 0,0 };
       int dum = 0;
       if (file_type == 1) {
         stream >> count >> c_temp;
@@ -565,7 +565,7 @@ bool read_basis_set_missing(const string& basis_set_path, WFN& wave, bool debug)
       int count = 0;
       int nr_exp = 0;
       char c_temp = '?';
-      double temp_num[2](0);
+      double temp_num[2]{ 0,0 };
       int dum = 0;
       if (file_type == 1) {
         stream >> count >> c_temp;

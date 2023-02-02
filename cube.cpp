@@ -507,7 +507,7 @@ cube cube::operator+(cube& right) const {
     int run_y = 0;
     string line2;
     ifstream file2(right.path.c_str(), ios::in);
-    double tmp[6](0);
+    double tmp[6]{ 0,0,0,0,0,0 };
     for (int i = 0; i < 6 + na; i++)
       if (!right.get_loaded()) getline(file2, line2);
     while (run_x < size[0] && run_y < size[1] && !file2.eof()) {
@@ -592,7 +592,7 @@ cube cube::operator-(cube& right) const {
     int run_y = 0;
     string line2;
     ifstream file2(right.path.c_str(), ios::in);
-    double tmp[6](0);
+    double tmp[6]{ 0,0,0,0,0,0 };
     for (int i = 0; i < 6 + na; i++)
       if (!right.get_loaded()) getline(file2, line2);
     while (run_x < size[0] && run_y < size[1] && !file2.eof()) {
@@ -677,7 +677,7 @@ cube cube::operator*(cube& right) const {
     int run_y = 0;
     string line2;
     ifstream file2(right.path.c_str(), ios::in);
-    double tmp[6](0);
+    double tmp[6]{ 0,0,0,0,0,0 };
     for (int i = 0; i < 6 + na; i++)
       if (!right.get_loaded()) getline(file2, line2);
     while (run_x < size[0] && run_y < size[1] && !file2.eof()) {
@@ -762,7 +762,7 @@ cube cube::operator/(cube& right) const {
     int run_y = 0;
     string line2;
     ifstream file2(right.path.c_str(), ios::in);
-    double tmp[6](0);
+    double tmp[6]{ 0,0,0,0,0,0 };
     for (int i = 0; i < 6 + na; i++)
       if (!right.get_loaded()) getline(file2, line2);
     while (run_x < size[0] && run_y < size[1] && !file2.eof()) {
@@ -992,7 +992,7 @@ bool cube::set_origin(unsigned int i, double value) {
 };
 
 string cube::super_cube() {
-  int m[3](0);
+  int m[3]{ 0,0,0 };
   cout << "How many times in X-direction? ";
   cin >> m[0];
   while (m[0] <= 0 || m[0] > 20) {
