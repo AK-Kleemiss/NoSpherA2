@@ -1348,7 +1348,7 @@ int make_hirshfeld_grids(const int& pbc,
 #pragma omp parallel for reduction(+:final_size)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
-        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > cutoff) {
+        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > _cutoff) {
           new_gridsize[i]++;
         }
       }
@@ -1365,7 +1365,7 @@ int make_hirshfeld_grids(const int& pbc,
       }
       int reduction = 0;
       for (int p = 0; p < num_points[i]; p++) {
-        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > cutoff) {
+        if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > _cutoff) {
           for (int k = 0; k < 5; k++)
             total_grid[k][p + offset - reduction] = grid[i][k][p];
           total_grid[6][p + offset - reduction] = grid[i][5][p];
@@ -1741,7 +1741,7 @@ int make_hirshfeld_grids(const int& pbc,
     for (int a = 0; a < i; a++)
       start_p += num_points[a];
     for (int p = start_p; p < start_p + num_points[i]; p++) {
-      if (abs(total_grid[6][p]) > cutoff) {
+      if (abs(total_grid[6][p]) > _cutoff) {
         atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
         atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
       }
@@ -1827,7 +1827,7 @@ int make_hirshfeld_grids(const int& pbc,
     //file << "At atom: " << i;
     gpuErrchk(cudaMemcpy(temp_dens.data(), gpu_spherical_density[0][i], sizeof(float) * num_points[i], cudaMemcpyDeviceToHost));
     for (int p = 0; p < 0 + num_points[i]; p++) {
-      if (abs(temp_dens[p]) > cutoff) {
+      if (abs(temp_dens[p]) > _cutoff) {
         dens[i].push_back(temp_dens[p]);
         d1[i].push_back(Prototype_grids[type].get_gridx(p));
         d2[i].push_back(Prototype_grids[type].get_gridy(p));
@@ -1902,7 +1902,7 @@ int make_hirshfeld_grids(const int& pbc,
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       upper += abs(abs(total_grid[5][p]) * total_grid[3][p] - abs(total_grid[4][p]) * total_grid[3][p]);
       lower += abs(total_grid[5][p]) * total_grid[3][p];
-      if (abs(res) > cutoff) {
+      if (abs(res) > _cutoff) {
         dens[i][run] = (res);
         d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
         d2[i][run] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
