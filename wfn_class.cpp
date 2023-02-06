@@ -2447,7 +2447,7 @@ int WFN::check_order(const bool& debug)
   }
   //---------------------------check if the wfn is in the right order----------------------
   int order = 0; //1= gaussian (P=2222 3333 4444) 2= tonto (234 234 234 234) 3= ORCA (423 423 423 423)
-  int f_order = 0; //1=gaussian (F=11 12 13 17 14 15 18 19 16 20) 2=tonto=ORCA 3=ORCA (11 12 13 14 15 17 16 18 19 20)
+  int f_order = 0; //1=gaussian (F=11 12 13 17 14 15 18 19 16 20) 2=tonto=ORCA 3=ORCA (11 12 13 14 15 17 16 18 19 20) 4 = natural (11 12 13 14 15 16 17 18 19 20)
   int primcounter = 0;
   bool order_found = false;
   for (int a = 0; a < get_ncen(); a++) {
@@ -2622,7 +2622,20 @@ int WFN::check_order(const bool& debug)
             || types[get_shell_start_in_primitives(a, s) + 7 * get_atom_shell_primitives(a, s) + i] != 19
             || types[get_shell_start_in_primitives(a, s) + 8 * get_atom_shell_primitives(a, s) + i] != 16
             || types[get_shell_start_in_primitives(a, s) + 9 * get_atom_shell_primitives(a, s) + i] != 20) {
-            if (types[primcounter] != 11 || types[primcounter + 1] != 12 || types[primcounter + 2] != 13
+            if (types[primcounter] == 11 || types[primcounter + 1] == 12 || types[primcounter + 2] == 13
+              || types[primcounter + 3] == 14 || types[primcounter + 4] == 15 || types[primcounter + 5] == 16
+              || types[primcounter + 6] == 17 || types[primcounter + 7] == 18 || types[primcounter + 8] == 19 || types[primcounter + 9] == 20) {
+              f_order = 4;
+              if (debug) {
+                cout << "The checked types are 10 from #" << primcounter << " and are:" << endl;
+                cout << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
+                  << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
+                  << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
+                  << types[primcounter + 9] << endl;
+                cout << "Appears to be already okay..." << endl;
+              }
+            }
+            else if (types[primcounter] != 11 || types[primcounter + 1] != 12 || types[primcounter + 2] != 13
               || types[primcounter + 3] != 14 || types[primcounter + 4] != 15 || types[primcounter + 5] != 17
               || types[primcounter + 6] != 16 || types[primcounter + 7] != 18 || types[primcounter + 8] != 19 || types[primcounter + 9] != 20) {
               order = -1;
@@ -2939,6 +2952,11 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
         }
               break;
         }
+    break;
+  case 4:
+    if (debug) {
+      cout << "This is fine, i like them well ordered!" << endl;
+    }
     break;
   case 0:
     if (debug) {

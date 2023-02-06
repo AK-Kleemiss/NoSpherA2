@@ -958,7 +958,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     vector <vector <double> > changed_coefs;
     changed_coefs.resize(wave.get_nmo());
     if(debug){
-      file << "Opening nurm_cprim!" << endl;
+      file << "Opening norm_cprim!" << endl;
       ofstream norm_cprim("norm_prim.debug", ofstream::out);
       for (int m = 0; m < wave.get_nmo(); m++) {
         norm_cprim << m << ". MO:" << endl;
@@ -985,7 +985,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       }
     }
     //--------------Build CMO of alessandro from the first elements of each shell-------------
-    for (int m = 0; m < alpha_els; m++) {
+    for (int m = 0; m < wave.get_nmo(); m++) {
       int run_2 = 0;
       for (int a = 0; a < wave.get_ncen(); a++) {
         for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
@@ -1504,7 +1504,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     st_s.str("");
     runs = 0;
     for (int i = 0; i < nao * nao; i++) {
-      if (i < nao * alpha_els) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
+      if (i < nao * wave.get_nmo()) st_s << uppercase << scientific << setw(16) << setprecision(8) << CMO[i];
       else st_s << uppercase << scientific << setw(16) << setprecision(8) << 0.0;
       runs++;
       if ((runs % 5 == 0 && runs != 0) || i == nao * nao - 1) st_s << endl;
