@@ -1245,7 +1245,20 @@ const double normgauss(const int& type, const double& exp)
   int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
   return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g) {
+bool generate_sph2cart_mat(vector<vector<double>>&p, vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g) {
+  //                                                   
+  //From 3P: P0 P1 P2
+  //To 3P : Z X Y (4 2 3, as in ORCA format)
+  // 
+  p.resize(3);
+#pragma omp parallel for
+  for (int i = 0; i < 3; i++) {
+    p[i].resize(3, 0.0);
+  }
+  p[0][2] = 1.0;
+  p[1][0] = 1.0;
+  p[2][1] = 1.0;
+  
   //                                                   
   //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
   //To 6D : 5  6  7  8  9 10                           

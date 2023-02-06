@@ -564,7 +564,7 @@ int main(int argc, char** argv)
     err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
     wavy.push_back(WFN(9));
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
-    wavy[0].write_wfn("converted.wfn", false, true);
+    wavy[0].write_wfn("converted.wfn", false, false);
     log_file.flush();
     log_file.close();
     return 0;
