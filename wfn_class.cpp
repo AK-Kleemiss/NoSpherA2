@@ -1182,10 +1182,11 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
   //vector<double> norm_const = get_norm_const(file);
   //int norm_const_run = 0;
   int MO_run = 0;
+  vector<vector<double>> p_pure_2_cart;
   vector<vector<double>> d_pure_2_cart;
   vector<vector<double>> f_pure_2_cart;
   vector<vector<double>> g_pure_2_cart;
-  err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
+  err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
   while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos) {
     run++;
     temp = split_string<string>(line, " ");
@@ -1207,6 +1208,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
     push_back_MO(run, occup, ene);
     //int run_coef = 0;
     int p_run = 0;
+    vector<vector<double>> p_temp(3);
     int d_run = 0;
     vector<vector<double>> d_temp(5);
     int f_run = 0;
@@ -1236,19 +1238,35 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
         break;
       }
       case 2: {
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-          double t = stod(temp[1]) * prims[basis_run + s].coefficient;
-          if (abs(t) < 1E-10) t = 0;
-          push_back_MO_coef(MO_run, t);
-          if (MO_run == 0) {
-            push_back_exponent(prims[basis_run + s].exp);
-            push_back_center(prims[basis_run].center);
-            push_back_type(prims[basis_run].type + p_run);
-            nex++;
+        if (p_run == 0) {
+          for (int _i = 0; _i < 3; _i++) {
+            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
           }
         }
+        for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+          p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+        }
         p_run++;
-        if (p_run == 3) {
+        if (p_run == 2) {
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+            double temp_coef = 0;
+            for (int cart = 0; cart < 3; cart++) {
+              temp_coef = p_temp[cart][s];
+              if (abs(temp_coef) < 1E-10) temp_coef = 0;
+              push_back_MO_coef(MO_run, temp_coef);
+              if (MO_run == 0) {
+                push_back_exponent(prims[basis_run + s].exp);
+                push_back_center(prims[basis_run].center);
+                if (p_run == 0)
+                  push_back_type(prims[basis_run].type + 2);
+                else if (p_run == 1)
+                  push_back_type(prims[basis_run].type);
+                else if (p_run == 2)
+                  push_back_type(prims[basis_run].type + 1);
+                nex++;
+              }
+            }
+          }
           p_run = 0;
           basis_run += temp_shellsizes[basis_run];
         }
@@ -1486,10 +1504,11 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   }
   //int norm_const_run = 0;
   int MO_run = 0;
+  vector<vector<double>> p_pure_2_cart;
   vector<vector<double>> d_pure_2_cart;
   vector<vector<double>> f_pure_2_cart;
   vector<vector<double>> g_pure_2_cart;
-  err_checkf(generate_sph2cart_mat(d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
+  err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
   if (debug)
     file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
 
@@ -1544,6 +1563,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
       push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
       //int run_coef = 0;
       int p_run = 0;
+      vector<vector<double>> p_temp(3);
       int d_run = 0;
       vector<vector<double>> d_temp(5);
       int f_run = 0;
@@ -1569,6 +1589,40 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
           break;
         }
         case 2: {
+          if (p_run == 0) {
+            for (int _i = 0; _i < 3; _i++) {
+              p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+            p_temp[p_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+          }
+          p_run++;
+          if (p_run == 3) {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+              double temp_coef = 0;
+              for (int cart = 0; cart < 3; cart++) {
+                temp_coef = p_temp[cart][s];
+                if (abs(temp_coef) < 1E-10) temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0) {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  if (cart == 0)
+                    push_back_type(prims[basis_run].type + 2);
+                  else if (cart == 1)
+                    push_back_type(prims[basis_run].type);
+                  else if (cart == 2)
+                    push_back_type(prims[basis_run].type + 1);
+                  nex++;
+                }
+              }
+            }
+            p_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+          /*
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
             double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
             if (abs(t) < 1E-10) t = 0;
@@ -1591,6 +1645,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
             basis_run += temp_shellsizes[basis_run];
           }
           break;
+          */
         }
         case 3: {
           if (d_run == 0) {
@@ -2397,7 +2452,8 @@ int WFN::check_order(const bool& debug)
   bool order_found = false;
   for (int a = 0; a < get_ncen(); a++) {
     for (int s = 0; s < get_atom_shell_count(a); s++) {
-      switch (get_shell_type(a, s)) {
+      int type = get_shell_type(a, s);
+      switch (type) {
       case 1:
         for (int i = 0; i < get_atom_shell_primitives(a, s); i++) {
           if (types[primcounter] != 1) {
