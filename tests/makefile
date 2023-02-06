@@ -21,7 +21,7 @@ malbac_SF_ECP:
 	cd ECP_SF && ../../NoSpherA2 \
 		-cif malbac.cif \
 		-hkl malbac.hkl \
-		-wfn malbac_ECP.molden \
+		-wfn malbac.gbw \
 		-acc 0 \
 		-ECP 1 \
 		-no-date \
