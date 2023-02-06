@@ -1247,7 +1247,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
           p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
         }
         p_run++;
-        if (p_run == 2) {
+        if (p_run == 3) {
           for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
             double temp_coef = 0;
             for (int cart = 0; cart < 3; cart++) {
@@ -1257,11 +1257,11 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
               if (MO_run == 0) {
                 push_back_exponent(prims[basis_run + s].exp);
                 push_back_center(prims[basis_run].center);
-                if (p_run == 0)
+                if (cart == 0)
                   push_back_type(prims[basis_run].type + 2);
-                else if (p_run == 1)
+                else if (cart == 1)
                   push_back_type(prims[basis_run].type);
-                else if (p_run == 2)
+                else if (cart == 2)
                   push_back_type(prims[basis_run].type + 1);
                 nex++;
               }
