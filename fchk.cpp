@@ -763,7 +763,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
   if (debug) {
     file << "Origin: " << wave.get_origin() << endl;
   }
-  if (wave.get_origin() == 2 || wave.get_origin() == 4) {
+  if (wave.get_origin() == 2 || wave.get_origin() == 4 || wave.get_origin() == 9 || wave.get_origin() == 8) {
     //-----------------------check ordering and order accordingly----------------------
     wave.sort_wfn(wave.check_order(debug), debug);
     //---------------normalize basis set---------------------------------
@@ -1206,7 +1206,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     s += st_s.str();
     st_s.str("");
     s += "\nInfo1-9                                    I   N=           9\n";
-    s += "          53          51           0           0           0         111\n           1           1           2\n";  //I have NO CLUE what the fuck this means...
+    s += "          53          51           0           0           0         111\n           1           1           2\n";  //I have NO CLUE what the hell this means...
     fchk << s;
     //fchk.flush();
     s = "Charge                                     I";

@@ -180,7 +180,7 @@ inline void not_implemented(const std::string& file, const int& line, const std:
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
 
-bool generate_sph2cart_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
+bool generate_sph2cart_mat(std::vector<std::vector<double>>& p, std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
 bool generate_cart2sph_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
