@@ -2,7 +2,6 @@
 #include "convenience.h"
 #include "basis_set.h"
 using namespace std;
-bool debug_fchk = false;
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -713,53 +712,18 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
   }
   if (wave.get_nr_basis_set_loaded() == 0) {
     if (debug) file << "No basis set loaded, will load a complete basis set now!" << endl;
-    if (!read_basis_set_vanilla(basis_set_path, wave, debug, false)) {
-      file << "Problem during reading of the basis set!" << endl;
-      return "WRONG";
-    }
+    err_checkf(read_basis_set_vanilla(basis_set_path, wave, debug, false), "ERROR during reading of missing basis set!", file);
   }
   else if (wave.get_nr_basis_set_loaded() < wave.get_ncen()) {
-    file << "Not all atoms have a basis set loaded!" << endl
-      << "Laoding the missing atoms..." << flush;
-    if (!read_basis_set_missing(basis_set_path, wave, debug)) {
-      file << "ERROR during reading of missing basis set!" << endl;
-      return "WRONG";
-    }
-    //if (!yesno()) {
-    //  file << "Do you want to load a new basis set?" << flush;
-    //  if (!yesno()) {
-    //    file << "Okay, aborting then!!!" << endl;
-    //    return "WRONG";
-    //  }
-    //  file << "deleting old one..." << endl;
-    //  if (!delete_basis_set_vanilla(basis_set_path, wave, debug)) {
-    //    file << "ERROR while deleting a basis set!" << endl;
-    //    return "WRONG";
-    //  }
-    //  else if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
-    //    file << "ERROR during reading of the new basis set!" << endl;
-    //    return "WRONG";
-    //  }
-    //}
-    //else {
-    //  file << "okay, loading the missing atoms.." << endl;
-    //  if (!read_basis_set_missing(basis_set_path, wave, debug)) {
-    //    file << "ERROR during reading of missing basis set!" << endl;
-    //    return "WRONG";
-    //  }
-    //}
+    file << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
+    err_checkf(read_basis_set_missing(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
   }
   else if (wave.get_nr_basis_set_loaded() > wave.get_ncen()) {
-    file << "# of loaded > # atoms" << endl
-      << "Sorry, this should not happen... aborting!!!" << endl;
-    return "WRONG";
+    err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", file);
   }
   //wave.set_modified();
   vector < double > CMO;
   vector < double > CMO_beta;
-  int nao = 0;
-  int nshell = 0;
-  int naotr = 0;
   if (debug) {
     file << "Origin: " << wave.get_origin() << endl;
   }
@@ -784,44 +748,29 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
 
     //-------------------normalize the basis set shell wise into a copy vector---------
     vector <vector <double> > basis_coefficients(wave.get_ncen());
-    //vector <vector <double> > contraction_coefficients(wave.get_ncen());
 #pragma omp parallel for
     for (int a = 0; a < wave.get_ncen(); a++) {
-      //contraction_coefficients[a].resize(wave.get_atom_primitive_count(a));
       for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
         double temp_c = wave.get_atom_basis_set_exponent(a, p);
         switch (wave.get_atom_primitive_type(a, p)) {
         case 1:
-          temp_c = 2 * temp_c / PI;
-          temp_c = pow(temp_c, 0.75);
-          temp_c = temp_c * wave.get_atom_basis_set_coefficient(a, p);
-          basis_coefficients[a].push_back(temp_c);
+          temp_c = 8 * pow(temp_c, 3) / PI3;
           break;
         case 2:
-          temp_c = 128 * pow(temp_c, 5);
-          temp_c = temp_c / pow(PI, 3);
-          temp_c = pow(temp_c, 0.25);
-          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
-          basis_coefficients[a].push_back(temp_c);
+          temp_c = 128 * pow(temp_c, 5) / PI3;
           break;
         case 3:
-          temp_c = 2048 * pow(temp_c, 7);
-          temp_c = temp_c / (9 * pow(PI, 3));
-          temp_c = pow(temp_c, 0.25);
-          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
-          basis_coefficients[a].push_back(temp_c);
+          temp_c = 2048 * pow(temp_c, 7) / (9 * PI3);
           break;
         case 4:
-          temp_c = 32768 * pow(temp_c, 9);
-          temp_c = temp_c / (225 * pow(PI, 3));
-          temp_c = pow(temp_c, 0.25);
-          temp_c = wave.get_atom_basis_set_coefficient(a, p) * temp_c;
-          basis_coefficients[a].push_back(temp_c);
+          temp_c = 32768 * pow(temp_c, 9) / (225 * PI3);
           break;
         case -1:
           file << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
           break;
         }
+        temp_c = pow(temp_c, 0.25) * wave.get_atom_basis_set_coefficient(a, p);
+        basis_coefficients[a].push_back(temp_c);
       }
     }
     for (int a = 0; a < wave.get_ncen(); a++) {
@@ -829,9 +778,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       double factor = 0.0;
       for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
         int type_temp = wave.get_shell_type(a, s);
-        if (type_temp == -1) {
-          file << "ERROR in type assignement!!" << endl;
-        }
+        err_chkf (type_temp != -1, "ERROR in type assignement!!", file);
         if (debug) {
           file << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
             << "start: " << wave.get_shell_start(a, s)
@@ -844,8 +791,8 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = (PI / aiaj);
-              term = pow(term, 1.5);
+              double term = PI3 / pow(aiaj, 3);
+              term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
           }
@@ -867,8 +814,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = 4 * pow(aiaj, 5);
-              term = pow(PI, 3) / term;
+              double term = PI3 / 4 * pow(aiaj, 5);
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -891,8 +837,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = 16 * pow(aiaj, 7);
-              term = pow(PI, 3) / term;
+              double term = PI3 / (16 * pow(aiaj, 7));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -916,8 +861,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = 64 * pow((aiaj), 9);
-              term = pow(PI, 3) / term;
+              double term = PI3 / (64 * pow((aiaj), 9));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -985,6 +929,26 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       }
     }
     //--------------Build CMO of alessandro from the first elements of each shell-------------
+    int nao = 0;
+    for (int a = 0; a < wave.get_ncen(); a++) {
+      for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
+        switch (wave.get_shell_type(a, s)) {
+        case 1:
+            nao++;
+          break;
+        case 2:
+            nao += 3;
+          break;
+        case 3:
+            nao += 6;
+          break;
+        case 4:
+            nao += 10;
+          break;
+        }
+      }
+    }
+    int nshell = 0;
     for (int m = 0; m < wave.get_nmo(); m++) {
       int run_2 = 0;
       for (int a = 0; a < wave.get_ncen(); a++) {
@@ -993,7 +957,6 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           switch (wave.get_shell_type(a, s)) {
           case 1:
             CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s)]);
-            if (m == 0) nao++;
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s) << endl;
             break;
@@ -1001,13 +964,11 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
             for (int i = 0; i < 3; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               file << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
-            if (m == 0) nao += 3;
             break;
           case 3:
             for (int i = 0; i < 6; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               file << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
-            if (m == 0) nao += 6;
             break;
           case 4:
             //this hardcoded piece is due to the order of f-type functions in the fchk
@@ -1019,7 +980,6 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
                                         CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
               file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
-            if (m == 0) nao += 10;
             break;
           }
           run_2++;
@@ -1093,7 +1053,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       file << nshell << " = nshell" << endl;
     }
     //------------------ make the DM -----------------------------
-    naotr = nao * (nao + 1) / 2;
+    int naotr = nao * (nao + 1) / 2;
     vector<double> kp;
     wave.resize_DM(naotr, 0.0);
     if (alpha_els != beta_els)

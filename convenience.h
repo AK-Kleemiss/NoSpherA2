@@ -46,6 +46,7 @@ inline const double TWO_PI = 2 * PI;
 inline const double FOUR_PI = 4 * PI;
 inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
 inline const double PI2 = pow(PI, 2);
+inline const double PI3 = pow(PI, 3);
 inline const double PI_180 = PI / 180.0;
 inline const double TG32 = tgamma(3.0 / 2.0);
 inline const double ED_fact = 0.023934;
@@ -178,6 +179,8 @@ inline void not_implemented(const std::string& file, const int& line, const std:
   exit(-1);
 };
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
 
 bool generate_sph2cart_mat(std::vector<std::vector<double>>& p, std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
