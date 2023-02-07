@@ -1390,374 +1390,378 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
   if (rf.good())
     path = filename;
   string line;
-
-  //Reading geometry
-  rf.seekg(8, ios::beg);
-  long int geo_start = 0;
-  rf.read((char*)&geo_start, sizeof(geo_start));
-  err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
-  if (debug)
-    file << "I read the pointer of geometry succesfully" << endl;
-  rf.seekg(geo_start, ios::beg);
-  int at = 0;
-  rf.read((char*)&at, 4);
-  double geo_vals[6]{0,0,0,0,0,0}; //x,y,z, ch, exp_fin_nuc, mass
-  int geo_ints[5]{0,0,0,0,0};
-  for (int a = 0; a < at; a++) {
-    for (int i = 0; i < 6; i++) {
-      rf.read((char*)&(geo_vals[i]), 8);
-      err_checkf(rf.good(), "Error reading geo_val", file);
-    }
-    for (int i = 0; i < 5; i++) {
-      rf.read((char*)&(geo_ints[i]), 4);
-      err_checkf(rf.good(), "Error reading geo_int", file);
-    }
-    string temp = atnr2letter(geo_ints[0]);
-    err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
-    err_checkf(push_back_atom(temp,
-      geo_vals[0],
-      geo_vals[1],
-      geo_vals[2],
-      geo_ints[0]), "Error pushing back atom", file);
-  }
-  if (debug)
-    file << "I read the geometry of " << at << " atoms succesfully" << endl;
-
-  rf.seekg(16, ios::beg);
-  long int basis_start = 0;
-  rf.read((char*)&basis_start, 8);
-  err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
-  if (debug)
-    file << "I read the pointer of basis set succesfully" << endl;
-  rf.seekg(basis_start, ios::beg);
-  int atoms2 = 0, temp = 0;
-  rf.read((char*)&temp, 4);
-  rf.read((char*)&atoms2, 4);
-  long unsigned int atoms_with_basis = 0;
-  vector<double> exp(37,0);
-  vector<double> con(37,0);
-  for (int a = 0; a < atoms2; a++) {
-    int atom_based = 0, nr_shells = 0;
-    rf.read((char*)&atom_based, 4);
-    err_checkf(rf.good(), "Error reading atom_based", file);
-    rf.read((char*)&nr_shells, 4);
-    err_checkf(rf.good(), "Error reading nr_shells", file);
-    int shell = 0;
-    for (int p = 0; p < nr_shells; p++) {
-      int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
-      rf.read((char*)&ang_mom, 4);
-      err_checkf(rf.good(), "Error reading ang_mom", file);
-      if (ang_mom >= 5) err_not_impl_f("Higher angular momentum basis functions than G", file);
-      rf.read((char*)&coeff_ind, 4);
-      err_checkf(rf.good(), "Error reading ceof_ind", file);
-      rf.read((char*)&nr_funct, 4);
-      err_checkf(rf.good(), "Error reading nr_func", file);
-      rf.read((char*)&center, 4);
-      err_checkf(rf.good(), "Error reading center", file);
-      for (int b = 0; b < 37; b++) {
-        rf.read((char*)&(exp[b]), 8);
-        err_checkf(rf.good(), "Error reading exp", file);
+  try {
+    //Reading geometry
+    rf.seekg(8, ios::beg);
+    long int geo_start = 0;
+    rf.read((char*)&geo_start, sizeof(geo_start));
+    err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
+    if (debug)
+      file << "I read the pointer of geometry succesfully" << endl;
+    rf.seekg(geo_start, ios::beg);
+    int at = 0;
+    rf.read((char*)&at, 4);
+    double geo_vals[6]{ 0,0,0,0,0,0 }; //x,y,z, ch, exp_fin_nuc, mass
+    int geo_ints[5]{ 0,0,0,0,0 };
+    for (int a = 0; a < at; a++) {
+      for (int i = 0; i < 6; i++) {
+        rf.read((char*)&(geo_vals[i]), 8);
+        err_checkf(rf.good(), "Error reading geo_val", file);
       }
-      for (int b = 0; b < 37; b++) {
-        rf.read((char*)&(con[b]), 8);
-        err_checkf(rf.good(), "Error reading con", file);
-        if (exp[b] != 0 && con[b] != 0) {
-          err_checkf(atoms[atom_based].push_back_basis_set(exp[b], con[b], ang_mom + 1, shell), "Error pushing back basis", file);
-        }
+      for (int i = 0; i < 5; i++) {
+        rf.read((char*)&(geo_ints[i]), 4);
+        err_checkf(rf.good(), "Error reading geo_int", file);
       }
-      shell++;
+      string temp = atnr2letter(geo_ints[0]);
+      err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
+      err_checkf(push_back_atom(temp,
+        geo_vals[0],
+        geo_vals[1],
+        geo_vals[2],
+        geo_ints[0]), "Error pushing back atom", file);
     }
-    atoms_with_basis++;
-  }
-  int expected_coefs = 0;
-  vector<primitive> prims;
-  vector<int> temp_shellsizes;
-  for (int a = 0; a < ncen; a++) {
-    int current_shell = -1;
-    for (int s = 0; s < atoms[a].basis_set.size(); s++) {
-      if (atoms[a].basis_set[s].shell != current_shell) {
-        if (atoms[a].basis_set[s].type == 1) {
-          expected_coefs++;
-        }
-        else if (atoms[a].basis_set[s].type == 2) {
-          expected_coefs += 3;
-        }
-        else if (atoms[a].basis_set[s].type == 3) {
-          expected_coefs += 5;
-        }
-        else if (atoms[a].basis_set[s].type == 4) {
-          expected_coefs += 7;
-        }
-        else if (atoms[a].basis_set[s].type == 5) {
-          expected_coefs += 9;
-        }
-        current_shell++;
-      }
-      temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
-      prims.push_back(primitive(a + 1,
-        atoms[a].basis_set[s].type,
-        atoms[a].basis_set[s].exponent,
-        atoms[a].basis_set[s].coefficient));
-    }
-  }
-  //int norm_const_run = 0;
-  int MO_run = 0;
-  vector<vector<double>> p_pure_2_cart;
-  vector<vector<double>> d_pure_2_cart;
-  vector<vector<double>> f_pure_2_cart;
-  vector<vector<double>> g_pure_2_cart;
-  err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
-  if (debug)
-    file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
+    if (debug)
+      file << "I read the geometry of " << at << " atoms succesfully" << endl;
 
-  rf.seekg(24, ios::beg);
-  long int MOs_start = 0;
-  rf.read((char*)&MOs_start, 8);
-  err_checkf(rf.good(), "Error reading MO_start", file);
-  err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
-  if (debug)
-    file << "I read the pointer of MOs succesfully" << endl;
-  rf.seekg(MOs_start, ios::beg);
-  int operators = 0, dimension = 0;
-  rf.read((char*)&operators, 4);
-  err_checkf(rf.good(), "Error reading operators", file);
-  rf.read((char*)&dimension, 4);
-  err_checkf(rf.good(), "Error reading dimnesion", file);
-  size_t coef_nr = size_t(dimension) * size_t(dimension);
-  vector<vector<double>> coefficients(operators);
-  vector<vector<double>> occupations(operators);
-  vector<vector<double>> energies(operators);
-  vector<vector<int>> irreps(operators);
-  vector<vector<int>> cores(operators);
-  for (int i = 0; i < operators; i++) {
-    coefficients[i].resize(coef_nr,0);
-    occupations[i].resize(dimension,0);
-    energies[i].resize(dimension,0);
-    irreps[i].resize(dimension,0);
-    cores[i].resize(dimension,0);
-    if (debug) file << "coef_nr: " << coef_nr << " dimension: " << dimension << endl;
-    rf.read((char*)coefficients[i].data(), 8 * coef_nr);
-    err_checkf(rf.good(), "Error reading coefficients", file);
+    rf.seekg(16, ios::beg);
+    long int basis_start = 0;
+    rf.read((char*)&basis_start, 8);
+    err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
     if (debug)
-      file << "I read the coefficients succesfully" << endl;
-    rf.read((char*)occupations[i].data(), 8 * dimension);
-    err_checkf(rf.good(), "Error reading occupations", file);
-    if (debug)
-      file << "I read the occupations succesfully" << endl;
-    rf.read((char*)energies[i].data(), 8 * dimension);
-    err_checkf(rf.good(), "Error reading energies", file);
-    if (debug)
-      file << "I read the energies succesfully" << endl;
-    rf.read((char*)irreps[i].data(), 4 * dimension);
-    err_checkf(rf.good(), "Error reading irreps", file);
-    if (debug)
-      file << "I read the irreps succesfully" << endl;
-    rf.read((char*)cores[i].data(), 4 * dimension);
-    err_checkf(rf.good(), "Error reading cores", file);
-    if (debug) {
-      file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
-    }
-    for (int j = 0; j < dimension; j++) {
-      push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
-      //int run_coef = 0;
-      int p_run = 0;
-      vector<vector<double>> p_temp(3);
-      int d_run = 0;
-      vector<vector<double>> d_temp(5);
-      int f_run = 0;
-      vector<vector<double>> f_temp(7);
-      int g_run = 0;
-      vector<vector<double>> g_temp(9);
-      int basis_run = 0;
-      for (int p = 0; p < expected_coefs; p++) {
-        switch (prims[basis_run].type) {
-        case 1: {
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
-            if (abs(t) < 1E-10) t = 0;
-            push_back_MO_coef(MO_run, t);
-            if (MO_run == 0) {
-              push_back_exponent(prims[basis_run + s].exp);
-              push_back_center(prims[basis_run].center);
-              push_back_type(prims[basis_run].type);
-              nex++;
-            }
-          }
-          basis_run += temp_shellsizes[basis_run];
-          break;
+      file << "I read the pointer of basis set succesfully" << endl;
+    rf.seekg(basis_start, ios::beg);
+    int atoms2 = 0, temp = 0;
+    rf.read((char*)&temp, 4);
+    rf.read((char*)&atoms2, 4);
+    long unsigned int atoms_with_basis = 0;
+    vector<double> exp(37, 0);
+    vector<double> con(37, 0);
+    for (int a = 0; a < atoms2; a++) {
+      int atom_based = 0, nr_shells = 0;
+      rf.read((char*)&atom_based, 4);
+      err_checkf(rf.good(), "Error reading atom_based", file);
+      rf.read((char*)&nr_shells, 4);
+      err_checkf(rf.good(), "Error reading nr_shells", file);
+      int shell = 0;
+      for (int p = 0; p < nr_shells; p++) {
+        int ang_mom = 0, coeff_ind = 0, nr_funct = 0, center = 0;
+        rf.read((char*)&ang_mom, 4);
+        err_checkf(rf.good(), "Error reading ang_mom", file);
+        if (ang_mom >= 5) err_not_impl_f("Higher angular momentum basis functions than G", file);
+        rf.read((char*)&coeff_ind, 4);
+        err_checkf(rf.good(), "Error reading ceof_ind", file);
+        rf.read((char*)&nr_funct, 4);
+        err_checkf(rf.good(), "Error reading nr_func", file);
+        rf.read((char*)&center, 4);
+        err_checkf(rf.good(), "Error reading center", file);
+        for (int b = 0; b < 37; b++) {
+          rf.read((char*)&(exp[b]), 8);
+          err_checkf(rf.good(), "Error reading exp", file);
         }
-        case 2: {
-          if (p_run == 0) {
-            for (int _i = 0; _i < 3; _i++) {
-              p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            }
+        for (int b = 0; b < 37; b++) {
+          rf.read((char*)&(con[b]), 8);
+          err_checkf(rf.good(), "Error reading con", file);
+          if (exp[b] != 0 && con[b] != 0) {
+            err_checkf(atoms[atom_based].push_back_basis_set(exp[b], con[b], ang_mom + 1, shell), "Error pushing back basis", file);
           }
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            p_temp[p_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+        }
+        shell++;
+      }
+      atoms_with_basis++;
+    }
+    int expected_coefs = 0;
+    vector<primitive> prims;
+    vector<int> temp_shellsizes;
+    for (int a = 0; a < ncen; a++) {
+      int current_shell = -1;
+      for (int s = 0; s < atoms[a].basis_set.size(); s++) {
+        if (atoms[a].basis_set[s].shell != current_shell) {
+          if (atoms[a].basis_set[s].type == 1) {
+            expected_coefs++;
           }
-          p_run++;
-          if (p_run == 3) {
+          else if (atoms[a].basis_set[s].type == 2) {
+            expected_coefs += 3;
+          }
+          else if (atoms[a].basis_set[s].type == 3) {
+            expected_coefs += 5;
+          }
+          else if (atoms[a].basis_set[s].type == 4) {
+            expected_coefs += 7;
+          }
+          else if (atoms[a].basis_set[s].type == 5) {
+            expected_coefs += 9;
+          }
+          current_shell++;
+        }
+        temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+        prims.push_back(primitive(a + 1,
+          atoms[a].basis_set[s].type,
+          atoms[a].basis_set[s].exponent,
+          atoms[a].basis_set[s].coefficient));
+      }
+    }
+    //int norm_const_run = 0;
+    int MO_run = 0;
+    vector<vector<double>> p_pure_2_cart;
+    vector<vector<double>> d_pure_2_cart;
+    vector<vector<double>> f_pure_2_cart;
+    vector<vector<double>> g_pure_2_cart;
+    err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
+    if (debug)
+      file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
+
+    rf.seekg(24, ios::beg);
+    long int MOs_start = 0;
+    rf.read((char*)&MOs_start, 8);
+    err_checkf(rf.good(), "Error reading MO_start", file);
+    err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
+    if (debug)
+      file << "I read the pointer of MOs succesfully" << endl;
+    rf.seekg(MOs_start, ios::beg);
+    int operators = 0, dimension = 0;
+    rf.read((char*)&operators, 4);
+    err_checkf(rf.good(), "Error reading operators", file);
+    rf.read((char*)&dimension, 4);
+    err_checkf(rf.good(), "Error reading dimnesion", file);
+    size_t coef_nr = size_t(dimension) * size_t(dimension);
+    vector<vector<double>> coefficients(operators);
+    vector<vector<double>> occupations(operators);
+    vector<vector<double>> energies(operators);
+    vector<vector<int>> irreps(operators);
+    vector<vector<int>> cores(operators);
+    for (int i = 0; i < operators; i++) {
+      coefficients[i].resize(coef_nr, 0);
+      occupations[i].resize(dimension, 0);
+      energies[i].resize(dimension, 0);
+      irreps[i].resize(dimension, 0);
+      cores[i].resize(dimension, 0);
+      if (debug) file << "coef_nr: " << coef_nr << " dimension: " << dimension << endl;
+      rf.read((char*)coefficients[i].data(), 8 * coef_nr);
+      err_checkf(rf.good(), "Error reading coefficients", file);
+      if (debug)
+        file << "I read the coefficients succesfully" << endl;
+      rf.read((char*)occupations[i].data(), 8 * dimension);
+      err_checkf(rf.good(), "Error reading occupations", file);
+      if (debug)
+        file << "I read the occupations succesfully" << endl;
+      rf.read((char*)energies[i].data(), 8 * dimension);
+      err_checkf(rf.good(), "Error reading energies", file);
+      if (debug)
+        file << "I read the energies succesfully" << endl;
+      rf.read((char*)irreps[i].data(), 4 * dimension);
+      err_checkf(rf.good(), "Error reading irreps", file);
+      if (debug)
+        file << "I read the irreps succesfully" << endl;
+      rf.read((char*)cores[i].data(), 4 * dimension);
+      err_checkf(rf.good(), "Error reading cores", file);
+      if (debug) {
+        file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
+      }
+      for (int j = 0; j < dimension; j++) {
+        push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
+        //int run_coef = 0;
+        int p_run = 0;
+        vector<vector<double>> p_temp(3);
+        int d_run = 0;
+        vector<vector<double>> d_temp(5);
+        int f_run = 0;
+        vector<vector<double>> f_temp(7);
+        int g_run = 0;
+        vector<vector<double>> g_temp(9);
+        int basis_run = 0;
+        for (int p = 0; p < expected_coefs; p++) {
+          switch (prims[basis_run].type) {
+          case 1: {
             for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-              double temp_coef = 0;
-              for (int cart = 0; cart < 3; cart++) {
-                temp_coef = p_temp[cart][s];
-                if (abs(temp_coef) < 1E-10) temp_coef = 0;
-                push_back_MO_coef(MO_run, temp_coef);
-                if (MO_run == 0) {
-                  push_back_exponent(prims[basis_run + s].exp);
-                  push_back_center(prims[basis_run].center);
-                  if (cart == 0)
-                    push_back_type(prims[basis_run].type + 2);
-                  else if (cart == 1)
-                    push_back_type(prims[basis_run].type);
-                  else if (cart == 2)
-                    push_back_type(prims[basis_run].type + 1);
-                  nex++;
-                }
-              }
-            }
-            p_run = 0;
-            basis_run += temp_shellsizes[basis_run];
-          }
-          break;
-          /*
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
-            if (abs(t) < 1E-10) t = 0;
-            push_back_MO_coef(MO_run, t);
-            if (MO_run == 0) {
-              push_back_exponent(prims[basis_run + s].exp);
-              push_back_center(prims[basis_run].center);
-              if (p_run == 0)
-                push_back_type(prims[basis_run].type + 2);
-              else if (p_run == 1)
+              double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+              if (abs(t) < 1E-10) t = 0;
+              push_back_MO_coef(MO_run, t);
+              if (MO_run == 0) {
+                push_back_exponent(prims[basis_run + s].exp);
+                push_back_center(prims[basis_run].center);
                 push_back_type(prims[basis_run].type);
-              else if (p_run == 2)
-                push_back_type(prims[basis_run].type + 1);
-              nex++;
-            }
-          }
-          p_run++;
-          if (p_run == 3) {
-            p_run = 0;
-            basis_run += temp_shellsizes[basis_run];
-          }
-          break;
-          */
-        }
-        case 3: {
-          if (d_run == 0) {
-            for (int _i = 0; _i < 5; _i++) {
-              d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            }
-          }
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            d_temp[d_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
-          }
-          d_run++;
-          if (d_run == 5) {
-            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-              double temp_coef = 0;
-              for (int cart = 0; cart < 6; cart++) {
-                temp_coef = 0;
-                for (int spher = 0; spher < 5; spher++) {
-                  temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher][s];
-                }
-                if (abs(temp_coef) < 1E-10) temp_coef = 0;
-                push_back_MO_coef(MO_run, temp_coef);
-                if (MO_run == 0) {
-                  push_back_exponent(prims[basis_run + s].exp);
-                  push_back_center(prims[basis_run].center);
-                  push_back_type(5 + cart);
-                  nex++;
-                }
+                nex++;
               }
             }
-            d_run = 0;
             basis_run += temp_shellsizes[basis_run];
+            break;
           }
-          break;
-        }
-        case 4: {
-          if (f_run == 0) {
-            for (int _i = 0; _i < 7; _i++) {
-              f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            }
-          }
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            f_temp[f_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
-          }
-          f_run++;
-          if (f_run == 7) {
-            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-              double temp_coef = 0;
-              for (int cart = 0; cart < 10; cart++) {
-                temp_coef = 0;
-                for (int spher = 0; spher < 7; spher++) {
-                  temp_coef += f_pure_2_cart[cart][spher] * f_temp[spher][s];
-                }
-                if (abs(temp_coef) < 1E-10) temp_coef = 0;
-                push_back_MO_coef(MO_run, temp_coef);
-                if (MO_run == 0) {
-                  push_back_exponent(prims[basis_run + s].exp);
-                  push_back_center(prims[basis_run].center);
-                  push_back_type(11 + cart);
-                  nex++;
-                }
+          case 2: {
+            if (p_run == 0) {
+              for (int _i = 0; _i < 3; _i++) {
+                p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
               }
             }
-            f_run = 0;
-            basis_run += temp_shellsizes[basis_run];
-          }
-          break;
-        }
-        case 5: {
-          if (g_run == 0) {
-            for (int _i = 0; _i < 9; _i++) {
-              g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-            }
-          }
-          for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-            g_temp[g_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
-          }
-          g_run++;
-          if (g_run == 9) {
             for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
-              double temp_coef = 0;
-              for (int cart = 0; cart < 15; cart++) {
-                temp_coef = 0;
-                for (int spher = 0; spher < 9; spher++) {
-                  temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
-                }
-                if (abs(temp_coef) < 1E-10) temp_coef = 0;
-                push_back_MO_coef(MO_run, temp_coef);
-                if (MO_run == 0) {
-                  push_back_exponent(prims[basis_run].exp);
-                  push_back_center(prims[basis_run].center);
-                  push_back_type(21 + cart);
-                  nex++;
+              p_temp[p_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+            }
+            p_run++;
+            if (p_run == 3) {
+              for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+                double temp_coef = 0;
+                for (int cart = 0; cart < 3; cart++) {
+                  temp_coef = p_temp[cart][s];
+                  if (abs(temp_coef) < 1E-10) temp_coef = 0;
+                  push_back_MO_coef(MO_run, temp_coef);
+                  if (MO_run == 0) {
+                    push_back_exponent(prims[basis_run + s].exp);
+                    push_back_center(prims[basis_run].center);
+                    if (cart == 0)
+                      push_back_type(prims[basis_run].type + 2);
+                    else if (cart == 1)
+                      push_back_type(prims[basis_run].type);
+                    else if (cart == 2)
+                      push_back_type(prims[basis_run].type + 1);
+                    nex++;
+                  }
                 }
               }
+              p_run = 0;
+              basis_run += temp_shellsizes[basis_run];
             }
-            g_run = 0;
-            basis_run += temp_shellsizes[basis_run];
+            break;
+            /*
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+              double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+              if (abs(t) < 1E-10) t = 0;
+              push_back_MO_coef(MO_run, t);
+              if (MO_run == 0) {
+                push_back_exponent(prims[basis_run + s].exp);
+                push_back_center(prims[basis_run].center);
+                if (p_run == 0)
+                  push_back_type(prims[basis_run].type + 2);
+                else if (p_run == 1)
+                  push_back_type(prims[basis_run].type);
+                else if (p_run == 2)
+                  push_back_type(prims[basis_run].type + 1);
+                nex++;
+              }
+            }
+            p_run++;
+            if (p_run == 3) {
+              p_run = 0;
+              basis_run += temp_shellsizes[basis_run];
+            }
+            break;
+            */
           }
-          break;
+          case 3: {
+            if (d_run == 0) {
+              for (int _i = 0; _i < 5; _i++) {
+                d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+              }
+            }
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+              d_temp[d_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+            }
+            d_run++;
+            if (d_run == 5) {
+              for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+                double temp_coef = 0;
+                for (int cart = 0; cart < 6; cart++) {
+                  temp_coef = 0;
+                  for (int spher = 0; spher < 5; spher++) {
+                    temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher][s];
+                  }
+                  if (abs(temp_coef) < 1E-10) temp_coef = 0;
+                  push_back_MO_coef(MO_run, temp_coef);
+                  if (MO_run == 0) {
+                    push_back_exponent(prims[basis_run + s].exp);
+                    push_back_center(prims[basis_run].center);
+                    push_back_type(5 + cart);
+                    nex++;
+                  }
+                }
+              }
+              d_run = 0;
+              basis_run += temp_shellsizes[basis_run];
+            }
+            break;
+          }
+          case 4: {
+            if (f_run == 0) {
+              for (int _i = 0; _i < 7; _i++) {
+                f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+              }
+            }
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+              f_temp[f_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+            }
+            f_run++;
+            if (f_run == 7) {
+              for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+                double temp_coef = 0;
+                for (int cart = 0; cart < 10; cart++) {
+                  temp_coef = 0;
+                  for (int spher = 0; spher < 7; spher++) {
+                    temp_coef += f_pure_2_cart[cart][spher] * f_temp[spher][s];
+                  }
+                  if (abs(temp_coef) < 1E-10) temp_coef = 0;
+                  push_back_MO_coef(MO_run, temp_coef);
+                  if (MO_run == 0) {
+                    push_back_exponent(prims[basis_run + s].exp);
+                    push_back_center(prims[basis_run].center);
+                    push_back_type(11 + cart);
+                    nex++;
+                  }
+                }
+              }
+              f_run = 0;
+              basis_run += temp_shellsizes[basis_run];
+            }
+            break;
+          }
+          case 5: {
+            if (g_run == 0) {
+              for (int _i = 0; _i < 9; _i++) {
+                g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+              }
+            }
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+              g_temp[g_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+            }
+            g_run++;
+            if (g_run == 9) {
+              for (int s = 0; s < temp_shellsizes[basis_run]; s++) {
+                double temp_coef = 0;
+                for (int cart = 0; cart < 15; cart++) {
+                  temp_coef = 0;
+                  for (int spher = 0; spher < 9; spher++) {
+                    temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
+                  }
+                  if (abs(temp_coef) < 1E-10) temp_coef = 0;
+                  push_back_MO_coef(MO_run, temp_coef);
+                  if (MO_run == 0) {
+                    push_back_exponent(prims[basis_run].exp);
+                    push_back_center(prims[basis_run].center);
+                    push_back_type(21 + cart);
+                    nex++;
+                  }
+                }
+              }
+              g_run = 0;
+              basis_run += temp_shellsizes[basis_run];
+            }
+            break;
+          }
+          default: {
+            err_not_impl_f("Types higher than g type in gbws", file);
+            break;
+          }
+          }
         }
-        default: {
-          err_not_impl_f("Types higher than g type in gbws", file);
-          break;
-        }
-        }
+        err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading gbw file after MO " + to_string(MO_run) + "!\nStatus (p,d,f,g): "
+          + to_string(p_run) + " " + to_string(d_run) + " " + to_string(f_run) + " " + to_string(g_run), file);
+        MO_run++;
       }
-      err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading gbw file after MO " + to_string(MO_run) + "!\nStatus (p,d,f,g): "
-        + to_string(p_run) + " " + to_string(d_run) + " " + to_string(f_run) + " " + to_string(g_run), file);
-      MO_run++;
+    }
+    if (debug) {
+      file << "I read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
+      file << "There are " << nex << " primitives afetr conversion" << endl;
     }
   }
-  if (debug) {
-    file << "I read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
-    file << "There are " << nex << " primitives afetr conversion" << endl;
+  catch (const exception &e) {
+    err_checkf(false, "Error during reading of the gbw file! " + string(e.what()), file);
   }
   return true;
 };

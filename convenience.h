@@ -15,6 +15,7 @@
 #include <numeric>
 #include <complex>
 #include <functional>
+#include <stdexcept>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
