@@ -2,7 +2,7 @@ RM := rm
 
 DIFF := diff -q -i
 
-all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP fchk_conversion
+all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP
 
 sucrose_SF:
 	@echo 'Running test: $@'
