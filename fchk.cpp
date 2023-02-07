@@ -814,7 +814,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = PI3 / 4 * pow(aiaj, 5);
+              double term = PI3 / (4 * pow(aiaj, 5));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -906,10 +906,13 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       ofstream norm_cprim("norm_prim.debug", ofstream::out);
       for (int m = 0; m < wave.get_nmo(); m++) {
         norm_cprim << m << ". MO:" << endl;
+        changed_coefs[m].resize(wave.get_MO_primitive_count(m), 0.0);
         for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
-          file << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
-          changed_coefs[m].push_back(wave.get_MO_coef(m, p) / norm_const[p]);
-          file << " temp after normalization: " << changed_coefs[m][p] << endl;
+          changed_coefs[m][p] = wave.get_MO_coef(m, p) / norm_const[p];
+          if (m == 0)
+            file << p << ". primitive; " << m << ". MO " 
+                 << "norm nonst: " << norm_const[p] 
+                 << " temp after normalization: " << changed_coefs[m][p] << "\n";
           norm_cprim << " " << changed_coefs[m][p] << endl;
           run++;
         }
@@ -922,7 +925,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     else {
 #pragma omp parallel for
       for (int m = 0; m < wave.get_nmo(); m++) {
-        changed_coefs[m].resize(wave.get_MO_primitive_count(m));
+        changed_coefs[m].resize(wave.get_MO_primitive_count(m), 0.0);
         for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
           changed_coefs[m][p] = wave.get_MO_coef(m, p) / norm_const[p];
         }
@@ -953,21 +956,21 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       int run_2 = 0;
       for (int a = 0; a < wave.get_ncen(); a++) {
         for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
-          if (debug) file << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value" << endl;
+          //if (debug) file << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value\n"l;
           switch (wave.get_shell_type(a, s)) {
           case 1:
             CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s)]);
-            if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+            if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
               file << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s) << endl;
             break;
           case 2:
             for (int i = 0; i < 3; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-            if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+            if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
               file << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             break;
           case 3:
             for (int i = 0; i < 6; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i]);
-            if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+            if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
               file << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             break;
           case 4:
@@ -978,13 +981,13 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
             for (int i = 0; i < 2; i++) CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + i + 7]);
                                         CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 5]);
                                         CMO.push_back(changed_coefs[m][wave.get_shell_start_in_primitives(a, s) + 9]);
-            if (debug && wave.get_atom_shell_primitives(a, s) != 1)
+            if (debug && wave.get_atom_shell_primitives(a, s) != 1 && m == 0)
               file << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             break;
           }
           run_2++;
         }
-        if (debug) file << "finished with atom!" << endl;
+        if (debug && m == 0) file << "finished with atom!" << endl;
       }
       if (debug) file << "finished with MO!" << endl;
       if (nshell != run_2) nshell = run_2;
@@ -1063,13 +1066,16 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       cout << "Making DM now!" << endl;
     }
     for (int iu = 0; iu < nao; iu++) {
+#pragma omp parallel for
       for (int iv = 0; iv <= iu; iv++) {
-        int iuv = (iu * (iu + 1) / 2) + iv;
-        if (debug) file << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
+        const int iuv = (iu * (iu + 1) / 2) + iv;
+        //if (debug) file << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
         double temp;
-        if (debug) file << "Working on MO: ";
+        //if (debug) file << "Working on MO: ";
         for (int m = 0; m < wave.get_nmo(); m++) {
-          if (debug) file << m << " " << flush;
+          //if (debug && m == 0) file << m << " " << flush;
+          //else if (debug && m != wave.get_nmo() - 1) file << "." << flush;
+          //else file << wave.get_nmo() - 1 << flush;
           if (alpha_els != beta_els) {
             if (m < alpha_els) {
               temp = wave.get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
@@ -1089,7 +1095,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           }
           //else if (debug) file << "DM after: " << wave.get_DM(iuv) << endl;
         }
-        if (debug) file << endl;
+        //if (debug) file << endl;
       }
     }
     if (debug) {
@@ -1304,7 +1310,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
          << "\nAlpha Orbital Energies                     R   N=" << setw(12) << nao << "\n";
     runs = 0;
     for (int m = 0; m < nao; m++) {
-      if (m < alpha_els) fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
+      if (m < wave.get_nmo()) fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m);
       else fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(alpha_els - 1) + m;
       runs++;
       if ((runs % 5 == 0 && runs != 0) || m == nao - 1) 
@@ -1315,7 +1321,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
       fchk << "Beta Orbital Energies                      R   N=" << setw(12) << nao << "\n";
       runs = 0;
       for (int m = 0; m < nao; m++) {
-        if (m < beta_els) fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + alpha_els);
+        if (m + nao < wave.get_nmo()) fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(m + nao);
         else fchk << uppercase << scientific << setw(16) << setprecision(8) << wave.get_MO_energy(wave.get_nmo() - 1) + m;
         runs++;
         if ((runs % 5 == 0 && runs != 0) || m == nao - 1) 
