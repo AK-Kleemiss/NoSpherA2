@@ -648,6 +648,11 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     file << "finished with exponents, reading MOs now...\n";
     file << "line: " << line << endl;
   }
+  for (int i = 0; i < e_nuc; i++)
+    err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!\n", file);
+  for (int j = 0; j < e_nex; j++) {
+    err_checkf(add_exp(dum_center[j], dum_type[j], dum_exp[j]), "Error while writing MO coefficients...\n", file);
+  }
   int linecount = 0;
   exnum = 0;
   int monum = 0;
@@ -656,7 +661,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   for (int i = 0; i < e_nmo; i++)
     temp_val[i].resize(e_nex);
   //-------------------------------- Read MOs --------------------------------------
-  bool orca_switch;
+  bool orca_switch = false;
   int temp_orca = check_order(debug_wfn), temp_nr = 0;
   double temp_occ = -1.0, temp_ener = 0.0;
   if (temp_orca % 10 == 3)
@@ -748,13 +753,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     if (b == true) break;
   }
   err_checkf(monum + 1 >= e_nmo, "less MOs than expected, quitting...\nmonum: " + to_string(monum) + " e_nmo : " + to_string(e_nmo), file);
-  //---------------------Start writing everything from the temp arrays into wave ---------------------
-
-  for (int i = 0; i < e_nuc; i++)
-    err_checkf(push_back_atom(dum_label[i], dum_x[i], dum_y[i], dum_z[i], dum_ch[i]), "Error while making atoms!!\n", file);
-  for (int j = 0; j < e_nex; j++) {
-    err_checkf(add_exp(dum_center[j], dum_type[j], dum_exp[j]), "Error while writing MO coefficients...\n", file);
-  }
   for (int i = 0; i < e_nmo; i++) {
     for (int j = 0; j < e_nex; j++) {
       MOs[i].push_back_coef(temp_val[i][j]);
@@ -2547,7 +2545,6 @@ int WFN::check_order(const bool& debug)
             }
           }
           else {
-            order = -1;
             cout << "I can't recognize this order of the .wfn file..." << endl;
             return -1;
           }
@@ -2578,7 +2575,7 @@ int WFN::check_order(const bool& debug)
               else primcounter += 6;
             }
           }
-                break;
+          break;
           case 2:
           case 3: {
             for (int i = 0; i < get_atom_shell_primitives(a, s); i++) {
@@ -2601,7 +2598,7 @@ int WFN::check_order(const bool& debug)
               else primcounter += 6;
             }
           }
-                break;
+          break;
           }
         }
         else {
@@ -2682,17 +2679,9 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
   int f_order = 0;
   int order = g_order;
   //Sorry for this way of forwarding the order, i think 2 switches would have been more nicely
-  if (order >= 10 && order < 20) {
-    f_order = 1;
+  while (order >= 10){
+    f_order++;
     order -= 10;
-  }
-  else if (order >= 20 && order < 30) {
-    f_order = 2;
-    order -= 20;
-  }
-  else if (order >= 30 && order < 40) {
-    f_order = 3;
-    order -= 30;
   }
   switch (order) {
   case 1:
