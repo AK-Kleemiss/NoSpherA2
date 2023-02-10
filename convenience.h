@@ -590,7 +590,7 @@ struct options {
   bool becke = false;
   bool electron_diffraction = false;
   bool ECP = false;
-  bool set_ECPs = true;
+  bool set_ECPs = false;
   int ECP_mode = 0;
   bool calc = false;
   bool eli = false;
