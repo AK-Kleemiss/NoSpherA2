@@ -590,6 +590,7 @@ struct options {
   bool becke = false;
   bool electron_diffraction = false;
   bool ECP = false;
+  bool set_ECPs = true;
   int ECP_mode = 0;
   bool calc = false;
   bool eli = false;
@@ -640,6 +641,8 @@ struct options {
   std::vector<std::string> arguments;
   std::vector<std::string> Cations;
   std::vector<std::string> Anions;
+  std::vector<int> ECP_nrs;
+  std::vector<int> ECP_elcounts;
   int ncpus = 0;
   double mem = 0.0;
   unsigned int mult = 0;
