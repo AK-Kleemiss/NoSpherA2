@@ -662,10 +662,11 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
     temp_val[i].resize(e_nex);
   //-------------------------------- Read MOs --------------------------------------
   bool orca_switch = false;
-  int temp_orca = check_order(debug_wfn), temp_nr = 0;
+  //int temp_orca = check_order(debug_wfn),
+  int temp_nr = 0;
   double temp_occ = -1.0, temp_ener = 0.0;
-  if (temp_orca % 10 == 3)
-    orca_switch = true;
+  //if (temp_orca % 10 == 3)
+  //  orca_switch = true;
   while (!(line.compare(0, 3, "END") == 0) && !rf.eof()) {
     bool b = 0;
     if (monum == e_nmo) {
@@ -694,12 +695,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       temp_occ = stod(tempchar);
     }
     if (temp_ener == 0) {
-      if (temp_orca % 10 == 3)
-        length = line.copy(tempchar, 12, 63);
-      else if (temp_orca % 10 == 1)
-        length = line.copy(tempchar, 12, 62);
-      else
-        length = line.copy(tempchar, 12, 61);
+      length = line.copy(tempchar, 12, 61);
       tempchar[length] = '\0';
       temp_ener = stod(tempchar);
     }
