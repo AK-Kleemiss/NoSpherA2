@@ -2976,6 +2976,21 @@ void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms) {
   }
 };
 
+void WFN::set_ECPs(vector<int> &nr, vector<int> &elcount) {
+  has_ECPs = true;
+#pragma omp parallel for
+  for (int i = 0; i < ncen; i++) {
+    for (int j = 0; j < nr.size(); j++) {
+      cout << "checking " << atoms[i].charge << " against " << nr[j] << endl;
+      if (atoms[i].charge == nr[j]) {
+        cout << "Adding " << elcount[j] << " electron to atom " << i << endl;
+        atoms[i].ECP_electrons = elcount[j];
+        break;
+      }
+    }
+  }
+};
+
 void WFN::operator=(const WFN& right)
 {
   ncen = right.get_ncen();

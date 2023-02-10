@@ -2179,6 +2179,21 @@ void options::digest_options() {
         ECP_mode = stoi(arguments[i + 1]);
       }
     }
+    else if (temp.find("-set_ECPs") < 1) {
+      set_ECPs = true;
+      if (debug) cout << "Reading set ECPs" << endl;
+      int j = 0;
+      while (argc >= i + 2 * (j+1) && string(arguments[i + j]).find("-") != 0 && string(arguments[i + j + 1]).find("-") != 0) {
+        ECP_nrs.push_back(stoi(arguments[i + j]));
+        ECP_elcounts.push_back(stoi(arguments[i + j + 1]));
+        j += 2;
+        if (debug) {
+          cout << j << " " << arguments[i + j]<< " " << arguments[i + j + 1] << endl;
+          cout << ECP_nrs.size() << endl;
+          cout << ECP_elcounts.size() << endl;
+        }
+      }
+    }
     else if (temp.find("-ED") < 1)
       electron_diffraction = true;
     else if (temp.find("-eli") < 1)

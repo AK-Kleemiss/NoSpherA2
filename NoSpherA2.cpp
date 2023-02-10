@@ -52,6 +52,9 @@ int main(int argc, char** argv)
       if (opt.ECP) {
         wavy[i].set_has_ECPs(true);
       }
+      if (opt.set_ECPs) {
+        wavy[i].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
+      }
       log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
     }
 
@@ -141,6 +144,10 @@ int main(int argc, char** argv)
     wavy[0].set_multi(opt.mult);
     if (opt.ECP) {
       wavy[0].set_has_ECPs(true);
+    }
+    if (opt.set_ECPs) {
+      log_file << "Adding ECPs" << endl;
+      wavy[0].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
     }
     log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
