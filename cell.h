@@ -24,24 +24,7 @@ public:
     for (int i = 0; i < 3; i++)
       sym[i].resize(3);
   };
-  cell(const std::string filename)
-  {
-    sym.resize(3);
-    for (int i = 0; i < 3; i++)
-      sym[i].resize(3);
-    read_CIF(filename);
-    read_symm_CIF(filename);
-  };
-  cell(const std::string filename, std::ostream& file)
-  {
-    file << "Reading: " << std::setw(44) << filename << std::flush;
-    sym.resize(3);
-    for (int i = 0; i < 3; i++)
-      sym[i].resize(3);
-    read_CIF(filename, file);
-    read_symm_CIF(filename, file);
-  };
-  cell(const std::string filename, std::ostream& file, const bool& debug)
+  cell(const std::string filename, std::ostream& file = std::cout, const bool& debug = false)
   {
     if (debug)
       file << "starting to read cif!" << std::endl;
@@ -176,7 +159,7 @@ public:
     return positions_cart;
   }
 
-  bool read_CIF(std::string filename, std::ostream& file, const bool& debug = false)
+  bool read_CIF(std::string filename, std::ostream& file = std::cout, const bool& debug = false)
   {
     std::ifstream cif_input(filename.c_str(), std::ios::in);
     std::vector<bool> found;
@@ -289,121 +272,8 @@ public:
     cif_input.close();
     return true;
   }
-  bool read_CIF(std::string filename, const bool& debug = false)
-  {
-    std::ifstream cif_input(filename.c_str(), std::ios::in);
-    std::vector<bool> found;
-    found.resize(7);
-    for (int k = 0; k < 7; k++)
-      found[k] = false;
-    double v = 0.0;
-    std::vector <std::string> cell_keywords;
-    std::string line;
-    cell_keywords.push_back("_cell_length_a");
-    cell_keywords.push_back("_cell_length_b");
-    cell_keywords.push_back("_cell_length_c");
-    cell_keywords.push_back("_cell_angle_alpha");
-    cell_keywords.push_back("_cell_angle_beta");
-    cell_keywords.push_back("_cell_angle_gamma");
-    cell_keywords.push_back("_cell_volume");
-    if (debug)
-      std::cout << "\nStarting while !.eof()" << std::endl;
-    while (!cif_input.eof()) {
-      getline(cif_input, line);
-      for (int k = 0; k < cell_keywords.size(); k++) {
-        if (line.find(cell_keywords[k]) != std::string::npos) {
-          switch (k) {
-          case 0:
-            a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 1:
-            b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 2:
-            c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 3:
-            alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 4:
-            beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 5:
-            gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          case 6:
-            v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-            break;
-          default:
-            std::cout << "This is weird... should never get here... aborting!" << std::endl;
-            return false;
-          }
-          found[k] = true;
-        }
-      }
-      if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
-        break;
-    }
-    ca = cos(PI_180 * alpha);
-    cb = cos(PI_180 * beta);
-    cg = cos(PI_180 * gamma);
-    sa = sin(PI_180 * alpha);
-    sb = sin(PI_180 * beta);
-    sg = sin(PI_180 * gamma);
-    V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
-    if (V / v > 1.1 || V / v < 0.9) {
-      std::cout << "Volume computed is more than 10% off, please check!" << std::endl;
-      return false;
-    }
-    as = b * c * sa / V;
-    bs = a * c * sb / V;
-    cs = a * b * sg / V;
 
-    if (debug)
-      std::cout << "Making cm and rcm" << std::endl
-      << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << std::endl
-      << as << " " << bs << " " << cs << std::endl;
-
-    cm[0][0] = a;
-    cm[0][1] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-    cm[0][2] = sqrt(abs(a * c * cb)) * pow(-1, 1 + (cb > 0));
-
-    cm[1][0] = sqrt(abs(a * b * cg)) * pow(-1, 1 + (cg > 0));
-    cm[1][1] = b;
-    cm[1][2] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
-
-    cm[2][0] = sqrt(abs(a * c * cg)) * pow(-1, 1 + (cg > 0));
-    cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
-    cm[2][2] = c;
-
-    rcm[0][0] = TWO_PI / a;
-    rcm[0][1] = 0;
-    rcm[0][2] = 0;
-
-    rcm[1][0] = TWO_PI * -cg / (a * sg);
-    rcm[1][1] = TWO_PI * 1 / (b * sg);
-    rcm[1][2] = 0;
-
-    rcm[2][0] = TWO_PI * b * c * (ca * cg - cb) / V / sg;
-    rcm[2][1] = TWO_PI * a * c * (cb * cg - ca) / V / sg;
-    rcm[2][2] = TWO_PI * a * b * sg / V;
-
-    for (int i = 0; i < 3; i++)
-      for (int j = 0; j < 3; j++)
-        if (abs(rcm[i][j]) < 10e-10) {
-          rcm[i][j] = 0.0;
-          //cm[i][j] = 0.0;
-        }
-        else {
-          rcm[i][j] = bohr2ang(rcm[i][j]);
-          cm[i][j] = bohr2ang(cm[i][j]);
-        }
-
-    cif_input.close();
-    return true;
-  }
-
-  void read_symm_CIF(std::string filename, std::ostream& file, const bool& debug = false)
+  void read_symm_CIF(std::string filename, std::ostream& file = std::cout, const bool& debug = false)
   {
     std::ifstream cif_input(filename.c_str(), std::ios::in);
     std::string line;
@@ -513,14 +383,6 @@ public:
                 for (int y = 0; y < 3; y++)
                   if (sym[y][x][s_] != sym_from_cif[x][y] * -1)
                     inverse = false;
-            /*if (debug) {
-              file << "Comparison with ";
-              for (int x = 0; x < 3; x++)
-                for (int y = 0; y < 3; y++)
-                  file << sym[x][y][s] << " ";
-              file << "resulted in ";
-              file << identical << " " << inverse << endl;
-            }*/
             if (identical || inverse) {
               already_known = true;
               break;
@@ -538,138 +400,4 @@ public:
     }
   };
 
-  void read_symm_CIF(std::string filename, const bool& debug = false)
-  {
-    std::ifstream cif_input(filename.c_str(), std::ios::in);
-    std::string line;
-    cif_input.clear();
-    cif_input.seekg(0, cif_input.beg);
-    bool symm_found = false;
-    int operation_field = 200;
-    int count_fields = 0;
-    while (!cif_input.eof() && !symm_found) {
-      getline(cif_input, line);
-      if (line.find("loop_") != std::string::npos) {
-        //if(debug) file << "found loop!" << endl;
-        while (line.find("_") != std::string::npos) {
-          getline(cif_input, line);
-          if (debug) std::cout << "line in loop field definition: " << line << std::endl;
-          if (line.find("space_group_symop_operation_xyz") != std::string::npos)
-            operation_field = count_fields;
-          else if (count_fields > 2 || (operation_field == 200 && count_fields != 0)) {
-            if (debug) std::cout << "I don't think this is the symmetry block.. moving on!" << std::endl;
-            count_fields = 0;
-            break;
-          }
-          count_fields++;
-        }
-        while (line.find("_") == std::string::npos && line.length() > 3 && count_fields != 0) {
-          if (debug) std::cout << "Reading operation!" << line << std::endl;
-          symm_found = true;
-          std::stringstream s(line);
-          std::vector <std::string> fields;
-          fields.resize(count_fields);
-          int sym_from_cif[3][3]{ 0, 0, 0, 0, 0, 0, 0, 0, 0 };;
-          for (int i = 0; i < count_fields; i++)
-            s >> fields[i];
-          std::vector<std::string> vectors;
-          vectors.resize(3);
-          int column = 0;
-          for (int _c = 0; _c < fields[operation_field].length(); _c++) {
-            if (fields[operation_field][_c] != ',')
-              vectors[column].push_back(fields[operation_field][_c]);
-            else column++;
-          }
-
-          for (int x = 0; x < 3; x++) {
-            if (vectors[x].find("X") != std::string::npos || vectors[x].find("x") != std::string::npos) {
-              char sign = ' ';
-              if (vectors[x].find("X") != std::string::npos && vectors[x].find("X") != 0)
-                sign = vectors[x].at(vectors[x].find("X") - 1);
-              else if (vectors[x].find("X") == 0)
-                sign = '+';
-              if (vectors[x].find("x") != std::string::npos && vectors[x].find("x") != 0)
-                sign = vectors[x].at(vectors[x].find("x") - 1);
-              else if (vectors[x].find("x") == 0)
-                sign = '+';
-              if (sign == '-')
-                sym_from_cif[x][0] = -1;
-              else if (sign == '+')
-                sym_from_cif[x][0] = 1;
-            }
-            if (vectors[x].find("Y") != std::string::npos || vectors[x].find("y") != std::string::npos) {
-              char sign = ' ';
-              if (vectors[x].find("Y") != std::string::npos && vectors[x].find("Y") != 0)
-                sign = vectors[x].at(vectors[x].find("Y") - 1);
-              else if (vectors[x].find("Y") == 0)
-                sign = '+';
-              if (vectors[x].find("y") != std::string::npos && vectors[x].find("y") != 0)
-                sign = vectors[x].at(vectors[x].find("y") - 1);
-              else if (vectors[x].find("y") == 0)
-                sign = '+';
-              if (sign == '-')
-                sym_from_cif[x][1] = -1;
-              else if (sign == '+')
-                sym_from_cif[x][1] = 1;
-            }
-            if (vectors[x].find("Z") != std::string::npos || vectors[x].find("z") != std::string::npos) {
-              char sign = ' ';
-              if (vectors[x].find("Z") != std::string::npos && vectors[x].find("Z") != 0)
-                sign = vectors[x].at(vectors[x].find("Z") - 1);
-              else if (vectors[x].find("Z") == 0)
-                sign = '+';
-              if (vectors[x].find("z") != std::string::npos && vectors[x].find("z") != 0)
-                sign = vectors[x].at(vectors[x].find("z") - 1);
-              else if (vectors[x].find("z") == 0)
-                sign = '+';
-              if (sign == '-')
-                sym_from_cif[x][2] = -1;
-              else if (sign == '+')
-                sym_from_cif[x][2] = 1;
-            }
-          }
-          if (debug) {
-            std::cout << "Comparing ";
-            for (int x = 0; x < 3; x++)
-              for (int y = 0; y < 3; y++)
-                std::cout << sym_from_cif[x][y] << " ";
-            std::cout << std::endl;
-          }
-          bool already_known = false;
-          for (int _s = 0; _s < sym[0][0].size(); _s++) {
-            bool identical = true;
-            bool inverse = true;
-            for (int x = 0; x < 3; x++)
-              for (int y = 0; y < 3; y++)
-                if (sym[y][x][_s] != sym_from_cif[x][y])
-                  identical = false;
-            if (!identical)
-              for (int x = 0; x < 3; x++)
-                for (int y = 0; y < 3; y++)
-                  if (sym[y][x][_s] != sym_from_cif[x][y] * -1)
-                    inverse = false;
-            /*if (debug) {
-              file << "Comparison with ";
-              for (int x = 0; x < 3; x++)
-                for (int y = 0; y < 3; y++)
-                  file << sym[x][y][s] << " ";
-              file << "resulted in ";
-              file << identical << " " << inverse << endl;
-            }*/
-            if (identical || inverse) {
-              already_known = true;
-              break;
-            }
-          }
-          if (!already_known) {
-            if (debug) std::cout << "This is a new symmetry operation!" << std::endl;
-            for (int x = 0; x < 3; x++)
-              for (int y = 0; y < 3; y++)
-                sym[y][x].push_back(sym_from_cif[x][y]);
-          }
-          getline(cif_input, line);
-        }
-      }
-    }
-  };
 };
