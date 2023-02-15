@@ -1648,8 +1648,8 @@ int make_hirshfeld_grids(const int& pbc,
     if (debug) file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
 #pragma omp parallel
     {
-      vector<vector<double>> d_temp(4);
-      for (int i = 0; i < 4; i++) {
+      vector<vector<double>> d_temp(16);
+      for (int i = 0; i < 16; i++) {
         d_temp[i].resize(nr_cen);
       }
       vector<double> phi_temp(nr_mos);
