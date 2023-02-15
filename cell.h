@@ -39,7 +39,7 @@ public:
       file << "RCM done!" << std::endl;
       for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j)
-          file << std::setw(10) << std::fixed << get_rcm(i, j) / 2 / PI / 0.529177249 << ' ';
+          file << std::setw(10) << std::fixed << get_rcm(i, j) / TWO_PI / 0.529177249 << ' ';
         file << std::endl;
       }
       file << "CM in 2*PI bohr:" << std::endl;
