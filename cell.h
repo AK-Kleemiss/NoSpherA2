@@ -10,6 +10,7 @@ private:
   std::string crystal_system;
   std::vector < std::vector < std::vector <int> > > sym;
   const double PI = 3.14159265358979323846;
+  const double bohr2angs = 0.529177249;
 public:
   cell()
   {
@@ -60,6 +61,8 @@ public:
   double get_sg() { return sg; };
   double get_rcm(int i, int j) const { return rcm[i][j]; };
   double get_cm(int i, int j) const { return cm[i][j]; };
+  double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / TWO_PI; };
+  double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / TWO_PI; };
   double get_sym(int i, int j, int k) const  { return sym[i][j][k]; };
   std::vector <std::vector < std::vector<int>>> get_sym() const { return sym; };
   double get_a() const { return a; };
@@ -77,6 +80,24 @@ public:
       break;
     case 2:
       return gamma;
+      break;
+    default:
+      std::cout << "Wrong angle!" << std::endl;
+      return -400;
+      break;
+    }
+  }
+  double get_angle_rad(int i) const
+  {
+    switch (i) {
+    case 0:
+      return alpha * PI_180;
+      break;
+    case 1:
+      return beta * PI_180;
+      break;
+    case 2:
+      return gamma * PI_180;
       break;
     default:
       std::cout << "Wrong angle!" << std::endl;
