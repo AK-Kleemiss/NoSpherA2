@@ -40,30 +40,30 @@ std::string help_message();
 std::string NoSpherA2_message();
 std::string build_date();
 //Constants for later use
-inline const int hardness = 3;
-inline const double cutoff = 1.0e-20;
-inline const double PI = 3.14159265358979323846;
-inline const double TWO_PI = 2 * PI;
-inline const double FOUR_PI = 4 * PI;
-inline const double C0 = 4.0 * std::sqrt(2.0) * PI;
-inline const double PI2 = pow(PI, 2);
-inline const double PI3 = pow(PI, 3);
-inline const double PI_180 = PI / 180.0;
-inline const double TG32 = tgamma(3.0 / 2.0);
-inline const double ED_fact = 0.023934;
-inline const int max_LT = 33;
-inline const int MAG = 5810;
+constexpr int hardness = 3;
+constexpr double cutoff = 1.0e-20;
+constexpr double PI = 3.14159265358979323846;
+constexpr double TWO_PI = 2 * PI;
+constexpr double FOUR_PI = 4 * PI;
+const double C0 = std::sqrt(2.0) * FOUR_PI;
+constexpr double PI2 = PI * PI;
+constexpr double PI3 = PI * PI * PI;
+constexpr double PI_180 = PI / 180.0;
+const double TG32 = tgamma(3.0 / 2.0);
+constexpr double ED_fact = 0.023934;
+constexpr int max_LT = 33;
+constexpr int MAG = 5810;
 //                       3,     5     7,    9,    11,   13,   15,   17
 //                      19,    21
-inline const int lebedev_table[33] = { 6,    14,   26,   38,   50,   74,   86,   110,
+constexpr int lebedev_table[33] = { 6,    14,   26,   38,   50,   74,   86,   110,
              146,  170,  194,  230,  266,  302,  350,  434,
              590,  770,  974,  1202, 1454, 1730, 2030, 2354,
              2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
-inline const int ft[13] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600 };
-inline const double alpha_coef = 0.1616204596739954813316614;
-inline const double c_43 = 4.0 / 3.0;
-inline const double c_38 = 3.0 / 8.0;
-inline const double c_m53 = -5.0 / 3.0;
+constexpr int ft[13] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600 };
+constexpr double alpha_coef = 0.1616204596739954813316614;
+constexpr double c_43 = 4.0 / 3.0;
+constexpr double c_38 = 3.0 / 8.0;
+constexpr double c_m53 = -5.0 / 3.0;
 inline const double ctelf = 10 * pow(2, -2.0 / 3.0) * pow(3, c_m53) * pow(PI, -c_43);
 inline const double c_1_4p     = sqrt(1.0 / (FOUR_PI));
 inline const double c_3_4p     = sqrt(3.0 / (FOUR_PI));
@@ -114,7 +114,7 @@ constexpr double cubic_bohr2ang(const double& inp)
 }
 
 //------------------general functions for easy use of terminal input--------------------
-inline const double bragg_angstrom[114]{
+constexpr double bragg_angstrom[114]{
   0.00, //DUMMY LINE
   0.35,																																														                                                                                          0.35,
   1.45, 1.05,																																																										                              0.85, 0.70, 0.65, 0.60, 0.50, 0.45,
@@ -125,7 +125,7 @@ inline const double bragg_angstrom[114]{
   2.80, 2.35, 2.15, 2.05, 2.05, 2.05, 2.05, 2.05, 2.05, 2.00, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95 };
 
 //Covalent Radii according to the CSD
-inline const double covalent_radii[114]{
+constexpr double covalent_radii[114]{
    0.0,
   0.23,	                                                                                                                                                                                    1.5,
   1.28, 0.96,	                                                                                                                                                0.83,	0.68,	0.68,	0.68,	0.64, 1.5,
@@ -137,7 +137,7 @@ inline const double covalent_radii[114]{
 };
 
 //Integer atom masses
-inline const unsigned int integer_masses[]{
+constexpr unsigned int integer_masses[]{
  1,																																																	4,
  7,  9,																																												11,12,14,16,19,20,
  23,24,																																												27,28,31,32,35,40,
@@ -145,7 +145,7 @@ inline const unsigned int integer_masses[]{
  85, 87,																																	88, 91, 92, 96, 98, 101, 103, 106, 108, 112, 115, 119, 122, 128, 127, 131,
  132,137,139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222 };
 
-inline const double real_masses[]{
+constexpr double real_masses[]{
  1.0079,																																																																	4.0026,
  6.941,		9.0122,																																											                            			10.811,	12.011,	14.007,	15.999,	18.998,	20.18,
  22.99,		24.305,        																																											                  				26.986,	28.086,	30.974,	32.065,	35.453,	39.948,
