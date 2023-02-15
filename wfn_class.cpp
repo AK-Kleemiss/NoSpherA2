@@ -3740,8 +3740,8 @@ double WFN::compute_dens(
     return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
   else {
-    d.resize(4);
-    for (int i = 0; i < 4; i++)
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
       d[i].resize(ncen, 0.0);
     return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
   }
@@ -3768,8 +3768,20 @@ double WFN::compute_dens_cartesian(
     d[1][iat] = Pos2 - atoms[iat].y;
     d[2][iat] = Pos3 - atoms[iat].z;
     d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+    d[4][iat] = d[0][iat] * d[0][iat];
+    d[5][iat] = d[1][iat] * d[1][iat];
+    d[6][iat] = d[2][iat] * d[2][iat];
+    d[7][iat] = d[0][iat] * d[4][iat];
+    d[8][iat] = d[1][iat] * d[5][iat];
+    d[9][iat] = d[2][iat] * d[6][iat];
+    d[10][iat] = d[0][iat] * d[7][iat];
+    d[11][iat] = d[1][iat] * d[8][iat];
+    d[12][iat] = d[2][iat] * d[9][iat];
+    d[13][iat] = d[0][iat] * d[10][iat];
+    d[14][iat] = d[1][iat] * d[11][iat];
+    d[15][iat] = d[2][iat] * d[12][iat];
     if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {  // This adds a tight core density based on 
-      Rho += 8 * atoms[iat].ECP_electrons * exp(-4 * PI * d[3][iat]); // a spherical gaussian to fill in the gap 
+      Rho += 8 * atoms[iat].ECP_electrons * exp(-FOUR_PI * d[3][iat]); // a spherical gaussian to fill in the gap 
     }                                                                 // left by ECPs integrating to the correct number of electrons
   }
 
@@ -3785,10 +3797,10 @@ double WFN::compute_dens_cartesian(
     for (int k = 0; k < 3; k++) {
       if (l[k] == 0)		continue;
       else if (l[k] == 1)	ex *= d[k][iat];
-      else if (l[k] == 2)	ex *= d[k][iat] * d[k][iat];
-      else if (l[k] == 3)	ex *= pow(d[k][iat], 3);
-      else if (l[k] == 4)	ex *= pow(d[k][iat], 4);
-      else if (l[k] == 5)	ex *= pow(d[k][iat], 5);
+      else if (l[k] == 2)	ex *= d[k+4][iat];
+      else if (l[k] == 3)	ex *= d[k+7][iat];
+      else if (l[k] == 4)	ex *= d[k+10][iat];
+      else if (l[k] == 5)	ex *= d[k+13][iat];
     }
     auto run = phi.data();
     auto run2 = MOs.data();
