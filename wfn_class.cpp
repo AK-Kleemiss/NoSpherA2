@@ -2974,12 +2974,13 @@ void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms) {
 
 void WFN::set_ECPs(vector<int> &nr, vector<int> &elcount) {
   has_ECPs = true;
+  err_chkf(nr.size() == elcount.size(), "mismatch in size of atoms and ECP electrons!", std::cout);
 #pragma omp parallel for
   for (int i = 0; i < ncen; i++) {
     for (int j = 0; j < nr.size(); j++) {
       cout << "checking " << atoms[i].charge << " against " << nr[j] << endl;
       if (atoms[i].charge == nr[j]) {
-        cout << "Adding " << elcount[j] << " electron to atom " << i << endl;
+        cout << "Adding " << elcount[j] << " electron to atom " << i << "with charge " << atoms[i].charge << endl;
         atoms[i].ECP_electrons = elcount[j];
         break;
       }
@@ -2995,6 +2996,7 @@ void WFN::operator=(const WFN& right)
   nex = right.get_nex();
   multi = right.get_multi();
   charge = right.get_charge();
+  has_ECPs = right.get_has_ECPs();
   for (int i = 0; i < ncen; i++) {
     push_back_center(right.get_center(i));
     push_back_type(right.get_type(i));

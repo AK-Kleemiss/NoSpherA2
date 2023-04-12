@@ -2081,14 +2081,14 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
         << scientific << setw(14) << setprecision(8)
         << wave.atoms[asym_atom_list[i]].ECP_electrons
-        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k), 2) / 16 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k), 2) / 16.0 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
 #pragma omp parallel for private(it, k)
     for (int s = 0; s < sf[0].size(); s++) {
       it = next(hkl.begin(), s);
       k = FOUR_PI * cell.get_stl_of_hkl(*it);
       for (int i = 0; i < asym_atom_list.size(); i++) {
-        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16 / PI);
+        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16.0 / PI);
       }
     }
   }
@@ -2097,9 +2097,9 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
     for (int i = 0; i < asym_atom_list.size(); i++) {
       temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) {
-        double k_0001 = temp[i].get_core_form_factor(0.0001, wave.atoms[asym_atom_list[i]].ECP_electrons);
+        double k_0001 = temp[i].get_core_form_factor(0, wave.atoms[asym_atom_list[i]].ECP_electrons);
         double k_1 = temp[i].get_core_form_factor(FOUR_PI * bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons);
-        file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0.0001): "
+        file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0): "
           << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
       }
     }
