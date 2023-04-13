@@ -24,7 +24,7 @@ jobs:
       with:
         name: executable_MacOS_Xcode
         path: |
-          Mac_Xcode/NoSpherA2_Mac_Xcode
+          Mac/NoSpherA2_Mac
 
   build_windows:
     runs-on: windows-2022
