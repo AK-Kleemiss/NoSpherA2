@@ -20,13 +20,13 @@ GCC_OPTS := -std=c++11 -O3 -fopenmp -static
 
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../
+	clang -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../ -I/usr/local/include
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
 ./unity.o: ../unity.cpp
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -I/usr/local/opt/libomp/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	clang ${GCC_OPTS} -I/usr/local/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 clean:
