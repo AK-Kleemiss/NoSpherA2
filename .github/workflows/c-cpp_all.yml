@@ -15,7 +15,25 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: make_MacOS
-      run: cd Mac && make && cp NoSpherA2 NoSpherA2_Mac
+      run: cd Mac && make && cp NoSpherA2 NoSpherA2_Mac_Xcode
+    - name: tmate session if tests fail
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
+    - name: Archive executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: executable_MacOS_Xcode
+        path: |
+          Mac_Xcode/NoSpherA2_Mac_Xcode
+
+  build_Mac_Xcode:
+    runs-on: macos-latest
+    needs: build_Linux
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: make_MacOS
+      run: xcode-select --install && cd Mac_Xcode && make && cp NoSpherA2 NoSpherA2_Mac_Xcode
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
