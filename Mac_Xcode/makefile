@@ -16,7 +16,7 @@ CPP_DEPS += \
 
 -include ${CPP_DEPS}
 
-GCC_OPTS := -std=c++11 -O3 -fopenmp=libomp -static
+GCC_OPTS := -std=c++11 -O3 -fopenmp -static
 
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
