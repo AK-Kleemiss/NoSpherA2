@@ -594,10 +594,12 @@ int make_hirshfeld_grids(const int& pbc,
 
   if (no_date)
     file << "\nMaking Becke Grids..." << flush;
-  if (debug)
-    file << "max_l_overall: " << max_l_overall << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
-  else
-    file << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+  else {
+    if (debug)
+      file << "max_l_overall: " << max_l_overall << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
+    else
+      file << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+  }
 
   //Make Prototype grids with only single atom weights for all elements
   vector <AtomGrid> Prototype_grids;
