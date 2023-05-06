@@ -592,7 +592,7 @@ int make_hirshfeld_grids(const int& pbc,
   gpuErrchk(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
 #endif
 
-  if (!no_date)
+  if (no_date)
     file << "\nMaking Becke Grids..." << flush;
   if (debug)
     file << "max_l_overall: " << max_l_overall << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
