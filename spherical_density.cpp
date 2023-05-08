@@ -133,7 +133,7 @@ double calc_int(const int& occ, const double& coef, const double& exp, const int
 	return occ * coef * sinus_integral(radial_exp, exp, k_vector);
 }
 
-double calc_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
+double calc_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double&) {
 	return occ * coef * ft[radial_exp] / pow(exp, radial_exp + 1);
 }
 
