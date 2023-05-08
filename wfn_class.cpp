@@ -1753,7 +1753,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     }
     if (debug) {
       file << "I read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
-      file << "There are " << nex << " primitives afetr conversion" << endl;
+      file << "There are " << nex << " primitives after conversion" << endl;
     }
   }
   catch (const exception &e) {
@@ -2368,7 +2368,7 @@ int WFN::get_atom_charge(const int& nr) const
   if (nr <= ncen && nr >= 0) return atoms[nr].charge;
   else {
     cout << "invalid atom choice in atom_basis_set_loaded!" << endl;
-    return false;
+    return -1;
   }
 };
 

@@ -309,8 +309,8 @@ void read_atoms_from_CIF(ifstream& cif_input,
             string element = atnr2letter(wave.get_atom_charge(i));
             err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
             string label = fields[label_field];
-            std::transform(element.begin(), element.end(), element.begin(), asciitolower);
-            std::transform(label.begin(), label.end(), label.begin(), asciitolower);
+            transform(element.begin(), element.end(), element.begin(), asciitolower);
+            transform(label.begin(), label.end(), label.begin(), asciitolower);
             if (debug) {
               file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
                 << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
@@ -592,10 +592,14 @@ int make_hirshfeld_grids(const int& pbc,
   gpuErrchk(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
 #endif
 
-  if (debug)
-    file << "max_l_overall: " << max_l_overall << endl << "Making Becke Grid for" << endl;
-  else
-    file << endl << "Making Becke Grids..." << flush;
+  if (no_date)
+    file << "\nMaking Becke Grids..." << flush;
+  else {
+    if (debug)
+      file << "max_l_overall: " << max_l_overall << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
+    else
+      file << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+  }
 
   //Make Prototype grids with only single atom weights for all elements
   vector <AtomGrid> Prototype_grids;
@@ -1186,7 +1190,7 @@ int make_hirshfeld_grids(const int& pbc,
     sphericals.push_back(Thakkar(atom_type_list[i]));
   //Make radial grids
   if (debug) {
-    file << "Size of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
+    file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
     for (int i = 0; i < atom_type_list.size(); i++) {
       file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
       double current = 1;
@@ -1234,7 +1238,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
   }
   sphericals.clear();
-  int type_list_number;
+  int type_list_number = -1;
   if (debug) {
     file << "Cleared the sphericals!" << endl;
   }
@@ -1344,7 +1348,6 @@ int make_hirshfeld_grids(const int& pbc,
   bool prune = true;
   if (prune) {
     file << "Pruning Grid..." << flush;
-
 #pragma omp parallel for reduction(+:final_size)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
@@ -1645,7 +1648,10 @@ int make_hirshfeld_grids(const int& pbc,
     const int nr_atoms = (int) total_grid[0].size();
     const int nr_mos = temp.get_nmo(true);
     const int nr_cen = temp.get_ncen();
-    if (debug) file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
+    if (debug) {
+      file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
+      temp.write_wfn("temp_wavefunction.wfn",false,true);
+    }
 #pragma omp parallel
     {
       vector<vector<double>> d_temp(16);
@@ -2222,7 +2228,7 @@ bool thakkar_sfac(
       }
     }
   }
-  //For all elements of Cations
+  //For all elements of Anions
   for (int i = 0; i < opt.Anions.size(); i++) {
     // look for atom that has matching label
     for (int j = 0; j < wave.atoms.size(); j++) {
