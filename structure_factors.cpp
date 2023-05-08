@@ -1896,8 +1896,8 @@ int make_hirshfeld_grids(const int& pbc,
     d2[i].resize(num_points[i]);
     d3[i].resize(num_points[i]);
   }
-  double upper = 0, avg = 0;
-#pragma omp parallel for reduction(+:points, upper, avg)
+  double upper = 0, diffs=0, avg = 0, lower = 0;
+#pragma omp parallel for reduction(+:points, upper, avg, diffs, lower)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     int run = 0;
@@ -1908,7 +1908,9 @@ int make_hirshfeld_grids(const int& pbc,
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-      upper += pow(diff,2);
+      diffs += pow(diff,2);
+      upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]));
+      lower += abs(total_grid[5][p]);
       avg += diff;
       if (abs(res) > _cutoff) {
         dens[i][run] = (res);
@@ -1926,7 +1928,8 @@ int make_hirshfeld_grids(const int& pbc,
     d3[i].resize(run);
   }
   if (no_date == false) {
-    file << "NRMSD value of density = " << setw(12) << setprecision(8) << fixed << sqrt(upper / points) / (avg/points) << endl;
+    file << "NRMSD value of density =              " << setw(9) << setprecision(4) << fixed << sqrt(diffs / points) / (avg/points);
+    file << "\nR value of sph. vs non-sph. density = " << setw(9) << setprecision(4) << fixed << upper / lower*100 << " %" << endl;
   }
   shrink_vector<vector<double>>(spherical_density);
 #pragma omp parallel for
