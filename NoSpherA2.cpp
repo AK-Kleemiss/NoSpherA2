@@ -35,6 +35,86 @@ int main(int argc, char** argv)
     log_file.close();
     return 0;
   }
+  //perform combine_mo and quit
+  if (opt.combine_mo.size() != 0) {
+    WFN wavy1(2);
+    WFN wavy2(2);
+    WFN wavy3(2);
+    wavy1.read_wfn(opt.combine_mo[0], false, cout);
+    wavy2.read_wfn(opt.combine_mo[1], false, cout);
+    for (int i = 0; i < wavy1.get_ncen(); i++) {
+      wavy3.push_back_atom(wavy1.get_atom(i));
+    }
+    for (int i = 0; i < wavy2.get_ncen(); i++) {
+      wavy3.push_back_atom(wavy2.get_atom(i));
+    }
+    cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
+
+    double MinMax1[6];
+    int steps1[3];
+    readxyzMinMax_fromWFN(wavy1, MinMax1, steps1, opt.radius, opt.resolution, true);
+    double MinMax2[6];
+    int steps2[3];
+    readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
+
+    cout << "Read input" << endl;
+
+    double MinMax[6]{ 100,100,100,-100,-100,-100 };
+    int steps[3]{ 0,0,0 };
+    for (int i = 0; i < 3; i++) {
+      if (MinMax1[i] < MinMax[i])
+        MinMax[i] = MinMax1[i];
+      if (MinMax1[i + 3] > MinMax[i + 3])
+        MinMax[i + 3] = MinMax1[i + 3];
+    }
+    for (int i = 0; i < 3; i++) {
+      if (MinMax2[i] < MinMax[i])
+        MinMax[i] = MinMax2[i];
+      if (MinMax2[i + 3] > MinMax[i + 3])
+        MinMax[i + 3] = MinMax2[i + 3];
+      steps[i] = (int)ceil(bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
+    }
+    vector<int> orbs1{ 79,80,81,158,159 };
+    vector<int> orbs2{ 23,24,21 };
+    int counter = 0;
+    cube total(steps[0], steps[1], steps[2], 0, true);
+    cube MO1(steps[0], steps[1], steps[2], 0, true);
+    MO1.give_parent_wfn(wavy3);
+    MO1.set_na(wavy3.get_ncen());
+    cube MO2(steps[0], steps[1], steps[2], 0, true);
+    for (int i = 0; i < 3; i++) {
+      MO1.set_origin(i, MinMax[i]);
+      MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+      total.set_origin(i, MinMax[i]);
+      total.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+      MO2.set_origin(i, MinMax[i]);
+      MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+    for (int v1 = 0; v1 < orbs1.size(); v1++) {
+      MO1.set_zero(); 
+      Calc_MO(MO1, orbs1[v1]-1, wavy1, -1, opt.radius, std::cout);
+      for (int j = 0; j < orbs2.size(); j++) {
+        counter++;
+        cout << "Running: " << counter << " of " << orbs2.size() * orbs1.size() << endl;
+        string filename("");
+        MO2.set_zero();
+        Calc_MO(MO2, orbs2[j]-1, wavy2, -1, opt.radius, std::cout);
+        cout << "writing files..." << flush;
+        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(orbs1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(orbs2[j]) + ".cube";
+        total.set_zero();
+        total = MO1;
+        total += MO2;
+        total.write_file(filename, false);
+        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(orbs1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(orbs2[j]) + ".cube";
+        total.set_zero();
+        total = MO1;
+        total -= MO2;
+        total.write_file(filename, false);
+        cout << " ... done!" << endl;
+      }
+    }
+    exit(0);
+  }
   //Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
   if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc) {
     err_checkf(opt.hkl != "", "No hkl specified", log_file);

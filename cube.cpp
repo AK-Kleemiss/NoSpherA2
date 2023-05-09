@@ -274,21 +274,19 @@ bool cube::write_file(string& given_path, bool debug) {
   stringstream stream;
   string temp;
   ofstream of(given_path.c_str(), ios::out);
-  of << comment1 << endl;
-  of << comment2 << endl;
-  of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
+  of << comment1 << "\n";
+  of << comment2 << "\n";
+  of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << "\n";
   for (int i = 0; i < 3; i++) {
     of << setw(5) << size[i];
     for (int j = 0; j < 3; j++)  of << fixed << setw(12) << setprecision(6) << vectors[i][j];
-    of << endl;
+    of << "\n";
   }
-  //of << stream.str();
-  //stream.str("");
   for (int i = 0; i < na; i++) {
     of << setw(5) << parent_wavefunction->get_atom_charge(i) << setw(5) << parent_wavefunction->get_atom_charge(i) << ".000000";
     for (int j = 0; j < 3; j++)
       of << fixed << setw(12) << setprecision(6) << parent_wavefunction->get_atom_coordinate(i, j);
-    of << endl;
+    of << "\n";
   }
   if (debug) cout << "Finished atoms!" << endl;
   if (get_loaded())
@@ -298,10 +296,10 @@ bool cube::write_file(string& given_path, bool debug) {
         while (temp_write < size[2]) {
           of << uppercase << scientific << setw(13) << setprecision(5) << values[run_x][run_y][temp_write];
           temp_write++;
-          if (temp_write % 6 == 0) of << endl;
+          if (temp_write % 6 == 0) of << "\n";
         }
         if (debug) cout << "Write Z-line!" << endl;
-        if (temp_write % 6 != 0) of << endl;
+        if (temp_write % 6 != 0) of << "\n";
       }
   else {
     ifstream f(path, ios::in);
@@ -309,7 +307,7 @@ bool cube::write_file(string& given_path, bool debug) {
     for (int a = 0; a < na + 6; a++) getline(f, line_buffer);
     while (!f.eof()) {
       getline(f, line_buffer);
-      of << line_buffer << endl;
+      of << line_buffer << "\n";
     }
   }
   //of << stream.str();
@@ -481,6 +479,7 @@ void cube::operator=(cube& right) {
     }
     loaded = true;
   }
+  parent_wavefunction = right.parent_wavefunction;
 };
 
 cube cube::operator+(cube& right) const {
