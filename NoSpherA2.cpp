@@ -98,13 +98,13 @@ int main(int argc, char** argv)
     }
     for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
       MO1.set_zero(); 
-      Calc_MO(MO1, opt.cmo1[v1]-1, wavy1, -1, opt.radius, std::cout);
+      Calc_MO(MO1, opt.cmo1[v1]-1, wavy1, -1, 400, std::cout);
       for (int j = 0; j < opt.cmo2.size(); j++) {
         counter++;
         cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
         string filename("");
         MO2.set_zero();
-        Calc_MO(MO2, opt.cmo2[j]-1, wavy2, -1, opt.radius, std::cout);
+        Calc_MO(MO2, opt.cmo2[j]-1, wavy2, -1, 400, std::cout);
         cout << "writing files..." << flush;
         filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
         fns.push_back(filename);
