@@ -181,8 +181,9 @@ public:
   };
   void print_atom_long(const int& nr) { if (nr <= ncen && nr >= 0) atoms[nr].print_values_long(); };
   int get_atom_charge(const int& nr) const;
-  unsigned int get_atom_integer_mass(const unsigned int& atomnr);
-  double get_atom_real_mass(const int& atomnr);
+  unsigned int get_atom_integer_mass(const unsigned int& atomnr) const;
+  double get_atom_real_mass(const int& atomnr) const;
+  atom get_atom(const unsigned int& nr) const;
   //----------Calcualtion of Properties
   //double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones

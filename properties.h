@@ -78,7 +78,7 @@ void Calc_MO(
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Hirshfeld(
 	cube& CubeHDEF,
