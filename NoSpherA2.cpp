@@ -87,6 +87,7 @@ int main(int argc, char** argv)
     MO1.give_parent_wfn(wavy3);
     MO1.set_na(wavy3.get_ncen());
     cube MO2(steps[0], steps[1], steps[2], 0, true);
+    vector<string> fns;
     for (int i = 0; i < 3; i++) {
       MO1.set_origin(i, MinMax[i]);
       MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
@@ -106,11 +107,13 @@ int main(int argc, char** argv)
         Calc_MO(MO2, opt.cmo2[j]-1, wavy2, -1, opt.radius, std::cout);
         cout << "writing files..." << flush;
         filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+        fns.push_back(filename);
         total.set_zero();
         total = MO1;
         total += MO2;
         total.write_file(filename, false);
         filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+        fns.push_back(filename);
         total.set_zero();
         total = MO1;
         total -= MO2;
@@ -118,6 +121,20 @@ int main(int argc, char** argv)
         cout << " ... done!" << endl;
       }
     }
+    ofstream vmd("read_files.vmd");
+    vmd << "mol addrep 0\nmol new {" + fns[0] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 }\n";
+    vmd << "animate style Loop\n";
+    for(int i=1; i<fns.size(); i++)
+      vmd << "mol addfile {" + fns[i] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 } 0\n";
+    vmd << "animate style Loop\ndisplay projection Orthographic\ndisplay depthcue off\n";
+    vmd << "axes location Off\ndisplay rendermode GLSL\ncolor Display Background white\ncolor Element P purple\n";
+    vmd << "color Element Ni green\ncolor Element C gray\nmol modstyle 0 0 CPK 1.000000 0.300000 12.000000 12.000000\n";
+    vmd << "mol modcolor 0 0 Element\nmol color Element\nmol representation CPK 1.000000 0.300000 22.000000 22.000000\n";
+    vmd << "mol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 1 0 Isosurface 0.020000 0 0 0 1 1\n";
+    vmd << "mol modcolor 1 0 ColorID 0\nmol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 2 0 Isosurface -0.020000 0 0 0 1 1\nmol modcolor 2 0 ColorID 1\n";
+    vmd << "mol selection all\nmol material Transparent\n";
+    vmd.flush();
+    vmd.close();
     exit(0);
   }
   //Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
