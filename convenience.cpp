@@ -2173,6 +2173,20 @@ void options::digest_options() {
       combine_mo.push_back(arguments[i + 1]);
       combine_mo.push_back(arguments[i + 2]);
     }
+    else if (temp.find("-cmos1") < 1) {
+      int j = 1;
+      while (i + j < argc && arguments[i + j].find("-") >= 1){
+        cmo1.push_back(stoi(arguments[i + j]));
+        j++;
+      }
+    }
+    else if (temp.find("-cmos2") < 1) {
+      int j = 1;
+      while (i+j < argc && arguments[i + j].find("-") >= 1) {
+        cmo2.push_back(stoi(arguments[i + j]));
+        j++;
+      }
+    }
     else if (temp.find("-def") < 1)
       def = calc = true;
     else if (temp.find("-DEF") < 1)
