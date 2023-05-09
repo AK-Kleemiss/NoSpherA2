@@ -969,9 +969,10 @@ void Calc_MO(
   WFN& wavy,
   int cpus,
   double radius,
-  ofstream& file
+  ostream& file
 )
 {
+  err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
 #ifdef _OPENMP
   if (cpus != -1) {
     omp_set_num_threads(cpus);

@@ -1050,7 +1050,8 @@ void readxyzMinMax_fromWFN(
   double* CoordMinMax,
   int* NbSteps,
   double Radius,
-  double Increments
+  double Increments,
+  bool no_bohr
 )
 {
   vector < vector <double > > PosAtoms;
@@ -1058,6 +1059,7 @@ void readxyzMinMax_fromWFN(
   for (int i = 0; i < wavy.get_ncen(); i++)
     PosAtoms[i].resize(3);
   bool bohrang = !check_bohr(wavy, false);
+  if (no_bohr) bohrang = true;
   for (int j = 0; j < wavy.get_ncen(); j++)
   {
 
@@ -2166,6 +2168,10 @@ void options::digest_options() {
         groups.push_back(split_string<int>(_temp, delimiter));
         n++;
       }
+    }
+    else if (temp.find("-combine_mos") < 1) {
+      combine_mo.push_back(arguments[i + 1]);
+      combine_mo.push_back(arguments[i + 2]);
     }
     else if (temp.find("-def") < 1)
       def = calc = true;

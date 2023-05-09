@@ -452,7 +452,8 @@ void readxyzMinMax_fromWFN(
   double* CoordMinMax,
   int* NbSteps,
   double Radius,
-  double Increments);
+  double Increments,
+  bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
   std::string cif,
@@ -639,6 +640,7 @@ struct options {
   std::string turbomole_path;
   std::string basis_set_path;
   std::vector<std::string> arguments;
+  std::vector<std::string> combine_mo;
   std::vector<std::string> Cations;
   std::vector<std::string> Anions;
   std::vector<int> ECP_nrs;

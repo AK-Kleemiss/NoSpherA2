@@ -3113,7 +3113,7 @@ double* WFN::get_ptr_mo_coefficients(const int& mo)
   return MOs[mo].get_ptr_coefficients();
 };
 
-unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr)
+unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr) const
 {
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << endl;
@@ -3126,7 +3126,7 @@ unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr)
   return integer_masses[get_atom_charge(atomnr) - 1];
 };
 
-double WFN::get_atom_real_mass(const int& atomnr)
+double WFN::get_atom_real_mass(const int& atomnr) const
 {
   if (get_atom_charge(atomnr) > 86) {
     cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << endl;
@@ -3137,6 +3137,11 @@ double WFN::get_atom_real_mass(const int& atomnr)
     return 0;
   }
   return real_masses[get_atom_charge(atomnr) - 1];
+}
+
+atom WFN::get_atom(const unsigned int& nr) const {
+  err_checkf(nr <= ncen, "Error, selected atom index higehr than wavefunction!", cout);
+  return atoms[nr];
 }
 
 double WFN::get_MO_occ(const int& nr) const
