@@ -643,6 +643,8 @@ struct options {
   std::vector<std::string> combine_mo;
   std::vector<std::string> Cations;
   std::vector<std::string> Anions;
+  std::vector<int> cmo1;
+  std::vector<int> cmo2;
   std::vector<int> ECP_nrs;
   std::vector<int> ECP_elcounts;
   int ncpus = 0;
