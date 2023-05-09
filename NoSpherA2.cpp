@@ -57,8 +57,15 @@ int main(int argc, char** argv)
     int steps2[3];
     readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
 
-    cout << "Read input" << endl;
-
+    cout << "Read input\nCalculating for MOs ";
+    for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
+      cout << opt.cmo1[v1] << " ";
+    }
+    cout << "of fragment 1 and MOs ";
+    for (int v1 = 0; v1 < opt.cmo2.size(); v1++) {
+      cout << opt.cmo2[v1] << " ";
+    }
+    cout << "of fragment 2" << endl;
     double MinMax[6]{ 100,100,100,-100,-100,-100 };
     int steps[3]{ 0,0,0 };
     for (int i = 0; i < 3; i++) {
@@ -74,8 +81,6 @@ int main(int argc, char** argv)
         MinMax[i + 3] = MinMax2[i + 3];
       steps[i] = (int)ceil(bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
     }
-    vector<int> orbs1{ 79,80,81,158,159 };
-    vector<int> orbs2{ 23,24,21 };
     int counter = 0;
     cube total(steps[0], steps[1], steps[2], 0, true);
     cube MO1(steps[0], steps[1], steps[2], 0, true);
@@ -90,22 +95,22 @@ int main(int argc, char** argv)
       MO2.set_origin(i, MinMax[i]);
       MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
-    for (int v1 = 0; v1 < orbs1.size(); v1++) {
+    for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
       MO1.set_zero(); 
-      Calc_MO(MO1, orbs1[v1]-1, wavy1, -1, opt.radius, std::cout);
-      for (int j = 0; j < orbs2.size(); j++) {
+      Calc_MO(MO1, opt.cmo1[v1]-1, wavy1, -1, opt.radius, std::cout);
+      for (int j = 0; j < opt.cmo2.size(); j++) {
         counter++;
-        cout << "Running: " << counter << " of " << orbs2.size() * orbs1.size() << endl;
+        cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
         string filename("");
         MO2.set_zero();
-        Calc_MO(MO2, orbs2[j]-1, wavy2, -1, opt.radius, std::cout);
+        Calc_MO(MO2, opt.cmo2[j]-1, wavy2, -1, opt.radius, std::cout);
         cout << "writing files..." << flush;
-        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(orbs1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(orbs2[j]) + ".cube";
+        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
         total.set_zero();
         total = MO1;
         total += MO2;
         total.write_file(filename, false);
-        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(orbs1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(orbs2[j]) + ".cube";
+        filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
         total.set_zero();
         total = MO1;
         total -= MO2;
