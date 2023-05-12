@@ -214,6 +214,95 @@ void read_hkl(const string& hkl_filename,
   file << "Nr of reflections to be used: " << hkl.size() << endl;
 }
 
+void generate_hkl(const double& dmin,
+  hkl_list& hkl,
+  const vector<vector<double>>& twin_law,
+  cell& unit_cell,
+  ostream& file,
+  bool debug = false)
+{
+  file << "Generating hkl indices up to d=: " << setw(8) << setprecision(2) << dmin << " ... " << flush;
+  vector<int> hkl_(3);
+  string line, temp;
+  const int extreme = 201;
+  for (int h = -extreme; h < extreme; h++) {
+    for (int k = -extreme; k < extreme; k++) {
+      //only need 0 to extreme, since we have no DISP signal
+      for (int l = 0; l < extreme; l++) {
+        hkl_ = { h,k,l };
+        if (unit_cell.get_d_of_hkl(hkl_) >= dmin)
+          hkl.emplace(hkl_);
+        else
+          break;
+      }
+    }
+  }
+  file << "... done!\nNr of reflections generated: " << hkl.size() << endl;
+
+  if (debug)
+    file << "Number of reflections before twin: " << hkl.size() << endl;
+  if (twin_law.size() > 0) {
+    for (const vector<int>& hkl__ : hkl)
+      for (int i = 0; i < twin_law.size(); i++)
+        hkl.emplace(vector<int>{
+        int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+          int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+          int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])
+      });
+  }
+  if (debug)
+    file << "Number of reflections after twin: " << hkl.size() << endl;
+
+  vector < vector < vector <int> > > sym(3);
+  for (int i = 0; i < 3; i++)
+    sym[i].resize(3);
+  sym = unit_cell.get_sym();
+
+  if (debug) {
+    file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+    for (int i = 0; i < sym[0][0].size(); i++) {
+      for (int x = 0; x < 3; x++) {
+        for (int y = 0; y < 3; y++)
+          file << setw(3) << sym[y][x][i];
+        file << endl;
+      }
+      file << endl;
+    }
+  }
+  else
+    file << "Number of symmetry operations: " << sym[0][0].size() << endl;
+
+  vector<int> tempv(3);
+  hkl_list hkl_enlarged = hkl;
+  for (int s = 0; s < sym[0][0].size(); s++) {
+    if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+      sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+      sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0) {
+      continue;
+    }
+    for (const vector<int>& hkl__ : hkl) {
+      tempv = { 0,0,0 };
+      for (int h = 0; h < 3; h++) {
+        for (int j = 0; j < 3; j++)
+          tempv[j] += hkl__[h] * sym[j][h][s];
+      }
+      hkl_enlarged.emplace(tempv);
+    }
+  }
+
+  for (const vector<int>& hkl__ : hkl_enlarged) {
+    tempv = hkl__;
+    tempv[0] *= -1;
+    tempv[1] *= -1;
+    tempv[2] *= -1;
+    if (hkl_enlarged.find(tempv) != hkl_enlarged.end()) {
+      hkl_enlarged.erase(tempv);
+    }
+  }
+  hkl = hkl_enlarged;
+  file << "Nr of reflections to be used: " << hkl.size() << endl;
+}
+
 void read_atoms_from_CIF(ifstream& cif_input,
   const vector <int>& input_groups,
   const cell& unit_cell,
@@ -2184,7 +2273,10 @@ bool thakkar_sfac(
 
   hkl_list hkl;
   if (!opt.read_k_pts) {
-    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    if (opt.dmin != 99.0)
+      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    else
+      read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
   if (opt.debug) {
@@ -2391,7 +2483,10 @@ tsc_block MTC_thakkar_sfac(
     }*/
   }
   else if (nr == 0 && opt.read_k_pts == false) {
-    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    if (opt.dmin != 99.0)
+      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    else
+      read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     opt.m_hkl_list = hkl;
   }
 
@@ -2502,7 +2597,10 @@ bool calculate_structure_factors_HF(
 
   hkl_list hkl;
   if (!opt.read_k_pts) {
-    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    if (opt.dmin != 99.0)
+      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    else
+      read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
 
   if (opt.debug)
@@ -2742,7 +2840,10 @@ tsc_block calculate_structure_factors_MTC(
     */
   }
   else if (nr == 0 && opt.read_k_pts == false) {
-    read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    if (opt.dmin != 99.0)
+      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    else
+      read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     opt.m_hkl_list = hkl;
   }
   if (kpts == NULL || kpts->size() == 0) { 
