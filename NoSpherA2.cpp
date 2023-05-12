@@ -186,13 +186,6 @@ int main(int argc, char** argv)
       }
     }
 
-    if (opt.debug) {
-      for (int i = 1; i < opt.combined_tsc_calc_files.size(); i++) {
-        log_file << opt.combined_tsc_calc_files[i] << " ";
-        for (int j = 0; j < opt.groups[i].size(); j++) log_file << opt.groups[i][j] << " ";
-        log_file << endl;
-      }
-    }
     known_scatterer = result.get_scatterers();
     log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
 #ifdef _WIN64
