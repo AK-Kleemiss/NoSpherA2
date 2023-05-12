@@ -616,6 +616,7 @@ struct options {
   bool old_tsc = false;
   bool thakkar_d_plot = false;
   double sfac_scan = 0.0;
+  double dmin = 99.0;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
   int NbSteps[3]{ 0,0,0 };
