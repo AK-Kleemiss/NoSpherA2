@@ -2124,7 +2124,7 @@ void options::digest_options() {
       if (debug) cout << "Looking for Anions!" << endl;
       while (i + n < argc && string(arguments[i + n]).find("-") != 0) {
         store = arguments[i + n];
-        vector<string> Z = split_string<string>(store," ");
+        vector<string> Z = split_string<string>(store, " ");
         for (int r = 0; r < Z.size(); r++) {
           if (debug) cout << Z[r] << endl;
           Anions.push_back(Z[r]);
@@ -2175,22 +2175,22 @@ void options::digest_options() {
     }
     else if (temp.find("-cmos1") < 1) {
       int j = 1;
-      while (i + j < argc && arguments[i + j].find("-") >= 1){
+      while (i + j < argc && arguments[i + j].find("-") >= 1) {
         cmo1.push_back(stoi(arguments[i + j]));
         j++;
       }
     }
     else if (temp.find("-cmos2") < 1) {
       int j = 1;
-      while (i+j < argc && arguments[i + j].find("-") >= 1) {
+      while (i + j < argc && arguments[i + j].find("-") >= 1) {
         cmo2.push_back(stoi(arguments[i + j]));
         j++;
       }
     }
-    else if (temp.find("-def") < 1)
+    else if (temp.find("-def") < 1 || temp.find("-DEF") < 1)
       def = calc = true;
-    else if (temp.find("-DEF") < 1)
-      def = calc = true;
+    else if (temp.find("-dmin") < 1)
+      dmin = stod(arguments[i + 1]);
     else if (temp.find("-d") < 1)
       basis_set_path = arguments[i + 1];
     else if (temp.find("-ECP") < 1) {

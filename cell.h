@@ -7,6 +7,7 @@ private:
   double ca, cb, cg, sa, sb, sg;
   double rcm[3][3];
   double cm[3][3];
+  double upper;
   std::string crystal_system;
   std::vector < std::vector < std::vector <int> > > sym;
   const double PI = 3.14159265358979323846;
@@ -14,7 +15,7 @@ private:
 public:
   cell()
   {
-    as = bs = cs = a = b = c = alpha = beta = gamma = V = ca = cb = cg = sa = sb = sg = 0.0;
+    as = bs = cs = a = b = c = alpha = beta = gamma = V = ca = cb = cg = sa = sb = sg = upper = 0.0;
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++) {
         rcm[i][j] = 0.0;
@@ -144,12 +145,9 @@ public:
   double get_d_of_hkl(const std::vector<int> hkl) const 
   {
     // d will be in Angstrom
-    double d, upper, lower;
     // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
-    upper = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
-    lower = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
-    d = sqrt(lower / upper);
-    return d;
+    double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
+    return sqrt(upper / lower);
   }
 
   double get_stl_of_hkl(const std::vector<int> hkl) const
@@ -278,6 +276,8 @@ public:
     rcm[2][0] = TWO_PI * b * c * (ca * cg - cb) / V / sg;
     rcm[2][1] = TWO_PI * a * c * (cb * cg - ca) / V / sg;
     rcm[2][2] = TWO_PI * a * b * sg / V;
+
+    upper = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
 
     for (int i = 0; i < 3; i++)
       for (int j = 0; j < 3; j++)

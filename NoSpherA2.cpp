@@ -139,7 +139,7 @@ int main(int argc, char** argv)
   }
   //Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
   if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc) {
-    err_checkf(opt.hkl != "", "No hkl specified", log_file);
+    err_checkf(opt.hkl != "" || opt.dmin != 99.0, "No hkl specified and no dmin value given", log_file);
     if (opt.combined_tsc_calc) err_checkf(opt.cif != "", "No cif specified", log_file);
     //First make sure all files exist
     if (opt.cif_based_combined_tsc_calc) err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
