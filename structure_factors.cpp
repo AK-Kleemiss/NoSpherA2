@@ -2241,7 +2241,10 @@ bool thakkar_sfac(
   WFN& wave
 )
 {
-  err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
+  if (opt.hkl != "") {
+    err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
+  }
+  
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons() << endl;
   file << "Reading: " << opt.hkl;
