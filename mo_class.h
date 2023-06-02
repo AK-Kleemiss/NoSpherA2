@@ -10,16 +10,19 @@ private:
   double occ;
   double ener;
   std::vector<double> coefficients;
+  int op; //0=alpha, 1=beta
 public:
   MO() {
     nr = 0;
+    op = 0;
     occ = 0.0;
     ener = 0.0;
   };
-  MO(const int& number, const double& occupation, const double& energy) {
+  MO(const int& number, const double& occupation, const double& energy, const int& oper = 0) {
     nr = number;
     occ = occupation;
     ener = energy;
+    op = oper;
   };
   void push_back_coef(const double &val){
     coefficients.push_back(val);
@@ -92,7 +95,9 @@ public:
   void set_nr(const int& inr) { nr = inr; };
   void set_occ(const int& iocc) { occ = iocc; };
   void set_occ(const double& iocc) { occ = iocc; };
+  void set_op(const int& oper) { op = oper; };
   double get_occ() const { return occ; };
+  int get_op() const { return op; };
   void set_ener(const double& iener) { ener = iener; };
   int get_primitive_count() const { return (int) coefficients.size(); };
   std::string hdr() {
