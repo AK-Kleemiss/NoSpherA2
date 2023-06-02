@@ -59,8 +59,7 @@ constexpr int lebedev_table[33] = { 6,    14,   26,   38,   50,   74,   86,   11
              146,  170,  194,  230,  266,  302,  350,  434,
              590,  770,  974,  1202, 1454, 1730, 2030, 2354,
              2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
-constexpr int ft[13] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600 };
-constexpr double alpha_coef = 0.1616204596739954813316614;
+constexpr int ft[] = { 1,1,2,6,24,120,720,5040,40320,362880,3628800,39916800,479001600,6227020800,87178291200,1307674368000,20922789888000,355687428096000,6402373705728000,121645100408832000,2432902008176640000 }; constexpr double alpha_coef = 0.1616204596739954813316614;
 constexpr double c_43 = 4.0 / 3.0;
 constexpr double c_38 = 3.0 / 8.0;
 constexpr double c_m53 = -5.0 / 3.0;
@@ -82,6 +81,14 @@ inline const double c_315_16p  = sqrt(315.0 / (16.0 * PI));
 inline const double c_315_32p  = sqrt(315.0 / (32.0 * PI));
 inline const double c_315_256p = sqrt(315.0 / (256.0 * PI));
 
+const inline int ft_fun(const int& nr) {
+  if (nr >= 0 && nr <= 20)
+    return ft[nr];
+  else if (nr < 0)
+    return 0;
+  else
+    return ft_fun(nr - 1) * nr;
+}
 
 constexpr double bohr2ang(const double& inp)
 {
