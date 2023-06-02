@@ -23,6 +23,7 @@
 #else
 #define GetCurrentDir getcwd
 #include <unistd.h>
+#include <cfloat>
 #include <sys/wait.h>
 #include <sys/time.h>
 #include <termios.h>
@@ -611,6 +612,7 @@ struct options {
   bool def = false;
   bool fract = false;
   bool hirsh = false;
+  bool s_rho = false;
   bool Olex2_1_3_switch = false;
   bool iam_switch = false;
   bool read_k_pts = false;

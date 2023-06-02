@@ -110,6 +110,14 @@ bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener)
   return true;
 };
 
+bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener, const int& oper)
+{
+  nmo++;
+  //hier fehlen noch sinnhaftigkeitsfragen
+  MOs.push_back(MO(nr, occ, ener, oper));
+  return true;
+};
+
 bool WFN::push_back_MO(MO& given)
 {
   nmo++;
@@ -664,14 +672,13 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   bool orca_switch = false;
   //int temp_orca = check_order(debug_wfn),
   int temp_nr = 0;
-  double temp_occ = -1.0, temp_ener = 0.0;
+  int oper = 0;
+  double temp_occ = -1.0, temp_ener = 0.0, last_ener = -DBL_MAX;
   //if (temp_orca % 10 == 3)
   //  orca_switch = true;
   while (!(line.compare(0, 3, "END") == 0) && !rf.eof()) {
-    bool b = 0;
     if (monum == e_nmo) {
       //if (debug_wfn) file << "read all MOs I expected, finishing read...." << endl;
-      b = true;
       break;
     }
     stringstream stream2(line);
@@ -699,7 +706,14 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       tempchar[length] = '\0';
       temp_ener = stod(tempchar);
     }
-    push_back_MO(temp_nr, temp_occ, temp_ener);
+    if (temp_ener > last_ener) {
+      last_ener = temp_ener;
+    }
+    else{
+      last_ener = -DBL_MAX;
+      oper++;
+    }
+    push_back_MO(temp_nr, temp_occ, temp_ener, oper);
     //---------------------------Start reading MO coefficients-----------------------
     getline(rf, line);
     linecount = 0;
@@ -746,7 +760,6 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
       run++;
     }
     monum++;
-    if (b == true) break;
   }
   err_checkf(monum + 1 >= e_nmo, "less MOs than expected, quitting...\nmonum: " + to_string(monum) + " e_nmo : " + to_string(e_nmo), file);
   for (int i = 0; i < e_nmo; i++) {
@@ -988,8 +1001,17 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     if (please_break)
       break;
   }
+  double last_ener = -DBL_MAX;
+  int oper = 0;
   for (int i = 0; i < temp_nmo; i++) {
-    err_checkf(push_back_MO(i + 1, occ[i], ener[i]), "Error poshing back MO! MO: " + to_string(i), file);
+    if (ener[i] > last_ener) {
+      last_ener = ener[i];
+    }
+    else {
+      last_ener = -DBL_MAX;
+      oper++;
+    }
+    err_checkf(push_back_MO(i + 1, occ[i], ener[i], oper), "Error poshing back MO! MO: " + to_string(i), file);
   }
   occ.resize(0);
   ener.resize(0);
@@ -1003,6 +1025,7 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
     getline(rf, line);
     //if (debug) file << "mo Nr line: " << line << endl;
     int nr = stoi(line);
+    nr--;
     while (line.find("</MO Number>") == string::npos)
       getline(rf, line);
     while (coef.size() != nex) {
@@ -1018,7 +1041,7 @@ bool WFN::read_wfx(const string& fileName, const bool& debug, ostream& file)
       err_checkf(coef.size() <= nex, "Error reading coefficients! MO: " + to_string(MOs.size()), file);
     }
     for (int i = 0; i < nex; i++)
-      MOs[nr - 1].push_back_coef(coef[i]);
+      MOs[nr].push_back_coef(coef[i]);
     coef.resize(0);
     getline(rf, line);
   }
@@ -1082,7 +1105,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
   while (atoms_with_basis < ncen && line.find("[") == string::npos) {
     vector <string> line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
-    const int atom_based = stoi(line_digest[0]);
+    const int atom_based = stoi(line_digest[0]) - 1;
     getline(rf, line);
     int shell = 0;
     while (line.size() > 2) {
@@ -1106,7 +1129,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
       for (int i = 0; i < number_of_functions; i++) {
         line_digest = split_string<string>(line, " ");
         remove_empty_elements(line_digest);
-        err_checkf(atoms[atom_based - 1].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
+        err_checkf(atoms[atom_based].push_back_basis_set(stod(line_digest[0]), stod(line_digest[1]), shell_type, shell), "Error pushing back basis", file);
         getline(rf, line);
       }
       shell++;
@@ -1199,7 +1222,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
     temp = split_string<string>(line, " ");
     remove_empty_elements(temp);
     occup = stod(temp[1]);
-    push_back_MO(run, occup, ene);
+    push_back_MO(run, occup, ene, spin);
     //int run_coef = 0;
     int p_run = 0;
     vector<vector<double>> p_temp(3);
@@ -1554,7 +1577,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
         file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
       }
       for (int j = 0; j < dimension; j++) {
-        push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j]);
+        push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j],i);
         //int run_coef = 0;
         int p_run = 0;
         vector<vector<double>> p_temp(3);
@@ -3149,6 +3172,11 @@ double WFN::get_MO_occ(const int& nr) const
   return MOs[nr].get_occ();
 };
 
+int WFN::get_MO_op(const int& nr) const
+{
+  return MOs[nr].get_op();
+};
+
 void WFN::delete_unoccupied_MOs()
 {
   for (int i = (int) MOs.size() - 1; i >= 0; i--) {
@@ -3754,6 +3782,51 @@ double WFN::compute_dens(
   }
 };
 
+double WFN::compute_spin_dens(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3,
+  vector<vector<double>>& d,
+  vector<double>& phi
+)
+{
+  if (d_f_switch) {
+    err_checkf(d.size() >= 5, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, true);
+  }
+  else {
+    err_checkf(d.size() >= 4, "d is too small!", std::cout);
+    err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
+    return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+  }
+};
+
+double WFN::compute_spin_dens(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3
+)
+{
+  vector<vector<double>> d;
+  vector<double> phi(nmo, 0.0);
+  //const int n = get_nmo(true);
+  if (d_f_switch) {
+    d.resize(5);
+    for (int i = 0; i < 5; i++)
+      d[i].resize(ncen, 0.0);
+    err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
+    return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, true);
+  }
+  else {
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
+      d[i].resize(ncen, 0.0);
+    return compute_spin_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
+  }
+};
+
 double WFN::compute_dens_cartesian(
   const double& Pos1,
   const double& Pos2,
@@ -3765,7 +3838,7 @@ double WFN::compute_dens_cartesian(
 {
   std::fill(phi.begin(), phi.end(), 0.0);
   double Rho = 0.0;
-  int iat;
+  int iat, j, k;
   int l[3];
   double ex;
   int mo;
@@ -3792,7 +3865,7 @@ double WFN::compute_dens_cartesian(
     }                                                                 // left by ECPs integrating to the correct number of electrons
   }
 
-  for (int j = 0; j < nex; j++) {
+  for (j = 0; j < nex; j++) {
     iat = centers[j] - 1;
     //if (iat != atom) continue;
     type2vector(types[j], l);
@@ -3801,7 +3874,7 @@ double WFN::compute_dens_cartesian(
       continue;
     }
     ex = exp(ex);
-    for (int k = 0; k < 3; k++) {
+    for (k = 0; k < 3; k++) {
       if (l[k] == 0)		continue;
       else if (l[k] == 1)	ex *= d[k][iat];
       else if (l[k] == 2)	ex *= d[k+4][iat];
@@ -3809,22 +3882,91 @@ double WFN::compute_dens_cartesian(
       else if (l[k] == 4)	ex *= d[k+10][iat];
       else if (l[k] == 5)	ex *= d[k+13][iat];
     }
-    auto run = phi.data();
-    auto run2 = MOs.data();
+    double* run = phi.data();
+    MO* run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++) {
       *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
       run2++, run++;
     }
   }
 
-  auto run = phi.data();
-  auto run2 = MOs.data();
+  double* run = phi.data();
+  MO* run2 = MOs.data();
   for (mo = 0; mo < nmo; mo++) {
     Rho += (*run2).get_occ() * pow(*run, 2);
     run++, run2++;
   }
 
   return Rho;
+}
+
+double WFN::compute_spin_dens_cartesian(
+  const double& Pos1,
+  const double& Pos2,
+  const double& Pos3,
+  vector<vector<double>>& d,
+  vector<double>& phi
+)
+{
+  std::fill(phi.begin(), phi.end(), 0.0);
+  double alpha=0.0, beta=0.0;
+  int iat, j, k;
+  int l[3];
+  double ex;
+  int mo;
+
+  for (iat = 0; iat < ncen; iat++) {
+    d[0][iat] = Pos1 - atoms[iat].x;
+    d[1][iat] = Pos2 - atoms[iat].y;
+    d[2][iat] = Pos3 - atoms[iat].z;
+    d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+    d[4][iat] = d[0][iat] * d[0][iat];
+    d[5][iat] = d[1][iat] * d[1][iat];
+    d[6][iat] = d[2][iat] * d[2][iat];
+    d[7][iat] = d[0][iat] * d[4][iat];
+    d[8][iat] = d[1][iat] * d[5][iat];
+    d[9][iat] = d[2][iat] * d[6][iat];
+    d[10][iat] = d[0][iat] * d[7][iat];
+    d[11][iat] = d[1][iat] * d[8][iat];
+    d[12][iat] = d[2][iat] * d[9][iat];
+    d[13][iat] = d[0][iat] * d[10][iat];
+    d[14][iat] = d[1][iat] * d[11][iat];
+    d[15][iat] = d[2][iat] * d[12][iat];
+  }
+
+  for (j = 0; j < nex; j++) {
+    iat = centers[j] - 1;
+    type2vector(types[j], l);
+    ex = -exponents[j] * d[3][iat];
+    if (ex < -46.0517) { //corresponds to cutoff of ex ~< 1E-20
+      continue;
+    }
+    ex = exp(ex);
+    for (k = 0; k < 3; k++) {
+      if (l[k] == 0)		continue;
+      else if (l[k] == 1)	ex *= d[k][iat];
+      else if (l[k] == 2)	ex *= d[k + 4][iat];
+      else if (l[k] == 3)	ex *= d[k + 7][iat];
+      else if (l[k] == 4)	ex *= d[k + 10][iat];
+      else if (l[k] == 5)	ex *= d[k + 13][iat];
+    }
+    double* run = phi.data();
+    MO* run2 = MOs.data();
+    for (mo = 0; mo < nmo; mo++) {
+      *run += (*run2).get_coefficient_f(j) * ex;      //build MO values at this point
+      run2++, run++;
+    }
+  }
+
+  double* run = phi.data();
+  MO* run2 = MOs.data();
+  for (mo = 0; mo < nmo; mo++) {
+    if ((*run2).get_op()) beta += (*run2).get_occ() * pow(*run, 2);
+    else alpha += (*run2).get_occ() * pow(*run, 2);
+    run++, run2++;
+  }
+
+  return alpha - beta;
 }
 
 double WFN::compute_MO_spherical(

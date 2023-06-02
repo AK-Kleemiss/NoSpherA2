@@ -80,6 +80,13 @@ void Calc_MO(
 	double radius,
 	std::ostream& file
 );
+void Calc_S_Rho(
+	cube& Cube_S_Rho,
+	WFN& wavy,
+	int cpus,
+	std::ofstream& file,
+	bool nodate
+);
 void Calc_Hirshfeld(
 	cube& CubeHDEF,
 	cube& CubeRho,
