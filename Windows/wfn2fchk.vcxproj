@@ -1424,6 +1424,7 @@
     <ClInclude Include="..\CUDA_utilities.h" />
     <ClInclude Include="..\properties.h" />
     <ClInclude Include="..\spherical_density.h" />
+    <ClInclude Include="..\test_functions.h" />
     <ClInclude Include="..\tsc_block.h" />
   </ItemGroup>
   <ItemGroup>

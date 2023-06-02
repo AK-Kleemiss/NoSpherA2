@@ -63,6 +63,7 @@ private:
   double fj(int& j, int& l, int& m, double& aa, double& bb);
   double Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtmp);
   double compute_dens_cartesian(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens);
+  double compute_spin_dens_cartesian(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
   double compute_dens_spherical(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens);
 public:
   WFN();
@@ -78,11 +79,13 @@ public:
   double* get_MO_coef_ptr(const int& nr_mo);
   int get_MO_primitive_count(const int& nr_mo) const;
   bool push_back_MO(const int& nr, const double& occ, const double& ener);
+  bool push_back_MO(const int& nr, const double& occ, const double& ener, const int& oper);
   bool push_back_MO(MO& given);
   double get_MO_energy(const int& mo) const;
   int get_center(const int& nr) const { return centers[nr]; };
   int get_type(const int& nr) const { return types[nr]; };
   double get_MO_occ(const int& nr) const;
+  int get_MO_op(const int& nr) const;
   void delete_unoccupied_MOs();
   const MO& get_MO(const int& n) const;
 
@@ -189,6 +192,8 @@ public:
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
   double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, const bool& add_ECP_dens = true);
   double compute_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi, const bool& add_ECP_dens = true);
+  double compute_spin_dens(const double& Pos1, const double& Pos2, const double& Pos3);
+  double compute_spin_dens(const double& Pos1, const double& Pos2, const double& Pos3, std::vector<std::vector<double>>& d, std::vector<double>& phi);
   void computeValues(const double* PosGrid, double& Rho, double& normGrad, double* Hess, double& Elf, double& Eli, double& Lap, const bool& add_ECP_dens = true);
   void computeLapELIELF(const double* PosGrid, double& Elf, double& Eli, double& Lap);
   void computeELIELF(const double* PosGrid, double& Elf, double& Eli);

@@ -2312,6 +2312,8 @@ void options::digest_options() {
       read_k_pts = true;
     else if (temp.find("-rho_cube_test") != string::npos)
       density_test_cube = true;
+    else if (temp.find("-s_rho") < 1)
+      s_rho = true;
     else if (temp.find("-skpts") < 1)
       save_k_pts = true;
     else if (temp.find("-sfac_scan") < 1) {
