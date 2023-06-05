@@ -34,14 +34,14 @@ NoSpherA2_x86_64: ${OBJS} ${USER_OBJS}
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
-NoSpherA2_arm64: ${OBJS} ${USER_OBJS}
+NoSpherA2_arm64: ../unity.cpp
 	@echo 'Building target: $@'
-	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d_arm)" -MT"$(@:%.o=%.d_arm)" -o "$@_arm" "$<"
-	g++ -o "NoSpherA2_arm64" unity.o_arm -I../ -target arm64-apple-macos11
+	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_arm "$<"
+	g++ -o "$@" unity.o_arm -I../ -target arm64-apple-macos11
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
-lipo: NoSpherA2_arm64 NoSpherA2_x86_64
+lipo: NoSpherA2_x86_64 NoSpherA2_arm64
 	lipo -create -output universal_NoSpherA2 NoSpherA2_arm64 NoSpherA2_64
 
 
