@@ -3,7 +3,7 @@ RM := rm
 
 LIBOMP := /usr/local/opt/libomp/lib/libomp.a
 
-all: NoSpherA2
+all: NoSpherA2 lipo
 
 CPP_SRCS += \
 ../unity.cpp 
@@ -28,6 +28,22 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -I/usr/local/opt/libomp/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
+
+NoSpherA2_x86_64: ${OBJS} ${USER_OBJS}
+	@echo 'Building target: $@'
+	g++ -o "NoSpherA2_64" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib -target x86_64-apple-macos10.12
+	${RM} ${CPP_DEPS} ${OBJS}
+	@echo 'Finished building target: $@'
+
+NoSpherA2_arm64: ${OBJS} ${USER_OBJS}
+	@echo 'Building target: $@'
+	g++ -o "NoSpherA2_arm64" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib -target arm64-apple-macos11
+	${RM} ${CPP_DEPS} ${OBJS}
+	@echo 'Finished building target: $@'
+
+lipo: NoSpherA2_arm64 NoSpherA2_x86_64
+	lipo -create -output universal_NoSpherA2 NoSpherA2_arm64 NoSpherA2_64
+
 
 clean:
 	-${RM} NoSpherA2
