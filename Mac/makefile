@@ -36,7 +36,7 @@ NoSpherA2_x86_64: ${OBJS} ${USER_OBJS}
 
 NoSpherA2_arm64: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_arm64" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib -target arm64-apple-macos11
+	g++ -o "NoSpherA2_arm64" ${LIBOMP} ${OBJS} -I../ -target arm64-apple-macos11
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
