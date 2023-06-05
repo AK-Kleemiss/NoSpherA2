@@ -2370,15 +2370,15 @@ void options::look_for_debug(int& argc, char** argv) {
     else if (temp.find("-v2") < 1)
       cout << "Turning on verbose mode!" << endl, debug = true;
     else if (temp.find("-h") < 1 && temp.length() == 2) {
-      cout << NoSpherA2_message() << help_message() << endl;
+      cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
     else if (temp.find("--h") < 1) {
-      cout << NoSpherA2_message() << help_message() << endl;
+      cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
     else if (temp.find("-help") < 1) {
-      cout << NoSpherA2_message() << help_message() << endl;
+      cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
   }
