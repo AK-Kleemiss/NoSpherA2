@@ -788,7 +788,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
     else {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[33];
+        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[32];
         lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
         radial_acc = 1e-20;
       }
