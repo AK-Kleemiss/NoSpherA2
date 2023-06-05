@@ -30,14 +30,14 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 
 NoSpherA2_x86_64: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_64" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib -target x86_64-apple-macos10.12
+	g++ -o "NoSpherA2_64" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib -target x86_64-apple-macos12
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
 NoSpherA2_arm64: ../unity.cpp
 	@echo 'Building target: $@'
-	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_arm "$<"
-	g++ -o "$@" unity.o_arm -I../ -target arm64-apple-macos11
+	g++ ${GCC_OPTS} -I/usr/local/opt/libomp/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_arm "$<"
+	g++ -o "$@" unity.o_arm -I../ -target arm64-apple-macos12
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
