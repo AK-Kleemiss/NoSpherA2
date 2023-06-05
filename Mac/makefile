@@ -21,7 +21,6 @@ GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -fopenmp -static
 NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib
-	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
 ./unity.o: ../unity.cpp
