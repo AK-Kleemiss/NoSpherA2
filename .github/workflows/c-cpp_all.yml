@@ -18,7 +18,7 @@ jobs:
       run: >
           git clone --depth 1 https://github.com/llvm/llvm-project.git &&
           cd llvm-project/openmp && mkdir build && cd build &&
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF .. &&
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 .. &&
           make && cd ../../../Mac && make && cp NoSpherA2 NoSpherA2_Mac
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
