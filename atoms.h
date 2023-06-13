@@ -62,7 +62,9 @@ struct atom {
 	//[1] = third order  (C111, C112, C113, C122, C123, C133, C222, C223, C233, C333)
 	//[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
 	std::vector<std::vector<double>> ADPs;
-};						  
+
+	bool operator==(const atom& other) const = default;
+};
 
 inline atom::atom() {
 	label = '?';
