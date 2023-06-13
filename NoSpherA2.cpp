@@ -549,6 +549,15 @@ int main(int argc, char** argv)
     sfac_scan(opt, log_file);
     return 0;
   }
+  if (opt.spherical_harmonic) {
+    spherical_harmonic_test();
+    return 0;
+  }
+  if (opt.ML_test) {
+
+    ML_test();
+    return 0;
+  }
   std::cout << NoSpherA2_message();
   if (!opt.no_date) std::cout << build_date();
   std::cout << "Did not understand the task to perform!\n" << help_message() << endl;

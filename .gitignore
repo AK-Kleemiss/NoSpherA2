@@ -40,3 +40,35 @@ tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
 Windows/.vs/NoSpherA2/v16/.suo
 *.deps
 *.pch
+NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.d.json
+NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.module.json
+NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.module.json.command
+NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.d.json
+NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.module.json
+NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.module.json.command
+Windows/x64/D_SH/std.compat.ixx.ifc
+Windows/x64/D_SH/std.compat.ixx.ifc.d.json
+Windows/x64/D_SH/std.compat.ixx.module.json
+Windows/x64/D_SH/std.ixx.ifc
+Windows/x64/D_SH/std.ixx.ifc.d.json
+Windows/x64/D_SH/std.ixx.module.json
+Windows/x64/Release + Copy/std.compat.ixx.ifc
+Windows/x64/Release + Copy/std.compat.ixx.ifc.d.json
+Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.d.json
+Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.module.json
+Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.module.json.command
+Windows/x64/Release + Copy/std.compat.ixx.module.json
+Windows/x64/Release + Copy/std.ixx.ifc
+Windows/x64/Release + Copy/std.ixx.ifc.d.json
+Windows/x64/Release + Copy/std.ixx.ifc.dt.d.json
+Windows/x64/Release + Copy/std.ixx.ifc.dt.module.json
+Windows/x64/Release + Copy/std.ixx.ifc.dt.module.json.command
+Windows/x64/Release + Copy/std.ixx.module.json
+Windows_cuda/x64/Release/std.compat.ixx.ifc.dt.module.json.command
+Windows_cuda/x64/Release/std.ixx.ifc.dt.module.json.command
+Windows/x64/D_ML/std.compat.ixx.ifc
+Windows/x64/D_ML/std.compat.ixx.ifc.d.json
+Windows/x64/D_ML/std.compat.ixx.module.json
+Windows/x64/D_ML/std.ixx.ifc
+Windows/x64/D_ML/std.ixx.ifc.d.json
+Windows/x64/D_ML/std.ixx.module.json

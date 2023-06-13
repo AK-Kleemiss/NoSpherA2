@@ -98,6 +98,9 @@
     <ClInclude Include="..\test_functions.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\npy.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">
