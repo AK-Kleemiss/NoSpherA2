@@ -164,13 +164,13 @@ string WFN::get_centers(const bool& bohr)
     temp.append(atoms[i].label);
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].x));
-    else temp.append(to_string(atoms[i].x * 0.52917721067));
+    else temp.append(to_string(bohr2ang(atoms[i].x)));
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].y));
-    else temp.append(to_string(atoms[i].y * 0.52917721067));
+    else temp.append(to_string(bohr2ang(atoms[i].y)));
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].z));
-    else temp.append(to_string(atoms[i].z * 0.52917721067));
+    else temp.append(to_string(bohr2ang(atoms[i].z)));
     temp.append("\n");
   }
   return temp;
@@ -669,7 +669,7 @@ bool WFN::read_wfn(const string& fileName, const bool& debug, ostream& file)
   for (int i = 0; i < e_nmo; i++)
     temp_val[i].resize(e_nex);
   //-------------------------------- Read MOs --------------------------------------
-  bool orca_switch = false;
+  //bool orca_switch = false;
   //int temp_orca = check_order(debug_wfn),
   int temp_nr = 0;
   int oper = 0;
@@ -4009,97 +4009,68 @@ double WFN::compute_MO_spherical(
     }
     //apply radial function:
     ex = exp(ex);
-    l = types[j];
+    int lam = 0, m = 0;
     if (l > 1) {
-      if (l <= 4)	ex *= d[4][iat];
-      else if (l <= 9)	ex *= d[3][iat];
-      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
-      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
-      else if (l <= 36)	ex *= pow(d[4][iat], 5);
+      if (l <= 4) {
+        ex *= d[4][iat];
+        lam = 1;
+        if (l == 2) m = 0;
+        else if (l == 3) m = 1;
+        else if (l == 4) m = -1;
+      }
+      else if (l <= 9) {
+        ex *= d[3][iat];
+        lam = 2;
+        if (l == 5) m = 0;
+        else if (l == 6) m = 1;
+        else if (l == 7) m = -1;
+        else if (l == 8) m = 2;
+        else if (l == 9) m = -2;
+      }
+      else if (l <= 16) {
+        ex *= d[3][iat] * d[4][iat];
+        lam = 3;
+        if (l == 10) m = 0;
+        else if (l == 11) m = 1;
+        else if (l == 12) m = -1;
+        else if (l == 13) m = 2;
+        else if (l == 14) m = -2;
+        else if (l == 15) m = 3;
+        else if (l == 16) m = -3;
+      }
+      else if (l <= 25) {
+        ex *= d[3][iat] * d[3][iat];
+        lam = 4;
+        if (l == 17) m = 0;
+        else if (l == 18) m = 1;
+        else if (l == 19) m = -1;
+        else if (l == 20) m = 2;
+        else if (l == 21) m = -2;
+        else if (l == 22) m = 3;
+        else if (l == 23) m = -3;
+        else if (l == 24) m = 4;
+        else if (l == 25) m = -4;
+      }
+      else if (l <= 36)
+      {
+        ex *= pow(d[4][iat], 5);
+        lam = 5;
+        if (l == 26) m = 0;
+        else if (l == 27) m = 1;
+        else if (l == 28) m = -1;
+        else if (l == 29) m = 2;
+        else if (l == 30) m = -2;
+        else if (l == 31) m = 3;
+        else if (l == 32) m = -3;
+        else if (l == 33) m = 4;
+        else if (l == 34) m = -4;
+        else if (l == 35) m = 5;
+        else if (l == 36) m = -5;
+      }
     }
     //calc spherical harmonic
-    double SH = 0;
-    switch (l) {
-    case 1: { //S
-      SH = c_1_4p; break;
-    }
-    case 4: { //P 0 Z
-      SH = c_3_4p * d[2][iat] / d[4][iat]; break;
-    }
-    case 2: { //P 1 X
-      SH = c_3_4p * d[0][iat] / d[4][iat]; break;
-    }
-    case 3: { //P -1 Y
-      SH = c_3_4p * d[1][iat] / d[4][iat]; break;
-    }
-    case 5: { //D 0 Z2
-      SH = c_5_16p / d[3][iat] * (3 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 6: { //D 1 XZ
-      SH = c_15_4p * d[0][iat] * d[2][iat] / d[3][iat]; break;
-    }
-    case 7: { //D -1 YZ
-      SH = c_15_4p * d[1][iat] * d[2][iat] / d[3][iat]; break;
-    }
-    case 8: { //D 2 X2-Y2
-      SH = c_15_16p * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) / d[3][iat]; break;
-    }
-    case 9: { //D -2 XY
-      SH = c_15_4p * d[1][iat] * d[0][iat] / d[3][iat]; break;
-    }
-    case 10: { //F 0 Z3
-      SH = c_7_16p / pow(d[4][iat], 3) * (5 * pow(d[2][iat], 3) - 3 * d[3][iat] * d[2][iat]); break;
-    }
-    case 11: { //F 1 XZZ
-      SH = c_21_32p / pow(d[4][iat], 3) * d[0][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 12: { //F -1 YZZ
-      SH = c_21_32p / pow(d[4][iat], 3) * d[1][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 13: { //F 2 Z(X2-Y2)
-      SH = c_105_16p / pow(d[4][iat], 3) * ((pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]); break;
-    }
-    case 14: { //F -2 XYZ
-      SH = c_105_4p / pow(d[4][iat], 3) * d[0][iat] * d[1][iat] * d[2][iat]; break;
-    }
-    case 15: { //F 3 X(X^2-3Y^2)
-      SH = c_35_32p / pow(d[4][iat], 3) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)); break;
-    }
-    case 16: { //F -3 Y(3X^2-Y^2)
-      SH = c_35_32p / pow(d[4][iat], 3) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
-    }
-    case 17: { //G 0 Z^4
-      SH = c_9_256p / pow(d[4][iat], 4) * (35 * pow(d[2][iat], 4) - 30 * pow(d[2][iat] * d[4][iat], 2) + 3.0 * pow(d[4][iat], 4)); break;
-    }
-    case 18: { //G 1 X(7Z^3-3ZR^2)
-      SH = c_45_32p / pow(d[4][iat], 4) * d[0][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
-    }
-    case 19: { //G -1 Y(7Z^3-3ZR^2)
-      SH = c_45_32p / pow(d[4][iat], 4) * d[1][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
-    }
-    case 20: { //G 2
-      SH = c_45_64p / pow(d[4][iat], 4) * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 21: { //G -2
-      SH = c_45_64p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 22: { //G 3 XZ(X^2-3Y^2)
-      SH = c_315_32p / pow(d[4][iat], 4) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)) * d[2][iat]; break;
-    }
-    case 23: { //G -3 XZ(3X^2-Y^2)
-      SH = c_315_32p / pow(d[4][iat], 4) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]; break;
-    }
-    case 24: { //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-      SH = c_315_256p / pow(d[4][iat], 4) * ((pow(d[0][iat], 2) * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2))) -
-        (pow(d[1][iat], 2) * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)))); break;
-    }
-    case 25: { //G -4 XY(X^2-Y^2)
-      SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
-    }
-    default: {
-      err_not_impl_f("Higher than G types", std::cout);
-    }
-    };
+    double d_t[]{ d[0][iat], d[1][iat], d[2][iat], d[3][iat], d[4][iat] };
+    double SH = spherical_harmonic(lam, m, d_t);
     SH *= ex; // multiply radial part with spherical harmonic
     phi += MOs[MO].get_coefficient_f(j) * SH;      //build MO values at this point
   }
@@ -4153,96 +4124,67 @@ double WFN::compute_dens_spherical(
     ex = exp(ex);
     //apply radial function:
     l = types[j];
+    int lam=0, m=0;
     if (l > 1) {
-      if (l <= 4)	ex *= d[4][iat];
-      else if (l <= 9)	ex *= d[3][iat];
-      else if (l <= 16)	ex *= d[3][iat] * d[4][iat];
-      else if (l <= 25)	ex *= d[3][iat] * d[3][iat];
-      else if (l <= 36)	ex *= pow(d[4][iat], 5);
+      if (l <= 4) {
+        ex *= d[4][iat];
+        lam = 1;
+        if (l == 2) m = 0;
+        else if (l == 3) m = 1;
+        else if (l == 4) m = -1;
+      }
+      else if (l <= 9) {
+        ex *= d[3][iat];
+        lam = 2;
+        if (l == 5) m = 0;
+        else if (l == 6) m = 1;
+        else if (l == 7) m = -1;
+        else if (l == 8) m = 2;
+        else if (l == 9) m = -2;
+      }
+      else if (l <= 16) {
+        ex *= d[3][iat] * d[4][iat];
+        lam = 3;
+        if (l == 10) m = 0;
+        else if (l == 11) m = 1;
+        else if (l == 12) m = -1;
+        else if (l == 13) m = 2;
+        else if (l == 14) m = -2;
+        else if (l == 15) m = 3;
+        else if (l == 16) m = -3;
+      }
+      else if (l <= 25) {
+        ex *= d[3][iat] * d[3][iat];
+        lam = 4;
+        if (l == 17) m = 0;
+        else if (l == 18) m = 1;
+        else if (l == 19) m = -1;
+        else if (l == 20) m = 2;
+        else if (l == 21) m = -2;
+        else if (l == 22) m = 3;
+        else if (l == 23) m = -3;
+        else if (l == 24) m = 4;
+        else if (l == 25) m = -4;
+      }
+      else if (l <= 36)	
+      {
+        ex *= pow(d[4][iat], 5);
+        lam = 5;
+        if (l == 26) m = 0;
+        else if (l == 27) m = 1;
+        else if (l == 28) m = -1;
+        else if (l == 29) m = 2;
+        else if (l == 30) m = -2;
+        else if (l == 31) m = 3;
+        else if (l == 32) m = -3;
+        else if (l == 33) m = 4;
+        else if (l == 34) m = -4;
+        else if (l == 35) m = 5;
+        else if (l == 36) m = -5;
+      }
     }
-    //calc spherical harmonic
-    double SH = 0;
-    switch (l) {
-    case 1: { //S
-      SH = c_1_4p; break;
-    }
-    case 4: { //P 0 Z
-      SH = c_3_4p * d[2][iat] / d[4][iat]; break;
-    }
-    case 2: { //P 1 X
-      SH = c_3_4p * d[0][iat] / d[4][iat]; break;
-    }
-    case 3: { //P -1 Y
-      SH = c_3_4p * d[1][iat] / d[4][iat]; break;
-    }
-    case 5: { //D 0 Z2
-      SH = c_5_16p * (3 / d[3][iat] * pow(d[2][iat], 2) - 1.0); break;
-    }
-    case 6: { //D 1 XZ
-      SH = c_15_4p * d[0][iat] * d[2][iat] / d[3][iat]; break;
-    }
-    case 7: { //D -1 YZ
-      SH = c_15_4p * d[1][iat] * d[2][iat] / d[3][iat]; break;
-    }
-    case 8: { //D 2 X2-Y2
-      SH = c_15_16p * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) / d[3][iat]; break;
-    }
-    case 9: { //D -2 XY
-      SH = c_15_4p * d[1][iat] * d[0][iat] / d[3][iat]; break;
-    }
-    case 10: { //F 0 Z3
-      SH = c_7_16p / pow(d[4][iat], 3) * (5 * pow(d[2][iat], 3) - 3 * d[3][iat] * d[2][iat]); break;
-    }
-    case 11: { //F 1 XZZ
-      SH = c_21_32p / pow(d[4][iat], 3) * d[0][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 12: { //F -1 YZZ
-      SH = c_21_32p / pow(d[4][iat], 3) * d[1][iat] * (5 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 13: { //F 2 Z(X2-Y2)
-      SH = c_105_16p / pow(d[4][iat], 3) * ((pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]); break;
-    }
-    case 14: { //F -2 XYZ
-      SH = c_105_4p / pow(d[4][iat], 3) * d[0][iat] * d[1][iat] * d[2][iat]; break;
-    }
-    case 15: { //F 3 X(X^2-3Y^2)
-      SH = c_35_32p / pow(d[4][iat], 3) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)); break;
-    }
-    case 16: { //F -3 Y(3X^2-Y^2)
-      SH = c_35_32p / pow(d[4][iat], 3) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
-    }
-    case 17: { //G 0 Z^4
-      SH = c_9_256p / pow(d[4][iat], 4) * (35 * pow(d[2][iat], 4) - 30 * pow(d[2][iat] * d[4][iat], 2) + 3.0 * pow(d[4][iat], 4)); break;
-    }
-    case 18: { //G 1 X(7Z^3-3ZR^2)
-      SH = c_45_32p / pow(d[4][iat], 4) * d[0][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
-    }
-    case 19: { //G -1 Y(7Z^2-3ZR^2)
-      SH = c_45_32p / pow(d[4][iat], 4) * d[1][iat] * (7 * pow(d[2][iat], 3) - 3 * d[2][iat] * d[3][iat]); break;
-    }
-    case 20: { //G 2
-      SH = c_45_64p / pow(d[4][iat], 4) * (pow(d[0][iat], 2) - pow(d[1][iat], 2)) * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 21: { //G -2
-      SH = c_45_64p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (7 * pow(d[2][iat], 2) - d[3][iat]); break;
-    }
-    case 22: { //G 3 XZ(X^2-3Y^2)
-      SH = c_315_32p / pow(d[4][iat], 4) * d[0][iat] * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2)) * d[2][iat]; break;
-    }
-    case 23: { //G -3 XZ(3X^2-Y^2)
-      SH = c_315_32p / pow(d[4][iat], 4) * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)) * d[2][iat]; break;
-    }
-    case 24: { //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-      SH = c_315_256p / pow(d[4][iat], 4) * ((pow(d[0][iat], 2) * (pow(d[0][iat], 2) - 3 * pow(d[1][iat], 2))) -
-        (pow(d[1][iat], 2) * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)))); break;
-    }
-    case 25: { //G -4 XY(X^2-Y^2)
-      SH = c_315_16p / pow(d[4][iat], 4) * d[0][iat] * d[1][iat] * (3 * pow(d[0][iat], 2) - pow(d[1][iat], 2)); break;
-    }
-    default: {
-      err_checkf(false, "Not yet implemented!", std::cout);
-    }
-    };
+    double d_t[]{ d[0][iat], d[1][iat], d[2][iat], d[3][iat], d[4][iat] };
+    double SH = spherical_harmonic(lam, m, d_t);
     SH *= ex; // multiply radial part with spherical harmonic
     auto run = phi.data();
     auto run2 = MOs.data();

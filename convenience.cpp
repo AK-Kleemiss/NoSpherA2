@@ -2281,6 +2281,9 @@ void options::digest_options() {
         all_mos = true;
       calc = true;
     }
+    else if (temp.find("-ML_test") < 1) {
+      ML_test = true;
+    }
     else if (temp.find("-mtc") != string::npos) {
       combined_tsc_calc = true;
       int n = 1;
@@ -2321,6 +2324,8 @@ void options::digest_options() {
       cif = arguments[i + 2];
       wfn = arguments[i + 3];
     }
+    else if (temp.find("-spherical_harmonic") < 1)
+      spherical_harmonic = true;
     else if (temp.find("-test") < 1)
       cout << "Running in test mode!" << endl, test = true;
     else if (temp.find("-thakkar_d_plot") < 1)
@@ -2383,3 +2388,95 @@ void options::look_for_debug(int& argc, char** argv) {
     }
   }
 };
+
+const double spherical_harmonic(const int& l, const int& m, const double* d) {
+  /*Here d[0] = x
+         d[1] = y
+         d[2] = z
+         d[3] = r^2 IGNORED
+         d[4] = r   IGNORED
+         */
+  //Will need extension for up to l=8
+  //calc spherical harmonic
+  double SH = 0;
+  switch (l) {
+    case 0:  //S
+      SH = c_1_4p; break;
+    case 1:
+      switch (m) {
+        case 0: //P 0 Z
+          SH = c_3_4p * d[2]; break;
+        case 1: //P 1 X
+          SH = c_3_4p * d[0]; break;
+        case -1: //P -1 Y
+          SH = c_3_4p * d[1]; break;
+        default:
+          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+      }
+      break;
+    case 2:
+      switch (m) {
+        case 0: //D 0 Z2
+          SH = c_5_16p * (3 * pow(d[2], 2) - 1.0); break;
+        case 1: //D 1 XZ
+          SH = c_15_4p * d[0] * d[2]; break;
+        case -1: //D -1 YZ
+          SH = c_15_4p * d[1] * d[2]; break;
+        case 2: //D 2 X2-Y2
+          SH = c_15_16p * (pow(d[0], 2) - pow(d[1], 2)); break;
+        case -2: //D -2 XY
+          SH = c_15_4p * d[1] * d[0]; break;
+        default:
+          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+      }
+      break;
+    case 3:
+      switch (m) {
+        case 0: //F 0 Z3
+          SH = c_7_16p * (5 * pow(d[2], 3) - 3 * d[2]); break;
+        case 1: //F 1 XZZ
+          SH = c_21_32p * d[0] * (5 * pow(d[2], 2) - 1.0); break;
+        case -1: //F -1 YZZ
+          SH = c_21_32p * d[1] * (5 * pow(d[2], 2) - 1.0); break;
+        case 2: //F 2 Z(X2-Y2)
+          SH = c_105_16p * ((pow(d[0], 2) - pow(d[1], 2)) * d[2]); break;
+        case -2: //F -2 XYZ
+          SH = c_105_4p * d[0] * d[1] * d[2]; break;
+        case 3: //F 3 X(X^2-3Y^2)
+          SH = c_35_32p * d[0] * (pow(d[0], 2) - 3 * pow(d[1], 2)); break;
+        case -3: //F -3 Y(3X^2-Y^2)
+          SH = c_35_32p * d[1] * (3 * pow(d[0], 2) - pow(d[1], 2)); break;
+        default: 
+          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+      }
+      break;
+    case 4:
+      switch (m) {
+        case 0: //G 0 Z^4
+          SH = c_9_256p * (35 * pow(d[2], 4) - 30 * pow(d[2], 2) + 3.0); break;
+        case 1: //G 1 X(7Z^3-3ZR^2)
+          SH = c_45_32p * d[0] * (7 * pow(d[2], 3) - 3 * d[2]); break;
+        case -1: //G -1 Y(7Z^2-3ZR^2)
+          SH = c_45_32p * d[1] * (7 * pow(d[2], 3) - 3 * d[2]); break;
+        case 2: //G 2
+          SH = c_45_64p * (pow(d[0], 2) - pow(d[1], 2)) * (7 * pow(d[2], 2) - 1.0); break;
+        case -2: //G -2
+          SH = c_45_16p * d[0] * d[1] * (7 * pow(d[2], 2) - 1.0); break;
+        case 3: //G 3 XZ(X^2-3Y^2)
+          SH = c_315_32p * d[0] * (pow(d[0], 2) - 3 * pow(d[1], 2)) * d[2]; break;
+        case -3: //G -3 XZ(3X^2-Y^2)
+          SH = c_315_32p * d[1] * (3 * pow(d[0], 2) - pow(d[1], 2)) * d[2]; break;
+        case 4: //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
+          SH = c_315_256p * ((pow(d[0], 2) * (pow(d[0], 2) - 3 * pow(d[1], 2))) -
+            (pow(d[1], 2) * (3 * pow(d[0], 2) - pow(d[1], 2)))); break;
+        case -4: //G -4 XY(X^2-Y^2)
+          SH = c_315_16p * d[0] * d[1] * (3 * pow(d[0], 2) - pow(d[1], 2)); break;
+        default:
+          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+      }
+      break;
+    default:
+      err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
+  }
+  return SH;
+}

@@ -292,8 +292,8 @@ public:
     tsc_file << std::endl << "DATA:" << std::endl;
 
     for (int r = 0; r < index[0].size(); r++) {
-      for (int h = 0; h < 3; h++)
-        tsc_file << index[h][r] << " ";
+      for (int h_loc = 0; h_loc < 3; h_loc++)
+        tsc_file << index[h_loc][r] << " ";
       for (int i = 0; i < sf.size(); i++)
         tsc_file << std::scientific << std::setprecision(8) << real(sf[i][r]) << ","
         << std::scientific << std::setprecision(8) << imag(sf[i][r]) << " ";
@@ -477,8 +477,8 @@ inline bool merge_tscs(
   }
   std::cout << "Writing combined file..." << std::endl;
   std::string header_string("");
-  for (size_t h = 0; h < header.size(); h++)
-    header_string += header[h] + "\n";
+  for (size_t h_loc = 0; h_loc < header.size(); h_loc++)
+    header_string += header[h_loc] + "\n";
   tsc_block combined(form_fact, labels, indices, header_string);
   if (!old_tsc) {
     combined.write_tscb_file("combined.tscb");
@@ -583,8 +583,8 @@ inline bool merge_tscs_without_checks(
   }
   std::cout << "Writing combined file..." << std::endl;
   std::string header_string("");
-  for (size_t h = 0; h < header.size(); h++)
-    header_string += header[h] + "\n";
+  for (size_t h_loc = 0; h_loc < header.size(); h_loc++)
+    header_string += header[h_loc] + "\n";
   tsc_block combined(form_fact, labels, indices, header_string);
   if (!old_tsc) {
     combined.write_tscb_file("combined.tscb");
