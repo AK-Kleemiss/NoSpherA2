@@ -1098,4 +1098,230 @@ void Calc_MO(
   else if (difftime(end, start) < 3600) file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
   else file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
 };
+
+void properties_calculation(options& opt) {
+  ofstream log2("NoSpherA2_cube.log", ios::out);
+  auto coutbuf = std::cout.rdbuf(log2.rdbuf()); //save and redirect
+  log2 << NoSpherA2_message();
+  if (!opt.no_date) {
+    log2 << build_date();
+  }
+  log2.flush();
+
+  err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
+  WFN wavy(0);
+  wavy.read_known_wavefunction_format(opt.wfn, log2, opt.debug);
+  if (opt.debug)
+    log2 << "Starting calculation of properties" << endl;
+  if (opt.all_mos)
+    for (int mo = 0; mo < wavy.get_nmo(); mo++)
+      opt.MOs.push_back(mo);
+  if (opt.debug)
+    log2 << "Size of MOs: " << opt.MOs.size() << endl;
+
+  vector < vector < double > > cell_matrix;
+  cell_matrix.resize(3);
+  for (int i = 0; i < 3; i++)
+    cell_matrix[i].resize(3);
+  if (opt.debug)
+    log2 << opt.cif << " " << opt.resolution << " " << opt.radius << endl;
+  readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution, log2, opt.debug);
+  if (opt.debug) {
+    log2 << "Resolution: " << opt.resolution << endl;
+    log2 << "MinMax:" << endl;
+    for (int i = 0; i < 6; i++)
+      log2 << setw(14) << scientific << opt.MinMax[i];
+    log2 << endl;
+    log2 << "Steps:" << endl;
+    for (int i = 0; i < 3; i++)
+      log2 << setw(14) << scientific << opt.NbSteps[i];
+    log2 << endl;
+    log2 << "Cell Matrix:" << endl;
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++)
+        log2 << setw(14) << scientific << cell_matrix[i][j];
+      log2 << endl;
+    }
+  }
+  cube Rho(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
+  cube RDG(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.rdg);
+  cube Elf(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.elf);
+  cube Eli(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.eli);
+  cube Lap(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.lap);
+  cube ESP(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.esp);
+  cube MO(   opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), true);
+  cube HDEF( opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hdef);
+  cube DEF(  opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.def);
+  cube Hirsh(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hirsh);
+  cube S_Rho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hirsh);
+
+  Rho.give_parent_wfn(wavy);
+  RDG.give_parent_wfn(wavy);
+  Elf.give_parent_wfn(wavy);
+  Eli.give_parent_wfn(wavy);
+  Lap.give_parent_wfn(wavy);
+  ESP.give_parent_wfn(wavy);
+  MO.give_parent_wfn(wavy);
+  HDEF.give_parent_wfn(wavy);
+  DEF.give_parent_wfn(wavy);
+  Hirsh.give_parent_wfn(wavy);
+  S_Rho.give_parent_wfn(wavy);
+
+  for (int i = 0; i < 3; i++) {
+    Rho.set_origin(i, opt.MinMax[i]);
+    RDG.set_origin(i, opt.MinMax[i]);
+    Elf.set_origin(i, opt.MinMax[i]);
+    Eli.set_origin(i, opt.MinMax[i]);
+    Lap.set_origin(i, opt.MinMax[i]);
+    ESP.set_origin(i, opt.MinMax[i]);
+    MO.set_origin(i, opt.MinMax[i]);
+    HDEF.set_origin(i, opt.MinMax[i]);
+    DEF.set_origin(i, opt.MinMax[i]);
+    Hirsh.set_origin(i, opt.MinMax[i]);
+    S_Rho.set_origin(i, opt.MinMax[i]);
+    for (int j = 0; j < 3; j++) {
+      Rho.set_vector(i, j, cell_matrix[i][j]);
+      RDG.set_vector(i, j, cell_matrix[i][j]);
+      Elf.set_vector(i, j, cell_matrix[i][j]);
+      Eli.set_vector(i, j, cell_matrix[i][j]);
+      Lap.set_vector(i, j, cell_matrix[i][j]);
+      ESP.set_vector(i, j, cell_matrix[i][j]);
+      MO.set_vector(i, j, cell_matrix[i][j]);
+      HDEF.set_vector(i, j, cell_matrix[i][j]);
+      DEF.set_vector(i, j, cell_matrix[i][j]);
+      Hirsh.set_vector(i, j, cell_matrix[i][j]);
+      S_Rho.set_vector(i, j, cell_matrix[i][j]);
+    }
+  }
+  if (opt.debug)
+    log2 << "Origins etc are set up" << endl;
+  Rho.set_comment1("Calculated density using NoSpherA2");
+  RDG.set_comment1("Calculated reduced density gradient using NoSpherA2");
+  Elf.set_comment1("Calculated electron localization function using NoSpherA2");
+  Eli.set_comment1("Calculated same-spin electron localizability indicator using NoSpherA2");
+  Lap.set_comment1("Calculated laplacian of electron density using NoSpherA2");
+  ESP.set_comment1("Calculated electrostatic potential using NoSpherA2");
+  MO.set_comment1("Calcualted MO values using NoSpherA2");
+  HDEF.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+  DEF.set_comment1("Calculated static deformation density values using NoSpherA2");
+  Hirsh.set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
+  S_Rho.set_comment1("Calculated spin density using NoSpherA2");
+  Rho.set_comment2("from " + wavy.get_path());
+  RDG.set_comment2("from " + wavy.get_path());
+  Elf.set_comment2("from " + wavy.get_path());
+  Eli.set_comment2("from " + wavy.get_path());
+  Lap.set_comment2("from " + wavy.get_path());
+  ESP.set_comment2("from " + wavy.get_path());
+  MO.set_comment2("from" + wavy.get_path());
+  HDEF.set_comment2("from" + wavy.get_path());
+  DEF.set_comment2("from" + wavy.get_path());
+  Hirsh.set_comment2("from" + wavy.get_path());
+  S_Rho.set_comment2("from" + wavy.get_path());
+  Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
+  RDG.path = get_basename_without_ending(wavy.get_path()) + "_rdg.cube";
+  Elf.path = get_basename_without_ending(wavy.get_path()) + "_elf.cube";
+  Eli.path = get_basename_without_ending(wavy.get_path()) + "_eli.cube";
+  Lap.path = get_basename_without_ending(wavy.get_path()) + "_lap.cube";
+  ESP.path = get_basename_without_ending(wavy.get_path()) + "_esp.cube";
+  DEF.path = get_basename_without_ending(wavy.get_path()) + "_def.cube";
+  Hirsh.path = get_basename_without_ending(wavy.get_path()) + "_hirsh.cube";
+  S_Rho.path = get_basename_without_ending(wavy.get_path()) + "_s_rho.cube";
+
+  if (opt.debug) {
+    log2 << "Status: " << opt.hdef << opt.def << opt.hirsh << opt.lap << opt.eli << opt.elf << opt.rdg << opt.esp << endl;
+    log2 << "Everything is set up; starting calculation..." << endl;
+  }
+
+  log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
+
+  if (opt.MOs.size() != 0)
+    for (int i = 0; i < opt.MOs.size(); i++) {
+      log2 << "Calcualting MO: " << opt.MOs[i] << endl;
+      MO.set_zero();
+      MO.path = get_basename_without_ending(wavy.get_path()) + "_MO_" + to_string(opt.MOs[i]) + ".cube";
+      Calc_MO(MO, opt.MOs[i], wavy, opt.threads, opt.radius, log2);
+      MO.write_file(true);
+    }
+
+  if (opt.hdef || opt.def || opt.hirsh) {
+    log2 << "Calcualting Rho...";
+    Calc_Rho(Rho, wavy, opt.threads, opt.radius, log2);
+    log2 << " ...done!" << endl;
+    cube temp(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hdef || opt.hirsh);
+    for (int i = 0; i < 3; i++) {
+      temp.set_origin(i, opt.MinMax[i]);
+      for (int j = 0; j < 3; j++)
+        temp.set_vector(i, j, cell_matrix[i][j]);
+    }
+    if (opt.hdef || opt.hirsh) {
+      log2 << "Calcualting spherical Rho...";
+      Calc_Spherical_Dens(temp, wavy, opt.threads, opt.radius, log2);
+      log2 << " ...done!" << endl;
+    }
+
+    if (opt.def) {
+      log2 << "Calculating static deformation density...";
+      if (opt.hdef)
+        Calc_Static_Def(DEF, Rho, temp, wavy, opt.threads, opt.radius, log2);
+      else
+        Calc_Static_Def(DEF, Rho, wavy, opt.threads, opt.radius, log2);
+      log2 << " ...done!" << endl;
+    }
+
+    if (opt.hdef) {
+      for (int a = 0; a < wavy.get_ncen(); a++) {
+        log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
+        HDEF.path = get_basename_without_ending(wavy.get_path()) + "_HDEF_" + to_string(a) + ".cube";
+        Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.threads, opt.radius, a, log2);
+        HDEF.write_file(true);
+        HDEF.set_zero();
+      }
+    }
+
+    if (opt.hirsh)
+    {
+      log2 << "Calcualting Hirshfeld density for atom: " << opt.hirsh_number << endl;
+      Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy, opt.threads, opt.radius, opt.hirsh_number, log2);
+      log2 << "..done!" << endl;
+    }
+  }
+
+  if (opt.lap || opt.eli || opt.elf || opt.rdg || opt.esp)
+    Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy, opt.threads, opt.radius, log2, opt.no_date);
+
+  if (opt.s_rho)
+    Calc_S_Rho(S_Rho, wavy, opt.threads, log2, opt.no_date);
+
+  log2 << "Writing cubes to Disk..." << flush;
+  if (opt.rdg) {
+    Rho.path = get_basename_without_ending(wavy.get_path()) + "_signed_rho.cube";
+    Rho.write_file(true);
+    Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
+    Rho.write_file(true, true);
+  }
+  else if (opt.lap || opt.eli || opt.elf || opt.esp) Rho.write_file(true);
+  if (opt.rdg) RDG.write_file(true);
+  if (opt.lap) Lap.write_file(true);
+  if (opt.elf) Elf.write_file(true);
+  if (opt.eli) Eli.write_file(true);
+  if (opt.s_rho) S_Rho.write_file(true);
+  if (opt.def) {
+    DEF.write_file(true);
+    Rho.write_file(true);
+  }
+  if (opt.hirsh) Hirsh.write_file(true);
+
+  log2 << " done!" << endl;
+
+  if (opt.esp) {
+    log2 << "Calculating ESP..." << flush;
+    WFN temp = wavy;
+    temp.delete_unoccupied_MOs();
+    Calc_ESP(ESP, temp, opt.threads, opt.radius, opt.no_date, log2);
+    log2 << "Writing cube to Disk..." << flush;
+    ESP.write_file(true);
+    log2 << "  done!" << endl;
+  }
+}
+
 //end here
