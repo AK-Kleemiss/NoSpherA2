@@ -12,6 +12,7 @@
 #include "spherical_density.h"
 #include "tsc_block.h"
 #include "AtomGrid.h"
+#include "npy.h"
 using namespace std;
 
 #ifdef PEOJECT_NAME
@@ -2042,6 +2043,7 @@ int make_hirshfeld_grids_RI(const int& pbc,
   vector<vector<double>>& d2,
   vector<vector<double>>& d3,
   vector<vector<double>>& dens,
+  const int exp_coefs,
   ostream& file,
 #ifdef _WIN64
   time_t& start,
@@ -2080,10 +2082,11 @@ int make_hirshfeld_grids_RI(const int& pbc,
   //Accumulate vectors with information about all atoms
 #pragma omp parallel for
   for (int i = 0; i < wave.get_ncen(); i++) {
+    const atom* ai = &(wave.atoms[i]);
     atom_z[i] = wave.get_atom_charge(i);
-    x[i] = wave.atoms[i].x;
-    y[i] = wave.atoms[i].y;
-    z[i] = wave.atoms[i].z;
+    x[i] = ai->x;
+    y[i] = ai->y;
+    z[i] = ai->z;
     //if(debug)
     //    file << "xyz= 000 position: " << x[i] << " " << y[i] << " " << z[i] << " Charge: " << atom_z[i] << endl;
     if (pbc != 0) {
@@ -2096,9 +2099,9 @@ int make_hirshfeld_grids_RI(const int& pbc,
             else {
               j++;
               atom_z[i + j * wave.get_ncen()] = wave.get_atom_charge(i);
-              x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
-              y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
-              z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
+              x[i + j * wave.get_ncen()] = ai->x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
+              y[i + j * wave.get_ncen()] = ai->y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
+              z[i + j * wave.get_ncen()] = ai->z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
               if (debug)
                 file << "xyz= " << pbc_x << pbc_y << pbc_z << " j = " << j << " position: " << x[i + j * wave.get_ncen()] << " " << y[i + j * wave.get_ncen()] << " " << z[i + j * wave.get_ncen()] << " Charge: " << atom_z[i + j * wave.get_ncen()] << endl;
             }
@@ -2106,23 +2109,11 @@ int make_hirshfeld_grids_RI(const int& pbc,
     }
     alpha_max[i] = 0.0;
     max_l[i] = 0;
-    for (int b = 0; b < wave.get_nex(); b++) {
-      if (wave.get_center(b) != i + 1)
-        continue;
-      if (wave.get_exponent(b) > alpha_max[i])
-        alpha_max[i] = wave.get_exponent(b);
-      if (wave.get_type(b) > max_l[i]) {
-        int l = wave.get_type(b);
-        if (l == 1)
-          l = 1;
-        else if (l >= 2 && l <= 4)
-          l = 2;
-        else if (l >= 5 && l <= 10)
-          l = 3;
-        else if (l >= 11 && l <= 20)
-          l = 4;
-        else if (l >= 21 && l <= 35)
-          l = 5;
+    for (int b = 0; b < ai->basis_set.size(); b++) {
+      if (ai->basis_set[b].exponent > alpha_max[i])
+        alpha_max[i] = ai->basis_set[b].exponent;
+      int l = ai->basis_set[b].type;
+      if (l > max_l[i]) {
         max_l[i] = l;
 #pragma omp critical
         {
@@ -2151,24 +2142,11 @@ int make_hirshfeld_grids_RI(const int& pbc,
 
 #pragma omp parallel for
   for (int i = 0; i < wave.get_ncen(); i++) {
-    for (int b = 0; b < wave.get_nex(); b++) {
-      if (wave.get_center(b) != i + 1)
-        continue;
-      int l = wave.get_type(b);
-      if (l == 1)
-        l = 1;
-      else if (l >= 2 && l <= 4)
-        l = 2;
-      else if (l >= 5 && l <= 10)
-        l = 3;
-      else if (l >= 11 && l <= 20)
-        l = 4;
-      else if (l >= 21 && l <= 35)
-        l = 5;
-      else if (l >= 36 && l <= 56)
-        l = 6;
-      if (wave.get_exponent(b) < alpha_min[i][l - 1])
-        alpha_min[i][l - 1] = wave.get_exponent(b);
+    const atom* ai = &(wave.atoms[i]);
+    for (int b = 0; b < ai->basis_set.size(); b++) {
+      int l = ai->basis_set[b].type;
+      if (ai->basis_set[b].exponent < alpha_min[i][l])
+        alpha_min[i][l] = ai->basis_set[b].exponent;
     }
   }
 
@@ -3256,38 +3234,26 @@ int make_hirshfeld_grids_RI(const int& pbc,
 #else
   {
     WFN temp = wave;
-    temp.delete_unoccupied_MOs();
-    const int nr_atoms = (int)total_grid[0].size();
-    const int nr_mos = temp.get_nmo(true);
-    const int nr_cen = temp.get_ncen();
-    if (debug) {
-      file << endl << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
-      temp.write_wfn("temp_wavefunction.wfn", false, true);
+    const int nr_pts = (int)total_grid[0].size();
+    vector<unsigned long> shape {};
+    bool fortran_order;
+    vec data{};
+
+    string path{ coef_filename };
+    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
+
+#pragma omp parallel for
+    for (int i = 0; i < nr_pts; i++) {
+      total_grid[5][i] = calc_density_ML(
+        total_grid[0][i],
+        total_grid[1][i],
+        total_grid[2][i],
+        data,
+        temp.atoms,
+        exp_coefs
+      );
     }
-#pragma omp parallel
-    {
-      vector<vector<double>> d_temp(16);
-      for (int i = 0; i < 16; i++) {
-        d_temp[i].resize(nr_cen);
-      }
-      vector<double> phi_temp(nr_mos);
-      const int coefs = 100; //WORK HERE
-#pragma omp for
-      for (int i = 0; i < nr_atoms; i++) {
-        total_grid[5][i] = calc_density_ML(
-          total_grid[0][i],
-          total_grid[1][i],
-          total_grid[2][i],
-          phi_temp,
-          wave.atoms,
-          coefs
-        );
-      }
-      for (int i = 0; i < 4; i++)
-        shrink_vector<double>(d_temp[i]);
-      shrink_vector<vector<double>>(d_temp);
-      shrink_vector<double>(phi_temp);
-    }
+    shrink_vector<double>(data);
     //if (debug) {
     //	//Copy grid from GPU to print:
     //	// Dimensions: [c] [p]
@@ -3303,6 +3269,7 @@ int make_hirshfeld_grids_RI(const int& pbc,
     //	grid.close();
     //}
     if (pbc != 0) {
+      err_not_impl_f("No periodic grid with ML densities so far!", file);
       periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
       int j = 0;
       for (int d = 0; d < (int)pow(pbc * 2 + 1, 3); d++)
@@ -4258,7 +4225,8 @@ bool calculate_structure_factors_HF(
 bool calculate_structure_factors_RI(
   const options& opt,
   WFN& wave,
-  ofstream& file
+  ofstream& file,
+  const int exp_coefs
 )
 {
 #ifdef FLO_CUDA
@@ -4269,8 +4237,7 @@ bool calculate_structure_factors_RI(
 #endif
   err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
-  file << "Number of protons: " << wave.get_nr_electrons() << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
-  if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
+  file << "Number of protons: " << wave.get_nr_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
   if (opt.threads != -1) {
     omp_set_num_threads(opt.threads);
@@ -4323,14 +4290,16 @@ bool calculate_structure_factors_RI(
     file << "made it post CIF, now make grids!" << endl;
   vector<vector<double>> d1, d2, d3, dens;
 
-  int points = make_hirshfeld_grids(opt.pbc,
+  int points = make_hirshfeld_grids_RI(opt.pbc,
     opt.accuracy,
     unit_cell,
     wave,
+    opt.coef_file,
     atom_type_list,
     asym_atom_list,
     needs_grid,
     d1, d2, d3, dens,
+    exp_coefs,
     file,
 #ifdef _WIN64
     start,

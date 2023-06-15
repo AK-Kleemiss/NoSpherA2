@@ -27,6 +27,12 @@ bool calculate_structure_factors_HF(
   WFN& wave,
   std::ofstream& file);
 
+bool calculate_structure_factors_RI(
+  const options& opt,
+  WFN& wave,
+  std::ofstream& file,
+  const int exp_coefs);
+
 tsc_block calculate_structure_factors_MTC(
   options& opt,
   std::vector<WFN>& wave,
