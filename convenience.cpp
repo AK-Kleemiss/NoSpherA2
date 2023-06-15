@@ -2062,8 +2062,61 @@ double get_lambda_1(double* a)
   }
 };
 
+const double gaussian_radial(primitive& p, double& r) {
+  return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
+}
+
+const double calc_density_ML(double& x,
+  double& y,
+  double& z,
+  vec& coefficients,
+  std::vector<atom>& atoms,
+  const int& exp_coefs) {
+  double dens = 0, radial = 0;
+  int coef_counter = 0;
+  int e = 0, size = 0;
+  for (int a = 0; a < atoms.size(); a++) {
+    size = (int)atoms[a].basis_set.size();
+    basis_set_entry* bf;
+    double d[4]{
+    x - atoms[a].x,
+    y - atoms[a].y,
+    z - atoms[a].z, 0.0 };
+    //store r in last element
+    d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+    //normalize distances for spherical harmonic
+    for (e = 0; e < 3; e++)
+      d[e] /= d[3];
+    for (e = 0; e < size; e++) {
+      bf = &atoms[a].basis_set[e];
+      primitive p(a, bf->type, bf->exponent, bf->coefficient);
+      radial = gaussian_radial(p, d[3]);
+      for (int m = -p.type; m <= p.type; m++) {
+        dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
+      }
+      coef_counter += (2 * p.type + 1);
+    }
+  }
+  err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+  return dens;
+}
+
+int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b) {
+  int nr_coefs = 0;
+  for (int i = 0; i < wavy.atoms.size(); i++) {
+    int current_charge = wavy.atoms[i].charge - 1;
+    const primitive* basis = b[current_charge].data();
+    int size = (int)b[current_charge].size();
+    for (int e = 0; e < size; e++) {
+      wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
+      nr_coefs += 2 * basis[e].type + 1;
+    }
+  }
+  return nr_coefs;
+}
+
 double get_decimal_precision_from_CIF_number(string& given_string) {
-  int len = (int) given_string.length();
+  int len = (int)given_string.length();
   int open_bracket = -1;
   int close_bracket = -1;
   int decimal_point = -1;
@@ -2110,7 +2163,7 @@ void options::digest_options() {
     cout << " Recap of input:\nsize: " << arguments.size() << endl;
   }
   //This loop figures out command line options
-  int argc = (int) arguments.size();  
+  int argc = (int)arguments.size();
   for (int i = 0; i < arguments.size(); i++) {
     if (debug)
       cout << arguments[i] << endl;
@@ -2147,6 +2200,10 @@ void options::digest_options() {
         }
         n++;
       }
+    }
+    else if (temp.find("-coef") < 1) {
+      coef_file = arguments[i + 1];
+      err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
     }
     else if (temp.find("-cif") < 1) {
       cif = arguments[i + 1];
@@ -2359,7 +2416,6 @@ void options::digest_options() {
     }
     else if (temp.find("-xyz") != string::npos) {
       xyz_file = arguments[i + 1];
-      iam_switch = true;
     }
   }
 };

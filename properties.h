@@ -117,5 +117,7 @@ void Calc_Hirshfeld_atom(
 	std::ofstream& file
 );
 
+void properties_calculation(options& opt);
+
 #include "wfn_class.h"
 #include "cell.h"
