@@ -427,7 +427,7 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
 
 void spherical_harmonic_test() {
   const double phi = 0.3, theta = 0.4;
-  for (int lam = 0; lam <= 4; lam++) {
+  for (int lam = 0; lam <= 5; lam++) {
     for (int m = -lam; m <= lam; m++) {
       std::vector<double> d {std::sin(theta)*std::cos(phi),
                              std::sin(theta)*std::sin(phi),
@@ -438,71 +438,269 @@ void spherical_harmonic_test() {
   }
 };
 
-double gaussian_radial(int& l, double& exp, double& r) {
-  double gauss = pow(r, l) * std::exp(-exp * r * r);
-  double norm = std::sqrt(pow(2 * exp / PI, 1.5) * pow(4 * exp, l) / doublefactorial(2 * l - 1));
-  return norm * gauss;
+const double gaussian_radial(primitive& p, double& r) {
+  return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
 }
 
 double calc_density_ML(double& x, 
                        double& y, 
                        double& z, 
                        vec& coefficients,
-                       std::vector<atom>& atoms) {
-  double dens = 0;
-  unsigned int coef_counter = 0;
+                       std::vector<atom>& atoms,
+                       const int& exp_coefs) {
+  double dens = 0, radial = 0;
+  int coef_counter = 0;
+  int e = 0, size = 0;
   for (int a = 0; a < atoms.size(); a++) {
-    int size = (int)atoms[a].basis_set.size();
+    size = (int)atoms[a].basis_set.size();
     basis_set_entry* bf;
-    int l; double exp,d[4];
-    d[0] = x - atoms[a].x;
-    d[1] = y - atoms[a].y;
-    d[2] = z - atoms[a].z;
+    double d[4]{
+    x - atoms[a].x,
+    y - atoms[a].y,
+    z - atoms[a].z, 0.0 };
+    //store r in last element
     d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-    for (int e = 0; e < size; e++) {
+    //normalize distances for spherical harmonic
+    for(e = 0; e<3; e++)
+      d[e] /= d[3];
+    for (e = 0; e < size; e++) {
       bf = &atoms[a].basis_set[e];
-      l = bf->type; exp = bf->exponent;
-      for (int m = -l; m <= l; m++) {
-        dens += coefficients[coef_counter + e] * gaussian_radial(l, exp, d[3]) * spherical_harmonic(l, m, d);
+      primitive p(a, bf->type, bf->exponent, bf->coefficient);
+      radial = gaussian_radial(p, d[3]);
+      for (int m = -p.type; m <= p.type; m++) {
+        dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
       }
+      coef_counter += (2 * p.type + 1);
     }
-    coef_counter += size;
   }
+  err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
   return dens;
 }
 
-std::vector<vec> TZVP_JKfit_exp(
-  { {9.5302493327,1.9174506246,0.68424049142,0.28413255710,2.9133232035,1.2621205398,0.50199775874,2.3135329149,0.71290724024,1.6565726132},//H
+std::vector<std::vector<primitive>> TZVP_JKfit(
+  {
+    { //center  type  exp         coef
+      {0,       0, 9.5302493327,  1.0},
+      {0,       0, 1.9174506246,  1.0},
+      {0,       0, 0.68424049142, 1.0},
+      {0,       0, 0.28413255710, 1.0},
+      {0,       1, 2.9133232035,  1.0},
+      {0,       1, 1.2621205398,  1.0},
+      {0,       1, 0.50199775874, 1.0},
+      {0,       2, 2.3135329149,  1.0},
+      {0,       2, 0.71290724024, 1.0},
+      {0,       3, 1.6565726132 , 1.0},
+    },//H
     {},//He
     {},//Li
     {},//Be
     {},//B
-    {1113.9867719     ,369.16234180    ,121.79275232    , 48.127114540   , 20.365074004   ,  8.0883596856  ,  2.5068656570  ,  1.2438537380  ,  0.48449899601 ,  0.19185160296 ,102.99176249    , 28.132594009   ,  9.8364318173  ,  3.3490544980  ,  1.4947618613  ,  0.57690108899 ,  0.20320063291 , 10.594068356   ,  3.5997195366  ,  1.3355691094  ,  0.51949764954 ,  0.19954125200 ,  1.194866338369,   .415866338369,   .858866338369},//C
-    {1102.8622453     ,370.98041153    ,136.73555938    , 50.755871924   , 20.535656095   ,  7.8318737184  ,  3.4784063855  ,  1.4552856603  ,  0.63068989071 ,  0.27276596483 , 93.540954073   , 29.524019527   , 10.917502987   ,  4.3449288991  ,  1.8216912640  ,  0.75792424494 ,  0.28241469033 , 16.419378926   ,  5.0104049385  ,  1.9793971884  ,  0.78495771518 ,  0.28954065963 ,  1.79354239843 ,   .60854239843 ,  1.23254239843 },//N
-    {1517.8667506     ,489.67952008    ,176.72118665    , 63.792233137   , 25.366499130   ,  9.9135491200  ,  4.4645306584  ,  1.8017743661  ,  0.80789710965 ,  0.33864326862 ,120.16030921    , 34.409622474   , 12.581148610   ,  5.0663824249  ,  2.0346927092  ,  0.86092967212 ,  0.36681356726 , 19.043062805   ,  5.8060381104  ,  2.1891841580  ,  0.87794613558 ,  0.35623646700 ,  2.493914788135,   .824914788135,  1.607914788135},//O
+    {
+      {0,        0, 1113.9867719, 1.0},
+      {0,        0, 369.16234180, 1.0},
+      {0,        0, 121.79275232, 1.0},
+      {0,        0, 48.127114540, 1.0},
+      {0,        0, 20.365074004, 1.0},
+      {0,        0, 8.0883596856, 1.0},
+      {0,        0, 2.5068656570, 1.0},
+      {0,        0, 1.2438537380, 1.0},
+      {0,        0,0.48449899601, 1.0},
+      {0,        0,0.19185160296, 1.0},
+      {0,        1, 102.99176249, 1.0},
+      {0,        1, 28.132594009, 1.0},
+      {0,        1, 9.8364318173, 1.0},
+      {0,        1, 3.3490544980, 1.0},
+      {0,        1, 1.4947618613, 1.0},
+      {0,        1,0.57690108899, 1.0},
+      {0,        1,0.20320063291, 1.0},
+      {0,        2, 10.594068356, 1.0},
+      {0,        2, 3.5997195366, 1.0},
+      {0,        2, 1.3355691094, 1.0},
+      {0,        2,0.51949764954, 1.0},
+      {0,        2,0.19954125200, 1.0},
+      {0,        3,1.194866338369, 1.0},
+      {0,        3, .415866338369, 1.0},
+      {0,        4, .858866338369, 1.0}
+    },//C
+    {
+      {0,        0, 1102.8622453, 1.0},
+      {0,        0, 370.98041153, 1.0},
+      {0,        0, 136.73555938, 1.0},
+      {0,        0, 50.755871924, 1.0},
+      {0,        0, 20.535656095, 1.0},
+      {0,        0, 7.8318737184, 1.0},
+      {0,        0, 3.4784063855, 1.0},
+      {0,        0, 1.4552856603, 1.0},
+      {0,        0,0.63068989071, 1.0},
+      {0,        0,0.27276596483, 1.0},
+      {0,        1, 93.540954073, 1.0},
+      {0,        1, 29.524019527, 1.0},
+      {0,        1, 10.917502987, 1.0},
+      {0,        1, 4.3449288991, 1.0},
+      {0,        1, 1.8216912640, 1.0},
+      {0,        1,0.75792424494, 1.0},
+      {0,        1,0.28241469033, 1.0},
+      {0,        2, 16.419378926, 1.0},
+      {0,        2, 5.0104049385, 1.0},
+      {0,        2, 1.9793971884, 1.0},
+      {0,        2,0.78495771518, 1.0},
+      {0,        2,0.28954065963, 1.0},
+      {0,        3,1.79354239843, 1.0},
+      {0,        3, .60854239843, 1.0},
+      {0,        4,1.23254239843, 1.0}
+    },//N
+    {
+      {0,        0, 1517.8667506, 1.0},
+      {0,        0, 489.67952008, 1.0},
+      {0,        0, 176.72118665, 1.0},
+      {0,        0, 63.792233137, 1.0},
+      {0,        0, 25.366499130, 1.0},
+      {0,        0, 9.9135491200, 1.0},
+      {0,        0, 4.4645306584, 1.0},
+      {0,        0, 1.8017743661, 1.0},
+      {0,        0,0.80789710965, 1.0},
+      {0,        0,0.33864326862, 1.0},
+      {0,        1, 120.16030921, 1.0},
+      {0,        1, 34.409622474, 1.0},
+      {0,        1, 12.581148610, 1.0},
+      {0,        1, 5.0663824249, 1.0},
+      {0,        1, 2.0346927092, 1.0},
+      {0,        1,0.86092967212, 1.0},
+      {0,        1,0.36681356726, 1.0},
+      {0,        2, 19.043062805, 1.0},
+      {0,        2, 5.8060381104, 1.0},
+      {0,        2, 2.1891841580, 1.0},
+      {0,        2,0.87794613558, 1.0},
+      {0,        2,0.35623646700, 1.0},
+      {0,        3,2.493914788135, 1.0},
+      {0,        3, .824914788135, 1.0},
+      {0,        4,1.607914788135, 1.0}
+    },//O
     {},//F
     {} //Ne
   }
 );
 
-std::vector<std::vector<int>> TZVP_JKfit_l(
-  { {0,0,0,0,1,1,1,2,2,3},//H
+std::vector<std::vector<primitive>> QZVP_JKfit(
+  { 
+    { //center  type  exp         coef
+      {0,       0, 9.5302493327,  1.0},
+      {0,       0, 1.9174506246,  1.0},
+      {0,       0, 0.68424049142, 1.0},
+      {0,       0, 0.28413255710, 1.0},
+      {0,       1, 2.9133232035,  1.0},
+      {0,       1, 1.2621205398,  1.0},
+      {0,       1, 0.50199775874, 1.0},
+      {0,       2, 2.8832083931,  1.0},
+      {0,       2, 1.2801701725 , 1.0},
+      {0,       2, 0.52511317770, 1.0},
+      {0,       3, 2.7489448439 , 1.0},
+      {0,       3, 1.1900885456 , 1.0},
+      {0,       4, 1.4752662714 , 1.0}
+    },//H
     {},//He
     {},//Li
     {},//Be
     {},//B
-    {0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,2,2,2,2,2,3,3,4},//C
-    {0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,2,2,2,2,2,3,3,4},//N
-    {0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,2,2,2,2,2,3,3,4},//O
+    {
+      {0,        0, 1113.9867719, 1.0},
+      {0,        0, 369.16234180, 1.0},
+      {0,        0, 121.79275232, 1.0},
+      {0,        0, 48.127114540, 1.0},
+      {0,        0, 20.365074004, 1.0},
+      {0,        0, 8.0883596856, 1.0},
+      {0,        0, 2.5068656570, 1.0},
+      {0,        0, 1.2438537380, 1.0},
+      {0,        0,0.48449899601, 1.0},
+      {0,        0,0.19185160296, 1.0},
+      {0,        1, 102.99176249, 1.0},
+      {0,        1, 28.132594009, 1.0},
+      {0,        1, 9.8364318173, 1.0},
+      {0,        1, 3.3490544980, 1.0},
+      {0,        1, 1.4947618613, 1.0},
+      {0,        1,0.57690108899, 1.0},
+      {0,        1,0.20320063291, 1.0},
+      {0,        2, 10.594068356, 1.0},
+      {0,        2, 3.5997195366, 1.0},
+      {0,        2, 1.3355691094, 1.0},
+      {0,        2,0.51949764954, 1.0},
+      {0,        2,0.19954125200, 1.0},
+      {0,        3,1.95390000000, 1.0},
+      {0,        3, .75490000000, 1.0},
+      {0,        3, .33390000000, 1.0},
+      {0,        4,1.52490000000, 1.0},
+      {0,        4, .59090000000, 1.0},
+      {0,        5,1.11690000000, 1.0}
+    },//C
+    {
+      {0,        0, 1102.8622453, 1.0},
+      {0,        0, 370.98041153, 1.0},
+      {0,        0, 136.73555938, 1.0},
+      {0,        0, 50.755871924, 1.0},
+      {0,        0, 20.535656095, 1.0},
+      {0,        0, 7.8318737184, 1.0},
+      {0,        0, 3.4784063855, 1.0},
+      {0,        0, 1.4552856603, 1.0},
+      {0,        0,0.63068989071, 1.0},
+      {0,        0,0.27276596483, 1.0},
+      {0,        1, 93.540954073, 1.0},
+      {0,        1, 29.524019527, 1.0},
+      {0,        1, 10.917502987, 1.0},
+      {0,        1, 4.3449288991, 1.0},
+      {0,        1, 1.8216912640, 1.0},
+      {0,        1,0.75792424494, 1.0},
+      {0,        1,0.28241469033, 1.0},
+      {0,        2, 16.419378926, 1.0},
+      {0,        2, 5.0104049385, 1.0},
+      {0,        2, 1.9793971884, 1.0},
+      {0,        2,0.78495771518, 1.0},
+      {0,        2,0.28954065963, 1.0},
+      {0,        3,2.98600000000, 1.0},
+      {0,        3,1.11700000000, 1.0},
+      {0,        3, .48400000000, 1.0},
+      {0,        4,2.17600000000, 1.0},
+      {0,        4, .83400000000, 1.0},
+      {0,        5,1.57600000000, 1.0}
+    },//N
+    {
+      {0,        0, 1517.8667506, 1.0},
+      {0,        0, 489.67952008, 1.0},
+      {0,        0, 176.72118665, 1.0},
+      {0,        0, 63.792233137, 1.0},
+      {0,        0, 25.366499130, 1.0},
+      {0,        0, 9.9135491200, 1.0},
+      {0,        0, 4.4645306584, 1.0},
+      {0,        0, 1.8017743661, 1.0},
+      {0,        0,0.80789710965, 1.0},
+      {0,        0,0.33864326862, 1.0},
+      {0,        1, 120.16030921, 1.0},
+      {0,        1, 34.409622474, 1.0},
+      {0,        1, 12.581148610, 1.0},
+      {0,        1, 5.0663824249, 1.0},
+      {0,        1, 2.0346927092, 1.0},
+      {0,        1,0.86092967212, 1.0},
+      {0,        1,0.36681356726, 1.0},
+      {0,        2, 19.043062805, 1.0},
+      {0,        2, 5.8060381104, 1.0},
+      {0,        2, 2.1891841580, 1.0},
+      {0,        2,0.87794613558, 1.0},
+      {0,        2,0.35623646700, 1.0},
+      {0,        3,3.96585000000, 1.0},
+      {0,        3,1.49085000000, 1.0},
+      {0,        3, .63485000000, 1.0},
+      {0,        4,2.85685000000, 1.0},
+      {0,        4,1.04985000000, 1.0},
+      {0,        5,2.03685000000, 1.0}
+    },//O
     {},//F
     {} //Ne
   }
 );
 
-void calc_cube(vec data, WFN& dummy) {
+void calc_cube(vec data, WFN& dummy, int& exp_coef) {
   double MinMax[6]{ 0,0,0,0,0,0 };
   int steps[3]{ 0,0,0 };
-  readxyzMinMax_fromWFN(dummy, MinMax, steps, 3.0, 0.05);
+  readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1);
   cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
   CubeRho.give_parent_wfn(dummy);
 
@@ -518,26 +716,23 @@ void calc_cube(vec data, WFN& dummy) {
   std::time(&start);
 
   progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
-  const int step = (int)std::max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
+  const int step = (int)std::max(floor(CubeRho.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < CubeRho.get_size(0); i++) {
     for (int j = 0; j < CubeRho.get_size(1); j++)
       for (int k = 0; k < CubeRho.get_size(2); k++) {
 
-        double PosGrid[3]{
+        vec PosGrid{
           i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
           i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
           i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)
-        },
-          Rho = 0;
+        };
 
-        Rho = calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms);
-
-        CubeRho.set_value(i, j, k, Rho);
+        CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef));
       }
     if (i != 0 && i % step == 0)
-      progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+      progress->write(i / double(CubeRho.get_size(0)));
   }
   delete(progress);
 
@@ -546,29 +741,124 @@ void calc_cube(vec data, WFN& dummy) {
   if (difftime(end, start) < 60) std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << difftime(end, start) << " s" << std::endl;
   else if (difftime(end, start) < 3600) std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 60) << " m " << int(std::floor(difftime(end, start))) % 60 << " s" << std::endl;
   else std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 3600) << " h " << (int(std::floor(difftime(end, start))) % 3600) / 60 << " m" << std::endl;
-
+  std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
   CubeRho.write_file(true);
-  std::cout << "Number of electrons: " << CubeRho.sum() << "\n";
 };
+
+double numerical_3d_integral(std::function<double(double*)> f, double stepsize = 0.001, double r_max = 10.0) {
+  double tot_int = 0;
+  double da = stepsize * PI;
+  double dr = stepsize;
+  int upper = TWO_PI / da;
+  long long int total_calcs = upper * PI / da * r_max / dr;
+  std::cout << "Integrating over " << total_calcs << " points" << std::endl;
+
+  progress_bar* progress = new progress_bar{ std::cout, 50u, "Integrating" };
+  const long long int step = (long long int)std::max(floor(upper / 20.0), 1.0);
+
+#pragma omp parallel for reduction(+:tot_int) schedule(dynamic)
+  for (int phic = 0; phic <= upper; phic++) {
+    double phi = phic * da;
+    double cp = std::cos(phi);
+    double sp = std::sin(phi);
+    for (double theta = 0; theta <= PI; theta += da) {
+      double st = std::sin(theta);
+      double ct = std::cos(theta);
+      double x0 = st * cp, y0 = st * sp;
+      double ang_mom = dr * da * da * st;
+      for (double r = r_max; r >= 0; r -= dr) {
+        double d[4] {r* x0,
+          r* y0,
+          r* ct,
+          r};
+        tot_int += f(d) * r * r * ang_mom;
+      }
+    }
+    if (phic != 0 && phic % step == 0)
+      progress->write((double)phic / (double)upper);
+  }
+
+  std::cout << "\ntotal integral : " << std::fixed << std::setprecision(4) << tot_int << std::endl;
+}
+
+double s_value(double* d) {
+  primitive p_0(0, 0, 3.5, 1.0);
+  int m = 0;
+  return pow(gaussian_radial(p_0, d[3]) * spherical_harmonic(p_0.type, m, d),2);
+}
+
+double one(double* d) {
+  return 1;
+}
+
+double gaussian(double* d) {
+  double g = exp(-3.5 * d[3] * d[3]);
+  return g;
+}
+
+int load_basis_into_WFN(WFN& wavy, auto b) {
+  int nr_coefs = 0;
+  for (int i = 0; i < wavy.atoms.size(); i++) {
+    int current_charge = wavy.atoms[i].charge - 1;
+    primitive* basis = b[current_charge].data();
+    int size = (int)b[current_charge].size();
+    for (int e = 0; e < size; e++) {
+      wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
+      nr_coefs += 2 * basis[e].type + 1;
+    }
+  }
+  return nr_coefs;
+}
 
 void ML_test() {
   using namespace std;
+  //cout << "c_1_4p " << c_1_4p << endl;
+  //cout << "1/c_1_4p " << 1/ c_1_4p << endl;
+  //cout << "4pi " << FOUR_PI << endl;
+  //cout << "4/3 pi " << 4.0 / 3.0 * PI << endl;
+  //expected value integrating to r=1 
+  //for f=one is 4/3 pi
+  //for f=gaussian: 0.789257
+  //for f=s_value = 1?
+  //numerical_3d_integral(s_value,0.002,10.0);
+
   vector<unsigned long> shape {};
   bool fortran_order;
   vec data{};
 
-  const string path {"prediction_conf0.npy"};
+  string path {"coefficients_conf0.npy"};
   npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
   WFN dummy(7);
-  dummy.read_xyz("water.xyz", std::cout);
+  dummy.read_xyz("water_monomer.xyz", std::cout);
 
-  for (int i = 0; i < dummy.atoms.size(); i++) {
-    int current_charge = dummy.atoms[i].charge -1;
-    for (int e = 0; e < TZVP_JKfit_exp[current_charge].size(); e++)
-      dummy.atoms[i].push_back_basis_set(TZVP_JKfit_exp[current_charge][e], 1.0, TZVP_JKfit_l[current_charge][e], e);
-  }
+  int nr_coefs = load_basis_into_WFN(dummy, QZVP_JKfit);
+
+  cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
+  calc_cube(data, dummy, nr_coefs);
+
+  path = "prediction_conf0.npy";
+  npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
+
+  WFN dummy2(7);
+  dummy2.read_xyz("water.xyz", std::cout);
+
+  nr_coefs = load_basis_into_WFN(dummy2, QZVP_JKfit);;
   
-  calc_cube(data, dummy);
+  cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
+  calc_cube(data, dummy2, nr_coefs);
+
+  path = "alanine2.npy";
+  npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
+
+  WFN dummy3(7);
+  dummy3.read_xyz("alanine.xyz", std::cout);
+
+  nr_coefs = load_basis_into_WFN(dummy3, TZVP_JKfit);;
+
+  cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
+  calc_cube(data, dummy3, nr_coefs);
+
+  cout << "Done :)" << endl;
 }
 
