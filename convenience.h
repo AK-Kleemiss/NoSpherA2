@@ -37,8 +37,6 @@
 class WFN;
 class cell;
 
-typedef std::vector<std::vector<std::complex<double>>> M_type;
-typedef std::vector<std::vector<double>> W_type;
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
 typedef std::vector<cdouble> cvec;
@@ -113,6 +111,7 @@ inline const double c_7_16p    = sqrt(7.0 / (16.0 * PI));
 inline const double c_9_256p   = sqrt(9.0 / (256.0 * PI));
 inline const double c_15_4p    = sqrt(15.0 / (FOUR_PI));
 inline const double c_15_16p   = sqrt(15.0 / (16.0 * PI));
+inline const double c_11_256p = sqrt(11.0 / (256.0 * PI));
 inline const double c_21_32p   = sqrt(21.0 / (32.0 * PI));
 inline const double c_35_32p   = sqrt(35.0 / (32.0 * PI));
 inline const double c_45_16p   = sqrt(45.0 / (16.0 * PI));
@@ -120,9 +119,14 @@ inline const double c_45_32p   = sqrt(45.0 / (32.0 * PI));
 inline const double c_45_64p   = sqrt(45.0 / (64.0 * PI));
 inline const double c_105_4p   = sqrt(105.0 / (FOUR_PI));
 inline const double c_105_16p  = sqrt(105.0 / (16.0 * PI));
+inline const double c_165_256p = sqrt(165.0 / (256.0 * PI));
 inline const double c_315_16p  = sqrt(315.0 / (16.0 * PI));
 inline const double c_315_32p  = sqrt(315.0 / (32.0 * PI));
 inline const double c_315_256p = sqrt(315.0 / (256.0 * PI));
+inline const double c_385_512p = sqrt(385.0 / (512.0 * PI));
+inline const double c_693_2048p = sqrt(693.0 / (2048.0 * PI));
+inline const double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
+inline const double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
 
 const inline long long int ft_fun(const int& nr) {
   if (nr >= 0 && nr <= 20)
@@ -600,24 +604,25 @@ struct primitive
 {
   int center, type;
   double exp, coefficient;
+  double norm_const = -10;
   void normalize() {
-    double c = normalization_constant();
-    coefficient *= c;
+    coefficient *= normalization_constant();
   };
   void unnormalize() {
-//    const int l = type - 1;
-    double c = normalization_constant();
-    coefficient /= c;
+    coefficient /= normalization_constant();
   };
   double normalization_constant() {
-    const int l = type - 1;
-    return sqrt(
-      pow(2 * exp / PI, 3.0 / 2.0) *
-      pow(4 * exp, l)
-    );
+    //assuming type is equal to angular momentum
+    return norm_const;
   }
   primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
-  primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef) {}
+  primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef) {
+    norm_const = pow(
+      pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type)
+      / PI / pow(doublefactorial(2 * type + 1), 2),
+      0.25
+    );
+  }
 };
 
 typedef std::set<std::vector<int>> hkl_list;
