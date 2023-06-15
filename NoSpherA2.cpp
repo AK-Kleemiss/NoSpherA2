@@ -337,8 +337,18 @@ int main(int argc, char** argv)
     return 0;
   }
   if (opt.coef_file != "") {
-    if (opt.cif != "") {
-
+    if (opt.cif != "" && opt.xyz_file != "") {
+      wavy.push_back(WFN(7));
+      // Read the xyzfile
+      wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
+      //Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
+      int nr_coefs = load_basis_into_WFN(wavy[0], TZVP_JKfit);
+      //Run generation of tsc file
+      err_checkf(calculate_structure_factors_RI(
+        opt,
+        wavy[0],
+        log_file,
+        nr_coefs), "Error during ML-SF Calcualtion", log_file);
     }
     else {
       cube_from_coef_npy(opt.coef_file, opt.xyz_file);
