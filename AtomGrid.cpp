@@ -45,10 +45,10 @@ AtomGrid::AtomGrid(const double radial_precision,
     get_closest_num_angular(max_num_angular_points);
   err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
-  vector<double> angular_x(max_LT * MAG, 0.0);
-  vector<double> angular_y(max_LT * MAG, 0.0);
-  vector<double> angular_z(max_LT * MAG, 0.0);
-  vector<double> angular_w(max_LT * MAG, 0.0);
+  vec angular_x(max_LT * MAG, 0.0);
+  vec angular_y(max_LT * MAG, 0.0);
+  vec angular_z(max_LT * MAG, 0.0);
+  vec angular_w(max_LT * MAG, 0.0);
   int angular_off;
   lebedev_sphere ls;
 
@@ -165,7 +165,7 @@ void AtomGrid::get_grid(const int num_centers,
   if (num_centers > 1) {
 #pragma omp parallel
     {
-      std::vector<double> pa(num_centers);
+      vec pa(num_centers);
       double temp;
 #pragma omp for schedule(dynamic)
       for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
@@ -198,6 +198,25 @@ void AtomGrid::get_grid(const int num_centers,
     }
 }
 
+void AtomGrid::get_atomic_grid(
+  const int center_index,
+  const double* x_coordinates_bohr,
+  const double* y_coordinates_bohr,
+  const double* z_coordinates_bohr,
+  double grid_x_bohr[],
+  double grid_y_bohr[],
+  double grid_z_bohr[],
+  double grid_aw[]) const
+{
+#pragma omp parallel for schedule(dynamic)
+  for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
+    grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
+    grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
+    grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
+    grid_aw[ipoint] = atom_grid_w_[ipoint];
+  }
+}
+
 void AtomGrid::get_grid(const int num_centers,
   const int center_index,
   const double* x_coordinates_bohr,
@@ -209,7 +228,7 @@ void AtomGrid::get_grid(const int num_centers,
   double grid_z_bohr[],
   double grid_w[]) const
 {
-  std::vector<double> pa(num_centers);
+  vec pa(num_centers);
   if (num_centers > 1)
     for (size_t ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
       grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
@@ -247,7 +266,7 @@ void AtomGrid::get_grid_omp(const int num_centers,
   double grid_w[]) const
 {
   if (num_centers > 1) {
-    std::vector<double> pa(num_centers);
+    vec pa(num_centers);
 #pragma omp parallel for private(pa)
     for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
       grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
@@ -341,7 +360,7 @@ double get_becke_w(const int& num_centers,
   const double& x,
   const double& y,
   const double& z,
-  std::vector<double>& pa)
+  vec& pa)
 {
   double R_a, R_b;
   double u_ab, a_ab, mu_ab, nu_ab;

@@ -32,6 +32,16 @@ class AtomGrid
         double grid_aw[],
         double grid_mw[]) const;
 
+    void get_atomic_grid(
+      const int center_index,
+      const double* x_coordinates_bohr,
+      const double* y_coordinates_bohr,
+      const double* z_coordinates_bohr,
+      double grid_x_bohr[],
+      double grid_y_bohr[],
+      double grid_z_bohr[],
+      double grid_aw[]) const;
+
     void get_grid(const int num_centers,
                   const int center_index,
                   const double* x_coordinates_bohr,

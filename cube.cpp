@@ -46,7 +46,7 @@ cube::cube(const string& filepath, bool read, WFN& wave, ostream& file, bool exp
   loaded = read;
 };
 
-cube::cube(int g_na, const vector<int>& g_size, const vector< double >& g_origin, const vector< vector<double> >& g_vectors, const vector<vector<vector<double> > >& g_values) {
+cube::cube(int g_na, const vector<int>& g_size, const vector< double >& g_origin, const vector< vec >& g_vectors, const vector<vector<vec > >& g_values) {
   na = g_na;
   parent_wavefunction = new WFN(6);
   cout << "Assigned Nr of Atoms" << endl;
@@ -369,12 +369,12 @@ bool cube::fractal_dimension(const double stepsize) {
         if (values[i][j][k] > max) max = values[i][j][k];
       }
   const double map_min = min, map_max = max;
-  vector<double> e = double_sum();
+  vec e = double_sum();
   min -= 2 * stepsize, max += 2 * stepsize;
   const int steps = int((max - min) / stepsize) + 2;
   vector<int> bins;
-  vector<double> df;
-  vector<double> iso;
+  vec df;
+  vec iso;
   bins.resize(steps), df.resize(steps), iso.resize(steps);
   for (int i = 0; i < steps; i++)
     iso[i] = round((min + i * stepsize) * 100) / 100;
@@ -939,10 +939,10 @@ double cube::diff_sum() {
   return (s * dv); //RETURN Sum of values inside the cube
 };
 
-vector<double> cube::double_sum() {
+vec cube::double_sum() {
   for (int i = 0; i < 3; i++) {
     if (size[i] == 0) 
-      return (vector<double>(1,0));
+      return (vec(1,0));
   }
   double s = 0.0;
   double s2 = 0.0;
@@ -957,7 +957,7 @@ vector<double> cube::double_sum() {
   double dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2]
     + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0]
     + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
-  vector<double> result;
+  vec result;
   result.resize(2);
   result[0] = s * dv;
   result[1] = s2 * dv;

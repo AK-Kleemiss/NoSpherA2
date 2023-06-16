@@ -42,7 +42,7 @@ struct atom {
 	std::string label;
 	int nr, charge, ECP_electrons;
 	double x, y, z;
-	std::vector<double> frac_coords;
+	vec frac_coords;
 	atom();
 	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
 	atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
@@ -52,8 +52,8 @@ struct atom {
 	void print_values_long();
 	bool get_basis_set_loaded();
 	bool is_anharm();
-	void assign_ADPs(std::vector<double> &second, std::vector<double> &third, std::vector<double> &fourth);
-	void assign_ADPs(std::vector<double>& second);
+	void assign_ADPs(vec &second, vec &third, vec &fourth);
+	void assign_ADPs(vec& second);
 	void assign_ADPs(double& Uiso);
 	std::vector<basis_set_entry> basis_set;
 	std::vector<unsigned int> shellcount;
@@ -61,7 +61,7 @@ struct atom {
 	//[0] = second order (U11, U22, U33, U12, U13, U23)
 	//[1] = third order  (C111, C112, C113, C122, C123, C133, C222, C223, C233, C333)
 	//[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
-	std::vector<std::vector<double>> ADPs;
+	std::vector<vec> ADPs;
 
 	bool operator==(const atom& other) const = default;
 };
@@ -166,7 +166,7 @@ inline void atom::assign_ADPs(double& Uiso) {
 	ADPs[0][0] = ADPs[0][1] = ADPs[0][2] = Uiso;
 };
 
-inline void atom::assign_ADPs(std::vector<double>& second) {
+inline void atom::assign_ADPs(vec& second) {
 	if (second.size() != 6) {
 		std::cout << "Wrong size of second order ADP!" << std::endl;
 		return;
@@ -178,7 +178,7 @@ inline void atom::assign_ADPs(std::vector<double>& second) {
 	}
 };
 
-inline void atom::assign_ADPs(std::vector<double> &second, std::vector<double> &third, std::vector<double> &fourth) {
+inline void atom::assign_ADPs(vec &second, vec &third, vec &fourth) {
 	if (second.size() != 6) {
 		std::cout << "Wrong size of second order ADP!" << std::endl;
 		return;

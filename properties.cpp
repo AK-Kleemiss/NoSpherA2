@@ -616,11 +616,11 @@ void Calc_Rho_spherical_harmonics(
 //#pragma omp parallel shared(CubeRho)
   {
     cout << omp_get_thread_num() << endl;
-    vector<vector<double>> d(5);
+    vector<vec> d(5);
     for (int i = 0; i < 5; i++)
       d[i].resize(wavy.get_ncen(), 0.0);
     const int n = wavy.get_nmo(true);
-    vector<double> phi(n, 0.0);
+    vec phi(n, 0.0);
 //#pragma omp for schedule(dynamic)
     for (int i = 0; i < CubeRho.get_size(0); i++) {
       for (int j = 0; j < CubeRho.get_size(1); j++)
@@ -720,8 +720,8 @@ void Calc_S_Rho(
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < Cube_S_Rho.get_size(0); i++) {
-    vector<vector<double>> d(16);
-    vector<double> phi(wavy.get_nmo(), 0.0);
+    vector<vec> d(16);
+    vec phi(wavy.get_nmo(), 0.0);
     for (int p = 0; p < 16; p++)
       d[p].resize(wavy.get_ncen());
     for (int j = 0; j < Cube_S_Rho.get_size(1); j++)
