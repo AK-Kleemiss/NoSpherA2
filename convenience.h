@@ -239,8 +239,8 @@ inline void not_implemented(const std::string& file, const int& line, const std:
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
 
-bool generate_sph2cart_mat(std::vector<std::vector<double>>& p, std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g);
-bool generate_cart2sph_mat(std::vector<std::vector<double>>& d, std::vector<std::vector<double>>& f, std::vector<std::vector<double>>& g, std::vector<std::vector<double>>& h);
+bool generate_sph2cart_mat(std::vector<vec>& p, std::vector<vec>& d, std::vector<vec>& f, std::vector<vec>& g);
+bool generate_cart2sph_mat(std::vector<vec>& d, std::vector<vec>& f, std::vector<vec>& g, std::vector<vec>& h);
 std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
 inline const int sht2nbas(const int& type)
@@ -378,7 +378,7 @@ std::string get_foldername_from_path(const std::string& input);
 std::string get_basename_without_ending(const std::string& input);
 //------------------Functions to read from .fchk files----------------------------------
 bool read_fchk_integer_block(std::ifstream& in, std::string heading, std::vector<int>& result, bool rewind = true);
-bool read_fchk_double_block(std::ifstream& in, std::string heading, std::vector<double>& result, bool rewind = true);
+bool read_fchk_double_block(std::ifstream& in, std::string heading, vec& result, bool rewind = true);
 int read_fchk_integer(std::string in);
 int read_fchk_integer(std::ifstream& in, std::string search, bool rewind = true);
 double read_fchk_double(std::string in);
@@ -661,6 +661,7 @@ struct options {
   bool fract = false;
   bool hirsh = false;
   bool s_rho = false;
+  bool SALTED = false, SALTED_BECKE = false;
   bool Olex2_1_3_switch = false;
   bool iam_switch = false;
   bool read_k_pts = false;
@@ -725,6 +726,13 @@ const double calc_density_ML(double& x,
   vec& coefficients,
   std::vector<atom>& atoms,
   const int& exp_coefs);
+const double calc_density_ML(double& x,
+  double& y,
+  double& z,
+  vec& coefficients,
+  std::vector<atom>& atoms,
+  const int& exp_coefs,
+  const int& atom_nr);
 
 int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b);
 

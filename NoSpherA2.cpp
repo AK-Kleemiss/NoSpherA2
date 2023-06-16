@@ -158,11 +158,11 @@ int main(int argc, char** argv)
       if (opt.set_ECPs) {
         wavy[i].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
       }
-      log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+      log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
     }
 
     vector<string> known_scatterer;
-    vector<vector<double>> known_kpts;
+    vector<vec> known_kpts;
     tsc_block result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
@@ -245,7 +245,7 @@ int main(int argc, char** argv)
       log_file << "Adding ECPs" << endl;
       wavy[0].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
     }
-    log_file << " done!" << endl << "Number of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
+    log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
     if (opt.basis_set != "" || opt.fchk != "") {
       //Make a fchk out of the wfn/wfx file
@@ -339,16 +339,23 @@ int main(int argc, char** argv)
   if (opt.coef_file != "") {
     if (opt.cif != "" && opt.xyz_file != "") {
       wavy.push_back(WFN(7));
-      // Read the xyzfile
+      //Read the xyzfile
       wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
       //Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
       int nr_coefs = load_basis_into_WFN(wavy[0], TZVP_JKfit);
       //Run generation of tsc file
-      err_checkf(calculate_structure_factors_RI(
-        opt,
-        wavy[0],
-        log_file,
-        nr_coefs), "Error during ML-SF Calcualtion", log_file);
+      if(opt.SALTED_BECKE || opt.SALTED)
+        err_checkf(calculate_structure_factors_RI_No_H(
+          opt,
+          wavy[0],
+          log_file,
+          nr_coefs), "Error during ML-SF Calcualtion", log_file);
+      else
+        err_checkf(calculate_structure_factors_RI(
+          opt,
+          wavy[0],
+          log_file,
+          nr_coefs), "Error during ML-SF Calcualtion", log_file);
     }
     else {
       cube_from_coef_npy(opt.coef_file, opt.xyz_file);

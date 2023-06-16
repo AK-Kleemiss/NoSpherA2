@@ -280,7 +280,7 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
     opt.debug);
 
   cif_input.close();
-  vector<vector<double>> d1, d2, d3, dens;
+  vector<vec> d1, d2, d3, dens;
 
   make_hirshfeld_grids(opt.pbc,
     opt.accuracy,
@@ -315,7 +315,7 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
 
   //This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
   // by iterating over both spherical angles by a fixed step defined above
-  vector<vector<double>> k_pt;
+  vector<vec> k_pt;
   k_pt.resize(4);
 #pragma omp parallel for
   for (int i = 0; i < 4; i++)
@@ -429,7 +429,7 @@ void spherical_harmonic_test() {
   const double phi = 0.3, theta = 0.4;
   for (int lam = 0; lam <= 5; lam++) {
     for (int m = -lam; m <= lam; m++) {
-      std::vector<double> d {std::sin(theta)*std::cos(phi),
+      vec d {std::sin(theta)*std::cos(phi),
                              std::sin(theta)*std::sin(phi),
                              std::cos(theta), 1.0, 1.0};
       std::cout << spherical_harmonic(lam, m, d.data()) << " ";
@@ -438,7 +438,7 @@ void spherical_harmonic_test() {
   }
 };
 
-void calc_cube(vec data, WFN& dummy, int& exp_coef) {
+void calc_cube(vec data, WFN& dummy, int& exp_coef, int atom=-1) {
   double MinMax[6]{ 0,0,0,0,0,0 };
   int steps[3]{ 0,0,0 };
   readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1);
@@ -458,6 +458,8 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef) {
 
   progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
   const int step = (int)std::max(floor(CubeRho.get_size(0) / 20.0), 1.0);
+  if (atom != -1)
+    std::cout << "Calculation for atom " << atom << std::endl;
 
 #pragma omp parallel for schedule(dynamic)
   for (int i = 0; i < CubeRho.get_size(0); i++) {
@@ -470,7 +472,10 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef) {
           i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)
         };
 
-        CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef));
+        if (atom == -1)
+          CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef));
+        else
+          CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef, atom));
       }
     if (i != 0 && i % step == 0)
       progress->write(i / double(CubeRho.get_size(0)));
@@ -483,7 +488,13 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef) {
   else if (difftime(end, start) < 3600) std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 60) << " m " << int(std::floor(difftime(end, start))) % 60 << " s" << std::endl;
   else std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 3600) << " h " << (int(std::floor(difftime(end, start))) % 3600) / 60 << " m" << std::endl;
   std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-  CubeRho.write_file(true);
+  if (atom == -1) {
+    CubeRho.write_file(true);
+  }
+  else {
+    std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
+    CubeRho.write_file(fn, false);
+  }
 };
 
 double numerical_3d_integral(std::function<double(double*)> f, double stepsize = 0.001, double r_max = 10.0) {
@@ -602,5 +613,8 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
   int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
   std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
   calc_cube(data, dummy, nr_coefs);
+
+  for (int i = 0; i < dummy.get_ncen(); i++)
+    calc_cube(data, dummy, nr_coefs, i);
 }
 

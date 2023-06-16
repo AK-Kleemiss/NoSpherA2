@@ -1247,7 +1247,7 @@ const double normgauss(const int& type, const double& exp)
   int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
   return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vector<double>>&p, vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g) {
+bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector<vec>& g) {
   //                                                   
   //From 3P: P0 P1 P2
   //To 3P : Z X Y (4 2 3, as in ORCA format)
@@ -1370,7 +1370,7 @@ bool generate_sph2cart_mat(vector<vector<double>>&p, vector<vector<double>>& d, 
   g[14][4] = 3.0 / sqrt(7);
   return true;
 }
-bool generate_cart2sph_mat(vector<vector<double>>& d, vector<vector<double>>& f, vector<vector<double>>& g, vector<vector<double>>& h)
+bool generate_cart2sph_mat(vector<vec>& d, vector<vec>& f, vector<vec>& g, vector<vec>& h)
 {
   //                                                   
   //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
@@ -1627,7 +1627,7 @@ void type2vector(
 
 bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& log3, bool debug)
 {
-  vector<vector<double>> Uij, Cijk, Dijkl;
+  vector<vec> Uij, Cijk, Dijkl;
   ifstream asym_cif_input(cif.c_str(), std::ios::in);
   asym_cif_input.clear();
   asym_cif_input.seekg(0, asym_cif_input.beg);
@@ -1917,7 +1917,7 @@ bool read_fchk_integer_block(ifstream& in, string heading, vector<int>& result, 
   }
   return true;
 };
-bool read_fchk_double_block(ifstream& in, string heading, vector<double>& result, bool rewind)
+bool read_fchk_double_block(ifstream& in, string heading, vec& result, bool rewind)
 {
   if (result.size() != 0) result.clear();
   string line = go_get_string(in, heading, rewind);
@@ -2003,7 +2003,7 @@ void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
 
 double get_lambda_1(double* a)
 {
-  vector<double> bw, zw;
+  vec bw, zw;
   //int run = 0;
   double eig1, eig2, eig3;
   const double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
@@ -2092,9 +2092,55 @@ const double calc_density_ML(double& x,
       primitive p(a, bf->type, bf->exponent, bf->coefficient);
       radial = gaussian_radial(p, d[3]);
       for (int m = -p.type; m <= p.type; m++) {
+        // m+p.type should yield just the running index of coefficents, since we start at -p.type
         dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
       }
       coef_counter += (2 * p.type + 1);
+    }
+  }
+  err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+  return dens;
+}
+
+const double calc_density_ML(double& x,
+  double& y,
+  double& z,
+  vec& coefficients,
+  std::vector<atom>& atoms,
+  const int& exp_coefs,
+  const int& atom_nr) {
+  double dens = 0, radial = 0;
+  int coef_counter = 0;
+  int e = 0, size = 0;
+  for (int a = 0; a < atoms.size(); a++) {
+    if (a == atom_nr) {
+      size = (int)atoms[a].basis_set.size();
+      basis_set_entry* bf;
+      double d[4]{
+      x - atoms[a].x,
+      y - atoms[a].y,
+      z - atoms[a].z, 0.0 };
+      //store r in last element
+      d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+      //normalize distances for spherical harmonic
+      for (e = 0; e < 3; e++)
+        d[e] /= d[3];
+      for (e = 0; e < size; e++) {
+        bf = &atoms[a].basis_set[e];
+        primitive p(a, bf->type, bf->exponent, bf->coefficient);
+        radial = gaussian_radial(p, d[3]);
+        for (int m = -p.type; m <= p.type; m++) {
+          // m+p.type should yield just the running index of coefficents, since we start at -p.type
+          dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
+        }
+        coef_counter += (2 * p.type + 1);
+      }
+    }
+    else {
+      size = (int)atoms[a].basis_set.size();
+      for (e = 0; e < size; e++) {
+        coef_counter += (2 * atoms[a].basis_set[e].type + 1);
+      }
     }
   }
   err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
@@ -2356,9 +2402,7 @@ void options::digest_options() {
     }
     else if (temp.find("-mult") < 1)
       mult = stoi(arguments[i + 1]);
-    else if (temp.find("-no-date") < 1)
-      no_date = true;
-    else if (temp.find("-no_date") < 1)
+    else if (temp.find("-no-date") < 1 || temp.find("-no_date") < 1)
       no_date = true;
     else if (temp.find("-pbc") < 1)
       pbc = stoi(arguments[i + 1]);
@@ -2374,6 +2418,10 @@ void options::digest_options() {
       density_test_cube = true;
     else if (temp.find("-s_rho") < 1)
       s_rho = true;
+    else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
+      SALTED_BECKE = true;
+    else if (temp.find("-SALTED") < 1 || temp.find("-salted") < 1)
+      SALTED = true;
     else if (temp.find("-skpts") < 1)
       save_k_pts = true;
     else if (temp.find("-sfac_scan") < 1) {
