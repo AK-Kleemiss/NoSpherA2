@@ -732,7 +732,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     wave.sort_wfn(wave.check_order(debug), debug);
     //---------------normalize basis set---------------------------------
     if (debug) file << "starting to normalize the basis set" << endl;
-    vector<double> norm_const;
+    vec norm_const;
     //-----------debug output---------------------------------------------------------
     if (debug) {
       file << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
@@ -1057,7 +1057,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     }
     //------------------ make the DM -----------------------------
     int naotr = nao * (nao + 1) / 2;
-    vector<double> kp;
+    vec kp;
     wave.resize_DM(naotr, 0.0);
     if (alpha_els != beta_els)
       wave.resize_SDM(naotr, 0.0);

@@ -30,7 +30,7 @@ public:
   {
     if (debug)
       file << "starting to read cif!" << std::endl;
-    file << "Reading: " << std::setw(44) << filename << std::flush;
+    file << "Reading: " << std::setw(41) << filename << std::flush;
     sym.resize(3);
     for (int i = 0; i < 3; i++)
       sym[i].resize(3);
