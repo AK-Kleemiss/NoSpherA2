@@ -3671,7 +3671,7 @@ int make_integration_grids_SALTED(
       final_size += new_gridsize[i];
     }
     for (int k = 0; k < total_grid.size(); k++)
-      total_grid[k].resize(final_size);
+      total_grid[k].resize(final_size,0.0);
 #pragma omp parallel for
     for (int i = 0; i < atoms_with_grids; i++) {
       int offset = 0;
@@ -3747,10 +3747,8 @@ int make_integration_grids_SALTED(
   // Vector containing integrated numbers of electrons
   // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
   // dimension 1: atoms of asym_atom_list
-  vector < vec > atom_els(3);
-  for (int n = 0; n < atom_els.size(); n++) {
-    atom_els[n].resize(asym_atom_list.size(), 0.0);
-  }
+  vec atom_els;
+  atom_els.resize(asym_atom_list.size(), 0.0);
 
   if (debug) file << "before loop" << endl;
   //Generate Electron sums
@@ -3768,14 +3766,14 @@ int make_integration_grids_SALTED(
         temp.atoms,
         exp_coefs,
         asym_atom_list[i]
-        );
-      atom_els[2][i] += total_grid[4][p] * total_grid[3][p];
+        ) * total_grid[3][p];
+      atom_els[i] += total_grid[4][p];
     }
-    el_sum_SALTED += atom_els[2][i];
+    el_sum_SALTED += atom_els[i];
     if (wave.get_has_ECPs()) {
       int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
       el_sum_SALTED += n;
-      atom_els[2][i] += n;
+      atom_els[i] += n;
     }
   }
   shrink_vector<double>(data);
@@ -3784,25 +3782,21 @@ int make_integration_grids_SALTED(
     file << "Becke grid with hirshfeld weights done!" << endl;
     file << "atom_els[2]: ";
     for (int i = 0; i < asym_atom_list.size(); i++)
-      file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
+      file << fixed << setw(10) << setprecision(3) << atom_els[i] << " ";
     file << endl;
   }
 
-#pragma omp parallel for
-  for (int p = 0; p < total_grid[0].size(); p++)
-    total_grid[4][p] *= total_grid[3][p];
-  file << " done!" << endl;
-  file << "Number of points evaluated: " << total_grid[0].size();
+  file << " done!\nNumber of points evaluated: " << total_grid[0].size();
 
-  file << " with " << fixed << setw(10) << setprecision(6) << el_sum_SALTED << " electrons in Becke Grid in total." << endl << endl;
+  file << " with " << fixed << setw(10) << setprecision(6) << el_sum_SALTED << " electrons in Becke Grid in total.\n\n";
 
-  file << "Table of Charges in electrons" << endl << endl << "    Atom      Charge" << endl;
+  file << "Table of Charges in electrons\n\n    Atom      Charge" << endl;
 
   int counter = 0;
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int a = asym_atom_list[i];
     file << setw(10) << wave.atoms[a].label
-      << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
+      << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[counter];
     counter++;
     file << endl;
   }
