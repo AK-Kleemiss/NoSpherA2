@@ -49,7 +49,8 @@ sucrose_twin:
 		-acc 0 \
 		-twin 1 0 0 0 -1 0 0 1 -2 \
 		-no-date \
-		&& mv NoSpherA2.log $@.log
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 disorder_THPP:
