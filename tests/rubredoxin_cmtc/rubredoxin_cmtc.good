@@ -17,7 +17,7 @@ Reading:                               residues/4.gbw done!
 Number of atoms in Wavefunction file: 31 Number of MOs: 642
 Number of protons: 57
 Number of electrons: 56
-Reading:                               residues/1.cif done!
+Reading:                            residues/1.cif... done!
 There are:
   18 atoms read from the wavefunction, of which 
   12 are identified as asymmetric unit atoms!
@@ -55,7 +55,7 @@ Number of k-points to evaluate: 800 for 2758 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================== [100%] 
 Number of protons: 111
 Number of electrons: 110.000
-Reading:                               residues/2.cif done!
+Reading:                            residues/2.cif... done!
 There are:
   34 atoms read from the wavefunction, of which 
   22 are identified as asymmetric unit atoms!
@@ -97,7 +97,7 @@ Total number of electrons in the wavefunction: 69.941
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 111
 Number of electrons: 110.000
-Reading:                               residues/3.cif done!
+Reading:                            residues/3.cif... done!
 There are:
   34 atoms read from the wavefunction, of which 
   19 are identified as asymmetric unit atoms!
@@ -136,7 +136,7 @@ Total number of electrons in the wavefunction: 48.469
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
 Number of protons: 102
 Number of electrons: 102.000
-Reading:                               residues/4.cif done!
+Reading:                            residues/4.cif... done!
 There are:
   31 atoms read from the wavefunction, of which 
   19 are identified as asymmetric unit atoms!
