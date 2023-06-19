@@ -100,3 +100,9 @@ Windows_cuda/x64/D_ML/std.compat.ixx.ifc.dt.module.json.command
 Windows_cuda/x64/D_ML/std.ixx.ifc.dt.d.json
 Windows_cuda/x64/D_ML/std.ixx.ifc.dt.module.json
 Windows_cuda/x64/D_ML/std.ixx.ifc.dt.module.json.command
+Windows/x64/D_SALTED_tsc/std.compat.ixx.ifc
+Windows/x64/D_SALTED_tsc/std.compat.ixx.ifc.d.json
+Windows/x64/D_SALTED_tsc/std.compat.ixx.module.json
+Windows/x64/D_SALTED_tsc/std.ixx.ifc
+Windows/x64/D_SALTED_tsc/std.ixx.ifc.d.json
+Windows/x64/D_SALTED_tsc/std.ixx.module.json
