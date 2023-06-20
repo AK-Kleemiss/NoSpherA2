@@ -226,12 +226,13 @@ void generate_hkl(const double& dmin,
   vector<int> hkl_(3);
   string line, temp;
   const int extreme = 201;
+  double dmin_l = 0.9 * dmin;
   for (int h = -extreme; h < extreme; h++) {
     for (int k = -extreme; k < extreme; k++) {
       //only need 0 to extreme, since we have no DISP signal
       for (int l = 0; l < extreme; l++) {
         hkl_ = { h,k,l };
-        if (unit_cell.get_d_of_hkl(hkl_) >= dmin)
+        if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
           hkl.emplace(hkl_);
         else
           break;

@@ -465,7 +465,6 @@ public:
   void write(double fraction);
 };
 /*
-const double MPI2 = 2 * 3.14159265358979323844;
 
 class cosinus_annaeherung
 {
@@ -955,6 +954,40 @@ inline const std::vector<std::vector<primitive>> QZVP_JKfit(
     {} //Ne
   }
 );
+
+inline double hypergeometric(double a, double b, double c, double x)
+{
+  const double TOLERANCE = 1.0e-10;
+  double term = a * b * x / c;
+  double value = 1.0 + term;
+  int n = 1;
+
+  while (std::abs(term) > TOLERANCE)
+  {
+    a++, b++, c++, n++;
+    term *= a * b * x / c / n;
+    value += term;
+  }
+
+  return value;
+}
+
+inline cdouble hypergeometric(double a, double b, double c, cdouble x)
+{
+  const double TOLERANCE = 1.0e-10;
+  cdouble term = a * b * x / c;
+  cdouble value = 1.0 + term;
+  int n = 1;
+
+  while (std::abs(term) > TOLERANCE)
+  {
+    a++, b++, c++, n++;
+    term *= a * b * x / c / (double)n;
+    value += term;
+  }
+
+  return value;
+}
 
 #include "wfn_class.h"
 #include "atoms.h"
