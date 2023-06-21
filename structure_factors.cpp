@@ -320,6 +320,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
   bool atoms_read = false;
   int count_fields = 0;
   int group_field = 0;
+  int type_field = 0;
   int position_field[3] = { 0,0,0 };
   int label_field = 1000;
   string line;
@@ -337,6 +338,8 @@ void read_atoms_from_CIF(ifstream& cif_input,
         if (debug) file << "line in loop field definition: " << trim(line) << endl;
         if (line.find("label") != string::npos)
           label_field = count_fields;
+        else if (line.find("type_symbol") != string::npos)
+          type_field = count_fields;
         else if (line.find("disorder_group") != string::npos)
           group_field = count_fields;
         else if (line.find("fract_x") != string::npos)
@@ -361,7 +364,8 @@ void read_atoms_from_CIF(ifstream& cif_input,
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
         fields[label_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
-        if (debug) file << "label: " << setw(8) << fields[label_field] << " frac. pos: "
+        fields[type_field].erase(remove_if(fields[label_field].begin(), fields[label_field].end(), ::isspace), fields[label_field].end());
+        if (debug) file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
           << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
           << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
           << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
@@ -400,8 +404,10 @@ void read_atoms_from_CIF(ifstream& cif_input,
             string element = atnr2letter(wave.get_atom_charge(i));
             err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
             string label = fields[label_field];
+            string type = fields[type_field];
             transform(element.begin(), element.end(), element.begin(), asciitolower);
             transform(label.begin(), label.end(), label.begin(), asciitolower);
+            transform(type.begin(), type.end(), type.begin(), asciitolower);
             if (debug) {
               file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
                 << fixed << setprecision(3) << setw(16) << wave.atoms[i].x << " "
@@ -431,12 +437,32 @@ void read_atoms_from_CIF(ifstream& cif_input,
             }
             if (label.find(element) == string::npos) {
               if (element != "h") {
-                if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
-                continue;
+                if (debug) {
+                  file << "\nElement symbol not found in label, this is a problem!\n checking type...";
+                  if (type.find(element) == string::npos) {
+                    file << " ALSO FAILED! WILL IGNORE ATOM!\n";
+                    continue;
+                  }
+                }
+                else {
+                  if (type.find(element) == string::npos) {
+                    continue;
+                  }
+                }
               }
               else if (label.find("d") == string::npos && label.find("t") == string::npos) {
-                if (debug) file << "Element symbol not found in label, this is a problem!" << endl;
-                continue;
+                if (debug) {
+                  file << "\nElement symbol not found in label, this is a problem!\n will check type...";
+                  if (type.find(element) == string::npos) {
+                    file << " ALSO FAILED! WILL IGNORE ATOM!\n";
+                    continue;
+                  }
+                }
+                else {
+                  if (type.find(element) == string::npos) {
+                    continue;
+                  }
+                }
               }
             }
             wave.atoms[i].label = fields[label_field];
@@ -2624,10 +2650,11 @@ int make_hirshfeld_grids_RI(
       start_p += num_points[a];
     for (int p = start_p; p < start_p + num_points[i]; p++) {
       if (abs(total_grid[6][p]) > _cutoff) {
-        atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
-        atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
+        atom_els[0][i] += total_grid[6][p] * total_grid[5][p]; //Molecular grid * WFN rho
+        atom_els[1][i] += total_grid[6][p] * total_grid[4][p]; //Molecular grid * spheircal rho
       }
       if (total_grid[4][p] != 0) {
+                           //WFN rho * atomic weight * hirshfeld weight
         atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
       }
     }
