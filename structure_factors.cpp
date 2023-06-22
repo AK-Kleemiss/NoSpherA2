@@ -3348,7 +3348,6 @@ int make_integration_grids_SALTED(
   time_t& start,
   time_t& end_becke,
   time_t& end_prototypes,
-  time_t& end_spherical,
   time_t& end_prune,
   time_t& end_aspherical,
 #else
@@ -3669,14 +3668,6 @@ int make_integration_grids_SALTED(
 
   int type_list_number = -1;
 
-#ifdef _WIN64
-  if (debug) {
-    file << "Taking time..." << endl;
-  }
-  end_spherical = time(NULL);
-
-#endif
-
   double _cutoff;
   if (accuracy < 3)
     _cutoff = 1E-10;
@@ -3685,9 +3676,8 @@ int make_integration_grids_SALTED(
   else
     _cutoff = 1E-30;
   vector<int> new_gridsize(atoms_with_grids, 0);
-  vector<int> reductions(atoms_with_grids, 0);
   int final_size = 0;
-  bool prune = true;
+  bool prune = false;
   if (prune) {
     file << "Pruning Grid..." << flush;
 #pragma omp parallel for reduction(+:final_size)
@@ -3697,7 +3687,6 @@ int make_integration_grids_SALTED(
           new_gridsize[i]++;
         }
       }
-      reductions[i] = num_points[i] - new_gridsize[i];
       final_size += new_gridsize[i];
     }
     for (int k = 0; k < total_grid.size(); k++)
@@ -3727,13 +3716,14 @@ int make_integration_grids_SALTED(
       for (int p = 0; p < num_points[i]; p++) {
         for (int k = 0; k < 4; k++)
           total_grid[k].push_back(grid[i][k][p]);
+        total_grid[4].push_back(0);
       }
       shrink_vector<vec>(grid[i]);
     }
   }
   shrink_vector<vector<vec>>(grid);
   points = 0;
-  for (int i = 0; i < asym_atom_list.size(); i++)
+  for (int i = 0; i < atoms_with_grids; i++)
     points += num_points[i];
 
   file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
@@ -4851,7 +4841,6 @@ bool calculate_structure_factors_RI_No_H(
       start,
       end_becke,
       end_prototypes,
-      end_spherical,
       end_prune,
       end_aspherical,
 #else

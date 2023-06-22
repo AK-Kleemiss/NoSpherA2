@@ -148,10 +148,7 @@ AtomGrid::~AtomGrid() {}
 
 int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(); }
 
-int AtomGrid::get_num_radial_grid_points() const
-{
-  return num_radial_grid_points_;
-}
+int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
 void AtomGrid::get_grid(const int num_centers,
   const int center_index,
