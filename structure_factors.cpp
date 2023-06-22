@@ -446,6 +446,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
                 }
                 else {
                   if (type.find(element) == string::npos) {
+                    file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
                     continue;
                   }
                 }
@@ -460,6 +461,7 @@ void read_atoms_from_CIF(ifstream& cif_input,
                 }
                 else {
                   if (type.find(element) == string::npos) {
+                    file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
                     continue;
                   }
                 }
