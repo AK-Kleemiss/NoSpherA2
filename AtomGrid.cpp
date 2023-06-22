@@ -39,9 +39,9 @@ AtomGrid::AtomGrid(const double radial_precision,
   std::ostream& file)
 {
   using namespace std;
-  int min_num_angular_points_closest =
+  const int min_num_angular_points_closest =
     get_closest_num_angular(min_num_angular_points);
-  int max_num_angular_points_closest =
+  const int max_num_angular_points_closest =
     get_closest_num_angular(max_num_angular_points);
   err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
@@ -62,7 +62,7 @@ AtomGrid::AtomGrid(const double radial_precision,
   }
 
   // radial parameters
-  double r_inner = get_r_inner(radial_precision, alpha_max * 2.0); // factor 2.0 to match DIRAC
+  const double r_inner = get_r_inner(radial_precision, alpha_max * 2.0); // factor 2.0 to match DIRAC
   double h = (std::numeric_limits<double>::max)();
   double r_outer = 0.0;
 
@@ -94,9 +94,9 @@ AtomGrid::AtomGrid(const double radial_precision,
 
   num_radial_grid_points_ = 0;
 
-  double rb = bragg_angstrom[proton_charge] / (5.0 * 0.529177249);
-  double c = r_inner / (exp(h) - 1.0);
-  int num_radial = int(log(1.0 + (r_outer / c)) / h);
+  const double rb = bragg_angstrom[proton_charge] / (5.0 * 0.529177249);
+  const double c = r_inner / (exp(h) - 1.0);
+  const int num_radial = int(log(1.0 + (r_outer / c)) / h);
 
   //if (debug)
   //  file << "ATOM GRID: "
@@ -106,8 +106,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 
   for (int irad = 0; irad < num_radial; irad++) {
     double radial_r = c * (exp(double(irad + 1.0) * h) - 1.0);
-    double radial_w;
-    radial_w = (radial_r + c) * radial_r * radial_r * h;
+    double radial_w = (radial_r + c) * radial_r * radial_r * h;
 
     radial_atom_grid_r_bohr_.push_back(radial_r);
     radial_atom_grid_w_.push_back(radial_w);
@@ -125,18 +124,22 @@ AtomGrid::AtomGrid(const double radial_precision,
 
     angular_off = get_angular_order(num_angular) * MAG;
     err_checkf(angular_off != -MAG, "Invalid angular order!", file);
-    int start = (int) atom_grid_x_bohr_.size();
-    atom_grid_x_bohr_.resize(start + num_angular);
-    atom_grid_y_bohr_.resize(start + num_angular);
-    atom_grid_z_bohr_.resize(start + num_angular);
-    atom_grid_w_.resize(start + num_angular);
-#pragma omp parallel for
-    for (int iang = start; iang < start + num_angular; iang++) {
-      atom_grid_x_bohr_[iang] = angular_x[angular_off + iang - start] * radial_r;
-      atom_grid_y_bohr_[iang] = angular_y[angular_off + iang - start] * radial_r;
-      atom_grid_z_bohr_[iang] = angular_z[angular_off + iang - start] * radial_r;
+    const int start = (int) atom_grid_x_bohr_.size();
+    angular_off -= start;
+    const int size = start + num_angular;
+    int p = 0;
+    atom_grid_x_bohr_.resize(size);
+    atom_grid_y_bohr_.resize(size);
+    atom_grid_z_bohr_.resize(size);
+    atom_grid_w_.resize(size);
+#pragma omp parallel for private(p)
+    for (int iang = start; iang < size; iang++) {
+      p = angular_off + iang;
+      atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
+      atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
+      atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
 
-      atom_grid_w_[iang] = 4.0 * PI * angular_w[angular_off + iang - start] * radial_w;
+      atom_grid_w_[iang] = FOUR_PI * angular_w[p] * radial_w;
     }
   }
 }
