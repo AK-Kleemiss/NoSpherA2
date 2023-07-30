@@ -2607,6 +2607,34 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
         err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
       break;
+    case 6:
+      switch (m) {
+      case 0: //I Z^6
+        SH = c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z,2) - 5); break;
+      case 1:
+        SH = c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+      case -1:
+        SH = c_165_256p * 2*y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+      case 2:
+        SH = c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
+      case -2:
+        SH = c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
+      case 3:
+        SH = c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+      case -3:
+        SH = c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+      case 4:
+        SH = c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z; break;
+      case -4:
+        SH = -c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
+      case 5:
+        SH = c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4)); break;
+      case -5:
+        SH = c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4)); break;
+      default:
+        err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+      }
+      break;
     default:
       err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
   }
