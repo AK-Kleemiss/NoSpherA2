@@ -3979,7 +3979,7 @@ double WFN::compute_MO_spherical(
   err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
   err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   int iat;
-  int l;
+  int l = 0;
   //ex will carry information about radial function
   double ex;
   vector<vec> d(5);
