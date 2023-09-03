@@ -1243,8 +1243,8 @@ const double normgauss(const int& type, const double& exp)
     type2vector(type, t);
   else
     t[0] = t[1] = t[2] = 0;
-  int temp = ft[t[0]] * ft[t[1]] * ft[t[2]];
-  int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
+  long long int temp = ft[t[0]] * ft[t[1]] * ft[t[2]];
+  long long int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
   return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
 bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector<vec>& g) {
