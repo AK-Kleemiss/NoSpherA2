@@ -15,6 +15,7 @@ struct basis_set_entry{
 	basis_set_entry operator=(const basis_set_entry &rhs);
 	basis_set_entry();
 	basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
+	bool operator==(const basis_set_entry& other) const;
 };
 
 inline basis_set_entry::basis_set_entry(){
@@ -37,6 +38,13 @@ inline basis_set_entry basis_set_entry::operator=(const basis_set_entry &rhs){
 	type = rhs.type;
 	return *this;
 };
+
+inline bool basis_set_entry::operator==(const basis_set_entry& other) const {
+	return coefficient == other.coefficient &&
+		exponent == other.exponent &&
+		type == other.type &&
+		shell == other.shell;
+}
 
 struct atom {
 	std::string label;
@@ -63,7 +71,7 @@ struct atom {
 	//[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
 	std::vector<vec> ADPs;
 
-	bool operator==(const atom& other) const = default;
+	bool operator==(const atom& other) const;
 };
 
 inline atom::atom() {
@@ -206,3 +214,21 @@ inline void atom::assign_ADPs(vec &second, vec &third, vec &fourth) {
 		ADPs[2] = fourth;
 	}
 };
+
+inline bool atom::operator==(const atom& other) const {
+	if (this == &other) {
+		return true;
+	}
+
+	return label == other.label &&
+		nr == other.nr &&
+		charge == other.charge &&
+		ECP_electrons == other.ECP_electrons &&
+		x == other.x &&
+		y == other.y &&
+		z == other.z &&
+		frac_coords == other.frac_coords &&
+		basis_set == other.basis_set &&
+		shellcount == other.shellcount &&
+		ADPs == other.ADPs;
+}
