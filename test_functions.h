@@ -502,7 +502,7 @@ double numerical_3d_integral(std::function<double(double*)> f, double stepsize =
   double da = stepsize * PI;
   double dr = stepsize;
   int upper = int(TWO_PI / da);
-  long long int total_calcs = upper * long long int(PI / da * r_max / dr);
+  long long int total_calcs = upper * (long long int)(PI / da * r_max / dr);
   std::cout << "Integrating over " << total_calcs << " points" << std::endl;
 
   progress_bar* progress = new progress_bar{ std::cout, 50u, "Integrating" };
