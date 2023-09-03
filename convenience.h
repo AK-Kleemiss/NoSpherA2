@@ -991,5 +991,12 @@ inline cdouble hypergeometric(double a, double b, double c, cdouble x)
   return value;
 }
 
+inline bool ends_with(const std::string& str, const std::string& suffix) {
+    if (str.length() >= suffix.length()) {
+        return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
+    }
+    return false;
+}
+
 #include "wfn_class.h"
 #include "atoms.h"

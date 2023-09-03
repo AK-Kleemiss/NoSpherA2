@@ -355,7 +355,7 @@ inline bool merge_tscs(
   indices.resize(3);
   for (int f = 0; f < files.size(); f++) {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    if (files[f].ends_with(".tscb")) {
+    if (ends_with(files[f],".tscb")) {
       std::string name = files[f];
       std::string new_name = get_basename_without_ending(name) + ".tsc";
       std::cout << "Converting to: " << new_name << std::endl;
@@ -514,7 +514,7 @@ inline bool merge_tscs_without_checks(
   indices.resize(3);
   for (int f = 0; f < files.size(); f++) {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    if (files[f].ends_with(".tscb")) {
+    if (ends_with(files[f],".tscb")) {
       std::string name = files[f];
       std::string new_name = get_basename_without_ending(name) + ".tsc";
       std::cout << "Converting to: " << new_name << std::endl;
