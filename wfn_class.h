@@ -56,9 +56,9 @@ private:
   bool distance_switch;
   bool has_ECPs;
   //precomputed factors and helper functions for ESP calc
-  int pre[9][5][5][9];
+  long long int pre[9][5][5][9];
   void fill_pre();
-  int Afac_pre[9][5][9];
+  long long int Afac_pre[9][5][9];
   void fill_Afac_pre();
   double fj(int& j, int& l, int& m, double& aa, double& bb);
   double Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtmp);
@@ -186,7 +186,7 @@ public:
   int get_atom_charge(const int& nr) const;
   unsigned int get_atom_integer_mass(const unsigned int& atomnr) const;
   double get_atom_real_mass(const int& atomnr) const;
-  atom get_atom(const unsigned int& nr) const;
+  atom get_atom(const int& nr) const;
   //----------Calcualtion of Properties
   //double compute_dens(const double* PosGrid, const int atom = -1);
   //This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones

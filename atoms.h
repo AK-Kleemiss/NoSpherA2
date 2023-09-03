@@ -36,6 +36,7 @@ inline basis_set_entry basis_set_entry::operator=(const basis_set_entry &rhs){
 	coefficient = rhs.coefficient;
 	exponent = rhs.exponent;
 	type = rhs.type;
+	shell = rhs.shell;
 	return *this;
 };
 
@@ -46,7 +47,8 @@ inline bool basis_set_entry::operator==(const basis_set_entry& other) const {
 		shell == other.shell;
 }
 
-struct atom {
+class atom {
+public:
 	std::string label;
 	int nr, charge, ECP_electrons;
 	double x, y, z;
