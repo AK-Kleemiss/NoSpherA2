@@ -3162,8 +3162,8 @@ double WFN::get_atom_real_mass(const int& atomnr) const
   return real_masses[get_atom_charge(atomnr) - 1];
 }
 
-atom WFN::get_atom(const unsigned int& nr) const {
-  err_checkf(nr <= ncen, "Error, selected atom index higehr than wavefunction!", cout);
+atom WFN::get_atom(const int& nr) const {
+  err_checkf(nr <= ncen && nr > 0, "Error, selected atom index higehr than wavefunction!", cout);
   return atoms[nr];
 }
 
