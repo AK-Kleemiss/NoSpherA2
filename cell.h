@@ -40,7 +40,7 @@ public:
       file << "RCM done!" << std::endl;
       for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j)
-          file << std::setw(10) << std::fixed << get_rcm(i, j) / TWO_PI / 0.529177249 << ' ';
+          file << std::setw(10) << std::fixed << get_rcm(i, j) / constants::TWO_PI / 0.529177249 << ' ';
         file << std::endl;
       }
       file << "CM in 2*PI bohr:" << std::endl;
@@ -62,8 +62,8 @@ public:
   double get_sg() { return sg; };
   double get_rcm(int i, int j) const { return rcm[i][j]; };
   double get_cm(int i, int j) const { return cm[i][j]; };
-  double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / TWO_PI; };
-  double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / TWO_PI; };
+  double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };
+  double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / constants::TWO_PI; };
   double get_sym(int i, int j, int k) const  { return sym[i][j][k]; };
   std::vector <std::vector < std::vector<int>>> get_sym() const { return sym; };
   double get_a() const { return a; };
@@ -92,13 +92,13 @@ public:
   {
     switch (i) {
     case 0:
-      return alpha * PI_180;
+      return alpha * constants::PI_180;
       break;
     case 1:
-      return beta * PI_180;
+      return beta * constants::PI_180;
       break;
     case 2:
-      return gamma * PI_180;
+      return gamma * constants::PI_180;
       break;
     default:
       std::cout << "Wrong angle!" << std::endl;
@@ -163,7 +163,7 @@ public:
     positions_cart[2] = V / (a * b * sg) * frac_z;
     if (in_bohr)
       for (int i = 0; i < 3; i++)
-        positions_cart[i] = ang2bohr(positions_cart[i]);
+        positions_cart[i] = constants::ang2bohr(positions_cart[i]);
   }
 
   std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
@@ -174,7 +174,7 @@ public:
     positions_cart[2] = V / (a * b * sg) * frac_z;
     if (in_bohr)
       for (int i = 0; i < 3; i++)
-        positions_cart[i] = ang2bohr(positions_cart[i]);
+        positions_cart[i] = constants::ang2bohr(positions_cart[i]);
     return positions_cart;
   }
 
@@ -233,12 +233,12 @@ public:
       if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
         break;
     }
-    ca = cos(PI_180 * alpha);
-    cb = cos(PI_180 * beta);
-    cg = cos(PI_180 * gamma);
-    sa = sin(PI_180 * alpha);
-    sb = sin(PI_180 * beta);
-    sg = sin(PI_180 * gamma);
+    ca = cos(constants::PI_180 * alpha);
+    cb = cos(constants::PI_180 * beta);
+    cg = cos(constants::PI_180 * gamma);
+    sa = sin(constants::PI_180 * alpha);
+    sb = sin(constants::PI_180 * beta);
+    sg = sin(constants::PI_180 * gamma);
     V = a * b * c * sqrt(1 + 2 * ca * cb * cg - ca * ca - cb * cb - cg * cg);
     if (V / v > 1.1 || V / v < 0.9) {
       file << "Volume computed is more than 10% off, please check!" << std::endl;
@@ -265,17 +265,17 @@ public:
     cm[2][1] = sqrt(abs(b * c * cb)) * pow(-1, 1 + (cb > 0));
     cm[2][2] = c;
 
-    rcm[0][0] = TWO_PI / a;
+    rcm[0][0] = constants::TWO_PI / a;
     rcm[0][1] = 0;
     rcm[0][2] = 0;
 
-    rcm[1][0] = TWO_PI * -cg / (a * sg);
-    rcm[1][1] = TWO_PI * 1 / (b * sg);
+    rcm[1][0] = constants::TWO_PI * -cg / (a * sg);
+    rcm[1][1] = constants::TWO_PI * 1 / (b * sg);
     rcm[1][2] = 0;
 
-    rcm[2][0] = TWO_PI * b * c * (ca * cg - cb) / V / sg;
-    rcm[2][1] = TWO_PI * a * c * (cb * cg - ca) / V / sg;
-    rcm[2][2] = TWO_PI * a * b * sg / V;
+    rcm[2][0] = constants::TWO_PI * b * c * (ca * cg - cb) / V / sg;
+    rcm[2][1] = constants::TWO_PI * a * c * (cb * cg - ca) / V / sg;
+    rcm[2][2] = constants::TWO_PI * a * b * sg / V;
 
     upper = 1 - pow(ca, 2) - pow(cb, 2) - pow(cg, 2) + 2 * ca * cb * cg;
 
@@ -286,8 +286,8 @@ public:
           //cm[i][j] = 0.0;
         }
         else {
-          rcm[i][j] = bohr2ang(rcm[i][j]);
-          cm[i][j] = bohr2ang(cm[i][j]);
+          rcm[i][j] = constants::bohr2ang(rcm[i][j]);
+          cm[i][j] = constants::bohr2ang(cm[i][j]);
         }
 
     cif_input.close();

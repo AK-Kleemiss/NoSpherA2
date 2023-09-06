@@ -80,7 +80,7 @@ int main(int argc, char** argv)
         MinMax[i] = MinMax2[i];
       if (MinMax2[i + 3] > MinMax[i + 3])
         MinMax[i + 3] = MinMax2[i + 3];
-      steps[i] = (int)ceil(bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
+      steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
     }
     int counter = 0;
     cube total(steps[0], steps[1], steps[2], 0, true);

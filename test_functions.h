@@ -13,7 +13,7 @@ void thakkar_d_test(options& opt) {
   if (!opt.electron_diffraction) {
     ofstream result("thakkar.dat", ios::out);
     for (double i = 0.001; i <= 4.0; i += 0.001) {
-      k_value = bohr2ang(FOUR_PI * i);
+      k_value = constants::bohr2ang(constants::FOUR_PI * i);
       result << showpos << setw(6) << setprecision(3) << fixed << i;
       result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor(k_value);
       result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor(k_value);
@@ -37,7 +37,7 @@ void thakkar_d_test(options& opt) {
   else {
     ofstream result("thakkar_ED.dat", ios::out);
     for (double i = 0.001; i <= 4.0; i += 0.001) {
-      k_value = bohr2ang(FOUR_PI * i);
+      k_value = constants::bohr2ang(constants::FOUR_PI * i);
       result << showpos << setw(6) << setprecision(3) << fixed << i;
       complex<double> temp = H.get_form_factor(k_value);
       result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(1, temp, i).real();
@@ -310,8 +310,8 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
   const int size = 4000;
   const int phi_size = 50;
   const int theta_size = 50;
-  const double phi_step = 360.0 / phi_size * PI_180;
-  const double theta_step = 180.0 / phi_size * PI_180;
+  const double phi_step = 360.0 / phi_size * constants::PI_180;
+  const double theta_step = 180.0 / phi_size * constants::PI_180;
 
   //This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
   // by iterating over both spherical angles by a fixed step defined above
@@ -327,7 +327,7 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
     for (int p = 0; p < phi_size; p++) {
       for (int t = 0; t < theta_size; t++) {
         int ind = t + (p + (ref - 1) * phi_size) * theta_size;
-        double k_length = bohr2ang(FOUR_PI * ref / size * opt.sfac_scan);
+        double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.sfac_scan);
         k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
         k_pt[1][ind] = k_length * sin(t * theta_step) * sin(p * phi_step);
         k_pt[2][ind] = k_length * cos(t * theta_step);
@@ -379,7 +379,7 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
     log_file.flush();
     //Now we just need to write the result to a file, together with the spherical results and separated for valence and core
     for (int i = 0; i < k_pt[0].size(); i++) {
-      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][i] / FOUR_PI);
+      result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
       result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]));
       result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]));
       result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor((k_pt[3][i]));
@@ -399,10 +399,10 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
     const double fact = 0.023934;
     double h2;
     for (int s = 0; s < k_pt[0].size(); s++) {
-      h2 = pow(ang2bohr(k_pt[3][s] / FOUR_PI), 2);
+      h2 = pow(constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI), 2);
       sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
 
-      result << showpos << setw(8) << setprecision(5) << fixed << ang2bohr(k_pt[3][s] / FOUR_PI);
+      result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI);
       double temp = fact * (wavy[0].get_atom_charge(0) - O.get_form_factor(k_pt[3][s])) / h2;
       result << showpos << setw(16) << setprecision(8) << scientific << temp;
       temp = fact * (wavy[0].get_atom_charge(0) - O_an.get_form_factor(k_pt[3][s])) / h2;
@@ -499,10 +499,10 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef, int atom=-1) {
 
 double numerical_3d_integral(std::function<double(double*)> f, double stepsize = 0.001, double r_max = 10.0) {
   double tot_int = 0;
-  double da = stepsize * PI;
+  double da = stepsize * constants::PI;
   double dr = stepsize;
-  int upper = int(TWO_PI / da);
-  long long int total_calcs = upper * (long long int)(PI / da * r_max / dr);
+  int upper = int(constants::TWO_PI / da);
+  long long int total_calcs = upper * (long long int)(constants::PI / da * r_max / dr);
   std::cout << "Integrating over " << total_calcs << " points" << std::endl;
 
   progress_bar* progress = new progress_bar{ std::cout, 50u, "Integrating" };
@@ -513,7 +513,7 @@ double numerical_3d_integral(std::function<double(double*)> f, double stepsize =
     double phi = phic * da;
     double cp = std::cos(phi);
     double sp = std::sin(phi);
-    for (double theta = 0; theta <= PI; theta += da) {
+    for (double theta = 0; theta <= constants::PI; theta += da) {
       double st = std::sin(theta);
       double ct = std::cos(theta);
       double x0 = st * cp, y0 = st * sp;
