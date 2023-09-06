@@ -48,19 +48,16 @@ tsc_block calculate_structure_factors_MTC(
   const int& nr,
   std::vector<vec>* kpts=NULL);
 
-std::complex<double> convert_to_ED_single(const int& charge,
-  std::complex<double>& sf,
-  const double& k_vector);
-
+template <typename NumType>
 std::complex<double> convert_to_ED_single(const int& neutralcharge,
-  const int& charge,
-  std::complex<double>& sf,
-  const double& k_vector);
-
-std::complex<double> convert_to_ED_single(const int& neutralcharge,
-  const double& charge,
-  std::complex<double>& sf,
-  const double& k_vector);
+	std::complex<double>& sf,
+	const double& k_vector,
+	const NumType& charge = 0) {
+	const double h2 = pow(k_vector, 2);
+	std::complex<double> neutral(ED_fact * (neutralcharge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
+	if (charge == 0) return neutral;
+	return neutral + ED_fact * charge / h2;
+}
 
 void read_atoms_from_CIF(std::ifstream& cif_input,
   const std::vector <int>& input_groups,
