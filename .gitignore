@@ -40,44 +40,6 @@ tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
 Windows/.vs/NoSpherA2/v16/.suo
 *.deps
 *.pch
-NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.d.json
-NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.module.json
-NoSpherA2_DLL/x64/Release/std.compat.ixx.ifc.dt.module.json.command
-NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.d.json
-NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.module.json
-NoSpherA2_DLL/x64/Release/std.ixx.ifc.dt.module.json.command
-Windows/x64/D_SH/std.compat.ixx.ifc
-Windows/x64/D_SH/std.compat.ixx.ifc.d.json
-Windows/x64/D_SH/std.compat.ixx.module.json
-Windows/x64/D_SH/std.ixx.ifc
-Windows/x64/D_SH/std.ixx.ifc.d.json
-Windows/x64/D_SH/std.ixx.module.json
-Windows/x64/Release + Copy/std.compat.ixx.ifc
-Windows/x64/Release + Copy/std.compat.ixx.ifc.d.json
-Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.d.json
-Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.module.json
-Windows/x64/Release + Copy/std.compat.ixx.ifc.dt.module.json.command
-Windows/x64/Release + Copy/std.compat.ixx.module.json
-Windows/x64/Release + Copy/std.ixx.ifc
-Windows/x64/Release + Copy/std.ixx.ifc.d.json
-Windows/x64/Release + Copy/std.ixx.ifc.dt.d.json
-Windows/x64/Release + Copy/std.ixx.ifc.dt.module.json
-Windows/x64/Release + Copy/std.ixx.ifc.dt.module.json.command
-Windows/x64/Release + Copy/std.ixx.module.json
-Windows_cuda/x64/Release/std.compat.ixx.ifc.dt.module.json.command
-Windows_cuda/x64/Release/std.ixx.ifc.dt.module.json.command
-Windows/x64/D_ML/std.compat.ixx.ifc
-Windows/x64/D_ML/std.compat.ixx.ifc.d.json
-Windows/x64/D_ML/std.compat.ixx.module.json
-Windows/x64/D_ML/std.ixx.ifc
-Windows/x64/D_ML/std.ixx.ifc.d.json
-Windows/x64/D_ML/std.ixx.module.json
-NoSpherA2_DLL/x64/D_ML/std.compat.ixx.ifc.dt.d.json
-NoSpherA2_DLL/x64/D_ML/std.compat.ixx.ifc.dt.module.json
-NoSpherA2_DLL/x64/D_ML/std.compat.ixx.ifc.dt.module.json.command
-NoSpherA2_DLL/x64/D_ML/std.ixx.ifc.dt.d.json
-NoSpherA2_DLL/x64/D_ML/std.ixx.ifc.dt.module.json
-NoSpherA2_DLL/x64/D_ML/std.ixx.ifc.dt.module.json.command
 tests/reading_SALTED/alanine_rho.cube
 tests/reading_SALTED/ORCA/water_monomer.densities
 tests/reading_SALTED/ORCA/water_monomer.gbw
@@ -88,21 +50,5 @@ tests/reading_SALTED/ORCA/water_monomer_property.txt
 tests/reading_SALTED/visualize water
 tests/reading_SALTED/water_monomer_rho.cube
 tests/reading_SALTED/water_rho.cube
-Windows/x64/D_ML/std.compat.ixx.ifc.dt.d.json
-Windows/x64/D_ML/std.compat.ixx.ifc.dt.module.json
-Windows/x64/D_ML/std.compat.ixx.ifc.dt.module.json.command
-Windows/x64/D_ML/std.ixx.ifc.dt.d.json
-Windows/x64/D_ML/std.ixx.ifc.dt.module.json
-Windows/x64/D_ML/std.ixx.ifc.dt.module.json.command
-Windows_cuda/x64/D_ML/std.compat.ixx.ifc.dt.d.json
-Windows_cuda/x64/D_ML/std.compat.ixx.ifc.dt.module.json
-Windows_cuda/x64/D_ML/std.compat.ixx.ifc.dt.module.json.command
-Windows_cuda/x64/D_ML/std.ixx.ifc.dt.d.json
-Windows_cuda/x64/D_ML/std.ixx.ifc.dt.module.json
-Windows_cuda/x64/D_ML/std.ixx.ifc.dt.module.json.command
-Windows/x64/D_SALTED_tsc/std.compat.ixx.ifc
-Windows/x64/D_SALTED_tsc/std.compat.ixx.ifc.d.json
-Windows/x64/D_SALTED_tsc/std.compat.ixx.module.json
-Windows/x64/D_SALTED_tsc/std.ixx.ifc
-Windows/x64/D_SALTED_tsc/std.ixx.ifc.d.json
-Windows/x64/D_SALTED_tsc/std.ixx.module.json
+*std.compat.ixx*
+*std.ixx*
