@@ -46,22 +46,6 @@ double linear_interpolate_spherical_density(
 }
 #endif
 
-std::complex<double> convert_to_ED_single(const int& charge, std::complex<double>& sf, const double& k_vector) {
-  const double h2 = pow(k_vector, 2);
-  return std::complex<double>(ED_fact * (charge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
-}
-
-std::complex<double> convert_to_ED_single(const int& neutralcharge, const int& charge, std::complex<double>& sf, const double& k_vector) {
-  const double h2 = pow(k_vector, 2);
-  std::complex<double> neutral(ED_fact * (neutralcharge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
-  return neutral + ED_fact*charge/h2;
-}
-std::complex<double> convert_to_ED_single(const int& neutralcharge, const double& charge, std::complex<double>& sf, const double& k_vector) {
-  const double h2 = pow(k_vector, 2);
-  std::complex<double> neutral(ED_fact * (neutralcharge - sf.real()) / h2, -ED_fact * sf.imag() / h2);
-  return neutral + ED_fact * charge / h2;
-}
-
 void read_k_points(vector<vec>& k_pt, hkl_list& hkl, ostream& file)
 {
   err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
@@ -4780,7 +4764,7 @@ bool calculate_structure_factors_RI_No_H(
 
 #ifdef _WIN64
   time_t start = time(NULL);
-  time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+  time_t end_becke=0, end_prototypes=0, end_spherical=0, end_prune=0, end_aspherical=0, end1=0;
 #else
   struct timeval t1, t2;
 
