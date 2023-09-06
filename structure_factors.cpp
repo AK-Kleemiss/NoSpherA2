@@ -742,73 +742,73 @@ int make_hirshfeld_grids(const int& pbc,
     err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
     if (accuracy == 0) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-3;
       }
     }
     else if (accuracy == 1) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
         radial_acc = 1e-5;
       }
     }
     else if (accuracy == 2) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
         radial_acc = 1e-5;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
         radial_acc = 1e-6;
       }
     }
     else if (accuracy == 3) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
         radial_acc = 1e-10;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
         radial_acc = 1e-11;
       }
     }
     else if (accuracy == 4) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
         radial_acc = 1e-15;
       }
     }
     else {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[30] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[28] : lebedev_table[30];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
         radial_acc = 1e-15;
       }
     }
@@ -2208,73 +2208,73 @@ int make_hirshfeld_grids_RI(
     err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
     if (accuracy == 0) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-3;
       }
     }
     else if (accuracy == 1) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
         radial_acc = 1e-5;
       }
     }
     else if (accuracy == 2) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
         radial_acc = 1e-5;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
         radial_acc = 1e-6;
       }
     }
     else if (accuracy == 3) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
         radial_acc = 1e-10;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
         radial_acc = 1e-11;
       }
     }
     else if (accuracy == 4) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
         radial_acc = 1e-15;
       }
     }
     else {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[30] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[28] : lebedev_table[30];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
         radial_acc = 1e-15;
       }
     }
@@ -2927,73 +2927,73 @@ int make_integration_grids(
     err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
     if (accuracy == 0) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-3;
       }
     }
     else if (accuracy == 1) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
         radial_acc = 1e-5;
       }
     }
     else if (accuracy == 2) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
         radial_acc = 1e-5;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
         radial_acc = 1e-6;
       }
     }
     else if (accuracy == 3) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
         radial_acc = 1e-10;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
         radial_acc = 1e-11;
       }
     }
     else if (accuracy == 4) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
         radial_acc = 1e-15;
       }
     }
     else {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[30] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[28] : lebedev_table[30];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
         radial_acc = 1e-15;
       }
     }
@@ -3481,73 +3481,73 @@ int make_integration_grids_SALTED(
     err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
     if (accuracy == 0) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[0] : lebedev_table[1];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
         radial_acc = 1e-3;
       }
     }
     else if (accuracy == 1) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[3] : lebedev_table[4];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
         radial_acc = 1e-4;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[2] : lebedev_table[3];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
         radial_acc = 1e-5;
       }
     }
     else if (accuracy == 2) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[12];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[7] : lebedev_table[8];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
         radial_acc = 1e-5;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[10] : lebedev_table[11];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[6] : lebedev_table[7];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
         radial_acc = 1e-6;
       }
     }
     else if (accuracy == 3) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[16];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[12] : lebedev_table[14];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
         radial_acc = 1e-10;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[15];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[11] : lebedev_table[13];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
         radial_acc = 1e-11;
       }
     }
     else if (accuracy == 4) {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[19] : lebedev_table[21];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[14] : lebedev_table[17];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[18] : lebedev_table[20];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[13] : lebedev_table[16];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
         radial_acc = 1e-15;
       }
     }
     else {
       if (atom_type_list[i] != 1) {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[31] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[29] : lebedev_table[31];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
         radial_acc = 1e-20;
       }
       else {
-        lebedev_high = (max_l_temp < 3) ? lebedev_table[30] : lebedev_table[32];
-        lebedev_low = (max_l_temp < 3) ? lebedev_table[28] : lebedev_table[30];
+        lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
+        lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
         radial_acc = 1e-15;
       }
     }
@@ -4011,14 +4011,14 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
         << scientific << setw(14) << setprecision(8)
         << wave.atoms[asym_atom_list[i]].ECP_electrons
-        << " and at 1 angstrom: " << exp(-pow(bohr2ang(k), 2) / 16.0 / PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+        << " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
 #pragma omp parallel for private(it, k)
     for (int s = 0; s < sf[0].size(); s++) {
       it = next(hkl.begin(), s);
-      k = FOUR_PI * cell.get_stl_of_hkl(*it);
+      k = constants::FOUR_PI * cell.get_stl_of_hkl(*it);
       for (int i = 0; i < asym_atom_list.size(); i++) {
-        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16.0 / PI);
+        sf[i][s] += wave.atoms[asym_atom_list[i]].ECP_electrons * exp(-k / 16.0 / constants::PI);
       }
     }
   }
@@ -4028,7 +4028,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
       if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0) {
         double k_0001 = temp[i].get_core_form_factor(0, wave.atoms[asym_atom_list[i]].ECP_electrons);
-        double k_1 = temp[i].get_core_form_factor(FOUR_PI * bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons);
+        double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons);
         file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0): "
           << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
       }
@@ -4037,7 +4037,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
 #pragma omp parallel for private(it, k)
     for (int s = 0; s < sf[0].size(); s++) {
       it = next(hkl.begin(), s);
-      k = FOUR_PI * bohr2ang(cell.get_stl_of_hkl(*it));
+      k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
       for (int i = 0; i < asym_atom_list.size(); i++) {
         sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
       }
@@ -4061,7 +4061,7 @@ void convert_to_ED(const std::vector <int>& asym_atom_list,
     it = next(hkl.begin(), s);
     h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
     for (int i = 0; i < asym_atom_list.size(); i++)
-      sf[i][s] = std::complex<double>(ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -ED_fact * sf[i][s].imag() / h2);
+      sf[i][s] = std::complex<double>(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
   }
 }
 
@@ -4224,7 +4224,7 @@ bool thakkar_sfac(
 #pragma omp parallel for private(it)
   for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
-    double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
+    double k = constants::bohr2ang(constants::FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
   }
@@ -4236,7 +4236,7 @@ bool thakkar_sfac(
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf[i][s]) / h2;
+        sf[i][s] = constants::ED_fact * (atom_type_list[asym_atom_to_type_list[i]] - sf[i][s]) / h2;
     }
   }
 
@@ -4339,7 +4339,7 @@ tsc_block MTC_thakkar_sfac(
 #pragma omp parallel for private(it)
   for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
-    double k = bohr2ang(FOUR_PI*unit_cell.get_stl_of_hkl(*it));
+    double k = constants::bohr2ang(constants::FOUR_PI*unit_cell.get_stl_of_hkl(*it));
     for (int i = 0; i < imax; i++)
       sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
   }
@@ -4351,7 +4351,7 @@ tsc_block MTC_thakkar_sfac(
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = ED_fact * (atom_type_list[i] - sf[i][s]) / h2;
+        sf[i][s] = constants::ED_fact * (atom_type_list[i] - sf[i][s]) / h2;
     }
   }
 

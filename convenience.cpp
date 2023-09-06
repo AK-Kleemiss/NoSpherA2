@@ -1069,7 +1069,7 @@ void readxyzMinMax_fromWFN(
     if (!bohrang) {
       cout << "Dividing atom positions!" << endl;
       for(int i=0; i<3; i++)
-        PosAtoms[j][i] = ang2bohr(PosAtoms[j][i]);
+        PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
     }
     if (j == 0)
     {
@@ -1100,7 +1100,7 @@ void readxyzMinMax_fromWFN(
     }
     j++;
   }
-  double temp_rad = ang2bohr(Radius);
+  double temp_rad = constants::ang2bohr(Radius);
   CoordMinMax[0] -= temp_rad;
   CoordMinMax[3] += temp_rad;
   CoordMinMax[1] -= temp_rad;
@@ -1108,9 +1108,9 @@ void readxyzMinMax_fromWFN(
   CoordMinMax[2] -= temp_rad;
   CoordMinMax[5] += temp_rad;
 
-  NbSteps[0] = (int) ceil(bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
-  NbSteps[1] = (int) ceil(bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
-  NbSteps[2] = (int) ceil(bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
+  NbSteps[0] = (int) ceil(constants::bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
+  NbSteps[1] = (int) ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
+  NbSteps[2] = (int) ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
 
 void readxyzMinMax_fromCIF(
@@ -1192,12 +1192,12 @@ void readxyzMinMax_fromCIF(
     if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
       break;
   }
-  double ca = cos(PI_180 * alpha);
-  double cb = cos(PI_180 * beta);
-  double cg = cos(PI_180 * gamma);
-  double sa = sin(PI_180 * alpha);
-  double sb = sin(PI_180 * beta);
-  double sg = sin(PI_180 * gamma);
+  double ca = cos(constants::PI_180 * alpha);
+  double cb = cos(constants::PI_180 * beta);
+  double cg = cos(constants::PI_180 * gamma);
+  double sa = sin(constants::PI_180 * alpha);
+  double sb = sin(constants::PI_180 * beta);
+  double sg = sin(constants::PI_180 * gamma);
   double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
   double V = a * b * c * Vp;
 
@@ -1243,9 +1243,9 @@ const double normgauss(const int& type, const double& exp)
     type2vector(type, t);
   else
     t[0] = t[1] = t[2] = 0;
-  long long int temp = ft[t[0]] * ft[t[1]] * ft[t[2]];
-  long long int temp2 = ft[2 * t[0]] * ft[2 * t[1]] * ft[2 * t[2]];
-  return pow(2 * exp / PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
+  long long int temp = constants::ft[t[0]] * constants::ft[t[1]] * constants::ft[t[2]];
+  long long int temp2 = constants::ft[2 * t[0]] * constants::ft[2 * t[1]] * constants::ft[2 * t[2]];
+  return pow(2 * exp / constants::PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
 bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector<vec>& g) {
   //                                                   
@@ -2042,14 +2042,14 @@ double get_lambda_1(double* a)
       - B[2] * B[4] * B[6]) / 2;
     double phi;
     if (r <= -1)
-      phi = PI / 3;
+      phi = constants::PI / 3;
     else if (r >= 1)
       phi = 0;
     else
       phi = acos(r) / 3;
 
     eig1 = q + 2 * p * cos(phi);
-    eig3 = q + 2 * p * cos(phi + 2 * PI / 3);
+    eig3 = q + 2 * p * cos(phi + 2 * constants::PI / 3);
     eig2 = 3 * q - eig1 - eig3;
     if ((eig1 < eig2 && eig2 < eig3) || (eig3 < eig2 && eig2 < eig1))
       return eig2;
@@ -2505,15 +2505,15 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
   double SH = 0, x=d[0], y=d[1], z=d[2];
   switch (l) {
     case 0:  //S
-      SH = c_1_4p; break;
+      SH = constants::c_1_4p; break;
     case 1:
       switch (m) {
         case 0: //P 0 Z
-          SH = c_3_4p * z; break;
+          SH = constants::c_3_4p * z; break;
         case 1: //P 1 X
-          SH = c_3_4p * x; break;
+          SH = constants::c_3_4p * x; break;
         case -1: //P -1 Y
-          SH = c_3_4p * y; break;
+          SH = constants::c_3_4p * y; break;
         default:
           err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
@@ -2521,15 +2521,15 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
     case 2:
       switch (m) {
         case 0: //D 0 Z2
-          SH = c_5_16p * (3 * pow(z, 2) - 1.0); break;
+          SH = constants::c_5_16p * (3 * pow(z, 2) - 1.0); break;
         case 1: //D 1 XZ
-          SH = c_15_4p * x * z; break;
+          SH = constants::c_15_4p * x * z; break;
         case -1: //D -1 YZ
-          SH = c_15_4p * y * z; break;
+          SH = constants::c_15_4p * y * z; break;
         case 2: //D 2 X2-Y2
-          SH = c_15_16p * (pow(x, 2) - pow(y, 2)); break;
+          SH = constants::c_15_16p * (pow(x, 2) - pow(y, 2)); break;
         case -2: //D -2 XY
-          SH = c_15_4p * y * x; break;
+          SH = constants::c_15_4p * y * x; break;
         default:
           err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
@@ -2537,19 +2537,19 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
     case 3:
       switch (m) {
         case 0: //F 0 Z3
-          SH = c_7_16p * (5 * pow(z, 3) - 3 * z); break;
+          SH = constants::c_7_16p * (5 * pow(z, 3) - 3 * z); break;
         case 1: //F 1 XZZ
-          SH = c_21_32p * x * (5 * pow(z, 2) - 1.0); break;
+          SH = constants::c_21_32p * x * (5 * pow(z, 2) - 1.0); break;
         case -1: //F -1 YZZ
-          SH = c_21_32p * y * (5 * pow(z, 2) - 1.0); break;
+          SH = constants::c_21_32p * y * (5 * pow(z, 2) - 1.0); break;
         case 2: //F 2 Z(X2-Y2)
-          SH = c_105_16p * ((pow(x, 2) - pow(y, 2)) * z); break;
+          SH = constants::c_105_16p * ((pow(x, 2) - pow(y, 2)) * z); break;
         case -2: //F -2 XYZ
-          SH = c_105_4p * x * y * z; break;
+          SH = constants::c_105_4p * x * y * z; break;
         case 3: //F 3 X(X^2-3Y^2)
-          SH = c_35_32p * x * (pow(x, 2) - 3 * pow(y, 2)); break;
+          SH = constants::c_35_32p * x * (pow(x, 2) - 3 * pow(y, 2)); break;
         case -3: //F -3 Y(3X^2-Y^2)
-          SH = c_35_32p * y * (3 * pow(x, 2) - pow(y, 2)); break;
+          SH = constants::c_35_32p * y * (3 * pow(x, 2) - pow(y, 2)); break;
         default: 
           err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
@@ -2557,24 +2557,24 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
     case 4:
       switch (m) {
         case 0: //G 0 Z^4
-          SH = c_9_256p * (35 * pow(z, 4) - 30 * pow(z, 2) + 3.0); break;
+          SH = constants::c_9_256p * (35 * pow(z, 4) - 30 * pow(z, 2) + 3.0); break;
         case 1: //G 1 X(7Z^3-3ZR^2)
-          SH = c_45_32p * x * (7 * pow(z, 3) - 3 * z); break;
+          SH = constants::c_45_32p * x * (7 * pow(z, 3) - 3 * z); break;
         case -1: //G -1 Y(7Z^2-3ZR^2)
-          SH = c_45_32p * y * (7 * pow(z, 3) - 3 * z); break;
+          SH = constants::c_45_32p * y * (7 * pow(z, 3) - 3 * z); break;
         case 2: //G 2
-          SH = c_45_64p * (pow(x, 2) - pow(y, 2)) * (7 * pow(z, 2) - 1.0); break;
+          SH = constants::c_45_64p * (pow(x, 2) - pow(y, 2)) * (7 * pow(z, 2) - 1.0); break;
         case -2: //G -2
-          SH = c_45_16p * x * y * (7 * pow(z, 2) - 1.0); break;
+          SH = constants::c_45_16p * x * y * (7 * pow(z, 2) - 1.0); break;
         case 3: //G 3 XZ(X^2-3Y^2)
-          SH = c_315_32p * x * (pow(x, 2) - 3 * pow(y, 2)) * z; break;
+          SH = constants::c_315_32p * x * (pow(x, 2) - 3 * pow(y, 2)) * z; break;
         case -3: //G -3 XZ(3X^2-Y^2)
-          SH = c_315_32p * y * (3 * pow(x, 2) - pow(y, 2)) * z; break;
+          SH = constants::c_315_32p * y * (3 * pow(x, 2) - pow(y, 2)) * z; break;
         case 4: //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-          SH = c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
+          SH = constants::c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
             (pow(y, 2) * (3 * pow(x, 2) - pow(y, 2)))); break;
         case -4: //G -4 XY(X^2-Y^2)
-          SH = c_315_16p * x * y * (pow(x, 2) - pow(y, 2)); break;
+          SH = constants::c_315_16p * x * y * (pow(x, 2) - pow(y, 2)); break;
         default:
           err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
@@ -2582,27 +2582,27 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
     case 5:
       switch (m) {
       case 0: //H Z^5
-        SH = c_11_256p * (63 * pow(z, 5) - 70 * pow(z, 3) + 15 * z); break;
+        SH = constants::c_11_256p * (63 * pow(z, 5) - 70 * pow(z, 3) + 15 * z); break;
       case 1: 
-        SH = c_165_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+        SH = constants::c_165_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
       case -1: 
-        SH = c_165_256p * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+        SH = constants::c_165_256p * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
       case 2: 
-        SH = c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
+        SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
       case -2: 
-        SH = c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
+        SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
       case 3: 
-        SH = c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+        SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
       case -3: 
-        SH = c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+        SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
       case 4: 
-        SH = c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y,4)) * z; break;
+        SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y,4)) * z; break;
       case -4: 
-        SH = -c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
+        SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
       case 5:
-        SH = c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y,2) + 10 * x * pow(y, 4)); break;
+        SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y,2) + 10 * x * pow(y, 4)); break;
       case -5:
-        SH = c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y,3) + 10 * y * pow(x, 4)); break;
+        SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y,3) + 10 * y * pow(x, 4)); break;
       default:
         err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }
@@ -2610,27 +2610,27 @@ const double spherical_harmonic(const int& l, const int& m, const double* d) {
     case 6:
       switch (m) {
       case 0: //I Z^6
-        SH = c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z,2) - 5); break;
+        SH = constants::c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z,2) - 5); break;
       case 1:
-        SH = c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+        SH = constants::c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
       case -1:
-        SH = c_165_256p * 2*y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
+        SH = constants::c_165_256p * 2*y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
       case 2:
-        SH = c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
+        SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
       case -2:
-        SH = c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
+        SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
       case 3:
-        SH = c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+        SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
       case -3:
-        SH = c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
+        SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
       case 4:
-        SH = c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z; break;
+        SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z; break;
       case -4:
-        SH = -c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
+        SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
       case 5:
-        SH = c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4)); break;
+        SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4)); break;
       case -5:
-        SH = c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4)); break;
+        SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4)); break;
       default:
         err_not_impl_f("Wrong spherical harmonic called!", std::cout);
       }

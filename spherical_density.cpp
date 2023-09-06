@@ -59,7 +59,7 @@ void Thakkar::calc_orbs(
 const double Thakkar::get_radial_density(double& dist){
 	//Speedup things for H
 	if (atomic_number == 1)
-		return 6.0835 * exp(-2.3*dist) / FOUR_PI;
+		return 6.0835 * exp(-2.3*dist) / constants::FOUR_PI;
 
 	double Rho = 0.0;
 	int nr_ex = first_ex();
@@ -80,7 +80,7 @@ const double Thakkar::get_radial_density(double& dist){
 			continue;
 		Rho += occ[offset + m] * pow(Orb[m], 2);
 	}
-	return Rho / (FOUR_PI);
+	return Rho / (constants::FOUR_PI);
 };
 
 constexpr double cosinus_integral(const int N, const double z, const double k);
@@ -134,7 +134,7 @@ double calc_int(const int& occ, const double& coef, const double& exp, const int
 }
 
 double calc_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double&) {
-	return occ * coef * ft[radial_exp] / pow(exp, radial_exp + 1);
+	return occ * coef * constants::ft[radial_exp] / pow(exp, radial_exp + 1);
 }
 
 double Thakkar::calc_type(

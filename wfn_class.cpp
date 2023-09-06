@@ -24,7 +24,7 @@ void WFN::fill_pre()
         int imax = min(j, l);
         int imin = max(0, j - m);
         for (int i = imin; i <= imax; i++)
-          pre[j][l][m][i] = ft[j] * ft[l] / ft[l - i] / ft[i] * ft[m] / ft[m - j + i] / ft[j - i];
+          pre[j][l][m][i] = constants::ft[j] * constants::ft[l] / constants::ft[l - i] / constants::ft[i] * constants::ft[m] / constants::ft[m - j + i] / constants::ft[j - i];
       }
 }
 
@@ -33,7 +33,7 @@ void WFN::fill_Afac_pre()
   for (int l = 0; l < 9; l++)
     for (int r = 0; r <= l / 2; r++)
       for (int s = 0; s <= (l - 2 * r) / 2; s++)
-        Afac_pre[l][r][s] = ft[r] * ft[s] * ft[l - 2 * r - 2 * s];
+        Afac_pre[l][r][s] = constants::ft[r] * constants::ft[s] * constants::ft[l - 2 * r - 2 * s];
 }
 
 WFN::WFN()
@@ -164,13 +164,13 @@ string WFN::get_centers(const bool& bohr)
     temp.append(atoms[i].label);
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].x));
-    else temp.append(to_string(bohr2ang(atoms[i].x)));
+    else temp.append(to_string(constants::bohr2ang(atoms[i].x)));
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].y));
-    else temp.append(to_string(bohr2ang(atoms[i].y)));
+    else temp.append(to_string(constants::bohr2ang(atoms[i].y)));
     temp.append(" ");
     if (bohr) temp.append(to_string(atoms[i].z));
-    else temp.append(to_string(bohr2ang(atoms[i].z)));
+    else temp.append(to_string(constants::bohr2ang(atoms[i].z)));
     temp.append("\n");
   }
   return temp;
@@ -803,9 +803,9 @@ bool WFN::read_xyz(const string& filename, ostream& file, const bool debug)
     temp = split_string<string>(line, " ");
     remove_empty_elements(temp);
     dum_label[i] = temp[0];
-    dum_x[i] = ang2bohr(stod(temp[1]));
-    dum_y[i] = ang2bohr(stod(temp[2]));
-    dum_z[i] = ang2bohr(stod(temp[3]));
+    dum_x[i] = constants::ang2bohr(stod(temp[1]));
+    dum_y[i] = constants::ang2bohr(stod(temp[2]));
+    dum_z[i] = constants::ang2bohr(stod(temp[3]));
     dum_ch[i] = get_Z_from_label(dum_label[i].c_str()) + 1;
     if (debug) {
       file << "label:" << dum_label[i]
@@ -1087,9 +1087,9 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
     remove_empty_elements(temp);
     if (au_bohr)
       err_checkf(push_back_atom(temp[0],
-        ang2bohr(stod(temp[3])),
-        ang2bohr(stod(temp[4])),
-        ang2bohr(stod(temp[5])),
+          constants::ang2bohr(stod(temp[3])),
+          constants::ang2bohr(stod(temp[4])),
+          constants::ang2bohr(stod(temp[5])),
         stoi(temp[2])), "Error pushing back atom", file);
     else
       err_checkf(push_back_atom(temp[0],
@@ -1798,28 +1798,28 @@ vec WFN::get_norm_const(ostream& file, bool debug)
       double temp = get_atom_basis_set_exponent(a, p);
       switch (get_atom_primitive_type(a, p)) {
       case 1:
-        temp = 2 * temp / PI;
+        temp = 2 * temp / constants::PI;
         temp = pow(temp, 0.75);
         temp = temp * get_atom_basis_set_coefficient(a, p);
         basis_coefficients[a].push_back(temp);
         break;
       case 2:
         temp = 128 * pow(temp, 5);
-        temp = temp / pow(PI, 3);
+        temp = temp / constants::PI3;
         temp = pow(temp, 0.25);
         temp = get_atom_basis_set_coefficient(a, p) * temp;
         basis_coefficients[a].push_back(temp);
         break;
       case 3:
         temp = 2048 * pow(temp, 7);
-        temp = temp / (9 * pow(PI, 3));
+        temp = temp / (9 * constants::PI3);
         temp = pow(temp, 0.25);
         temp = get_atom_basis_set_coefficient(a, p) * temp;
         basis_coefficients[a].push_back(temp);
         break;
       case 4:
         temp = 32768 * pow(temp, 9);
-        temp = temp / (225 * pow(PI, 3));
+        temp = temp / (225 * constants::PI3);
         temp = pow(temp, 0.25);
         temp = get_atom_basis_set_coefficient(a, p) * temp;
         basis_coefficients[a].push_back(temp);
@@ -1848,7 +1848,7 @@ vec WFN::get_norm_const(ostream& file, bool debug)
         for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++) {
           for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++) {
             double aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
-            double term = (PI / aiaj);
+            double term = (constants::PI / aiaj);
             term = pow(term, 1.5);
             factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
           }
@@ -1871,7 +1871,7 @@ vec WFN::get_norm_const(ostream& file, bool debug)
           for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++) {
             double aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
             double term = 4 * pow(aiaj, 5);
-            term = pow(PI, 3) / term;
+            term = constants::PI3 / term;
             term = pow(term, 0.5);
             factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
           }
@@ -1894,7 +1894,7 @@ vec WFN::get_norm_const(ostream& file, bool debug)
           for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++) {
             double aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
             double term = 16 * pow(aiaj, 7);
-            term = pow(PI, 3) / term;
+            term = constants::PI3 / term;
             term = pow(term, 0.5);
             factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
           }
@@ -1918,7 +1918,7 @@ vec WFN::get_norm_const(ostream& file, bool debug)
           for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++) {
             double aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
             double term = 64 * pow((aiaj), 9);
-            term = pow(PI, 3) / term;
+            term = constants::PI3 / term;
             term = pow(term, 0.5);
             factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
           }
@@ -3146,7 +3146,7 @@ unsigned int WFN::get_atom_integer_mass(const unsigned int& atomnr) const
     cout << "sorry, something seems wrong with the atoms you requested!" << endl;
     return 0;
   }
-  return integer_masses[get_atom_charge(atomnr) - 1];
+  return constants::integer_masses[get_atom_charge(atomnr) - 1];
 };
 
 double WFN::get_atom_real_mass(const int& atomnr) const
@@ -3159,7 +3159,7 @@ double WFN::get_atom_real_mass(const int& atomnr) const
     cout << "sorry, something seems wrong with the atoms you requested!" << endl;
     return 0;
   }
-  return real_masses[get_atom_charge(atomnr) - 1];
+  return constants::real_masses[get_atom_charge(atomnr) - 1];
 }
 
 atom WFN::get_atom(const int& nr) const {
@@ -3861,7 +3861,7 @@ double WFN::compute_dens_cartesian(
     d[14][iat] = d[1][iat] * d[11][iat];
     d[15][iat] = d[2][iat] * d[12][iat];
     if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {  // This adds a tight core density based on 
-      Rho += 8 * atoms[iat].ECP_electrons * exp(-FOUR_PI * d[3][iat]); // a spherical gaussian to fill in the gap 
+      Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3][iat]); // a spherical gaussian to fill in the gap 
     }                                                                 // left by ECPs integrating to the correct number of electrons
   }
 
@@ -4104,7 +4104,7 @@ double WFN::compute_dens_spherical(
     d[2][iat] = Pos3 - atoms[iat].z;
     d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
     if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {
-      Rho += 8 * atoms[iat].ECP_electrons * exp(-4 * PI * d[3][iat]);
+      Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3][iat]);
     }
     d[4][iat] = sqrt(d[3][iat]);
   }
@@ -4240,7 +4240,7 @@ void WFN::computeValues(
     d[2] = PosGrid[2] - atoms[iat].z;
     d[3] = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
     if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0) {
-      Rho += 8 * atoms[iat].ECP_electrons * exp(-4 * PI * d[3]);
+      Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3]);
     }
     double temp = -get_exponent(j) * (d[3]);
     if (temp < -34.5388) //corresponds to cutoff of ex < 1E-15
@@ -4321,9 +4321,9 @@ void WFN::computeValues(
   Hess[6] = Hess[2];
   Hess[7] = Hess[5];
   if (Rho > 0) {
-    normGrad = alpha_coef * sqrt(Grad[0] * Grad[0] + Grad[1] * Grad[1] + Grad[2] * Grad[2]) / pow(Rho, c_43);
-    Elf = 1 / (1 + pow(ctelf * pow(Rho, c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), c_38);
+    normGrad = constants::alpha_coef * sqrt(Grad[0] * Grad[0] + Grad[1] * Grad[1] + Grad[2] * Grad[2]) / pow(Rho, constants::c_43);
+    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
   }
   Lap = Hess[0] + Hess[4] + Hess[8];
 };
@@ -4417,8 +4417,8 @@ void WFN::computeELIELF(
     }
   }
   if (Rho > 0) {
-    Elf = 1 / (1 + pow(ctelf * pow(Rho, c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), c_38);
+    Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+    Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
   }
 };
 
@@ -4509,7 +4509,7 @@ void WFN::computeELI(
       tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
     }
   }
-  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), c_38);
+  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
 };
 
 void WFN::computeELF(
@@ -4599,7 +4599,7 @@ void WFN::computeELF(
       tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
     }
   }
-  Elf = 1 / (1 + pow(ctelf * pow(Rho, c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+  Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
 };
 
 void WFN::computeLapELIELF(
@@ -4701,8 +4701,8 @@ void WFN::computeLapELIELF(
       tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
     }
   }
-  Elf = 1 / (1 + pow(ctelf * pow(Rho, c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
-  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), c_38);
+  Elf = 1 / (1 + pow(constants::ctelf * pow(Rho, constants::c_m53) * (tau * 0.5 - 0.125 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2)) / Rho), 2));
+  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
   Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
@@ -4802,7 +4802,7 @@ void WFN::computeLapELI(
       tau += occ * (pow(phi_temp[1], 2) + pow(phi_temp[2], 2) + pow(phi_temp[3], 2));
     }
   }
-  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), c_38);
+  Eli = Rho * pow(12 / (Rho * tau - 0.25 * (pow(Grad[0], 2) + pow(Grad[1], 2) + pow(Grad[2], 2))), constants::c_38);
   Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
@@ -4979,7 +4979,7 @@ double WFN::computeESP(const double* PosGrid, vector<vec >& d2)
 
       sqd = d2[iat][jat];
 
-      prefac = TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
+      prefac = constants::TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
       if (prefac < 1E-10) continue;
 
       for (int i = 0; i < 3; i++) {
