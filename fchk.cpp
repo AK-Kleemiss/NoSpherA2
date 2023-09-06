@@ -754,16 +754,16 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
         double temp_c = wave.get_atom_basis_set_exponent(a, p);
         switch (wave.get_atom_primitive_type(a, p)) {
         case 1:
-          temp_c = 8 * pow(temp_c, 3) / PI3;
+          temp_c = 8 * pow(temp_c, 3) / constants::PI3;
           break;
         case 2:
-          temp_c = 128 * pow(temp_c, 5) / PI3;
+          temp_c = 128 * pow(temp_c, 5) / constants::PI3;
           break;
         case 3:
-          temp_c = 2048 * pow(temp_c, 7) / (9 * PI3);
+          temp_c = 2048 * pow(temp_c, 7) / (9 * constants::PI3);
           break;
         case 4:
-          temp_c = 32768 * pow(temp_c, 9) / (225 * PI3);
+          temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
           break;
         case -1:
           file << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
@@ -791,7 +791,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = PI3 / pow(aiaj, 3);
+              double term = constants::PI3 / pow(aiaj, 3);
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -814,7 +814,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = PI3 / (4 * pow(aiaj, 5));
+              double term = constants::PI3 / (4 * pow(aiaj, 5));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -837,7 +837,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = PI3 / (16 * pow(aiaj, 7));
+              double term = constants::PI3 / (16 * pow(aiaj, 7));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
@@ -861,7 +861,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
           for (int i = wave.get_shell_start(a, s); i <= wave.get_shell_end(a, s); i++) {
             for (int j = wave.get_shell_start(a, s); j <= wave.get_shell_end(a, s); j++) {
               aiaj = wave.get_atom_basis_set_exponent(a, i) + wave.get_atom_basis_set_exponent(a, j);
-              double term = PI3 / (64 * pow((aiaj), 9));
+              double term = constants::PI3 / (64 * pow((aiaj), 9));
               term = pow(term, 0.5);
               factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
             }
