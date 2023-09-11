@@ -11,6 +11,17 @@
 
 using namespace std;
 
+typedef enum omp_sched_t {
+    // schedule kinds 
+    omp_sched_static = 0x1,
+    omp_sched_dynamic = 0x2,
+    omp_sched_guided = 0x3,
+    omp_sched_auto = 0x4,
+
+    // schedule modifier 
+    omp_sched_monotonic = 0x80000000u
+} omp_sched_t;
+
 int main(int argc, char** argv)
 {
   ofstream log_file("NoSpherA2.log", ios::out);
@@ -20,7 +31,8 @@ int main(int argc, char** argv)
   opt.digest_options();
   if (opt.threads != -1) {
     omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
+    //omp_set_dynamic(0);
+    _putenv("OMP_SCHEDULE=dynamic,2");
   }
   log_file << NoSpherA2_message();
   if (!opt.no_date) {

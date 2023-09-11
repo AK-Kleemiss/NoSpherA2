@@ -16,8 +16,6 @@ void Calc_Spherical_Dens(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -104,8 +102,6 @@ void Calc_Static_Def(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -193,8 +189,6 @@ void Calc_Static_Def(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -273,8 +267,6 @@ void Calc_Hirshfeld(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -366,8 +358,6 @@ void Calc_Hirshfeld(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -446,8 +436,6 @@ void Calc_Hirshfeld_atom(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -523,8 +511,6 @@ void Calc_Rho(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -600,12 +586,6 @@ void Calc_Rho_spherical_harmonics(
   ofstream& file
 )
 {
-#ifdef _OPENMP
-  if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    //omp_set_dynamic(0);
-  }
-#endif
 
   time_t start;
   std::time(&start);
@@ -657,8 +637,6 @@ void Calc_MO_spherical_harmonics(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -705,8 +683,6 @@ void Calc_S_Rho(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -763,8 +739,6 @@ void Calc_Prop(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -929,8 +903,6 @@ void Calc_ESP(
 {
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
@@ -1027,8 +999,6 @@ void Calc_MO(
   err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
 #ifdef _OPENMP
   if (cpus != -1) {
-    omp_set_num_threads(cpus);
-    omp_set_dynamic(0);
     if (cpus > 1)
       omp_set_nested(1);
   }
