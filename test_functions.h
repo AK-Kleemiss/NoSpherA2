@@ -245,10 +245,6 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
   err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
   err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.threads != -1) {
-    omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
-  }
 
 #ifdef _WIN64
   time_t start = time(NULL);

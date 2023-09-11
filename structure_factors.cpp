@@ -1320,7 +1320,7 @@ int make_hirshfeld_grids(const int& pbc,
     }
   }
   else {
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int i = 0; i < atom_type_list.size(); i++) {
       double current = 1;
       double dist = min_dist;
@@ -1370,7 +1370,7 @@ int make_hirshfeld_grids(const int& pbc,
         }
         continue;
       }
-#pragma omp for
+#pragma omp for schedule(runtime)
       for (int g = 0; g < atoms_with_grids; g++) {
         for (int p = 0; p < num_points[g]; p++) {
           double temp =
@@ -1403,7 +1403,7 @@ int make_hirshfeld_grids(const int& pbc,
               if (wave.get_atom_charge(i) == atom_type_list[j])
                 type_list_number = j;
             for (int g = 0; g < atoms_with_grids; g++) {
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
               for (int p = 0; p < num_points[g]; p++)
                 grid[g][4][p] += linear_interpolate_spherical_density(
                   radial_density[type_list_number],
@@ -1762,7 +1762,7 @@ int make_hirshfeld_grids(const int& pbc,
         d_temp[i].resize(nr_cen);
       }
       vec phi_temp(nr_mos);
-#pragma omp for
+#pragma omp for schedule(runtime)
       for (int i = 0; i < nr_atoms; i++) {
         total_grid[5][i] = temp.compute_dens(
           total_grid[0][i],
@@ -1802,7 +1802,7 @@ int make_hirshfeld_grids(const int& pbc,
           for (int _z = -pbc; _z < pbc + 1; _z++) {
             if (_x == 0 && _y == 0 && _z == 0)
               continue;
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
             for (int i = 0; i < total_grid[0].size(); i++) {
               periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
                                                       total_grid[1][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
@@ -1843,7 +1843,7 @@ int make_hirshfeld_grids(const int& pbc,
 
   if (debug) file << "before loop" << endl;
   //Generate Electron sums
-#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld)
+#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     //if (debug) file << "i=" << i << endl;
     int start_p = 0;
@@ -1879,7 +1879,7 @@ int make_hirshfeld_grids(const int& pbc,
     file << endl;
   }
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int p = 0; p < total_grid[0].size(); p++)
     total_grid[5][p] *= total_grid[3][p];
   file << " done!" << endl;
@@ -1992,7 +1992,7 @@ int make_hirshfeld_grids(const int& pbc,
   file << "CUDA device resetted!" << endl;
 #else
   points = 0;
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     dens[i].resize(num_points[i]);
     d1[i].resize(num_points[i]);
@@ -2000,7 +2000,7 @@ int make_hirshfeld_grids(const int& pbc,
     d3[i].resize(num_points[i]);
   }
   double upper = 0, diffs=0, avg = 0, lower = 0;
-#pragma omp parallel for reduction(+:points, upper, avg, diffs, lower)
+#pragma omp parallel for reduction(+:points, upper, avg, diffs, lower) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     int run = 0;
@@ -2035,7 +2035,7 @@ int make_hirshfeld_grids(const int& pbc,
     file << "\nR value of sph. vs non-sph. density = " << setw(9) << setprecision(4) << fixed << upper / lower*100 << " %" << endl;
   }
   shrink_vector<vec>(spherical_density);
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int _grid = 0; _grid < total_grid.size(); _grid++)
     shrink_vector<double>(total_grid[_grid]);
   shrink_vector<vec>(total_grid);
@@ -2474,7 +2474,7 @@ int make_hirshfeld_grids_RI(
         }
         continue;
       }
-#pragma omp for
+#pragma omp for schedule(runtime)
       for (int g = 0; g < atoms_with_grids; g++) {
         for (int p = 0; p < num_points[g]; p++) {
           double temp =
@@ -2523,7 +2523,7 @@ int make_hirshfeld_grids_RI(
   bool prune = true;
   if (prune) {
     file << "Pruning Grid..." << flush;
-#pragma omp parallel for reduction(+:final_size)
+#pragma omp parallel for reduction(+:final_size) schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
         if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > _cutoff) {
@@ -2535,7 +2535,7 @@ int make_hirshfeld_grids_RI(
     }
     for (int k = 0; k < 7; k++)
       total_grid[k].resize(final_size);
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       int offset = 0;
       for (int j = 0; j < i; j++) {
@@ -2597,7 +2597,7 @@ int make_hirshfeld_grids_RI(
     string path{ coef_filename };
     npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int i = 0; i < nr_pts; i++) {
       total_grid[5][i] = calc_density_ML(
         total_grid[0][i],
@@ -2628,7 +2628,7 @@ int make_hirshfeld_grids_RI(
 
   if (debug) file << "before loop" << endl;
   //Generate Electron sums
-#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld)
+#pragma omp parallel for reduction(+:el_sum_becke,el_sum_spherical,el_sum_hirshfeld) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     //if (debug) file << "i=" << i << endl;
     int start_p = 0;
@@ -2665,7 +2665,7 @@ int make_hirshfeld_grids_RI(
     file << endl;
   }
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int p = 0; p < total_grid[0].size(); p++)
     total_grid[5][p] *= total_grid[3][p];
   file << " done!" << endl;
@@ -2717,7 +2717,7 @@ int make_hirshfeld_grids_RI(
     d3[i].resize(num_points[i]);
   }
   double upper = 0, diffs = 0, avg = 0, lower = 0;
-#pragma omp parallel for reduction(+:points, upper, avg, diffs, lower)
+#pragma omp parallel for reduction(+:points, upper, avg, diffs, lower) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     int run = 0;
@@ -3121,7 +3121,7 @@ int make_integration_grids(
   bool prune = true;
   if (prune) {
     file << "Pruning Grid..." << flush;
-#pragma omp parallel for reduction(+:final_size)
+#pragma omp parallel for reduction(+:final_size) schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
         if (abs(grid[i][4][p]) > _cutoff) {
@@ -3133,7 +3133,7 @@ int make_integration_grids(
     }
     for (int k = 0; k < total_grid.size(); k++)
       total_grid[k].resize(final_size);
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       int offset = 0;
       for (int j = 0; j < i; j++) {
@@ -3189,7 +3189,7 @@ int make_integration_grids(
   string path{ coef_filename };
   npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < nr_pts; i++) {
     total_grid[4][i] = calc_density_ML(
       total_grid[0][i],
@@ -3217,7 +3217,7 @@ int make_integration_grids(
 
   if (debug) file << "before loop" << endl;
   //Generate Electron sums
-#pragma omp parallel for reduction(+:el_sum_SALTED)
+#pragma omp parallel for reduction(+:el_sum_SALTED) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     for (int a = 0; a < i; a++)
@@ -3241,7 +3241,7 @@ int make_integration_grids(
     file << endl;
   }
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int p = 0; p < total_grid[0].size(); p++)
     total_grid[4][p] *= total_grid[5][p];
   file << " done!" << endl;
@@ -3281,7 +3281,7 @@ int make_integration_grids(
   points = 0;
 #pragma omp parallel
   {
-#pragma omp for reduction(+:points)
+#pragma omp for reduction(+:points) schedule(runtime)
     for (int i = 0; i < asym_atom_list.size(); i++) {
       dens[i].resize(num_points[i]);
       d1[i].resize(num_points[i]);
@@ -3367,7 +3367,7 @@ int make_integration_grids_SALTED(
   int max_l_overall = 0;
 
   //Accumulate vectors with information about all atoms
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < wave.get_ncen(); i++) {
     const atom* ai = &(wave.atoms[i]);
     atom_z[i] = wave.get_atom_charge(i);
@@ -3664,7 +3664,7 @@ int make_integration_grids_SALTED(
   bool prune = false;
   if (prune) {
     file << "Pruning Grid..." << flush;
-#pragma omp parallel for reduction(+:final_size)
+#pragma omp parallel for reduction(+:final_size) schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       for (int p = 0; p < num_points[i]; p++) {
         if (abs(grid[i][3][p]) > _cutoff) {
@@ -3675,7 +3675,7 @@ int make_integration_grids_SALTED(
     }
     for (int k = 0; k < total_grid.size(); k++)
       total_grid[k].resize(final_size,0.0);
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int i = 0; i < atoms_with_grids; i++) {
       int offset = 0;
       for (int j = 0; j < i; j++) {
@@ -3756,7 +3756,7 @@ int make_integration_grids_SALTED(
 
   if (debug) file << "before loop" << endl;
   //Generate Electron sums
-#pragma omp parallel for reduction(+:el_sum_SALTED)
+#pragma omp parallel for reduction(+:el_sum_SALTED) schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++) {
     int start_p = 0;
     for (int a = 0; a < i; a++)
@@ -3826,7 +3826,7 @@ int make_integration_grids_SALTED(
   points = 0;
 #pragma omp parallel
   {
-#pragma omp for reduction(+:points)
+#pragma omp for reduction(+:points) schedule(runtime)
     for (int i = 0; i < asym_atom_list.size(); i++) {
       dens[i].resize(num_points[i]);
       d1[i].resize(num_points[i]);
@@ -3879,7 +3879,7 @@ void make_k_pts(const bool& read_k_pts,
     if (debug)
       file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
 
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
     for (int ref = 0; ref < size; ref++) {
       hkl_list_it hkl_ = next(hkl.begin(), ref);
       for (int x = 0; x < 3; x++) {
@@ -3918,7 +3918,7 @@ void calc_SF(const int& points,
 {
   const int imax = (int) dens.size();
   sf.resize(imax);
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < imax; i++)
     sf[i].resize(k_pt[0].size(), complex<double>(0.0, 0.0));
 
@@ -3979,7 +3979,7 @@ void calc_SF(const int& points,
     d2_local = d2[i].data();
     d3_local = d3[i].data();
     sf_local = sf[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work,rho) schedule(runtime)
     for (int s = 0; s < smax; s++) {
       for (int p = pmax - 1; p >= 0; p--) {
         rho = dens_local[p];
@@ -4013,7 +4013,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
         << wave.atoms[asym_atom_list[i]].ECP_electrons
         << " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
     }
-#pragma omp parallel for private(it, k)
+#pragma omp parallel for private(it, k) schedule(runtime)
     for (int s = 0; s < sf[0].size(); s++) {
       it = next(hkl.begin(), s);
       k = constants::FOUR_PI * cell.get_stl_of_hkl(*it);
@@ -4034,7 +4034,7 @@ void add_ECP_contribution(const vector <int>& asym_atom_list,
       }
     }
 
-#pragma omp parallel for private(it, k)
+#pragma omp parallel for private(it, k) schedule(runtime)
     for (int s = 0; s < sf[0].size(); s++) {
       it = next(hkl.begin(), s);
       k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
@@ -4056,7 +4056,7 @@ void convert_to_ED(const std::vector <int>& asym_atom_list,
 {
   double h2;
   hkl_list_it it;
-#pragma omp parallel for private(h2,it)
+#pragma omp parallel for private(h2,it) schedule(runtime)
   for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
     h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
@@ -4216,12 +4216,12 @@ bool thakkar_sfac(
 
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++)
     sf[i].resize(hkl.size());
 
   hkl_list_it it = hkl.begin();
-#pragma omp parallel for private(it)
+#pragma omp parallel for private(it) schedule(runtime)
   for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
     double k = constants::bohr2ang(constants::FOUR_PI*unit_cell.get_stl_of_hkl(*it));
@@ -4231,7 +4231,7 @@ bool thakkar_sfac(
 
   if (opt.electron_diffraction) {
     double h2;
-#pragma omp parallel for private(h2, it)
+#pragma omp parallel for private(h2, it) schedule(runtime)
     for (int s = 0; s < hkl.size(); s++) {
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
@@ -4331,12 +4331,12 @@ tsc_block MTC_thakkar_sfac(
   //const int amax = (int) atom_type_list.size();
   vector< vector < double> > sf;
   sf.resize(asym_atom_list.size());
-#pragma omp parallel for
+#pragma omp parallel for schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++)
     sf[i].resize(hkl.size());
 
   hkl_list_it it = hkl.begin();
-#pragma omp parallel for private(it)
+#pragma omp parallel for private(it) schedule(runtime)
   for (int s = 0; s < hkl.size(); s++) {
     it = next(hkl.begin(), s);
     double k = constants::bohr2ang(constants::FOUR_PI*unit_cell.get_stl_of_hkl(*it));
@@ -4346,7 +4346,7 @@ tsc_block MTC_thakkar_sfac(
 
   if (opt.electron_diffraction) {
     double h2;
-#pragma omp parallel for private(h2, it)
+#pragma omp parallel for private(h2, it) schedule(runtime)
     for (int s = 0; s < hkl.size(); s++) {
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
@@ -4389,10 +4389,6 @@ bool calculate_structure_factors_HF(
   file << "Number of protons: " << wave.get_nr_electrons() << endl << "Number of electrons: " << wave.count_nr_electrons() << endl;
   if (wave.get_has_ECPs()) file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.threads != -1) {
-    omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
-  }
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -4572,10 +4568,6 @@ bool calculate_structure_factors_RI(
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.threads != -1) {
-    omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
-  }
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -4757,10 +4749,6 @@ bool calculate_structure_factors_RI_No_H(
   err_checkf(exists(opt.cif), "CIF does not exists!", file);
   file << "Number of protons: " << wave.get_nr_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.threads != -1) {
-    omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
-  }
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -4987,10 +4975,6 @@ tsc_block calculate_structure_factors_MTC(
   file << "Number of protons: " << wave[nr].get_nr_electrons() << endl << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
   if (wave[nr].get_has_ECPs()) file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.ncpus != -1) {
-    omp_set_num_threads(opt.ncpus);
-    omp_set_dynamic(0);
-  }
   if (opt.debug) file << "Working with: " << wave[nr].get_path() << endl;
 
 #ifdef _WIN64
