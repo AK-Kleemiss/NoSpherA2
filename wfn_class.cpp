@@ -1150,6 +1150,15 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
     if (line.find("[9G]") != string::npos) {
       g9 = true;
     }
+    if (line.find("[5D7F]") != string::npos) {
+      f7 = true;
+      d5 = true;
+    }
+    if (line.find("[5D7F9G]") != string::npos) {
+        f7 = true;
+        d5 = true;
+        g9 = true;
+    }
     getline(rf, line); //Read more lines until we reach MO block
   }
   err_checkf(d5 && f7 && g9, "Molden files without spheircal harmonics not yet implemented!", file);
