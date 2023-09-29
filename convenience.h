@@ -405,7 +405,7 @@ inline int CountWords(const char* str)
 
 inline bool exists(const std::string& name)
 {
-  std::ifstream f(name.c_str());
+  std::ifstream f(name.c_str(), std::ios::in);
   return f.good();
 };
 
