@@ -262,6 +262,7 @@ int main(int argc, char** argv)
     if (opt.basis_set != "" || opt.fchk != "") {
       //Make a fchk out of the wfn/wfx file
       join_path(opt.basis_set_path, opt.basis_set);
+      if (opt.debug) log_file << "Checking for " << opt.basis_set_path << endl;
       err_checkf(exists(opt.basis_set_path), "Basis set file does not exist!", log_file);
       wavy[0].set_basis_set_name(opt.basis_set_path);
 
