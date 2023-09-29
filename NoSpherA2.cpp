@@ -10,7 +10,7 @@
 #include "test_functions.h"
 
 using namespace std;
-
+#ifdef _WIN32
 typedef enum omp_sched_t {
     // schedule kinds 
     omp_sched_static = 0x1,
@@ -21,6 +21,7 @@ typedef enum omp_sched_t {
     // schedule modifier 
     omp_sched_monotonic = 0x80000000u
 } omp_sched_t;
+#endif
 
 int main(int argc, char** argv)
 {
