@@ -405,8 +405,13 @@ inline int CountWords(const char* str)
 
 inline bool exists(const std::string& name)
 {
-  std::ifstream f(name.c_str(), std::ios::in);
-  return f.good();
+    if (FILE* file = fopen(name.c_str(), "r")) {
+        fclose(file);
+        return true;
+    }
+    else {
+        return false;
+    }
 };
 
 std::string atnr2letter(const int& nr);
