@@ -33,7 +33,11 @@ int main(int argc, char** argv)
   if (opt.threads != -1) {
     omp_set_num_threads(opt.threads);
     //omp_set_dynamic(0);
+#ifdef _WIN32
     _putenv("OMP_SCHEDULE=dynamic,2");
+#else
+    putenv("OMP_SCHEDULE=dynamic,2");
+#endif
   }
   log_file << NoSpherA2_message();
   if (!opt.no_date) {
