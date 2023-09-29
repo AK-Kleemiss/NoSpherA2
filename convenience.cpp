@@ -315,7 +315,7 @@ void join_path(string& s1, string& s2)
 #ifdef _WIN32
   s1.append("\\");
 #else
-  if (s1.substr(s1.length() - 1) == "/")
+  if (s1.substr(s1.length() - 1) != "/")
     s1.append("/");
 #endif
   s1.append(s2);
