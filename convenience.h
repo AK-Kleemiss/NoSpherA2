@@ -673,6 +673,9 @@ struct primitive
 typedef std::set<std::vector<int>> hkl_list;
 typedef std::set<std::vector<int>>::const_iterator hkl_list_it;
 
+typedef std::set<vec> hkl_list_d;
+typedef std::set<vec>::const_iterator hkl_list_it_d;
+
 //---------------- Object for handling all input options -------------------------------
 struct options {
   options() {

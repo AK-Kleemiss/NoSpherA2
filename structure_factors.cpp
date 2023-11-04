@@ -5,12 +5,12 @@
  *      Author: florian
  */
 
+#include "tsc_block.h"
 #include "structure_factors.h"
 #include "convenience.h"
 #include "cell.h"
 #include "wfn_class.h"
 #include "spherical_density.h"
-#include "tsc_block.h"
 #include "AtomGrid.h"
 #include "npy.h"
 using namespace std;
@@ -4263,7 +4263,7 @@ bool thakkar_sfac(
   return true;
 }
 
-tsc_block MTC_thakkar_sfac(
+tsc_block<int,cdouble> MTC_thakkar_sfac(
   options& opt,
   ofstream& file,
   vector < string >& known_atoms,
@@ -4329,7 +4329,7 @@ tsc_block MTC_thakkar_sfac(
 
   const int imax = (int) asym_atom_list.size();
   //const int amax = (int) atom_type_list.size();
-  vector< vector < double> > sf;
+  vector< vector < cdouble> > sf;
   sf.resize(asym_atom_list.size());
 #pragma omp parallel for schedule(runtime)
   for (int i = 0; i < asym_atom_list.size(); i++)
@@ -4351,7 +4351,7 @@ tsc_block MTC_thakkar_sfac(
       it = next(hkl.begin(), s);
       h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
       for (int i = 0; i < imax; i++)
-        sf[i][s] = constants::ED_fact * (atom_type_list[i] - sf[i][s]) / h2;
+        sf[i][s] = constants::ED_fact * ((cdouble)atom_type_list[i] - sf[i][s]) / h2;
     }
   }
 
@@ -4363,7 +4363,7 @@ tsc_block MTC_thakkar_sfac(
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
 
-  tsc_block blocky(
+  tsc_block<int,cdouble> blocky(
     sf,
     labels,
     hkl
@@ -4517,8 +4517,8 @@ bool calculate_structure_factors_HF(
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave.atoms[asym_atom_list[i]].label);
-
-  tsc_block blocky(
+  
+  tsc_block<int,cdouble> blocky(
     sf,
     labels,
     hkl
@@ -4699,7 +4699,7 @@ bool calculate_structure_factors_RI(
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
-  tsc_block blocky(
+  tsc_block<int, cdouble> blocky(
     sf,
     labels,
     hkl
@@ -4911,7 +4911,7 @@ bool calculate_structure_factors_RI_No_H(
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
-  tsc_block blocky(
+  tsc_block<int, cdouble> blocky(
     sf,
     labels,
     hkl
@@ -4950,7 +4950,7 @@ bool calculate_structure_factors_RI_No_H(
   return true;
 }
 
-tsc_block calculate_structure_factors_MTC(
+tsc_block<int, cdouble> calculate_structure_factors_MTC(
   options& opt,
   vector<WFN>& wave,
   ofstream& file,
@@ -5126,7 +5126,7 @@ tsc_block calculate_structure_factors_MTC(
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
 
-  tsc_block blocky(
+  tsc_block<int, cdouble> blocky(
     sf,
     labels,
     hkl

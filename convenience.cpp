@@ -2453,7 +2453,7 @@ void options::digest_options() {
     }
     else if (temp.find("-tscb") != string::npos) {
       string name = arguments[i + 1];
-      tsc_block blocky = tsc_block(name);
+      tsc_block<int,cdouble> blocky = tsc_block<int,cdouble>(name);
       name = "test.cif";
       blocky.write_tsc_file(name);
       exit(0);

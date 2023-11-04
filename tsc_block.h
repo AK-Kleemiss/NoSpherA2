@@ -1,22 +1,21 @@
 #pragma once
 
 #include "convenience.h"
-
+template<typename numtype_index = int, typename numtype = std::complex<double>>
 class tsc_block
 {
 private:
   std::vector<std::vector<std::complex<double> > > sf; //[#scatterer] [#reflection]
   std::vector<std::string> scatterer; //Labels of reflections the correpsonding entry of sf belonds to
-  std::vector<std::vector<int> > index; //[3] [index]
+  std::vector<std::vector<numtype_index> > index; //[3] [index]
   std::string header;
   bool anomalous_dispersion;
 
 public:
-  template<typename numtype>
   tsc_block(
     std::vector<std::vector<numtype> >& given_sf,
     std::vector<std::string>& given_scatterer,
-    std::vector<std::vector<int> >& given_index,
+    std::vector<std::vector<numtype_index> >& given_index,
     std::string& given_header)
   {
     sf.resize(given_sf.size());
@@ -32,11 +31,10 @@ public:
     header = given_header;
     anomalous_dispersion = false;
   };
-  template<typename numtype>
   tsc_block(
     std::vector<std::vector<numtype> >& given_sf,
     std::vector<std::string>& given_scatterer,
-    std::vector<std::vector<int> >& given_index)
+    std::vector<std::vector<numtype_index> >& given_index)
   {
     sf.resize(given_sf.size());
 #pragma omp parallel for
@@ -50,7 +48,27 @@ public:
     index = given_index;
     anomalous_dispersion = false;
   };
-  template<typename numtype>
+  tsc_block(
+    std::vector<std::vector<numtype> >& given_sf,
+    std::vector<std::string>& given_scatterer,
+    hkl_list_d& given_index)
+  {
+    sf.resize(given_sf.size());
+#pragma omp parallel for
+    for (int i = 0; i < given_sf.size(); i++) {
+      sf[i].resize(given_sf[i].size());
+      for (int j = 0; j < given_sf[i].size(); j++) {
+        sf[i][j] = given_sf[i][j];
+      }
+    }
+    scatterer = given_scatterer;
+    index.resize(3);
+    for (const std::vector<double>& hkl : given_index) {
+      for (int i = 0; i < 3; i++)
+        index[i].push_back(hkl[i]);
+    }
+    anomalous_dispersion = false;
+  };
   tsc_block(
     std::vector<std::vector<numtype> >& given_sf,
     std::vector<std::string>& given_scatterer,
@@ -80,6 +98,7 @@ public:
     auto charsize = sizeof(char);
     int head[1]{ 0 };
     auto intsize = sizeof(head);
+    auto indexsize = sizeof(numtype_index);
     tsc_file.read((char*)&head, intsize);
     char* cheader;
     string header_str;
@@ -103,11 +122,11 @@ public:
     int nr_hkl[1]{ 0 };
     tsc_file.read((char*)&nr_hkl, intsize);
     //read indices and scattering factors row by row
-    int rindex[3]{ 0, 0, 0 };
+    numtype_index rindex[3]{ 0, 0, 0 };
     sf.resize(nr_scatterers);
     index.resize(3);
     for (int run = 0; run < *nr_hkl; run++) {
-      tsc_file.read((char*)&rindex, 3 * intsize);
+      tsc_file.read((char*)&rindex, 3 * indexsize);
       for (int i = 0; i < 3; i++) {
         index[i].push_back(rindex[i]);
       }
@@ -130,7 +149,7 @@ public:
     sf.clear();
     shrink_vector<std::string>(scatterer);
     for (int i = 0; i < index.size(); i++) {
-      shrink_vector<int>(index[i]);
+      shrink_vector<numtype_index>(index[i]);
     }
   };
   const std::vector<std::complex<double> > get_sf_for_scatterer(const unsigned int nr)
@@ -204,7 +223,7 @@ public:
       return 0;
     }
   }
-  const std::vector<std::vector<int>> get_index_vector() const { return index; };
+  const std::vector<std::vector<numtype_index>> get_index_vector() const { return index; };
   void append(tsc_block& rhs, std::ofstream& log)
   {
     if (reflection_size() == 0) {
@@ -320,7 +339,7 @@ public:
     
     for (int run = 0; run < *nr_hkl; run++) {
       for (int i = 0; i < 3; i++) {
-        tsc_file.write((char*)&(index[i][run]), sizeof(int));
+        tsc_file.write((char*)&(index[i][run]), sizeof(numtype_index));
       }
       for (int i = 0; i < scat_size; i++) {
         tsc_file.write((char*)&(sf[i][run]), sizeof(std::complex<double>));
@@ -359,7 +378,7 @@ inline bool merge_tscs(
       std::string name = files[f];
       std::string new_name = get_basename_without_ending(name) + ".tsc";
       std::cout << "Converting to: " << new_name << std::endl;
-      tsc_block blocky(name);
+      tsc_block<int,cdouble> blocky(name);
       blocky.write_tsc_file(new_name, new_name);
       local_files[f] = new_name;
       std::cout << "Now reading converted: " << new_name << std::endl;
@@ -479,7 +498,7 @@ inline bool merge_tscs(
   std::string header_string("");
   for (size_t h_loc = 0; h_loc < header.size(); h_loc++)
     header_string += header[h_loc] + "\n";
-  tsc_block combined(form_fact, labels, indices, header_string);
+  tsc_block<int, cdouble> combined(form_fact, labels, indices, header_string);
   if (!old_tsc) {
     combined.write_tscb_file("combined.tscb");
   }
@@ -518,7 +537,7 @@ inline bool merge_tscs_without_checks(
       std::string name = files[f];
       std::string new_name = get_basename_without_ending(name) + ".tsc";
       std::cout << "Converting to: " << new_name << std::endl;
-      tsc_block blocky(name);
+      tsc_block<int> blocky(name);
       blocky.write_tsc_file(new_name,new_name);
       local_files[f] = new_name;
       std::cout << "Now reading converted: " << new_name << std::endl;
