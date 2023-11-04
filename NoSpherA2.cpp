@@ -1,4 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
+#include "tsc_block.h"
 #include "convenience.h"
 #include "fchk.h"
 #include "cube.h"
@@ -180,7 +181,7 @@ int main(int argc, char** argv)
 
     vector<string> known_scatterer;
     vector<vec> known_kpts;
-    tsc_block result;
+    tsc_block<int,cdouble> result;
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++) {
       known_scatterer = result.get_scatterers();
       if (wavy[i].get_origin() != 7) {

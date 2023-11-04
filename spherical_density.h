@@ -4,7 +4,7 @@
 #include <iostream>
 
 //These values stem from the following publications:
-// (1) Koga, T.; Kanayama, K.; Watanabe, S.; Thakkar, A. J. Analytical Hartree-Fock Wave Functions Subject to Cusp and Asymptotic Constraints: He to Xe, Li+ to Cs+, H? To I? Int. J. Quant. Chem. 1999, 71 (6), 491–497. https://doi.org/10.1002/(SICI)1097-461X(1999)71:6<491::AID-QUA6>3.0.CO;2-T.
+// (1) Koga, T.; Kanayama, K.; Watanabe, S.; Thakkar, A. J. Analytical Hartree-Fock Wave Functions Subject to Cusp and Asymptotic Constraints: He to Xe, Li+ to Cs+, H- To I- Int. J. Quant. Chem. 1999, 71 (6), 491–497. https://doi.org/10.1002/(SICI)1097-461X(1999)71:6<491::AID-QUA6>3.0.CO;2-T.
 // (2) Koga, T.; Kanayama, K.; Watanabe, T.; Imai, T.; Thakkar, A. J. Analytical Hartree-Fock Wave Functions for the Atoms Cs to Lr. Theoretical Chemistry Accounts: Theory, Computation, and Modeling (Theoretica Chimica Acta) 2000, 104 (5), 411–413. https://doi.org/10.1007/s002140000150.
 
 
