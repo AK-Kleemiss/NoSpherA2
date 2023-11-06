@@ -49,6 +49,21 @@ itsc_block calculate_structure_factors_MTC(
   const int& nr,
   std::vector<vec>* kpts=NULL);
 
+void generate_hkl(const double& dmin,
+  hkl_list& hkl,
+  const std::vector<vec>& twin_law,
+  cell& unit_cell,
+  std::ostream& file,
+  bool debug = false);
+
+void generate_fractional_hkl(const double& dmin,
+  hkl_list_d& hkl,
+  const std::vector<vec>& twin_law,
+  cell& unit_cell,
+  std::ostream& file,
+  double stepsize,
+  bool debug);
+
 template <typename NumType>
 std::complex<double> convert_to_ED_single(const int& neutralcharge,
 	std::complex<double>& sf,

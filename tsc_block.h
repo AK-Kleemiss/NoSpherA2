@@ -7,7 +7,7 @@ class tsc_block
 private:
   std::vector<std::vector<std::complex<double> > > sf; //[#scatterer] [#reflection]
   std::vector<std::string> scatterer; //Labels of reflections the correpsonding entry of sf belonds to
-  std::vector<std::vector<numtype_index> > index; //[3] [index]
+  std::vector<std::vector<numtype_index> > index; //[3] [miller_index]
   std::string header;
   bool anomalous_dispersion;
 
@@ -313,6 +313,29 @@ public:
     for (int r = 0; r < index[0].size(); r++) {
       for (int h_loc = 0; h_loc < 3; h_loc++)
         tsc_file << index[h_loc][r] << " ";
+      for (int i = 0; i < sf.size(); i++)
+        tsc_file << std::scientific << std::setprecision(8) << real(sf[i][r]) << ","
+        << std::scientific << std::setprecision(8) << imag(sf[i][r]) << " ";
+      tsc_file << std::endl;
+    }
+    tsc_file.close();
+    err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
+  }
+  void write_tsc_file_non_integer(const std::string& cif, std::string name = "experimental.tsc")
+  {
+    std::ofstream tsc_file(name, std::ios::out);
+
+    tsc_file << "TITLE: " << get_filename_from_path(cif).substr(0, cif.find(".cif")) << std::endl << "SYMM: ";
+    tsc_file << "expanded";
+    if (anomalous_dispersion) tsc_file << std::endl << "AD: TRUE";
+    tsc_file << std::endl << "SCATTERERS:";
+    for (int i = 0; i < scatterer.size(); i++)
+      tsc_file << " " << scatterer[i];
+    tsc_file << std::endl << "DATA:" << std::endl;
+
+    for (int r = 0; r < index[0].size(); r++) {
+      for (int h_loc = 0; h_loc < 3; h_loc++)
+        tsc_file << std::fixed << std::setprecision(3) << index[h_loc][r] << " ";
       for (int i = 0; i < sf.size(); i++)
         tsc_file << std::scientific << std::setprecision(8) << real(sf[i][r]) << ","
         << std::scientific << std::setprecision(8) << imag(sf[i][r]) << " ";

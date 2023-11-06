@@ -142,7 +142,8 @@ public:
     return crystal_system;
   }
 
-  double get_d_of_hkl(const std::vector<int> hkl) const 
+  template <typename numtype>
+  double get_d_of_hkl(const std::vector<numtype> hkl) const
   {
     // d will be in Angstrom
     // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
@@ -150,7 +151,8 @@ public:
     return sqrt(upper / lower);
   }
 
-  double get_stl_of_hkl(const std::vector<int> hkl) const
+  template <typename numtype>
+  double get_stl_of_hkl(const std::vector<numtype> hkl) const
   {
     //Result will be in Angstrom^-1
     return 1.0 / (2 * get_d_of_hkl(hkl));

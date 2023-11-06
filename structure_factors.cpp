@@ -204,7 +204,7 @@ void generate_hkl(const double& dmin,
   const vector<vec>& twin_law,
   cell& unit_cell,
   ostream& file,
-  bool debug = false)
+  bool debug)
 {
   file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
   vector<int> hkl_(3);
@@ -286,6 +286,51 @@ void generate_hkl(const double& dmin,
     }
   }
   hkl = hkl_enlarged;
+  file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
+}
+
+void generate_fractional_hkl(const double& dmin,
+  hkl_list_d& hkl,
+  const vector<vec>& twin_law,
+  cell& unit_cell,
+  ostream& file,
+  double stepsize,
+  bool debug)
+{
+  file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
+  vec hkl_(3);
+  string line, temp;
+  const int extreme = 201;
+  double dmin_l = 0.9 * dmin;
+  const int lim = extreme / stepsize;
+  for (double h = -extreme; h < extreme; h+=stepsize) {
+    for (double k = -extreme; k < extreme; k+=stepsize) {
+      //only need 0 to extreme, since we have no DISP signal
+      for (int l = 0; l < lim; l++) {
+        hkl_ = { h,k,l*stepsize };
+        if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
+          hkl.emplace(hkl_);
+        else
+          break;
+      }
+    }
+  }
+  file << "... done!\nNr of reflections generated: " << setw(21) << hkl.size() << endl;
+
+  if (debug)
+    file << "Number of reflections before twin: " << hkl.size() << endl;
+  if (twin_law.size() > 0) {
+    for (const vec& hkl__ : hkl)
+      for (int i = 0; i < twin_law.size(); i++)
+        hkl.emplace(vec{
+        (twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+          (twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+          (twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])
+      });
+  }
+  if (debug)
+    file << "Number of reflections after twin: " << hkl.size() << endl;
+
   file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
