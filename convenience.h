@@ -724,6 +724,7 @@ struct options {
   bool spherical_harmonic = false;
   bool ML_test = false;
   double sfac_scan = 0.0;
+  double sfac_diffuse = 0.0;
   double dmin = 99.0;
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
