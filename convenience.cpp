@@ -2429,6 +2429,12 @@ void options::digest_options() {
       cif = arguments[i + 2];
       wfn = arguments[i + 3];
     }
+    else if (temp.find("-sfac_diffuse") < 1) {
+      sfac_diffuse = fromString<double>(arguments[i + 1]);
+      cif = arguments[i + 2];
+      wfn = arguments[i + 3];
+      dmin = fromString<double>(arguments[i + 4]);
+    }
     else if (temp.find("-spherical_harmonic") < 1)
       spherical_harmonic = true;
     else if (temp.find("-test") < 1)
