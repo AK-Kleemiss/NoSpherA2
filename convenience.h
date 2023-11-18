@@ -40,6 +40,7 @@ class atom;
 
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
+typedef std::vector<int> ivec;
 typedef std::vector<cdouble> cvec;
 
 inline double vec_sum(vec& in) {
@@ -422,7 +423,7 @@ std::string get_filename_from_path(const std::string& input);
 std::string get_foldername_from_path(const std::string& input);
 std::string get_basename_without_ending(const std::string& input);
 //------------------Functions to read from .fchk files----------------------------------
-bool read_fchk_integer_block(std::ifstream& in, std::string heading, std::vector<int>& result, bool rewind = true);
+bool read_fchk_integer_block(std::ifstream& in, std::string heading, ivec& result, bool rewind = true);
 bool read_fchk_double_block(std::ifstream& in, std::string heading, vec& result, bool rewind = true);
 int read_fchk_integer(std::string in);
 int read_fchk_integer(std::ifstream& in, std::string search, bool rewind = true);
@@ -578,9 +579,9 @@ inline double double_from_string_with_esd(std::string in)
     return stod(in.substr(0, in.find('(')));
 }
 
-void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v);
+void swap_sort(ivec order, cvec& v);
 
-void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v);
+void swap_sort_multi(ivec order, std::vector<ivec>& v);
 
 //Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
 double get_lambda_1(double* a);
@@ -670,8 +671,8 @@ struct primitive
   }
 };
 
-typedef std::set<std::vector<int>> hkl_list;
-typedef std::set<std::vector<int>>::const_iterator hkl_list_it;
+typedef std::set<ivec> hkl_list;
+typedef std::set<ivec>::const_iterator hkl_list_it;
 
 typedef std::set<vec> hkl_list_d;
 typedef std::set<vec>::const_iterator hkl_list_it_d;
@@ -729,10 +730,10 @@ struct options {
   int hirsh_number = 0;
   double MinMax[6]{ 0,0,0,0,0,0 };
   int NbSteps[3]{ 0,0,0 };
-  std::vector <int> MOs;
-  std::vector < std::vector <int> > groups;
-  std::vector < std::vector <double> > twin_law;
-  std::vector < std::vector <int> > combined_tsc_groups;
+  ivec MOs;
+  std::vector < ivec > groups;
+  std::vector < vec > twin_law;
+  std::vector < ivec > combined_tsc_groups;
   bool all_mos = false;
   bool test = false;
   std::string wfn;
@@ -754,10 +755,10 @@ struct options {
   std::vector<std::string> combine_mo;
   std::vector<std::string> Cations;
   std::vector<std::string> Anions;
-  std::vector<int> cmo1;
-  std::vector<int> cmo2;
-  std::vector<int> ECP_nrs;
-  std::vector<int> ECP_elcounts;
+  ivec cmo1;
+  ivec cmo2;
+  ivec ECP_nrs;
+  ivec ECP_elcounts;
   int ncpus = 0;
   double mem = 0.0;
   unsigned int mult = 0;

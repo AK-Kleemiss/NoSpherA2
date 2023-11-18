@@ -132,7 +132,7 @@ void WFN::push_back_MO_coef(const int& nr, const double& value)
   MOs[nr].push_back_coef(value);
 };
 
-void WFN::assign_MO_coefs(const int& nr, vec& values)
+void WFN::assign_MO_coefs(const int& nr, std::vector<double>& values)
 {
   err_checkf(nr < nmo, "not enough MOs", std::cout);
   MOs[nr].assign_coefs(values);
@@ -1168,7 +1168,7 @@ bool WFN::read_molden(const string& filename, ostream& file, const bool debug)
   double ene, occup;
   int expected_coefs = 0;
   vector<primitive> prims;
-  vector<int> temp_shellsizes;
+  ivec temp_shellsizes;
   for (int a = 0; a < ncen; a++) {
     int current_shell = -1;
     int l = 0;
@@ -1499,7 +1499,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     }
     int expected_coefs = 0;
     vector<primitive> prims;
-    vector<int> temp_shellsizes;
+    ivec temp_shellsizes;
     for (int a = 0; a < ncen; a++) {
       int current_shell = -1;
       for (int s = 0; s < atoms[a].basis_set.size(); s++) {
@@ -1555,8 +1555,8 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug)
     vector<vec> coefficients(operators);
     vector<vec> occupations(operators);
     vector<vec> energies(operators);
-    vector<vector<int>> irreps(operators);
-    vector<vector<int>> cores(operators);
+    vector<ivec> irreps(operators);
+    vector<ivec> cores(operators);
     for (int i = 0; i < operators; i++) {
       coefficients[i].resize(coef_nr, 0);
       occupations[i].resize(dimension, 0);
@@ -2725,9 +2725,9 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
           break;
         case 2: {
           if (get_atom_shell_primitives(a, s) > 1) {
-            vector<int> temp_centers;
+            ivec temp_centers;
             temp_centers.resize(3 * get_atom_shell_primitives(a, s));
-            vector<int> temp_types;
+            ivec temp_types;
             temp_types.resize(3 * get_atom_shell_primitives(a, s));
             vec temp_exponents;
             temp_exponents.resize(3 * get_atom_shell_primitives(a, s));
@@ -2755,9 +2755,9 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
         }
         case 3: {
           if (get_atom_shell_primitives(a, s) > 1) {
-            vector<int> temp_centers;
+            ivec temp_centers;
             temp_centers.resize(6 * get_atom_shell_primitives(a, s));
-            vector<int> temp_types;
+            ivec temp_types;
             temp_types.resize(6 * get_atom_shell_primitives(a, s));
             vec temp_exponents;
             temp_exponents.resize(get_atom_shell_primitives(a, s) * 6);
@@ -2788,9 +2788,9 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
         }
         case 4: {
           if (get_atom_shell_primitives(a, s) > 1) {
-            vector<int> temp_centers;
+            ivec temp_centers;
             temp_centers.resize(10 * get_atom_shell_primitives(a, s));
-            vector<int> temp_types;
+            ivec temp_types;
             temp_types.resize(10 * get_atom_shell_primitives(a, s));
             vec temp_exponents;
             temp_exponents.resize(get_atom_shell_primitives(a, s) * 10);
@@ -3004,7 +3004,7 @@ void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms) {
   }
 };
 
-void WFN::set_ECPs(vector<int> &nr, vector<int> &elcount) {
+void WFN::set_ECPs(ivec &nr, ivec &elcount) {
   has_ECPs = true;
   err_chkf(nr.size() == elcount.size(), "mismatch in size of atoms and ECP electrons!", std::cout);
 #pragma omp parallel for
@@ -3240,7 +3240,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
   line = go_get_string(fchk, "Total Energy");
   if (line != "")
     total_energy = read_fchk_double(line);
-  vector<int> atnbrs;
+  ivec atnbrs;
   if (!read_fchk_integer_block(fchk, "Atomic numbers", atnbrs)) {
     log << "Error reading atnbrs" << endl;
     return false;
@@ -3357,7 +3357,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
     }
   }
   if (debug) log << "Finished reading the file! Transferring to WFN object!" << endl;
-  vector<int> shelltypesspherical;
+  ivec shelltypesspherical;
   int nbas5D(0);
   nmo = nbas;
   int nshell = (int) shell_types.size();
@@ -3379,7 +3379,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
     log << setw(3) << nbas5D << endl;
     log << setw(3) << nbas << endl;
   }
-  vector<int> shelltypescartesian(size_t(shell_types.size()), 0);
+  ivec shelltypescartesian(size_t(shell_types.size()), 0);
   shelltypescartesian = shell_types;
   //int nbasCart = nbas;
   int nprims = 0;
@@ -3407,7 +3407,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
   }
   //vector<primitive> basis;
   vector<vec> COa, COb, CObasa, CObasb, CObasa_spherical, CObasb_spherical;
-  //vector<int> basshell, bascen, bastype, basstart, basend, primstart, primend;
+  //ivec basshell, bascen, bastype, basstart, basend, primstart, primend;
   vec primconnorm;
   //create arrays
   //basshell.resize(nbas);
