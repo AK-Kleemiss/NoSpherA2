@@ -1899,7 +1899,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
   return true;
 };
 
-bool read_fchk_integer_block(ifstream& in, string heading, vector<int>& result, bool rewind)
+bool read_fchk_integer_block(ifstream& in, string heading, ivec& result, bool rewind)
 {
   if (result.size() != 0) result.clear();
   string line = go_get_string(in, heading, rewind);
@@ -1953,7 +1953,7 @@ double read_fchk_double(std::ifstream& in, std::string search, bool rewind)
   string temp = go_get_string(in, search, rewind);
   return stod(temp.substr(49, temp.length() - 49));
 };
-void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v)
+void swap_sort(ivec order, cvec& v)
 {
   int i = 0;
   while (i < v.size() - 1) {
@@ -1974,10 +1974,10 @@ void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v)
   }
 }
 
-void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
+void swap_sort_multi(ivec order, std::vector<ivec>& v)
 {
   int i = 0;
-  std::vector<int> temp;
+  ivec temp;
   temp.resize(v.size());
   while (i < v.size() - 1) {
     int new_index = 0;
