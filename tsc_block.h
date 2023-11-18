@@ -84,7 +84,7 @@ public:
     }
     scatterer = given_scatterer;
     index.resize(3);
-    for (const std::vector<int>& hkl : given_index) {
+    for (const ivec& hkl : given_index) {
       for (int i = 0; i < 3; i++)
         index[i].push_back(hkl[i]);
     }
@@ -183,12 +183,12 @@ public:
   }
   void set_AD(const bool value) { anomalous_dispersion = value; };
   bool get_AD() { return anomalous_dispersion; };
-  const std::vector<int> get_indices(const unsigned int nr)
+  const ivec get_indices(const unsigned int nr)
   {
     err_checkf(nr < index[0].size(), "Invalid nr of index", std::cout);
     return { index[0][nr], index[1][nr], index[2][nr] };
   };
-  const std::vector<int> get_indices(const unsigned int nr, std::ofstream& file)
+  const ivec get_indices(const unsigned int nr, std::ofstream& file)
   {
     err_checkf(nr < index[0].size(), "Invalid nr of index", file);
     return { index[0][nr], index[1][nr], index[2][nr] };
