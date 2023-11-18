@@ -678,7 +678,7 @@ void Calc_S_Rho(
   WFN& wavy,
   int cpus,
   ofstream& file,
-  bool nodate
+  bool& nodate
 )
 {
 #ifdef _OPENMP
@@ -687,6 +687,8 @@ void Calc_S_Rho(
       omp_set_nested(1);
   }
 #endif
+
+  if (nodate) nodate = nodate;
 
   time_t start;
   std::time(&start);
