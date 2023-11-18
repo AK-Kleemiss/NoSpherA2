@@ -276,18 +276,15 @@ void generate_hkl(const double& dmin,
     }
   }
 
-  hkl = hkl_enlarged;
-
-  for (const ivec& hkl__ : hkl) {
+  for (const ivec& hkl__ : hkl_enlarged) {
     tempv = hkl__;
     tempv[0] *= -1;
     tempv[1] *= -1;
     tempv[2] *= -1;
-    if (hkl_enlarged.find(tempv) != hkl_enlarged.end()) {
-      hkl_enlarged.erase(tempv);
+    if (hkl.find(tempv) != hkl.end() && hkl.find(hkl__) == hkl.end()) {
+      hkl.emplace(hkl__);
     }
   }
-  hkl = hkl_enlarged;
   file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
