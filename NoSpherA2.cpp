@@ -26,6 +26,7 @@ typedef enum omp_sched_t {
 
 int main(int argc, char** argv)
 {
+  std::cout << NoSpherA2_message();
   ofstream log_file("NoSpherA2.log", ios::out);
   auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); //save and redirect
   vector<WFN> wavy;
