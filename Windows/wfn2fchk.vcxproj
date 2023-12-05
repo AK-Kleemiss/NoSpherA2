@@ -1517,7 +1517,7 @@
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
-      <Command>copy "D:\git\wfn2fchk\Windows\x64\Release + Copy\NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
+      <Command>copy "$(IntDirFullPath)\NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">
