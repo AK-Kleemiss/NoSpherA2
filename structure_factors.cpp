@@ -570,8 +570,8 @@ int make_hirshfeld_grids(const int& pbc,
   const int& accuracy,
   cell& unit_cell,
   const WFN& wave,
-  const vector <int>& atom_type_list,
-  const vector <int>& asym_atom_list,
+  const ivec& atom_type_list,
+  const ivec& asym_atom_list,
   vector <bool>& needs_grid,
   vector<vec>& d1,
   vector<vec>& d2,
@@ -2088,7 +2088,7 @@ int make_hirshfeld_grids(const int& pbc,
 }
 
 //returns number of gridpoints in the final total grid
-int make_hirshfeld_grids_RI(
+static int make_hirshfeld_grids_RI(
   const int& accuracy,
   cell& unit_cell,
   const WFN& wave,
@@ -2803,7 +2803,7 @@ int make_hirshfeld_grids_RI(
   return points;
 }
 
-int make_integration_grids(
+static int make_integration_grids(
   const int& accuracy,
   cell& unit_cell,
   const WFN& wave,
@@ -3358,7 +3358,7 @@ int make_integration_grids(
   return points;
 }
 
-int make_integration_grids_SALTED(
+static int make_integration_grids_SALTED(
   const int& accuracy,
   cell& unit_cell,
   const WFN& wave,
