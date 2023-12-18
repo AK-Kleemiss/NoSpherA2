@@ -3903,7 +3903,6 @@ static int make_integration_grids_SALTED(
   return points;
 }
 
-//return whether it remnoved symmetry equivalent entries
 void make_k_pts(const bool& read_k_pts,
   const bool& save_k_pts,
   const int gridsize,
@@ -4151,7 +4150,10 @@ bool thakkar_sfac(
   hkl_list hkl;
   if (!opt.read_k_pts) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin/2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
@@ -4361,7 +4363,10 @@ tsc_block<int,cdouble> MTC_thakkar_sfac(
   }
   else if (nr == 0 && opt.read_k_pts == false) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     opt.m_hkl_list = hkl;
@@ -4471,7 +4476,10 @@ bool calculate_structure_factors_HF(
   hkl_list hkl;
   if (!opt.read_k_pts) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
@@ -4650,7 +4658,10 @@ bool calculate_structure_factors_RI(
   hkl_list hkl;
   if (!opt.read_k_pts) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
@@ -4831,7 +4842,10 @@ bool calculate_structure_factors_RI_No_H(
   hkl_list hkl;
   if (!opt.read_k_pts) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
   }
@@ -5103,7 +5117,10 @@ tsc_block<int, cdouble> calculate_structure_factors_MTC(
   }
   else if (nr == 0 && opt.read_k_pts == false) {
     if (opt.dmin != 99.0)
-      generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      if (opt.electron_diffraction)
+        generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+      else
+        generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
     else
       read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     opt.m_hkl_list = hkl;
