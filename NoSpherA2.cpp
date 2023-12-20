@@ -145,7 +145,9 @@ int main(int argc, char** argv)
     }
     err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
     err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
-    wavy.push_back(WFN(0));
+    auto t = new WFN(0);
+    wavy.push_back(*t);
+    delete t;
     wavy[0].read_known_wavefunction_format(opt.xyz_file, log_file, opt.debug);
 
     if (opt.electron_diffraction && opt.debug)
@@ -159,7 +161,9 @@ int main(int argc, char** argv)
   }
   //This one has conversion to fchk and calculation of one single tsc file
   if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.sfac_scan == 0.0) {
-    wavy.push_back(WFN(0));
+    auto t = new WFN(0);
+    wavy.push_back(*t);
+    delete t;
     log_file << "Reading: " << setw(44) << opt.wfn << flush;
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file, opt.debug);
     wavy[0].set_method(opt.method);
@@ -237,7 +241,9 @@ int main(int argc, char** argv)
   //Converts gbw file to wfn file and leaves
   if (opt.gbw2wfn) {
     err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
-    wavy.push_back(WFN(9));
+    auto t = new WFN(9);
+    wavy.push_back(*t);
+    delete t;
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, false);
     log_file.flush();
@@ -265,7 +271,9 @@ int main(int argc, char** argv)
   }
   if (opt.coef_file != "") {
     if (opt.cif != "" && opt.xyz_file != "") {
-      wavy.push_back(WFN(7));
+      auto t = new WFN(7);
+      wavy.push_back(*t);
+      delete t;
       //Read the xyzfile
       wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
       //Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
