@@ -238,7 +238,9 @@ void test_density_cubes(options& opt, std::ofstream& log_file) {
 void sfac_scan(options& opt, std::ofstream& log_file) {
   using namespace std;
   std::vector<WFN> wavy;
-  wavy.push_back(WFN(1));
+  auto t = new WFN(1);
+  wavy.push_back(*t);
+  delete t;
   wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
   Thakkar O(wavy[0].atoms[0].charge);
   Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
@@ -425,7 +427,9 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
 void sfac_diffuse(options& opt, std::ofstream& log_file) {
   using namespace std;
   std::vector<WFN> wavy;
-  wavy.push_back(WFN(1));
+  auto t = new WFN(1);
+  wavy.push_back(*t);
+  delete t;
   wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
   Thakkar O(wavy[0].atoms[0].charge);
   Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
@@ -841,7 +845,6 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
   vec data{};
 
   npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-
   WFN dummy(7); dummy.read_xyz(xyzfile, std::cout);
 
   int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
