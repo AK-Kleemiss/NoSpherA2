@@ -16,6 +16,7 @@
 #include <complex>
 #include <functional>
 #include <stdexcept>
+#include <typeinfo>
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
@@ -1044,6 +1045,22 @@ inline bool ends_with(const std::string& str, const std::string& suffix) {
         return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
     }
     return false;
+}
+
+template <typename T>
+inline bool is_nan(T in) {
+  if (typeid(in) == typeid(double)) {
+    return in != in;
+  }
+  else if (typeid(in) == typeid(float)) {
+    return in != in;
+  }
+  else if (typeid(in) == typeid(long double)) {
+    return in != in;
+  }
+  else {
+    return false;
+  }
 }
 
 #include "wfn_class.h"

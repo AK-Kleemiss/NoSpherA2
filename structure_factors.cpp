@@ -4038,7 +4038,7 @@ void calc_SF(const int& points,
   //#endif
 }
 
-void add_ECP_contribution(const vector <int>& asym_atom_list,
+static void add_ECP_contribution(const vector <int>& asym_atom_list,
   const WFN& wave,
   vector<vector<complex<double>>>& sf,
   const cell &cell,
