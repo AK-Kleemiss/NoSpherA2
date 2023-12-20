@@ -23,6 +23,7 @@ public:
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
+        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -41,6 +42,7 @@ public:
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
+        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -58,6 +60,7 @@ public:
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
+        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -79,6 +82,7 @@ public:
     for (int i = 0; i < given_sf.size(); i++) {
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++) {
+        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -92,6 +96,7 @@ public:
   };
   tsc_block(std::string &file_name)
   {
+    anomalous_dispersion = false;
     using namespace std;
     ifstream tsc_file(file_name.c_str(), ios::binary);
 
