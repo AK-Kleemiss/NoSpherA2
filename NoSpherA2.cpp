@@ -35,7 +35,9 @@ int main(int argc, char **argv)
   opt.digest_options();
   if (opt.threads != -1)
   {
+#ifdef _OPENMP
     omp_set_num_threads(opt.threads);
+#endif
     // omp_set_dynamic(0);
 #ifdef _WIN32
     _putenv("OMP_SCHEDULE=dynamic,2");
