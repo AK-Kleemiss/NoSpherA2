@@ -207,6 +207,7 @@ const MO &WFN::get_MO(const int &n) const
   else
   {
     err_not_impl_f("Wrong MO number", std::cout);
+    return MOs[0];
   }
 };
 
@@ -4600,6 +4601,7 @@ double WFN::compute_MO_spherical(
     const int &MO)
 {
   err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
+  return 0.0;
   /*
   err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   int iat;
@@ -4713,6 +4715,7 @@ double WFN::compute_dens_spherical(
     const bool &add_ECP_dens)
 {
   err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
+  return 0.0;
   /*
   err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
   std::fill(phi.begin(), phi.end(), 0.0);
