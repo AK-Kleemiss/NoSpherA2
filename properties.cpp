@@ -1100,7 +1100,7 @@ void Calc_MO(
   if (cpus != -1)
   {
     if (cpus > 1)
-      set_nested(1);
+      omp_set_nested(1);
   }
 #endif
   time_t start;
