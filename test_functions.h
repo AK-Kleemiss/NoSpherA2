@@ -1,5 +1,6 @@
 #pragma once
 #include "spherical_density.h"
+#include "structure_factors.h"
 #include "convenience.h"
 #include "npy.h"
 
@@ -237,7 +238,9 @@ void test_density_cubes(options& opt, std::ofstream& log_file) {
 void sfac_scan(options& opt, std::ofstream& log_file) {
   using namespace std;
   std::vector<WFN> wavy;
-  wavy.push_back(WFN(1));
+  auto t = new WFN(1);
+  wavy.push_back(*t);
+  delete t;
   wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
   Thakkar O(wavy[0].atoms[0].charge);
   Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
@@ -245,10 +248,6 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
   err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
   err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
   //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-  if (opt.threads != -1) {
-    omp_set_num_threads(opt.threads);
-    omp_set_dynamic(0);
-  }
 
 #ifdef _WIN64
   time_t start = time(NULL);
@@ -423,6 +422,245 @@ void sfac_scan(options& opt, std::ofstream& log_file) {
     log_file << " ... done!" << endl;
   }
   log_file.close();
+}
+
+void sfac_diffuse(options& opt, std::ofstream& log_file) {
+  using namespace std;
+  std::vector<WFN> wavy;
+  auto t = new WFN(1);
+  wavy.push_back(*t);
+  delete t;
+  wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
+  Thakkar O(wavy[0].atoms[0].charge);
+  Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
+  Thakkar_Anion O_an(wavy[0].atoms[0].charge);
+  err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+  err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
+  //err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+
+#ifdef _WIN64
+  time_t start = time(NULL);
+  time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+#else
+  struct timeval t1, t2;
+
+  gettimeofday(&t1, 0);
+#endif
+
+  cell unit_cell(opt.cif, std::cout, opt.debug);
+  ifstream cif_input(opt.cif.c_str(), std::ios::in);
+  vector <int> atom_type_list;
+  vector <int> asym_atom_to_type_list;
+  vector <int> asym_atom_list;
+  vector <bool> needs_grid(wavy[0].get_ncen(), false);
+  vector<string> known_atoms;
+
+  read_atoms_from_CIF(cif_input,
+    opt.groups[0],
+    unit_cell,
+    wavy[0],
+    known_atoms,
+    atom_type_list,
+    asym_atom_to_type_list,
+    asym_atom_list,
+    needs_grid,
+    std::cout,
+    opt.debug);
+
+  cif_input.close();
+  vector<vec> d1, d2, d3, dens;
+
+  make_hirshfeld_grids(opt.pbc,
+    opt.accuracy,
+    unit_cell,
+    wavy[0],
+    atom_type_list,
+    asym_atom_list,
+    needs_grid,
+    d1, d2, d3, dens,
+    std::cout,
+#ifdef _WIN64
+    start,
+    end_becke,
+    end_prototypes,
+    end_spherical,
+    end_prune,
+    end_aspherical,
+#else
+    t1,
+    t2,
+#endif
+    opt.debug,
+    opt.no_date);
+
+  hkl_list_d hkl;
+  generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
+
+  const int size = (int)hkl.size();
+  vector<vec> k_pt;
+  k_pt.resize(3);
+#pragma omp parallel for
+  for (int i = 0; i < 3; i++)
+    k_pt[i].resize(size, 0.0);
+
+  if (opt.debug)
+    log_file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+  int i_ = 0;
+  for (const vec& hkl_ : hkl) {
+    for (int x = 0; x < 3; x++) {
+      for (int j = 0; j < 3; j++) {
+        k_pt[x][i_] += unit_cell.get_rcm(x, j) * hkl_[j];
+      }
+    }
+    i_++;
+  }
+
+  // below is a strip of Calc_SF without the file IO or progress bar
+  vector<vector<complex<double>>> sf;
+
+  const int imax = (int)dens.size();
+  const int smax = (int)k_pt[0].size();
+  int pmax = (int)dens[0].size();
+  const int step = max((int)floor(smax / 20), 1);
+  std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
+  sf.resize(imax);
+#pragma omp parallel for
+  for (int i = 0; i < imax; i++)
+    sf[i].resize(k_pt[0].size());
+  double* dens_local, * d1_local, * d2_local, * d3_local;
+  complex<double>* sf_local;
+  const double* k1_local = k_pt[0].data();
+  const double* k2_local = k_pt[1].data();
+  const double* k3_local = k_pt[2].data();
+  double work, rho;
+  progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
+  for (int i = 0; i < imax; i++) {
+    pmax = (int)dens[i].size();
+    dens_local = dens[i].data();
+    d1_local = d1[i].data();
+    d2_local = d2[i].data();
+    d3_local = d3[i].data();
+    sf_local = sf[i].data();
+#pragma omp parallel for private(work,rho)
+    for (int s = 0; s < smax; s++) {
+      for (int p = pmax - 1; p >= 0; p--) {
+        rho = dens_local[p];
+        work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+        sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
+      }
+      if (i != 0 && i % step == 0)
+        progress->write(i / double(imax));
+    }
+  }
+  delete(progress);
+  vector<string> labels;
+  for (int i = 0; i < asym_atom_list.size(); i++)
+    labels.push_back(wavy[0].atoms[asym_atom_list[i]].label);
+  tsc_block<double, cdouble> result(sf, labels, hkl);
+  result.write_tsc_file_non_integer(opt.cif);
+  log_file.close();
+}
+
+void combine_mo(options& opt) {
+  using namespace std;
+  WFN wavy1(2);
+  WFN wavy2(2);
+  WFN wavy3(2);
+  wavy1.read_wfn(opt.combine_mo[0], false, cout);
+  wavy2.read_wfn(opt.combine_mo[1], false, cout);
+  for (int i = 0; i < wavy1.get_ncen(); i++) {
+    wavy3.push_back_atom(wavy1.get_atom(i));
+  }
+  for (int i = 0; i < wavy2.get_ncen(); i++) {
+    wavy3.push_back_atom(wavy2.get_atom(i));
+  }
+  cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
+
+  double MinMax1[6];
+  int steps1[3];
+  readxyzMinMax_fromWFN(wavy1, MinMax1, steps1, opt.radius, opt.resolution, true);
+  double MinMax2[6];
+  int steps2[3];
+  readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
+
+  cout << "Read input\nCalculating for MOs ";
+  for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
+    cout << opt.cmo1[v1] << " ";
+  }
+  cout << "of fragment 1 and MOs ";
+  for (int v1 = 0; v1 < opt.cmo2.size(); v1++) {
+    cout << opt.cmo2[v1] << " ";
+  }
+  cout << "of fragment 2" << endl;
+  double MinMax[6]{ 100,100,100,-100,-100,-100 };
+  int steps[3]{ 0,0,0 };
+  for (int i = 0; i < 3; i++) {
+    if (MinMax1[i] < MinMax[i])
+      MinMax[i] = MinMax1[i];
+    if (MinMax1[i + 3] > MinMax[i + 3])
+      MinMax[i + 3] = MinMax1[i + 3];
+  }
+  for (int i = 0; i < 3; i++) {
+    if (MinMax2[i] < MinMax[i])
+      MinMax[i] = MinMax2[i];
+    if (MinMax2[i + 3] > MinMax[i + 3])
+      MinMax[i + 3] = MinMax2[i + 3];
+    steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / 0.1);
+  }
+  int counter = 0;
+  cube total(steps[0], steps[1], steps[2], 0, true);
+  cube MO1(steps[0], steps[1], steps[2], 0, true);
+  MO1.give_parent_wfn(wavy3);
+  MO1.set_na(wavy3.get_ncen());
+  cube MO2(steps[0], steps[1], steps[2], 0, true);
+  vector<string> fns;
+  for (int i = 0; i < 3; i++) {
+    MO1.set_origin(i, MinMax[i]);
+    MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    total.set_origin(i, MinMax[i]);
+    total.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    MO2.set_origin(i, MinMax[i]);
+    MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+  }
+  for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
+    MO1.set_zero();
+    Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, -1, 400, std::cout);
+    for (int j = 0; j < opt.cmo2.size(); j++) {
+      counter++;
+      cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
+      string filename("");
+      MO2.set_zero();
+      Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, -1, 400, std::cout);
+      cout << "writing files..." << flush;
+      filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+      fns.push_back(filename);
+      total.set_zero();
+      total = MO1;
+      total += MO2;
+      total.write_file(filename, false);
+      filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+      fns.push_back(filename);
+      total.set_zero();
+      total = MO1;
+      total -= MO2;
+      total.write_file(filename, false);
+      cout << " ... done!" << endl;
+    }
+  }
+  ofstream vmd("read_files.vmd");
+  vmd << "mol addrep 0\nmol new {" + fns[0] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 }\n";
+  vmd << "animate style Loop\n";
+  for (int i = 1; i < fns.size(); i++)
+    vmd << "mol addfile {" + fns[i] + "} type {cube} first 0 last -1 step 1 waitfor 1 volsets {0 } 0\n";
+  vmd << "animate style Loop\ndisplay projection Orthographic\ndisplay depthcue off\n";
+  vmd << "axes location Off\ndisplay rendermode GLSL\ncolor Display Background white\ncolor Element P purple\n";
+  vmd << "color Element Ni green\ncolor Element C gray\nmol modstyle 0 0 CPK 1.000000 0.300000 12.000000 12.000000\n";
+  vmd << "mol modcolor 0 0 Element\nmol color Element\nmol representation CPK 1.000000 0.300000 22.000000 22.000000\n";
+  vmd << "mol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 1 0 Isosurface 0.020000 0 0 0 1 1\n";
+  vmd << "mol modcolor 1 0 ColorID 0\nmol selection all\nmol material Transparent\nmol addrep 0\nmol modstyle 2 0 Isosurface -0.020000 0 0 0 1 1\nmol modcolor 2 0 ColorID 1\n";
+  vmd << "mol selection all\nmol material Transparent\n";
+  vmd.flush();
+  vmd.close();
 }
 
 void spherical_harmonic_test() {
@@ -607,7 +845,6 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
   vec data{};
 
   npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-
   WFN dummy(7); dummy.read_xyz(xyzfile, std::cout);
 
   int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);

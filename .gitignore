@@ -52,3 +52,4 @@ tests/reading_SALTED/water_monomer_rho.cube
 tests/reading_SALTED/water_rho.cube
 *std.compat.ixx*
 *std.ixx*
+*.ixx.ifc*

@@ -46,7 +46,7 @@ cube::cube(const string& filepath, bool read, WFN& wave, ostream& file, bool exp
   loaded = read;
 };
 
-cube::cube(int g_na, const vector<int>& g_size, const vector< double >& g_origin, const vector< vec >& g_vectors, const vector<vector<vec > >& g_values) {
+cube::cube(int g_na, const ivec& g_size, const vector< double >& g_origin, const vector< vec >& g_vectors, const vector<vector<vec > >& g_values) {
   na = g_na;
   parent_wavefunction = new WFN(6);
   cout << "Assigned Nr of Atoms" << endl;
@@ -372,7 +372,7 @@ bool cube::fractal_dimension(const double stepsize) {
   vec e = double_sum();
   min -= 2 * stepsize, max += 2 * stepsize;
   const int steps = int((max - min) / stepsize) + 2;
-  vector<int> bins;
+  ivec bins;
   vec df;
   vec iso;
   bins.resize(steps), df.resize(steps), iso.resize(steps);

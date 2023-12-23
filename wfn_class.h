@@ -151,8 +151,8 @@ public:
   bool guess_multiplicity(std::ostream& file);
   std::vector<double> get_norm_const(std::ostream& file, const bool debug = false);
   //-------------------atom handling--------------------------------------------------------------
-  double get_atom_coordinate(const int& nr, const int& axis);
-  std::string get_atom_label(const int& nr);
+  double get_atom_coordinate(const unsigned  int& nr, const unsigned int& axis);
+  std::string get_atom_label(const unsigned int& nr);
   int get_nr_basis_set_loaded();
   bool get_atom_basis_set_loaded(const int& nr);
   double get_atom_basis_set_exponent(const int& nr_atom, const int& nr_prim);
@@ -165,15 +165,15 @@ public:
     if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].basis_set.size() && nr_prim >= 0)
       return atoms[nr_atom].basis_set[nr_prim].type; else return -1;
   };
-  bool erase_atom_primitive(const int& nr, const int& nr_prim);
-  int get_atom_shell_count(const int& nr);
-  int get_atom_shell_primitives(const int& nr_atom, const int& nr_shell);
-  int get_shell_type(const int& nr_atom, const int& nr_shell);
-  int get_shell_center(const int& nr_atom, const int& nr_shell);
-  int get_basis_set_shell(const int& nr_atom, const int& nr_prim);
-  int get_shell_start(const int& nr_atom, const int& nr_shell);
-  int get_shell_start_in_primitives(const int& nr_atom, const int& nr_shell);
-  int get_shell_end(const int& nr_atom, const int& nr_shell);
+  bool erase_atom_primitive(const unsigned int& nr, const unsigned int& nr_prim);
+  int get_atom_shell_count(const unsigned int& nr);
+  int get_atom_shell_primitives(const unsigned int& nr_atom, const unsigned int& nr_shell);
+  int get_shell_type(const unsigned int& nr_atom, const unsigned int& nr_shell);
+  int get_shell_center(const unsigned int& nr_atom, const unsigned int& nr_shell);
+  int get_basis_set_shell(const unsigned int& nr_atom, const unsigned int& nr_prim);
+  int get_shell_start(const unsigned int& nr_atom, const unsigned int& nr_shell);
+  int get_shell_start_in_primitives(const unsigned int& nr_atom, const unsigned int& nr_shell);
+  int get_shell_end(const unsigned int& nr_atom, const unsigned int& nr_shell);
   bool push_back_atom(const std::string& label, const double& x, const double& y, const double& z, const int& charge);
   bool push_back_atom(const atom& given);
   //atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };

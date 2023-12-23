@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-wfn test.wfn -hkl test.hkl -cif test.cif -acc 1 -no-date</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)../tests/wfn_reading</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-cpus 36 -v -acc 1 -dmin 0.54 -wfn olex2/Wfn_job/fk_03422_int_db.gbw -cif olex2/Wfn_job/fk_03422_int_db.cif</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>E:\Temp\test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
@@ -32,7 +32,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
-    <LocalDebuggerCommandArguments>-wfn olex2/Wfn_job/sucrose.wfx -cif olex2/Wfn_job/sucrose.cif -hkl olex2/Wfn_job/sucrose.hkl -cpus 24 -acc 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn olex2/Wfn_job/sucrose.wfx -cif olex2/Wfn_job/sucrose.cif -dmin 0.7 -cpus 24 -acc 2</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_fchk_SF\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -50,7 +50,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">
-    <LocalDebuggerCommandArguments>-xyz alanine.xyz -cif alanine.cif -coef_file alanine2.npy -dmin 0.7 -SALTED_BECKE</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-xyz alanine.xyz -cif alanine.cif -coef_file alanine2.npy -dmin 0.7 -SALTED -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\reading_SALTED</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
