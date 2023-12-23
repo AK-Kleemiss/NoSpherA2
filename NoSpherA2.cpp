@@ -282,10 +282,8 @@ int main(int argc, char **argv)
                        log_file,
                        wavy[0]),
                    "Error during SF Calcualtion", log_file);
-      log_file << "This is after the calculation" << endl;
     }
     log_file.flush();
-    log_file << "This is after the calculation2" << endl;
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
     // log_file.close();
