@@ -22,7 +22,7 @@ jobs:
           make
     - name: make_MacOS
       run: >
-          cd ../../../Mac && make && mv NoSpherA2 NoSpherA2_Mac && mv universal_NoSpherA2 NoSpherA2_Mac_universal
+          cd Mac && make && mv NoSpherA2 NoSpherA2_Mac && mv universal_NoSpherA2 NoSpherA2_Mac_universal
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
