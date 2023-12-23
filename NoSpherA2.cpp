@@ -29,7 +29,7 @@ int main(int argc, char **argv)
 {
   std::cout << NoSpherA2_message();
   char cwd[1024];
-  if (getcwd(cwd, sizeof(cwd)) != NULL)
+  if (_getcwd(cwd, sizeof(cwd)) != NULL)
   {
     std::cout << "Current working directory: " << cwd << std::endl;
   }
