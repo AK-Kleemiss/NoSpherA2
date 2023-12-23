@@ -29,7 +29,11 @@ int main(int argc, char **argv)
 {
   std::cout << NoSpherA2_message();
   char cwd[1024];
+#ifdef _WIN32
   if (_getcwd(cwd, sizeof(cwd)) != NULL)
+#else
+  if (getcwd(cwd, sizeof(cwd)) != NULL)
+#endif
   {
     std::cout << "Current working directory: " << cwd << std::endl;
   }
