@@ -28,6 +28,16 @@ typedef enum omp_sched_t
 int main(int argc, char **argv)
 {
   std::cout << NoSpherA2_message();
+  char cwd[1024];
+  if (getcwd(cwd, sizeof(cwd)) != NULL)
+  {
+    std::cout << "Current working directory: " << cwd << std::endl;
+  }
+  else
+  {
+    std::cerr << "getcwd() error" << std::endl;
+    return 1;
+  }
   ofstream log_file("NoSpherA2.log", ios::out);
   auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
   vector<WFN> wavy;
@@ -58,18 +68,23 @@ int main(int argc, char **argv)
     cube residual(opt.fract_name, true, wav, std::cout, opt.debug);
     residual.fractal_dimension(0.01);
     log_file.flush();
-    log_file.close();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   if (opt.sfac_diffuse > 0.0)
   {
     sfac_diffuse(opt, log_file);
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // perform combine_mo and quit
   if (opt.combine_mo.size() != 0)
   {
     combine_mo(opt);
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     exit(0);
   }
   // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
@@ -158,7 +173,8 @@ int main(int argc, char **argv)
     log_file << endl;
 #endif
     log_file.flush();
-    log_file.close();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // Performs the Thakkar IAM
@@ -181,7 +197,8 @@ int main(int argc, char **argv)
       log_file << "Entering Structure Factor Calculation!" << endl;
     err_checkf(thakkar_sfac(opt, log_file, wavy[0]), "Error during SF Calculation!", log_file);
     log_file.flush();
-    log_file.close();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // This one has conversion to fchk and calculation of one single tsc file
@@ -268,7 +285,10 @@ int main(int argc, char **argv)
       log_file << "This is after the calculation" << endl;
     }
     log_file.flush();
-    log_file.close();
+    log_file << "This is after the calculation2" << endl;
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
+    // log_file.close();
     return 0;
   }
   // Contains all calculations of properties and cubes
@@ -276,7 +296,8 @@ int main(int argc, char **argv)
   {
     properties_calculation(opt);
     log_file.flush();
-    log_file.close();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // Test for molden and ECP files
@@ -295,13 +316,16 @@ int main(int argc, char **argv)
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, false);
     log_file.flush();
-    log_file.close();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // Calcualtes data for Thakkar IAM Paper
   if (opt.thakkar_d_plot)
   {
     thakkar_d_test(opt);
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   // Calcualtes data sampling a full sphere for the first atom in a wavefunction and tries to compare to
@@ -309,16 +333,22 @@ int main(int argc, char **argv)
   if (opt.sfac_scan > 0.0)
   {
     sfac_scan(opt, log_file);
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   if (opt.spherical_harmonic)
   {
     spherical_harmonic_test();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   if (opt.ML_test)
   {
     ML_test();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   if (opt.coef_file != "")
@@ -352,6 +382,8 @@ int main(int argc, char **argv)
     {
       cube_from_coef_npy(opt.coef_file, opt.xyz_file);
     }
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
     return 0;
   }
   std::cout << NoSpherA2_message();
@@ -360,6 +392,5 @@ int main(int argc, char **argv)
   std::cout << "Did not understand the task to perform!\n"
             << help_message() << endl;
   log_file.flush();
-  log_file.close();
   return 0;
 }

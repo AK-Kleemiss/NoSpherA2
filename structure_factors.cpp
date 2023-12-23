@@ -21,11 +21,11 @@ using namespace std;
 #include "device_launch_parameters.h"
 #include "CUDA_utilities.h"
 #endif
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
 
-#ifdef FLO_CUDA
-
-#else
-
+#ifndef FLO_CUDA
 double linear_interpolate_spherical_density(
     vector<double> &radial_dens,
     vector<double> &spherical_dist,
@@ -4548,6 +4548,15 @@ void calc_SF(const int &points,
       {
         rho = dens_local[p];
         work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+        if (rho < 0)
+        {
+          rho = -rho;
+          work += M_PI;
+        }
+#endif
+#endif
         sf_local[s] += polar(rho, work);
       }
     }
@@ -5100,11 +5109,6 @@ bool calculate_structure_factors_HF(
       file,
       opt.debug);
 
-  if (opt.debug)
-  {
-    for (int i = 0; i < 4; i++)
-      file << k_pt[i][0] << " " << k_pt[i][1] << " " << k_pt[i][2] << endl;
-  }
 #ifdef _WIN64
   time_t after_kpts = time(NULL);
 #endif
@@ -5149,19 +5153,6 @@ bool calculate_structure_factors_HF(
   vector<string> labels;
   for (int i = 0; i < asym_atom_list.size(); i++)
     labels.push_back(wave.atoms[asym_atom_list[i]].label);
-
-  if (opt.debug)
-  {
-    for (int i = 0; i < sf.size(); i++)
-    {
-      file << "SF for atom " << i << " (" << labels[i] << "):" << endl;
-      for (int j = 0; j < 1; j++)
-      {
-        auto hkly = *hkl.begin();
-        file << setw(4) << j << setw(4) << hkly[0] << setw(4) << hkly[1] << setw(4) << hkly[2] << " " << sf[i][j] << endl;
-      }
-    }
-  }
 
   tsc_block<int, cdouble> blocky(
       sf,
