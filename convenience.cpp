@@ -5,7 +5,7 @@
 using namespace std;
 
 //--------------------------General convenience terminal functions---------------------------------
-//bool yesno()
+// bool yesno()
 //{
 //  bool end = false;
 //  while (!end) {
@@ -75,13 +75,12 @@ string NoSpherA2_message()
   return t;
 }
 
-string build_date() {
+string build_date()
+{
   return ("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
 }
 
-
-
-bool is_similar_rel(const double& first, const double& second, const double& tolerance)
+bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
   double diff = abs(first - second);
   if (diff > abs((first + second + 0.01) * tolerance / 2))
@@ -90,7 +89,7 @@ bool is_similar_rel(const double& first, const double& second, const double& tol
     return true;
 };
 
-bool is_similar(const double& first, const double& second, const double& tolerance)
+bool is_similar(const double &first, const double &second, const double &tolerance)
 {
   double diff = abs(first - second);
   if (diff > pow(10, tolerance))
@@ -99,7 +98,7 @@ bool is_similar(const double& first, const double& second, const double& toleran
     return true;
 };
 
-bool is_similar_abs(const double& first, const double& second, const double& tolerance)
+bool is_similar_abs(const double &first, const double &second, const double &tolerance)
 {
   double diff = abs(first - second);
   if (diff > abs(tolerance))
@@ -112,152 +111,267 @@ void cls()
 {
   //    cout << string( 100, '\n' );
 #ifdef _WIN32
-  if (system("CLS")) cout << "this should not happen...!" << endl;
+  if (system("CLS"))
+    cout << "this should not happen...!" << endl;
 #else
-  if (system("clear")) cout << "this should not happen...!" << endl;
+  if (system("clear"))
+    cout << "this should not happen...!" << endl;
 #endif
 };
 
-string atnr2letter(const int& nr)
+string atnr2letter(const int &nr)
 {
-  vector <string> Labels{ "DM","H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar","K","Ca"
-    ,"Sc","Ti","V","Cr","Mn","Fe","Co","Ni","Cu","Zn","Ga","Ge","As","Se","Br","Kr"
-    ,"Rb","Sr","Y","Zr","Nb","Mo","Tc","Ru","Rh","Pd","Ag","Cd","In","Sn","Sb","Te","I","Xe"
-    ,"Cs","Ba","La","Ce","Pr","Nd","Pm","Sm","Eu","Gd","Tb","Dy","Ho","Er","Tm","Yb","Lu","Hf","Ta","W","Re","Os","Ir","Pt","Au","Hg","Tl","Pb","Bi","Po","At","Rn"
-    ,"Fr","Ra","Ac","Th","Pa","U","Np","Pu","Am","Cm","Bk","Cf","Es","Fm","Md","No","Lr"
-  };
-  if (nr == 0) {
-    //Exception for Q peaks in residual maps
+  vector<string> Labels{"DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"};
+  if (nr == 0)
+  {
+    // Exception for Q peaks in residual maps
     return "Q";
   }
-  if (nr > 103 || nr < 0) {
-    if (nr == 119) {
-      //Exception for Q in ECPs from ORCA
+  if (nr > 103 || nr < 0)
+  {
+    if (nr == 119)
+    {
+      // Exception for Q in ECPs from ORCA
       return "Q";
     }
     cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-103!" << endl;
     return ("PROBLEM");
   }
-  else return Labels[nr];
+  else
+    return Labels[nr];
 };
 
-int get_Z_from_label(const char* tmp)
+int get_Z_from_label(const char *tmp)
 {
-  if (strcmp(tmp, "H") == 0)  return 0;
-  else  if (strcmp(tmp, "D") == 0)   return 0;
-  else  if (strcmp(tmp, "T") == 0)   return 0;
-  else 	if (strcmp(tmp, "He") == 0)  return 1;
-  else 	if (strcmp(tmp, "Li") == 0)  return 2;
-  else 	if (strcmp(tmp, "Be") == 0)  return 3;
-  else 	if (strcmp(tmp, "B") == 0)   return 4;
-  else 	if (strcmp(tmp, "C") == 0)   return 5;
-  else 	if (strcmp(tmp, "N") == 0)   return 6;
-  else 	if (strcmp(tmp, "O") == 0)   return 7;
-  else 	if (strcmp(tmp, "F") == 0)   return 8;
-  else 	if (strcmp(tmp, "Ne") == 0)  return 9;
-  else 	if (strcmp(tmp, "Na") == 0)  return 10;
-  else 	if (strcmp(tmp, "Mg") == 0)  return 11;
-  else 	if (strcmp(tmp, "Al") == 0)  return 12;
-  else 	if (strcmp(tmp, "Si") == 0)  return 13;
-  else 	if (strcmp(tmp, "P") == 0)   return 14;
-  else 	if (strcmp(tmp, "S") == 0)   return 15;
-  else 	if (strcmp(tmp, "Cl") == 0)  return 16;
-  else 	if (strcmp(tmp, "Ar") == 0)  return 17;
-  else 	if (strcmp(tmp, "K") == 0)   return 18;
-  else 	if (strcmp(tmp, "Ca") == 0)  return 19;
-  else 	if (strcmp(tmp, "Sc") == 0)  return 20;
-  else 	if (strcmp(tmp, "Ti") == 0)  return 21;
-  else 	if (strcmp(tmp, "V") == 0)   return 22;
-  else 	if (strcmp(tmp, "Cr") == 0)  return 23;
-  else 	if (strcmp(tmp, "Mn") == 0)  return 24;
-  else 	if (strcmp(tmp, "Fe") == 0)  return 25;
-  else 	if (strcmp(tmp, "Co") == 0)  return 26;
-  else 	if (strcmp(tmp, "Ni") == 0)  return 27;
-  else 	if (strcmp(tmp, "Cu") == 0)  return 28;
-  else 	if (strcmp(tmp, "Zn") == 0)  return 29;
-  else 	if (strcmp(tmp, "Ga") == 0)  return 30;
-  else 	if (strcmp(tmp, "Ge") == 0)  return 31;
-  else 	if (strcmp(tmp, "As") == 0)  return 32;
-  else 	if (strcmp(tmp, "Se") == 0)  return 33;
-  else 	if (strcmp(tmp, "Br") == 0)  return 34;
-  else 	if (strcmp(tmp, "Kr") == 0)  return 35;
-  else 	if (strcmp(tmp, "Rb") == 0)  return 36;
-  else 	if (strcmp(tmp, "Sr") == 0)  return 37;
-  else 	if (strcmp(tmp, "Y") == 0)   return 38;
-  else 	if (strcmp(tmp, "Zr") == 0)  return 39;
-  else 	if (strcmp(tmp, "Nb") == 0)  return 40;
-  else 	if (strcmp(tmp, "Mo") == 0)  return 41;
-  else 	if (strcmp(tmp, "Tc") == 0)  return 42;
-  else 	if (strcmp(tmp, "Ru") == 0)  return 43;
-  else 	if (strcmp(tmp, "Rh") == 0)  return 44;
-  else 	if (strcmp(tmp, "Pd") == 0)  return 45;
-  else 	if (strcmp(tmp, "Ag") == 0)  return 46;
-  else 	if (strcmp(tmp, "Cd") == 0)  return 47;
-  else 	if (strcmp(tmp, "In") == 0)  return 48;
-  else 	if (strcmp(tmp, "Sn") == 0)  return 49;
-  else 	if (strcmp(tmp, "Sb") == 0)  return 50;
-  else 	if (strcmp(tmp, "Te") == 0)  return 51;
-  else 	if (strcmp(tmp, "I") == 0)   return 52;
-  else 	if (strcmp(tmp, "Xe") == 0)  return 53;
-  else 	if (strcmp(tmp, "Cs") == 0)  return 54;
-  else 	if (strcmp(tmp, "Ba") == 0)  return 55;
-  else 	if (strcmp(tmp, "La") == 0)  return 56;
-  else 	if (strcmp(tmp, "Ce") == 0)  return 57;
-  else 	if (strcmp(tmp, "Pr") == 0)  return 58;
-  else 	if (strcmp(tmp, "Nd") == 0)  return 59;
-  else 	if (strcmp(tmp, "Pm") == 0)  return 60;
-  else 	if (strcmp(tmp, "Sm") == 0)  return 61;
-  else 	if (strcmp(tmp, "Eu") == 0)  return 62;
-  else 	if (strcmp(tmp, "Gd") == 0)  return 63;
-  else 	if (strcmp(tmp, "Tb") == 0)  return 64;
-  else 	if (strcmp(tmp, "Dy") == 0)  return 65;
-  else 	if (strcmp(tmp, "Ho") == 0)  return 66;
-  else 	if (strcmp(tmp, "Er") == 0)  return 67;
-  else 	if (strcmp(tmp, "Tm") == 0)  return 68;
-  else 	if (strcmp(tmp, "Yb") == 0)  return 69;
-  else 	if (strcmp(tmp, "Lu") == 0)  return 70;
-  else 	if (strcmp(tmp, "Hf") == 0)  return 71;
-  else 	if (strcmp(tmp, "Ta") == 0)  return 72;
-  else 	if (strcmp(tmp, "W") == 0)   return 73;
-  else 	if (strcmp(tmp, "Re") == 0)  return 74;
-  else 	if (strcmp(tmp, "Os") == 0)  return 75;
-  else 	if (strcmp(tmp, "Ir") == 0)  return 76;
-  else 	if (strcmp(tmp, "Pt") == 0)  return 77;
-  else 	if (strcmp(tmp, "Au") == 0)  return 78;
-  else 	if (strcmp(tmp, "Hg") == 0)  return 79;
-  else 	if (strcmp(tmp, "Ti") == 0)  return 80;
-  else 	if (strcmp(tmp, "Pb") == 0)  return 81;
-  else 	if (strcmp(tmp, "Bi") == 0)  return 82;
-  else 	if (strcmp(tmp, "Po") == 0)  return 83;
-  else 	if (strcmp(tmp, "At") == 0)  return 84;
-  else 	if (strcmp(tmp, "Rn") == 0)  return 85;
+  if (strcmp(tmp, "H") == 0)
+    return 0;
+  else if (strcmp(tmp, "D") == 0)
+    return 0;
+  else if (strcmp(tmp, "T") == 0)
+    return 0;
+  else if (strcmp(tmp, "He") == 0)
+    return 1;
+  else if (strcmp(tmp, "Li") == 0)
+    return 2;
+  else if (strcmp(tmp, "Be") == 0)
+    return 3;
+  else if (strcmp(tmp, "B") == 0)
+    return 4;
+  else if (strcmp(tmp, "C") == 0)
+    return 5;
+  else if (strcmp(tmp, "N") == 0)
+    return 6;
+  else if (strcmp(tmp, "O") == 0)
+    return 7;
+  else if (strcmp(tmp, "F") == 0)
+    return 8;
+  else if (strcmp(tmp, "Ne") == 0)
+    return 9;
+  else if (strcmp(tmp, "Na") == 0)
+    return 10;
+  else if (strcmp(tmp, "Mg") == 0)
+    return 11;
+  else if (strcmp(tmp, "Al") == 0)
+    return 12;
+  else if (strcmp(tmp, "Si") == 0)
+    return 13;
+  else if (strcmp(tmp, "P") == 0)
+    return 14;
+  else if (strcmp(tmp, "S") == 0)
+    return 15;
+  else if (strcmp(tmp, "Cl") == 0)
+    return 16;
+  else if (strcmp(tmp, "Ar") == 0)
+    return 17;
+  else if (strcmp(tmp, "K") == 0)
+    return 18;
+  else if (strcmp(tmp, "Ca") == 0)
+    return 19;
+  else if (strcmp(tmp, "Sc") == 0)
+    return 20;
+  else if (strcmp(tmp, "Ti") == 0)
+    return 21;
+  else if (strcmp(tmp, "V") == 0)
+    return 22;
+  else if (strcmp(tmp, "Cr") == 0)
+    return 23;
+  else if (strcmp(tmp, "Mn") == 0)
+    return 24;
+  else if (strcmp(tmp, "Fe") == 0)
+    return 25;
+  else if (strcmp(tmp, "Co") == 0)
+    return 26;
+  else if (strcmp(tmp, "Ni") == 0)
+    return 27;
+  else if (strcmp(tmp, "Cu") == 0)
+    return 28;
+  else if (strcmp(tmp, "Zn") == 0)
+    return 29;
+  else if (strcmp(tmp, "Ga") == 0)
+    return 30;
+  else if (strcmp(tmp, "Ge") == 0)
+    return 31;
+  else if (strcmp(tmp, "As") == 0)
+    return 32;
+  else if (strcmp(tmp, "Se") == 0)
+    return 33;
+  else if (strcmp(tmp, "Br") == 0)
+    return 34;
+  else if (strcmp(tmp, "Kr") == 0)
+    return 35;
+  else if (strcmp(tmp, "Rb") == 0)
+    return 36;
+  else if (strcmp(tmp, "Sr") == 0)
+    return 37;
+  else if (strcmp(tmp, "Y") == 0)
+    return 38;
+  else if (strcmp(tmp, "Zr") == 0)
+    return 39;
+  else if (strcmp(tmp, "Nb") == 0)
+    return 40;
+  else if (strcmp(tmp, "Mo") == 0)
+    return 41;
+  else if (strcmp(tmp, "Tc") == 0)
+    return 42;
+  else if (strcmp(tmp, "Ru") == 0)
+    return 43;
+  else if (strcmp(tmp, "Rh") == 0)
+    return 44;
+  else if (strcmp(tmp, "Pd") == 0)
+    return 45;
+  else if (strcmp(tmp, "Ag") == 0)
+    return 46;
+  else if (strcmp(tmp, "Cd") == 0)
+    return 47;
+  else if (strcmp(tmp, "In") == 0)
+    return 48;
+  else if (strcmp(tmp, "Sn") == 0)
+    return 49;
+  else if (strcmp(tmp, "Sb") == 0)
+    return 50;
+  else if (strcmp(tmp, "Te") == 0)
+    return 51;
+  else if (strcmp(tmp, "I") == 0)
+    return 52;
+  else if (strcmp(tmp, "Xe") == 0)
+    return 53;
+  else if (strcmp(tmp, "Cs") == 0)
+    return 54;
+  else if (strcmp(tmp, "Ba") == 0)
+    return 55;
+  else if (strcmp(tmp, "La") == 0)
+    return 56;
+  else if (strcmp(tmp, "Ce") == 0)
+    return 57;
+  else if (strcmp(tmp, "Pr") == 0)
+    return 58;
+  else if (strcmp(tmp, "Nd") == 0)
+    return 59;
+  else if (strcmp(tmp, "Pm") == 0)
+    return 60;
+  else if (strcmp(tmp, "Sm") == 0)
+    return 61;
+  else if (strcmp(tmp, "Eu") == 0)
+    return 62;
+  else if (strcmp(tmp, "Gd") == 0)
+    return 63;
+  else if (strcmp(tmp, "Tb") == 0)
+    return 64;
+  else if (strcmp(tmp, "Dy") == 0)
+    return 65;
+  else if (strcmp(tmp, "Ho") == 0)
+    return 66;
+  else if (strcmp(tmp, "Er") == 0)
+    return 67;
+  else if (strcmp(tmp, "Tm") == 0)
+    return 68;
+  else if (strcmp(tmp, "Yb") == 0)
+    return 69;
+  else if (strcmp(tmp, "Lu") == 0)
+    return 70;
+  else if (strcmp(tmp, "Hf") == 0)
+    return 71;
+  else if (strcmp(tmp, "Ta") == 0)
+    return 72;
+  else if (strcmp(tmp, "W") == 0)
+    return 73;
+  else if (strcmp(tmp, "Re") == 0)
+    return 74;
+  else if (strcmp(tmp, "Os") == 0)
+    return 75;
+  else if (strcmp(tmp, "Ir") == 0)
+    return 76;
+  else if (strcmp(tmp, "Pt") == 0)
+    return 77;
+  else if (strcmp(tmp, "Au") == 0)
+    return 78;
+  else if (strcmp(tmp, "Hg") == 0)
+    return 79;
+  else if (strcmp(tmp, "Ti") == 0)
+    return 80;
+  else if (strcmp(tmp, "Pb") == 0)
+    return 81;
+  else if (strcmp(tmp, "Bi") == 0)
+    return 82;
+  else if (strcmp(tmp, "Po") == 0)
+    return 83;
+  else if (strcmp(tmp, "At") == 0)
+    return 84;
+  else if (strcmp(tmp, "Rn") == 0)
+    return 85;
 
-  else 	if (strcmp(tmp, "Fr") == 0)  return 86;
-  else 	if (strcmp(tmp, "Ra") == 0)  return 87;
-  else 	if (strcmp(tmp, "Ac") == 0)  return 88;
-  else 	if (strcmp(tmp, "Th") == 0)  return 89;
-  else 	if (strcmp(tmp, "Pa") == 0)  return 90;
-  else 	if (strcmp(tmp, "U") == 0)   return 91;
-  else 	if (strcmp(tmp, "Np") == 0)  return 92;
-  else 	if (strcmp(tmp, "Pu") == 0)  return 93;
-  else 	if (strcmp(tmp, "Am") == 0)  return 94;
-  else 	if (strcmp(tmp, "Cm") == 0)  return 95;
-  else 	if (strcmp(tmp, "Bk") == 0)  return 96;
-  else 	if (strcmp(tmp, "Cf") == 0)  return 97;
-  else 	if (strcmp(tmp, "Es") == 0)  return 98;
-  else 	if (strcmp(tmp, "Fm") == 0)  return 99;
-  else 	if (strcmp(tmp, "Md") == 0)  return 100;
-  else 	if (strcmp(tmp, "No") == 0)  return 101;
-  else 	if (strcmp(tmp, "Lr") == 0)  return 102;
-  else 	if (strcmp(tmp, "Rf") == 0)  return 103;
-  else 	if (strcmp(tmp, "Db") == 0)  return 104;
-  else 	if (strcmp(tmp, "Sg") == 0)  return 105;
-  else 	if (strcmp(tmp, "Bh") == 0)  return 106;
-  else 	if (strcmp(tmp, "Hs") == 0)  return 107;
-  else 	if (strcmp(tmp, "Mt") == 0)  return 108;
-  else 	if (strcmp(tmp, "Ds") == 0)  return 109;
-  else 	if (strcmp(tmp, "Rg") == 0)  return 110;
-  else                               return -1;
+  else if (strcmp(tmp, "Fr") == 0)
+    return 86;
+  else if (strcmp(tmp, "Ra") == 0)
+    return 87;
+  else if (strcmp(tmp, "Ac") == 0)
+    return 88;
+  else if (strcmp(tmp, "Th") == 0)
+    return 89;
+  else if (strcmp(tmp, "Pa") == 0)
+    return 90;
+  else if (strcmp(tmp, "U") == 0)
+    return 91;
+  else if (strcmp(tmp, "Np") == 0)
+    return 92;
+  else if (strcmp(tmp, "Pu") == 0)
+    return 93;
+  else if (strcmp(tmp, "Am") == 0)
+    return 94;
+  else if (strcmp(tmp, "Cm") == 0)
+    return 95;
+  else if (strcmp(tmp, "Bk") == 0)
+    return 96;
+  else if (strcmp(tmp, "Cf") == 0)
+    return 97;
+  else if (strcmp(tmp, "Es") == 0)
+    return 98;
+  else if (strcmp(tmp, "Fm") == 0)
+    return 99;
+  else if (strcmp(tmp, "Md") == 0)
+    return 100;
+  else if (strcmp(tmp, "No") == 0)
+    return 101;
+  else if (strcmp(tmp, "Lr") == 0)
+    return 102;
+  else if (strcmp(tmp, "Rf") == 0)
+    return 103;
+  else if (strcmp(tmp, "Db") == 0)
+    return 104;
+  else if (strcmp(tmp, "Sg") == 0)
+    return 105;
+  else if (strcmp(tmp, "Bh") == 0)
+    return 106;
+  else if (strcmp(tmp, "Hs") == 0)
+    return 107;
+  else if (strcmp(tmp, "Mt") == 0)
+    return 108;
+  else if (strcmp(tmp, "Ds") == 0)
+    return 109;
+  else if (strcmp(tmp, "Rg") == 0)
+    return 110;
+  else
+    return -1;
 }
 /*
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
@@ -284,7 +398,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
   return cos(x) - get(x);
 }
 */
-void copy_file(string& from, string& to)
+void copy_file(string &from, string &to)
 {
   ifstream source(from.c_str(), ios::binary);
   ofstream dest(to.c_str(), ios::binary);
@@ -310,18 +424,18 @@ string get_home_path(void)
 #endif
 }
 
-void join_path(string& s1, string& s2)
+void join_path(string &s1, string &s2)
 {
 #ifdef _WIN32
   s1.append("\\");
 #else
-  if (s1.substr(s1.length() - 1) == "/")
+  if (s1.substr(s1.length() - 1) != "/")
     s1.append("/");
 #endif
   s1.append(s2);
 }
 
-string get_filename_from_path(const string& input)
+string get_filename_from_path(const string &input)
 {
 #ifdef _WIN32
   return input.substr(input.rfind("\\") + 1);
@@ -330,7 +444,7 @@ string get_filename_from_path(const string& input)
 #endif
 }
 
-string get_foldername_from_path(const string& input)
+string get_foldername_from_path(const string &input)
 {
 #ifdef _WIN32
   return input.substr(0, input.rfind("\\") + 1);
@@ -339,7 +453,7 @@ string get_foldername_from_path(const string& input)
 #endif
 }
 
-string get_basename_without_ending(const string& input)
+string get_basename_without_ending(const string &input)
 {
   return input.substr(0, input.rfind("."));
 }
@@ -350,7 +464,8 @@ void write_template_confi()
   string programs = get_home_path();
   string filename = ".cuQCT.conf";
   join_path(programs, filename);
-  if (exists(programs)) {
+  if (exists(programs))
+  {
     cout << "File already exists! Aborting!" << endl;
     return;
   }
@@ -388,10 +503,11 @@ void write_template_confi()
   return;
 };
 
-int program_confi(string& gaussian_path, string& turbomole_path, string& basis, int& ncpus, double& mem, bool debug, bool expert, unsigned int counter)
+int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
   counter++;
-  if (counter == 3) {
+  if (counter == 3)
+  {
     cout << "Too many iterations of tries to read config file, better abort..." << endl;
     return -1;
   }
@@ -399,20 +515,27 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   string filename = ".cuQCT.conf";
   join_path(programs, filename);
   ifstream conf(programs.c_str());
-  if (debug) cout << programs << endl;
+  if (debug)
+    cout << programs << endl;
   string line;
-  if (conf.good()) {
-    if (debug) cout << "File is valid, continuing..." << endl;
+  if (conf.good())
+  {
+    if (debug)
+      cout << "File is valid, continuing..." << endl;
   }
-  else {
-    if (expert) {
+  else
+  {
+    if (expert)
+    {
       cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", writing a template for you!" << endl;
       write_template_confi();
-      if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1) return -1;
+      if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1)
+        return -1;
       cout << "Wrote a template for you, read default values!" << endl;
       return 0;
     }
-    else {
+    else
+    {
       write_template_confi();
       program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug);
       return 0;
@@ -421,10 +544,12 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
   conf.seekg(0);
   getline(conf, line);
   size_t length;
-  char* tempchar = new char[200];
+  char *tempchar = new char[200];
   int run = 0;
-  while (!conf.eof()) {
-    switch (run) {
+  while (!conf.eof())
+  {
+    switch (run)
+    {
     case 0:
       length = line.copy(tempchar, line.size() - 11, 10);
       tempchar[length] = '\0';
@@ -440,46 +565,55 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
       tempchar[length] = '\0';
       basis = tempchar;
       break;
-    case 3: length = line.copy(tempchar, line.size() - 3, 4);
+    case 3:
+      length = line.copy(tempchar, line.size() - 3, 4);
       tempchar[length] = '\0';
       ncpus = stoi(tempchar);
       break;
-    case 4: length = line.copy(tempchar, line.size() - 3, 4);
+    case 4:
+      length = line.copy(tempchar, line.size() - 3, 4);
       tempchar[length] = '\0';
       mem = stod(tempchar);
       break;
     default:
-      if (debug) cout << "found everything i was looking for, if you miss something check the switch" << endl;
+      if (debug)
+        cout << "found everything i was looking for, if you miss something check the switch" << endl;
       break;
     }
-    if (debug) cout << run << ". line: " << tempchar << endl;
+    if (debug)
+      cout << run << ". line: " << tempchar << endl;
     run++;
     getline(conf, line);
   }
   return 1;
 };
 
-bool check_bohr(WFN& wave, bool debug)
+bool check_bohr(WFN &wave, bool debug)
 {
   double min_length = 300.0;
-  for (int i = 0; i < wave.get_ncen(); i++) {
-    double atom1[3]{ 0,0,0 };
+  for (int i = 0; i < wave.get_ncen(); i++)
+  {
+    double atom1[3]{0, 0, 0};
     for (int x = 0; x < 3; x++)
       atom1[x] = wave.get_atom_coordinate(i, x);
-    for (int j = i + 1; j < wave.get_ncen(); j++) {
-      double atom2[3]{ 0,0,0 };
+    for (int j = i + 1; j < wave.get_ncen(); j++)
+    {
+      double atom2[3]{0, 0, 0};
       for (int x = 0; x < 3; x++)
         atom2[x] = wave.get_atom_coordinate(j, x);
-      double d[3]{ 0,0,0 };
+      double d[3]{0, 0, 0};
       d[0] = atom1[0] - atom2[0];
       d[1] = atom1[1] - atom2[1];
       d[2] = atom1[2] - atom2[2];
       double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
-      if (debug) cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << endl;
-      if (length < min_length) min_length = length;
+      if (debug)
+        cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << endl;
+      if (length < min_length)
+        min_length = length;
     }
   }
-  if (debug) {
+  if (debug)
+  {
     if (min_length < 2)
       cout << "Decided it's written in Angstrom" << endl;
     else
@@ -488,7 +622,7 @@ bool check_bohr(WFN& wave, bool debug)
   return (!(min_length < 2));
 };
 
-int filetype_identifier(string& file, bool debug)
+int filetype_identifier(string &file, bool debug)
 {
   /*
   List of filetypes and correpsonding values:
@@ -500,122 +634,164 @@ int filetype_identifier(string& file, bool debug)
   -g/o *.grd      6: XDGraph grid file
   -o *.(F)fc(C)hk 5: fchk
   */
-  if (debug) {
+  if (debug)
+  {
     cout << "Testing WFN:  " << file.find(".wfn") << endl
-      << "Testing out:  " << file.find(".out") << endl
-      << "Testing FFN:  " << file.find(".ffn") << endl
-      << "Testing CUB:  " << file.find(".cub") << endl
-      << "Testing CUBE: " << file.find(".cube") << endl
-      << "Testing Grid: " << file.find(".grd") << endl
-      << "Testing fchk: " << file.find(".fchk") << endl
-      << "Testing FChk: " << file.find(".FChk") << endl
-      << "Testing Fchk: " << file.find(".Fchk") << endl;
+         << "Testing out:  " << file.find(".out") << endl
+         << "Testing FFN:  " << file.find(".ffn") << endl
+         << "Testing CUB:  " << file.find(".cub") << endl
+         << "Testing CUBE: " << file.find(".cube") << endl
+         << "Testing Grid: " << file.find(".grd") << endl
+         << "Testing fchk: " << file.find(".fchk") << endl
+         << "Testing FChk: " << file.find(".FChk") << endl
+         << "Testing Fchk: " << file.find(".Fchk") << endl;
     cout << "string::npos: " << string::npos << endl;
   }
   int temp_type = 0;
   size_t found, temp;
   temp = 0;
-  if (debug) cout << "Temp before any checks: " << temp << endl;
-  vector <string> types{ ".out",".wfn",".ffn",".cub",".cube",".grd",".fchk",".Fchk",".FChk" };
-  if (file.find(".wfn") != string::npos) {
-    if (debug) cout << "Checking for" << ".wfn" << endl;
+  if (debug)
+    cout << "Temp before any checks: " << temp << endl;
+  vector<string> types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
+  if (file.find(".wfn") != string::npos)
+  {
+    if (debug)
+      cout << "Checking for"
+           << ".wfn" << endl;
     temp_type = 2;
     found = file.rfind(".wfn");
-    if (debug) cout << "Found: " << found << endl;
+    if (debug)
+      cout << "Found: " << found << endl;
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (debug) cout << "Temp: " << temp << endl;
-    if (temp == found) return temp_type;
-    else {
+    if (debug)
+      cout << "Temp: " << temp << endl;
+    if (temp == found)
+      return temp_type;
+    else
+    {
       temp = 0;
-      if (debug) cout << "Moving on!" << endl;
+      if (debug)
+        cout << "Moving on!" << endl;
     }
   }
-  if (file.find(".out") != string::npos) {
-    if (debug) cout << "Checking for" << ".out" << endl;
+  if (file.find(".out") != string::npos)
+  {
+    if (debug)
+      cout << "Checking for"
+           << ".out" << endl;
     temp_type = 1;
     found = file.rfind(".out");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".ffn") != string::npos) {
-    if (debug) cout << "Checking for" << ".ffn" << endl;
+  if (file.find(".ffn") != string::npos)
+  {
+    if (debug)
+      cout << "Checking for"
+           << ".ffn" << endl;
     temp_type = 4;
     found = file.rfind(".ffn");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".cub") != string::npos) {
-    if (debug) cout << "Checking for" << ".cub" << endl;
+  if (file.find(".cub") != string::npos)
+  {
+    if (debug)
+      cout << "Checking for"
+           << ".cub" << endl;
     temp_type = 3;
     found = file.rfind(".cub");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else {
+    if (temp == found)
+      return temp_type;
+    else
+    {
       temp = 0;
-      if (debug) cout << "Moving on!" << endl;
+      if (debug)
+        cout << "Moving on!" << endl;
     }
   }
-  if (file.find(".cube") != string::npos) {
+  if (file.find(".cube") != string::npos)
+  {
     temp_type = 3;
     found = file.rfind(".cube");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".grd") != string::npos) {
+  if (file.find(".grd") != string::npos)
+  {
     temp_type = 6;
     found = file.rfind(".grd");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".fchk") != string::npos) {
+  if (file.find(".fchk") != string::npos)
+  {
     temp_type = 5;
     found = file.rfind(".fchk");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".FChk") != string::npos) {
+  if (file.find(".FChk") != string::npos)
+  {
     temp_type = 5;
     found = file.rfind(".FChk");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
-  if (file.find(".Fchk") != string::npos) {
+  if (file.find(".Fchk") != string::npos)
+  {
     temp_type = 5;
     found = file.rfind(".Fchk");
     for (int i = 0; i < types.size(); i++)
       if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
         temp = file.rfind(types[i]);
-    if (temp == found) return temp_type;
-    else temp = 0;
+    if (temp == found)
+      return temp_type;
+    else
+      temp = 0;
   }
   return -1;
 }
 
-string go_get_string(ifstream& file, string search, bool rewind)
+string go_get_string(ifstream &file, string search, bool rewind)
 {
-  if (rewind) {
+  if (rewind)
+  {
     file.clear();
     file.seekg(0, file.beg);
   }
@@ -628,42 +804,121 @@ string go_get_string(ifstream& file, string search, bool rewind)
     return line;
 }
 
-string shrink_string(string& input)
+string shrink_string(string &input)
 {
-  while (input.find(" ") != -1) { input.erase(input.find(" "), 1); }
-  while (input.find("1") != -1) { input.erase(input.find("1"), 1); }
-  while (input.find("2") != -1) { input.erase(input.find("2"), 1); }
-  while (input.find("3") != -1) { input.erase(input.find("3"), 1); }
-  while (input.find("4") != -1) { input.erase(input.find("4"), 1); }
-  while (input.find("5") != -1) { input.erase(input.find("5"), 1); }
-  while (input.find("6") != -1) { input.erase(input.find("6"), 1); }
-  while (input.find("7") != -1) { input.erase(input.find("7"), 1); }
-  while (input.find("8") != -1) { input.erase(input.find("8"), 1); }
-  while (input.find("9") != -1) { input.erase(input.find("9"), 1); }
-  while (input.find("0") != -1) { input.erase(input.find("0"), 1); }
-  while (input.find("(") != -1) { input.erase(input.find("("), 1); }
-  while (input.find(")") != -1) { input.erase(input.find(")"), 1); }
+  while (input.find(" ") != -1)
+  {
+    input.erase(input.find(" "), 1);
+  }
+  while (input.find("1") != -1)
+  {
+    input.erase(input.find("1"), 1);
+  }
+  while (input.find("2") != -1)
+  {
+    input.erase(input.find("2"), 1);
+  }
+  while (input.find("3") != -1)
+  {
+    input.erase(input.find("3"), 1);
+  }
+  while (input.find("4") != -1)
+  {
+    input.erase(input.find("4"), 1);
+  }
+  while (input.find("5") != -1)
+  {
+    input.erase(input.find("5"), 1);
+  }
+  while (input.find("6") != -1)
+  {
+    input.erase(input.find("6"), 1);
+  }
+  while (input.find("7") != -1)
+  {
+    input.erase(input.find("7"), 1);
+  }
+  while (input.find("8") != -1)
+  {
+    input.erase(input.find("8"), 1);
+  }
+  while (input.find("9") != -1)
+  {
+    input.erase(input.find("9"), 1);
+  }
+  while (input.find("0") != -1)
+  {
+    input.erase(input.find("0"), 1);
+  }
+  while (input.find("(") != -1)
+  {
+    input.erase(input.find("("), 1);
+  }
+  while (input.find(")") != -1)
+  {
+    input.erase(input.find(")"), 1);
+  }
   return input;
 };
 
-string shrink_string_to_atom(string& input, const int& atom_number)
+string shrink_string_to_atom(string &input, const int &atom_number)
 {
-  while (input.find(" ") != -1) { input.erase(input.find(" "), 1); }
-  while (input.find("1") != -1) { input.erase(input.find("1"), 1); }
-  while (input.find("2") != -1) { input.erase(input.find("2"), 1); }
-  while (input.find("3") != -1) { input.erase(input.find("3"), 1); }
-  while (input.find("4") != -1) { input.erase(input.find("4"), 1); }
-  while (input.find("5") != -1) { input.erase(input.find("5"), 1); }
-  while (input.find("6") != -1) { input.erase(input.find("6"), 1); }
-  while (input.find("7") != -1) { input.erase(input.find("7"), 1); }
-  while (input.find("8") != -1) { input.erase(input.find("8"), 1); }
-  while (input.find("9") != -1) { input.erase(input.find("9"), 1); }
-  while (input.find("0") != -1) { input.erase(input.find("0"), 1); }
-  while (input.find("(") != -1) { input.erase(input.find("("), 1); }
-  while (input.find(")") != -1) { input.erase(input.find(")"), 1); }
+  while (input.find(" ") != -1)
+  {
+    input.erase(input.find(" "), 1);
+  }
+  while (input.find("1") != -1)
+  {
+    input.erase(input.find("1"), 1);
+  }
+  while (input.find("2") != -1)
+  {
+    input.erase(input.find("2"), 1);
+  }
+  while (input.find("3") != -1)
+  {
+    input.erase(input.find("3"), 1);
+  }
+  while (input.find("4") != -1)
+  {
+    input.erase(input.find("4"), 1);
+  }
+  while (input.find("5") != -1)
+  {
+    input.erase(input.find("5"), 1);
+  }
+  while (input.find("6") != -1)
+  {
+    input.erase(input.find("6"), 1);
+  }
+  while (input.find("7") != -1)
+  {
+    input.erase(input.find("7"), 1);
+  }
+  while (input.find("8") != -1)
+  {
+    input.erase(input.find("8"), 1);
+  }
+  while (input.find("9") != -1)
+  {
+    input.erase(input.find("9"), 1);
+  }
+  while (input.find("0") != -1)
+  {
+    input.erase(input.find("0"), 1);
+  }
+  while (input.find("(") != -1)
+  {
+    input.erase(input.find("("), 1);
+  }
+  while (input.find(")") != -1)
+  {
+    input.erase(input.find(")"), 1);
+  }
   string temp = atnr2letter(atom_number);
   err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
-  if (input.find(temp) != 1) return temp;
+  if (input.find(temp) != 1)
+    return temp;
   if (temp != "PROBLEM")
     while (input.size() > temp.size())
       input.pop_back();
@@ -935,66 +1190,89 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 };
 */
 
-void select_cubes(vector <vector <unsigned int> >& selection, vector<WFN>& wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
-  //asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
-  //Returns values in selection[0][i] for iths selection of wavefunction and
-  // selection[1][i] for iths selection of cube
+  // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
+  // Returns values in selection[0][i] for iths selection of wavefunction and
+  //  selection[1][i] for iths selection of cube
   cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
-  if (nr_of_cubes > 1) cout << "s in total." << endl;
-  else cout << "." << endl;
-  cout << endl << endl;
-  for (int w = 0; w < wavy.size(); w++) {
+  if (nr_of_cubes > 1)
+    cout << "s in total." << endl;
+  else
+    cout << "." << endl;
+  cout << endl
+       << endl;
+  for (int w = 0; w < wavy.size(); w++)
+  {
     stringstream stream;
     cout << "_____________________________________________________________" << endl;
     cout << "WFN ";
     stream << setw(2) << w;
     cout << stream.str() << ") " << get_basename_without_ending(wavy[w].get_path()) << endl;
     stream.str("");
-    for (int c = 0; c < wavy[w].cub.size(); c++) {
-      if (c == 0) cout << "        |" << endl << "Cube    |" << endl;
-      else cout << "        |" << endl;
-      if (!wfnonly) {
+    for (int c = 0; c < wavy[w].cub.size(); c++)
+    {
+      if (c == 0)
+        cout << "        |" << endl
+             << "Cube    |" << endl;
+      else
+        cout << "        |" << endl;
+      if (!wfnonly)
+      {
         cout << setw(2) << w;
         cout << ".";
         cout << setw(2) << c;
       }
-      else cout << "     ";
+      else
+        cout << "     ";
       cout << "   |_ " << get_basename_without_ending(wavy[w].cub[c].path);
       if (!exists(wavy[w].cub[c].path))
         cout << " (MEM ONLY)";
       cout << endl;
     }
-    cout << "_____________________________________________________________" << endl << endl << endl;
+    cout << "_____________________________________________________________" << endl
+         << endl
+         << endl;
   }
-  //bool happy = false;
+  // bool happy = false;
   unsigned int selected_cubes = 0;
-  do {
+  do
+  {
     cout << "Select " << selected_cubes + 1 << ". ";
-    if (wfnonly) cout << "WFN ";
-    else cout << "cube ";
+    if (wfnonly)
+      cout << "WFN ";
+    else
+      cout << "cube ";
     cout << "please: ";
     string input;
     cin >> input;
-    if (!wfnonly) {
-      if (input.find('.') == string::npos) {
+    if (!wfnonly)
+    {
+      if (input.find('.') == string::npos)
+      {
         cout << "no . found in input!" << endl;
         continue;
       }
     }
-    else {
-      if (input.find('.') == string::npos) cout << "Ignoring the .!" << endl;
+    else
+    {
+      if (input.find('.') == string::npos)
+        cout << "Ignoring the .!" << endl;
       unsigned int nr_wave = fromString<unsigned int>(input);
-      if (nr_wave < 0 || nr_wave >= wavy.size()) {
+      if (nr_wave < 0 || nr_wave >= wavy.size())
+      {
         cout << "Invalid choice!" << endl;
         continue;
       }
       selected_cubes++;
       selection[0].push_back(nr_wave);
-      if (selected_cubes == nr_of_cubes) return;
-      else continue;
+      if (selected_cubes == nr_of_cubes)
+        return;
+      else
+        continue;
     }
-    if (debug) {
+    if (debug)
+    {
       cout << "input: " << input << endl;
       cout << "with . found at: " << input.find('.') << endl;
       cout << "substr1: " << input.substr(0, input.find('.')) << endl;
@@ -1004,22 +1282,26 @@ void select_cubes(vector <vector <unsigned int> >& selection, vector<WFN>& wavy,
     string cube(input.substr(input.find('.') + 1));
     unsigned int nr_wave = fromString<unsigned int>(wave);
     unsigned int nr_cube = fromString<unsigned int>(cube);
-    if (debug) cout << "Translated: " << nr_wave << " " << nr_cube << endl;
-    if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].cub.size()) {
+    if (debug)
+      cout << "Translated: " << nr_wave << " " << nr_cube << endl;
+    if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].cub.size())
+    {
       cout << "Invalid choice!" << endl;
       continue;
     }
     selection[0][selected_cubes] = nr_wave;
     selection[1][selected_cubes] = nr_cube;
     selected_cubes++;
-    if (selected_cubes == nr_of_cubes) {
-      if (debug) cout << "Going to return!" << endl;
+    if (selected_cubes == nr_of_cubes)
+    {
+      if (debug)
+        cout << "Going to return!" << endl;
       return;
     }
   } while (true);
 };
 
-bool unsaved_files(vector<WFN>& wavy)
+bool unsaved_files(vector<WFN> &wavy)
 {
   for (int w = 0; w < wavy.size(); w++)
     for (int c = 0; c < wavy[w].cub.size(); c++)
@@ -1027,7 +1309,6 @@ bool unsaved_files(vector<WFN>& wavy)
         return true;
   return false;
 };
-
 
 void progress_bar::write(double fraction)
 {
@@ -1046,29 +1327,30 @@ void progress_bar::write(double fraction)
 }
 
 void readxyzMinMax_fromWFN(
-  WFN& wavy,
-  double* CoordMinMax,
-  int* NbSteps,
-  double Radius,
-  double Increments,
-  bool no_bohr
-)
+    WFN &wavy,
+    double *CoordMinMax,
+    int *NbSteps,
+    double Radius,
+    double Increments,
+    bool no_bohr)
 {
-  vector < vector <double > > PosAtoms;
+  vector<vector<double>> PosAtoms;
   PosAtoms.resize(wavy.get_ncen());
   for (int i = 0; i < wavy.get_ncen(); i++)
     PosAtoms[i].resize(3);
   bool bohrang = !check_bohr(wavy, false);
-  if (no_bohr) bohrang = true;
+  if (no_bohr)
+    bohrang = true;
   for (int j = 0; j < wavy.get_ncen(); j++)
   {
 
     PosAtoms[j][0] = wavy.atoms[j].x;
     PosAtoms[j][1] = wavy.atoms[j].y;
     PosAtoms[j][2] = wavy.atoms[j].z;
-    if (!bohrang) {
+    if (!bohrang)
+    {
       cout << "Dividing atom positions!" << endl;
-      for(int i=0; i<3; i++)
+      for (int i = 0; i < 3; i++)
         PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
     }
     if (j == 0)
@@ -1108,24 +1390,24 @@ void readxyzMinMax_fromWFN(
   CoordMinMax[2] -= temp_rad;
   CoordMinMax[5] += temp_rad;
 
-  NbSteps[0] = (int) ceil(constants::bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
-  NbSteps[1] = (int) ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
-  NbSteps[2] = (int) ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
+  NbSteps[0] = (int)ceil(constants::bohr2ang(CoordMinMax[3] - CoordMinMax[0]) / Increments);
+  NbSteps[1] = (int)ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
+  NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
 
 void readxyzMinMax_fromCIF(
-  string cif,
-  double* CoordMinMax,
-  int* NbSteps,
-  vector < vector < double > >& cm,
-  double Resolution,
-  ofstream& file,
-  bool debug
-)
+    string cif,
+    double *CoordMinMax,
+    int *NbSteps,
+    vector<vector<double>> &cm,
+    double Resolution,
+    ofstream &file,
+    bool debug)
 {
   if (debug)
     file << "starting to read cif!" << endl;
-  if (!exists(cif)) {
+  if (!exists(cif))
+  {
     file << "CIF does not exists!" << endl;
     return;
   }
@@ -1137,7 +1419,7 @@ void readxyzMinMax_fromCIF(
     found[k] = false;
   double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
   double alpha = 0.0, beta = 0.0, gamma = 0.0;
-  vector <string> cell_keywords;
+  vector<string> cell_keywords;
   cell_keywords.push_back("_cell_length_a");
   cell_keywords.push_back("_cell_length_b");
   cell_keywords.push_back("_cell_length_c");
@@ -1147,20 +1429,24 @@ void readxyzMinMax_fromCIF(
   cell_keywords.push_back("_cell_volume");
   if (debug)
     file << "Starting while !.eof()" << endl;
-  while (!cif_input.eof()) {
+  while (!cif_input.eof())
+  {
     if (debug)
       file << "While line! " << setw(80) << line
-      << setw(10) << a << found[0]
-      << setw(10) << b << found[1]
-      << setw(10) << c << found[2]
-      << setw(10) << alpha << found[3]
-      << setw(10) << beta << found[4]
-      << setw(10) << gamma << found[5]
-      << setw(10) << v << found[6] << endl;
+           << setw(10) << a << found[0]
+           << setw(10) << b << found[1]
+           << setw(10) << c << found[2]
+           << setw(10) << alpha << found[3]
+           << setw(10) << beta << found[4]
+           << setw(10) << gamma << found[5]
+           << setw(10) << v << found[6] << endl;
     getline(cif_input, line);
-    for (int k = 0; k < cell_keywords.size(); k++) {
-      if (line.find(cell_keywords[k]) != string::npos) {
-        switch (k) {
+    for (int k = 0; k < cell_keywords.size(); k++)
+    {
+      if (line.find(cell_keywords[k]) != string::npos)
+      {
+        switch (k)
+        {
         case 0:
           a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
           break;
@@ -1203,7 +1489,7 @@ void readxyzMinMax_fromCIF(
 
   if (debug)
     file << "Making cm" << endl
-    << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
+         << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
 
   cm[0][0] = a / 0.529177249;
   cm[1][0] = 0.0;
@@ -1225,9 +1511,9 @@ void readxyzMinMax_fromCIF(
   CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
   CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
 
-  NbSteps[0] = (int) ceil(a / Resolution);
-  NbSteps[1] = (int) ceil(b / Resolution);
-  NbSteps[2] = (int) ceil(c / Resolution);
+  NbSteps[0] = (int)ceil(a / Resolution);
+  NbSteps[1] = (int)ceil(b / Resolution);
+  NbSteps[2] = (int)ceil(c / Resolution);
 
   for (int i = 0; i < 3; i++)
     for (int j = 0; j < 3; j++)
@@ -1236,7 +1522,7 @@ void readxyzMinMax_fromCIF(
   cif_input.close();
 }
 
-const double normgauss(const int& type, const double& exp)
+const double normgauss(const int &type, const double &exp)
 {
   int t[3];
   if (type > 0)
@@ -1247,52 +1533,56 @@ const double normgauss(const int& type, const double& exp)
   long long int temp2 = constants::ft[2 * t[0]] * constants::ft[2 * t[1]] * constants::ft[2 * t[2]];
   return pow(2 * exp / constants::PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector<vec>& g) {
-  //                                                   
-  //From 3P: P0 P1 P2
-  //To 3P : Z X Y (4 2 3, as in ORCA format)
-  // 
+bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vector<vec> &g)
+{
+  //
+  // From 3P: P0 P1 P2
+  // To 3P : Z X Y (4 2 3, as in ORCA format)
+  //
   p.resize(3);
 #pragma omp parallel for
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     p[i].resize(3, 0.0);
   }
   p[0][2] = 1.0;
   p[1][0] = 1.0;
   p[2][1] = 1.0;
-  
-  //                                                   
-  //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
-  //To 6D : 5  6  7  8  9 10                           
-  //XX, YY, ZZ, XY, XZ, YZ      
-  // 
+
+  //
+  // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
+  // To 6D : 5  6  7  8  9 10
+  // XX, YY, ZZ, XY, XZ, YZ
+  //
   d.resize(6);
 #pragma omp parallel for
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 6; i++)
+  {
     d[i].resize(5, 0.0);
   }
-  //XX = -0.5/SQRT(3) * D0 + 0.5 * D2
+  // XX = -0.5/SQRT(3) * D0 + 0.5 * D2
   d[0][0] = -0.5 / sqrt(3);
   d[0][3] = 0.5;
-  //YY = -0.5/SQRT(3) * D0 - 0.5 * D2
+  // YY = -0.5/SQRT(3) * D0 - 0.5 * D2
   d[1][0] = -0.5 / sqrt(3);
   d[1][3] = -0.5;
-  //ZZ = SQRT(1/3) * D0
+  // ZZ = SQRT(1/3) * D0
   d[2][0] = sqrt(1.0 / 3.0);
-  //XY = D-2
+  // XY = D-2
   d[3][4] = 1.0;
-  //XZ = D1
+  // XZ = D1
   d[4][1] = 1.0;
-  //YZ = D-1
+  // YZ = D-1
   d[5][2] = 1.0;
 
-  //From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
-  //To 10F : 11   12   13   14   15   16   17   18   19  20
-  //XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
+  // From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
+  // To 10F : 11   12   13   14   15   16   17   18   19  20
+  // XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ (AIMALL order!)
   //
   f.resize(10);
 #pragma omp parallel for
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     f[i].resize(7, 0.0);
   }
   f[0][1] = -sqrt(0.025);
@@ -1323,7 +1613,8 @@ bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector
 
   g.resize(15);
 #pragma omp parallel for
-  for (int i = 0; i < 15; i++) {
+  for (int i = 0; i < 15; i++)
+  {
     g[i].resize(9, 0.0);
   }
   g[0][0] = 0.375 * sqrt(1.0 / 35.0);
@@ -1370,250 +1661,254 @@ bool generate_sph2cart_mat(vector<vec>&p, vector<vec>& d, vector<vec>& f, vector
   g[14][4] = 3.0 / sqrt(7);
   return true;
 }
-bool generate_cart2sph_mat(vector<vec>& d, vector<vec>& f, vector<vec>& g, vector<vec>& h)
+bool generate_cart2sph_mat(vector<vec> &d, vector<vec> &f, vector<vec> &g, vector<vec> &h)
 {
-  //                                                   
-  //From 5D: D 0, D + 1, D - 1, D + 2, D - 2           
-  //To 6D : 1  2  3  4  5  6                           
-  //XX, YY, ZZ, XY, XZ, YZ      
-  // 
+  //
+  // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
+  // To 6D : 1  2  3  4  5  6
+  // XX, YY, ZZ, XY, XZ, YZ
+  //
   d.resize(6);
 #pragma omp parallel for
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 6; i++)
+  {
     d[i].resize(5, 0.0);
   }
-  //D0 = -0.5 * XX - 0.5 * YY + ZZ
+  // D0 = -0.5 * XX - 0.5 * YY + ZZ
   d[0][0] = -0.5;
   d[1][0] = -0.5;
   d[2][0] = 1.0;
-  //D + 1 = XZ
+  // D + 1 = XZ
   d[4][1] = 1.0;
-  //D - 1 = YZ
+  // D - 1 = YZ
   d[5][2] = 1.0;
-  //D + 2 = SQRT(3) / 2 * (XX - YY)
+  // D + 2 = SQRT(3) / 2 * (XX - YY)
   d[0][3] = sqrt(3.0) / 2.0;
   d[1][3] = -sqrt(3.0) / 2.0;
-  //D - 2 = XY
+  // D - 2 = XY
   d[3][4] = 1.0;
 
-  //From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
-  //To 10F : 1   2   3   4   5   6   7   8   9  10
-  //XXX, YYY, ZZZ, XYY, XXY, XXZ, XZZ, YZZ, YYZ, XYZ(Gaussian sequence, not identical to Multiwfn)
+  // From 7F: F 0, F + 1, F - 1, F + 2, F - 2, F + 3, F - 3
+  // To 10F : 1   2   3   4   5   6   7   8   9  10
+  // XXX, YYY, ZZZ, XYY, XXY, XXZ, XZZ, YZZ, YYZ, XYZ(Gaussian sequence, not identical to Multiwfn)
   //
   f.resize(10);
 #pragma omp parallel for
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10; i++)
+  {
     f[i].resize(7, 0.0);
   }
-  //F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
+  // F 0 = -3 / (2 * sqrt5) * (XXZ + YYZ) + ZZZ
   f[2][0] = 1.0;
   f[5][0] = -1.5 / sqrt(5.0);
   f[8][0] = -1.5 / sqrt(5.0);
-  //F + 1 = -sqrt(3 / 8) * XXX - sqrt(3 / 40) * XYY + sqrt(6 / 5) * XZZ
+  // F + 1 = -sqrt(3 / 8) * XXX - sqrt(3 / 40) * XYY + sqrt(6 / 5) * XZZ
   f[0][1] = -sqrt(3.0 / 8.0);
   f[3][1] = -sqrt(3.0 / 40.0);
   f[6][1] = sqrt(6.0 / 5.0);
-  //F - 1 = -sqrt(3 / 40) * XXY - sqrt(3 / 8) * YYY + sqrt(6 / 5) * YZZ
+  // F - 1 = -sqrt(3 / 40) * XXY - sqrt(3 / 8) * YYY + sqrt(6 / 5) * YZZ
   f[1][2] = -sqrt(3.0 / 8.0);
   f[4][2] = -sqrt(3.0 / 40.0);
   f[7][2] = sqrt(6.0 / 5.0);
-  //F + 2 = sqrt3 / 2 * (XXZ - YYZ)
+  // F + 2 = sqrt3 / 2 * (XXZ - YYZ)
   f[5][3] = sqrt(3.0) / 2.0;
   f[8][3] = -sqrt(3.0) / 2.0;
-  //F - 2 = XYZ
+  // F - 2 = XYZ
   f[9][4] = 1.0;
-  //F + 3 = sqrt(5 / 8) * XXX - 3 / sqrt8 * XYY
+  // F + 3 = sqrt(5 / 8) * XXX - 3 / sqrt8 * XYY
   f[0][5] = sqrt(5.0 / 8.0);
   f[3][5] = -3.0 / sqrt(8.0);
-  //F - 3 = 3 / sqrt8 * XXY - sqrt(5 / 8) * YYY
+  // F - 3 = 3 / sqrt8 * XXY - sqrt(5 / 8) * YYY
   f[1][6] = -sqrt(5.0 / 8.0);
   f[4][6] = 3.0 / sqrt(8.0);
 
-  //From 9G: G 0, G + 1, G - 1, G + 2, G - 2, G + 3, G - 3, G + 4, G - 4
-  //To 15G : 1    2    3    4    5    6    7    8
-  //ZZZZ, YZZZ, YYZZ, YYYZ, YYYY, XZZZ, XYZZ, XYYZ
-  //9   10   11   12   13   14   15
-  //XYYY, XXZZ, XXYZ, XXYY, XXXZ, XXXY, XXXX
+  // From 9G: G 0, G + 1, G - 1, G + 2, G - 2, G + 3, G - 3, G + 4, G - 4
+  // To 15G : 1    2    3    4    5    6    7    8
+  // ZZZZ, YZZZ, YYZZ, YYYZ, YYYY, XZZZ, XYZZ, XYYZ
+  // 9   10   11   12   13   14   15
+  // XYYY, XXZZ, XXYZ, XXYY, XXXZ, XXXY, XXXX
   //
   g.resize(15);
 #pragma omp parallel for
-  for (int i = 0; i < 15; i++) {
+  for (int i = 0; i < 15; i++)
+  {
     g[i].resize(9, 0.0);
   }
-  //G 0 = ZZZZ + 3 / 8 * (XXXX + YYYY) - 3 * sqrt(3 / 35) * (XXZZ + YYZZ - 1 / 4 * XXYY)
+  // G 0 = ZZZZ + 3 / 8 * (XXXX + YYYY) - 3 * sqrt(3 / 35) * (XXZZ + YYZZ - 1 / 4 * XXYY)
   g[0][0] = 1.0;
   g[2][0] = -3.0 * sqrt(3.0 / 35.0);
   g[4][0] = 3.0 / 8.0;
   g[9][0] = -3.0 * sqrt(3.0 / 35.0);
   g[11][0] = 3.0 / 4.0 * sqrt(3.0 / 35.0);
   g[14][0] = 3.0 / 8.0;
-  //G + 1 = 2 * sqrt(5 / 14) * XZZZ - 3 / 2 * sqrt(5 / 14) * XXXZ - 3 / 2 / sqrt14 * XYYZ
+  // G + 1 = 2 * sqrt(5 / 14) * XZZZ - 3 / 2 * sqrt(5 / 14) * XXXZ - 3 / 2 / sqrt14 * XYYZ
   g[5][1] = 2.0 * sqrt(5.0 / 14.0);
   g[7][1] = -1.5 / sqrt(14.0);
   g[12][1] = -1.5 * sqrt(5.0 / 14.0);
-  //G - 1 = 2 * sqrt(5 / 14) * YZZZ - 3 / 2 * sqrt(5 / 14) * YYYZ - 3 / 2 / sqrt14 * XXYZ
+  // G - 1 = 2 * sqrt(5 / 14) * YZZZ - 3 / 2 * sqrt(5 / 14) * YYYZ - 3 / 2 / sqrt14 * XXYZ
   g[1][2] = 2.0 * sqrt(5.0 / 14.0);
   g[3][2] = -1.5 * sqrt(5.0 / 14.0);
   g[10][2] = -1.5 / sqrt(14.0);
-  //G + 2 = 3 * sqrt(3 / 28) * (XXZZ - YYZZ) - sqrt5 / 4 * (XXXX - YYYY)
+  // G + 2 = 3 * sqrt(3 / 28) * (XXZZ - YYZZ) - sqrt5 / 4 * (XXXX - YYYY)
   g[2][3] = -3.0 * sqrt(3.0 / 28.0);
   g[4][3] = sqrt(5.0) / 4.0;
   g[9][3] = 3.0 * sqrt(3.0 / 28.0);
   g[14][3] = -sqrt(5.0) / 4.0;
-  //G - 2 = 3 / sqrt7 * XYZZ - sqrt(5 / 28) * (XXXY + XYYY)
+  // G - 2 = 3 / sqrt7 * XYZZ - sqrt(5 / 28) * (XXXY + XYYY)
   g[6][4] = 3.0 / sqrt(7.0);
   g[8][4] = -sqrt(5.0 / 28.0);
   g[13][4] = -sqrt(5.0 / 28.0);
-  //G + 3 = sqrt(5 / 8) * XXXZ - 3 / sqrt8 * XYYZ
+  // G + 3 = sqrt(5 / 8) * XXXZ - 3 / sqrt8 * XYYZ
   g[7][5] = -3.0 / sqrt(8.0);
   g[12][5] = sqrt(5.0 / 8.0);
-  //G - 3 = -sqrt(5 / 8) * YYYZ + 3 / sqrt8 * XXYZ
+  // G - 3 = -sqrt(5 / 8) * YYYZ + 3 / sqrt8 * XXYZ
   g[3][6] = -sqrt(5.0 / 8.0);
   g[10][6] = 3.0 / sqrt(8.0);
-  //G + 4 = sqrt35 / 8 * (XXXX + YYYY) - 3 / 4 * sqrt3 * XXYY
+  // G + 4 = sqrt35 / 8 * (XXXX + YYYY) - 3 / 4 * sqrt3 * XXYY
   g[4][7] = sqrt(35.0) / 8.0;
   g[11][7] = -3.0 / 4.0 * sqrt(3.0);
   g[14][7] = sqrt(35.0) / 8.0;
-  //G - 4 = sqrt5 / 2 * (XXXY - XYYY)
+  // G - 4 = sqrt5 / 2 * (XXXY - XYYY)
   g[8][8] = -sqrt(5.0) / 2.0;
   g[13][8] = sqrt(5.0) / 2.0;
 
-  //From 11H: H 0, H + 1, H - 1, H + 2, H - 2, H + 3, H - 3, H + 4, H - 4, H + 5, H - 5
-  //To 21H : 1     2     3     4     5     6     7     8     9    10
-  //ZZZZZ YZZZZ YYZZZ YYYZZ YYYYZ YYYYY XZZZZ XYZZZ XYYZZ XYYYZ
-  //11    12    13    14    15    16    17    18    19    20    21
-  //XYYYY XXZZZ XXYZZ XXYYZ XXYYY XXXZZ XXXYZ XXXYY XXXXZ XXXXY XXXXX
+  // From 11H: H 0, H + 1, H - 1, H + 2, H - 2, H + 3, H - 3, H + 4, H - 4, H + 5, H - 5
+  // To 21H : 1     2     3     4     5     6     7     8     9    10
+  // ZZZZZ YZZZZ YYZZZ YYYZZ YYYYZ YYYYY XZZZZ XYZZZ XYYZZ XYYYZ
+  // 11    12    13    14    15    16    17    18    19    20    21
+  // XYYYY XXZZZ XXYZZ XXYYZ XXYYY XXXZZ XXXYZ XXXYY XXXXZ XXXXY XXXXX
   //
   h.resize(21);
 #pragma omp parallel for
-  for (int i = 0; i < 21; i++) {
+  for (int i = 0; i < 21; i++)
+  {
     h[i].resize(11);
     std::fill(h[i].begin(), h[i].end(), 0.0);
   }
-  //H 0 = ZZZZZ - 5 / sqrt21 * (XXZZZ + YYZZZ) + 5 / 8 * (XXXXZ + YYYYZ) + sqrt(15 / 7) / 4 * XXYYZ
+  // H 0 = ZZZZZ - 5 / sqrt21 * (XXZZZ + YYZZZ) + 5 / 8 * (XXXXZ + YYYYZ) + sqrt(15 / 7) / 4 * XXYYZ
   h[0][0] = 1.0;
   h[11][0] = -5.0 / sqrt(21.0);
   h[2][0] = -5.0 / sqrt(21.0);
   h[18][0] = 5.0 / 8.0;
   h[4][0] = 5.0 / 8.0;
   h[13][0] = sqrt(15.0 / 7.0) / 4.0;
-  //H + 1 = sqrt(5 / 3) * XZZZZ - 3 * sqrt(5 / 28) * XXXZZ - 3 / sqrt28 * XYYZZ + sqrt15 / 8 * XXXXX + sqrt(5 / 3) / 8 * XYYYY + sqrt(5 / 7) / 4 * XXXYY
+  // H + 1 = sqrt(5 / 3) * XZZZZ - 3 * sqrt(5 / 28) * XXXZZ - 3 / sqrt28 * XYYZZ + sqrt15 / 8 * XXXXX + sqrt(5 / 3) / 8 * XYYYY + sqrt(5 / 7) / 4 * XXXYY
   h[6][1] = sqrt(5.0 / 3.0);
   h[15][1] = -3.0 * sqrt(5.0 / 28.0);
   h[8][1] = -3.0 / sqrt(28.0);
   h[20][1] = sqrt(15.0) / 8.0;
   h[10][1] = sqrt(5.0 / 3.0) / 8.0;
   h[17][1] = sqrt(5.0 / 7.0) / 4.0;
-  //H - 1 = sqrt(5 / 3) * YZZZZ - 3 * sqrt(5 / 28) * YYYZZ - 3 / sqrt28 * XXYZZ + sqrt15 / 8 * YYYYY + sqrt(5 / 3) / 8 * XXXXY + sqrt(5 / 7) / 4 * XXYYY
+  // H - 1 = sqrt(5 / 3) * YZZZZ - 3 * sqrt(5 / 28) * YYYZZ - 3 / sqrt28 * XXYZZ + sqrt15 / 8 * YYYYY + sqrt(5 / 3) / 8 * XXXXY + sqrt(5 / 7) / 4 * XXYYY
   h[1][2] = sqrt(5.0 / 3.0);
   h[3][2] = -3.0 * sqrt(5.0 / 28.0);
   h[12][2] = -3.0 / sqrt(28.0);
   h[5][2] = sqrt(15.0) / 8.0;
   h[19][2] = sqrt(5.0 / 3.0) / 8.0;
   h[14][2] = sqrt(5.0 / 7.0) / 4.0;
-  //H + 2 = sqrt5 / 2 * (XXZZZ - YYZZZ) - sqrt(35 / 3) / 4 * (XXXXZ - YYYYZ)
+  // H + 2 = sqrt5 / 2 * (XXZZZ - YYZZZ) - sqrt(35 / 3) / 4 * (XXXXZ - YYYYZ)
   h[11][3] = sqrt(5.0) / 2.0;
   h[2][3] = -sqrt(5.0) / 2.0;
   h[18][3] = -sqrt(35.0 / 3.0) / 4.0;
   h[4][3] = sqrt(35.0 / 3.0) / 4.0;
-  //H - 2 = sqrt(5 / 3) * XYZZZ - sqrt(5 / 12) * (XXXYZ + XYYYZ)
+  // H - 2 = sqrt(5 / 3) * XYZZZ - sqrt(5 / 12) * (XXXYZ + XYYYZ)
   h[7][4] = sqrt(5.0 / 3.0);
   h[16][4] = -sqrt(5.0 / 12.0);
   h[9][4] = -sqrt(5.0 / 12.0);
-  //H + 3 = sqrt(5 / 6) * XXXZZ - sqrt(3 / 2) * XYYZZ - sqrt(35 / 2) / 8 * (XXXXX - XYYYY) + sqrt(5 / 6) / 4 * XXXYY
+  // H + 3 = sqrt(5 / 6) * XXXZZ - sqrt(3 / 2) * XYYZZ - sqrt(35 / 2) / 8 * (XXXXX - XYYYY) + sqrt(5 / 6) / 4 * XXXYY
   h[15][5] = sqrt(5.0 / 6.0);
   h[8][5] = -sqrt(1.5);
   h[20][5] = -sqrt(17.5) / 8.0;
   h[10][5] = sqrt(17.5) / 8.0;
   h[17][5] = sqrt(5.0 / 6.0) / 4.0;
-  //H - 3 = -sqrt(5 / 6) * YYYZZ + sqrt(3 / 2) * XXYZZ - sqrt(35 / 2) / 8 * (XXXXY - YYYYY) - sqrt(5 / 6) / 4 * XXYYY
+  // H - 3 = -sqrt(5 / 6) * YYYZZ + sqrt(3 / 2) * XXYZZ - sqrt(35 / 2) / 8 * (XXXXY - YYYYY) - sqrt(5 / 6) / 4 * XXYYY
   h[3][6] = -sqrt(5.0 / 6.0);
   h[12][6] = sqrt(1.5);
   h[19][6] = -sqrt(17.5) / 8.0;
   h[5][6] = sqrt(17.5) / 8.0;
   h[14][6] = -sqrt(5.0 / 6.0) / 4.0;
-  //H + 4 = sqrt35 / 8 * (XXXXZ + YYYYZ) - 3 / 4 * sqrt3 * XXYYZ
+  // H + 4 = sqrt35 / 8 * (XXXXZ + YYYYZ) - 3 / 4 * sqrt3 * XXYYZ
   h[18][7] = sqrt(35.0) / 8.0;
   h[4][7] = sqrt(35.0) / 8.0;
   h[13][7] = -0.75 * sqrt(3.0);
-  //H - 4 = sqrt5 / 2 * (XXXYZ - XYYYZ)
+  // H - 4 = sqrt5 / 2 * (XXXYZ - XYYYZ)
   h[16][8] = sqrt(5.0) / 2.0;
   h[9][8] = -sqrt(5.0) / 2.0;
-  //H + 5 = 3 / 8 * sqrt(7 / 2) * XXXXX + 5 / 8 * sqrt(7 / 2) * XYYYY - 5 / 4 * sqrt(3 / 2) * XXXYY
+  // H + 5 = 3 / 8 * sqrt(7 / 2) * XXXXX + 5 / 8 * sqrt(7 / 2) * XYYYY - 5 / 4 * sqrt(3 / 2) * XXXYY
   h[20][9] = 3.0 / 8.0 * sqrt(3.5);
   h[10][9] = 5.0 / 8.0 * sqrt(3.5);
   h[17][9] = -1.25 * sqrt(1.5);
-  //H - 5 = 3 / 8 * sqrt(7 / 2) * YYYYY + 5 / 8 * sqrt(7 / 2) * XXXXY - 5 / 4 * sqrt(3 / 2) * XXYYY
+  // H - 5 = 3 / 8 * sqrt(7 / 2) * YYYYY + 5 / 8 * sqrt(7 / 2) * XXXXY - 5 / 4 * sqrt(3 / 2) * XXYYY
   h[5][10] = 3.0 / 8.0 * sqrt(3.5);
   h[19][10] = 5.0 / 8.0 * sqrt(3.5);
   h[14][10] = -1.25 * sqrt(1.5);
   return true;
 }
 
-
 const int type_vector[168]{
-  0, 0, 0,
-  1, 0, 0,
-  0, 1, 0,
-  0, 0, 1,
-  2, 0, 0,
-  0, 2, 0,
-  0, 0, 2,
-  1, 1, 0,
-  1, 0, 1,
-  0, 1, 1,
-  3, 0, 0,
-  0, 3, 0,
-  0, 0, 3,
-  2, 1, 0,
-  2, 0, 1,
-  0, 2, 1,
-  1, 2, 0,
-  1, 0, 2,
-  0, 1, 2,
-  1, 1, 1,
-  0, 0, 4,
-  0, 1, 3,
-  0, 2, 2,
-  0, 3, 1,
-  0, 4, 0,
-  1, 0, 3,
-  1, 1, 2,
-  1, 2, 1,
-  1, 3, 0,
-  2, 0, 2,
-  2, 1, 1,
-  2, 2, 0,
-  3, 0, 1,
-  3, 1, 0,
-  4, 0, 0,
-  0, 0, 5,
-  0, 1, 4,
-  0, 2, 3,
-  0, 3, 2,
-  0, 4, 1,
-  0, 5, 0,
-  1, 0, 4,
-  1, 1, 3,
-  1, 2, 2,
-  1, 3, 1,
-  1, 4, 0,
-  2, 0, 3,
-  2, 1, 2,
-  2, 2, 1,
-  2, 3, 0,
-  3, 0, 2,
-  3, 1, 1,
-  3, 2, 0,
-  4, 0, 1,
-  4, 1, 0,
-  5, 0, 0 };
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+    0, 0, 1,
+    2, 0, 0,
+    0, 2, 0,
+    0, 0, 2,
+    1, 1, 0,
+    1, 0, 1,
+    0, 1, 1,
+    3, 0, 0,
+    0, 3, 0,
+    0, 0, 3,
+    2, 1, 0,
+    2, 0, 1,
+    0, 2, 1,
+    1, 2, 0,
+    1, 0, 2,
+    0, 1, 2,
+    1, 1, 1,
+    0, 0, 4,
+    0, 1, 3,
+    0, 2, 2,
+    0, 3, 1,
+    0, 4, 0,
+    1, 0, 3,
+    1, 1, 2,
+    1, 2, 1,
+    1, 3, 0,
+    2, 0, 2,
+    2, 1, 1,
+    2, 2, 0,
+    3, 0, 1,
+    3, 1, 0,
+    4, 0, 0,
+    0, 0, 5,
+    0, 1, 4,
+    0, 2, 3,
+    0, 3, 2,
+    0, 4, 1,
+    0, 5, 0,
+    1, 0, 4,
+    1, 1, 3,
+    1, 2, 2,
+    1, 3, 1,
+    1, 4, 0,
+    2, 0, 3,
+    2, 1, 2,
+    2, 2, 1,
+    2, 3, 0,
+    3, 0, 2,
+    3, 1, 1,
+    3, 2, 0,
+    4, 0, 1,
+    4, 1, 0,
+    5, 0, 0};
 
 void type2vector(
-  const int& index,
-  int* vector)
+    const int &index,
+    int *vector)
 {
-  if (index < 1 || index > 56) {
+  if (index < 1 || index > 56)
+  {
     vector[0] = -1;
     vector[1] = -1;
     vector[2] = -1;
@@ -1625,31 +1920,36 @@ void type2vector(
   vector[2] = type_vector[temp * 3 + 2];
 }
 
-bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& log3, bool debug)
+bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
 {
   vector<vec> Uij, Cijk, Dijkl;
   ifstream asym_cif_input(cif.c_str(), std::ios::in);
   asym_cif_input.clear();
   asym_cif_input.seekg(0, asym_cif_input.beg);
   string line;
-  vector <string> labels;
+  vector<string> labels;
   int count_fields = 0;
-  int position_field[3] = { 0,0,0 };
+  int position_field[3] = {0, 0, 0};
   int label_field = 100;
-  vector < vector <double > > positions;
+  vector<vector<double>> positions;
   positions.resize(wavy.get_ncen());
 
 #pragma omp parallel for schedule(dynamic)
-  for (int i = 0; i < wavy.get_ncen(); i++) {
+  for (int i = 0; i < wavy.get_ncen(); i++)
+  {
     positions[i].resize(3);
   }
   bool atoms_read = false;
-  while (!asym_cif_input.eof() && !atoms_read) {
+  while (!asym_cif_input.eof() && !atoms_read)
+  {
     getline(asym_cif_input, line);
-    if (line.find("loop_") != string::npos) {
-      while (line.find("_") != string::npos) {
+    if (line.find("loop_") != string::npos)
+    {
+      while (line.find("_") != string::npos)
+      {
         getline(asym_cif_input, line);
-        if (debug) log3 << "line in loop field definition: " << line << endl;
+        if (debug)
+          log3 << "line in loop field definition: " << line << endl;
         if (line.find("label") != string::npos)
           label_field = count_fields;
         else if (line.find("fract_x") != string::npos)
@@ -1658,31 +1958,37 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
           position_field[1] = count_fields;
         else if (line.find("fract_z") != string::npos)
           position_field[2] = count_fields;
-        else if (label_field == 100) {
-          if (debug) log3 << "I don't think this is the atom block.. moving on!" << endl;
+        else if (label_field == 100)
+        {
+          if (debug)
+            log3 << "I don't think this is the atom block.. moving on!" << endl;
           break;
         }
         count_fields++;
       }
-      while (line.find("_") == string::npos && line.length() > 3) {
+      while (line.find("_") == string::npos && line.length() > 3)
+      {
         atoms_read = true;
         stringstream s(line);
-        vector <string> fields;
+        vector<string> fields;
         fields.resize(count_fields);
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
-        if (debug) log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
+        if (debug)
+          log3 << "label: " << fields[label_field] << " frac_position: " << stod(fields[position_field[0]]) << " " << stod(fields[position_field[1]]) << " " << stod(fields[position_field[2]]) << endl;
         positions[labels.size()] = unit_cell.get_coords_cartesian(stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]));
         bool found_this_one = false;
-        if (debug) log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-          if (is_similar(positions[labels.size()][0], wavy.atoms[i].x, -1)
-            && is_similar(positions[labels.size()][1], wavy.atoms[i].y, -1)
-            && is_similar(positions[labels.size()][2], wavy.atoms[i].z, -1)) {
-            if (debug) log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
-              << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
+        if (debug)
+          log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
+        for (int i = 0; i < wavy.get_ncen(); i++)
+        {
+          if (is_similar(positions[labels.size()][0], wavy.atoms[i].x, -1) && is_similar(positions[labels.size()][1], wavy.atoms[i].y, -1) && is_similar(positions[labels.size()][2], wavy.atoms[i].z, -1))
+          {
+            if (debug)
+              log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
+                   << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
             wavy.atoms[i].label = fields[label_field];
-            wavy.atoms[i].frac_coords = { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) };
+            wavy.atoms[i].frac_coords = {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])};
             found_this_one = true;
             break;
           }
@@ -1698,16 +2004,20 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
   asym_cif_input.clear();
   asym_cif_input.seekg(0, asym_cif_input.beg);
   count_fields = 0;
-  int ADP_field[15] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+  int ADP_field[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   label_field = 100;
   atoms_read = false;
   Uij.resize(wavy.get_ncen());
-  while (!asym_cif_input.eof() && !atoms_read) {
+  while (!asym_cif_input.eof() && !atoms_read)
+  {
     getline(asym_cif_input, line);
-    if (line.find("loop_") != string::npos) {
-      while (line.find("_") != string::npos) {
+    if (line.find("loop_") != string::npos)
+    {
+      while (line.find("_") != string::npos)
+      {
         getline(asym_cif_input, line);
-        if (debug) log3 << "line in loop field definition: " << line << endl;
+        if (debug)
+          log3 << "line in loop field definition: " << line << endl;
         if (line.find("aniso_label") != string::npos)
           label_field = count_fields;
         else if (line.find("aniso_U_11") != string::npos)
@@ -1722,23 +2032,29 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
           ADP_field[4] = count_fields;
         else if (line.find("aniso_U_23") != string::npos)
           ADP_field[5] = count_fields;
-        else if (label_field == 100) {
-          if (debug) log3 << "I don't think this is the Uij block.. moving on!" << endl;
+        else if (label_field == 100)
+        {
+          if (debug)
+            log3 << "I don't think this is the Uij block.. moving on!" << endl;
           break;
         }
         count_fields++;
       }
-      while (line.find("_") == string::npos && line.length() > 3) {
+      while (line.find("_") == string::npos && line.length() > 3)
+      {
         atoms_read = true;
         stringstream s(line);
-        vector <string> fields;
+        vector<string> fields;
         fields.resize(count_fields);
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
-        if (debug) log3 << "label: " << fields[label_field] << endl;
+        if (debug)
+          log3 << "label: " << fields[label_field] << endl;
         bool found_this_one = false;
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-          if (fields[label_field] == wavy.atoms[i].label) {
+        for (int i = 0; i < wavy.get_ncen(); i++)
+        {
+          if (fields[label_field] == wavy.atoms[i].label)
+          {
             Uij[i].resize(6);
             for (int j = 0; j < 6; j++)
               Uij[i][j] = stod(fields[ADP_field[j]]);
@@ -1759,12 +2075,16 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
   label_field = 100;
   atoms_read = false;
   Cijk.resize(wavy.get_ncen());
-  while (!asym_cif_input.eof() && !atoms_read) {
+  while (!asym_cif_input.eof() && !atoms_read)
+  {
     getline(asym_cif_input, line);
-    if (line.find("loop_") != string::npos) {
-      while (line.find("_") != string::npos) {
+    if (line.find("loop_") != string::npos)
+    {
+      while (line.find("_") != string::npos)
+      {
         getline(asym_cif_input, line);
-        if (debug) log3 << "line in loop field definition: " << line << endl;
+        if (debug)
+          log3 << "line in loop field definition: " << line << endl;
         if (line.find("C_label") != string::npos)
           label_field = count_fields;
         else if (line.find("C_111") != string::npos)
@@ -1787,23 +2107,29 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
           ADP_field[8] = count_fields;
         else if (line.find("C_333") != string::npos)
           ADP_field[9] = count_fields;
-        else if (label_field == 100) {
-          if (debug) log3 << "I don't think this is the Cijk block.. moving on!" << endl;
+        else if (label_field == 100)
+        {
+          if (debug)
+            log3 << "I don't think this is the Cijk block.. moving on!" << endl;
           break;
         }
         count_fields++;
       }
-      while (line.find("_") == string::npos && line.length() > 3) {
+      while (line.find("_") == string::npos && line.length() > 3)
+      {
         atoms_read = true;
         stringstream s(line);
-        vector <string> fields;
+        vector<string> fields;
         fields.resize(count_fields);
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
-        if (debug) log3 << "label: " << fields[label_field] << endl;
+        if (debug)
+          log3 << "label: " << fields[label_field] << endl;
         bool found_this_one = false;
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-          if (fields[label_field] == wavy.atoms[i].label) {
+        for (int i = 0; i < wavy.get_ncen(); i++)
+        {
+          if (fields[label_field] == wavy.atoms[i].label)
+          {
             Cijk[i].resize(10);
             for (int j = 0; j < 6; j++)
               Cijk[i][j] = stod(fields[ADP_field[j]]);
@@ -1824,12 +2150,16 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
   label_field = 100;
   atoms_read = false;
   Dijkl.resize(wavy.get_ncen());
-  while (!asym_cif_input.eof() && !atoms_read) {
+  while (!asym_cif_input.eof() && !atoms_read)
+  {
     getline(asym_cif_input, line);
-    if (line.find("loop_") != string::npos) {
-      while (line.find("_") != string::npos) {
+    if (line.find("loop_") != string::npos)
+    {
+      while (line.find("_") != string::npos)
+      {
         getline(asym_cif_input, line);
-        if (debug) log3 << "line in loop field definition: " << line << endl;
+        if (debug)
+          log3 << "line in loop field definition: " << line << endl;
         if (line.find("D_label") != string::npos)
           label_field = count_fields;
         else if (line.find("D_1111") != string::npos)
@@ -1862,23 +2192,29 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
           ADP_field[13] = count_fields;
         else if (line.find("D_3333") != string::npos)
           ADP_field[14] = count_fields;
-        else if (label_field == 100) {
-          if (debug) log3 << "I don't think this is the Dijk block.. moving on!" << endl;
+        else if (label_field == 100)
+        {
+          if (debug)
+            log3 << "I don't think this is the Dijk block.. moving on!" << endl;
           break;
         }
         count_fields++;
       }
-      while (line.find("_") == string::npos && line.length() > 3) {
+      while (line.find("_") == string::npos && line.length() > 3)
+      {
         atoms_read = true;
         stringstream s(line);
-        vector <string> fields;
+        vector<string> fields;
         fields.resize(count_fields);
         for (int i = 0; i < count_fields; i++)
           s >> fields[i];
-        if (debug) log3 << "label: " << fields[label_field] << endl;
+        if (debug)
+          log3 << "label: " << fields[label_field] << endl;
         bool found_this_one = false;
-        for (int i = 0; i < wavy.get_ncen(); i++) {
-          if (fields[label_field] == wavy.atoms[i].label) {
+        for (int i = 0; i < wavy.get_ncen(); i++)
+        {
+          if (fields[label_field] == wavy.atoms[i].label)
+          {
             Dijkl[i].resize(15);
             for (int j = 0; j < 6; j++)
               Dijkl[i][j] = stod(fields[ADP_field[j]]);
@@ -1899,16 +2235,19 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
   return true;
 };
 
-bool read_fchk_integer_block(ifstream& in, string heading, vector<int>& result, bool rewind)
+bool read_fchk_integer_block(ifstream &in, string heading, ivec &result, bool rewind)
 {
-  if (result.size() != 0) result.clear();
+  if (result.size() != 0)
+    result.clear();
   string line = go_get_string(in, heading, rewind);
   int limit = read_fchk_integer(line);
   int run = 0;
   int temp;
   getline(in, line);
-  while (run < limit) {
-    if (in.eof()) return false;
+  while (run < limit)
+  {
+    if (in.eof())
+      return false;
     temp = stoi(line.substr(12 * (run % 6), 12 * (run % 6 + 1)));
     result.push_back(temp);
     run++;
@@ -1917,16 +2256,19 @@ bool read_fchk_integer_block(ifstream& in, string heading, vector<int>& result, 
   }
   return true;
 };
-bool read_fchk_double_block(ifstream& in, string heading, vec& result, bool rewind)
+bool read_fchk_double_block(ifstream &in, string heading, vec &result, bool rewind)
 {
-  if (result.size() != 0) result.clear();
+  if (result.size() != 0)
+    result.clear();
   string line = go_get_string(in, heading, rewind);
   int limit = read_fchk_integer(line);
   int run = 0;
   double temp;
   getline(in, line);
-  while (run < limit) {
-    if (in.eof()) return false;
+  while (run < limit)
+  {
+    if (in.eof())
+      return false;
     temp = stod(line.substr(16 * (run % 5), 16 * (run % 5 + 1)));
     result.push_back(temp);
     run++;
@@ -1943,25 +2285,27 @@ double read_fchk_double(string in)
 {
   return stod(in.substr(49, in.length() - 49));
 };
-int read_fchk_integer(std::ifstream& in, std::string search, bool rewind)
+int read_fchk_integer(std::ifstream &in, std::string search, bool rewind)
 {
   string temp = go_get_string(in, search, rewind);
   return stoi(temp.substr(49, temp.length() - 49));
 };
-double read_fchk_double(std::ifstream& in, std::string search, bool rewind)
+double read_fchk_double(std::ifstream &in, std::string search, bool rewind)
 {
   string temp = go_get_string(in, search, rewind);
   return stod(temp.substr(49, temp.length() - 49));
 };
-void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v)
+void swap_sort(ivec order, cvec &v)
 {
   int i = 0;
-  while (i < v.size() - 1) {
+  while (i < v.size() - 1)
+  {
     int new_index = 0;
     for (int j = i; j < v.size(); j++)
       if (order[j] < order[i])
         new_index++;
-    if (new_index > 0) {
+    if (new_index > 0)
+    {
       std::complex<double> temp = v[i];
       v[i] = v[i + new_index];
       v[i + new_index] = temp;
@@ -1974,20 +2318,23 @@ void swap_sort(std::vector<int> order, std::vector< std::complex<double> >& v)
   }
 }
 
-void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
+void swap_sort_multi(ivec order, std::vector<ivec> &v)
 {
   int i = 0;
-  std::vector<int> temp;
+  ivec temp;
   temp.resize(v.size());
-  while (i < v.size() - 1) {
+  while (i < v.size() - 1)
+  {
     int new_index = 0;
-#pragma omp parallel for reduction(+:new_index)
+#pragma omp parallel for reduction(+ : new_index)
     for (int j = i; j < v.size(); j++)
       if (order[j] < order[i])
         new_index++;
-    if (new_index > 0) {
+    if (new_index > 0)
+    {
 #pragma omp parallel for
-      for (int run = 0; run < v.size(); run++) {
+      for (int run = 0; run < v.size(); run++)
+      {
         temp[run] = v[run][i];
         v[run][i] = v[run][i + new_index];
         v[run][i + new_index] = temp[run];
@@ -2001,13 +2348,14 @@ void swap_sort_multi(std::vector<int> order, std::vector<std::vector<int>>& v)
   }
 }
 
-double get_lambda_1(double* a)
+double get_lambda_1(double *a)
 {
   vec bw, zw;
-  //int run = 0;
+  // int run = 0;
   double eig1, eig2, eig3;
   const double p1 = a[1] * a[1] + a[2] * a[2] + a[5] * a[5];
-  if (p1 == 0) {
+  if (p1 == 0)
+  {
     eig1 = a[0];
     eig2 = a[4];
     eig3 = a[8];
@@ -2020,26 +2368,22 @@ double get_lambda_1(double* a)
     else
       return eig3;
   }
-  else {
+  else
+  {
     const double q = (a[0] + a[4] + a[8]) / 3;
     const double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
     const double p = sqrt(p2 / 6);
     const double B[9]{
-    a[0] - q,
-    a[1],
-    a[2],
-    a[3],
-    a[4] - q,
-    a[5],
-    a[6],
-    a[7],
-    a[8] - q };
-    const double r = (B[0] * B[4] * B[8]
-      + B[1] * B[5] * B[6]
-      + B[3] * B[4] * B[7]
-      - B[0] * B[5] * B[7]
-      - B[1] * B[3] * B[8]
-      - B[2] * B[4] * B[6]) / 2;
+        a[0] - q,
+        a[1],
+        a[2],
+        a[3],
+        a[4] - q,
+        a[5],
+        a[6],
+        a[7],
+        a[8] - q};
+    const double r = (B[0] * B[4] * B[8] + B[1] * B[5] * B[6] + B[3] * B[4] * B[7] - B[0] * B[5] * B[7] - B[1] * B[3] * B[8] - B[2] * B[4] * B[6]) / 2;
     double phi;
     if (r <= -1)
       phi = constants::PI / 3;
@@ -2062,36 +2406,41 @@ double get_lambda_1(double* a)
   }
 };
 
-const double gaussian_radial(primitive& p, double& r) {
+const double gaussian_radial(primitive &p, double &r)
+{
   return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
 }
 
-const double calc_density_ML(double& x,
-  double& y,
-  double& z,
-  vec& coefficients,
-  std::vector<atom>& atoms,
-  const int& exp_coefs) {
+const double calc_density_ML(double &x,
+                             double &y,
+                             double &z,
+                             vec &coefficients,
+                             std::vector<atom> &atoms,
+                             const int &exp_coefs)
+{
   double dens = 0, radial = 0;
   int coef_counter = 0;
   int e = 0, size = 0;
-  for (int a = 0; a < atoms.size(); a++) {
+  for (int a = 0; a < atoms.size(); a++)
+  {
     size = (int)atoms[a].basis_set.size();
-    basis_set_entry* bf;
+    basis_set_entry *bf;
     double d[4]{
-    x - atoms[a].x,
-    y - atoms[a].y,
-    z - atoms[a].z, 0.0 };
-    //store r in last element
+        x - atoms[a].x,
+        y - atoms[a].y,
+        z - atoms[a].z, 0.0};
+    // store r in last element
     d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-    //normalize distances for spherical harmonic
+    // normalize distances for spherical harmonic
     for (e = 0; e < 3; e++)
       d[e] /= d[3];
-    for (e = 0; e < size; e++) {
+    for (e = 0; e < size; e++)
+    {
       bf = &atoms[a].basis_set[e];
       primitive p(a, bf->type, bf->exponent, bf->coefficient);
       radial = gaussian_radial(p, d[3]);
-      for (int m = -p.type; m <= p.type; m++) {
+      for (int m = -p.type; m <= p.type; m++)
+      {
         // m+p.type should yield just the running index of coefficents, since we start at -p.type
         dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
       }
@@ -2102,43 +2451,50 @@ const double calc_density_ML(double& x,
   return dens;
 }
 
-const double calc_density_ML(double& x,
-  double& y,
-  double& z,
-  vec& coefficients,
-  std::vector<atom>& atoms,
-  const int& exp_coefs,
-  const int& atom_nr) {
+const double calc_density_ML(double &x,
+                             double &y,
+                             double &z,
+                             vec &coefficients,
+                             std::vector<atom> &atoms,
+                             const int &exp_coefs,
+                             const int &atom_nr)
+{
   double dens = 0, radial = 0;
   int coef_counter = 0;
   int e = 0, size = 0;
-  for (int a = 0; a < atoms.size(); a++) {
-    if (a == atom_nr) {
+  for (int a = 0; a < atoms.size(); a++)
+  {
+    if (a == atom_nr)
+    {
       size = (int)atoms[a].basis_set.size();
-      basis_set_entry* bf;
+      basis_set_entry *bf;
       double d[4]{
-      x - atoms[a].x,
-      y - atoms[a].y,
-      z - atoms[a].z, 0.0 };
-      //store r in last element
+          x - atoms[a].x,
+          y - atoms[a].y,
+          z - atoms[a].z, 0.0};
+      // store r in last element
       d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-      //normalize distances for spherical harmonic
+      // normalize distances for spherical harmonic
       for (e = 0; e < 3; e++)
         d[e] /= d[3];
-      for (e = 0; e < size; e++) {
+      for (e = 0; e < size; e++)
+      {
         bf = &atoms[a].basis_set[e];
         primitive p(a, bf->type, bf->exponent, bf->coefficient);
         radial = gaussian_radial(p, d[3]);
-        for (int m = -p.type; m <= p.type; m++) {
+        for (int m = -p.type; m <= p.type; m++)
+        {
           // m+p.type should yield just the running index of coefficents, since we start at -p.type
           dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
         }
         coef_counter += (2 * p.type + 1);
       }
     }
-    else {
+    else
+    {
       size = (int)atoms[a].basis_set.size();
-      for (e = 0; e < size; e++) {
+      for (e = 0; e < size; e++)
+      {
         coef_counter += (2 * atoms[a].basis_set[e].type + 1);
       }
     }
@@ -2147,13 +2503,16 @@ const double calc_density_ML(double& x,
   return dens;
 }
 
-int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b) {
+int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b)
+{
   int nr_coefs = 0;
-  for (int i = 0; i < wavy.atoms.size(); i++) {
+  for (int i = 0; i < wavy.atoms.size(); i++)
+  {
     int current_charge = wavy.atoms[i].charge - 1;
-    const primitive* basis = b[current_charge].data();
+    const primitive *basis = b[current_charge].data();
     int size = (int)b[current_charge].size();
-    for (int e = 0; e < size; e++) {
+    for (int e = 0; e < size; e++)
+    {
       wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
       nr_coefs += 2 * basis[e].type + 1;
     }
@@ -2161,71 +2520,91 @@ int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b)
   return nr_coefs;
 }
 
-double get_decimal_precision_from_CIF_number(string& given_string) {
+double get_decimal_precision_from_CIF_number(string &given_string)
+{
   int len = (int)given_string.length();
   int open_bracket = -1;
   int close_bracket = -1;
   int decimal_point = -1;
-  //const char* gs = given_string.c_str();
-  for (int i = 0; i < len; i++) {
-    if (given_string[i] == '(' && open_bracket == -1) {
+  // const char* gs = given_string.c_str();
+  for (int i = 0; i < len; i++)
+  {
+    if (given_string[i] == '(' && open_bracket == -1)
+    {
       open_bracket = i;
     }
-    else if (given_string[i] == ')' && close_bracket == -1) {
+    else if (given_string[i] == ')' && close_bracket == -1)
+    {
       close_bracket = i;
     }
-    else if (given_string[i] == '.' && decimal_point == -1) {
+    else if (given_string[i] == '.' && decimal_point == -1)
+    {
       decimal_point = i;
     }
   }
   double result = 0;
   int precision = 1;
   int size_of_precision = 1;
-  if (open_bracket != -1 && close_bracket != -1) {
+  if (open_bracket != -1 && close_bracket != -1)
+  {
     size_of_precision = close_bracket - open_bracket - 1;
     string temp = given_string.substr(open_bracket + 1, size_of_precision);
     precision = stoi(temp);
   }
   int digits = 0;
-  if (open_bracket != -1 && close_bracket != -1) {
-    if (decimal_point != -1) {
+  if (open_bracket != -1 && close_bracket != -1)
+  {
+    if (decimal_point != -1)
+    {
       digits = open_bracket - decimal_point - 1;
     }
-    else {
+    else
+    {
       digits = close_bracket - open_bracket - 1;
     }
-    if (digits == 0) {
+    if (digits == 0)
+    {
       return 0.001;
     }
     result = abs(precision * pow(10, -digits));
     return result;
   }
-  else return 0.005;
+  else
+    return 0.005;
 };
 
-void options::digest_options() {
-  //Lets print what was the command line, for debugging
-  if (debug) {
+void options::digest_options()
+{
+  // Lets print what was the command line, for debugging
+  if (debug)
+  {
     cout << " Recap of input:\nsize: " << arguments.size() << endl;
   }
-  //This loop figures out command line options
+  // This loop figures out command line options
   int argc = (int)arguments.size();
-  for (int i = 0; i < arguments.size(); i++) {
+  for (int i = 0; i < arguments.size(); i++)
+  {
     if (debug)
       cout << arguments[i] << endl;
     string temp = arguments[i];
-    if (temp.find("-") > 0) continue;
+    if (temp.find("-") > 0)
+      continue;
     if (temp.find("-acc") < 1)
       accuracy = stoi(arguments[i + 1]);
-    else if (temp.find("-Anion") < 1) {
+    else if (temp.find("-Anion") < 1)
+    {
       int n = 1;
       string store;
-      if (debug) cout << "Looking for Anions!" << endl;
-      while (i + n < argc && string(arguments[i + n]).find("-") != 0) {
+      if (debug)
+        cout << "Looking for Anions!" << endl;
+      while (i + n < argc && string(arguments[i + n]).find("-") != 0)
+      {
         store = arguments[i + n];
         vector<string> Z = split_string<string>(store, " ");
-        for (int r = 0; r < Z.size(); r++) {
-          if (debug) cout << Z[r] << endl;
+        for (int r = 0; r < Z.size(); r++)
+        {
+          if (debug)
+            cout << Z[r] << endl;
           Anions.push_back(Z[r]);
         }
         n++;
@@ -2233,36 +2612,45 @@ void options::digest_options() {
     }
     else if (temp.find("-b") < 1)
       basis_set = arguments[i + 1];
-    else if (temp.find("-Cation") < 1) {
+    else if (temp.find("-Cation") < 1)
+    {
       int n = 1;
       string store;
-      if (debug) cout << "Looking for Cations!" << endl;
-      while (i + n < argc && string(arguments[i + n]).find("-") != 0) {
+      if (debug)
+        cout << "Looking for Cations!" << endl;
+      while (i + n < argc && string(arguments[i + n]).find("-") != 0)
+      {
         store = arguments[i + n];
         vector<string> Z = split_string<string>(store, " ");
-        for (int r = 0; r < Z.size(); r++) {
-          if (debug) cout << Z[r] << endl;
+        for (int r = 0; r < Z.size(); r++)
+        {
+          if (debug)
+            cout << Z[r] << endl;
           Cations.push_back(Z[r]);
         }
         n++;
       }
     }
-    else if (temp.find("-coef") < 1) {
+    else if (temp.find("-coef") < 1)
+    {
       coef_file = arguments[i + 1];
       err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
     }
-    else if (temp.find("-cif") < 1) {
+    else if (temp.find("-cif") < 1)
+    {
       cif = arguments[i + 1];
       err_checkf(exists(cif), "CIF doesn't exist", cout);
     }
     else if (temp.find("-cpus") < 1)
       threads = stoi(arguments[i + 1]);
-    else if (temp.find("-cmtc") != string::npos) {
+    else if (temp.find("-cmtc") != string::npos)
+    {
       cif_based_combined_tsc_calc = true;
       int n = 1;
       string delimiter = ",";
       groups.pop_back();
-      while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+      while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+      {
         combined_tsc_calc_files.push_back(arguments[i + n]);
         n++;
         combined_tsc_calc_cifs.push_back(arguments[i + n]);
@@ -2272,20 +2660,25 @@ void options::digest_options() {
         n++;
       }
     }
-    else if (temp.find("-combine_mos") < 1) {
+    else if (temp.find("-combine_mos") < 1)
+    {
       combine_mo.push_back(arguments[i + 1]);
       combine_mo.push_back(arguments[i + 2]);
     }
-    else if (temp.find("-cmos1") < 1) {
+    else if (temp.find("-cmos1") < 1)
+    {
       int j = 1;
-      while (i + j < argc && arguments[i + j].find("-") >= 1) {
+      while (i + j < argc && arguments[i + j].find("-") >= 1)
+      {
         cmo1.push_back(stoi(arguments[i + j]));
         j++;
       }
     }
-    else if (temp.find("-cmos2") < 1) {
+    else if (temp.find("-cmos2") < 1)
+    {
       int j = 1;
-      while (i + j < argc && arguments[i + j].find("-") >= 1) {
+      while (i + j < argc && arguments[i + j].find("-") >= 1)
+      {
         cmo2.push_back(stoi(arguments[i + j]));
         j++;
       }
@@ -2296,22 +2689,30 @@ void options::digest_options() {
       dmin = stod(arguments[i + 1]);
     else if (temp.find("-d") < 1)
       basis_set_path = arguments[i + 1];
-    else if (temp.find("-ECP") < 1) {
+    else if (temp.find("-ECP") < 1)
+    {
       ECP = true;
-      if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0) {
+      if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
+      {
         ECP_mode = stoi(arguments[i + 1]);
       }
     }
-    else if (temp.find("-set_ECPs") < 1) {
+    else if (temp.find("-set_ECPs") < 1)
+    {
       set_ECPs = true;
-      if (debug) cout << "Reading set ECPs" << endl;
+      if (debug)
+        cout << "Reading set ECPs" << endl;
       int j = 0;
-      while (argc >= i + 2 * (j+1) && string(arguments[i + j]).find("-") != 0 && string(arguments[i + j + 1]).find("-") != 0) {
+      while (argc >= i + 2 * (j + 1) &&
+             string(arguments[i + j]).find("-") != 0 &&
+             string(arguments[i + j + 1]).find("-") != 0)
+      {
         ECP_nrs.push_back(stoi(arguments[i + j]));
         ECP_elcounts.push_back(stoi(arguments[i + j + 1]));
         j += 2;
-        if (debug) {
-          cout << j << " " << arguments[i + j]<< " " << arguments[i + j + 1] << endl;
+        if (debug)
+        {
+          cout << j << " " << arguments[i + j] << " " << arguments[i + j + 1] << endl;
           cout << ECP_nrs.size() << endl;
           cout << ECP_elcounts.size() << endl;
         }
@@ -2331,9 +2732,11 @@ void options::digest_options() {
       fract = true, fract_name = arguments[i + 1];
     else if (temp.find("-gbw2wfn") < 1)
       gbw2wfn = true;
-    else if (temp.find("-group") < 1) {
+    else if (temp.find("-group") < 1)
+    {
       int n = 1;
-      while (i + n < argc && string(arguments[i + n]).find("-") == string::npos) {
+      while (i + n < argc && string(arguments[i + n]).find("-") == string::npos)
+      {
         int group;
         if (arguments[i + 1][0] == '+')
           group = -stoi(arguments[i + n]);
@@ -2347,7 +2750,8 @@ void options::digest_options() {
       hdef = calc = true;
     else if (temp.find("-hirsh") < 1)
       calc = hirsh = true, hirsh_number = stoi(arguments[i + 1]);
-    else if (temp.find("-hkl") < 1) {
+    else if (temp.find("-hkl") < 1)
+    {
       hkl = arguments[i + 1];
       err_checkf(exists(hkl), "hkl doesn't exist", cout);
     }
@@ -2357,42 +2761,50 @@ void options::digest_options() {
       calc = lap = true;
     else if (temp.find("-method") < 1)
       method = arguments[i + 1];
-    else if (temp.find("-merge") != string::npos) {
+    else if (temp.find("-merge") != string::npos)
+    {
       vector<string> filenames;
       int n = 1;
-      while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+      while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+      {
         filenames.push_back(arguments[i + n]);
         n++;
       }
       merge_tscs("combine", filenames, old_tsc);
       exit(0);
     }
-    else if (temp.find("-merge_nocheck") != string::npos) {
+    else if (temp.find("-merge_nocheck") != string::npos)
+    {
       vector<string> filenames;
       int n = 1;
-      while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+      while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+      {
         filenames.push_back(arguments[i + n]);
         n++;
       }
       merge_tscs_without_checks("combine", filenames, old_tsc);
       exit(0);
     }
-    else if (temp.find("-MO") < 1) {
+    else if (temp.find("-MO") < 1)
+    {
       if (string(arguments[i + 1]) != "all")
         MOs.push_back(stoi(arguments[i + 1]));
       else
         all_mos = true;
       calc = true;
     }
-    else if (temp.find("-ML_test") < 1) {
+    else if (temp.find("-ML_test") < 1)
+    {
       ML_test = true;
     }
-    else if (temp.find("-mtc") != string::npos) {
+    else if (temp.find("-mtc") != string::npos)
+    {
       combined_tsc_calc = true;
       int n = 1;
       string delimiter = ",";
       groups.pop_back();
-      while (i + n < argc && string(arguments[i + n]).find("-") > 0) {
+      while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+      {
         combined_tsc_calc_files.push_back(arguments[i + n]);
         n++;
         const string _temp = arguments[i + n];
@@ -2424,10 +2836,18 @@ void options::digest_options() {
       SALTED = true;
     else if (temp.find("-skpts") < 1)
       save_k_pts = true;
-    else if (temp.find("-sfac_scan") < 1) {
-      sfac_scan = fromString<double> (arguments[i+1]);
+    else if (temp.find("-sfac_scan") < 1)
+    {
+      sfac_scan = fromString<double>(arguments[i + 1]);
       cif = arguments[i + 2];
       wfn = arguments[i + 3];
+    }
+    else if (temp.find("-sfac_diffuse") < 1)
+    {
+      sfac_diffuse = fromString<double>(arguments[i + 1]);
+      cif = arguments[i + 2];
+      wfn = arguments[i + 3];
+      dmin = fromString<double>(arguments[i + 4]);
     }
     else if (temp.find("-spherical_harmonic") < 1)
       spherical_harmonic = true;
@@ -2435,12 +2855,14 @@ void options::digest_options() {
       cout << "Running in test mode!" << endl, test = true;
     else if (temp.find("-thakkar_d_plot") < 1)
       cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_plot = true;
-    else if (temp.find("-twin") < 1) {
+    else if (temp.find("-twin") < 1)
+    {
       twin_law.resize(twin_law.size() + 1);
       twin_law[twin_law.size() - 1].resize(9);
       for (int twl = 0; twl < 9; twl++)
         twin_law[twin_law.size() - 1][twl] = stod(arguments[i + 1 + twl]);
-      if (debug) {
+      if (debug)
+      {
         cout << "twin_law: ";
         for (int twl = 0; twl < 9; twl++)
           cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
@@ -2448,195 +2870,260 @@ void options::digest_options() {
       }
       i += 9;
     }
-    else if (temp.find("-old_tsc") != string::npos) {
+    else if (temp.find("-old_tsc") != string::npos)
+    {
       old_tsc = true;
     }
-    else if (temp.find("-tscb") != string::npos) {
+    else if (temp.find("-tscb") != string::npos)
+    {
       string name = arguments[i + 1];
-      tsc_block blocky = tsc_block(name);
+      tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
       name = "test.cif";
       blocky.write_tsc_file(name);
       exit(0);
     }
-    else if (temp.find("-wfn") < 1) {
+    else if (temp.find("-wfn") < 1)
+    {
       wfn = arguments[i + 1];
       err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
     }
-    else if (temp.find("-xyz") != string::npos) {
+    else if (temp.find("-xyz") != string::npos)
+    {
       xyz_file = arguments[i + 1];
     }
   }
 };
 
-void options::look_for_debug(int& argc, char** argv) {
-  //This loop figures out command line options
-  for (int i = 0; i < argc; i++) {
+void options::look_for_debug(int &argc, char **argv)
+{
+  // This loop figures out command line options
+  for (int i = 0; i < argc; i++)
+  {
     string temp = argv[i];
     arguments.push_back(temp);
-    if (temp.find("-") > 0) continue;
+    if (temp.find("-") > 0)
+      continue;
     else if (temp.find("-v") < 1)
       cout << "Turning on verbose mode!" << endl, debug = true;
     else if (temp.find("-v2") < 1)
       cout << "Turning on verbose mode!" << endl, debug = true;
-    else if (temp.find("-h") < 1 && temp.length() == 2) {
+    else if (temp.find("-h") < 1 && temp.length() == 2)
+    {
       cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
-    else if (temp.find("--h") < 1) {
+    else if (temp.find("--h") < 1)
+    {
       cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
-    else if (temp.find("-help") < 1) {
+    else if (temp.find("-help") < 1)
+    {
       cout << NoSpherA2_message() << help_message() << build_date() << endl;
       exit(0);
     }
   }
 };
 
-const double spherical_harmonic(const int& l, const int& m, const double* d) {
+const double spherical_harmonic(const int &l, const int &m, const double *d)
+{
   /*Here d[0] = x
          d[1] = y
          d[2] = z
          d[3] = r^2 IGNORED
          d[4] = r   IGNORED
          */
-  //Will need extension for up to l=8
-  //calc spherical harmonic
-  double SH = 0, x=d[0], y=d[1], z=d[2];
-  switch (l) {
-    case 0:  //S
-      SH = constants::c_1_4p; break;
-    case 1:
-      switch (m) {
-        case 0: //P 0 Z
-          SH = constants::c_3_4p * z; break;
-        case 1: //P 1 X
-          SH = constants::c_3_4p * x; break;
-        case -1: //P -1 Y
-          SH = constants::c_3_4p * y; break;
-        default:
-          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
+  // Will need extension for up to l=8
+  // calc spherical harmonic
+  double SH = 0, x = d[0], y = d[1], z = d[2];
+  switch (l)
+  {
+  case 0: // S
+    SH = constants::c_1_4p;
+    break;
+  case 1:
+    switch (m)
+    {
+    case 0: // P 0 Z
+      SH = constants::c_3_4p * z;
       break;
-    case 2:
-      switch (m) {
-        case 0: //D 0 Z2
-          SH = constants::c_5_16p * (3 * pow(z, 2) - 1.0); break;
-        case 1: //D 1 XZ
-          SH = constants::c_15_4p * x * z; break;
-        case -1: //D -1 YZ
-          SH = constants::c_15_4p * y * z; break;
-        case 2: //D 2 X2-Y2
-          SH = constants::c_15_16p * (pow(x, 2) - pow(y, 2)); break;
-        case -2: //D -2 XY
-          SH = constants::c_15_4p * y * x; break;
-        default:
-          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
+    case 1: // P 1 X
+      SH = constants::c_3_4p * x;
       break;
-    case 3:
-      switch (m) {
-        case 0: //F 0 Z3
-          SH = constants::c_7_16p * (5 * pow(z, 3) - 3 * z); break;
-        case 1: //F 1 XZZ
-          SH = constants::c_21_32p * x * (5 * pow(z, 2) - 1.0); break;
-        case -1: //F -1 YZZ
-          SH = constants::c_21_32p * y * (5 * pow(z, 2) - 1.0); break;
-        case 2: //F 2 Z(X2-Y2)
-          SH = constants::c_105_16p * ((pow(x, 2) - pow(y, 2)) * z); break;
-        case -2: //F -2 XYZ
-          SH = constants::c_105_4p * x * y * z; break;
-        case 3: //F 3 X(X^2-3Y^2)
-          SH = constants::c_35_32p * x * (pow(x, 2) - 3 * pow(y, 2)); break;
-        case -3: //F -3 Y(3X^2-Y^2)
-          SH = constants::c_35_32p * y * (3 * pow(x, 2) - pow(y, 2)); break;
-        default: 
-          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
-      break;
-    case 4:
-      switch (m) {
-        case 0: //G 0 Z^4
-          SH = constants::c_9_256p * (35 * pow(z, 4) - 30 * pow(z, 2) + 3.0); break;
-        case 1: //G 1 X(7Z^3-3ZR^2)
-          SH = constants::c_45_32p * x * (7 * pow(z, 3) - 3 * z); break;
-        case -1: //G -1 Y(7Z^2-3ZR^2)
-          SH = constants::c_45_32p * y * (7 * pow(z, 3) - 3 * z); break;
-        case 2: //G 2
-          SH = constants::c_45_64p * (pow(x, 2) - pow(y, 2)) * (7 * pow(z, 2) - 1.0); break;
-        case -2: //G -2
-          SH = constants::c_45_16p * x * y * (7 * pow(z, 2) - 1.0); break;
-        case 3: //G 3 XZ(X^2-3Y^2)
-          SH = constants::c_315_32p * x * (pow(x, 2) - 3 * pow(y, 2)) * z; break;
-        case -3: //G -3 XZ(3X^2-Y^2)
-          SH = constants::c_315_32p * y * (3 * pow(x, 2) - pow(y, 2)) * z; break;
-        case 4: //G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-          SH = constants::c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
-            (pow(y, 2) * (3 * pow(x, 2) - pow(y, 2)))); break;
-        case -4: //G -4 XY(X^2-Y^2)
-          SH = constants::c_315_16p * x * y * (pow(x, 2) - pow(y, 2)); break;
-        default:
-          err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
-      break;
-    case 5:
-      switch (m) {
-      case 0: //H Z^5
-        SH = constants::c_11_256p * (63 * pow(z, 5) - 70 * pow(z, 3) + 15 * z); break;
-      case 1: 
-        SH = constants::c_165_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
-      case -1: 
-        SH = constants::c_165_256p * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
-      case 2: 
-        SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
-      case -2: 
-        SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
-      case 3: 
-        SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
-      case -3: 
-        SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
-      case 4: 
-        SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y,4)) * z; break;
-      case -4: 
-        SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
-      case 5:
-        SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y,2) + 10 * x * pow(y, 4)); break;
-      case -5:
-        SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y,3) + 10 * y * pow(x, 4)); break;
-      default:
-        err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
-      break;
-    case 6:
-      switch (m) {
-      case 0: //I Z^6
-        SH = constants::c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z,2) - 5); break;
-      case 1:
-        SH = constants::c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
-      case -1:
-        SH = constants::c_165_256p * 2*y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0); break;
-      case 2:
-        SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z); break;
-      case -2:
-        SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z); break;
-      case 3:
-        SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
-      case -3:
-        SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0); break;
-      case 4:
-        SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z; break;
-      case -4:
-        SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z; break;
-      case 5:
-        SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4)); break;
-      case -5:
-        SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4)); break;
-      default:
-        err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-      }
+    case -1: // P -1 Y
+      SH = constants::c_3_4p * y;
       break;
     default:
-      err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  case 2:
+    switch (m)
+    {
+    case 0: // D 0 Z2
+      SH = constants::c_5_16p * (3 * pow(z, 2) - 1.0);
+      break;
+    case 1: // D 1 XZ
+      SH = constants::c_15_4p * x * z;
+      break;
+    case -1: // D -1 YZ
+      SH = constants::c_15_4p * y * z;
+      break;
+    case 2: // D 2 X2-Y2
+      SH = constants::c_15_16p * (pow(x, 2) - pow(y, 2));
+      break;
+    case -2: // D -2 XY
+      SH = constants::c_15_4p * y * x;
+      break;
+    default:
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  case 3:
+    switch (m)
+    {
+    case 0: // F 0 Z3
+      SH = constants::c_7_16p * (5 * pow(z, 3) - 3 * z);
+      break;
+    case 1: // F 1 XZZ
+      SH = constants::c_21_32p * x * (5 * pow(z, 2) - 1.0);
+      break;
+    case -1: // F -1 YZZ
+      SH = constants::c_21_32p * y * (5 * pow(z, 2) - 1.0);
+      break;
+    case 2: // F 2 Z(X2-Y2)
+      SH = constants::c_105_16p * ((pow(x, 2) - pow(y, 2)) * z);
+      break;
+    case -2: // F -2 XYZ
+      SH = constants::c_105_4p * x * y * z;
+      break;
+    case 3: // F 3 X(X^2-3Y^2)
+      SH = constants::c_35_32p * x * (pow(x, 2) - 3 * pow(y, 2));
+      break;
+    case -3: // F -3 Y(3X^2-Y^2)
+      SH = constants::c_35_32p * y * (3 * pow(x, 2) - pow(y, 2));
+      break;
+    default:
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  case 4:
+    switch (m)
+    {
+    case 0: // G 0 Z^4
+      SH = constants::c_9_256p * (35 * pow(z, 4) - 30 * pow(z, 2) + 3.0);
+      break;
+    case 1: // G 1 X(7Z^3-3ZR^2)
+      SH = constants::c_45_32p * x * (7 * pow(z, 3) - 3 * z);
+      break;
+    case -1: // G -1 Y(7Z^2-3ZR^2)
+      SH = constants::c_45_32p * y * (7 * pow(z, 3) - 3 * z);
+      break;
+    case 2: // G 2
+      SH = constants::c_45_64p * (pow(x, 2) - pow(y, 2)) * (7 * pow(z, 2) - 1.0);
+      break;
+    case -2: // G -2
+      SH = constants::c_45_16p * x * y * (7 * pow(z, 2) - 1.0);
+      break;
+    case 3: // G 3 XZ(X^2-3Y^2)
+      SH = constants::c_315_32p * x * (pow(x, 2) - 3 * pow(y, 2)) * z;
+      break;
+    case -3: // G -3 XZ(3X^2-Y^2)
+      SH = constants::c_315_32p * y * (3 * pow(x, 2) - pow(y, 2)) * z;
+      break;
+    case 4: // G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
+      SH = constants::c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
+                                    (pow(y, 2) * (3 * pow(x, 2) - pow(y, 2))));
+      break;
+    case -4: // G -4 XY(X^2-Y^2)
+      SH = constants::c_315_16p * x * y * (pow(x, 2) - pow(y, 2));
+      break;
+    default:
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  case 5:
+    switch (m)
+    {
+    case 0: // H Z^5
+      SH = constants::c_11_256p * (63 * pow(z, 5) - 70 * pow(z, 3) + 15 * z);
+      break;
+    case 1:
+      SH = constants::c_165_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
+      break;
+    case -1:
+      SH = constants::c_165_256p * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
+      break;
+    case 2:
+      SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z);
+      break;
+    case -2:
+      SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z);
+      break;
+    case 3:
+      SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0);
+      break;
+    case -3:
+      SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0);
+      break;
+    case 4:
+      SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z;
+      break;
+    case -4:
+      SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z;
+      break;
+    case 5:
+      SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4));
+      break;
+    case -5:
+      SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4));
+      break;
+    default:
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  case 6:
+    switch (m)
+    {
+    case 0: // I Z^6
+      SH = constants::c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z, 2) - 5);
+      break;
+    case 1:
+      SH = constants::c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
+      break;
+    case -1:
+      SH = constants::c_165_256p * 2 * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
+      break;
+    case 2:
+      SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z);
+      break;
+    case -2:
+      SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z);
+      break;
+    case 3:
+      SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0);
+      break;
+    case -3:
+      SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0);
+      break;
+    case 4:
+      SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z;
+      break;
+    case -4:
+      SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z;
+      break;
+    case 5:
+      SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4));
+      break;
+    case -5:
+      SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4));
+      break;
+    default:
+      err_not_impl_f("Wrong spherical harmonic called!", std::cout);
+    }
+    break;
+  default:
+    err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
   }
   return SH;
 }
