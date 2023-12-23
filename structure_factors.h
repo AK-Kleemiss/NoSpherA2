@@ -7,7 +7,8 @@
 #include "convenience.h"
 
 class WFN;
-class tsc_block;
+template class tsc_block<int,cdouble>;
+typedef tsc_block<int, cdouble> itsc_block;
 class cell;
 struct options;
 
@@ -16,7 +17,7 @@ bool thakkar_sfac(
   std::ofstream& file,
   WFN& wave);
 
-tsc_block MTC_thakkar_sfac(
+itsc_block MTC_thakkar_sfac(
   options& opt,
   std::ofstream& file,
   std::vector < std::string >& known_atoms,
@@ -40,13 +41,28 @@ bool calculate_structure_factors_RI_No_H(
   std::ofstream& file,
   const int exp_coefs);
 
-tsc_block calculate_structure_factors_MTC(
+itsc_block calculate_structure_factors_MTC(
   options& opt,
   std::vector<WFN>& wave,
   std::ofstream& file,
   std::vector <std::string>& known_atoms,
   const int& nr,
   std::vector<vec>* kpts=NULL);
+
+void generate_hkl(const double& dmin,
+  hkl_list& hkl,
+  const std::vector<vec>& twin_law,
+  cell& unit_cell,
+  std::ostream& file,
+  bool debug = false);
+
+void generate_fractional_hkl(const double& dmin,
+  hkl_list_d& hkl,
+  const std::vector<vec>& twin_law,
+  cell& unit_cell,
+  std::ostream& file,
+  double stepsize,
+  bool debug);
 
 template <typename NumType>
 std::complex<double> convert_to_ED_single(const int& neutralcharge,
