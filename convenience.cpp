@@ -2599,6 +2599,8 @@ void options::digest_options()
         cout << "Looking for Anions!" << endl;
       while (i + n < argc && string(arguments[i + n]).find("-") != 0)
       {
+        if (i+n-1 > arguments.size())
+		    break;
         store = arguments[i + n];
         vector<string> Z = split_string<string>(store, " ");
         for (int r = 0; r < Z.size(); r++)
@@ -2620,6 +2622,8 @@ void options::digest_options()
         cout << "Looking for Cations!" << endl;
       while (i + n < argc && string(arguments[i + n]).find("-") != 0)
       {
+          if (i + n - 1 > arguments.size())
+              break;
         store = arguments[i + n];
         vector<string> Z = split_string<string>(store, " ");
         for (int r = 0; r < Z.size(); r++)
