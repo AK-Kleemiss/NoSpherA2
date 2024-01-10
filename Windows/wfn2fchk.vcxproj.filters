@@ -48,6 +48,9 @@
     <ClCompile Include="..\spherical_density.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Faddeeva.cc">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../AtomGrid.h">
@@ -99,6 +102,12 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\npy.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Thakkar_coefs.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Faddeeva.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
