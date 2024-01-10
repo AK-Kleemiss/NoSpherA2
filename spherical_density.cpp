@@ -124,7 +124,7 @@ static constexpr double sinus_integral(const int N, const double z, const double
 		return N / (z * z + k * k) * (z * sinus_integral(N - 1, z, k) + k * cosinus_integral(N - 1, z, k));
 };
 
-static constexpr double cosinus_integral(const int N, const double z, const double k) {
+constexpr double cosinus_integral(const int N, const double z, const double k) {
 	//Calculates the integral 0 - inf r ^ N e ^ -zr cos(kr) dr through recursion using the general integral int e^ax cos(bx) dx = -e^-ax/(a^2+b^2) * (a cos(bx) - b sin(bx)) and partial integration
 	if (N == 0)
 		return z / (z * z + k * k);
