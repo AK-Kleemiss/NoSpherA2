@@ -275,6 +275,8 @@ const double sqr_pi_half = sqrt(1.57079632679489661923);
 
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector);
 
+
+//NEED TO CHECK FOR FACTOR 2 DUE TO 2z or z in exponent
 static const double gauss_sin_integral(const int& N, const double& exp, const double& k_vector) {
 	if (N == 1) {
 		return k_vector * sqr_pi_half * std::exp(-k_vector * k_vector / 8. / exp) / 8. / pow(exp, 3. / 2.);
