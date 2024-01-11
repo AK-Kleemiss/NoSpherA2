@@ -272,18 +272,30 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) {
 	charge = +1;
 };
 
-static const double gauss_integral(const int& N, const double& exp, const double& k_vector) {
-	if (N == 0) {
-		return Faddeeva_Dawson_re(k_vector / (sqrt(8 * exp))) / sqrt(2 * exp);
+const double sqr_pi_half = sqrt(1.57079632679489661923);
+
+const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector);
+
+static const double gauss_sin_integral(const int& N, const double& exp, const double& k_vector) {
+	if (N == 1) {
+		return k_vector * (sqr_pi_half) * std::exp(-k_vector*k_vector/8/exp) / 8/pow(exp,3./2.);
 	}
 	else
-		return 0;
+		return -(k_vector/4/exp * gauss_cos_integral(N, exp, k_vector) + N/2/exp * gauss_sin_integral(N-1, exp, k_vector);
 
+};
+const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector) {
+	if (N == 1) {
+		return k_vector * (sqr_pi_half)*std::exp(-k_vector * k_vector / 8 / exp) / 2 / pow(exp, 3. / 2.);
+	}
+	else
+		// UNFINISHED!
+		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector);
 };
 
 //the integral in case of a gaussian function should be 1/(2 pi zeta) \int r^(2*n+1) e^(-2 * zeta r^2) sin(2 pi zeta r) dr
 static double calc_Gaussian_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
-	return occ * coef * gauss_integral(radial_exp, exp, k_vector);
+	return occ * coef * gauss_sin_integral(radial_exp, exp, k_vector);
 }
 
 
