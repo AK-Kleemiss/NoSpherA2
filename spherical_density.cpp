@@ -1,7 +1,6 @@
 #include "spherical_density.h"
 #include "convenience.h"
 #include "Thakkar_coefs.h"
-#include "Faddeeva.h"
 #include <complex>
 #include <cmath>
 
