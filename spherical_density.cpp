@@ -277,27 +277,29 @@ const double gauss_cos_integral(const int& N, const double& exp, const double& k
 
 static const double gauss_sin_integral(const int& N, const double& exp, const double& k_vector) {
 	if (N == 1) {
-		return k_vector * (sqr_pi_half)*std::exp(-k_vector * k_vector / 8 / exp) / 8 / pow(exp, 3. / 2.);
+		return k_vector * sqr_pi_half * std::exp(-k_vector * k_vector / 8. / exp) / 8. / pow(exp, 3. / 2.);
 	}
 	else
-		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector));
+		return -(k_vector / 4. / exp * gauss_cos_integral(N, exp, k_vector) + N / 2. / exp * gauss_sin_integral(N - 1, exp, k_vector));
 
 };
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector) {
-	if (N == 1) {
-		return k_vector * (sqr_pi_half)*std::exp(-k_vector * k_vector / 8 / exp) / 2 / pow(exp, 3. / 2.);
+	if (N == 0) {
+		return sqr_pi_half * std::exp(-k_vector * k_vector / 8. / exp) / 2. / pow(exp, 1. / 2.);
 	}
 	else
-		// UNFINISHED!
-		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector));
+		return -(N - 1) / (4. * exp) * gauss_cos_integral(N - 2, exp, k_vector) + k_vector / (4. * exp) * gauss_sin_integral(N - 1, exp, k_vector);
 };
 
-//the integral in case of a gaussian function should be 1/(2 pi zeta) \int r^(2*n+1) e^(-2 * zeta r^2) sin(2 pi zeta r) dr
+//the integral in case of a gaussian function should be 1/k \int r^(n) e^(-exp * r^2) sin(kr) dr
 static double calc_Gaussian_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
-	return occ * coef * gauss_sin_integral(radial_exp, exp, k_vector);
+	return occ * coef * gauss_sin_integral(radial_exp, exp, k_vector) / k_vector;
 }
 
-
+static double calc_Gaussian_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
+	const int N = radial_exp;
+	return -pow(2.0, -N - 2.5) * pow(exp, -N - 1.5) * tgamma(N + 1.5);
+}
 
 
 Gaussian_Atom::Gaussian_Atom(int g_atom_number) {
@@ -327,9 +329,9 @@ double Gaussian_Atom::calc_type(
 
 	std::function<double(const int&, const double&, const double&, const int&, const double&)> func;
 	if (k_vector == 0)
-		func = calc_int_at_k0;
+		func = calc_Gaussian_int_at_k0;
 	else
-		func = calc_int;
+		func = calc_Gaussian_int;
 	const int l_n = n_vector[atomic_number - 1];
 	double temp, result = 0;
 	int i_j_distance = 0;
@@ -343,7 +345,7 @@ double Gaussian_Atom::calc_type(
 				temp = func(occ[offset + m],
 					c[nr_coef + m - lower_m + i * i_j_distance] * c[nr_coef + m - lower_m + (i + j) * i_j_distance],
 					z[nr_ex + i] + z[nr_ex + i + j],
-					n[nr_ex + i] + n[nr_ex + i + j] - 1,
+					n[nr_ex + i] + n[nr_ex + i + j] + 1,
 					k_vector);
 				if (j != 0)
 					result += 2 * temp;
