@@ -278,10 +278,10 @@ const double gauss_cos_integral(const int& N, const double& exp, const double& k
 
 static const double gauss_sin_integral(const int& N, const double& exp, const double& k_vector) {
 	if (N == 1) {
-		return k_vector * (sqr_pi_half) * std::exp(-k_vector*k_vector/8/exp) / 8/pow(exp,3./2.);
+		return k_vector * (sqr_pi_half)*std::exp(-k_vector * k_vector / 8 / exp) / 8 / pow(exp, 3. / 2.);
 	}
 	else
-		return -(k_vector/4/exp * gauss_cos_integral(N, exp, k_vector) + N/2/exp * gauss_sin_integral(N-1, exp, k_vector);
+		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector));
 
 };
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector) {
@@ -290,7 +290,7 @@ const double gauss_cos_integral(const int& N, const double& exp, const double& k
 	}
 	else
 		// UNFINISHED!
-		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector);
+		return -(k_vector / 4 / exp * gauss_cos_integral(N, exp, k_vector) + N / 2 / exp * gauss_sin_integral(N - 1, exp, k_vector));
 };
 
 //the integral in case of a gaussian function should be 1/(2 pi zeta) \int r^(2*n+1) e^(-2 * zeta r^2) sin(2 pi zeta r) dr
