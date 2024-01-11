@@ -1568,7 +1568,6 @@
     <ClCompile Include="../wfn_class.cpp" />
     <ClCompile Include="..\properties.cpp" />
     <ClCompile Include="..\spherical_density.cpp" />
-    <ClCompile Include="..\Faddeeva.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../AtomGrid.h" />
@@ -1583,7 +1582,6 @@
     <ClInclude Include="../wfn_class.h" />
     <ClInclude Include="..\cell.h" />
     <ClInclude Include="..\CUDA_utilities.h" />
-    <ClInclude Include="..\Faddeeva.h" />
     <ClInclude Include="..\npy.h" />
     <ClInclude Include="..\properties.h" />
     <ClInclude Include="..\spherical_density.h" />
