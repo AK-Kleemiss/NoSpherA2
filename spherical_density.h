@@ -117,6 +117,7 @@ public:
 
 class Gaussian_Atom : public Spherical_Atom {
 protected:
+	const int* ng, * nh;
 	void calc_orbs(int& nr_ex,
 		int& nr_coef,
 		const double& dist,
@@ -136,8 +137,8 @@ protected:
 		const int& max,
 		const int& min) override;
 public:
-	Gaussian_Atom(const int g_atom_number);
-	Gaussian_Atom();
+	Gaussian_Atom(const int g_atom_number, std::string& basis);
+	Gaussian_Atom() = default;
 	const double get_radial_density(double& dist) override;
 	const double get_form_factor(const double& k_vector) override;
 	const double get_core_form_factor(const double& k_vector, const int& core_els) override;
@@ -151,4 +152,18 @@ public:
 		const int& min_p,
 		const int& min_d,
 		const int& min_f) override;
+	const double get_custom_form_factor(
+		const double& k_vector,
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& max_g,
+		const int& max_h,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f,
+		const int& min_g,
+		const int& min_h);
 };

@@ -1582,6 +1582,7 @@
     <ClInclude Include="../wfn_class.h" />
     <ClInclude Include="..\cell.h" />
     <ClInclude Include="..\CUDA_utilities.h" />
+    <ClInclude Include="..\def2-ECPs.h" />
     <ClInclude Include="..\npy.h" />
     <ClInclude Include="..\properties.h" />
     <ClInclude Include="..\spherical_density.h" />

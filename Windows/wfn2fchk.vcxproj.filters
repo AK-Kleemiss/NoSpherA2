@@ -104,6 +104,9 @@
     <ClInclude Include="..\Thakkar_coefs.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\def2-ECPs.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">
