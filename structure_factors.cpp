@@ -2329,7 +2329,6 @@ int make_hirshfeld_grids(const int &pbc,
 // returns number of gridpoints in the final total grid
 static int make_hirshfeld_grids_RI(
     const int &accuracy,
-    cell &unit_cell,
     const WFN &wave,
     const string coef_filename,
     const vector<int> &atom_type_list,
@@ -5259,7 +5258,6 @@ bool calculate_structure_factors_RI(
 
   int points = make_hirshfeld_grids_RI(
       opt.accuracy,
-      unit_cell,
       wave,
       opt.coef_file,
       atom_type_list,
