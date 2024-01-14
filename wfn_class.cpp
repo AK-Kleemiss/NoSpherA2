@@ -1340,304 +1340,584 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
     }
     getline(rf, line); // Read more lines until we reach MO block
   }
-  err_checkf(d5 && f7 && g9, "Molden files without spheircal harmonics not yet implemented!", file);
-  int run = 0;
-  string sym;
-  bool spin; // alpha = false, beta = true
-  double ene, occup;
-  int expected_coefs = 0;
-  vector<primitive> prims;
-  ivec temp_shellsizes;
-  for (int a = 0; a < ncen; a++)
-  {
-    int current_shell = -1;
-    int l = 0;
-    for (int s = 0; s < atoms[a].basis_set.size(); s++)
+  if (d5 && f7 && g9) {
+    int run = 0;
+    string sym;
+    bool spin; // alpha = false, beta = true
+    double ene, occup;
+    int expected_coefs = 0;
+    vector<primitive> prims;
+    ivec temp_shellsizes;
+    for (int a = 0; a < ncen; a++)
     {
-      if ((int)atoms[a].basis_set[s].shell != current_shell)
+      int current_shell = -1;
+      int l = 0;
+      for (int s = 0; s < atoms[a].basis_set.size(); s++)
       {
-        if (atoms[a].basis_set[s].type == 1)
+        if ((int)atoms[a].basis_set[s].shell != current_shell)
         {
-          expected_coefs++;
-          l = 0;
+          if (atoms[a].basis_set[s].type == 1)
+          {
+            expected_coefs++;
+            l = 0;
+          }
+          else if (atoms[a].basis_set[s].type == 2)
+          {
+            expected_coefs += 3;
+            l = 1;
+          }
+          else if (atoms[a].basis_set[s].type == 3)
+          {
+            expected_coefs += 5;
+            l = 2;
+          }
+          else if (atoms[a].basis_set[s].type == 4)
+          {
+            expected_coefs += 7;
+            l = 3;
+          }
+          else if (atoms[a].basis_set[s].type == 5)
+          {
+            expected_coefs += 9;
+            l = 4;
+          }
+          current_shell++;
         }
-        else if (atoms[a].basis_set[s].type == 2)
-        {
-          expected_coefs += 3;
-          l = 1;
-        }
-        else if (atoms[a].basis_set[s].type == 3)
-        {
-          expected_coefs += 5;
-          l = 2;
-        }
-        else if (atoms[a].basis_set[s].type == 4)
-        {
-          expected_coefs += 7;
-          l = 3;
-        }
-        else if (atoms[a].basis_set[s].type == 5)
-        {
-          expected_coefs += 9;
-          l = 4;
-        }
-        current_shell++;
+        temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+        prims.push_back(primitive(a + 1,
+          atoms[a].basis_set[s].type,
+          atoms[a].basis_set[s].exponent,
+          atoms[a].basis_set[s].coefficient));
+        // prims.back().unnormalize();
       }
-      temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
-      prims.push_back(primitive(a + 1,
-                                atoms[a].basis_set[s].type,
-                                atoms[a].basis_set[s].exponent,
-                                atoms[a].basis_set[s].coefficient));
-      // prims.back().unnormalize();
     }
-  }
-  getline(rf, line);
-  // vec norm_const = get_norm_const(file);
-  // int norm_const_run = 0;
-  int MO_run = 0;
-  vector<vec> p_pure_2_cart;
-  vector<vec> d_pure_2_cart;
-  vector<vec> f_pure_2_cart;
-  vector<vec> g_pure_2_cart;
-  err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
-  while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
-  {
-    run++;
-    temp = split_string<string>(line, " ");
-    remove_empty_elements(temp);
-    sym = temp[1];
     getline(rf, line);
-    temp = split_string<string>(line, " ");
-    remove_empty_elements(temp);
-    ene = stod(temp[1]);
-    getline(rf, line);
-    temp = split_string<string>(line, " ");
-    remove_empty_elements(temp);
-    if (temp[1] == "Alpha" || temp[1] == "alpha")
-      spin = false;
-    else
-      spin = true;
-    getline(rf, line);
-    temp = split_string<string>(line, " ");
-    remove_empty_elements(temp);
-    occup = stod(temp[1]);
-    push_back_MO(run, occup, ene, spin);
-    // int run_coef = 0;
-    int p_run = 0;
-    vector<vec> p_temp(3);
-    int d_run = 0;
-    vector<vec> d_temp(5);
-    int f_run = 0;
-    vector<vec> f_temp(7);
-    int g_run = 0;
-    vector<vec> g_temp(9);
-    int basis_run = 0;
-    for (int i = 0; i < expected_coefs; i++)
+    // vec norm_const = get_norm_const(file);
+    // int norm_const_run = 0;
+    int MO_run = 0;
+    vector<vec> p_pure_2_cart;
+    vector<vec> d_pure_2_cart;
+    vector<vec> f_pure_2_cart;
+    vector<vec> g_pure_2_cart;
+    err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
+    while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
     {
+      run++;
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      sym = temp[1];
       getline(rf, line);
       temp = split_string<string>(line, " ");
       remove_empty_elements(temp);
-      // err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
-      switch (prims[basis_run].type)
+      ene = stod(temp[1]);
+      getline(rf, line);
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      if (temp[1] == "Alpha" || temp[1] == "alpha")
+        spin = false;
+      else
+        spin = true;
+      getline(rf, line);
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      occup = stod(temp[1]);
+      push_back_MO(run, occup, ene, spin);
+      // int run_coef = 0;
+      int p_run = 0;
+      vector<vec> p_temp(3);
+      int d_run = 0;
+      vector<vec> d_temp(5);
+      int f_run = 0;
+      vector<vec> f_temp(7);
+      int g_run = 0;
+      vector<vec> g_temp(9);
+      int basis_run = 0;
+      for (int i = 0; i < expected_coefs; i++)
       {
-      case 1:
-      {
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+        getline(rf, line);
+        temp = split_string<string>(line, " ");
+        remove_empty_elements(temp);
+        // err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
+        switch (prims[basis_run].type)
         {
-          double t = stod(temp[1]) * prims[basis_run + s].coefficient;
-          if (abs(t) < 1E-10)
-            t = 0;
-          push_back_MO_coef(MO_run, t);
-          if (MO_run == 0)
-          {
-            push_back_exponent(prims[basis_run + s].exp);
-            push_back_center(prims[basis_run].center);
-            push_back_type(prims[basis_run].type);
-            nex++;
-          }
-        }
-        basis_run += temp_shellsizes[basis_run];
-        break;
-      }
-      case 2:
-      {
-        if (p_run == 0)
-        {
-          for (int _i = 0; _i < 3; _i++)
-          {
-            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-          }
-        }
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-        {
-          p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
-        }
-        p_run++;
-        if (p_run == 3)
+        case 1:
         {
           for (int s = 0; s < temp_shellsizes[basis_run]; s++)
           {
-            double temp_coef = 0;
-            for (int cart = 0; cart < 3; cart++)
+            double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+            if (abs(t) < 1E-10)
+              t = 0;
+            push_back_MO_coef(MO_run, t);
+            if (MO_run == 0)
             {
-              temp_coef = p_temp[cart][s];
-              if (abs(temp_coef) < 1E-10)
-                temp_coef = 0;
-              push_back_MO_coef(MO_run, temp_coef);
-              if (MO_run == 0)
-              {
-                push_back_exponent(prims[basis_run + s].exp);
-                push_back_center(prims[basis_run].center);
-                if (cart == 0)
-                  push_back_type(prims[basis_run].type + 2);
-                else if (cart == 1)
-                  push_back_type(prims[basis_run].type);
-                else if (cart == 2)
-                  push_back_type(prims[basis_run].type + 1);
-                nex++;
-              }
+              push_back_exponent(prims[basis_run + s].exp);
+              push_back_center(prims[basis_run].center);
+              push_back_type(prims[basis_run].type);
+              nex++;
             }
           }
-          p_run = 0;
           basis_run += temp_shellsizes[basis_run];
+          break;
         }
-        break;
-      }
-      case 3:
-      {
-        if (d_run == 0)
+        case 2:
         {
-          for (int _i = 0; _i < 5; _i++)
+          if (p_run == 0)
           {
-            d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            for (int _i = 0; _i < 3; _i++)
+            {
+              p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
           }
-        }
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-        {
-          d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
-        }
-        d_run++;
-        if (d_run == 5)
-        {
           for (int s = 0; s < temp_shellsizes[basis_run]; s++)
           {
-            double temp_coef = 0;
-            for (int cart = 0; cart < 6; cart++)
+            p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          p_run++;
+          if (p_run == 3)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
             {
-              temp_coef = 0;
-              for (int spher = 0; spher < 5; spher++)
+              double temp_coef = 0;
+              for (int cart = 0; cart < 3; cart++)
               {
-                temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher][s];
-              }
-              if (abs(temp_coef) < 1E-10)
-                temp_coef = 0;
-              push_back_MO_coef(MO_run, temp_coef);
-              if (MO_run == 0)
-              {
-                push_back_exponent(prims[basis_run + s].exp);
-                push_back_center(prims[basis_run].center);
-                push_back_type(5 + cart);
-                nex++;
+                temp_coef = p_temp[cart][s];
+                if (abs(temp_coef) < 1E-10)
+                  temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  if (cart == 0)
+                    push_back_type(prims[basis_run].type + 2);
+                  else if (cart == 1)
+                    push_back_type(prims[basis_run].type);
+                  else if (cart == 2)
+                    push_back_type(prims[basis_run].type + 1);
+                  nex++;
+                }
               }
             }
+            p_run = 0;
+            basis_run += temp_shellsizes[basis_run];
           }
-          d_run = 0;
-          basis_run += temp_shellsizes[basis_run];
+          break;
         }
-        break;
-      }
-      case 4:
-      {
-        if (f_run == 0)
+        case 3:
         {
-          for (int _i = 0; _i < 7; _i++)
+          if (d_run == 0)
           {
-            f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            for (int _i = 0; _i < 5; _i++)
+            {
+              d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
           }
-        }
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-        {
-          f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
-        }
-        f_run++;
-        if (f_run == 7)
-        {
           for (int s = 0; s < temp_shellsizes[basis_run]; s++)
           {
-            double temp_coef = 0;
-            for (int cart = 0; cart < 10; cart++)
+            d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          d_run++;
+          if (d_run == 5)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
             {
-              temp_coef = 0;
-              for (int spher = 0; spher < 7; spher++)
+              double temp_coef = 0;
+              for (int cart = 0; cart < 6; cart++)
               {
-                temp_coef += f_pure_2_cart[cart][spher] * f_temp[spher][s];
-              }
-              if (abs(temp_coef) < 1E-10)
                 temp_coef = 0;
-              push_back_MO_coef(MO_run, temp_coef);
-              if (MO_run == 0)
-              {
-                push_back_exponent(prims[basis_run + s].exp);
-                push_back_center(prims[basis_run].center);
-                push_back_type(11 + cart);
-                nex++;
+                for (int spher = 0; spher < 5; spher++)
+                {
+                  temp_coef += d_pure_2_cart[cart][spher] * d_temp[spher][s];
+                }
+                if (abs(temp_coef) < 1E-10)
+                  temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(5 + cart);
+                  nex++;
+                }
               }
             }
+            d_run = 0;
+            basis_run += temp_shellsizes[basis_run];
           }
-          f_run = 0;
-          basis_run += temp_shellsizes[basis_run];
+          break;
         }
-        break;
-      }
-      case 5:
-      {
-        if (g_run == 0)
+        case 4:
         {
-          for (int _i = 0; _i < 9; _i++)
+          if (f_run == 0)
           {
-            g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            for (int _i = 0; _i < 7; _i++)
+            {
+              f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
           }
-        }
-        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-        {
-          g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
-        }
-        g_run++;
-        if (g_run == 9)
-        {
           for (int s = 0; s < temp_shellsizes[basis_run]; s++)
           {
-            double temp_coef = 0;
-            for (int cart = 0; cart < 15; cart++)
+            f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          f_run++;
+          if (f_run == 7)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
             {
-              temp_coef = 0;
-              for (int spher = 0; spher < 9; spher++)
+              double temp_coef = 0;
+              for (int cart = 0; cart < 10; cart++)
               {
-                temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
-              }
-              if (abs(temp_coef) < 1E-10)
                 temp_coef = 0;
-              push_back_MO_coef(MO_run, temp_coef);
-              if (MO_run == 0)
-              {
-                push_back_exponent(prims[basis_run].exp);
-                push_back_center(prims[basis_run].center);
-                push_back_type(21 + cart);
-                nex++;
+                for (int spher = 0; spher < 7; spher++)
+                {
+                  temp_coef += f_pure_2_cart[cart][spher] * f_temp[spher][s];
+                }
+                if (abs(temp_coef) < 1E-10)
+                  temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(11 + cart);
+                  nex++;
+                }
               }
             }
+            f_run = 0;
+            basis_run += temp_shellsizes[basis_run];
           }
-          g_run = 0;
-          basis_run += temp_shellsizes[basis_run];
+          break;
         }
-        break;
+        case 5:
+        {
+          if (g_run == 0)
+          {
+            for (int _i = 0; _i < 9; _i++)
+            {
+              g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          g_run++;
+          if (g_run == 9)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+            {
+              double temp_coef = 0;
+              for (int cart = 0; cart < 15; cart++)
+              {
+                temp_coef = 0;
+                for (int spher = 0; spher < 9; spher++)
+                {
+                  temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
+                }
+                if (abs(temp_coef) < 1E-10)
+                  temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(21 + cart);
+                  nex++;
+                }
+              }
+            }
+            g_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+        }
+        }
       }
+      err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+      MO_run++;
+      getline(rf, line);
+    }
+  }
+  else if (!d5 && !f7 && !g9) {
+    int run = 0;
+    string sym;
+    bool spin; // alpha = false, beta = true
+    double ene, occup;
+    int expected_coefs = 0;
+    vector<primitive> prims;
+    ivec temp_shellsizes;
+    for (int a = 0; a < ncen; a++)
+    {
+      int current_shell = -1;
+      int l = 0;
+      for (int s = 0; s < atoms[a].basis_set.size(); s++)
+      {
+        if ((int)atoms[a].basis_set[s].shell != current_shell)
+        {
+          if (atoms[a].basis_set[s].type == 1)
+          {
+            expected_coefs++;
+            l = 0;
+          }
+          else if (atoms[a].basis_set[s].type == 2)
+          {
+            expected_coefs += 3;
+            l = 1;
+          }
+          else if (atoms[a].basis_set[s].type == 3)
+          {
+            expected_coefs += 6;
+            l = 2;
+          }
+          else if (atoms[a].basis_set[s].type == 4)
+          {
+            expected_coefs += 10;
+            l = 3;
+          }
+          else if (atoms[a].basis_set[s].type == 5)
+          {
+            expected_coefs += 15;
+            l = 4;
+          }
+          current_shell++;
+        }
+        temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+        prims.push_back(primitive(a + 1,
+          atoms[a].basis_set[s].type,
+          atoms[a].basis_set[s].exponent,
+          atoms[a].basis_set[s].coefficient));
       }
     }
-    err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
-    MO_run++;
     getline(rf, line);
+    int MO_run = 0;
+    while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
+    {
+      run++;
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      sym = temp[1];
+      getline(rf, line);
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      ene = stod(temp[1]);
+      getline(rf, line);
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      if (temp[1] == "Alpha" || temp[1] == "alpha")
+        spin = false;
+      else
+        spin = true;
+      getline(rf, line);
+      temp = split_string<string>(line, " ");
+      remove_empty_elements(temp);
+      occup = stod(temp[1]);
+      push_back_MO(run, occup, ene, spin);
+      // int run_coef = 0;
+      int p_run = 0;
+      vector<vec> p_temp(3);
+      int d_run = 0;
+      vector<vec> d_temp(5);
+      int f_run = 0;
+      vector<vec> f_temp(7);
+      int g_run = 0;
+      vector<vec> g_temp(9);
+      int basis_run = 0;
+      for (int i = 0; i < expected_coefs; i++)
+      {
+        getline(rf, line);
+        temp = split_string<string>(line, " ");
+        remove_empty_elements(temp);
+        switch (prims[basis_run].type)
+        {
+        case 1:
+        {
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+            if (abs(t) < 1E-10)
+              t = 0;
+            push_back_MO_coef(MO_run, t);
+            if (MO_run == 0)
+            {
+              push_back_exponent(prims[basis_run + s].exp);
+              push_back_center(prims[basis_run].center);
+              push_back_type(prims[basis_run].type);
+              nex++;
+            }
+          }
+          basis_run += temp_shellsizes[basis_run];
+          break;
+        }
+        case 2:
+        {
+          if (p_run == 0)
+          {
+            for (int _i = 0; _i < 3; _i++)
+            {
+              p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          p_run++;
+          if (p_run == 3)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+            {
+              double temp_coef = 0;
+              for (int cart = 0; cart < 3; cart++)
+              {
+                temp_coef = p_temp[cart][s];
+                if (abs(temp_coef) < 1E-10)
+                  temp_coef = 0;
+                push_back_MO_coef(MO_run, temp_coef);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  if (cart == 0)
+                    push_back_type(prims[basis_run].type + 2);
+                  else if (cart == 1)
+                    push_back_type(prims[basis_run].type);
+                  else if (cart == 2)
+                    push_back_type(prims[basis_run].type + 1);
+                  nex++;
+                }
+              }
+            }
+            p_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+        }
+        case 3:
+        {
+          if (d_run == 0)
+          {
+            for (int _i = 0; _i < 6; _i++)
+            {
+              d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          d_run++;
+          if (d_run == 6)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+            {
+              for (int cart = 0; cart < 6; cart++)
+              {
+                push_back_MO_coef(MO_run, d_temp[cart][s]);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(5 + cart);
+                  nex++;
+                }
+              }
+            }
+            d_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+        }
+        case 4:
+        {
+          if (f_run == 0)
+          {
+            for (int _i = 0; _i < 10; _i++)
+            {
+              f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          f_run++;
+          if (f_run == 10)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+            {
+              for (int cart = 0; cart < 10; cart++)
+              {
+                if (cart < 3 || cart == 9)
+                  push_back_MO_coef(MO_run, f_temp[cart][s]);
+                else if (cart == 3 || cart == 4)
+                  push_back_MO_coef(MO_run, f_temp[cart + 1][s]);
+                else if (cart == 5)
+                  push_back_MO_coef(MO_run, f_temp[cart + 3][s]);
+                else if (cart == 6)
+                  push_back_MO_coef(MO_run, f_temp[cart - 3][s]);
+                else if (cart == 7 || cart == 8)
+                  push_back_MO_coef(MO_run, f_temp[cart - 1][s]);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run + s].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(11 + cart);
+                  nex++;
+                }
+              }
+            }
+            f_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+        }
+        case 5:
+        {
+          if (g_run == 0)
+          {
+            for (int _i = 0; _i < 15; _i++)
+            {
+              g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+            }
+          }
+          for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+          {
+            g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+          }
+          g_run++;
+          if (g_run == 15)
+          {
+            for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+            {
+              for (int cart = 0; cart < 15; cart++)
+              {
+                push_back_MO_coef(MO_run, g_temp[cart][s]);
+                if (MO_run == 0)
+                {
+                  push_back_exponent(prims[basis_run].exp);
+                  push_back_center(prims[basis_run].center);
+                  push_back_type(21 + cart);
+                  nex++;
+                }
+              }
+            }
+            g_run = 0;
+            basis_run += temp_shellsizes[basis_run];
+          }
+          break;
+        }
+        }
+      }
+      err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+      MO_run++;
+      getline(rf, line);
+    }
   }
+  else {
+    err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
+  }
+
 
   return true;
 };
