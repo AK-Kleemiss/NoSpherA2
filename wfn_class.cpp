@@ -1717,11 +1717,11 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
       int p_run = 0;
       vector<vec> p_temp(3);
       int d_run = 0;
-      vector<vec> d_temp(5);
+      vector<vec> d_temp(6);
       int f_run = 0;
-      vector<vec> f_temp(7);
+      vector<vec> f_temp(10);
       int g_run = 0;
-      vector<vec> g_temp(9);
+      vector<vec> g_temp(15);
       int basis_run = 0;
       for (int i = 0; i < expected_coefs; i++)
       {
