@@ -3,11 +3,8 @@
 #include "convenience.h"
 #include "fchk.h"
 #include "cube.h"
-#include "basis_set.h"
 #include "structure_factors.h"
 #include "properties.h"
-#include "cell.h"
-#include "spherical_density.h"
 #include "test_functions.h"
 
 using namespace std;
