@@ -1062,39 +1062,42 @@
       <Command>copy D:\git\wfn2fchk\Windows\x64\Publish\NoSpherA2.exe D:\Dropbox\HARt_Olex_Executables\HAR_SF_Printout\NoSpherA2.exe</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="../AtomGrid.cpp" />
-    <ClCompile Include="../basis_set.cpp" />
-    <ClCompile Include="../convenience.cpp" />
-    <ClCompile Include="../cube.cpp" />
-    <ClCompile Include="../fchk.cpp" />
-    <ClCompile Include="../mo_class.cpp" />
-    <ClCompile Include="../sphere_lebedev_rule.cpp" />
-    <CudaCompile Include="../structure_factors.cpp">
+    <ItemGroup>
+    <ClCompile Include="../Src/AtomGrid.cpp" />
+    <ClCompile Include="../Src/basis_set.cpp" />
+    <ClCompile Include="../Src/convenience.cpp" />
+    <ClCompile Include="../Src/cube.cpp" />
+    <ClCompile Include="../Src/fchk.cpp" />
+    <ClCompile Include="../Src/sphere_lebedev_rule.cpp" />
+    <CudaCompile Include="../Src/structure_factors.cpp">
       <GenerateLineInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateLineInfo>
       <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Release|x64'">compute_75,sm_75;compute_61,sm_61</CodeGeneration>
     </CudaCompile>
-    <ClCompile Include="..\NoSpherA2.cpp" />
-    <ClCompile Include="../wfn_class.cpp" />
-    <ClCompile Include="..\properties.cpp" />
-    <ClCompile Include="..\spherical_density.cpp" />
+    <ClCompile Include="../Src/NoSpherA2.cpp" />
+    <ClCompile Include="../Src/wfn_class.cpp" />
+    <ClCompile Include="../Src/properties.cpp" />
+    <ClCompile Include="../Src/spherical_density.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="../AtomGrid.h" />
-    <ClInclude Include="../atoms.h" />
-    <ClInclude Include="../basis_set.h" />
-    <ClInclude Include="../convenience.h" />
-    <ClInclude Include="../cube.h" />
-    <ClInclude Include="../fchk.h" />
-    <ClInclude Include="../mo_class.h" />
-    <ClInclude Include="../parameters.h" />
-    <ClInclude Include="../sphere_lebedev_rule.h" />
-    <ClInclude Include="../structure_factors.h" />
-    <ClInclude Include="../wfn_class.h" />
-    <ClInclude Include="..\cell.h" />
-    <ClInclude Include="..\CUDA_utilities.h" />
-    <ClInclude Include="..\properties.h" />
-    <ClInclude Include="..\spherical_density.h" />
+    <ClInclude Include="../Src/AtomGrid.h" />
+    <ClInclude Include="../Src/atoms.h" />
+    <ClInclude Include="../Src/basis_set.h" />
+    <ClInclude Include="../Src/convenience.h" />
+    <ClInclude Include="../Src/cube.h" />
+    <ClInclude Include="../Src/fchk.h" />
+    <ClInclude Include="../Src/mo_class.h" />
+    <ClInclude Include="../Src/sphere_lebedev_rule.h" />
+    <ClInclude Include="../Src/structure_factors.h" />
+    <ClInclude Include="../Src/wfn_class.h" />
+    <ClInclude Include="../Src/cell.h" />
+    <ClInclude Include="../Src/CUDA_utilities.h" />
+    <ClInclude Include="../Src/def2-ECPs.h" />
+    <ClInclude Include="../Src/npy.h" />
+    <ClInclude Include="../Src/properties.h" />
+    <ClInclude Include="../Src/spherical_density.h" />
+    <ClInclude Include="../Src/test_functions.h" />
+    <ClInclude Include="../Src/tsc_block.h" />
+    <ClInclude Include="../Src/Thakkar_coefs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

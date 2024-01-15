@@ -26,7 +26,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
 
-./unity.o: ../unity.cpp
+./unity.o: ../Src/unity.cpp
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

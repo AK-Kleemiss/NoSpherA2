@@ -4,11 +4,11 @@
 // Windows Header Files
 #include <windows.h>
 
-#include "../convenience.h"
-#include "../fchk.h"
-#include "../cube.h"
-#include "../basis_set.h"
-#include "../structure_factors.h"
-#include "../properties.h"
-#include "../cell.h"
-#include "../spherical_density.h"
+#include "../Src/convenience.h"
+#include "../Src/fchk.h"
+#include "../Src/cube.h"
+#include "../Src/basis_set.h"
+#include "../Src/structure_factors.h"
+#include "../Src/properties.h"
+#include "../Src/cell.h"
+#include "../Src/spherical_density.h"
