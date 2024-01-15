@@ -1611,38 +1611,38 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="../AtomGrid.cpp" />
-    <ClCompile Include="../basis_set.cpp" />
-    <ClCompile Include="../convenience.cpp" />
-    <ClCompile Include="../cube.cpp" />
-    <ClCompile Include="../fchk.cpp" />
-    <ClCompile Include="../sphere_lebedev_rule.cpp" />
-    <ClCompile Include="../structure_factors.cpp" />
-    <ClCompile Include="..\NoSpherA2.cpp" />
-    <ClCompile Include="../wfn_class.cpp" />
-    <ClCompile Include="..\properties.cpp" />
-    <ClCompile Include="..\spherical_density.cpp" />
+    <ClCompile Include="../Src/AtomGrid.cpp" />
+    <ClCompile Include="../Src/basis_set.cpp" />
+    <ClCompile Include="../Src/convenience.cpp" />
+    <ClCompile Include="../Src/cube.cpp" />
+    <ClCompile Include="../Src/fchk.cpp" />
+    <ClCompile Include="../Src/sphere_lebedev_rule.cpp" />
+    <ClCompile Include="../Src/structure_factors.cpp" />
+    <ClCompile Include="../Src/NoSpherA2.cpp" />
+    <ClCompile Include="../Src/wfn_class.cpp" />
+    <ClCompile Include="../Src/properties.cpp" />
+    <ClCompile Include="../Src/spherical_density.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="../AtomGrid.h" />
-    <ClInclude Include="../atoms.h" />
-    <ClInclude Include="../basis_set.h" />
-    <ClInclude Include="../convenience.h" />
-    <ClInclude Include="../cube.h" />
-    <ClInclude Include="../fchk.h" />
-    <ClInclude Include="../mo_class.h" />
-    <ClInclude Include="../sphere_lebedev_rule.h" />
-    <ClInclude Include="../structure_factors.h" />
-    <ClInclude Include="../wfn_class.h" />
-    <ClInclude Include="..\cell.h" />
-    <ClInclude Include="..\CUDA_utilities.h" />
-    <ClInclude Include="..\def2-ECPs.h" />
-    <ClInclude Include="..\npy.h" />
-    <ClInclude Include="..\properties.h" />
-    <ClInclude Include="..\spherical_density.h" />
-    <ClInclude Include="..\test_functions.h" />
-    <ClInclude Include="..\tsc_block.h" />
-    <ClInclude Include="..\Thakkar_coefs.h" />
+    <ClInclude Include="../Src/AtomGrid.h" />
+    <ClInclude Include="../Src/atoms.h" />
+    <ClInclude Include="../Src/basis_set.h" />
+    <ClInclude Include="../Src/convenience.h" />
+    <ClInclude Include="../Src/cube.h" />
+    <ClInclude Include="../Src/fchk.h" />
+    <ClInclude Include="../Src/mo_class.h" />
+    <ClInclude Include="../Src/sphere_lebedev_rule.h" />
+    <ClInclude Include="../Src/structure_factors.h" />
+    <ClInclude Include="../Src/wfn_class.h" />
+    <ClInclude Include="../Src/cell.h" />
+    <ClInclude Include="../Src/CUDA_utilities.h" />
+    <ClInclude Include="../Src/def2-ECPs.h" />
+    <ClInclude Include="../Src/npy.h" />
+    <ClInclude Include="../Src/properties.h" />
+    <ClInclude Include="../Src/spherical_density.h" />
+    <ClInclude Include="../Src/test_functions.h" />
+    <ClInclude Include="../Src/tsc_block.h" />
+    <ClInclude Include="../Src/Thakkar_coefs.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml" />

@@ -23,7 +23,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	g++ -o "NoSpherA2" ${LIBOMP} ${OBJS} -I../ -L/usr/local/opt/libomp/lib
 	@echo 'Finished building target: $@'
 
-./unity.o: ../unity.cpp
+./unity.o: ../Src/unity.cpp
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -I/usr/local/opt/libomp/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

@@ -15,84 +15,96 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="../AtomGrid.cpp">
+    <ClCompile Include="../Src/AtomGrid.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../basis_set.cpp">
+    <ClCompile Include="../Src/basis_set.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../convenience.cpp">
+    <ClCompile Include="../Src/convenience.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../cube.cpp">
+    <ClCompile Include="../Src/cube.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../fchk.cpp">
+    <ClCompile Include="../Src/fchk.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../mo_class.cpp">
+    <ClCompile Include="../Src/sphere_lebedev_rule.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../sphere_lebedev_rule.cpp">
+    <ClCompile Include="../Src/structure_factors.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../wfn_class.cpp">
+    <ClCompile Include="../Src/wfn_class.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\properties.cpp">
+    <ClCompile Include="../Src/properties.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\NoSpherA2.cpp">
+    <ClCompile Include="../Src/NoSpherA2.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\spherical_density.cpp">
+    <ClCompile Include="../Src/spherical_density.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="../AtomGrid.h">
+    <ClInclude Include="../Src/AtomGrid.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../atoms.h">
+    <ClInclude Include="../Src/atoms.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../basis_set.h">
+    <ClInclude Include="../Src/basis_set.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../convenience.h">
+    <ClInclude Include="../Src/convenience.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../cube.h">
+    <ClInclude Include="../Src/cube.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../fchk.h">
+    <ClInclude Include="../Src/fchk.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../mo_class.h">
+    <ClInclude Include="../Src/mo_class.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../parameters.h">
+    <ClInclude Include="../Src/sphere_lebedev_rule.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../sphere_lebedev_rule.h">
+    <ClInclude Include="../Src/structure_factors.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../structure_factors.h">
+    <ClInclude Include="../Src/wfn_class.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../wfn_class.h">
+    <ClInclude Include="../Src/properties.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\properties.h">
+    <ClInclude Include="../Src/spherical_density.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\spherical_density.h">
+    <ClInclude Include="../Src/cell.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\cell.h">
+    <ClInclude Include="../Src/tsc_block.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\CUDA_utilities.h">
+    <ClInclude Include="../Src/CUDA_utilities.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/test_functions.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/npy.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/Thakkar_coefs.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/def2-ECPs.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

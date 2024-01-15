@@ -719,8 +719,33 @@ struct primitive
 	primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 	{
 		norm_const = pow(
-			pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
-			0.25);
+			pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2), 
+		0.25);
+	}
+};
+
+struct tonto_primitive
+{
+	int center, type;
+	double exp, coefficient;
+	double norm_const = -10;
+	void normalize()
+	{
+		coefficient *= normalization_constant();
+	};
+	void unnormalize()
+	{
+		coefficient /= normalization_constant();
+	};
+	double normalization_constant()
+	{
+		// assuming type is equal to angular momentum
+		return norm_const;
+	}
+	tonto_primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
+	tonto_primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
+	{
+		norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) * (1.0 / sqrt(doublefactorial(type));
 	}
 };
 
