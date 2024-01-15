@@ -92,7 +92,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.molden -cif epoxide.cif -dmin 0.5 -v -acc 1</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn epoxide.molden -cif epoxide.cif -dmin 0.5 -v -acc 1 -ECP 2</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

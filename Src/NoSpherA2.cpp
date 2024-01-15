@@ -110,7 +110,10 @@ int main(int argc, char **argv)
       wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file);
       if (opt.ECP)
       {
-        wavy[i].set_has_ECPs(true);
+        if (opt.ECP_mode == 2)
+          wavy[i].set_has_ECPs(true, true, true);
+        else 
+          wavy[i].set_has_ECPs(true);
       }
       if (opt.set_ECPs)
       {
@@ -214,7 +217,10 @@ int main(int argc, char **argv)
     wavy[0].set_multi(opt.mult);
     if (opt.ECP)
     {
-      wavy[0].set_has_ECPs(true);
+      if (opt.ECP_mode == 2)
+        wavy[0].set_has_ECPs(true, true, true);
+      else
+        wavy[0].set_has_ECPs(true);
     }
     if (opt.set_ECPs)
     {
