@@ -40,16 +40,20 @@ protected:
 		const int& max,
 		const int& min) {
 		err_not_impl_SA();
+		return -1;
 	};
 public:
 	virtual const double get_radial_density(double& dist) {
 		err_not_impl_SA();
+		return -1;
 	};
 	virtual const double get_form_factor(const double& k_vector) {
 		err_not_impl_SA();
+		return -1;
 	};
 	virtual const double get_core_form_factor(const double& k_vector, const int& core_els) {
 		err_not_impl_SA();
+		return -1;
 	};
 	virtual const double get_custom_form_factor(
 		const double& k_vector,
@@ -62,6 +66,7 @@ public:
 		const int& min_d,
 		const int& min_f) {
 		err_not_impl_SA();
+		return -1;
 	};
 	const int get_atomic_number() const { return atomic_number; };
 	const int get_charge() const { return charge; };
