@@ -4601,7 +4601,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
       }
     }
   }
-  else if (mode == 1)
+  else if (mode == 1 || mode == 2)
   { // Using a Thakkar core density
     vector<Thakkar> temp;
     for (int i = 0; i < asym_atom_list.size(); i++)
@@ -4623,7 +4623,8 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
       k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
       for (int i = 0; i < asym_atom_list.size(); i++)
       {
-        sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
+        if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+          sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
       }
     }
   }
