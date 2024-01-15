@@ -12,6 +12,13 @@ const int ECP_electrons[] = {0, 0, 0,
                              28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
                              46, 46, 46, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
 
+const int ECP_electrons_xTB[] = { 0, 0,                                                                                      0,
+ 2,  2,                                                                                                  2,  2,  2,  2,  2,  2,
+10, 10,                                                                                                 10, 10, 10, 10, 10, 10,
+18, 18,                                                         18, 18, 18, 18, 18, 18, 18, 18, 18, 28, 28, 28, 28, 28, 28, 28,
+36, 36,                                                         36, 36, 36, 36, 36, 36, 36, 36, 36, 46, 46, 46, 46, 46, 46, 46,
+54, 54, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 68, 68, 68, 68, 68, 68, 68, 68, 78, 78, 78, 78, 78, 78, 78};
+
 bool debug_wfn = false;
 bool debug_wfn_deep = false;
 
@@ -1388,12 +1395,9 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
           atoms[a].basis_set[s].type,
           atoms[a].basis_set[s].exponent,
           atoms[a].basis_set[s].coefficient));
-        // prims.back().unnormalize();
       }
     }
     getline(rf, line);
-    // vec norm_const = get_norm_const(file);
-    // int norm_const_run = 0;
     int MO_run = 0;
     vector<vec> p_pure_2_cart;
     vector<vec> d_pure_2_cart;
@@ -1683,6 +1687,7 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
           current_shell++;
         }
         temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+        double temp_c = atoms[a].basis_set[s].coefficient;
         prims.push_back(primitive(a + 1,
           atoms[a].basis_set[s].type,
           atoms[a].basis_set[s].exponent,
@@ -1778,12 +1783,7 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
                 {
                   push_back_exponent(prims[basis_run + s].exp);
                   push_back_center(prims[basis_run].center);
-                  if (cart == 0)
-                    push_back_type(prims[basis_run].type + 2);
-                  else if (cart == 1)
-                    push_back_type(prims[basis_run].type);
-                  else if (cart == 2)
-                    push_back_type(prims[basis_run].type + 1);
+                  push_back_type(prims[basis_run].type + cart);
                   nex++;
                 }
               }
@@ -3791,10 +3791,10 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
   return true;
 };
 
-void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms)
+void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const bool &use_xTB)
 {
   has_ECPs = in;
-  if (apply_to_atoms)
+  if (apply_to_atoms && !use_xTB)
   {
 #pragma omp parallel for
     for (int i = 0; i < ncen; i++)
@@ -3802,6 +3802,16 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms)
       if (ECP_electrons[atoms[i].charge] != 0)
       {
         atoms[i].ECP_electrons = ECP_electrons[atoms[i].charge];
+      }
+    }
+  }
+  if (apply_to_atoms && use_xTB) {
+#pragma omp parallel for
+    for (int i = 0; i < ncen; i++)
+    {
+      if (ECP_electrons_xTB[atoms[i].charge] != 0)
+      {
+        atoms[i].ECP_electrons = ECP_electrons_xTB[atoms[i].charge];
       }
     }
   }

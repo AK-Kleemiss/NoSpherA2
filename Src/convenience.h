@@ -718,9 +718,7 @@ struct primitive
 	primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
 	primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 	{
-		norm_const = pow(
-			pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2), 
-		0.25);
+		norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) / sqrt(doublefactorial(type));
 	}
 };
 
@@ -745,7 +743,7 @@ struct tonto_primitive
 	tonto_primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
 	tonto_primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 	{
-		norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) * (1.0 / sqrt(doublefactorial(type));
+		norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) / sqrt(doublefactorial(type));
 	}
 };
 

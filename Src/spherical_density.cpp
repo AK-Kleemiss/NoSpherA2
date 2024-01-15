@@ -150,11 +150,24 @@ const double Thakkar::get_core_form_factor(const double& k_vector, const int& co
 	else if (core_els == 28) {
 		max_s = 3; max_p = 2; max_d = 1; max_f = 0;
 	}
+	else if (core_els == 36) {
+		max_s = 4; max_p = 3; max_d = 1; max_f = 0;
+	}
 	else if (core_els == 46) {
 		max_s = 4; max_p = 3; max_d = 2; max_f = 0;
 	}
-	else if (core_els == 60) {
-		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
+	else if (core_els == 54) {
+		max_s = 5; max_p = 4; max_d = 2; max_f = 0;
+	}
+	else if (core_els > 54 && core_els < 69) {
+		max_s = 5; max_p = 4; max_d = 2; max_f = 1;
+	}
+	else if (core_els == 78) {
+		max_s = 5; max_p = 4; max_d = 3; max_f = 1;
+	}
+	else {
+		err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+		return -1;
 	}
 
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);

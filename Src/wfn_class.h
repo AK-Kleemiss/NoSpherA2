@@ -144,7 +144,7 @@ public:
   void set_dist_switch() { distance_switch = true; };
   void set_dist_switch(const bool& g) { distance_switch = g; };
   bool get_dist_switch() { return distance_switch; };
-  void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true);
+  void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true, const bool& use_xTB = false);
   void set_ECPs(std::vector<int> &nr, std::vector<int> &elcount);
   bool get_has_ECPs() const { return has_ECPs; };
   void operator=(const WFN& right);

@@ -4580,13 +4580,15 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
   hkl_list_it it = hkl.begin();
   if (mode == 0)
   { // Using a gaussian tight core function
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-      if (debug && wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
-        file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
-             << scientific << setw(14) << setprecision(8)
-             << wave.atoms[asym_atom_list[i]].ECP_electrons
-             << " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+    if (debug) {
+      for (int i = 0; i < asym_atom_list.size(); i++)
+      {
+        if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+          file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f000: "
+          << scientific << setw(14) << setprecision(8)
+          << wave.atoms[asym_atom_list[i]].ECP_electrons
+          << " and at 1 angstrom: " << exp(-pow(constants::bohr2ang(k), 2) / 16.0 / constants::PI) * wave.atoms[asym_atom_list[i]].ECP_electrons << endl;
+      }
     }
 #pragma omp parallel for private(it, k) schedule(runtime)
     for (int s = 0; s < sf[0].size(); s++)
