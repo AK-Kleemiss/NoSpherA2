@@ -387,6 +387,7 @@ const double Gaussian_Atom::get_custom_form_factor(
 	const int& min_f) {
 
 	err_not_impl_SA();
+	return -1;
 };
 const double Gaussian_Atom::get_custom_form_factor(
 	const double& k_vector,
