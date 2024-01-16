@@ -5,7 +5,6 @@
 #include "cube.h"
 #include "structure_factors.h"
 #include "properties.h"
-#include "test_functions.h"
 
 using namespace std;
 #ifdef _WIN32
@@ -42,7 +41,7 @@ int main(int argc, char **argv)
   ofstream log_file("NoSpherA2.log", ios::out);
   auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
   vector<WFN> wavy;
-  options opt(argc, argv);
+  options opt(argc, argv, log_file);
   opt.digest_options();
   if (opt.threads != -1)
   {
@@ -76,12 +75,6 @@ int main(int argc, char **argv)
   if (opt.sfac_diffuse > 0.0)
   {
     sfac_diffuse(opt, log_file);
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  if (opt.test_xtb_molden) {
-    test_xtb_molden(opt, log_file);
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
     return 0;
@@ -212,7 +205,7 @@ int main(int argc, char **argv)
     return 0;
   }
   // This one has conversion to fchk and calculation of one single tsc file
-  if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.sfac_scan == 0.0)
+  if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
   {
     auto t = new WFN(0);
     wavy.push_back(*t);
@@ -311,12 +304,6 @@ int main(int argc, char **argv)
     std::cout << "Finished!" << endl;
     return 0;
   }
-  // Test for molden and ECP files
-  if (opt.density_test_cube)
-  {
-    test_density_cubes(opt, log_file);
-    return 0;
-  }
   // Converts gbw file to wfn file and leaves
   if (opt.gbw2wfn)
   {
@@ -327,37 +314,6 @@ int main(int argc, char **argv)
     wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
     wavy[0].write_wfn("converted.wfn", false, false);
     log_file.flush();
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  // Calcualtes data for Thakkar IAM Paper
-  if (opt.thakkar_d_plot)
-  {
-    thakkar_d_test(opt);
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  // Calcualtes data sampling a full sphere for the first atom in a wavefunction and tries to compare to
-  // Thakkar densities. Make sure Thakkar ions are present if your selected atom
-  if (opt.sfac_scan > 0.0)
-  {
-    sfac_scan(opt, log_file);
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  if (opt.spherical_harmonic)
-  {
-    spherical_harmonic_test();
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  if (opt.ML_test)
-  {
-    ML_test();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
     return 0;
@@ -391,7 +347,8 @@ int main(int argc, char **argv)
     }
     else
     {
-      cube_from_coef_npy(opt.coef_file, opt.xyz_file);
+//#include "test_functions.h"
+//      cube_from_coef_npy(opt.coef_file, opt.xyz_file);
     }
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
