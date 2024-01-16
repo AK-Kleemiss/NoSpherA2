@@ -6,7 +6,7 @@ LIBOMP := /usr/local/opt/libomp/lib/libomp.a
 all: NoSpherA2 lipo
 
 CPP_SRCS += \
-../unity.cpp 
+../Src/unity.cpp 
 
 OBJS += \
 ./unity.o 
@@ -34,7 +34,7 @@ NoSpherA2_x86_64: ${OBJS} ${USER_OBJS}
 	${RM} ${CPP_DEPS} ${OBJS}
 	@echo 'Finished building target: $@'
 
-NoSpherA2_arm64: ../unity.cpp
+NoSpherA2_arm64: ../Src/unity.cpp
 	@echo 'Building target: $@'
 	g++ ${GCC_OPTS} -I../llvm-project/openmp/build/runtime/src -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_arm "$<" -target aarch64-apple-macos12.6
 	g++ -o "$@" ../llvm-project/openmp/build/runtime/src/libomp.a unity.o_arm -I../ -L../llvm-project/openmp/build/runtime/src -target aarch64-apple-macos12.6
