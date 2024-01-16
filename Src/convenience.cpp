@@ -2832,8 +2832,10 @@ void options::digest_options()
 			calc = rdg = true;
 		else if (temp.find("-rkpts") < 1)
 			read_k_pts = true;
-		else if (temp == "-rho_cube_test")
+		else if (temp == "-rho_cube_test") {
 			test_density_cubes(*this, log_file);
+			exit(0);
+		}
 		else if (temp.find("-s_rho") < 1)
 			s_rho = true;
 		else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
@@ -2857,10 +2859,14 @@ void options::digest_options()
 			wfn = arguments[i + 3];
 			dmin = fromString<double>(arguments[i + 4]);
 		}
-		else if (temp == "-spherical_harmonic")
+		else if (temp == "-spherical_harmonic") {
 			spherical_harmonic_test();
-		else if (temp == "-test-core")
+			exit(0);
+		}
+		else if (temp == "-test-core") {
 			test_core_dens();
+			exit(0);
+		}
 		else if (temp == "-test")
 			cout << "Running in test mode!" << endl, test = true;
 		else if (temp == "-thakkar_d_plot") {
@@ -2899,8 +2905,10 @@ void options::digest_options()
 			wfn = arguments[i + 1];
 			err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
 		}
-		else if (temp == "-xtb_test")
+		else if (temp == "-xtb_test") {
 			test_xtb_molden(*this, log_file);
+			exit(0);
+		}
 		else if (temp == "-xyz")
 		{
 			xyz_file = arguments[i + 1];
