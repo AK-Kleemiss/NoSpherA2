@@ -9,4 +9,3 @@
 #include "./cube.cpp"
 #include "./fchk.cpp"
 #include "./NoSpherA2.cpp"
-#include "./Faddeeva.cc"
