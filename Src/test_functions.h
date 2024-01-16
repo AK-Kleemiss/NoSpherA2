@@ -638,7 +638,7 @@ void test_core_dens() {
 	Gaussian_Atom G_Os(76, base);
 
 	for (int i = 0; i < 100; i++) {
-		double r = i * 0.01;
+		double r = i * 0.1;
 		cout << r << " " << T_Os.get_core_form_factor(r, 60) << " " << G_Os.get_core_form_factor(r, 60) << endl;
 	}
 
