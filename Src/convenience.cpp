@@ -1,6 +1,7 @@
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
+#include "test_functions.h"
 
 using namespace std;
 
@@ -2589,9 +2590,9 @@ void options::digest_options()
     string temp = arguments[i];
     if (temp.find("-") > 0)
       continue;
-    if (temp.find("-acc") < 1)
+    if (temp == "-acc")
       accuracy = stoi(arguments[i + 1]);
-    else if (temp.find("-Anion") < 1)
+    else if (temp == "-Anion")
     {
       int n = 1;
       string store;
@@ -2612,9 +2613,9 @@ void options::digest_options()
         n++;
       }
     }
-    else if (temp.find("-b") < 1)
+    else if (temp == "-b")
       basis_set = arguments[i + 1];
-    else if (temp.find("-Cation") < 1)
+    else if (temp == "-Cation")
     {
       int n = 1;
       string store;
@@ -2635,19 +2636,19 @@ void options::digest_options()
         n++;
       }
     }
-    else if (temp.find("-coef") < 1)
+    else if (temp == "-coef")
     {
       coef_file = arguments[i + 1];
       err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
     }
-    else if (temp.find("-cif") < 1)
+    else if (temp == "-cif")
     {
       cif = arguments[i + 1];
       err_checkf(exists(cif), "CIF doesn't exist", cout);
     }
-    else if (temp.find("-cpus") < 1)
+    else if (temp == "-cpus")
       threads = stoi(arguments[i + 1]);
-    else if (temp.find("-cmtc") != string::npos)
+    else if (temp == "-cmtc")
     {
       cif_based_combined_tsc_calc = true;
       int n = 1;
@@ -2664,12 +2665,12 @@ void options::digest_options()
         n++;
       }
     }
-    else if (temp.find("-combine_mos") < 1)
+    else if (temp == "-combine_mos")
     {
       combine_mo.push_back(arguments[i + 1]);
       combine_mo.push_back(arguments[i + 2]);
     }
-    else if (temp.find("-cmos1") < 1)
+    else if (temp == "-cmos1")
     {
       int j = 1;
       while (i + j < argc && arguments[i + j].find("-") >= 1)
@@ -2678,7 +2679,7 @@ void options::digest_options()
         j++;
       }
     }
-    else if (temp.find("-cmos2") < 1)
+    else if (temp == "-cmos2")
     {
       int j = 1;
       while (i + j < argc && arguments[i + j].find("-") >= 1)
@@ -2687,7 +2688,7 @@ void options::digest_options()
         j++;
       }
     }
-    else if (temp.find("-def") < 1 || temp.find("-DEF") < 1)
+    else if (temp == "-def" || temp == "-DEF")
       def = calc = true;
     else if (temp.find("-dmin") < 1)
       dmin = stod(arguments[i + 1]);
@@ -2799,7 +2800,8 @@ void options::digest_options()
     }
     else if (temp.find("-ML_test") < 1)
     {
-      ML_test = true;
+      ML_test();
+      exit(0);
     }
     else if (temp.find("-mtc") != string::npos)
     {
@@ -2830,38 +2832,42 @@ void options::digest_options()
       calc = rdg = true;
     else if (temp.find("-rkpts") < 1)
       read_k_pts = true;
-    else if (temp.find("-rho_cube_test") != string::npos)
-      density_test_cube = true;
+    else if (temp == "-rho_cube_test")
+      test_density_cubes(*this, log_file);
     else if (temp.find("-s_rho") < 1)
       s_rho = true;
     else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
       SALTED_BECKE = true;
-    else if (temp.find("-SALTED") < 1 || temp.find("-salted") < 1)
+    else if (temp == "-SALTED" || temp == "-salted")
       SALTED = true;
-    else if (temp.find("-skpts") < 1)
+    else if (temp == "-skpts")
       save_k_pts = true;
-    else if (temp.find("-sfac_scan") < 1)
+    else if (temp == "-sfac_scan")
     {
-      sfac_scan = fromString<double>(arguments[i + 1]);
+      d_sfac_scan = fromString<double>(arguments[i + 1]);
       cif = arguments[i + 2];
       wfn = arguments[i + 3];
+      sfac_scan(*this, log_file);
+      exit(0);
     }
-    else if (temp.find("-sfac_diffuse") < 1)
+    else if (temp == "-sfac_diffuse")
     {
       sfac_diffuse = fromString<double>(arguments[i + 1]);
       cif = arguments[i + 2];
       wfn = arguments[i + 3];
       dmin = fromString<double>(arguments[i + 4]);
     }
-    else if (temp.find("-spherical_harmonic") < 1)
-      spherical_harmonic = true;
-    else if (temp.find("-test") < 1)
+    else if (temp == "-spherical_harmonic")
+      spherical_harmonic_test();
+    else if (temp == "-test-core")
+      test_core_dens();
+    else if (temp == "-test")
       cout << "Running in test mode!" << endl, test = true;
-    else if (temp.find("-thakkar_d_plot") < 1)
-      cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_plot = true;
-    else if (temp.find("-xtb_test") < 1)
-      test_xtb_molden = true;
-    else if (temp.find("-twin") < 1)
+    else if (temp == "-thakkar_d_plot") {
+      cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
+      exit(0);
+    }
+    else if (temp == "-twin")
     {
       twin_law.resize(twin_law.size() + 1);
       twin_law[twin_law.size() - 1].resize(9);
@@ -2876,11 +2882,11 @@ void options::digest_options()
       }
       i += 9;
     }
-    else if (temp.find("-old_tsc") != string::npos)
+    else if (temp =="-old_tsc")
     {
       old_tsc = true;
     }
-    else if (temp.find("-tscb") != string::npos)
+    else if (temp == "-tscb")
     {
       string name = arguments[i + 1];
       tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
@@ -2888,12 +2894,14 @@ void options::digest_options()
       blocky.write_tsc_file(name);
       exit(0);
     }
-    else if (temp.find("-wfn") < 1)
+    else if (temp == "-wfn")
     {
       wfn = arguments[i + 1];
       err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
     }
-    else if (temp.find("-xyz") != string::npos)
+    else if (temp == "-xtb_test")
+      test_xtb_molden(*this, log_file);
+    else if (temp == "-xyz")
     {
       xyz_file = arguments[i + 1];
     }

@@ -13,7 +13,7 @@ void Calc_Static_Def(
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Static_Def(
 	cube& CubeDEF,
@@ -22,34 +22,34 @@ void Calc_Static_Def(
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Spherical_Dens(
 	cube& CubeSpher,
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Rho(
 	cube& CubeRho,
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Rho_spherical_harmonics(
 	cube& CubeRho,
 	WFN& wavy,
 	int cpus,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_MO_spherical_harmonics(
 	cube& CubeRho,
 	WFN& wavy,
 	int cpus,
 	int MO,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Prop(
 	cube& CubeRho,
@@ -61,7 +61,7 @@ void Calc_Prop(
 	WFN& wavy,
 	int cpus,
 	double radius,
-	std::ofstream& file,
+	std::ostream& file,
 	bool test
 );
 void Calc_ESP(
@@ -70,7 +70,7 @@ void Calc_ESP(
 	int cpus,
 	double radius,
 	bool no_date,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_MO(
 	cube& CubeMO,
@@ -84,7 +84,7 @@ void Calc_S_Rho(
 	cube& Cube_S_Rho,
 	WFN& wavy,
 	int cpus,
-	std::ofstream& file,
+	std::ostream& file,
 	bool nodate
 );
 void Calc_Hirshfeld(
@@ -94,7 +94,7 @@ void Calc_Hirshfeld(
 	int cpus,
 	double radius,
 	int ignore,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Hirshfeld(
 	cube& CubeHDEF,
@@ -104,7 +104,7 @@ void Calc_Hirshfeld(
 	int cpus,
 	double radius,
 	int ignore,
-	std::ofstream& file
+	std::ostream& file
 );
 void Calc_Hirshfeld_atom(
 	cube& CubeHirsh,
@@ -114,10 +114,12 @@ void Calc_Hirshfeld_atom(
 	int cpus,
 	double radius,
 	int ignore,
-	std::ofstream& file
+	std::ostream& file
 );
 
 void properties_calculation(options& opt);
+
+void combine_mo(options& opt);
 
 #include "wfn_class.h"
 #include "cell.h"

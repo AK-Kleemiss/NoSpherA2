@@ -14,12 +14,12 @@ struct options;
 
 bool thakkar_sfac(
   const options& opt,
-  std::ofstream& file,
+  std::ostream& file,
   WFN& wave);
 
 itsc_block MTC_thakkar_sfac(
   options& opt,
-  std::ofstream& file,
+  std::ostream& file,
   std::vector < std::string >& known_atoms,
   std::vector<WFN>& wave,
   const int& nr);
@@ -27,24 +27,24 @@ itsc_block MTC_thakkar_sfac(
 bool calculate_structure_factors_HF(
   const options& opt,
   WFN& wave,
-  std::ofstream& file);
+  std::ostream& file);
 
 bool calculate_structure_factors_RI(
   const options& opt,
   WFN& wave,
-  std::ofstream& file,
+  std::ostream& file,
   const int exp_coefs);
 
 bool calculate_structure_factors_RI_No_H(
   const options& opt,
   WFN& wave,
-  std::ofstream& file,
+  std::ostream& file,
   const int exp_coefs);
 
 itsc_block calculate_structure_factors_MTC(
   options& opt,
   std::vector<WFN>& wave,
-  std::ofstream& file,
+  std::ostream& file,
   std::vector <std::string>& known_atoms,
   const int& nr,
   std::vector<vec>* kpts=NULL);
@@ -129,6 +129,8 @@ void calc_SF(const int& points,
   timeval& t2,
 #endif
   bool debug = false);
+
+void sfac_diffuse(options& opt, std::ofstream& log_file);
 
 #include "wfn_class.h"
 #include "tsc_block.h"
