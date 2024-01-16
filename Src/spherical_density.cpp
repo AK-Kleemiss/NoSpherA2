@@ -401,11 +401,16 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string &basis) {
 		nf = &(def2_nf[0]);
 		ng = &(def2_nf[0]);
 		nh = &(def2_nf[0]);
-		double def2_n_size = 0;
-		for (int i = 0; i < 86; i++) {
-			def2_n_size += def2_nex[i];
+#pragma omp single
+		{
+			if (def2_n.size() == 0) {
+				double def2_n_size = 0;
+				for (int i = 0; i < 86; i++) {
+					def2_n_size += def2_nex[i];
+				}
+				def2_n.resize(def2_n_size, 2);
+			}
 		}
-		def2_n.resize(def2_n_size, 2);
 		occ = &(def2_occ[0]);
 		n = def2_n.data();
 		z = &(def2_z[0]);
@@ -413,6 +418,25 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string &basis) {
 	}
 	else {
 		err_checkf(false,"Basis set not implemented",std::cout);
+		//Just to silence intellisense
+		nex = &(def2_nex[0]);
+		ns = &(def2_ns[0]);
+		np = &(def2_np[0]);
+		nd = &(def2_nd[0]);
+		nf = &(def2_nf[0]);
+		ng = &(def2_nf[0]);
+		nh = &(def2_nf[0]);
+		if (def2_n.size() == 0) {
+			double def2_n_size = 0;
+			for (int i = 0; i < 86; i++) {
+				def2_n_size += def2_nex[i];
+			}
+			def2_n.resize(def2_n_size, 2);
+		}
+		occ = &(def2_occ[0]);
+		n = def2_n.data();
+		z = &(def2_z[0]);
+		c = &(def2_c[0]);
 	}
 	
 };
