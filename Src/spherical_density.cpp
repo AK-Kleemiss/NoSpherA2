@@ -164,8 +164,8 @@ const double Thakkar::get_radial_custom_density(const double& dist,
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
 	const int offset = (atomic_number - 1) * 19;
 
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, ns,  0,  7, max_s, min_s, Orb);
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, np,  7, 13, max_p, min_p, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, max_s, min_s, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, max_p, min_p, Orb);
 	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, max_d, min_d, Orb);
 	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, max_f, min_f, Orb);
 
@@ -369,7 +369,7 @@ static const double gauss_sin_integral(const int& N, const double& exp, const do
 		return k_vector * sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 4. / pow(exp, 3. / 2.);
 	}
 	else
-		return k_vector / (2. * exp) * gauss_cos_integral(N-1, exp, k_vector) + (N-1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector);
+		return k_vector / (2. * exp) * gauss_cos_integral(N - 1, exp, k_vector) + (N - 1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector);
 
 };
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector) {
@@ -380,7 +380,7 @@ const double gauss_cos_integral(const int& N, const double& exp, const double& k
 		return (N - 1) / (2. * exp) * gauss_cos_integral(N - 2, exp, k_vector) + k_vector / (2. * exp) * gauss_sin_integral(N - 1, exp, k_vector);
 };
 
-//the integral in case of a gaussian function should be 1/k \int r^(n) e^(-exp * r^2) sin(kr) dr
+//the integral in case of a gaussian function should be 1/k int r^(n) e^(-exp * r^2) sin(kr) dr
 static double calc_Gaussian_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {
 	return occ * coef * gauss_sin_integral(radial_exp, exp, k_vector) / k_vector;
 }
@@ -391,7 +391,7 @@ static double calc_Gaussian_int_at_k0(const int& occ, const double& coef, const 
 }
 
 
-Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string &basis) {
+Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) {
 	atomic_number = g_atom_number;
 	if (basis == "def2-ECP") {
 		nex = &(def2_nex[0]);
@@ -417,7 +417,7 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string &basis) {
 		c = &(def2_c[0]);
 	}
 	else {
-		err_checkf(false,"Basis set not implemented",std::cout);
+		err_checkf(false, "Basis set not implemented", std::cout);
 		//Just to silence intellisense
 		nex = &(def2_nex[0]);
 		ns = &(def2_ns[0]);
@@ -438,7 +438,7 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string &basis) {
 		z = &(def2_z[0]);
 		c = &(def2_c[0]);
 	}
-	
+
 };
 
 double Gaussian_Atom::calc_type(
@@ -510,8 +510,8 @@ const double Gaussian_Atom::get_custom_form_factor(
 	const int& min_p,
 	const int& min_d,
 	const int& min_f,
-	const int& min_g, 
-	const int& min_h ) {
+	const int& min_g,
+	const int& min_h) {
 
 	double result(0.0);
 	using namespace std;
@@ -540,7 +540,7 @@ const double Gaussian_Atom::get_form_factor(const double& k_vector) {
 };
 
 const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const int& core_els) {
-	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+	int max_s = 0, max_p = 0, max_d = 0, max_f = 0, max_h = 1, max_g = 1;
 	if (core_els == 2) {
 		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
 	}
@@ -559,8 +559,7 @@ const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const i
 	else if (core_els == 60) {
 		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
 	}
-
-	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
+	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, max_g, max_h, 0, 0, 0, 0, 0, 0);
 };
 
 void Gaussian_Atom::calc_orbs(
