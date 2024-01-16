@@ -2859,6 +2859,8 @@ void options::digest_options()
       cout << "Running in test mode!" << endl, test = true;
     else if (temp.find("-thakkar_d_plot") < 1)
       cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_plot = true;
+    else if (temp.find("-xtb_test") < 1)
+      test_xtb_molden = true;
     else if (temp.find("-twin") < 1)
     {
       twin_law.resize(twin_law.size() + 1);

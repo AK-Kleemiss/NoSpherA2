@@ -25,6 +25,10 @@ Global
 		D_SF_CMTC|x86 = D_SF_CMTC|x86
 		D_SH|x64 = D_SH|x64
 		D_SH|x86 = D_SH|x86
+		D_xTB_Co_molden|x64 = D_xTB_Co_molden|x64
+		D_xTB_Co_molden|x86 = D_xTB_Co_molden|x86
+		D_xTB_F_molden|x64 = D_xTB_F_molden|x64
+		D_xTB_F_molden|x86 = D_xTB_F_molden|x86
 		D_xTB_molden|x64 = D_xTB_molden|x64
 		D_xTB_molden|x86 = D_xTB_molden|x86
 		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
@@ -99,6 +103,14 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_SH|x64.Build.0 = D_SH|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_SH|x86.ActiveCfg = D_SH|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_SH|x86.Build.0 = D_SH|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_Co_molden|x64.ActiveCfg = D_xTB_Co_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_Co_molden|x64.Build.0 = D_xTB_Co_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_Co_molden|x86.ActiveCfg = D_xTB_Co_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_Co_molden|x86.Build.0 = D_xTB_Co_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x64.ActiveCfg = D_xTB_F_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x64.Build.0 = D_xTB_F_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x86.ActiveCfg = D_xTB_F_molden|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x86.Build.0 = D_xTB_F_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.Build.0 = D_xTB_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x86.ActiveCfg = D_xTB_molden|x64
@@ -208,6 +220,10 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_SH|x64.ActiveCfg = D_SH|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_SH|x86.ActiveCfg = D_SH|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_SH|x86.Build.0 = D_SH|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_Co_molden|x64.ActiveCfg = Debug_SF_MTC_Disorder|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_Co_molden|x86.ActiveCfg = Debug_SF_MTC_Disorder|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_F_molden|x64.ActiveCfg = Debug_SF_Disorder|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_F_molden|x86.ActiveCfg = Debug_SF_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_molden|x64.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_molden|x86.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|x64.ActiveCfg = Debug_Fractal|x64
@@ -290,6 +306,10 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_SF_CMTC|x86.Build.0 = Debug|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_SH|x64.ActiveCfg = D_SH|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_SH|x86.ActiveCfg = D_SH|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_Co_molden|x64.ActiveCfg = D_xTB_Co_molden|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_Co_molden|x86.ActiveCfg = D_xTB_Co_molden|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_F_molden|x64.ActiveCfg = D_xTB_F_molden|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_F_molden|x86.ActiveCfg = D_xTB_F_molden|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_molden|x86.ActiveCfg = D_xTB_molden|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_fchk_generation|x64.ActiveCfg = Debug|x64
