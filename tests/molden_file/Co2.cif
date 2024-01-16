@@ -1,0 +1,32 @@
+data_epoxide
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+
+_cell_length_a                     4.633(5)
+_cell_length_b                     4.633(5)
+_cell_length_c                     4.633(5)
+_cell_angle_alpha                  90
+_cell_angle_beta                   90
+_cell_angle_gamma                  90
+_cell_volume                       99.44590
+_cell_formula_units_Z              1
+
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ Co1 Co 0.0 0.0 0.0 0.029908 Uani 1 . 1 .
+ Co2 Co 0.323764299(5) 0.0 0.0 0.028725 Uani 1 . 1 .
+
+
+

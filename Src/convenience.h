@@ -801,6 +801,7 @@ struct options
 	bool gbw2wfn = false;
 	bool old_tsc = false;
 	bool thakkar_d_plot = false;
+	bool test_xtb_molden = false;
 	bool spherical_harmonic = false;
 	bool ML_test = false;
 	double sfac_scan = 0.0;

@@ -87,6 +87,34 @@ void Thakkar::calc_orbs(
 	}
 }
 
+void Thakkar::calc_custom_orbs(
+	int& nr_ex,
+	int& nr_coef,
+	const double& dist,
+	const int& offset,
+	const int* n_vector,
+	const int lower_m,
+	const int upper_m,
+	const int& max,
+	const int& min,
+	double* Orb) {
+	double exponent;
+	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
+		for (int m = lower_m + min; m < lower_m + max; m++) {
+			if (occ[offset + m] == 0) continue;
+			exponent = -z[nr_ex] * dist;
+			if (exponent > -46.5) { // Corresponds to at least 1E-20
+				if (n[nr_ex] == 1)
+					Orb[m] += c[nr_coef] * exp(exponent);
+				else
+					Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+			}
+			nr_coef++;
+		}
+		nr_ex++;
+	}
+}
+
 const double Thakkar::get_radial_density(double& dist) {
 	//Speedup things for H
 	if (atomic_number == 1)
@@ -105,6 +133,41 @@ const double Thakkar::get_radial_density(double& dist) {
 	calc_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, Orb);
 	calc_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, Orb);
 	calc_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, Orb);
+
+	for (int m = 0; m < 19; m++) {
+		if (Orb[m] == 0 || occ[offset + m] == 0)
+			continue;
+		Rho += occ[offset + m] * pow(Orb[m], 2);
+	}
+	return Rho / (constants::FOUR_PI);
+};
+
+const double Thakkar::get_radial_custom_density(const double& dist,
+	const int& max_s,
+	const int& max_p,
+	const int& max_d,
+	const int& max_f,
+	const int& min_s,
+	const int& min_p,
+	const int& min_d,
+	const int& min_f) {
+	//Speedup things for H
+	if (atomic_number == 1)
+		return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
+
+	double Rho = 0.0;
+	int nr_ex = first_ex();
+	if (nr_ex == 200000000)
+		return -20;
+	int nr_coef = previous_element_coef();
+
+	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+	const int offset = (atomic_number - 1) * 19;
+
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, ns,  0,  7, max_s, min_s, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, np,  7, 13, max_p, min_p, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, max_d, min_d, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, max_f, min_f, Orb);
 
 	for (int m = 0; m < 19; m++) {
 		if (Orb[m] == 0 || occ[offset + m] == 0)
@@ -136,41 +199,50 @@ const double Thakkar::get_form_factor(const double& k_vector) {
 	return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0, 0, 0, 0);
 };
 
-const double Thakkar::get_core_form_factor(const double& k_vector, const int& core_els) {
-	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& core_els) {
 	if (core_els == 2) {
-		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
+		*max_s = 1; *max_p = 0; *max_d = 0; *max_f = 0;
 	}
 	else if (core_els == 10) {
-		max_s = 2; max_p = 1; max_d = 0; max_f = 0;
+		*max_s = 2; *max_p = 1; *max_d = 0; *max_f = 0;
 	}
 	else if (core_els == 18) {
-		max_s = 3; max_p = 2; max_d = 0; max_f = 0;
+		*max_s = 3; *max_p = 2; *max_d = 0; *max_f = 0;
 	}
 	else if (core_els == 28) {
-		max_s = 3; max_p = 2; max_d = 1; max_f = 0;
+		*max_s = 3; *max_p = 2; *max_d = 1; *max_f = 0;
 	}
 	else if (core_els == 36) {
-		max_s = 4; max_p = 3; max_d = 1; max_f = 0;
+		*max_s = 4; *max_p = 3; *max_d = 1; *max_f = 0;
 	}
 	else if (core_els == 46) {
-		max_s = 4; max_p = 3; max_d = 2; max_f = 0;
+		*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 0;
 	}
 	else if (core_els == 54) {
-		max_s = 5; max_p = 4; max_d = 2; max_f = 0;
+		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 0;
 	}
 	else if (core_els > 54 && core_els < 69) {
-		max_s = 5; max_p = 4; max_d = 2; max_f = 1;
+		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 1;
 	}
 	else if (core_els == 78) {
-		max_s = 5; max_p = 4; max_d = 3; max_f = 1;
+		*max_s = 5; *max_p = 4; *max_d = 3; *max_f = 1;
 	}
 	else {
 		err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
-		return -1;
+		return;
 	}
+};
 
+const double Thakkar::get_core_form_factor(const double& k_vector, const int& core_els) {
+	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els);
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
+};
+
+const double Thakkar::get_core_density(const double& dist, const int& core_els) {
+	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els);
+	return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
 static double calc_int(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector) {

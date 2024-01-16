@@ -82,6 +82,16 @@ protected:
 		const int lower_m,
 		const int upper_m,
 		double* Orb) override;
+	void calc_custom_orbs(int& nr_ex,
+		int& nr_coef,
+		const double& dist,
+		const int& offset,
+		const int* n_vector,
+		const int lower_m,
+		const int upper_m,
+		const int& max,
+		const int& min,
+		double* Orb);
 	double calc_type(
 		int& nr_ex,
 		int& nr_coef,
@@ -96,8 +106,19 @@ public:
 	Thakkar(const int g_atom_number);
 	Thakkar();
 	const double get_radial_density(double& dist) override;
+	const double get_radial_custom_density(
+		const double& dist,
+		const int& max_s,
+		const int& max_p,
+		const int& max_d,
+		const int& max_f,
+		const int& min_s,
+		const int& min_p,
+		const int& min_d,
+		const int& min_f);
 	const double get_form_factor(const double& k_vector) override;
 	const double get_core_form_factor(const double& k_vector, const int& core_els) override;
+	const double get_core_density(const double& dist, const int& core_els);
 	const double get_custom_form_factor(
 		const double& k_vector,
 		const int& max_s,

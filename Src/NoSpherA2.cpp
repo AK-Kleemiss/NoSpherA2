@@ -80,6 +80,12 @@ int main(int argc, char **argv)
     std::cout << "Finished!" << endl;
     return 0;
   }
+  if (opt.test_xtb_molden) {
+    test_xtb_molden(opt, log_file);
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Finished!" << endl;
+    return 0;
+  }
   // perform combine_mo and quit
   if (opt.combine_mo.size() != 0)
   {

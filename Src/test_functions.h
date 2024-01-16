@@ -855,3 +855,18 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
     calc_cube(data, dummy, nr_coefs, i);
 }
 
+void test_xtb_molden(options& opt, std::ofstream& log_file) {
+  using namespace std;
+  for (int i = 0; i < 1; i++) {
+    WFN wavy(8);
+    wavy.read_molden("Co2.molden", cout, true, i);
+    opt.cif = "Co2.cif";
+    opt.dmin = 0.5;
+    cout << "STARTING CALC" << endl;
+    calculate_structure_factors_HF(
+      opt,
+      wavy,
+      log_file);
+  }
+}
+

@@ -1811,9 +1811,12 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
           {
             for (int s = 0; s < temp_shellsizes[basis_run]; s++)
             {
+              for(int i=0; i<3; i++)
+                push_back_MO_coef(MO_run, d_temp[i][s]);
+              for (int i = 3; i < 6; i++)
+                push_back_MO_coef(MO_run, d_temp[i][s] * sqrt(3));
               for (int cart = 0; cart < 6; cart++)
               {
-                push_back_MO_coef(MO_run, d_temp[cart][s]);
                 if (MO_run == 0)
                 {
                   push_back_exponent(prims[basis_run + s].exp);
@@ -1848,16 +1851,23 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
             {
               for (int cart = 0; cart < 10; cart++)
               {
-                if (cart < 3 || cart == 9)
-                  push_back_MO_coef(MO_run, f_temp[cart][s]);
+                //THIS IS A MESS AND NEEDS REEVALUATION; THEY ARE CERTAINLY NOT CORRECT!
+                if (cart < 3 || cart == 9) {
+                  if (cart == 9)
+                    push_back_MO_coef(MO_run, f_temp[cart][s] * sqrt(15));
+                  else
+                    push_back_MO_coef(MO_run, f_temp[cart][s]);
+                }
                 else if (cart == 3 || cart == 4)
-                  push_back_MO_coef(MO_run, f_temp[cart + 1][s]);
+                  push_back_MO_coef(MO_run, f_temp[cart + 1][s] * sqrt(15));
                 else if (cart == 5)
-                  push_back_MO_coef(MO_run, f_temp[cart + 3][s]);
+                  push_back_MO_coef(MO_run, f_temp[cart + 3][s] * sqrt(15));
                 else if (cart == 6)
-                  push_back_MO_coef(MO_run, f_temp[cart - 3][s]);
-                else if (cart == 7 || cart == 8)
-                  push_back_MO_coef(MO_run, f_temp[cart - 1][s]);
+                  push_back_MO_coef(MO_run, f_temp[cart - 3][s] * sqrt(5));
+                else if (cart == 7)
+                  push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(5));
+                else if (cart == 8)
+                  push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(15));
                 if (MO_run == 0)
                 {
                   push_back_exponent(prims[basis_run + s].exp);
