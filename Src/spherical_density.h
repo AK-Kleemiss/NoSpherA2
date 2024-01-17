@@ -14,8 +14,9 @@ inline void not_implemented_SA(const std::string& file, const int& line, const s
 class Spherical_Atom {
 protected:
 	int atomic_number;
+	int ECP_mode;
 	const int first_ex();
-	const int previous_element_coef();
+	virtual const int previous_element_coef();
 	const int* nex, * ns, * np, * nd, * nf, * occ, * n;
 	const double* z, * c;
 	int charge;
@@ -103,7 +104,7 @@ protected:
 		const int& max,
 		const int& min) override;
 public:
-	Thakkar(const int g_atom_number);
+	Thakkar(const int g_atom_number, const int ECP_mode = 1);
 	Thakkar();
 	const double get_radial_density(double& dist) override;
 	const double get_radial_custom_density(
@@ -144,6 +145,8 @@ public:
 class Gaussian_Atom : public Spherical_Atom {
 protected:
 	const int* ng, * nh;
+	int first_atomic_number;
+	const int previous_element_coef() override;
 	void calc_orbs(int& nr_ex,
 		int& nr_coef,
 		const double& dist,

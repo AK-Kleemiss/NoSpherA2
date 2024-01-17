@@ -633,16 +633,21 @@ void test_xtb_molden(options& opt, std::ostream& log_file) {
 
 void test_core_dens() {
 	using namespace std;
-	Thakkar T_Os(76);
+	Thakkar T_Rb(37);
 	string base = "def2-ECP";
-	Gaussian_Atom G_Os(76, base);
+	Gaussian_Atom G_Rb(37, base);
+	double PI = 3.14159265358979323846;
+	double TWO_PI = 2 * PI;
+	double FOUR_PI = 4 * PI;
 
-	for (int i = 1; i < 1000; i++) {
-		double r = i * 0.01;
+	for (int i = 1; i < 10000; i++) {
+		double r = i * 0.001;
 		double sr = r * 0.01;
-		cout << fixed << r << " " << T_Os.get_core_form_factor(r, 60) << " " << G_Os.get_core_form_factor(r, 60);
-		cout << " " << T_Os.get_core_density(sr, 60) << " " << G_Os.get_radial_density(sr);
-		cout << " " << T_Os.get_radial_density(sr) << endl;
+
+		double tsr = (sr) * 100 / PI;
+		cout << fixed << r << " " << T_Rb.get_core_form_factor(r, 28) << " " << G_Rb.get_core_form_factor(r, 28);
+		cout << " " << T_Rb.get_core_density(sr, 28) << " " << G_Rb.get_radial_density(tsr);
+		cout << " " << T_Rb.get_radial_density(sr) << endl;
 	}
 
 }
