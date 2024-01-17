@@ -100,14 +100,16 @@ void Thakkar::calc_custom_orbs(
 	double* Orb) {
 	double exponent;
 	for (int ex = 0; ex < n_vector[atomic_number - 1]; ex++) {
-		for (int m = lower_m + min; m < lower_m + max; m++) {
+		for (int m = lower_m + min; m < upper_m; m++) {
 			if (occ[offset + m] == 0) continue;
-			exponent = -z[nr_ex] * dist;
-			if (exponent > -46.5) { // Corresponds to at least 1E-20
-				if (n[nr_ex] == 1)
-					Orb[m] += c[nr_coef] * exp(exponent);
-				else
-					Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+			if (m < lower_m + max) {
+				exponent = -z[nr_ex] * dist;
+				if (exponent > -46.5) { // Corresponds to at least 1E-20
+					if (n[nr_ex] == 1)
+						Orb[m] += c[nr_coef] * exp(exponent);
+					else
+						Orb[m] += c[nr_coef] * pow(dist, n[nr_ex] - 1) * exp(exponent);
+				}
 			}
 			nr_coef++;
 		}
@@ -220,6 +222,9 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
 	}
 	else if (core_els == 54) {
 		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 0;
+	}
+	else if (core_els == 60) {
+		*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 1;
 	}
 	else if (core_els > 54 && core_els < 69) {
 		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 1;
