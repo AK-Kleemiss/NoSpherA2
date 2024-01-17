@@ -5,7 +5,8 @@
 #include <complex>
 #include <cmath>
 
-Thakkar::Thakkar(const int g_atom_number) : Spherical_Atom() {
+Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom() {
+	ECP_mode = ECP_m;
 	atomic_number = g_atom_number;
 	nex = &(Thakkar_nex[0]);
 	ns = &(Thakkar_ns[0]);
@@ -19,6 +20,7 @@ Thakkar::Thakkar(const int g_atom_number) : Spherical_Atom() {
 	charge = 0;
 };
 Thakkar::Thakkar() : Spherical_Atom() {
+	ECP_mode = 1;
 	atomic_number = 1;
 	nex = &(Thakkar_nex[0]);
 	ns = &(Thakkar_ns[0]);
@@ -201,36 +203,55 @@ const double Thakkar::get_form_factor(const double& k_vector) {
 	return get_custom_form_factor(k_vector, 7, 6, 4, 2, 0, 0, 0, 0);
 };
 
-void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& core_els) {
-	if (core_els == 2) {
-		*max_s = 1; *max_p = 0; *max_d = 0; *max_f = 0;
+void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& core_els, const int& ECP_mode) {
+	if (ECP_mode == 1) {
+		if (core_els == 2) {
+			*max_s = 1; *max_p = 0; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 10) {
+			*max_s = 2; *max_p = 1; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 18) {
+			*max_s = 3; *max_p = 2; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 28) {
+			*max_s = 3; *max_p = 2; *max_d = 1; *max_f = 0;
+		}
+		else if (core_els == 46) {
+			*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 0;
+		}
+		else if (core_els == 60) {
+			*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 1;
+		}
 	}
-	else if (core_els == 10) {
-		*max_s = 2; *max_p = 1; *max_d = 0; *max_f = 0;
-	}
-	else if (core_els == 18) {
-		*max_s = 3; *max_p = 2; *max_d = 0; *max_f = 0;
-	}
-	else if (core_els == 28) {
-		*max_s = 3; *max_p = 2; *max_d = 1; *max_f = 0;
-	}
-	else if (core_els == 36) {
-		*max_s = 4; *max_p = 3; *max_d = 1; *max_f = 0;
-	}
-	else if (core_els == 46) {
-		*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 0;
-	}
-	else if (core_els == 54) {
-		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 0;
-	}
-	else if (core_els == 60) {
-		*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 1;
-	}
-	else if (core_els > 54 && core_els < 69) {
-		*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 1;
-	}
-	else if (core_els == 78) {
-		*max_s = 5; *max_p = 4; *max_d = 3; *max_f = 1;
+	else if (ECP_mode == 2) {
+		if (core_els == 2) {
+			*max_s = 1; *max_p = 0; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 10) {
+			*max_s = 2; *max_p = 1; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 18) {
+			*max_s = 3; *max_p = 2; *max_d = 0; *max_f = 0;
+		}
+		else if (core_els == 28) {
+			*max_s = 3; *max_p = 2; *max_d = 1; *max_f = 0;
+		}
+		else if (core_els == 36) {
+			*max_s = 4; *max_p = 3; *max_d = 1; *max_f = 0;
+		}
+		else if (core_els == 46) {
+			*max_s = 4; *max_p = 3; *max_d = 2; *max_f = 0;
+		}
+		else if (core_els == 54) {
+			*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 0;
+		}
+		else if (core_els > 54 && core_els < 69) {
+			*max_s = 5; *max_p = 4; *max_d = 2; *max_f = 1;
+		}
+		else if (core_els == 78) {
+			*max_s = 5; *max_p = 4; *max_d = 3; *max_f = 1;
+		}
 	}
 	else {
 		err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
@@ -240,13 +261,13 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
 
 const double Thakkar::get_core_form_factor(const double& k_vector, const int& core_els) {
 	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
-	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els);
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
 const double Thakkar::get_core_density(const double& dist, const int& core_els) {
 	int max_s = 0, max_p = 0, max_d = 0, max_f = 0;
-	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els);
+	set_core_counts(&max_s, &max_p, &max_d, &max_f, core_els, ECP_mode);
 	return get_radial_custom_density(dist, max_s, max_p, max_d, max_f, 0, 0, 0, 0);
 };
 
@@ -399,21 +420,31 @@ static double calc_Gaussian_int_at_k0(const int& occ, const double& coef, const 
 Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) {
 	atomic_number = g_atom_number;
 	if (basis == "def2-ECP") {
+		first_atomic_number = 37;
 		nex = &(def2_nex[0]);
 		ns = &(def2_ns[0]);
 		np = &(def2_np[0]);
 		nd = &(def2_nd[0]);
 		nf = &(def2_nf[0]);
-		ng = &(def2_nf[0]);
-		nh = &(def2_nf[0]);
+		ng = &(def2_ng[0]);
+		nh = &(def2_nh[0]);
 #pragma omp single
 		{
 			if (def2_n.size() == 0) {
-				double def2_n_size = 0;
-				for (int i = 0; i < 86; i++) {
-					def2_n_size += def2_nex[i];
+				for (int i = 36; i < 86; i++) {
+					for (int s = 0; s < def2_ns[i]; s++)
+						def2_n.push_back(0);
+					for (int p = 0; p < def2_np[i]; p++)
+						def2_n.push_back(1);
+					for (int d = 0; d < def2_nd[i]; d++)
+						def2_n.push_back(2);
+					for (int f = 0; f < def2_nf[i]; f++)
+						def2_n.push_back(3);
+					for (int g = 0; g < def2_ng[i]; g++)
+						def2_n.push_back(4);
+					for (int h = 0; h < def2_nh[i]; h++)
+						def2_n.push_back(5);
 				}
-				def2_n.resize(def2_n_size, 2);
 			}
 		}
 		occ = &(def2_occ[0]);
@@ -424,13 +455,14 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) {
 	else {
 		err_checkf(false, "Basis set not implemented", std::cout);
 		//Just to silence intellisense
+		first_atomic_number = 37;
 		nex = &(def2_nex[0]);
 		ns = &(def2_ns[0]);
 		np = &(def2_np[0]);
 		nd = &(def2_nd[0]);
 		nf = &(def2_nf[0]);
-		ng = &(def2_nf[0]);
-		nh = &(def2_nf[0]);
+		ng = &(def2_ng[0]);
+		nh = &(def2_nh[0]);
 		if (def2_n.size() == 0) {
 			double def2_n_size = 0;
 			for (int i = 0; i < 86; i++) {
@@ -593,6 +625,30 @@ void Gaussian_Atom::calc_orbs(
 	}
 }
 
+const int Gaussian_Atom::previous_element_coef() {
+	if (atomic_number <= 2) return 0;
+	int counter = 0;
+	for (int temp = atomic_number - 2; temp >= 0; temp--) {
+		for (int m = 0; m < 7; m++)
+			if (occ[temp * 21 + 0 + m] != 0)
+				counter += ns[temp];
+		for (int m = 0; m < 6; m++)
+			if (occ[temp * 21 + 7 + m] != 0)
+				counter += np[temp];
+		for (int m = 0; m < 4; m++)
+			if (occ[temp * 21 + 13 + m] != 0)
+				counter += nd[temp];
+		for (int m = 0; m < 2; m++)
+			if (occ[temp * 21 + 17 + m] != 0)
+				counter += nf[temp];
+		if (occ[temp * 21 + 19] != 0)
+			counter += ng[temp];
+		if (occ[temp * 21 + 20] != 0)
+			counter += nh[temp];
+	}
+	return counter;
+};
+
 const double Gaussian_Atom::get_radial_density(double& dist) {
 	double Rho = 0.0;
 	int nr_ex = first_ex();
@@ -600,15 +656,15 @@ const double Gaussian_Atom::get_radial_density(double& dist) {
 		return -20;
 	int nr_coef = previous_element_coef();
 
-	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	const int offset = (atomic_number - 1) * 19;
+	double Orb[21] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+	const int offset = (atomic_number - 37) * 19;
 
 	calc_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, Orb);
 	calc_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, Orb);
 	calc_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, Orb);
 	calc_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, ng, 17, 19, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nh, 17, 19, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, offset, ng, 19, 20, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, offset, nh, 20, 21, Orb);
 
 	for (int m = 0; m < 19; m++) {
 		if (Orb[m] == 0 || occ[offset + m] == 0)
