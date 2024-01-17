@@ -637,9 +637,12 @@ void test_core_dens() {
 	string base = "def2-ECP";
 	Gaussian_Atom G_Os(76, base);
 
-	for (int i = 0; i < 100; i++) {
-		double r = i * 0.1;
-		cout << r << " " << T_Os.get_core_form_factor(r, 60) << " " << G_Os.get_core_form_factor(r, 60) << endl;
+	for (int i = 1; i < 1000; i++) {
+		double r = i * 0.01;
+		double sr = r * 0.01;
+		cout << fixed << r << " " << T_Os.get_core_form_factor(r, 60) << " " << G_Os.get_core_form_factor(r, 60);
+		cout << " " << T_Os.get_core_density(sr, 60) << " " << G_Os.get_radial_density(sr);
+		cout << " " << T_Os.get_radial_density(sr) << endl;
 	}
 
 }
