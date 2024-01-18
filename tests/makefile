@@ -1,6 +1,6 @@
 RM := rm
 
-DIFF := diff -q -i
+DIFF := diff -q -i -b
 
 all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP
 

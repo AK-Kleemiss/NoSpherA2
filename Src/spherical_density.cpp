@@ -5,10 +5,9 @@
 #include <complex>
 #include <cmath>
 
-Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom() {
-	ECP_mode = ECP_m;
-	atomic_number = g_atom_number;
+Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom(g_atom_number, ECP_m) {
 	nex = &(Thakkar_nex[0]);
+	_first_ex = first_ex();
 	ns = &(Thakkar_ns[0]);
 	np = &(Thakkar_np[0]);
 	nd = &(Thakkar_nd[0]);
@@ -17,12 +16,12 @@ Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom() {
 	n = &(Thakkar_n[0]);
 	z = &(Thakkar_z[0]);
 	c = &(Thakkar_c[0]);
-	charge = 0;
+	if (atomic_number == 1) _prev_coef = 0;
+	else _prev_coef = previous_element_coef();
 };
 Thakkar::Thakkar() : Spherical_Atom() {
-	ECP_mode = 1;
-	atomic_number = 1;
 	nex = &(Thakkar_nex[0]);
+	_first_ex = first_ex();
 	ns = &(Thakkar_ns[0]);
 	np = &(Thakkar_np[0]);
 	nd = &(Thakkar_nd[0]);
@@ -31,7 +30,8 @@ Thakkar::Thakkar() : Spherical_Atom() {
 	n = &(Thakkar_n[0]);
 	z = &(Thakkar_z[0]);
 	c = &(Thakkar_c[0]);
-	charge = 0;
+	if (atomic_number == 1) _prev_coef = 0;
+	else _prev_coef = previous_element_coef();
 };
 
 const int Spherical_Atom::first_ex() {
@@ -125,23 +125,22 @@ const double Thakkar::get_radial_density(double& dist) {
 		return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
 
 	double Rho = 0.0;
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
+	if (_first_ex == 200000000)
 		return -20;
-	int nr_coef = previous_element_coef();
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	const int offset = (atomic_number - 1) * 19;
 
-	calc_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, Orb);
 
 	for (int m = 0; m < 19; m++) {
-		if (Orb[m] == 0 || occ[offset + m] == 0)
+		if (Orb[m] == 0 || occ[_offset + m] == 0)
 			continue;
-		Rho += occ[offset + m] * pow(Orb[m], 2);
+		Rho += occ[_offset + m] * pow(Orb[m], 2);
 	}
 	return Rho / (constants::FOUR_PI);
 };
@@ -160,23 +159,22 @@ const double Thakkar::get_radial_custom_density(const double& dist,
 		return 6.0835 * exp(-2.3 * dist) / constants::FOUR_PI;
 
 	double Rho = 0.0;
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
+	if (_first_ex == 200000000)
 		return -20;
-	int nr_coef = previous_element_coef();
 
 	double Orb[19] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	const int offset = (atomic_number - 1) * 19;
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, max_s, min_s, Orb);
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, max_p, min_p, Orb);
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, max_d, min_d, Orb);
-	calc_custom_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, max_f, min_f, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 7, max_s, min_s, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, np, 7, 13, max_p, min_p, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nd, 13, 17, max_d, min_d, Orb);
+	calc_custom_orbs(nr_ex, nr_coef, dist, _offset, nf, 17, 19, max_f, min_f, Orb);
 
 	for (int m = 0; m < 19; m++) {
-		if (Orb[m] == 0 || occ[offset + m] == 0)
+		if (Orb[m] == 0 || occ[_offset + m] == 0)
 			continue;
-		Rho += occ[offset + m] * pow(Orb[m], 2);
+		Rho += occ[_offset + m] * pow(Orb[m], 2);
 	}
 	return Rho / (constants::FOUR_PI);
 };
@@ -334,29 +332,26 @@ const double Thakkar::get_custom_form_factor(
 	const int& min_f) {
 
 	double result(0.0);
-	using namespace std;
 
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
+	if (_first_ex == 200000000)
 		return -20;
-	int nr_coef = previous_element_coef();
-	if (atomic_number == 1) nr_coef = 0;//return 16.0/pow(4.0+pow(k_vector*2.13*PI,2),2);
-	const int offset = (atomic_number - 1) * 19;
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, ns, 0, 7, max_s, min_s);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, np, 7, 13, max_p, min_p);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, nd, 13, 17, max_d, min_d);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, nf, 17, 19, max_f, min_f);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 7, max_s, min_s);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 7, 13, max_p, min_p);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 13, 17, max_d, min_d);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 17, 19, max_f, min_f);
 
 	if (k_vector != 0)
 		return result / k_vector;
 	else return result;
 };
 
-Thakkar_Anion::Thakkar_Anion(int g_atom_number) {
+Thakkar_Anion::Thakkar_Anion(int g_atom_number) : Thakkar(g_atom_number) {
 	if (g_atom_number != 1 && g_atom_number != 6 && g_atom_number != 8 && g_atom_number != 15 && g_atom_number != 17) err_not_impl_f("Only selected anions are currently defined!", std::cout);
-	atomic_number = g_atom_number;
 	nex = &(Anion_nex[0]);
+	_first_ex = first_ex();
 	ns = &(Anion_ns[0]);
 	np = &(Anion_np[0]);
 	nd = &(Anion_nd[0]);
@@ -366,12 +361,14 @@ Thakkar_Anion::Thakkar_Anion(int g_atom_number) {
 	z = &(Anion_z[0]);
 	c = &(Anion_c[0]);
 	charge = -1;
+	if (atomic_number == 1) _prev_coef = 0;
+	else _prev_coef = previous_element_coef();
 };
 
-Thakkar_Cation::Thakkar_Cation(int g_atom_number) {
+Thakkar_Cation::Thakkar_Cation(int g_atom_number) : Thakkar(g_atom_number) {
 	if (g_atom_number < 3 || g_atom_number > 29) err_not_impl_f("Atoms with Z < 3 or bigger than 29 are not yet done!", std::cout);
-	atomic_number = g_atom_number;
 	nex = &(Cation_nex[0]);
+	_first_ex = first_ex();
 	ns = &(Cation_ns[0]);
 	np = &(Cation_np[0]);
 	nd = &(Cation_nd[0]);
@@ -381,18 +378,16 @@ Thakkar_Cation::Thakkar_Cation(int g_atom_number) {
 	z = &(Cation_z[0]);
 	c = &(Cation_c[0]);
 	charge = +1;
+	if (atomic_number == 1) _prev_coef = 0;
+	else _prev_coef = previous_element_coef();
 };
-
-const double sqr_pi = sqrt(3.14159265358979323846);
 
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector);
 
-
-//NEED TO CHECK FOR FACTOR 2 DUE TO 2z or z in exponent
 // This function calcualtes the integral of Int_0^Inf r^N exp(-zr^2) sin(kr) dr using a recursion of sinus and cosinus integrals with lower exponents of r
 static const double gauss_sin_integral(const int& N, const double& exp, const double& k_vector) {
 	if (N == 1) {
-		return k_vector * sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 4. / pow(exp, 3. / 2.);
+		return k_vector * constants::sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 4. / pow(exp, 3. / 2.);
 	}
 	else
 		return k_vector / (2. * exp) * gauss_cos_integral(N - 1, exp, k_vector) + (N - 1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector);
@@ -400,7 +395,7 @@ static const double gauss_sin_integral(const int& N, const double& exp, const do
 };
 const double gauss_cos_integral(const int& N, const double& exp, const double& k_vector) {
 	if (N == 0) {
-		return sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 2. / pow(exp, 1. / 2.);
+		return constants::sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 2. / pow(exp, 1. / 2.);
 	}
 	else
 		return (N - 1) / (2. * exp) * gauss_cos_integral(N - 2, exp, k_vector) + k_vector / (2. * exp) * gauss_sin_integral(N - 1, exp, k_vector);
@@ -417,11 +412,12 @@ static double calc_Gaussian_int_at_k0(const int& occ, const double& coef, const 
 }
 
 
-Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) {
-	atomic_number = g_atom_number;
+Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) : Spherical_Atom(g_atom_number, 2) {
+	_offset = (atomic_number - 37) * 21;
 	if (basis == "def2-ECP") {
 		first_atomic_number = 37;
 		nex = &(def2_nex[0]);
+		_first_ex = first_ex();
 		ns = &(def2_ns[0]);
 		np = &(def2_np[0]);
 		nd = &(def2_nd[0]);
@@ -457,25 +453,39 @@ Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) {
 		//Just to silence intellisense
 		first_atomic_number = 37;
 		nex = &(def2_nex[0]);
+		_first_ex = first_ex();
 		ns = &(def2_ns[0]);
 		np = &(def2_np[0]);
 		nd = &(def2_nd[0]);
 		nf = &(def2_nf[0]);
 		ng = &(def2_ng[0]);
 		nh = &(def2_nh[0]);
-		if (def2_n.size() == 0) {
-			double def2_n_size = 0;
-			for (int i = 0; i < 86; i++) {
-				def2_n_size += def2_nex[i];
+#pragma omp single
+		{
+			if (def2_n.size() == 0) {
+				for (int i = 36; i < 86; i++) {
+					for (int s = 0; s < def2_ns[i]; s++)
+						def2_n.push_back(0);
+					for (int p = 0; p < def2_np[i]; p++)
+						def2_n.push_back(1);
+					for (int d = 0; d < def2_nd[i]; d++)
+						def2_n.push_back(2);
+					for (int f = 0; f < def2_nf[i]; f++)
+						def2_n.push_back(3);
+					for (int g = 0; g < def2_ng[i]; g++)
+						def2_n.push_back(4);
+					for (int h = 0; h < def2_nh[i]; h++)
+						def2_n.push_back(5);
+				}
 			}
-			def2_n.resize(def2_n_size, 2);
 		}
 		occ = &(def2_occ[0]);
 		n = def2_n.data();
 		z = &(def2_z[0]);
 		c = &(def2_c[0]);
 	}
-
+	if (atomic_number == first_atomic_number) _prev_coef = 0;
+	else _prev_coef = previous_element_coef();
 };
 
 double Gaussian_Atom::calc_type(
@@ -551,21 +561,18 @@ const double Gaussian_Atom::get_custom_form_factor(
 	const int& min_h) {
 
 	double result(0.0);
-	using namespace std;
 
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
+	if (_first_ex == 200000000)
 		return -20;
-	int nr_coef = previous_element_coef();
-	if (atomic_number == 1) nr_coef = 0;
-	const int offset = (atomic_number - 1) * 19;
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, ns, 0, 7, max_s, min_s);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, np, 7, 13, max_p, min_p);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, nd, 13, 17, max_d, min_d);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, nf, 17, 19, max_f, min_f);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, ng, 17, 19, max_g, min_g);
-	result += calc_type(nr_ex, nr_coef, k_vector, offset, nh, 17, 19, max_h, min_h);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 1, max_s, min_s);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 1, 2, max_p, min_p);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 2, 3, max_d, min_d);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 3, 4, max_f, min_f);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ng, 4, 5, max_g, min_g);
+	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nh, 5, 6, max_h, min_h);
 
 	if (k_vector != 0)
 		return result / k_vector;
@@ -573,29 +580,11 @@ const double Gaussian_Atom::get_custom_form_factor(
 };
 
 const double Gaussian_Atom::get_form_factor(const double& k_vector) {
-	return get_custom_form_factor(k_vector, 7, 6, 4, 2, 2, 2, 0, 0, 0, 0, 0, 0);
+	return get_custom_form_factor(k_vector, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0);
 };
 
 const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const int& core_els) {
-	int max_s = 0, max_p = 0, max_d = 0, max_f = 0, max_h = 1, max_g = 1;
-	if (core_els == 2) {
-		max_s = 1; max_p = 0; max_d = 0; max_f = 0;
-	}
-	else if (core_els == 10) {
-		max_s = 2; max_p = 1; max_d = 0; max_f = 0;
-	}
-	else if (core_els == 18) {
-		max_s = 3; max_p = 2; max_d = 0; max_f = 0;
-	}
-	else if (core_els == 28) {
-		max_s = 3; max_p = 2; max_d = 1; max_f = 0;
-	}
-	else if (core_els == 46) {
-		max_s = 4; max_p = 3; max_d = 2; max_f = 0;
-	}
-	else if (core_els == 60) {
-		max_s = 4; max_p = 3; max_d = 2; max_f = 1;
-	}
+	int max_s = 0, max_p = 1, max_d = 1, max_f = 1, max_h = 1, max_g = 1;
 	return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, max_g, max_h, 0, 0, 0, 0, 0, 0);
 };
 
@@ -626,24 +615,20 @@ void Gaussian_Atom::calc_orbs(
 }
 
 const int Gaussian_Atom::previous_element_coef() {
-	if (atomic_number <= 2) return 0;
+	if (atomic_number <= first_atomic_number) return 0;
 	int counter = 0;
-	for (int temp = atomic_number - 2; temp >= 0; temp--) {
-		for (int m = 0; m < 7; m++)
-			if (occ[temp * 21 + 0 + m] != 0)
-				counter += ns[temp];
-		for (int m = 0; m < 6; m++)
-			if (occ[temp * 21 + 7 + m] != 0)
-				counter += np[temp];
-		for (int m = 0; m < 4; m++)
-			if (occ[temp * 21 + 13 + m] != 0)
-				counter += nd[temp];
-		for (int m = 0; m < 2; m++)
-			if (occ[temp * 21 + 17 + m] != 0)
-				counter += nf[temp];
-		if (occ[temp * 21 + 19] != 0)
+	for (int temp = atomic_number - first_atomic_number - 1; temp >= 0; temp--) {
+		if (occ[temp * 6 + 0] != 0)
+			counter += ns[temp];
+		if (occ[temp * 6 + 1] != 0)
+			counter += np[temp];
+		if (occ[temp * 6 + 2] != 0)
+			counter += nd[temp];
+		if (occ[temp * 6 + 3] != 0)
+			counter += nf[temp];
+		if (occ[temp * 6 + 4] != 0)
 			counter += ng[temp];
-		if (occ[temp * 21 + 20] != 0)
+		if (occ[temp * 6 + 5] != 0)
 			counter += nh[temp];
 	}
 	return counter;
@@ -651,25 +636,24 @@ const int Gaussian_Atom::previous_element_coef() {
 
 const double Gaussian_Atom::get_radial_density(double& dist) {
 	double Rho = 0.0;
-	int nr_ex = first_ex();
-	if (nr_ex == 200000000)
+	if (_first_ex == 200000000)
 		return -20;
-	int nr_coef = previous_element_coef();
 
-	double Orb[21] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
-	const int offset = (atomic_number - 37) * 19;
+	double Orb[6] = { 0,0,0,0,0,0 };
+	int nr_coef = _prev_coef;
+	int nr_ex = _first_ex;
 
-	calc_orbs(nr_ex, nr_coef, dist, offset, ns, 0, 7, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, np, 7, 13, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nd, 13, 17, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nf, 17, 19, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, ng, 19, 20, Orb);
-	calc_orbs(nr_ex, nr_coef, dist, offset, nh, 20, 21, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, ns, 0, 1, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, np, 1, 2, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nd, 2, 3, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nf, 3, 4, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, ng, 4, 5, Orb);
+	calc_orbs(nr_ex, nr_coef, dist, _offset, nh, 5, 6, Orb);
 
-	for (int m = 0; m < 19; m++) {
-		if (Orb[m] == 0 || occ[offset + m] == 0)
+	for (int m = 0; m < 6; m++) {
+		if (Orb[m] == 0 || occ[_offset + m] == 0)
 			continue;
-		Rho += occ[offset + m] * pow(Orb[m], 2);
+		Rho += occ[_offset + m] * pow(Orb[m], 2);
 	}
-	return Rho / (constants::FOUR_PI);
+	return Rho / (constants::FOUR_PI); //4pi is the angular function
 };
