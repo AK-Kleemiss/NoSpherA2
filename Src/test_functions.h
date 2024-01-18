@@ -639,15 +639,22 @@ void test_core_dens() {
 	double PI = 3.14159265358979323846;
 	double TWO_PI = 2 * PI;
 	double FOUR_PI = 4 * PI;
+	WFN wavy(9);
+	wavy.read_gbw("Rb.gbw", cout, false);
+	wavy.delete_unoccupied_MOs();
+	WFN wavy2(9);
+	wavy2.read_gbw("Rb.gbw", cout, false);
+	wavy2.delete_unoccupied_MOs();
+	wavy2.pop_back_MO();
 
-	for (int i = 1; i < 10000; i++) {
+	for (int i = 1; i < 20000; i++) {
 		double r = i * 0.001;
-		double sr = r * 0.01;
+		double sr = r * 0.1;
 
-		double tsr = (sr) * 100 / PI;
+		double tsr = (sr);
 		cout << fixed << r << " " << T_Rb.get_core_form_factor(r, 28) << " " << G_Rb.get_core_form_factor(r, 28);
 		cout << " " << T_Rb.get_core_density(sr, 28) << " " << G_Rb.get_radial_density(tsr);
-		cout << " " << T_Rb.get_radial_density(sr) << endl;
+		cout << " " << T_Rb.get_radial_density(sr) << " " << wavy.compute_dens(sr, 0, 0, false) << " " << wavy2.compute_dens(sr, 0, 0, false) << endl;
 	}
 
 }

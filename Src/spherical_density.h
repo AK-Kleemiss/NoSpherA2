@@ -20,6 +20,7 @@ protected:
 	const int* nex, * ns, * np, * nd, * nf, * occ, * n;
 	const double* z, * c;
 	int charge;
+	int _prev_coef, _offset, _first_ex;
 	virtual void calc_orbs(int& nr_ex,
 		int& nr_coef,
 		const double& dist,
@@ -44,6 +45,16 @@ protected:
 		return -1;
 	};
 public:
+	Spherical_Atom(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number), 
+		_offset((atomic_number-1) * 19) {
+		ECP_mode = ECP_m;
+		charge = 0;
+	};
+	Spherical_Atom() : _first_ex(0), _offset(0) {
+		ECP_mode = 1;
+		atomic_number = 1;
+		charge = 0;
+	};
 	virtual const double get_radial_density(double& dist) {
 		err_not_impl_SA();
 		return -1;
