@@ -115,9 +115,9 @@ namespace constants
 	//                       3,     5     7,    9,    11,   13,   15,   17
 	//                      19,    21
 	constexpr int lebedev_table[33] = { 6, 14, 26, 38, 50, 74, 86, 110,
-									   146, 170, 194, 230, 266, 302, 350, 434,
-									   590, 770, 974, 1202, 1454, 1730, 2030, 2354,
-									   2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
+										 146, 170, 194, 230, 266, 302, 350, 434,
+										 590, 770, 974, 1202, 1454, 1730, 2030, 2354,
+										 2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
 	constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
 	constexpr double alpha_coef = 0.1616204596739954813316614;
 	constexpr double c_43 = 4.0 / 3.0;
@@ -548,9 +548,9 @@ public:
 class cosinus_annaeherung
 {
 public:
-  cosinus_annaeherung();
-  inline double get(double x) const
-  {
+	cosinus_annaeherung();
+	inline double get(double x) const
+	{
 		double xa = abs(x);
 		size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
 		double dx = xa - pos * mStepwidth;
@@ -558,27 +558,27 @@ public:
 		double y1 = mBase_values[pos];
 		double y2 = mBase_values[pos + 1];
 		return y1 + dx * (y2 - y1) / mStepwidth;
-  }
+	}
 
-  void   resize(size_t size);
-  double calculate_error_at(double x) const;
+	void   resize(size_t size);
+	double calculate_error_at(double x) const;
 private:
-  size_t mSize;
-  double* mBase_values;
-  double mStepwidth;
+	size_t mSize;
+	double* mBase_values;
+	double mStepwidth;
 };
 struct sinus
 {
-  sinus(cosinus_annaeherung& helper) : helper(helper) {};
-  double get(double x) { return helper.get(x - 1.57079632679489661922l); }
-  cosinus_annaeherung& helper;
+	sinus(cosinus_annaeherung& helper) : helper(helper) {};
+	double get(double x) { return helper.get(x - 1.57079632679489661922l); }
+	cosinus_annaeherung& helper;
 };
 
 struct cosinus
 {
-  cosinus(cosinus_annaeherung& helper) : helper(helper) {};
-  double get(double x) { return helper.get(x); }
-  cosinus_annaeherung& helper;
+	cosinus(cosinus_annaeherung& helper) : helper(helper) {};
+	double get(double x) { return helper.get(x); }
+	cosinus_annaeherung& helper;
 };
 */
 void readxyzMinMax_fromWFN(
@@ -719,7 +719,9 @@ struct primitive
 	primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
 	primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 	{
-		norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) / sqrt(doublefactorial(type));
+		norm_const = pow(
+			pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
+			0.25);
 	}
 };
 
