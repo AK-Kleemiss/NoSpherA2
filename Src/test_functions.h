@@ -429,8 +429,8 @@ void spherical_harmonic_test() {
 	for (int lam = 0; lam <= 5; lam++) {
 		for (int m = -lam; m <= lam; m++) {
 			vec d{ std::sin(theta) * std::cos(phi),
-														 std::sin(theta) * std::sin(phi),
-														 std::cos(theta), 1.0, 1.0 };
+				   std::sin(theta) * std::sin(phi),
+				   std::cos(theta), 1.0, 1.0 };
 			std::cout << spherical_harmonic(lam, m, d.data()) << " ";
 		}
 		std::cout << "\n";

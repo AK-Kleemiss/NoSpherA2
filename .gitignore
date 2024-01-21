@@ -53,3 +53,4 @@ tests/reading_SALTED/water_rho.cube
 *std.compat.ixx*
 *std.ixx*
 *.ixx.ifc*
+*.adf
