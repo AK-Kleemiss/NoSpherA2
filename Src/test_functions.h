@@ -639,23 +639,42 @@ void test_core_dens() {
 	double PI = 3.14159265358979323846;
 	double TWO_PI = 2 * PI;
 	double FOUR_PI = 4 * PI;
+	ofstream out("core_dens.dat", ios::out);
+	WFN ECP_way(9);
+	ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
+
+	//exit(0);
 	WFN wavy(9);
 	wavy.read_gbw("Rb.gbw", cout, false);
 	wavy.delete_unoccupied_MOs();
 	WFN wavy2(9);
 	wavy2.read_gbw("Rb.gbw", cout, false);
 	wavy2.delete_unoccupied_MOs();
+	wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
+	wavy2.pop_back_MO();
+	wavy2.pop_back_MO();
+	wavy2.pop_back_MO();
 	wavy2.pop_back_MO();
 
-	for (int i = 1; i < 20000; i++) {
+	vector<vec> d;
+	d.resize(16);
+	for (int i = 0; i < 16; i++)
+		d[i].resize(wavy.get_ncen(), 0.0);
+
+	vec phi(wavy.get_nmo(), 0.0);
+
+	for (int i = 1; i < 1300000; i++) {
 		double r = i * 0.001;
-		double sr = r * 0.1;
+		double sr = r * 0.01;
 
 		double tsr = (sr);
 		cout << fixed << r << " " << T_Rb.get_core_form_factor(r, 28) << " " << G_Rb.get_core_form_factor(r, 28);
 		cout << " " << T_Rb.get_core_density(sr, 28) << " " << G_Rb.get_radial_density(tsr);
-		cout << " " << T_Rb.get_radial_density(sr) << " " << wavy.compute_dens(sr, 0, 0, false) << " " << wavy2.compute_dens(sr, 0, 0, false) << endl;
+		cout << " " << T_Rb.get_radial_density(sr) << " " << wavy.compute_dens(sr, 0, 0, d, phi, false) << " " << wavy2.compute_dens(sr, 0, 0, d, phi, false);
+		cout << " " << sr << " " << ECP_way.compute_dens(sr, 0, 0, d, phi, false);
+		cout << "\n";
 	}
+	cout << flush;
 
 }
 

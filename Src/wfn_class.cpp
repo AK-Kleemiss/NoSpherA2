@@ -1932,8 +1932,9 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
   return true;
 };
 
-bool WFN::read_gbw(const string &filename, ostream &file, const bool debug)
+bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, const bool has_ECPs)
 {
+  // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
   err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
   if (debug)
     file << "File is valid, continuing...\n"
@@ -2365,8 +2366,71 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug)
     }
     if (debug)
     {
-      file << "I read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
+      file << "\nI read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
       file << "There are " << nex << " primitives after conversion" << endl;
+    }
+    if (has_ECPs) {
+      vector<ECP_primitive> ECP_prims;
+      // Reading ECPs?
+      rf.seekg(32, ios::beg);
+      long int ECP_start = 0;
+      rf.read((char*)&ECP_start, sizeof(ECP_start));
+      err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
+      if (debug)
+        file << "I read the pointer of ECP succesfully" << endl;
+      rf.seekg(ECP_start, ios::beg);
+      long int i1 = 0;
+      const int soi = 4;
+      const int sod = 8;
+      if (debug) {
+        file << "Size of int: " << soi << endl;
+        file << "Size of long int: " << sizeof(long int) << endl;
+        file << "Size of float: " << sizeof(float) << endl;
+        file << "Size of double: " << sod << endl;
+      }
+      rf.read((char*)&i1, 9);
+      file << "First line: " << i1 << endl;
+      for (int i = 0; i < i1; i++) {
+        int Z = 0;
+        int nr_core = 0;
+        int temp_0 = 0;
+        int max_contract = 0;
+        int max_angular = 0;
+        int exps = 0;
+        double n = 0;
+        int center = 0;
+        int type = 0;
+        double e = 0;
+        double c = 0;
+        rf.read((char*)&Z, soi);
+        rf.read((char*)&temp_0, soi);
+        rf.read((char*)&nr_core, soi);
+        rf.read((char*)&max_contract, soi);
+        rf.read((char*)&max_angular, soi);
+        rf.read((char*)&center, soi);
+        file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
+        for (int l = 0; l < max_angular; l++) {
+          rf.read((char*)&exps, soi);
+          rf.read((char*)&type, soi);
+          err_checkf(type < 200, "This type will give me a headache...", file);
+          file << "There are " << exps << " exponents of type " << type << " for angular momentum " << l << endl;
+          for (int fun = 0; fun < exps; fun++) {
+            
+            rf.read((char*)&n, sod);
+            rf.read((char*)&c, sod);
+            rf.read((char*)&e, sod);
+            err_checkf(n < 200, "This Exponent will give me a headache...", file);
+            file << fun << " " << c << " " << e << " " << n << endl;
+            ECP_prims.push_back(ECP_primitive(center, type, e, c, n));
+          }
+        }
+        
+      }
+      
+      if (debug) {
+        file << "Ended reading" << endl;
+      }
+
     }
   }
   catch (const exception &e)

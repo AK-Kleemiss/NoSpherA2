@@ -725,6 +725,13 @@ struct primitive
 	}
 };
 
+struct ECP_primitive : primitive
+{
+	int n;
+	ECP_primitive() : primitive(), n(0) {}
+	ECP_primitive(int c, int t, double e, double coef, int n) : primitive(c, t, e, coef), n(n) {}
+};
+
 struct tonto_primitive
 {
 	int center, type;
