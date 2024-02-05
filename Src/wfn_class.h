@@ -102,7 +102,7 @@ public:
   bool read_fchk(const std::string& filename, std::ostream& log, const bool debug = false);
   bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
   bool read_molden(const std::string& filename, std::ostream& file, const bool debug = false);
-  bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false);
+  bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false, const bool has_ECPs = false);
   bool write_wfn(const std::string& fileName, const bool& debug, const bool occupied);
   bool set_path(std::string given_path) { path = given_path; return true; };
   void print_primitive(const int& nr);
