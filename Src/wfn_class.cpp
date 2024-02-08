@@ -2380,6 +2380,7 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
         file << "I read the pointer of ECP succesfully" << endl;
       rf.seekg(ECP_start, ios::beg);
       long int i1 = 0;
+      int i2 = 0;
       const int soi = 4;
       const int sod = 8;
       if (debug) {
@@ -2388,9 +2389,10 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
         file << "Size of float: " << sizeof(float) << endl;
         file << "Size of double: " << sod << endl;
       }
-      rf.read((char*)&i1, 9);
+      rf.read((char*)&i1, 8);
       file << "First line: " << i1 << endl;
       for (int i = 0; i < i1; i++) {
+        rf.read((char*)&i2, 1);
         int Z = 0;
         int nr_core = 0;
         int temp_0 = 0;
@@ -2404,7 +2406,10 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
         double c = 0;
         rf.read((char*)&Z, soi);
         rf.read((char*)&temp_0, soi);
+        char* temp_c = new char[temp_0];
+        rf.read(temp_c, temp_0);
         rf.read((char*)&nr_core, soi);
+        atoms[i].ECP_electrons = nr_core;
         rf.read((char*)&max_contract, soi);
         rf.read((char*)&max_angular, soi);
         rf.read((char*)&center, soi);
@@ -2424,13 +2429,10 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
             ECP_prims.push_back(ECP_primitive(center, type, e, c, n));
           }
         }
-        
       }
-      
       if (debug) {
         file << "Ended reading" << endl;
       }
-
     }
   }
   catch (const exception &e)
@@ -4806,6 +4808,7 @@ double WFN::compute_dens_cartesian(
   double ex;
   int mo;
 
+  //precalculate some distances and powers of distances for faster computation
   for (iat = 0; iat < ncen; iat++)
   {
     d[0][iat] = Pos1 - atoms[iat].x;
@@ -4833,7 +4836,6 @@ double WFN::compute_dens_cartesian(
   for (j = 0; j < nex; j++)
   {
     iat = centers[j] - 1;
-    // if (iat != atom) continue;
     type2vector(types[j], l);
     ex = -exponents[j] * d[3][iat];
     if (ex < -46.0517)

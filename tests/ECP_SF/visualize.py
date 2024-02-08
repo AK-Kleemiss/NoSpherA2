@@ -37,16 +37,16 @@ coefs = [ 89.5001980000,
 rad_exps = [0,
            0,
            0,
-           0,
-           0,
-           0,
-           0,
-           0,
-           0,
-           0
+           1,
+           1,
+           1,
+           2,
+           2,
+           2,
+           3
 ]
 
-def Rb_func(r, coefs = None, exponent = None, rad_exp = None):
+def Rb_func(r, Z, coefs = None, exponent = None, rad_exp = None):
     res = 0
     if exponent == None:
         raise ValueError("exponent is None")
@@ -54,11 +54,76 @@ def Rb_func(r, coefs = None, exponent = None, rad_exp = None):
         raise ValueError("coefs is None")
     if rad_exp == None:
         raise ValueError("rad_exp is None")
+    if Z < 0:
+        raise ValueError("Z is negative")
+    
+    UL = -4*coefs[-1]*np.exp(-exponent[-1]*r**2) * \
+        (1-3*exponent[-1]*r**2 + exponent[-1]**2 * r**4)
+    res = UL
+    
+    for _i in range(3):
+       Ul = 0#-UL
+       fac = (2*_i+1)
+       for k in range(3):
+          Ul += 4*coefs[_i*3+k]*np.exp(-exponent[_i*3+k]*r**2) \
+              * (1-3*exponent[_i*3+k]*r**2 + exponent[_i*3+k]**2 * r**4) 
+       res += Ul * fac
+    
+    return res/(4*np.pi)**2
     for _i, c in enumerate(coefs):
-        p1 = c * r**rad_exp[_i]
+        p1 = c
         p2 = np.exp(-exponent[_i] * r**2)
-        res += p1 * p2
-    return res
+        if rad_exp[_i] == 0:
+            p3 = -4 * (1-3*exponent[_i]*r**2 + exponent[_i]**2 * r**4)
+        elif rad_exp[_i] == 1:
+            p3 = -r * (9-16*exponent[_i]*r**2 + 4 * exponent[_i]**2 * r**4)
+        elif rad_exp[_i] == 2:
+            p3 = -4 * r**2 * (4-5*exponent[_i]*r**2 + exponent[_i]**2 * r**4)
+        elif rad_exp[_i] == 3:
+            p3 = -r**3 * (25-24*exponent[_i]*r**2+4*exponent[_i]**2*r**4)
+        res += p1 * p2 * p3
+    #for _i in range(4):
+    #    c1 = coeffies[3*_i]
+    #    ex1 = exponent[3*_i]
+    #    e1 = np.exp(-ex1 * r**2)
+    #    ep1 = np.exp(ex1 * r**2)
+    #    if not _i == 3:
+    #        c2 = coeffies[3*_i+1]
+    #        ex2 = exponent[3*_i+1]
+    #        e2 = np.exp(-ex2 * r**2)
+    #        ep2 = np.exp(ex2 * r**2)
+    #        c3 = coeffies[3*_i+2]
+    #        ex3 = exponent[3*_i+2]
+    #        e3 = np.exp(-ex3 * r**2)
+    #        ep3 = np.exp(ex3 * r**2)
+    #    else:
+    #        c2 = 1
+    #        ex2 = 1
+    #        e2 = 1
+    #        ep2 = 1
+    #        c3 = 1
+    #        ex3 = 1
+    #        e3 = 1
+    #        ep3 = 1
+    #    #if _i==0:
+    #    res += 4*e1*e2*e3*(c3*ep1*ep2*(1-3*ex3*r**2+ex3**2*r**4) +
+    #                          ep3*(c1*ep2*(1-3*ex1*r**2+ex1**2*r**4) +
+    #                               c2*ep1*(1-3*ex2*r**2+ex2**2*r**4)))
+    #    #elif _i==1:
+    #    #    res += r*e1*e2*e3*(c3*ep1*ep2*(9-16*ex3*r**2+4*ex3**2*r**4) +
+    #    #                    ep3*(c1*ep2*(9-16*ex1*r**2+4*ex1**2*r**4) +
+    #    #                         c2*ep1*(9-16*ex2*r**2+4*ex2**2*r**4)))
+    #    #elif _i==2:
+    #    #    res += 4*r**2*e1*e2*e3*(c3*ep1*ep2*(4-5*ex3*r**2+ex3**2*r**4) +
+    #    #                    ep3*(c1*ep2*(4-5*ex1*r**2+ex1**2*r**4) +
+    #    #                         c2*ep1*(4-5*ex2*r**2+ex2**2*r**4)))
+    #    #elif _i==3:
+    #    #    res += e1*e2*e3*r**3*(c3*ep1*ep2*(25-24*ex3*r**2+4*ex3**2*r**4) +
+    #    #                    ep3*(c1*ep2*(25-24*ex1*r**2+4*ex1**2*r**4) +
+    #    #                         c2*ep1*(25-24*ex2*r**2+4*ex2**2*r**4)))
+    if (Z>0):
+        res -= 4*Z/r**4#/(4*np.pi)
+    return -res/(4*np.pi)**2
 
 def get_numbers_from_filename(filename):
     # Use a regular expression to find all groups of digits in the filename
@@ -154,24 +219,20 @@ lf = os.path.join(dir, 'NoSpherA2.log')
 # 8 = r
 df = pd.read_csv(lf, delim_whitespace=True, header=None)
 
-upper = 13.0
-nr = 2000001
+upper = 4.0
+nr = 200000
 
-x = np.linspace(0, upper, nr)
+x = np.linspace(0.00001, upper, nr)
 dx = x[1]
 y = np.zeros_like(x)
 z = np.zeros_like(x)
 
-#coeffies = atom_dict['237']
-coeffies = coefs
-#for i in range(len(coeffies)):
-#    coeffies[i] *= pow(pow(2, 7) * pow(exps[i], 3 ) / np.pi, 0.25)
-#for i, v in enumerate(x):
-#    y[i] = Rb_func(v, coeffies, exps, rad_exps)
-#    z[i] = y[i] * (v)**2 * 4 * np.pi
+for i, v in enumerate(x):
+    y[i] = Rb_func(v, 28, coefs, exps, rad_exps)
+    z[i] = y[i] * (v)**2 * 4 * np.pi
 
-#integral = sum(x**2 * y * x[1] * 4 * np.pi)
-#print(integral)
+integral = sum(x**2 * y * x[1] * 4 * np.pi)
+print("ECP Integral: ", integral)
 
 integral2 = sum(df[8][1] * df[5] * (df[8])**2 * 4 * np.pi)
 print("Thakkar Integral:",integral2)
@@ -187,7 +248,7 @@ integral2 = sum(df[8][1] * df[9] * (df[8])**2 * 4 * np.pi)
 print("ORCA ECP Integral:",integral2)
 
 
-# Create a figure with 2 subplots
+# Create a figure with 3x2 subplots
 fig, axs = plt.subplots(2,2, figsize=(12, 8))
 
 #axs[0][0].set_title('ECP SF')
@@ -195,24 +256,18 @@ fig, axs = plt.subplots(2,2, figsize=(12, 8))
 #axs[0][0].plot(df[0], df[2], label='Gaussian')
 
 
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[0])], [exps[0]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[1])], [exps[1]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[2])], [exps[2]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[3])], [exps[3]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[4])], [exps[4]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[5])], [exps[5]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[6])], [exps[6]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[7])], [exps[7]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[8])], [exps[8]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[9])], [exps[9]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[10])], [exps[10]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[11])], [exps[11]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[12])], [exps[12]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[13])], [exps[13]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[14])], [exps[14]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[15])], [exps[15]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[16])], [exps[16]]))
-#axs[0][0].plot(x,Rb_func(x, [abs(coeffies[17])], [exps[17]]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[0]],  [exps[0]] , [0]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[1]],  [exps[1]] , [0]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[2]],  [exps[2]] , [0]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[3]],  [exps[3]] , [1]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[4]],  [exps[4]] , [1]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[5]],  [exps[5]] , [1]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[6]],  [exps[6]] , [2]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[7]],  [exps[7]] , [2]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[8]],  [exps[8]] , [2]))
+#axs[2][0].plot(x,Rb_func(x, 0, [coefs[9]],  [exps[9]] , [3]))
+#axs[2][0].plot(x,Rb_func(x, 9, [0],  [exps[9]] , [3]))
+#axs[2][0].set_ylim(-0.5,5)
 
 axs[0][0].set_title('Radial dens diff')
 axs[0][0].plot(df[8], (df[8])**2 * (df[9] + df[3] - df[5]) * 4 *np.pi, label='ECP +  Thakkar Core - Thakkar full')
@@ -222,14 +277,15 @@ axs[0][0].set_xlim(-0.1,3)
 axs[0][0].legend()
 
 axs[0][1].set_title('ECP Density')
-#axs[0][1].plot(x, y, label='Gaussian python')
+axs[0][1].plot(x, y, label='Gaussian python')
 axs[0][1].plot(df[8], df[3], label='Thakkar')
 #axs[0][1].plot(df[0]*dx_log, df[4], label='Gaussian')
 axs[0][1].plot(df[8], df[5], label='Thakkar full')
 axs[0][1].plot(df[8], df[6], label='ORCA')
+axs[0][1].plot(df[8], df[9], label='ECP')
 axs[0][1].plot(df[8], df[9] + df[3], label='ECP + Thakkar Core')
-axs[0][1].set_ylim(0,200)
-axs[0][1].set_xlim(-0.1,2)
+axs[0][1].set_ylim(-5,200)
+axs[0][1].set_xlim(-0.1,3)
 axs[0][1].legend()
 
 axs[1][0].set_title('Valence Density')
@@ -244,7 +300,7 @@ axs[1][0].set_xlim(-0.1,2)
 axs[1][0].legend()
 
 axs[1][1].set_title('ECP radial Density')
-#axs[1][1].plot(x, z, label='Gaussian python')
+axs[1][1].plot(x, z, label='Gaussian python')
 axs[1][1].plot(df[8], (df[8])**2 * df[3] * 4 *np.pi, label='Thakkar')
 #axs[1][1].plot(df[0]*dx_log, (df[0]*dx_log)**2 * df[4] * 4 *np.pi, label='Gaussian')
 axs[1][1].plot(df[8], (df[8])**2 * df[5] * 4 *np.pi, label='Thakkar full')
@@ -252,6 +308,7 @@ axs[1][1].plot(df[8], (df[8])**2 * df[6] * 4 *np.pi, label='ORCA')
 axs[1][1].plot(df[8], (df[8])**2 * df[9] * 4 *np.pi, label='ECP')
 axs[1][1].plot(df[8], (df[8])**2 * (df[9] + df[3]) * 4 *np.pi, label='ECP +  Thakkar Core')
 axs[1][1].set_xlim(-0.1,3)
+axs[1][1].set_ylim(-3,160)
 axs[1][1].legend()
 
 # Show the figure
