@@ -113,6 +113,15 @@ int make_hirshfeld_grids(const int& pbc,
   bool debug = false,
   bool no_date = false);
 
+static void add_ECP_contribution(const ivec& asym_atom_list,
+  const WFN& wave,
+  std::vector<cvec>& sf,
+  const cell& cell,
+  hkl_list& hkl,
+  std::ostream& file,
+  const int& mode = 0,
+  const bool debug = false);
+
 void calc_SF(const int& points,
   std::vector<vec>& k_pt,
   std::vector<vec>& d1,

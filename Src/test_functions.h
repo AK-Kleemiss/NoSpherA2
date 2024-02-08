@@ -424,6 +424,33 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	}
 }
 
+void add_ECP_contribution_test(const ivec& asym_atom_list,
+	const WFN& wave,
+	std::vector<cvec>& sf,
+	std::vector<vec>& k_pt,
+	std::ostream& file,
+	const bool debug)
+{
+	double k = 1.0;
+	// Using a Thakkar core density
+		std::vector<Thakkar> temp;
+		for (int i = 0; i < asym_atom_list.size(); i++)
+		{
+			temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
+		}
+
+#pragma omp parallel for private(k) schedule(runtime)
+		for (int s = 0; s < sf[0].size(); s++)
+		{
+			k = k_pt[3][s];
+			for (int i = 0; i < asym_atom_list.size(); i++)
+			{
+				if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+					sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
+			}
+		}
+}
+
 void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	using namespace std;
 	std::vector<WFN> wavy;
@@ -505,8 +532,8 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 
 	std::cout << "finished partitioning" << endl;
 	const int size = 4000;
-	const int phi_size = 50;
-	const int theta_size = 50;
+	const int phi_size = 60;
+	const int theta_size = 60;
 	const double phi_step = 360.0 / phi_size * constants::PI_180;
 	const double theta_step = 180.0 / phi_size * constants::PI_180;
 
@@ -579,17 +606,35 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			}
 		}
 	}
+
+	auto sf2 = sf;
+	add_ECP_contribution_test(
+		asym_atom_list,
+		wavy[0],
+		sf2,
+		k_pt,
+		log_file,
+		opt.debug);
+	vec thakkar_sfac;
+	vec thakkar_core_sfac;
+#pragma omp parallel for
+	for(int i=0; i<k_pt[0].size();i++)
+  {
+    thakkar_sfac.push_back(Au.get_form_factor(k_pt[3][i]));
+    thakkar_core_sfac.push_back(Au.get_core_form_factor(k_pt[3][i], 60));
+  }
 	delete(progress);
-	if (true) { //Change if oyu do not want X-ray
+	if (true) { //Change if you do not want X-ray
 		ofstream result("sfacs.dat", ios::out);
 		log_file << "Writing X-ray sfacs...";
 		log_file.flush();
 		//Now we just need to write the result to a file, together with the spherical results and separated for valence and core
 		for (int i = 0; i < k_pt[0].size(); i++) {
 			result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
-			result << showpos << setw(16) << setprecision(8) << scientific << Au.get_form_factor((k_pt[3][i]));
+			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_core_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-			result << showpos << setw(16) << setprecision(8) << scientific << Au.get_custom_form_factor((k_pt[3][i]), 4, 3, 2, 1, 0, 0, 0, 0);
+			result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf2[0][i].real(), 2) + pow(sf2[0][i].imag(), 2));
 			result << "\n";
 		}
 		log_file << " ... done!" << endl;

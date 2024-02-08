@@ -54,3 +54,7 @@ tests/reading_SALTED/water_rho.cube
 *std.ixx*
 *.ixx.ifc*
 *.adf
+tests/ECP_SF/Atomic_densities/*.prop
+tests/ECP_SF/Atomic_densities/*.densities
+tests/ECP_SF/Atomic_densities/*_property.txt
+tests/ECP_SF/Atomic_densities/*.gbw

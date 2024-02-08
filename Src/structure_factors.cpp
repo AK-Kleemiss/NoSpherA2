@@ -4601,8 +4601,8 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
                                  const cell &cell,
                                  hkl_list &hkl,
                                  ostream &file,
-                                 const int &mode = 0,
-                                 const bool debug = false)
+                                 const int &mode,
+                                 const bool debug)
 {
   double k = 1.0;
   hkl_list_it it = hkl.begin();

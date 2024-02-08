@@ -2854,6 +2854,7 @@ void options::digest_options()
 		}
 		else if (temp == "-test-ecp")
 		{
+			d_sfac_scan = fromString<double>(arguments[i + 1]);
 			sfac_scan_ECP(*this, log_file);
 		}
 		else if (temp == "-sfac_diffuse")
