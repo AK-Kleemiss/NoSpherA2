@@ -68,8 +68,9 @@ def Rb_func(r, Z, coefs = None, exponent = None, rad_exp = None):
           Ul += 4*coefs[_i*3+k]*np.exp(-exponent[_i*3+k]*r**2) \
               * (1-3*exponent[_i*3+k]*r**2 + exponent[_i*3+k]**2 * r**4) 
        res += Ul * fac
-    
-    return res/(4*np.pi)**2
+    if (Z>0):
+        res -= 4*Z/r**4#/(4*np.pi)
+    return -res/(4*np.pi)**2
     for _i, c in enumerate(coefs):
         p1 = c
         p2 = np.exp(-exponent[_i] * r**2)
