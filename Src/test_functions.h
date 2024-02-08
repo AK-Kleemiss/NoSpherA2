@@ -483,7 +483,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	gettimeofday(&t1, 0);
 #endif
 
-	cell unit_cell(opt.cif, std::cout, opt.debug);
+	cell unit_cell(opt.cif, log_file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), std::ios::in);
 	vector <int> atom_type_list;
 	vector <int> asym_atom_to_type_list;
@@ -500,21 +500,21 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		asym_atom_to_type_list,
 		asym_atom_list,
 		needs_grid,
-		std::cout,
+		log_file,
 		opt.debug);
 
 	cif_input.close();
 	vector<vec> d1, d2, d3, dens;
 
 	make_hirshfeld_grids(opt.pbc,
-		opt.accuracy,
+		4,
 		unit_cell,
 		wavy[0],
 		atom_type_list,
 		asym_atom_list,
 		needs_grid,
 		d1, d2, d3, dens,
-		std::cout,
+		log_file,
 #ifdef _WIN64
 		start,
 		end_becke,
@@ -532,8 +532,8 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 
 	std::cout << "finished partitioning" << endl;
 	const int size = 4000;
-	const int phi_size = 60;
-	const int theta_size = 60;
+	const int phi_size = 30;
+	const int theta_size = 30;
 	const double phi_step = 360.0 / phi_size * constants::PI_180;
 	const double theta_step = 180.0 / phi_size * constants::PI_180;
 
@@ -606,7 +606,8 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			}
 		}
 	}
-
+	delete(progress);
+	log_file << "adding ECP contribution" << endl;
 	auto sf2 = sf;
 	add_ECP_contribution_test(
 		asym_atom_list,
@@ -615,15 +616,22 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		k_pt,
 		log_file,
 		opt.debug);
-	vec thakkar_sfac;
-	vec thakkar_core_sfac;
+	log_file << "done adding ECP contribution" << endl;
+	log_file << "Calculating sfacs..." << endl;
+	vec thakkar_sfac(k_pt[0].size());
+	vec thakkar_core_sfac(k_pt[0].size());
+	vec sf1_sfac(k_pt[0].size());
+	vec sf2_sfac(k_pt[0].size());
 #pragma omp parallel for
 	for(int i=0; i<k_pt[0].size();i++)
   {
-    thakkar_sfac.push_back(Au.get_form_factor(k_pt[3][i]));
-    thakkar_core_sfac.push_back(Au.get_core_form_factor(k_pt[3][i], 60));
+		sf1_sfac[i] = sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
+		sf2_sfac[i] = sqrt(pow(sf2[0][i].real(), 2) + pow(sf2[0][i].imag(), 2));
+		if (sf[0][i].real() < 0)
+			sf1_sfac[i] = -sf1_sfac[i];
+    thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
+    thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
   }
-	delete(progress);
 	if (true) { //Change if you do not want X-ray
 		ofstream result("sfacs.dat", ios::out);
 		log_file << "Writing X-ray sfacs...";
@@ -633,8 +641,8 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
 			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_core_sfac[i];
-			result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
-			result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf2[0][i].real(), 2) + pow(sf2[0][i].imag(), 2));
+			result << showpos << setw(16) << setprecision(8) << scientific << sf1_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf2_sfac[i];
 			result << "\n";
 		}
 		log_file << " ... done!" << endl;
