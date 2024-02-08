@@ -1,0 +1,127 @@
+data_FK_dppmAu2Br2_shape_opt_2
+_audit_creation_method            
+ 'Olex2: Feb  6 2024 18:31:05 MSC:193833134 on WIN64, Python: 3.8.6, wxWidgets: 3.2.2'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'C25 H22 Au2 Br2 P2'
+_chemical_formula_sum              'C25 H22 Au2 Br2 P2'
+_chemical_formula_weight           469.07
+_chemical_melting_point            ?
+_space_group_crystal_system        'monoclinic'
+_space_group_IT_number             15
+_space_group_name_H-M_alt          'I 1 2/a 1'
+_space_group_name_Hall             '-I 2ya'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+ 2 1/2-X,+Y,-Z
+ 3 1/2+X,1/2+Y,1/2+Z
+ 4 -X,1/2+Y,1/2-Z
+ 5 -X,-Y,-Z
+ 6 1/2+X,-Y,+Z
+ 7 1/2-X,1/2-Y,1/2-Z
+ 8 +X,1/2-Y,1/2+Z
+
+_cell_length_a                     18.30627(11)
+_cell_length_b                     7.30873(4)
+_cell_length_c                     19.93137(13)
+_cell_angle_alpha                  90
+_cell_angle_beta                   108.6215(7)
+_cell_angle_gamma                  90
+_cell_volume                       2527.12(3)
+_cell_formula_units_Z              4
+_exptl_crystal_size_max            0.04
+_exptl_crystal_size_mid            0.09
+_exptl_crystal_size_min            0.12
+_diffrn_reflns_av_R_equivalents    0.0350
+_diffrn_reflns_av_unetI/netI       0.0113
+_diffrn_reflns_limit_h_max         41
+_diffrn_reflns_limit_h_min         -41
+_diffrn_reflns_limit_k_max         16
+_diffrn_reflns_limit_k_min         -16
+_diffrn_reflns_limit_l_max         45
+_diffrn_reflns_limit_l_min         -45
+_diffrn_reflns_number              168138
+_diffrn_reflns_theta_max           40.25
+_diffrn_reflns_theta_min           2.16
+_diffrn_ambient_temperature        100.15
+_diffrn_radiation_wavelength       0.71073
+_reflns_number_total               7962
+_refine_diff_density_max           2.12
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ Au01 Au 0.343912 0.876516 0.500003 0.011506 Uani 1 . 1 .
+ Br02 Br 0.408494 1.134486 0.569292 0.019996 Uani 1 . 1 .
+ P003 P 0.285672 0.626784 0.441719 0.009916 Uani 1 . 1 .
+ C004 C 0.203544 0.674075 0.364362 0.0111 Uani 1 . 1 .
+ C005 C 0.083452 0.589461 0.275881 0.020012 Uani 1 . 1 .
+ H005 H 0.022155 0.489487 0.247786 0.271328 Uani 1 . 1 .
+ C006 C 0.472717 0.413335 0.401521 0.019529 Uani 1 . 1 .
+ H006 H 0.536246 0.466933 0.415916 0.073847 Uani 1 . 1 .
+ C007 C 0.347351 0.476958 0.411582 0.012443 Uani 1 . 1 .
+ C008 C 0.423743 0.528217 0.423094 0.015414 Uani 1 . 1 .
+ H008 H 0.437177 0.657759 0.444596 0.026643 Uani 1 . 1 .
+ C009 C 0.203123 0.837871 0.328048 0.01928 Uani 1 . 1 .
+ H009 H 0.245777 0.919029 0.348378 0.039685 Uani 1 . 1 .
+ C00A C 0.445651 0.24748 0.368449 0.021822 Uani 1 . 1 .
+ H00A H 0.481723 0.148545 0.349157 0.042358 Uani 1 . 1 .
+ C00B C 0.369021 0.197402 0.356129 0.025077 Uani 1 . 1 .
+ H00B H 0.381497 0.091049 0.339023 0.213108 Uani 1 . 1 .
+ C00C C 0.319793 0.311361 0.377637 0.020024 Uani 1 . 1 .
+ H00C H 0.259068 0.272521 0.363401 0.1131 Uani 1 . 1 .
+ C00D C 0.143852 0.875234 0.265131 0.025126 Uani 1 . 1 .
+ H00D H 0.151466 0.999799 0.238603 0.094641 Uani 1 . 1 .
+ C00E C 0.084273 0.750997 0.239365 0.019715 Uani 1 . 1 .
+ H00E H 0.038864 0.771259 0.191274 0.042359 Uani 1 . 1 .
+ C00F C 0.143125 0.549943 0.337813 0.016777 Uani 1 . 1 .
+ H00F H 0.148368 0.434322 0.363707 0.036761 Uani 1 . 1 .
+ C00G C 0.25 0.483962 0.5 0.01099 Uani 1 . 2 .
+ H4 H 0.210916 0.390966 0.474426 0.024171 Uani 1 . 1 .
+
+loop_
+  _atom_site_aniso_label
+  _atom_site_aniso_U_11
+  _atom_site_aniso_U_22
+  _atom_site_aniso_U_33
+  _atom_site_aniso_U_23
+  _atom_site_aniso_U_13
+  _atom_site_aniso_U_12
+ Au01 0.011243 0.009817 0.012337 -0.001374 0.002188 -0.001018
+ Br02 0.018051 0.011894 0.023986 -0.005706 -0.001805 0.000539
+ P003 0.01004 0.010003 0.009885 -0.000673 0.003433 -0.000699
+ C004 0.0111 0.011733 0.010642 0.000377 0.003717 -0.000792
+ C005 0.016538 0.027067 0.013401 0.000449 0.000517 -0.006586
+ H005 0.505097 0.316252 0.040049 0.065052 0.153709 0.349324
+ C006 0.013036 0.029267 0.016751 -0.000598 0.005412 0.005005
+ H006 0.160111 0.002418 0.06636 0.009572 0.04649 0.02708
+ C007 0.012526 0.012877 0.013223 -0.000094 0.005934 0.000376
+ C008 0.011127 0.022373 0.012851 -0.001182 0.003982 0.000878
+ H008 0.019228 0.022373 0.019031 -0.000311 -0.021025 0.01093
+ C009 0.02 0.016131 0.017365 0.005627 -0.000144 -0.004993
+ H009 0.040924 0.036618 0.026151 0.015874 -0.010894 -0.024967
+ C00A 0.024252 0.022811 0.022884 0.003866 0.013827 0.010186
+ H00A 0.031252 0.056269 0.04573 -0.005534 0.020977 0.046326
+ C00B 0.031567 0.014455 0.038046 -0.005484 0.02354 0.000157
+ H00B 0.4891 0.083659 0.200214 0.086883 0.29799 0.202051
+ C00C 0.020595 0.014302 0.030961 -0.006195 0.016368 -0.002979
+ H00C 0.245082 0.023747 0.151051 0.050116 0.176556 0.086271
+ C00D 0.026616 0.023536 0.019161 0.010281 -0.001219 -0.00282
+ H00D 0.184521 0.048317 0.009182 0.01373 -0.027998 -0.07444
+ C00E 0.016755 0.027419 0.012159 0.002846 0.000661 0.000621
+ H00E 0.036399 0.060624 0.0103 -0.019181 -0.020321 0.035424
+ C00F 0.015762 0.017968 0.013825 0.002594 0.00082 -0.005649
+ H00F 0.019648 0.034349 0.055515 -0.025601 0.010918 -0.020709
+ C00G 0.01298 0.010816 0.010072 -0 0.00494 -0
+ H4 0.024998 0.017302 0.024452 -0.001587 -0.000205 -0.006663
+
