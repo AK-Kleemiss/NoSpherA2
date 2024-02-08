@@ -1,11 +1,6 @@
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-import struct
-import re
-import scipy.special as sp
-import json
 dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(dir)
 a0 = 0.52917721067
