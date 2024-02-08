@@ -643,18 +643,17 @@ void test_core_dens() {
 	WFN ECP_way(9);
 	ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
 
+
+	WFN multi_ecp_wavy(9);
+	multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);	
+
 	//exit(0);
 	WFN wavy(9);
 	wavy.read_gbw("Rb.gbw", cout, false);
 	wavy.delete_unoccupied_MOs();
 	WFN wavy2(9);
-	wavy2.read_gbw("Rb.gbw", cout, false);
+	wavy2.read_gbw("Rb_+9.gbw", cout, false);
 	wavy2.delete_unoccupied_MOs();
-	wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
-	wavy2.pop_back_MO();
-	wavy2.pop_back_MO();
-	wavy2.pop_back_MO();
-	wavy2.pop_back_MO();
 
 	vector<vec> d;
 	d.resize(16);
