@@ -433,22 +433,22 @@ void add_ECP_contribution_test(const ivec& asym_atom_list,
 {
 	double k = 1.0;
 	// Using a Thakkar core density
-		std::vector<Thakkar> temp;
-		for (int i = 0; i < asym_atom_list.size(); i++)
-		{
-			temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
-		}
+	std::vector<Thakkar> temp;
+	for (int i = 0; i < asym_atom_list.size(); i++)
+	{
+		temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
+	}
 
 #pragma omp parallel for private(k) schedule(runtime)
-		for (int s = 0; s < sf[0].size(); s++)
+	for (int s = 0; s < sf[0].size(); s++)
+	{
+		k = k_pt[3][s];
+		for (int i = 0; i < asym_atom_list.size(); i++)
 		{
-			k = k_pt[3][s];
-			for (int i = 0; i < asym_atom_list.size(); i++)
-			{
-				if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
-					sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
-			}
+			if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+				sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
 		}
+	}
 }
 
 void sfac_scan_ECP(options& opt, std::ostream& log_file) {
@@ -458,18 +458,27 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	wavy.push_back(*t);
 	delete t;
 	wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
+	t = new WFN(9);
+	wavy.push_back(*t);
+	delete t;
+	wavy[1].read_known_wavefunction_format("Au_def2.gbw", std::cout, opt.debug);
+	t = new WFN(9);
+	wavy.push_back(*t);
+	delete t;
+	wavy[2].read_known_wavefunction_format("Au_alle.gbw", std::cout, opt.debug);
 	Thakkar Au(wavy[0].atoms[0].charge);
 	if (opt.ECP)
 	{
-		if (opt.ECP_mode == 2)
+		if (opt.ECP_mode == 2) {
+
 			wavy[0].set_has_ECPs(true, true, true);
+			wavy[1].set_has_ECPs(true, true, true);
+		}
 		else
+		{
 			wavy[0].set_has_ECPs(true);
-	}
-	if (opt.set_ECPs)
-	{
-		log_file << "Adding ECPs" << endl;
-		wavy[0].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
+			wavy[1].set_has_ECPs(true);
+		}
 	}
 	err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
@@ -529,9 +538,67 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		opt.debug,
 		opt.no_date);
 
+	vector<vec> d1_def2, d2_def2, d3_def2, dens_def2;
+	ivec atl_def2{ 79 };
+	ivec aal_def2{ 0 };
+	vector<bool> ng_def2(1, true);
+
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy[1],
+		atl_def2,
+		aal_def2,
+		ng_def2,
+		d1_def2, d2_def2, d3_def2, dens_def2,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+	vector<vec> d1_all, d2_all, d3_all, dens_all;
+	ivec atl_all{ 79 };
+	ivec aal_all{ 0 };
+	vector<bool> ng_all(1, true);
+
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy[2],
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_all, d2_all, d3_all, dens_all,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
 
 	std::cout << "finished partitioning" << endl;
-	const int size = 4000;
+	const int size = 2000;
 	const int phi_size = 30;
 	const int theta_size = 30;
 	const double phi_step = 360.0 / phi_size * constants::PI_180;
@@ -546,7 +613,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		k_pt[i].resize(size * phi_size * theta_size, 0.0);
 
 	//int null = 0;
-#pragma omp parallel for
+#pragma omp parallel for schedule(dynamic)
 	for (int ref = 1; ref <= size; ref++) {
 		for (int p = 0; p < phi_size; p++) {
 			for (int t = 0; t < theta_size; t++) {
@@ -561,16 +628,22 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	}
 	// below is a strip of Calc_SF without the file IO or progress bar
 	vector<vector<complex<double>>> sf;
-
-	const int imax = (int)dens.size();
+	vector<vector<complex<double>>> sf_def2;
+	vector<vector<complex<double>>> sf_all;
 	const int smax = (int)k_pt[0].size();
 	int pmax = (int)dens[0].size();
 	const int step = max((int)floor(smax / 20), 1);
-	std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-	sf.resize(imax);
-#pragma omp parallel for
-	for (int i = 0; i < imax; i++)
+	std::cout << "Done with making k_pt " << smax << " " << pmax << endl;
+	sf.resize(1);
+	sf_def2.resize(1);
+	sf_all.resize(1);
+#pragma omp parallel for schedule(dynamic)
+	for (int i = 0; i < 1; i++)
+	{
 		sf[i].resize(k_pt[0].size());
+		sf_def2[i].resize(k_pt[0].size());
+		sf_all[i].resize(k_pt[0].size());
+	}
 	double* dens_local, * d1_local, * d2_local, * d3_local;
 	complex<double>* sf_local;
 	const double* k1_local = k_pt[0].data();
@@ -578,7 +651,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	const double* k3_local = k_pt[2].data();
 	double work, rho;
 	progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
-	for (int i = 0; i < 1; i++) 
+	for (int i = 0; i < 1; i++)
 	{
 		pmax = (int)dens[i].size();
 		dens_local = dens[i].data();
@@ -587,9 +660,9 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d3_local = d3[i].data();
 		sf_local = sf[i].data();
 #pragma omp parallel for private(work,rho) schedule(runtime)
-		for (int s = 0; s < smax; s++) 
+		for (int s = 0; s < smax; s++)
 		{
-			for (int p = pmax - 1; p >= 0; p--) 
+			for (int p = pmax - 1; p >= 0; p--)
 			{
 				rho = dens_local[p];
 				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
@@ -605,10 +678,62 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
+		pmax = (int)dens_def2[i].size();
+		dens_local = dens_def2[i].data();
+		d1_local = d1_def2[i].data();
+		d2_local = d2_def2[i].data();
+		d3_local = d3_def2[i].data();
+		sf_local = sf_def2[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+		}
+		pmax = (int)dens_all[i].size();
+		dens_local = dens_all[i].data();
+		d1_local = d1_all[i].data();
+		d2_local = d2_all[i].data();
+		d3_local = d3_all[i].data();
+		sf_local = sf_all[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+
+		}
 	}
 	delete(progress);
 	log_file << "adding ECP contribution" << endl;
 	auto sf2 = sf;
+	auto sf2_def2 = sf_def2;
 	add_ECP_contribution_test(
 		asym_atom_list,
 		wavy[0],
@@ -616,22 +741,37 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		k_pt,
 		log_file,
 		opt.debug);
+	add_ECP_contribution_test(
+		asym_atom_list,
+		wavy[1],
+		sf2_def2,
+		k_pt,
+		log_file,
+		opt.debug);
 	log_file << "done adding ECP contribution" << endl;
 	log_file << "Calculating sfacs..." << endl;
 	vec thakkar_sfac(k_pt[0].size());
 	vec thakkar_core_sfac(k_pt[0].size());
-	vec sf1_sfac(k_pt[0].size());
-	vec sf2_sfac(k_pt[0].size());
-#pragma omp parallel for
-	for(int i=0; i<k_pt[0].size();i++)
-  {
+	vec sf1_sfac(k_pt[0].size()); // Has the HAR density without ECP
+	vec sf2_sfac(k_pt[0].size()); // Has the HAR density with ECP
+	vec sf_def2_sfac(k_pt[0].size()); // Has the def2 density without ECP
+	vec sf2_def2_sfac(k_pt[0].size()); // Has the def2 density with ECP
+	vec sf_all_sfac(k_pt[0].size()); // Has the all electron density
+#pragma omp parallel for schedule(dynamic)
+	for (int i = 0; i < k_pt[0].size(); i++)
+	{
 		sf1_sfac[i] = sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
 		sf2_sfac[i] = sqrt(pow(sf2[0][i].real(), 2) + pow(sf2[0][i].imag(), 2));
+		sf_def2_sfac[i] = sqrt(pow(sf_def2[0][i].real(), 2) + pow(sf_def2[0][i].imag(), 2));
+		sf2_def2_sfac[i] = sqrt(pow(sf2_def2[0][i].real(), 2) + pow(sf2_def2[0][i].imag(), 2));
+		sf_all_sfac[i] = sqrt(pow(sf_all[0][i].real(), 2) + pow(sf_all[0][i].imag(), 2));
 		if (sf[0][i].real() < 0)
 			sf1_sfac[i] = -sf1_sfac[i];
-    thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
-    thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
-  }
+		if (sf_def2[0][i].real() < 0)
+			sf_def2_sfac[i] = -sf_def2_sfac[i];
+		thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
+		thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
+	}
 	if (true) { //Change if you do not want X-ray
 		ofstream result("sfacs.dat", ios::out);
 		log_file << "Writing X-ray sfacs...";
@@ -643,6 +783,9 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_core_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf1_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf2_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_def2_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf2_def2_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_all_sfac[i];
 			result << "\n";
 		}
 		log_file << " ... done!" << endl;
@@ -656,8 +799,8 @@ void spherical_harmonic_test() {
 	for (int lam = 0; lam <= 5; lam++) {
 		for (int m = -lam; m <= lam; m++) {
 			vec d{ std::sin(theta) * std::cos(phi),
-				   std::sin(theta) * std::sin(phi),
-				   std::cos(theta), 1.0, 1.0 };
+					 std::sin(theta) * std::sin(phi),
+					 std::cos(theta), 1.0, 1.0 };
 			std::cout << spherical_harmonic(lam, m, d.data()) << " ";
 		}
 		std::cout << "\n";
@@ -872,7 +1015,7 @@ void test_core_dens() {
 
 
 	WFN multi_ecp_wavy(9);
-	multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);	
+	multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
 
 	//exit(0);
 	WFN wavy(9);

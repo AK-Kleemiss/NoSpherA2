@@ -80,7 +80,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">
-    <LocalDebuggerCommandArguments>-wfn Au2Br2.gbw -cif Au2Br2.cif -ECP 1 -test-ecp 2.0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Au2Br2.gbw -cif Au2Br2.cif -ECP 1 -cpus 16 -test-ecp 2.0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
