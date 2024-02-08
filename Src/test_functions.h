@@ -452,6 +452,9 @@ void add_ECP_contribution_test(const ivec& asym_atom_list,
 }
 
 void sfac_scan_ECP(options& opt, std::ostream& log_file) {
+#ifdef _OPENMP
+	omp_set_num_threads(opt.threads);
+#endif
 	using namespace std;
 	std::vector<WFN> wavy;
 	auto t = new WFN(1);
@@ -742,7 +745,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		log_file,
 		opt.debug);
 	add_ECP_contribution_test(
-		asym_atom_list,
+		aal_def2,
 		wavy[1],
 		sf2_def2,
 		k_pt,

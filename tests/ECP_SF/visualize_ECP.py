@@ -12,6 +12,9 @@ lf = os.path.join(dir, 'sfacs.dat')
 # 2 = Thakkar Core FF
 # 3 = Orca Valence FF
 # 4 = ORCA ECP FF
+# 5 = ORCA_sphere Valence FF
+# 6 = ORCA_sphere ECP FF
+# 7 = ORCA_all FF
 df = pd.read_csv(lf, delim_whitespace=True, header=None)
 
 plt.rcParams['lines.linestyle'] = ''
@@ -21,7 +24,9 @@ plt.rcParams['lines.markersize'] = 0.5
 fig, axs = plt.subplots(2,2, figsize=(12, 8))
 
 axs[0][0].plot(df[0], df[1], label='Thakkar')
-axs[0][0].plot(df[0], df[4], label='ORCA Full')
+axs[0][0].plot(df[0], df[4], label='ORCA + Thakkar Core')
+axs[0][0].plot(df[0], df[6], label='def2 + Thakkar Core')
+axs[0][0].plot(df[0], df[7], label='DKH-Jorge ORCA')
 axs[0][0].legend()
 
 axs[1][1].plot(df[0], df[1]-df[2] - df[3], label='Thakkar - ORCA Valence')
@@ -29,9 +34,13 @@ axs[1][1].legend()
 
 axs[0][1].plot(df[0], df[1]-df[2], label = 'Thakkar - Thakkar Core')
 axs[0][1].plot(df[0], df[3], label='ORCA Valence')
+axs[0][1].plot(df[0], df[5], label='ORCA ECP')
 axs[0][1].legend()
 
 axs[1][0].plot(df[0], df[1]-df[4], label = 'Thakkar - ORCA')
+axs[1][0].plot(df[0], df[7]-df[1], label = 'ORCA Jorge - Thakkar')
+axs[1][0].plot(df[0], df[6]-df[1], label = 'ORCA def2 - Thakkar')
+axs[1][0].plot(df[0], df[7]-df[6], label = 'ORCA Jorge - ORCA def2')
 axs[1][0].legend()
 
 fig.savefig("ECP_SF_Au.png", dpi=300, bbox_inches='tight')
