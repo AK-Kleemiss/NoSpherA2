@@ -424,6 +424,180 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	}
 }
 
+void sfac_scan_ECP(options& opt, std::ostream& log_file) {
+	using namespace std;
+	std::vector<WFN> wavy;
+	auto t = new WFN(1);
+	wavy.push_back(*t);
+	delete t;
+	wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
+	Thakkar Au(wavy[0].atoms[0].charge);
+	if (opt.ECP)
+	{
+		if (opt.ECP_mode == 2)
+			wavy[0].set_has_ECPs(true, true, true);
+		else
+			wavy[0].set_has_ECPs(true);
+	}
+	if (opt.set_ECPs)
+	{
+		log_file << "Adding ECPs" << endl;
+		wavy[0].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
+	}
+	err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+	err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
+
+#ifdef _WIN64
+	time_t start = time(NULL);
+	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+#else
+	struct timeval t1, t2;
+
+	gettimeofday(&t1, 0);
+#endif
+
+	cell unit_cell(opt.cif, std::cout, opt.debug);
+	ifstream cif_input(opt.cif.c_str(), std::ios::in);
+	vector <int> atom_type_list;
+	vector <int> asym_atom_to_type_list;
+	vector <int> asym_atom_list;
+	vector <bool> needs_grid(wavy[0].get_ncen(), false);
+	vector<string> known_atoms;
+
+	read_atoms_from_CIF(cif_input,
+		opt.groups[0],
+		unit_cell,
+		wavy[0],
+		known_atoms,
+		atom_type_list,
+		asym_atom_to_type_list,
+		asym_atom_list,
+		needs_grid,
+		std::cout,
+		opt.debug);
+
+	cif_input.close();
+	vector<vec> d1, d2, d3, dens;
+
+	make_hirshfeld_grids(opt.pbc,
+		opt.accuracy,
+		unit_cell,
+		wavy[0],
+		atom_type_list,
+		asym_atom_list,
+		needs_grid,
+		d1, d2, d3, dens,
+		std::cout,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+
+	std::cout << "finished partitioning" << endl;
+	const int size = 4000;
+	const int phi_size = 50;
+	const int theta_size = 50;
+	const double phi_step = 360.0 / phi_size * constants::PI_180;
+	const double theta_step = 180.0 / phi_size * constants::PI_180;
+
+	//This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
+	// by iterating over both spherical angles by a fixed step defined above
+	vector<vec> k_pt;
+	k_pt.resize(4);
+#pragma omp parallel for
+	for (int i = 0; i < 4; i++)
+		k_pt[i].resize(size * phi_size * theta_size, 0.0);
+
+	//int null = 0;
+#pragma omp parallel for
+	for (int ref = 1; ref <= size; ref++) {
+		for (int p = 0; p < phi_size; p++) {
+			for (int t = 0; t < theta_size; t++) {
+				int ind = t + (p + (ref - 1) * phi_size) * theta_size;
+				double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
+				k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
+				k_pt[1][ind] = k_length * sin(t * theta_step) * sin(p * phi_step);
+				k_pt[2][ind] = k_length * cos(t * theta_step);
+				k_pt[3][ind] = k_length;
+			}
+		}
+	}
+	// below is a strip of Calc_SF without the file IO or progress bar
+	vector<vector<complex<double>>> sf;
+
+	const int imax = (int)dens.size();
+	const int smax = (int)k_pt[0].size();
+	int pmax = (int)dens[0].size();
+	const int step = max((int)floor(smax / 20), 1);
+	std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
+	sf.resize(imax);
+#pragma omp parallel for
+	for (int i = 0; i < imax; i++)
+		sf[i].resize(k_pt[0].size());
+	double* dens_local, * d1_local, * d2_local, * d3_local;
+	complex<double>* sf_local;
+	const double* k1_local = k_pt[0].data();
+	const double* k2_local = k_pt[1].data();
+	const double* k3_local = k_pt[2].data();
+	double work, rho;
+	progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
+	for (int i = 0; i < 1; i++) 
+	{
+		pmax = (int)dens[i].size();
+		dens_local = dens[i].data();
+		d1_local = d1[i].data();
+		d2_local = d2[i].data();
+		d3_local = d3[i].data();
+		sf_local = sf[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++) 
+		{
+			for (int p = pmax - 1; p >= 0; p--) 
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+		}
+	}
+	delete(progress);
+	if (true) { //Change if oyu do not want X-ray
+		ofstream result("sfacs.dat", ios::out);
+		log_file << "Writing X-ray sfacs...";
+		log_file.flush();
+		//Now we just need to write the result to a file, together with the spherical results and separated for valence and core
+		for (int i = 0; i < k_pt[0].size(); i++) {
+			result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
+			result << showpos << setw(16) << setprecision(8) << scientific << Au.get_form_factor((k_pt[3][i]));
+			result << showpos << setw(16) << setprecision(8) << scientific << sqrt(pow(sf[0][i].real(), 2) + pow(sf[0][i].imag(), 2));
+			result << showpos << setw(16) << setprecision(8) << scientific << Au.get_custom_form_factor((k_pt[3][i]), 4, 3, 2, 1, 0, 0, 0, 0);
+			result << "\n";
+		}
+		log_file << " ... done!" << endl;
+		result.flush();
+		result.close();
+	}
+}
+
 void spherical_harmonic_test() {
 	const double phi = 0.3, theta = 0.4;
 	for (int lam = 0; lam <= 5; lam++) {
