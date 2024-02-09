@@ -600,6 +600,38 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		opt.no_date);
 
 
+	WFN wavy_all_val(9);
+	wavy_all_val.read_known_wavefunction_format("Au_alle.gbw", std::cout, opt.debug);
+	for (int i = 0; i < 23; i++)
+		wavy_all_val.delete_MO(0);
+	for (int i = 0; i < 7; i++)
+		wavy_all_val.delete_MO(1);
+	vector<vec> d1_all_val, d2_all_val, d3_all_val, dens_all_val;
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy_all_val,
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_all_val, d2_all_val, d3_all_val, dens_all_val,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+
 	std::cout << "finished partitioning" << endl;
 	const int size = 2000;
 	const int phi_size = 30;
@@ -630,9 +662,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		}
 	}
 	// below is a strip of Calc_SF without the file IO or progress bar
-	vector<vector<complex<double>>> sf;
-	vector<vector<complex<double>>> sf_def2;
-	vector<vector<complex<double>>> sf_all;
+	vector<cvec> sf;
+	vector<cvec> sf_def2;
+	vector<cvec> sf_all;
+	vector<cvec> sf_all_val;
 	const int smax = (int)k_pt[0].size();
 	int pmax = (int)dens[0].size();
 	const int step = max((int)floor(smax / 20), 1);
@@ -640,12 +673,14 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	sf.resize(1);
 	sf_def2.resize(1);
 	sf_all.resize(1);
+	sf_all_val.resize(1);
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < 1; i++)
 	{
 		sf[i].resize(k_pt[0].size());
 		sf_def2[i].resize(k_pt[0].size());
 		sf_all[i].resize(k_pt[0].size());
+		sf_all_val[i].resize(k_pt[0].size());
 	}
 	double* dens_local, * d1_local, * d2_local, * d3_local;
 	complex<double>* sf_local;
@@ -681,6 +716,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
+		log_file << "Done with HAR SFs\n";
 		pmax = (int)dens_def2[i].size();
 		dens_local = dens_def2[i].data();
 		d1_local = d1_def2[i].data();
@@ -706,6 +742,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
+		log_file << "Done with def2 SFs\n";
 		pmax = (int)dens_all[i].size();
 		dens_local = dens_all[i].data();
 		d1_local = d1_all[i].data();
@@ -730,8 +767,35 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
+		}
+		log_file << "Done with Jorge SFs\n";
+		pmax = (int)dens_all_val[i].size();
+		dens_local = dens_all_val[i].data();
+		d1_local = d1_all_val[i].data();
+		d2_local = d2_all_val[i].data();
+		d3_local = d3_all_val[i].data();
+		sf_local = sf_all_val[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
 
 		}
+		log_file << "Done with Jorge Valence SFs\n";
 	}
 	delete(progress);
 	log_file << "adding ECP contribution" << endl;
@@ -760,6 +824,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vec sf_def2_sfac(k_pt[0].size()); // Has the def2 density without ECP
 	vec sf2_def2_sfac(k_pt[0].size()); // Has the def2 density with ECP
 	vec sf_all_sfac(k_pt[0].size()); // Has the all electron density
+	vec sf_all_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < k_pt[0].size(); i++)
 	{
@@ -768,10 +833,13 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		sf_def2_sfac[i] = sqrt(pow(sf_def2[0][i].real(), 2) + pow(sf_def2[0][i].imag(), 2));
 		sf2_def2_sfac[i] = sqrt(pow(sf2_def2[0][i].real(), 2) + pow(sf2_def2[0][i].imag(), 2));
 		sf_all_sfac[i] = sqrt(pow(sf_all[0][i].real(), 2) + pow(sf_all[0][i].imag(), 2));
+		sf_all_val_sfac[i] = sqrt(pow(sf_all_val[0][i].real(), 2) + pow(sf_all_val[0][i].imag(), 2));
 		if (sf[0][i].real() < 0)
 			sf1_sfac[i] = -sf1_sfac[i];
 		if (sf_def2[0][i].real() < 0)
 			sf_def2_sfac[i] = -sf_def2_sfac[i];
+		if (sf_all_val[0][i].real() < 0)
+			sf_all_val_sfac[i] = -sf_all_val_sfac[i];
 		thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
 		thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
 	}
@@ -789,6 +857,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			result << showpos << setw(16) << setprecision(8) << scientific << sf_def2_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf2_def2_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf_all_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_all_val_sfac[i];
 			result << "\n";
 		}
 		log_file << " ... done!" << endl;
