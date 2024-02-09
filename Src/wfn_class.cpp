@@ -217,6 +217,7 @@ void WFN::delete_MO(const int& nr)
 {
 	err_checkf(nr < nmo, "not enough MOs", std::cout);
 	MOs.erase(MOs.begin() + nr);
+	nmo--;
 };
 
 bool WFN::push_back_type(const int& type)
