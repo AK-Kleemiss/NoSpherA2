@@ -1084,9 +1084,9 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			sf_def2_sfac[i] = -sf_def2_sfac[i];
 		if (sf_all_val[0][i].real() < 0)
 			sf_all_val_sfac[i] = -sf_all_val_sfac[i];
-		if (sf_ZORA[0][i].real() < 0)
+		if (sf_ZORA_val[0][i].real() < 0)
 			sf_ZORA_val_sfac[i] = -sf_ZORA_val_sfac[i];
-		if (sf_x2c[0][i].real() < 0)
+		if (sf_x2c_val[0][i].real() < 0)
 			sf_x2c_val_sfac[i] = -sf_x2c_val_sfac[i];
 		thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
 		thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
