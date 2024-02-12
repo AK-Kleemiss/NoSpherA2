@@ -631,6 +631,122 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		opt.debug,
 		opt.no_date);
 
+	WFN wavy_ZORA(9);
+	wavy_ZORA.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
+	vector<vec> d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA;
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy_ZORA,
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+	WFN wavy_ZORA_val(9);
+	wavy_ZORA_val.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
+	for (int i = 0; i < 23; i++)
+		wavy_ZORA_val.delete_MO(0);
+	for (int i = 0; i < 7; i++)
+		wavy_ZORA_val.delete_MO(1);
+	vector<vec> d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val;
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy_ZORA_val,
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+	WFN wavy_x2c(9);
+	wavy_x2c.read_known_wavefunction_format("Au_alle_x2c.gbw", std::cout, opt.debug);
+	vector<vec> d1_x2c, d2_x2c, d3_x2c, dens_x2c;
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy_x2c,
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_x2c, d2_x2c, d3_x2c, dens_x2c,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
+	WFN wavy_x2c_val(9);
+	wavy_x2c_val.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
+	for (int i = 0; i < 23; i++)
+		wavy_x2c_val.delete_MO(0);
+	for (int i = 0; i < 7; i++)
+		wavy_x2c_val.delete_MO(1);
+	vector<vec> d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val;
+
+	make_hirshfeld_grids(opt.pbc,
+		4,
+		unit_cell,
+		wavy_x2c_val,
+		atl_all,
+		aal_all,
+		ng_all,
+		d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val,
+		log_file,
+#ifdef _WIN64
+		start,
+		end_becke,
+		end_prototypes,
+		end_spherical,
+		end_prune,
+		end_aspherical,
+#else
+		t1,
+		t2,
+#endif
+		opt.debug,
+		opt.no_date);
+
 
 	std::cout << "finished partitioning" << endl;
 	const int size = 2000;
@@ -666,6 +782,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vector<cvec> sf_def2;
 	vector<cvec> sf_all;
 	vector<cvec> sf_all_val;
+	vector<cvec> sf_ZORA;
+	vector<cvec> sf_ZORA_val;
+	vector<cvec> sf_x2c;
+	vector<cvec> sf_x2c_val;
 	const int smax = (int)k_pt[0].size();
 	int pmax = (int)dens[0].size();
 	const int step = max((int)floor(smax / 20), 1);
@@ -674,6 +794,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	sf_def2.resize(1);
 	sf_all.resize(1);
 	sf_all_val.resize(1);
+	sf_ZORA.resize(1);
+	sf_ZORA_val.resize(1);
+	sf_x2c.resize(1);
+	sf_x2c_val.resize(1);
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < 1; i++)
 	{
@@ -681,6 +805,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		sf_def2[i].resize(k_pt[0].size());
 		sf_all[i].resize(k_pt[0].size());
 		sf_all_val[i].resize(k_pt[0].size());
+		sf_ZORA[i].resize(k_pt[0].size());
+		sf_ZORA_val[i].resize(k_pt[0].size());
+		sf_x2c[i].resize(k_pt[0].size());
+		sf_x2c_val[i].resize(k_pt[0].size());
 	}
 	double* dens_local, * d1_local, * d2_local, * d3_local;
 	complex<double>* sf_local;
@@ -716,7 +844,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
-		log_file << "Done with HAR SFs\n";
+		log_file << "Done with HAR SFs" << endl;
 		pmax = (int)dens_def2[i].size();
 		dens_local = dens_def2[i].data();
 		d1_local = d1_def2[i].data();
@@ -742,7 +870,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
-		log_file << "Done with def2 SFs\n";
+		log_file << "Done with def2 SFs" << endl;
 		pmax = (int)dens_all[i].size();
 		dens_local = dens_all[i].data();
 		d1_local = d1_all[i].data();
@@ -768,7 +896,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 				sf_local[s] += polar(rho, work);
 			}
 		}
-		log_file << "Done with Jorge SFs\n";
+		log_file << "Done with Jorge SFs" << endl;
 		pmax = (int)dens_all_val[i].size();
 		dens_local = dens_all_val[i].data();
 		d1_local = d1_all_val[i].data();
@@ -795,7 +923,115 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			}
 
 		}
-		log_file << "Done with Jorge Valence SFs\n";
+		log_file << "Done with Jorge Valence SFs" << endl;
+		pmax = (int)dens_ZORA[i].size();
+		dens_local = dens_ZORA[i].data();
+		d1_local = d1_ZORA[i].data();
+		d2_local = d2_ZORA[i].data();
+		d3_local = d3_ZORA[i].data();
+		sf_local = sf_ZORA[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+
+		}
+		log_file << "Done with ZORA-Jorge SFs" << endl;
+		pmax = (int)dens_ZORA_val[i].size();
+		dens_local = dens_ZORA_val[i].data();
+		d1_local = d1_ZORA_val[i].data();
+		d2_local = d2_ZORA_val[i].data();
+		d3_local = d3_ZORA_val[i].data();
+		sf_local = sf_ZORA_val[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+
+		}
+		log_file << "Done with ZORA-Jorge Valence SFs" << endl;
+		pmax = (int)dens_x2c[i].size();
+		dens_local = dens_x2c[i].data();
+		d1_local = d1_x2c[i].data();
+		d2_local = d2_x2c[i].data();
+		d3_local = d3_x2c[i].data();
+		sf_local = sf_x2c[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+
+		}
+		log_file << "Done with X2C SFs" << endl;
+		pmax = (int)dens_x2c_val[i].size();
+		dens_local = dens_x2c_val[i].data();
+		d1_local = d1_x2c_val[i].data();
+		d2_local = d2_x2c_val[i].data();
+		d3_local = d3_x2c_val[i].data();
+		sf_local = sf_x2c_val[i].data();
+#pragma omp parallel for private(work,rho) schedule(runtime)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
+				rho = dens_local[p];
+				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+				if (rho < 0)
+				{
+					rho = -rho;
+					work += M_PI;
+				}
+#endif
+#endif
+				sf_local[s] += polar(rho, work);
+			}
+
+		}
+		log_file << "Done with X2C Valence SFs" << endl;
 	}
 	delete(progress);
 	log_file << "adding ECP contribution" << endl;
@@ -825,6 +1061,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vec sf2_def2_sfac(k_pt[0].size()); // Has the def2 density with ECP
 	vec sf_all_sfac(k_pt[0].size()); // Has the all electron density
 	vec sf_all_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction
+	vec sf_ZORA_sfac(k_pt[0].size()); // Has the all electron density using ZORA
+	vec sf_ZORA_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction using ZORA
+	vec sf_x2c_sfac(k_pt[0].size()); // Has the all electron density using X2C
+	vec sf_x2c_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction using X2C
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < k_pt[0].size(); i++)
 	{
@@ -834,12 +1074,20 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		sf2_def2_sfac[i] = sqrt(pow(sf2_def2[0][i].real(), 2) + pow(sf2_def2[0][i].imag(), 2));
 		sf_all_sfac[i] = sqrt(pow(sf_all[0][i].real(), 2) + pow(sf_all[0][i].imag(), 2));
 		sf_all_val_sfac[i] = sqrt(pow(sf_all_val[0][i].real(), 2) + pow(sf_all_val[0][i].imag(), 2));
+		sf_ZORA_sfac[i] = sqrt(pow(sf_ZORA[0][i].real(), 2) + pow(sf_ZORA[0][i].imag(), 2));
+		sf_ZORA_val_sfac[i] = sqrt(pow(sf_ZORA_val[0][i].real(), 2) + pow(sf_ZORA_val[0][i].imag(), 2));
+		sf_x2c_sfac[i] = sqrt(pow(sf_x2c[0][i].real(), 2) + pow(sf_x2c[0][i].imag(), 2));
+		sf_x2c_val_sfac[i] = sqrt(pow(sf_x2c_val[0][i].real(), 2) + pow(sf_x2c_val[0][i].imag(), 2));
 		if (sf[0][i].real() < 0)
 			sf1_sfac[i] = -sf1_sfac[i];
 		if (sf_def2[0][i].real() < 0)
 			sf_def2_sfac[i] = -sf_def2_sfac[i];
 		if (sf_all_val[0][i].real() < 0)
 			sf_all_val_sfac[i] = -sf_all_val_sfac[i];
+		if (sf_ZORA[0][i].real() < 0)
+			sf_ZORA_val_sfac[i] = -sf_ZORA_val_sfac[i];
+		if (sf_x2c[0][i].real() < 0)
+			sf_x2c_val_sfac[i] = -sf_x2c_val_sfac[i];
 		thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
 		thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
 	}
@@ -858,6 +1106,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 			result << showpos << setw(16) << setprecision(8) << scientific << sf2_def2_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf_all_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << sf_all_val_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_ZORA_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_ZORA_val_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_x2c_sfac[i];
+			result << showpos << setw(16) << setprecision(8) << scientific << sf_x2c_val_sfac[i];
 			result << "\n";
 		}
 		log_file << " ... done!" << endl;
