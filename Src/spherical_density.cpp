@@ -560,23 +560,26 @@ const double Gaussian_Atom::get_custom_form_factor(
 	const int& min_g,
 	const int& min_h) {
 
-	double result(0.0);
+	if (k_vector != 0) {
+		double result(0.0);
 
-	if (_first_ex == 200000000)
-		return -20;
-	int nr_coef = _prev_coef;
-	int nr_ex = _first_ex;
+		if (_first_ex == 200000000)
+			return -20;
+		int nr_coef = _prev_coef;
+		int nr_ex = _first_ex;
 
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 1, max_s, min_s);
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 1, 2, max_p, min_p);
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 2, 3, max_d, min_d);
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 3, 4, max_f, min_f);
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, ng, 4, 5, max_g, min_g);
-	result += calc_type(nr_ex, nr_coef, k_vector, _offset, nh, 5, 6, max_h, min_h);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, ns, 0, 1, max_s, min_s);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, np, 1, 2, max_p, min_p);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, nd, 2, 3, max_d, min_d);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, nf, 3, 4, max_f, min_f);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, ng, 4, 5, max_g, min_g);
+		result += calc_type(nr_ex, nr_coef, k_vector, _offset, nh, 5, 6, max_h, min_h);
 
-	if (k_vector != 0)
+
 		return result / k_vector;
-	else return result;
+	}
+	else 
+		return this->get_custom_form_factor(1E-12, max_s, max_p, max_d, max_f, max_g, max_h, min_s, min_p, min_d, min_f, min_g, min_h);
 };
 
 const double Gaussian_Atom::get_form_factor(const double& k_vector) {
