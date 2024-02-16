@@ -4735,7 +4735,7 @@ double WFN::compute_dens(
 {
 	vector<vec> d;
 	vec phi(nmo, 0.0);
-	// const int n = get_nmo(true);
+
 	if (d_f_switch)
 	{
 		d.resize(5);

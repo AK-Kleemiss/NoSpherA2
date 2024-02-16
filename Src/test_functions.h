@@ -4,6 +4,8 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
+#include <omp.h>
+#include <chrono>
 
 
 void thakkar_d_test(options& opt) {
@@ -424,6 +426,104 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	}
 }
 
+void test_timing() {
+	using namespace std;
+	cout << NoSpherA2_message() << endl;
+	options opt;
+	opt.dmin = 0.5;
+	opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_1\\thpp.wfx");
+	opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_2\\thpp.wfx");
+	opt.accuracy = 2;
+	vector<int> t1 = { 0,1 };
+	vector<int> t2 = { 0,2 };
+	opt.groups.pop_back();
+	opt.groups.push_back(t1);
+	opt.groups.push_back(t2);
+	opt.cif = "thpp.cif";
+	opt.combined_tsc_calc = true;
+	opt.binary_tsc = true;
+
+	int max_threads = 48;
+	vector<int> time(max_threads);
+	
+	for (int ncpus = 1; ncpus < 49; ncpus++) {
+		auto start = std::chrono::high_resolution_clock::now();
+		opt.threads = ncpus;
+
+		omp_set_num_threads(ncpus);		
+		//print the number of threads used
+		std::cout << "Using " << opt.threads << " threads" << std::endl;
+		// and the actrual results form omp_get_num_threads
+		std::cout << "Actual number of threads: " << omp_get_max_threads() << " ";
+#pragma omp parallel
+		{
+#pragma omp single
+			cout << omp_get_num_threads() << endl;
+		}
+		std::vector<WFN> wavy;
+		err_checkf(opt.hkl != "" || opt.dmin != 99.0, "No hkl specified and no dmin value given", std::cout);
+		if (opt.combined_tsc_calc)
+			err_checkf(opt.cif != "", "No cif specified", std::cout);
+		// First make sure all files exist
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], std::cout);
+			if (opt.cif_based_combined_tsc_calc)
+				err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i], std::cout);
+		}
+		wavy.resize(opt.combined_tsc_calc_files.size());
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			std::cout << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
+			wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], std::cout);
+			std::cout << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
+		}
+
+		std::vector<string> known_scatterer;
+		std::vector<vec> known_kpts;
+		tsc_block<int, cdouble> result;
+		for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
+		{
+			known_scatterer = result.get_scatterers();
+			if (wavy[i].get_origin() != 7)
+			{
+				result.append(calculate_structure_factors_MTC(
+					opt,
+					wavy,
+					std::cout,
+					known_scatterer,
+					i,
+					&known_kpts),
+					std::cout);
+			}
+			else
+			{
+				result.append(MTC_thakkar_sfac(
+					opt,
+					std::cout,
+					known_scatterer,
+					wavy,
+					i),
+					std::cout);
+			}
+		}
+
+		known_scatterer = result.get_scatterers();
+		std::cout << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		time[ncpus - 1] = duration.count();
+	}
+
+  //Print out results of timing
+	for (int i = 0; i < max_threads; i++) {
+		std::cout << "Time for " << i + 1 << " threads: " << time[i] << " microseconds" << std::endl;
+  }
+
+	exit(0);
+
+}
+
 void add_ECP_contribution_test(const ivec& asym_atom_list,
 	const WFN& wave,
 	std::vector<cvec>& sf,
@@ -439,7 +539,7 @@ void add_ECP_contribution_test(const ivec& asym_atom_list,
 		temp.push_back(Thakkar(wave.atoms[asym_atom_list[i]].charge));
 	}
 
-#pragma omp parallel for private(k) schedule(runtime)
+#pragma omp parallel for private(k)
 	for (int s = 0; s < sf[0].size(); s++)
 	{
 		k = k_pt[3][s];
@@ -825,7 +925,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 		sf_local = sf[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -851,7 +951,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_def2[i].data();
 		d3_local = d3_def2[i].data();
 		sf_local = sf_def2[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -877,7 +977,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_all[i].data();
 		d3_local = d3_all[i].data();
 		sf_local = sf_all[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -903,7 +1003,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_all_val[i].data();
 		d3_local = d3_all_val[i].data();
 		sf_local = sf_all_val[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -930,7 +1030,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_ZORA[i].data();
 		d3_local = d3_ZORA[i].data();
 		sf_local = sf_ZORA[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -957,7 +1057,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_ZORA_val[i].data();
 		d3_local = d3_ZORA_val[i].data();
 		sf_local = sf_ZORA_val[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -984,7 +1084,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_x2c[i].data();
 		d3_local = d3_x2c[i].data();
 		sf_local = sf_x2c[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1011,7 +1111,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_x2c_val[i].data();
 		d3_local = d3_x2c_val[i].data();
 		sf_local = sf_x2c_val[i].data();
-#pragma omp parallel for private(work,rho) schedule(runtime)
+#pragma omp parallel for private(work,rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1349,22 +1449,33 @@ void test_core_dens() {
 	wavy2.read_gbw("Rb_+9.gbw", cout, false);
 	wavy2.delete_unoccupied_MOs();
 
-	vector<vec> d;
-	d.resize(16);
-	for (int i = 0; i < 16; i++)
-		d[i].resize(wavy.get_ncen(), 0.0);
-
-	vec phi(wavy.get_nmo(), 0.0);
-
-	for (int i = 1; i < 1300000; i++) {
-		double r = i * 0.001;
-		double sr = r * 0.01;
-
-		double tsr = (sr);
-		cout << fixed << r << " " << T_Rb.get_core_form_factor(r, 28) << " " << G_Rb.get_core_form_factor(r, 28);
-		cout << " " << T_Rb.get_core_density(sr, 28) << " " << G_Rb.get_radial_density(tsr);
-		cout << " " << T_Rb.get_radial_density(sr) << " " << wavy.compute_dens(sr, 0, 0, d, phi, false) << " " << wavy2.compute_dens(sr, 0, 0, d, phi, false);
-		cout << " " << sr << " " << ECP_way.compute_dens(sr, 0, 0, d, phi, false);
+	vector<vec> res(10);
+	for(int i=0; i<10; i++)
+    res[i].resize(130000, 0.0);
+		
+#pragma omp parallel for
+	for (int i = 0; i < res[0].size(); i++) {
+		double r, sr;
+		r = i * 0.001;
+		sr = r * 0.01;
+		res[0][i] = r;
+		res[1][i] = T_Rb.get_core_form_factor(r, 28);
+		res[2][i] = G_Rb.get_core_form_factor(r, 28);
+		res[3][i] = T_Rb.get_core_density(sr, 28);
+		res[4][i] = G_Rb.get_radial_density(sr);
+		res[5][i] = T_Rb.get_radial_density(sr);
+		res[6][i] = wavy.compute_dens(sr, 0, 0, false);
+		res[7][i] = wavy2.compute_dens(sr, 0, 0, false);
+		res[8][i] = sr;
+		res[9][i] = ECP_way.compute_dens(sr, 0, 0, false);
+	}
+	cout << fixed;
+	for (int i = 0; i < res[0].size(); i++) {
+		for (int j = 0; j < res.size(); j++) {
+			auto t = res[j][i];
+			cout << t;
+			cout << " ";
+		}
 		cout << "\n";
 	}
 	cout << flush;

@@ -2,13 +2,10 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-import struct
 import re
 import scipy.special as sp
-import json
 dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(dir)
-a0 = 0.52917721067
 
 exps  = [5.0365510000,
          1.9708490000,
@@ -57,74 +54,47 @@ def Rb_func(r, Z, coefs = None, exponent = None, rad_exp = None):
     if Z < 0:
         raise ValueError("Z is negative")
     
+    UL = 4*coefs[-1]*exponent[-1]*np.exp(-exponent[-1]*r**2) * \
+        (exponent[-1]*r**2 - 1) + Z/r**3
+    res = UL
+    
+    for l in range(3):
+        Ul = -UL
+        for k in range(3):
+            Ul += 4*coefs[l*3+k]*exponent[l*3+k]*np.exp(-exponent[l*3+k]*r**2) \
+               * (exponent[l*3+k]*r**2 - 1)
+        #Ul += Z/r**3
+        for m in range(-l,l+1,1):
+            fac = np.sqrt(2*(l+1)+1)*sp.factorial((l+1)-abs(m))/sp.factorial((l+1)+abs(m))
+            res += (Ul) * fac
+    
+    return res/(4*np.pi)**2
+
+def Ul_func(r, Z, coefs = None, exponent = None, rad_exp = None):
+    res = 0
+    if exponent == None:
+        raise ValueError("exponent is None")
+    if coefs == None:
+        raise ValueError("coefs is None")
+    if rad_exp == None:
+        raise ValueError("rad_exp is None")
+    if Z < 0:
+        raise ValueError("Z is negative")
+    
     UL = -4*coefs[-1]*np.exp(-exponent[-1]*r**2) * \
         (1-3*exponent[-1]*r**2 + exponent[-1]**2 * r**4)
     res = UL
     
-    for _i in range(3):
-       Ul = 0#-UL
-       fac = (2*_i+1)
-       for k in range(3):
-          Ul += 4*coefs[_i*3+k]*np.exp(-exponent[_i*3+k]*r**2) \
-              * (1-3*exponent[_i*3+k]*r**2 + exponent[_i*3+k]**2 * r**4) 
-       res += Ul * fac
-    if (Z>0):
-        res -= 4*Z/r**4#/(4*np.pi)
-    return -res/(4*np.pi)**2
-    for _i, c in enumerate(coefs):
-        p1 = c
-        p2 = np.exp(-exponent[_i] * r**2)
-        if rad_exp[_i] == 0:
-            p3 = -4 * (1-3*exponent[_i]*r**2 + exponent[_i]**2 * r**4)
-        elif rad_exp[_i] == 1:
-            p3 = -r * (9-16*exponent[_i]*r**2 + 4 * exponent[_i]**2 * r**4)
-        elif rad_exp[_i] == 2:
-            p3 = -4 * r**2 * (4-5*exponent[_i]*r**2 + exponent[_i]**2 * r**4)
-        elif rad_exp[_i] == 3:
-            p3 = -r**3 * (25-24*exponent[_i]*r**2+4*exponent[_i]**2*r**4)
-        res += p1 * p2 * p3
-    #for _i in range(4):
-    #    c1 = coeffies[3*_i]
-    #    ex1 = exponent[3*_i]
-    #    e1 = np.exp(-ex1 * r**2)
-    #    ep1 = np.exp(ex1 * r**2)
-    #    if not _i == 3:
-    #        c2 = coeffies[3*_i+1]
-    #        ex2 = exponent[3*_i+1]
-    #        e2 = np.exp(-ex2 * r**2)
-    #        ep2 = np.exp(ex2 * r**2)
-    #        c3 = coeffies[3*_i+2]
-    #        ex3 = exponent[3*_i+2]
-    #        e3 = np.exp(-ex3 * r**2)
-    #        ep3 = np.exp(ex3 * r**2)
-    #    else:
-    #        c2 = 1
-    #        ex2 = 1
-    #        e2 = 1
-    #        ep2 = 1
-    #        c3 = 1
-    #        ex3 = 1
-    #        e3 = 1
-    #        ep3 = 1
-    #    #if _i==0:
-    #    res += 4*e1*e2*e3*(c3*ep1*ep2*(1-3*ex3*r**2+ex3**2*r**4) +
-    #                          ep3*(c1*ep2*(1-3*ex1*r**2+ex1**2*r**4) +
-    #                               c2*ep1*(1-3*ex2*r**2+ex2**2*r**4)))
-    #    #elif _i==1:
-    #    #    res += r*e1*e2*e3*(c3*ep1*ep2*(9-16*ex3*r**2+4*ex3**2*r**4) +
-    #    #                    ep3*(c1*ep2*(9-16*ex1*r**2+4*ex1**2*r**4) +
-    #    #                         c2*ep1*(9-16*ex2*r**2+4*ex2**2*r**4)))
-    #    #elif _i==2:
-    #    #    res += 4*r**2*e1*e2*e3*(c3*ep1*ep2*(4-5*ex3*r**2+ex3**2*r**4) +
-    #    #                    ep3*(c1*ep2*(4-5*ex1*r**2+ex1**2*r**4) +
-    #    #                         c2*ep1*(4-5*ex2*r**2+ex2**2*r**4)))
-    #    #elif _i==3:
-    #    #    res += e1*e2*e3*r**3*(c3*ep1*ep2*(25-24*ex3*r**2+4*ex3**2*r**4) +
-    #    #                    ep3*(c1*ep2*(25-24*ex1*r**2+4*ex1**2*r**4) +
-    #    #                         c2*ep1*(25-24*ex2*r**2+4*ex2**2*r**4)))
-    if (Z>0):
-        res -= 4*Z/r**4#/(4*np.pi)
-    return -res/(4*np.pi)**2
+    for l in range(3):
+        Ul = -UL
+        for k in range(3):
+            Ul += 4*coefs[l*3+k]*exponent[l*3+k]*np.exp(-exponent[l*3+k]*r**2) \
+               * (exponent[l*3+k]*r**2 - 1)
+        Ul += Z/r
+        for m in range(-l,l+1,1):
+            fac = np.sqrt(2*l+1)*sp.factorial(l-abs(m))/sp.factorial(l+abs(m))
+            res += (Ul) * fac
+    return res/(4*np.pi)
 
 def get_numbers_from_filename(filename):
     # Use a regular expression to find all groups of digits in the filename
@@ -135,77 +105,65 @@ def get_numbers_from_filename(filename):
     # Convert the numbers to integers and return them
     return str
 
-atom_dict = {}
-
-def read_adf_file(lf_n):
-    # Check if the file exists and raise an error otherwise
-    if not os.path.isfile(lf_n):
-        raise ValueError('File {} does not exist'.format(lf_n))
-    # Open the binary file in read mode
-    with open(lf_n, 'rb') as f:
-        data1 = f.read(4)
-        number_vals = struct.unpack('i', data1)[0]
-        print(data1)
-        at = get_numbers_from_filename(lf_n)
-        atom_dict[at] = []
-        for i in range(number_vals):
-            # Read 4 bytes (size of a float)
-            data = f.read(8)
-            data2 = f.read(8)
+def Slm(l,m,theta,phi):
+    if m == 0:
+        return sp.sph_harm(m,l,phi,theta)
+    elif m > 0:
+        if l == 1:
+            return np.real(sp.sph_harm(-m,l,phi,theta) - sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
+        elif l == 2:
+            if m%2 == 1:
+                return np.real(sp.sph_harm(-m,l,phi,theta) - sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
+            else:
+                return np.real(sp.sph_harm(-m,l,phi,theta) + sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
+    elif m < 0:
+        if l == 1:
+            return np.imag(sp.sph_harm(-m,l,phi,theta) + sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
+        elif l == 2:
+            if m%2 == 1:
+                return np.imag(sp.sph_harm(-m,l,phi,theta) + sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
+            else:
+                return np.imag(sp.sph_harm(-m,l,phi,theta) - sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
     
-            # If data is empty, we've reached the end of the file
-            if not data or not data2:
-                break
-    
-            # Unpack the bytes to a float
-            number = struct.unpack('d', data)[0]
-            number2 = struct.unpack('d', data2)[0]
-            print(number,number2)
-    
-            # Save the number
-            atom_dict[at].append(number)
+def Slm_self(l,m,theta,phi):
+    if l==0:
+        return np.sqrt(1/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
+    elif l==1:
+        if m == 0:
+            return np.sqrt(3/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == 1:
+            return np.sqrt(3/4/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == -1:
+            return np.sqrt(3/4/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta))
+        else:
+            return 0
+    elif l==2:
+        if m == 0:
+            return np.sqrt(5/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == 1:
+            return np.sqrt(5/12/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == -1:
+            return np.sqrt(5/12/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == 2:
+            return np.sqrt(5/48/np.pi)*np.cos(2*phi)*sp.lpmv(m,l,np.cos(theta))
+        elif m == -2:
+            return np.sqrt(5/48/np.pi)*np.sin(2*phi)*sp.lpmv(m,l,np.cos(theta))
+        else:
+            return 0
 
-dir = os.path.dirname(os.path.realpath(__file__))            
-os.chdir(dir)
-
-orca_read = json.load(open(os.path.join(dir,'Atomic_densities','atom_atom37.json')))
-
-def process_adf_files():
-    # Directory containing the .sdf files
-    directory = os.path.join(dir, 'Atomic_densities')
-
-    # Iterate over all files in the directory
-    for filename in os.listdir(directory):
-        # Check if the file is a .sdf file
-        if filename.endswith('.adf'):
-            # Full path to the file
-            file_path = os.path.join(directory, filename)
-            
-            # Check if the file exists and raise an error otherwise
-            if not os.path.isfile(file_path):
-                raise ValueError('File {} does not exist'.format(file_path))
-
-            # Call the read_adf_file function on the file
-            read_adf_file(file_path)
-
-
-def write_dict_to_file(dictionary, filename):
-    with open(filename, 'w') as f:
-        json.dump(dictionary, f, indent=2)
-
-def read_dict_from_file(filename):
-    # Check if the file exists and raise an error otherwise
-    if not os.path.isfile(filename):
-        raise ValueError('File {} does not exist'.format(filename))
-    with open(filename, 'r') as f:
-        dictionary = json.load(f)
-    return dictionary
-
-#!!This updates the json file!!
-#process_adf_files()
-#write_dict_to_file(atom_dict, 'atom_dict.json')
-######read_adf_file(os.path.join(dir,'Atomic_densities','atom_atom37.densities'))
-atom_dict = read_dict_from_file('atom_dict.json')
+def check_SLM():
+    for l in range(3):
+        for m in range(-l,l+1,1):
+            print("l: ", l, "m: ", m)
+            #Check if Slm and Slm_self are the same
+            for theta in np.linspace(0, np.pi, 100):
+                for phi in np.linspace(0, 2*np.pi, 100):
+                    if abs(Slm(l,m,theta,phi) - Slm_self(l,m,theta,phi)) > 1e-10:
+                        print("Slm and Slm_self are not the same")
+                        print("theta: ", theta, "phi: ", phi)
+                        print("Scipy:     ", Slm(l,m,theta,phi))
+                        print("selfbuild: ", Slm_self(l,m,theta,phi))
+                        exit(0)
 
 lf = os.path.join(dir, 'NoSpherA2.log')
 # Read the file
@@ -220,19 +178,156 @@ lf = os.path.join(dir, 'NoSpherA2.log')
 # 8 = r
 df = pd.read_csv(lf, delim_whitespace=True, header=None)
 
-upper = 4.0
-nr = 200000
+upper = 2.5
+nr = 500000
 
-x = np.linspace(0.00001, upper, nr)
+x = np.linspace(0.000001, upper, nr)
 dx = x[1]
 y = np.zeros_like(x)
 z = np.zeros_like(x)
+
+def br_test():
+    y = np.zeros_like(x)
+    z = np.zeros_like(x)
+    a = np.zeros_like(x)
+    y_lanl = np.zeros_like(x)
+    z_lanl = np.zeros_like(x)
+    a_lanl = np.zeros_like(x)
+    c_lanl = np.zeros_like(x)
+    lanl_density = np.zeros_like(x)
+    KG_dens = np.zeros_like(x)
+    e_br = [1.42  ,      3.56    ,    6.35    ,    10.4    ,    20.7, 32.4, 76.5, 142.1, 341.871, 1000.205, 220.0000]
+    d_br0 = [4.202568   ,    13.194570  ,    10.795897  ,    26.648345  ,    33.130248  ,    45.359127  ,    35.346799  ,    -31.766999 ,    -633.120024,    -47.285358 , 3.0]
+    d_br1 = [3.611982   ,    10.720320  ,    5.828031   ,    34.390992  ,    61.018209  ,    115.349011 ,    257.006175 ,    161.631632 ,    -144.676033,    -9.413723  , 5.0]
+    d_br2 = [3.484330   ,    -0.211214  ,    9.199904   ,    -3.542208  ,    43.713385  ,    77.076843  ,    245.662800 ,    509.898585 ,    -330.399360,    -21.536241 , 7.0]
+    n_br = [2,2,2,2,2,2,2,2,2,1,0]
+    lanl_e1 = [54.1980682,32.9053558,13.6744890,3.0341152]
+    lanl_d1 = [3.0000000,27.3430642,118.8028847,43.4354876]
+    lanl_n1 = [0,1,2,2]
+    lanl_e2 = [54.2563340,26.0095593,28.2012995,9.4341061,2.5321764]
+    lanl_d2 = [5.0000000,25.0504252,92.6157463,95.8249016,26.2684983]
+    lanl_n2 = [0,1,2,2,2]
+    lanl_e3 = [87.6328721,61.7373377,32.4385104,8.7537199,1.6633189]
+    lanl_d3 = [3.0000000,22.5533557,178.1241988,76.9924162,9.4818270]
+    lanl_n3 = [0,1,2,2,2]
+    lanl_e4 = [213.6143969,41.0585380,8.7086530,2.6074661]
+    lanl_d4 = [-28.0000000,-134.9268852,-41.9271913,-5.9336420]
+    lanl_n4 = [1,2,2,2]
+
+    for i in range(11):
+        y += d_br0[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        z += d_br1[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        a += d_br2[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        if n_br[i] == 2:
+            KG_dens -= 4 * d_br0[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
+                       3 * 4 * d_br1[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
+                       5 * 4 * d_br2[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2)
+        elif n_br[i] == 1:
+            KG_dens -= d_br0[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x + \
+                       d_br1[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x + \
+                       d_br2[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x
+        elif n_br[i] == 3:#  used to be 2
+            KG_dens -= 4*d_br2[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4) + \
+                       4*d_br1[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4) + \
+                       4*d_br0[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4)
+    y += 28/x
+    z += 28/x
+    a += 28/x
+    KG_dens += 28/x**3
+    
+    for i in range(4):
+        y_lanl += lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * x**(lanl_n1[i])
+        c_lanl += lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * x**(lanl_n4[i])
+        
+        
+        if lanl_n1[i] == 0:
+            lanl_density -= 4*lanl_d1[i] *lanl_e1[i] * np.exp(-lanl_e1[i]*x**2) * (-1 + lanl_e1[i]*x**2)
+        elif lanl_n1[i] == 1:
+            lanl_density -= lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 8*lanl_e1[i]*x**2 + 4*lanl_e1[i]**2 * x**4) / x
+        elif lanl_n1[i] == 2:
+            lanl_density -= 4*lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 3*lanl_e1[i]*x**2 + lanl_e1[i]**2 * x**4)
+        
+        if lanl_n4[i] == 0:
+            lanl_density -= 4*lanl_d4[i] *lanl_e4[i] * np.exp(-lanl_e4[i]*x**2) * (-1 + lanl_e4[i]*x**2)
+        elif lanl_n4[i] == 1:
+            lanl_density -= lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 8*lanl_e4[i]*x**2 + 4*lanl_e4[i]**2 * x**4) / x
+        elif lanl_n4[i] == 2:
+            lanl_density -= 4*lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 3*lanl_e4[i]*x**2 + lanl_e4[i]**2 * x**4)
+    for i in range(5):
+        z_lanl += lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * x**(lanl_n2[i])
+        a_lanl += lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * x**(lanl_n3[i])
+        
+        
+        if lanl_n2[i] == 0:
+            lanl_density -= 4 * lanl_d2[i] *lanl_e2[i] * np.exp(-lanl_e2[i]*x**2) * (-1 + lanl_e2[i]*x**2)
+        elif lanl_n2[i] == 1:
+            lanl_density -= lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 8*lanl_e2[i]*x**2 + 4*lanl_e2[i]**2 * x**4) / x
+        elif lanl_n2[i] == 2:
+            lanl_density -= 4*lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 3*lanl_e2[i]*x**2 + lanl_e2[i]**2 * x**4)
+        
+        if lanl_n3[i] == 0:
+            lanl_density -= 4*lanl_d3[i] *lanl_e3[i] * np.exp(-lanl_e3[i]*x**2) * (-1 + lanl_e3[i]*x**2)
+        elif lanl_n3[i] == 1:
+            lanl_density -= lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 8*lanl_e3[i]*x**2 + 4*lanl_e3[i]**2 * x**4) / x
+        elif lanl_n3[i] == 2:
+            lanl_density -= 4*lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 3*lanl_e3[i]*x**2 + lanl_e3[i]**2 * x**4)
+
+    b = a+z+y
+    
+    KG_radial_dens = KG_dens * x**2 * 4 * np.pi
+    lanl_radial_dens = lanl_density * x**2 * 4 * np.pi
+    
+    fig, axs = plt.subplots(4,1, figsize=(14, 8))
+
+    axs[1].plot(x, y, linestyle='-', label='l=0')
+    axs[1].plot(x, z, linestyle='-', label='l=1')
+    axs[1].plot(x, a, linestyle='-', label='l=2')
+    axs[1].plot(x, b, linestyle='-', label='sum')
+    
+    axs[1].set_xlabel('r')
+    axs[1].set_ylabel(r'$r^2(U_l(r) - \frac{N_C}{r}) / r^2 + N_C/r$')
+    axs[1].legend()
+    axs[1].set_ylim(0.0,150.0)
+    axs[1].set_xlim(0,2.5)
+    
+    axs[0].plot(x, y_lanl, linestyle='-', label='l=0')
+    axs[0].plot(x, z_lanl, linestyle='-', label='l=1')
+    axs[0].plot(x, a_lanl, linestyle='-', label='l=2')
+    axs[0].plot(x, y_lanl + z_lanl + a_lanl + c_lanl, linestyle='-', label='sum')
+    axs[0].plot(x, -c_lanl, linestyle='-', label='(-) l=3')
+    
+    axs[0].set_xlabel('r')
+    axs[0].set_ylabel(r'$U_l(r)$')
+    axs[0].legend()
+    axs[0].set_ylim(0,15.0)
+    axs[0].set_xlim(0,2.5)
+    
+    axs[2].plot(x, KG_dens, linestyle='-', label='KG')
+    axs[2].plot(x, lanl_density, linestyle='-', label='LANL')
+    
+    axs[2].set_ylim(-50,300.0)
+    axs[2].set_xlim(0,2.5)
+    axs[2].legend()
+    
+    axs[3].plot(x, KG_radial_dens, linestyle='-', label='KG')
+    axs[3].plot(x, lanl_radial_dens, linestyle='-', label='LANL')
+    
+    axs[3].set_ylim(-20,100.0)
+    axs[3].set_xlim(0,2.5)
+    axs[3].legend()
+    
+    
+    
+    fig.savefig("Br_test.png", dpi=300, bbox_inches='tight')
+    exit(0)
+    
+br_test()
 
 for i, v in enumerate(x):
     y[i] = Rb_func(v, 28, coefs, exps, rad_exps)
     z[i] = y[i] * (v)**2 * 4 * np.pi
 
-integral = sum(x**2 * y * x[1] * 4 * np.pi)
+integral = sum(x**2 * y * (x[1]-x[0]) * 4 * np.pi)
 print("ECP Integral: ", integral)
 
 integral2 = sum(df[8][1] * df[5] * (df[8])**2 * 4 * np.pi)
@@ -309,7 +404,7 @@ axs[1][1].plot(df[8], (df[8])**2 * df[6] * 4 *np.pi, label='ORCA')
 axs[1][1].plot(df[8], (df[8])**2 * df[9] * 4 *np.pi, label='ECP')
 axs[1][1].plot(df[8], (df[8])**2 * (df[9] + df[3]) * 4 *np.pi, label='ECP +  Thakkar Core')
 axs[1][1].set_xlim(-0.1,3)
-axs[1][1].set_ylim(-3,160)
+axs[1][1].set_ylim(-3,170)
 axs[1][1].legend()
 
 # Show the figure
