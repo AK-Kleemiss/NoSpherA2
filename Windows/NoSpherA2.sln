@@ -71,6 +71,8 @@ Global
 		Debug_tscb|x86 = Debug_tscb|x86
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Profile_Disorder|x64 = Profile_Disorder|x64
+		Profile_Disorder|x86 = Profile_Disorder|x86
 		Publish|x64 = Publish|x64
 		Publish|x86 = Publish|x86
 		Release + Copy|x64 = Release + Copy|x64
@@ -199,6 +201,10 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x64.Build.0 = Debug|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x86.ActiveCfg = Debug|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug|x86.Build.0 = Debug|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Profile_Disorder|x64.ActiveCfg = Profile_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Profile_Disorder|x64.Build.0 = Profile_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Profile_Disorder|x86.ActiveCfg = Profile_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Profile_Disorder|x86.Build.0 = Profile_Disorder|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|x64.ActiveCfg = Publish|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|x64.Build.0 = Publish|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Publish|x86.ActiveCfg = Publish|x64
@@ -296,6 +302,8 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug|x64.ActiveCfg = Debug|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug|x86.ActiveCfg = Debug|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug|x86.Build.0 = Debug|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Profile_Disorder|x64.ActiveCfg = Publish|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Profile_Disorder|x86.ActiveCfg = Publish|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|x64.ActiveCfg = Publish|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|x86.ActiveCfg = Publish|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Publish|x86.Build.0 = Publish|x64
@@ -386,6 +394,8 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug|x86.ActiveCfg = Debug|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug|x86.Build.0 = Debug|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Profile_Disorder|x64.ActiveCfg = Profile_Disorder|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Profile_Disorder|x86.ActiveCfg = Profile_Disorder|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Publish|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Publish|x86.ActiveCfg = Debug|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Publish|x86.Build.0 = Debug|Win32

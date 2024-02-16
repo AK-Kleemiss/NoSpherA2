@@ -2824,6 +2824,8 @@ void options::digest_options()
 			no_date = true;
 		else if (temp == "-pbc")
 			pbc = stoi(arguments[i + 1]);
+		else if (temp == "-perf_benchmark")
+			test_timing();
 		else if (temp == "-radius")
 			radius = stod(arguments[i + 1]);
 		else if (temp == "-resolution")

@@ -178,7 +178,7 @@ public:
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", std::cout);
     return sf[nr];
   };
-  const std::vector<std::complex<double>> get_sf_for_scatterer(const unsigned int nr, std::ofstream &log)
+  const std::vector<std::complex<double>> get_sf_for_scatterer(const unsigned int nr, std::ostream &log)
   {
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", log);
     return sf[nr];
@@ -188,7 +188,7 @@ public:
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", std::cout);
     return scatterer[nr];
   };
-  const std::string get_scatterer(const unsigned int nr, std::ofstream &log)
+  const std::string get_scatterer(const unsigned int nr, std::ostream &log)
   {
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", log);
     return scatterer[nr];
@@ -253,7 +253,7 @@ public:
     }
   }
   const std::vector<std::vector<numtype_index>> get_index_vector() const { return index; };
-  void append(tsc_block &rhs, std::ofstream &log)
+  void append(tsc_block &rhs, std::ostream &log)
   {
     if (reflection_size() == 0)
     {
@@ -296,7 +296,7 @@ public:
       }
     }
   };
-  void append(tsc_block rhs, std::ofstream &log)
+  void append(tsc_block rhs, std::ostream &log)
   {
     if (reflection_size() == 0)
     {

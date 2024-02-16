@@ -7,19 +7,6 @@
 #include "properties.h"
 
 using namespace std;
-#ifdef _WIN32
-typedef enum omp_sched_t
-{
-  // schedule kinds
-  omp_sched_static = 0x1,
-  omp_sched_dynamic = 0x2,
-  omp_sched_guided = 0x3,
-  omp_sched_auto = 0x4,
-
-  // schedule modifier
-  omp_sched_monotonic = 0x80000000u
-} omp_sched_t;
-#endif
 
 int main(int argc, char **argv)
 {
@@ -47,12 +34,6 @@ int main(int argc, char **argv)
   {
 #ifdef _OPENMP
     omp_set_num_threads(opt.threads);
-#endif
-    // omp_set_dynamic(0);
-#ifdef _WIN32
-    _putenv("OMP_SCHEDULE=dynamic,2");
-#else
-    putenv("OMP_SCHEDULE=dynamic,2");
 #endif
   }
   log_file << NoSpherA2_message();
