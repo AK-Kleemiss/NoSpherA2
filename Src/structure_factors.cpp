@@ -4419,7 +4419,8 @@ void calc_SF(const int &points,
 			 ostream &file,
 			 time_point &start,
 			 time_point &end1,
-			 bool debug)
+			 bool debug,
+			 bool no_date = false)
 {
 	const int imax = (int)dens.size();
 	sf.resize(imax);
@@ -4430,13 +4431,15 @@ void calc_SF(const int &points,
 	if (debug)
 		file << "Initialized FFs" << endl
 			 << "asym atom list size: " << imax << " total grid size: " << points << endl;
-
 	end1 = get_time();
-	int dur = get_sec(start, end1);
-	if (dur < 1)
-		file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " µs" << endl;
-	else
-		file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl;
+	if (!no_date)
+	{
+		int dur = get_sec(start, end1);
+		if (dur < 1)
+			file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " µs" << endl;
+		else
+			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl;
+	}
 
 	// #ifdef FLO_CUDA
 	//	double** gpu_k_pt = NULL,
@@ -5056,7 +5059,8 @@ bool calculate_structure_factors_HF(
 			file,
 			start,
 			end1,
-			opt.debug);
+			opt.debug,
+			opt.no_date);
 
 	if (wave.get_has_ECPs())
 	{
@@ -5090,17 +5094,21 @@ bool calculate_structure_factors_HF(
 		hkl);
 
 	time_point end = get_time();
-	write_timing_to_file(file,
-						 start,
-						 end_becke,
-						 end_prototypes,
-						 end_spherical,
-						 end_prune,
-						 end_aspherical,
-						 end1,
-						 before_kpts,
-						 after_kpts,
-						 end);
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file,
+							 start,
+							 end,
+							 end_becke,
+							 end_prototypes,
+							 end_spherical,
+							 end_prune,
+							 end_aspherical,
+							 before_kpts,
+							 after_kpts,
+							 end1);
+	}
+
 	file << "Writing tsc file... " << flush;
 	blocky.write_tscb_file();
 	if (opt.old_tsc)
@@ -5213,7 +5221,8 @@ bool calculate_structure_factors_RI(
 			file,
 			start,
 			end1,
-			opt.debug);
+			opt.debug,
+			opt.no_date);
 
 	if (wave.get_has_ECPs())
 	{
@@ -5247,17 +5256,20 @@ bool calculate_structure_factors_RI(
 		hkl);
 
 	time_point end = get_time();
-	write_timing_to_file(file,
-						 start,
-						 end_becke,
-						 end_prototypes,
-						 end_spherical,
-						 end_prune,
-						 end_aspherical,
-						 end1,
-						 before_kpts,
-						 after_kpts,
-						 end);
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file,
+							 start,
+							 end,
+							 end_becke,
+							 end_prototypes,
+							 end_spherical,
+							 end_prune,
+							 end_aspherical,
+							 before_kpts,
+							 after_kpts,
+							 end1);
+	}
 
 	file << "Writing tsc file... " << flush;
 	blocky.write_tscb_file();
@@ -5400,7 +5412,8 @@ bool calculate_structure_factors_RI_No_H(
 			file,
 			start,
 			end1,
-			opt.debug);
+			opt.debug,
+			opt.no_date);
 
 	if (wave.get_has_ECPs())
 	{
@@ -5434,17 +5447,20 @@ bool calculate_structure_factors_RI_No_H(
 		hkl);
 
 	time_point end = get_time();
-	write_timing_to_file(file,
-						 start,
-						 end_becke,
-						 end_prototypes,
-						 end_spherical,
-						 end_prune,
-						 end_aspherical,
-						 end1,
-						 before_kpts,
-						 after_kpts,
-						 end);
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file,
+							 start,
+							 end,
+							 end_becke,
+							 end_prototypes,
+							 end_spherical,
+							 end_prune,
+							 end_aspherical,
+							 before_kpts,
+							 after_kpts,
+							 end1);
+	}
 
 	file << "Writing tsc file... " << flush;
 	blocky.write_tscb_file();
@@ -5605,7 +5621,8 @@ tsc_block<int, cdouble> calculate_structure_factors_MTC(
 			file,
 			start,
 			end1,
-			opt.debug);
+			opt.debug,
+			opt.no_date);
 
 	if (wave[nr].get_has_ECPs())
 	{
@@ -5639,17 +5656,20 @@ tsc_block<int, cdouble> calculate_structure_factors_MTC(
 		hkl);
 
 	time_point end = get_time();
-	write_timing_to_file(file,
-						 start,
-						 end_becke,
-						 end_prototypes,
-						 end_spherical,
-						 end_prune,
-						 end_aspherical,
-						 end1,
-						 before_kpts,
-						 after_kpts,
-						 end);
+	if (!opt.no_date)
+	{
+		write_timing_to_file(file,
+							 start,
+							 end,
+							 end_becke,
+							 end_prototypes,
+							 end_spherical,
+							 end_prune,
+							 end_aspherical,
+							 before_kpts,
+							 after_kpts,
+							 end1);
+	}
 
 	return blocky;
 }
