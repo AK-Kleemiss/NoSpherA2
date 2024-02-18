@@ -92,7 +92,7 @@ int main(int argc, char **argv)
       {
         if (opt.ECP_mode == 2)
           wavy[i].set_has_ECPs(true, true, true);
-        else 
+        else
           wavy[i].set_has_ECPs(true);
       }
       if (opt.set_ECPs)
@@ -133,10 +133,7 @@ int main(int argc, char **argv)
 
     known_scatterer = result.get_scatterers();
     log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
-#ifdef _WIN64
-    time_t start = time(NULL);
-    time_t end_write;
-#endif
+    time_point start = get_time();
     log_file << "Writing tsc file... " << flush;
     if (opt.binary_tsc)
       result.write_tscb_file();
@@ -145,17 +142,14 @@ int main(int argc, char **argv)
       result.write_tsc_file(opt.cif);
     }
     log_file << " ... done!" << endl;
-#ifdef _WIN64
-    end_write = time(NULL);
-
-    if (end_write - start < 60)
-      log_file << "Writing Time: " << fixed << setprecision(0) << end_write - start << " s\n";
-    else if (end_write - start < 3600)
-      log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 60) << " m " << (end_write - start) % 60 << " s\n";
+    time_point end_write = get_time();
+    if (get_sec(start, end_write) < 60)
+      log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
+    else if (get_sec(start, end_write) < 3600)
+      log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 60) << " m " << get_sec(start, end_write) % 60 << " s\n";
     else
-      log_file << "Writing Time: " << fixed << setprecision(0) << floor((end_write - start) / 3600) << " h " << ((end_write - start) % 3600) / 60 << " m\n";
+      log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
     log_file << endl;
-#endif
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
@@ -328,8 +322,8 @@ int main(int argc, char **argv)
     }
     else
     {
-//#include "test_functions.h"
-//      cube_from_coef_npy(opt.coef_file, opt.xyz_file);
+      // #include "test_functions.h"
+      //       cube_from_coef_npy(opt.coef_file, opt.xyz_file);
     }
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;

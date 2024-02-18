@@ -4,19 +4,19 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
-#include <omp.h>
-#include <chrono>
 
-
-void thakkar_d_test(options& opt) {
+void thakkar_d_test(options &opt)
+{
 	using namespace std;
 	Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
 	Thakkar_Cation C_cat(6), O_cat(8), P_cat(15), Ca_cat(20);
 	Thakkar_Anion C_an(6), O_an(8), H_an(1), P_an(15);
 	double k_value = 0.0;
-	if (!opt.electron_diffraction) {
+	if (!opt.electron_diffraction)
+	{
 		ofstream result("thakkar.dat", ios::out);
-		for (double i = 0.001; i <= 4.0; i += 0.001) {
+		for (double i = 0.001; i <= 4.0; i += 0.001)
+		{
 			k_value = constants::bohr2ang(constants::FOUR_PI * i);
 			result << showpos << setw(6) << setprecision(3) << fixed << i;
 			result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor(k_value);
@@ -38,9 +38,11 @@ void thakkar_d_test(options& opt) {
 		result.flush();
 		result.close();
 	}
-	else {
+	else
+	{
 		ofstream result("thakkar_ED.dat", ios::out);
-		for (double i = 0.001; i <= 4.0; i += 0.001) {
+		for (double i = 0.001; i <= 4.0; i += 0.001)
+		{
 			k_value = constants::bohr2ang(constants::FOUR_PI * i);
 			result << showpos << setw(6) << setprecision(3) << fixed << i;
 			complex<double> temp = H.get_form_factor(k_value);
@@ -88,10 +90,11 @@ void thakkar_d_test(options& opt) {
 	}
 }
 
-void test_density_cubes(options& opt, std::ostream& log_file) {
+void test_density_cubes(options &opt, std::ostream &log_file)
+{
 	using namespace std;
 	vector<WFN> wavy(10);
-	//ScF2+ test file against ORCA calcualted cubes
+	// ScF2+ test file against ORCA calcualted cubes
 	log_file << "====================ScF2+ Test===============================" << endl;
 	wavy[0].read_known_wavefunction_format("test.molden", log_file);
 	cube Rho(100, 100, 100, wavy[0].get_ncen(), true);
@@ -103,13 +106,14 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	log_file << "Calcualting Rho...";
 	Calc_Rho(Rho, wavy[0], opt.threads, 7.0, log_file);
 	log_file << " ...done!" << endl;
-	//Rho.write_file(wavy[0], true);
+	// Rho.write_file(wavy[0], true);
 	const double test_molden = Rho.sum();
 	log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << test_molden << endl;
 	cube Rho2("test.eldens.cube", true, wavy[0], log_file);
 	const double test_ref = Rho2.sum();
 	log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << test_ref << endl;
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 1; i++)
+	{
 		cube MO(100, 100, 100, wavy[0].get_ncen(), true);
 		MO.set_origin(0, -7), MO.set_origin(1, -7), MO.set_origin(2, -7);
 		MO.set_vector(0, 0, 0.141414);
@@ -119,14 +123,14 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 		log_file << "Calcualting MO " + to_string(i) + "...";
 		Calc_MO(MO, i, wavy[0], opt.threads, 4.0, log_file);
 		log_file << " ...done!" << endl;
-		//MO.write_file(wavy[0], true);
+		// MO.write_file(wavy[0], true);
 		string name("test.mo" + to_string(i) + "a.cube");
 		cube MO2(name, true, wavy[0], log_file);
 		log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
 		log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
 	}
 
-	//F- ion calculations
+	// F- ion calculations
 	log_file << "====================F Test===============================" << endl;
 	wavy[1].read_known_wavefunction_format("F_full.molden", log_file);
 	wavy[1].write_wfn("F_conv.wfn", false, true);
@@ -139,7 +143,7 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	log_file << "Calcualting Rho...";
 	Calc_Rho(Rho_2, wavy[1], opt.threads, 7.0, log_file);
 	log_file << " ...done!" << endl;
-	//Rho_2.write_file(wavy[1], true);
+	// Rho_2.write_file(wavy[1], true);
 	const double F_molden = Rho_2.sum();
 	log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << F_molden << endl;
 	wavy[4].read_known_wavefunction_format("f_ref.wfx", log_file);
@@ -152,11 +156,11 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	log_file << "Calcualting Rho...";
 	Calc_Rho_spherical_harmonics(Rho_3, wavy[4], opt.threads, log_file);
 	log_file << " ...done!" << endl;
-	//Rho_3.write_file(wavy[1], true);
+	// Rho_3.write_file(wavy[1], true);
 	const double F_ref = Rho_3.sum();
 	log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << F_ref << endl;
 
-	//Ce conevrsion for test of f type
+	// Ce conevrsion for test of f type
 	log_file << "====================Ce Test===============================" << endl;
 	wavy[2].read_known_wavefunction_format("Ce_full.molden", log_file);
 	wavy[2].write_wfn("Ce_conv.wfn", false, true);
@@ -169,7 +173,7 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	log_file << "Calcualting Rho...";
 	Calc_Rho(Rho_4, wavy[2], opt.threads, 7.0, log_file);
 	log_file << " ...done!" << endl;
-	//Rho_4.write_file(wavy[2], true);
+	// Rho_4.write_file(wavy[2], true);
 	const double Ce_molden = Rho_4.sum();
 	log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Ce_molden << endl;
 
@@ -177,16 +181,16 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	wavy[5].read_known_wavefunction_format("Ce_full.wfn", log_file);
 	Calc_Rho(Rho_4, wavy[5], opt.threads, 7.0, log_file);
 	Rho_4.path = get_basename_without_ending(wavy[5].get_path()) + "_reference_rho.cube";
-	//Rho_4.write_file(wavy[5], true);
+	// Rho_4.write_file(wavy[5], true);
 	const double Ce_ref = Rho_4.sum();
 	log_file << "Number of electrons in the ref cube: " << setprecision(4) << fixed << Ce_ref << endl;
 
-	//Sc conversion
+	// Sc conversion
 	log_file << "====================Sc Test===============================" << endl;
 	wavy[3].read_known_wavefunction_format("Sc_full.molden", log_file);
 	wavy[3].write_wfn("Sc_conv.wfn", false, true);
 
-	//Lu g-type test
+	// Lu g-type test
 	log_file << "====================Lu Test===============================" << endl;
 	wavy[6].read_known_wavefunction_format("Lu_jorge.molden", log_file);
 	wavy[6].write_wfn("Lu_conv.wfn", false, true);
@@ -197,7 +201,7 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	Rho4.set_vector(2, 2, 0.1);
 	Calc_Rho(Rho4, wavy[6], opt.threads, 7.0, log_file);
 	Rho4.path = get_basename_without_ending(wavy[6].get_path()) + "_rho.cube";
-	//Rho4.write_file(wavy[6], true);
+	// Rho4.write_file(wavy[6], true);
 	const double Lu_molden = Rho4.sum();
 	log_file << "Number of electrons in cube: " << setprecision(4) << fixed << Lu_molden << endl;
 
@@ -209,11 +213,11 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	Rho_5.set_vector(2, 2, 0.1);
 	Calc_Rho(Rho_5, wavy[7], opt.threads, 7.0, log_file);
 	Rho_5.path = get_basename_without_ending(wavy[7].get_path()) + "_reference_rho.cube";
-	//Rho_5.write_file(wavy[7], true);
+	// Rho_5.write_file(wavy[7], true);
 	const double Lu_wfn = Rho_5.sum();
 	Rho_5 -= Rho4;
 	Rho_5.path = get_basename_without_ending(wavy[7].get_path()) + "_diff_rho.cube";
-	//Rho_5.write_file(wavy[7], true);
+	// Rho_5.write_file(wavy[7], true);
 	log_file << "Number of electrons in the ref cube: " << setprecision(4) << fixed << Lu_wfn << endl;
 	log_file << "Number of electrons in the diff cube: " << setprecision(4) << fixed << Rho_5.diff_sum() << endl;
 
@@ -227,7 +231,7 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	Rho5.set_vector(2, 2, 0.1);
 	Calc_Rho(Rho5, wavy[8], opt.threads, 7.0, log_file);
 	Rho5.path = get_basename_without_ending(wavy[8].get_path()) + "_rho.cube";
-	//Rho4.write_file(wavy[6], true);
+	// Rho4.write_file(wavy[6], true);
 	const double Lu_def2 = Rho5.sum();
 	log_file << "Number of electrons in cube: " << setprecision(4) << fixed << Lu_def2 << endl;
 
@@ -238,7 +242,8 @@ void test_density_cubes(options& opt, std::ostream& log_file) {
 	log_file << "All tests successfull!" << endl;
 }
 
-void sfac_scan(options& opt, std::ostream& log_file) {
+void sfac_scan(options &opt, std::ostream &log_file)
+{
 	using namespace std;
 	std::vector<WFN> wavy;
 	auto t = new WFN(1);
@@ -250,63 +255,51 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	Thakkar_Anion O_an(wavy[0].atoms[0].charge);
 	err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
-	//err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+	// err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-#ifdef _WIN64
-	time_t start = time(NULL);
-	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
-#else
-	struct timeval t1, t2;
-
-	gettimeofday(&t1, 0);
-#endif
+	time_point start = get_time();
+	time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
 
 	cell unit_cell(opt.cif, std::cout, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), std::ios::in);
-	vector <int> atom_type_list;
-	vector <int> asym_atom_to_type_list;
-	vector <int> asym_atom_list;
-	vector <bool> needs_grid(wavy[0].get_ncen(), false);
+	vector<int> atom_type_list;
+	vector<int> asym_atom_to_type_list;
+	vector<int> asym_atom_list;
+	vector<bool> needs_grid(wavy[0].get_ncen(), false);
 	vector<string> known_atoms;
 
 	read_atoms_from_CIF(cif_input,
-		opt.groups[0],
-		unit_cell,
-		wavy[0],
-		known_atoms,
-		atom_type_list,
-		asym_atom_to_type_list,
-		asym_atom_list,
-		needs_grid,
-		std::cout,
-		opt.debug);
+						opt.groups[0],
+						unit_cell,
+						wavy[0],
+						known_atoms,
+						atom_type_list,
+						asym_atom_to_type_list,
+						asym_atom_list,
+						needs_grid,
+						std::cout,
+						opt.debug);
 
 	cif_input.close();
 	vector<vec> d1, d2, d3, dens;
 
 	make_hirshfeld_grids(opt.pbc,
-		opt.accuracy,
-		unit_cell,
-		wavy[0],
-		atom_type_list,
-		asym_atom_list,
-		needs_grid,
-		d1, d2, d3, dens,
-		std::cout,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
-
+						 opt.accuracy,
+						 unit_cell,
+						 wavy[0],
+						 atom_type_list,
+						 asym_atom_list,
+						 needs_grid,
+						 d1, d2, d3, dens,
+						 std::cout,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	std::cout << "finished partitioning" << endl;
 	const int size = 4000;
@@ -315,19 +308,22 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	const double phi_step = 360.0 / phi_size * constants::PI_180;
 	const double theta_step = 180.0 / phi_size * constants::PI_180;
 
-	//This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
-	// by iterating over both spherical angles by a fixed step defined above
+	// This bit is basically the substitute for make_k_pts, where we sample the whole sphere
+	//  by iterating over both spherical angles by a fixed step defined above
 	vector<vec> k_pt;
 	k_pt.resize(4);
 #pragma omp parallel for
 	for (int i = 0; i < 4; i++)
 		k_pt[i].resize(size * phi_size * theta_size, 0.0);
 
-	//int null = 0;
+		// int null = 0;
 #pragma omp parallel for
-	for (int ref = 1; ref <= size; ref++) {
-		for (int p = 0; p < phi_size; p++) {
-			for (int t = 0; t < theta_size; t++) {
+	for (int ref = 1; ref <= size; ref++)
+	{
+		for (int p = 0; p < phi_size; p++)
+		{
+			for (int t = 0; t < theta_size; t++)
+			{
 				int ind = t + (p + (ref - 1) * phi_size) * theta_size;
 				double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
 				k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
@@ -349,23 +345,26 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 #pragma omp parallel for
 	for (int i = 0; i < imax; i++)
 		sf[i].resize(k_pt[0].size());
-	double* dens_local, * d1_local, * d2_local, * d3_local;
-	complex<double>* sf_local;
-	const double* k1_local = k_pt[0].data();
-	const double* k2_local = k_pt[1].data();
-	const double* k3_local = k_pt[2].data();
+	double *dens_local, *d1_local, *d2_local, *d3_local;
+	complex<double> *sf_local;
+	const double *k1_local = k_pt[0].data();
+	const double *k2_local = k_pt[1].data();
+	const double *k3_local = k_pt[2].data();
 	double work, rho;
-	progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
-	for (int i = 0; i < imax; i++) {
+	progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
+	for (int i = 0; i < imax; i++)
+	{
 		pmax = (int)dens[i].size();
 		dens_local = dens[i].data();
 		d1_local = d1[i].data();
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 		sf_local = sf[i].data();
-#pragma omp parallel for private(work,rho)
-		for (int s = 0; s < smax; s++) {
-			for (int p = pmax - 1; p >= 0; p--) {
+#pragma omp parallel for private(work, rho)
+		for (int s = 0; s < smax; s++)
+		{
+			for (int p = pmax - 1; p >= 0; p--)
+			{
 				rho = dens_local[p];
 				work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
 				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
@@ -374,13 +373,15 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 				progress->write(s / double(smax));
 		}
 	}
-	delete(progress);
-	if (true) { //Change if oyu do not want X-ray
+	delete (progress);
+	if (true)
+	{ // Change if oyu do not want X-ray
 		ofstream result("sfacs.dat", ios::out);
 		log_file << "Writing X-ray sfacs...";
 		log_file.flush();
-		//Now we just need to write the result to a file, together with the spherical results and separated for valence and core
-		for (int i = 0; i < k_pt[0].size(); i++) {
+		// Now we just need to write the result to a file, together with the spherical results and separated for valence and core
+		for (int i = 0; i < k_pt[0].size(); i++)
+		{
 			result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
 			result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor((k_pt[3][i]));
 			result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor((k_pt[3][i]));
@@ -394,13 +395,15 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 		result.flush();
 		result.close();
 	}
-	if (true) { //change if you do not want ED sfacs
+	if (true)
+	{ // change if you do not want ED sfacs
 		log_file << "Writing ED sfacs...";
 		log_file.flush();
 		ofstream result = ofstream("sfacs_ED.dat", ios::out);
 		const double fact = 0.023934;
 		double h2;
-		for (int s = 0; s < k_pt[0].size(); s++) {
+		for (int s = 0; s < k_pt[0].size(); s++)
+		{
 			h2 = pow(constants::ang2bohr(k_pt[3][s] / constants::FOUR_PI), 2);
 			sf[0][s] = std::complex<double>(fact * (wavy[0].get_atom_charge(0) - sf[0][s].real()) / h2, -fact * sf[0][s].imag() / h2);
 
@@ -426,7 +429,8 @@ void sfac_scan(options& opt, std::ostream& log_file) {
 	}
 }
 
-void test_timing() {
+void test_timing()
+{
 	using namespace std;
 	cout << NoSpherA2_message() << endl;
 	options opt;
@@ -434,8 +438,8 @@ void test_timing() {
 	opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_1\\thpp.wfx");
 	opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_2\\thpp.wfx");
 	opt.accuracy = 2;
-	vector<int> t1 = { 0,1 };
-	vector<int> t2 = { 0,2 };
+	vector<int> t1 = {0, 1};
+	vector<int> t2 = {0, 2};
 	opt.groups.pop_back();
 	opt.groups.push_back(t1);
 	opt.groups.push_back(t2);
@@ -445,13 +449,14 @@ void test_timing() {
 
 	int max_threads = 48;
 	vector<int> time(max_threads);
-	
-	for (int ncpus = 1; ncpus < 49; ncpus++) {
+
+	for (int ncpus = 1; ncpus < 49; ncpus++)
+	{
 		auto start = std::chrono::high_resolution_clock::now();
 		opt.threads = ncpus;
-
-		omp_set_num_threads(ncpus);		
-		//print the number of threads used
+#ifdef _OPENMP
+		omp_set_num_threads(ncpus);
+		// print the number of threads used
 		std::cout << "Using " << opt.threads << " threads" << std::endl;
 		// and the actrual results form omp_get_num_threads
 		std::cout << "Actual number of threads: " << omp_get_max_threads() << " ";
@@ -460,6 +465,10 @@ void test_timing() {
 #pragma omp single
 			cout << omp_get_num_threads() << endl;
 		}
+#else
+		std::cout << "You are running an OmpenMP Benchamrk without parallelization" << std::endl;
+		std::cout << "This will not give you any useful information" << std::endl;
+#endif
 		std::vector<WFN> wavy;
 		err_checkf(opt.hkl != "" || opt.dmin != 99.0, "No hkl specified and no dmin value given", std::cout);
 		if (opt.combined_tsc_calc)
@@ -488,23 +497,23 @@ void test_timing() {
 			if (wavy[i].get_origin() != 7)
 			{
 				result.append(calculate_structure_factors_MTC(
-					opt,
-					wavy,
-					std::cout,
-					known_scatterer,
-					i,
-					&known_kpts),
-					std::cout);
+								  opt,
+								  wavy,
+								  std::cout,
+								  known_scatterer,
+								  i,
+								  &known_kpts),
+							  std::cout);
 			}
 			else
 			{
 				result.append(MTC_thakkar_sfac(
-					opt,
-					std::cout,
-					known_scatterer,
-					wavy,
-					i),
-					std::cout);
+								  opt,
+								  std::cout,
+								  known_scatterer,
+								  wavy,
+								  i),
+							  std::cout);
 			}
 		}
 
@@ -515,21 +524,21 @@ void test_timing() {
 		time[ncpus - 1] = duration.count();
 	}
 
-  //Print out results of timing
-	for (int i = 0; i < max_threads; i++) {
+	// Print out results of timing
+	for (int i = 0; i < max_threads; i++)
+	{
 		std::cout << "Time for " << i + 1 << " threads: " << time[i] << " microseconds" << std::endl;
-  }
+	}
 
 	exit(0);
-
 }
 
-void add_ECP_contribution_test(const ivec& asym_atom_list,
-	const WFN& wave,
-	std::vector<cvec>& sf,
-	std::vector<vec>& k_pt,
-	std::ostream& file,
-	const bool debug)
+void add_ECP_contribution_test(const ivec &asym_atom_list,
+							   const WFN &wave,
+							   std::vector<cvec> &sf,
+							   std::vector<vec> &k_pt,
+							   std::ostream &file,
+							   const bool debug)
 {
 	double k = 1.0;
 	// Using a Thakkar core density
@@ -551,7 +560,8 @@ void add_ECP_contribution_test(const ivec& asym_atom_list,
 	}
 }
 
-void sfac_scan_ECP(options& opt, std::ostream& log_file) {
+void sfac_scan_ECP(options &opt, std::ostream &log_file)
+{
 #ifdef _OPENMP
 	omp_set_num_threads(opt.threads);
 #endif
@@ -572,7 +582,8 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	Thakkar Au(wavy[0].atoms[0].charge);
 	if (opt.ECP)
 	{
-		if (opt.ECP_mode == 2) {
+		if (opt.ECP_mode == 2)
+		{
 
 			wavy[0].set_has_ECPs(true, true, true);
 			wavy[1].set_has_ECPs(true, true, true);
@@ -586,119 +597,94 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 	err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
 
-#ifdef _WIN64
-	time_t start = time(NULL);
-	time_t end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
-#else
-	struct timeval t1, t2;
-
-	gettimeofday(&t1, 0);
-#endif
+	time_point start = get_time(), end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
 
 	cell unit_cell(opt.cif, log_file, opt.debug);
 	ifstream cif_input(opt.cif.c_str(), std::ios::in);
-	vector <int> atom_type_list;
-	vector <int> asym_atom_to_type_list;
-	vector <int> asym_atom_list;
-	vector <bool> needs_grid(wavy[0].get_ncen(), false);
+	vector<int> atom_type_list;
+	vector<int> asym_atom_to_type_list;
+	vector<int> asym_atom_list;
+	vector<bool> needs_grid(wavy[0].get_ncen(), false);
 	vector<string> known_atoms;
 
 	read_atoms_from_CIF(cif_input,
-		opt.groups[0],
-		unit_cell,
-		wavy[0],
-		known_atoms,
-		atom_type_list,
-		asym_atom_to_type_list,
-		asym_atom_list,
-		needs_grid,
-		log_file,
-		opt.debug);
+						opt.groups[0],
+						unit_cell,
+						wavy[0],
+						known_atoms,
+						atom_type_list,
+						asym_atom_to_type_list,
+						asym_atom_list,
+						needs_grid,
+						log_file,
+						opt.debug);
 
 	cif_input.close();
 	vector<vec> d1, d2, d3, dens;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy[0],
-		atom_type_list,
-		asym_atom_list,
-		needs_grid,
-		d1, d2, d3, dens,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy[0],
+						 atom_type_list,
+						 asym_atom_list,
+						 needs_grid,
+						 d1, d2, d3, dens,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	vector<vec> d1_def2, d2_def2, d3_def2, dens_def2;
-	ivec atl_def2{ 79 };
-	ivec aal_def2{ 0 };
+	ivec atl_def2{79};
+	ivec aal_def2{0};
 	vector<bool> ng_def2(1, true);
 
-
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy[1],
-		atl_def2,
-		aal_def2,
-		ng_def2,
-		d1_def2, d2_def2, d3_def2, dens_def2,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy[1],
+						 atl_def2,
+						 aal_def2,
+						 ng_def2,
+						 d1_def2, d2_def2, d3_def2, dens_def2,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	vector<vec> d1_all, d2_all, d3_all, dens_all;
-	ivec atl_all{ 79 };
-	ivec aal_all{ 0 };
+	ivec atl_all{79};
+	ivec aal_all{0};
 	vector<bool> ng_all(1, true);
 
-
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy[2],
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_all, d2_all, d3_all, dens_all,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
-
+						 4,
+						 unit_cell,
+						 wavy[2],
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_all, d2_all, d3_all, dens_all,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	WFN wavy_all_val(9);
 	wavy_all_val.read_known_wavefunction_format("Au_alle.gbw", std::cout, opt.debug);
@@ -709,54 +695,44 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vector<vec> d1_all_val, d2_all_val, d3_all_val, dens_all_val;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy_all_val,
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_all_val, d2_all_val, d3_all_val, dens_all_val,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy_all_val,
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_all_val, d2_all_val, d3_all_val, dens_all_val,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	WFN wavy_ZORA(9);
 	wavy_ZORA.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
 	vector<vec> d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy_ZORA,
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy_ZORA,
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	WFN wavy_ZORA_val(9);
 	wavy_ZORA_val.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
@@ -767,54 +743,44 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vector<vec> d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy_ZORA_val,
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy_ZORA_val,
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	WFN wavy_x2c(9);
 	wavy_x2c.read_known_wavefunction_format("Au_alle_x2c.gbw", std::cout, opt.debug);
 	vector<vec> d1_x2c, d2_x2c, d3_x2c, dens_x2c;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy_x2c,
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_x2c, d2_x2c, d3_x2c, dens_x2c,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
+						 4,
+						 unit_cell,
+						 wavy_x2c,
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_x2c, d2_x2c, d3_x2c, dens_x2c,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	WFN wavy_x2c_val(9);
 	wavy_x2c_val.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
@@ -825,28 +791,22 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	vector<vec> d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val;
 
 	make_hirshfeld_grids(opt.pbc,
-		4,
-		unit_cell,
-		wavy_x2c_val,
-		atl_all,
-		aal_all,
-		ng_all,
-		d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val,
-		log_file,
-#ifdef _WIN64
-		start,
-		end_becke,
-		end_prototypes,
-		end_spherical,
-		end_prune,
-		end_aspherical,
-#else
-		t1,
-		t2,
-#endif
-		opt.debug,
-		opt.no_date);
-
+						 4,
+						 unit_cell,
+						 wavy_x2c_val,
+						 atl_all,
+						 aal_all,
+						 ng_all,
+						 d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val,
+						 log_file,
+						 start,
+						 end_becke,
+						 end_prototypes,
+						 end_spherical,
+						 end_prune,
+						 end_aspherical,
+						 opt.debug,
+						 opt.no_date);
 
 	std::cout << "finished partitioning" << endl;
 	const int size = 2000;
@@ -855,19 +815,22 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	const double phi_step = 360.0 / phi_size * constants::PI_180;
 	const double theta_step = 180.0 / phi_size * constants::PI_180;
 
-	//This bit is basically the substitute for make_k_pts, where we sample the whole sphere 
-	// by iterating over both spherical angles by a fixed step defined above
+	// This bit is basically the substitute for make_k_pts, where we sample the whole sphere
+	//  by iterating over both spherical angles by a fixed step defined above
 	vector<vec> k_pt;
 	k_pt.resize(4);
 #pragma omp parallel for
 	for (int i = 0; i < 4; i++)
 		k_pt[i].resize(size * phi_size * theta_size, 0.0);
 
-	//int null = 0;
+		// int null = 0;
 #pragma omp parallel for schedule(dynamic)
-	for (int ref = 1; ref <= size; ref++) {
-		for (int p = 0; p < phi_size; p++) {
-			for (int t = 0; t < theta_size; t++) {
+	for (int ref = 1; ref <= size; ref++)
+	{
+		for (int p = 0; p < phi_size; p++)
+		{
+			for (int t = 0; t < theta_size; t++)
+			{
 				int ind = t + (p + (ref - 1) * phi_size) * theta_size;
 				double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
 				k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
@@ -910,13 +873,13 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		sf_x2c[i].resize(k_pt[0].size());
 		sf_x2c_val[i].resize(k_pt[0].size());
 	}
-	double* dens_local, * d1_local, * d2_local, * d3_local;
-	complex<double>* sf_local;
-	const double* k1_local = k_pt[0].data();
-	const double* k2_local = k_pt[1].data();
-	const double* k3_local = k_pt[2].data();
+	double *dens_local, *d1_local, *d2_local, *d3_local;
+	complex<double> *sf_local;
+	const double *k1_local = k_pt[0].data();
+	const double *k2_local = k_pt[1].data();
+	const double *k3_local = k_pt[2].data();
 	double work, rho;
-	progress_bar* progress = new progress_bar{ std::cout, 60u, "Calculating scattering factors" };
+	progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
 	for (int i = 0; i < 1; i++)
 	{
 		pmax = (int)dens[i].size();
@@ -925,7 +888,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2[i].data();
 		d3_local = d3[i].data();
 		sf_local = sf[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -951,7 +914,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_def2[i].data();
 		d3_local = d3_def2[i].data();
 		sf_local = sf_def2[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -977,7 +940,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_all[i].data();
 		d3_local = d3_all[i].data();
 		sf_local = sf_all[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1003,7 +966,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_all_val[i].data();
 		d3_local = d3_all_val[i].data();
 		sf_local = sf_all_val[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1021,7 +984,6 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
-
 		}
 		log_file << "Done with Jorge Valence SFs" << endl;
 		pmax = (int)dens_ZORA[i].size();
@@ -1030,7 +992,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_ZORA[i].data();
 		d3_local = d3_ZORA[i].data();
 		sf_local = sf_ZORA[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1048,7 +1010,6 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
-
 		}
 		log_file << "Done with ZORA-Jorge SFs" << endl;
 		pmax = (int)dens_ZORA_val[i].size();
@@ -1057,7 +1018,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_ZORA_val[i].data();
 		d3_local = d3_ZORA_val[i].data();
 		sf_local = sf_ZORA_val[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1075,7 +1036,6 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
-
 		}
 		log_file << "Done with ZORA-Jorge Valence SFs" << endl;
 		pmax = (int)dens_x2c[i].size();
@@ -1084,7 +1044,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_x2c[i].data();
 		d3_local = d3_x2c[i].data();
 		sf_local = sf_x2c[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1102,7 +1062,6 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
-
 		}
 		log_file << "Done with X2C SFs" << endl;
 		pmax = (int)dens_x2c_val[i].size();
@@ -1111,7 +1070,7 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		d2_local = d2_x2c_val[i].data();
 		d3_local = d3_x2c_val[i].data();
 		sf_local = sf_x2c_val[i].data();
-#pragma omp parallel for private(work,rho)
+#pragma omp parallel for private(work, rho)
 		for (int s = 0; s < smax; s++)
 		{
 			for (int p = pmax - 1; p >= 0; p--)
@@ -1129,11 +1088,10 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 #endif
 				sf_local[s] += polar(rho, work);
 			}
-
 		}
 		log_file << "Done with X2C Valence SFs" << endl;
 	}
-	delete(progress);
+	delete (progress);
 	log_file << "adding ECP contribution" << endl;
 	auto sf2 = sf;
 	auto sf2_def2 = sf_def2;
@@ -1155,16 +1113,16 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	log_file << "Calculating sfacs..." << endl;
 	vec thakkar_sfac(k_pt[0].size());
 	vec thakkar_core_sfac(k_pt[0].size());
-	vec sf1_sfac(k_pt[0].size()); // Has the HAR density without ECP
-	vec sf2_sfac(k_pt[0].size()); // Has the HAR density with ECP
-	vec sf_def2_sfac(k_pt[0].size()); // Has the def2 density without ECP
-	vec sf2_def2_sfac(k_pt[0].size()); // Has the def2 density with ECP
-	vec sf_all_sfac(k_pt[0].size()); // Has the all electron density
-	vec sf_all_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction
-	vec sf_ZORA_sfac(k_pt[0].size()); // Has the all electron density using ZORA
+	vec sf1_sfac(k_pt[0].size());		  // Has the HAR density without ECP
+	vec sf2_sfac(k_pt[0].size());		  // Has the HAR density with ECP
+	vec sf_def2_sfac(k_pt[0].size());	  // Has the def2 density without ECP
+	vec sf2_def2_sfac(k_pt[0].size());	  // Has the def2 density with ECP
+	vec sf_all_sfac(k_pt[0].size());	  // Has the all electron density
+	vec sf_all_val_sfac(k_pt[0].size());  // Has the valence electron density off the all electron wavefunction
+	vec sf_ZORA_sfac(k_pt[0].size());	  // Has the all electron density using ZORA
 	vec sf_ZORA_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction using ZORA
-	vec sf_x2c_sfac(k_pt[0].size()); // Has the all electron density using X2C
-	vec sf_x2c_val_sfac(k_pt[0].size()); // Has the valence electron density off the all electron wavefunction using X2C
+	vec sf_x2c_sfac(k_pt[0].size());	  // Has the all electron density using X2C
+	vec sf_x2c_val_sfac(k_pt[0].size());  // Has the valence electron density off the all electron wavefunction using X2C
 #pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < k_pt[0].size(); i++)
 	{
@@ -1191,12 +1149,14 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 		thakkar_sfac[i] = Au.get_form_factor(k_pt[3][i]);
 		thakkar_core_sfac[i] = Au.get_core_form_factor(k_pt[3][i], 60);
 	}
-	if (true) { //Change if you do not want X-ray
+	if (true)
+	{ // Change if you do not want X-ray
 		ofstream result("sfacs.dat", ios::out);
 		log_file << "Writing X-ray sfacs...";
 		log_file.flush();
-		//Now we just need to write the result to a file, together with the spherical results and separated for valence and core
-		for (int i = 0; i < k_pt[0].size(); i++) {
+		// Now we just need to write the result to a file, together with the spherical results and separated for valence and core
+		for (int i = 0; i < k_pt[0].size(); i++)
+		{
 			result << showpos << setw(8) << setprecision(5) << fixed << constants::ang2bohr(k_pt[3][i] / constants::FOUR_PI);
 			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_sfac[i];
 			result << showpos << setw(16) << setprecision(8) << scientific << thakkar_core_sfac[i];
@@ -1218,27 +1178,32 @@ void sfac_scan_ECP(options& opt, std::ostream& log_file) {
 	}
 }
 
-void spherical_harmonic_test() {
+void spherical_harmonic_test()
+{
 	const double phi = 0.3, theta = 0.4;
-	for (int lam = 0; lam <= 5; lam++) {
-		for (int m = -lam; m <= lam; m++) {
-			vec d{ std::sin(theta) * std::cos(phi),
-					 std::sin(theta) * std::sin(phi),
-					 std::cos(theta), 1.0, 1.0 };
+	for (int lam = 0; lam <= 5; lam++)
+	{
+		for (int m = -lam; m <= lam; m++)
+		{
+			vec d{std::sin(theta) * std::cos(phi),
+				  std::sin(theta) * std::sin(phi),
+				  std::cos(theta), 1.0, 1.0};
 			std::cout << spherical_harmonic(lam, m, d.data()) << " ";
 		}
 		std::cout << "\n";
 	}
 };
 
-void calc_cube(vec data, WFN& dummy, int& exp_coef, int atom = -1) {
-	double MinMax[6]{ 0,0,0,0,0,0 };
-	int steps[3]{ 0,0,0 };
+void calc_cube(vec data, WFN &dummy, int &exp_coef, int atom = -1)
+{
+	double MinMax[6]{0, 0, 0, 0, 0, 0};
+	int steps[3]{0, 0, 0};
 	readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1);
 	cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
 	CubeRho.give_parent_wfn(dummy);
 
-	for (int i = 0; i < 3; i++) {
+	for (int i = 0; i < 3; i++)
+	{
 		CubeRho.set_origin(i, MinMax[i]);
 		CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
 	}
@@ -1246,24 +1211,24 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef, int atom = -1) {
 	CubeRho.set_comment2("from " + dummy.get_path());
 	CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
 
-	time_t start;
-	std::time(&start);
+	time_point start = get_time();
 
-	progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
+	progress_bar *progress = new progress_bar{std::cout, 50u, "Calculating Values"};
 	const int step = (int)std::max(floor(CubeRho.get_size(0) / 20.0), 1.0);
 	if (atom != -1)
 		std::cout << "Calculation for atom " << atom << std::endl;
 
 #pragma omp parallel for schedule(dynamic)
-	for (int i = 0; i < CubeRho.get_size(0); i++) {
+	for (int i = 0; i < CubeRho.get_size(0); i++)
+	{
 		for (int j = 0; j < CubeRho.get_size(1); j++)
-			for (int k = 0; k < CubeRho.get_size(2); k++) {
+			for (int k = 0; k < CubeRho.get_size(2); k++)
+			{
 
 				vec PosGrid{
 					i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
 					i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-					i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)
-				};
+					i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
 
 				if (atom == -1)
 					CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef));
@@ -1273,24 +1238,30 @@ void calc_cube(vec data, WFN& dummy, int& exp_coef, int atom = -1) {
 		if (i != 0 && i % step == 0)
 			progress->write(i / double(CubeRho.get_size(0)));
 	}
-	delete(progress);
+	delete (progress);
 
-	time_t end;
-	std::time(&end);
-	if (difftime(end, start) < 60) std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << difftime(end, start) << " s" << std::endl;
-	else if (difftime(end, start) < 3600) std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 60) << " m " << int(std::floor(difftime(end, start))) % 60 << " s" << std::endl;
-	else std::cout << "Time to calculate Values: " << std::fixed << std::setprecision(0) << std::floor(difftime(end, start) / 3600) << " h " << (int(std::floor(difftime(end, start))) % 3600) / 60 << " m" << std::endl;
+	using namespace std;
+	time_point end = get_time();
+	if (get_sec(start, end) < 60)
+		std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+	else if (get_sec(start, end) < 3600)
+		std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+	else
+		std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 	std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-	if (atom == -1) {
+	if (atom == -1)
+	{
 		CubeRho.write_file(true);
 	}
-	else {
+	else
+	{
 		std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
 		CubeRho.write_file(fn, false);
 	}
 };
 
-double numerical_3d_integral(std::function<double(double*)> f, double stepsize = 0.001, double r_max = 10.0) {
+double numerical_3d_integral(std::function<double(double *)> f, double stepsize = 0.001, double r_max = 10.0)
+{
 	double tot_int = 0;
 	double da = stepsize * constants::PI;
 	double dr = stepsize;
@@ -1298,24 +1269,27 @@ double numerical_3d_integral(std::function<double(double*)> f, double stepsize =
 	long long int total_calcs = upper * (long long int)(constants::PI / da * r_max / dr);
 	std::cout << "Integrating over " << total_calcs << " points" << std::endl;
 
-	progress_bar* progress = new progress_bar{ std::cout, 50u, "Integrating" };
+	progress_bar *progress = new progress_bar{std::cout, 50u, "Integrating"};
 	const long long int step = (long long int)std::max(floor(upper / 20.0), 1.0);
 
-#pragma omp parallel for reduction(+:tot_int) schedule(dynamic)
-	for (int phic = 0; phic <= upper; phic++) {
+#pragma omp parallel for reduction(+ : tot_int) schedule(dynamic)
+	for (int phic = 0; phic <= upper; phic++)
+	{
 		double phi = phic * da;
 		double cp = std::cos(phi);
 		double sp = std::sin(phi);
-		for (double theta = 0; theta <= constants::PI; theta += da) {
+		for (double theta = 0; theta <= constants::PI; theta += da)
+		{
 			double st = std::sin(theta);
 			double ct = std::cos(theta);
 			double x0 = st * cp, y0 = st * sp;
 			double ang_mom = dr * da * da * st;
-			for (double r = r_max; r >= 0; r -= dr) {
-				double d[4]{ r * x0,
-					r * y0,
-					r * ct,
-					r };
+			for (double r = r_max; r >= 0; r -= dr)
+			{
+				double d[4]{r * x0,
+							r * y0,
+							r * ct,
+							r};
 				tot_int += f(d) * r * r * ang_mom;
 			}
 		}
@@ -1327,38 +1301,42 @@ double numerical_3d_integral(std::function<double(double*)> f, double stepsize =
 	return tot_int;
 }
 
-double s_value(double* d) {
+double s_value(double *d)
+{
 	primitive p_0(0, 0, 3.5, 1.0);
 	int m = 0;
 	return pow(gaussian_radial(p_0, d[3]) * spherical_harmonic(p_0.type, m, d), 2);
 }
 
-double one(double* d) {
+double one(double *d)
+{
 	return 1;
 }
 
-double gaussian(double* d) {
+double gaussian(double *d)
+{
 	double g = exp(-3.5 * d[3] * d[3]);
 	return g;
 }
 
-void ML_test() {
+void ML_test()
+{
 	using namespace std;
-	//cout << "c_1_4p " << c_1_4p << endl;
-	//cout << "1/c_1_4p " << 1/ c_1_4p << endl;
-	//cout << "4pi " << FOUR_PI << endl;
-	//cout << "4/3 pi " << 4.0 / 3.0 * PI << endl;
-	//expected value integrating to r=1 
-	//for f=one is 4/3 pi
-	//for f=gaussian: 0.789257
-	//for f=s_value = 1?
-	//numerical_3d_integral(s_value,0.002,10.0);
+	// cout << "c_1_4p " << c_1_4p << endl;
+	// cout << "1/c_1_4p " << 1/ c_1_4p << endl;
+	// cout << "4pi " << FOUR_PI << endl;
+	// cout << "4/3 pi " << 4.0 / 3.0 * PI << endl;
+	// expected value integrating to r=1
+	// for f=one is 4/3 pi
+	// for f=gaussian: 0.789257
+	// for f=s_value = 1?
+	// numerical_3d_integral(s_value,0.002,10.0);
 
 	vector<unsigned long> shape{};
 	bool fortran_order;
 	vec data{};
 
-	string path{ "coefficients_conf0.npy" };
+	string path{"coefficients_conf0.npy"};
 	npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
 	WFN dummy(7);
@@ -1375,7 +1353,8 @@ void ML_test() {
 	WFN dummy2(7);
 	dummy2.read_xyz("water.xyz", std::cout);
 
-	nr_coefs = load_basis_into_WFN(dummy2, QZVP_JKfit);;
+	nr_coefs = load_basis_into_WFN(dummy2, QZVP_JKfit);
+	;
 
 	cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
 	calc_cube(data, dummy2, nr_coefs);
@@ -1386,7 +1365,8 @@ void ML_test() {
 	WFN dummy3(7);
 	dummy3.read_xyz("alanine.xyz", std::cout);
 
-	nr_coefs = load_basis_into_WFN(dummy3, TZVP_JKfit);;
+	nr_coefs = load_basis_into_WFN(dummy3, TZVP_JKfit);
+	;
 
 	cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
 	calc_cube(data, dummy3, nr_coefs);
@@ -1394,13 +1374,15 @@ void ML_test() {
 	cout << "Done :)" << endl;
 }
 
-void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
+void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
+{
 	std::vector<unsigned long> shape{};
 	bool fortran_order;
 	vec data{};
 
 	npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-	WFN dummy(7); dummy.read_xyz(xyzfile, std::cout);
+	WFN dummy(7);
+	dummy.read_xyz(xyzfile, std::cout);
 
 	int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
 	std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
@@ -1410,9 +1392,11 @@ void cube_from_coef_npy(std::string& coef_fn, std::string& xyzfile) {
 		calc_cube(data, dummy, nr_coefs, i);
 }
 
-void test_xtb_molden(options& opt, std::ostream& log_file) {
+void test_xtb_molden(options &opt, std::ostream &log_file)
+{
 	using namespace std;
-	for (int i = 0; i < 1; i++) {
+	for (int i = 0; i < 1; i++)
+	{
 		WFN wavy(8);
 		wavy.read_molden("Co2.molden", cout, true);
 		opt.cif = "Co2.cif";
@@ -1425,7 +1409,8 @@ void test_xtb_molden(options& opt, std::ostream& log_file) {
 	}
 }
 
-void test_core_dens() {
+void test_core_dens()
+{
 	using namespace std;
 	Thakkar T_Rb(37);
 	string base = "def2-ECP";
@@ -1437,11 +1422,10 @@ void test_core_dens() {
 	WFN ECP_way(9);
 	ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
 
-
 	WFN multi_ecp_wavy(9);
 	multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
 
-	//exit(0);
+	// exit(0);
 	WFN wavy(9);
 	wavy.read_gbw("Rb.gbw", cout, false);
 	wavy.delete_unoccupied_MOs();
@@ -1450,11 +1434,12 @@ void test_core_dens() {
 	wavy2.delete_unoccupied_MOs();
 
 	vector<vec> res(10);
-	for(int i=0; i<10; i++)
-    res[i].resize(130000, 0.0);
-		
+	for (int i = 0; i < 10; i++)
+		res[i].resize(130000, 0.0);
+
 #pragma omp parallel for
-	for (int i = 0; i < res[0].size(); i++) {
+	for (int i = 0; i < res[0].size(); i++)
+	{
 		double r, sr;
 		r = i * 0.001;
 		sr = r * 0.01;
@@ -1470,8 +1455,10 @@ void test_core_dens() {
 		res[9][i] = ECP_way.compute_dens(sr, 0, 0, false);
 	}
 	cout << fixed;
-	for (int i = 0; i < res[0].size(); i++) {
-		for (int j = 0; j < res.size(); j++) {
+	for (int i = 0; i < res[0].size(); i++)
+	{
+		for (int j = 0; j < res.size(); j++)
+		{
 			auto t = res[j][i];
 			cout << t;
 			cout << " ";
@@ -1479,6 +1466,4 @@ void test_core_dens() {
 		cout << "\n";
 	}
 	cout << flush;
-
 }
-

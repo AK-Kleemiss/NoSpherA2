@@ -344,7 +344,7 @@ namespace npy {
        pprint.pformat() so the keys are in alphabetic order.
      */
 
-     // remove trailing newline
+    // remove trailing newline
     if (header.back() != '\n') throw std::runtime_error("invalid header");
     header.pop_back();
 
@@ -420,7 +420,7 @@ namespace npy {
   }
 
   inline std::string read_header(std::istream& istream) {
-    // check magic bytes an version number
+    // check magic bytes and version number
     version_t version = read_magic(istream);
 
     uint32_t header_length = 0;
