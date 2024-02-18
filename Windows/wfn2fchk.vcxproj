@@ -1832,7 +1832,7 @@
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(IntDirFullPath)\NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
+      <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">

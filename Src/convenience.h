@@ -406,28 +406,28 @@ inline void remove_empty_elements(std::vector<std::string> &input, const std::st
 			input.erase(input.begin() + i);
 }
 
-std::chrono::high_resolution_clock::time_point get_time()
+inline std::chrono::high_resolution_clock::time_point get_time()
 {
 	// gets the current time using std chrono library
 	std::chrono::high_resolution_clock::time_point time = std::chrono::high_resolution_clock::now();
 	return time;
 }
 
-int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+inline int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
 {
 	// gets the time difference in milliseconds
 	std::chrono::milliseconds msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 	return msec.count();
 }
 
-int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+inline int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
 {
 	// gets the time difference in seconds
 	std::chrono::seconds sec = std::chrono::duration_cast<std::chrono::seconds>(end - start);
 	return sec.count();
 }
 
-void write_timing_to_file(std::ostream &file,
+inline void write_timing_to_file(std::ostream &file,
 						  time_point start,
 						  time_point end,
 						  time_point end_prototypes,
