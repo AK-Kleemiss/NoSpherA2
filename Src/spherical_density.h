@@ -46,11 +46,11 @@ protected:
 	};
 public:
 	Spherical_Atom(const int g_atom_number, const int ECP_m = 1) : atomic_number(g_atom_number), 
-		_offset((atomic_number-1) * 19) {
+		_offset((atomic_number-1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL) {
 		ECP_mode = ECP_m;
 		charge = 0;
 	};
-	Spherical_Atom() : _first_ex(0), _offset(0) {
+	Spherical_Atom() : _first_ex(0), _offset(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL) {
 		ECP_mode = 1;
 		atomic_number = 1;
 		charge = 0;
