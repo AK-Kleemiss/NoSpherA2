@@ -142,14 +142,17 @@ int main(int argc, char **argv)
       result.write_tsc_file(opt.cif);
     }
     log_file << " ... done!" << endl;
-    time_point end_write = get_time();
-    if (get_sec(start, end_write) < 60)
-      log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
-    else if (get_sec(start, end_write) < 3600)
-      log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 60) << " m " << get_sec(start, end_write) % 60 << " s\n";
-    else
-      log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
-    log_file << endl;
+    if (!opt.no_date)
+    {
+      time_point end_write = get_time();
+      if (get_sec(start, end_write) < 60)
+        log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
+      else if (get_sec(start, end_write) < 3600)
+        log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 60) << " m " << get_sec(start, end_write) % 60 << " s\n";
+      else
+        log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
+      log_file << endl;
+    }
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
