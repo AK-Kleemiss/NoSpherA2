@@ -5,24 +5,6 @@
 
 using namespace std;
 
-//--------------------------General convenience terminal functions---------------------------------
-// bool yesno()
-//{
-//  bool end = false;
-//  while (!end) {
-//    char dum = '?';
-//    cout << "(Y/N)?";
-//    cin >> dum;
-//    if (dum == 'y' || dum == 'Y') {
-//      cout << "Okay..." << endl;
-//      return true;
-//    }
-//    else if (dum == 'N' || dum == 'n') return false;
-//    else cout << "Sorry, i did not understand that!" << endl;
-//  }
-//  return false;
-//};
-
 string help_message()
 {
 	std::string t = "\n----------------------------------------------------------------------------\n";
@@ -33,6 +15,7 @@ string help_message()
 	t.append("   -fchk           <FILENAME>.fchk        Write a wavefunction to the given filename\n");
 	t.append("   -b              <FILENAME>             Read this basis set\n");
 	t.append("   -d              <PATH>                 Path to basis_sets directory with basis_sets in tonto style\n");
+	t.append("   -dmin		     <NUMBER>               Minimum d-spacing to consider for structure factors (repalaces hkl file)\n");
 	t.append("   --help/-help/--h                       print this help\n");
 	t.append("   -v                                     Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
 	t.append("   -v2                                    Even more stuff\n");
@@ -60,6 +43,9 @@ string help_message()
 	t.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
 	t.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
 	t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
+	t.append("      convert tsc:  NoSpherA2.exe -tscb A.tsc\n");
+	t.append("      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n");
+	t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
 	return t;
 }
 string NoSpherA2_message()
@@ -72,7 +58,13 @@ string NoSpherA2_message()
 	t.append("                /_/\n");
 	t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
 	t.append("Please give credit and cite corresponding pieces!\n");
+	t.append("List of contributors of pieces of code or funcitonality:\n");
+	t.append("      Florian Kleemiss,\n");
+	t.append("      Emmanuel Hupf,\n");
+	t.append("      Alessandro Genoni,\n");
+	t.append("      and many more in communications or by feedback!\n");
 	t.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
+	t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174\n");
 	return t;
 }
 
@@ -81,7 +73,7 @@ string build_date()
 	return ("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
 }
 
-bool is_similar_rel(const double& first, const double& second, const double& tolerance)
+bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
 	double diff = abs(first - second);
 	if (diff > abs((first + second + 0.01) * tolerance / 2))
@@ -90,7 +82,7 @@ bool is_similar_rel(const double& first, const double& second, const double& tol
 		return true;
 };
 
-bool is_similar(const double& first, const double& second, const double& tolerance)
+bool is_similar(const double &first, const double &second, const double &tolerance)
 {
 	double diff = abs(first - second);
 	if (diff > pow(10, tolerance))
@@ -99,7 +91,7 @@ bool is_similar(const double& first, const double& second, const double& toleran
 		return true;
 };
 
-bool is_similar_abs(const double& first, const double& second, const double& tolerance)
+bool is_similar_abs(const double &first, const double &second, const double &tolerance)
 {
 	double diff = abs(first - second);
 	if (diff > abs(tolerance))
@@ -120,9 +112,9 @@ void cls()
 #endif
 };
 
-string atnr2letter(const int& nr)
+string atnr2letter(const int &nr)
 {
-	vector<string> Labels{ "DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr" };
+	vector<string> Labels{"DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"};
 	if (nr == 0)
 	{
 		// Exception for Q peaks in residual maps
@@ -142,7 +134,7 @@ string atnr2letter(const int& nr)
 		return Labels[nr];
 };
 
-int get_Z_from_label(const char* tmp)
+int get_Z_from_label(const char *tmp)
 {
 	if (strcmp(tmp, "H") == 0)
 		return 0;
@@ -399,7 +391,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
 	return cos(x) - get(x);
 }
 */
-void copy_file(string& from, string& to)
+void copy_file(string &from, string &to)
 {
 	ifstream source(from.c_str(), ios::binary);
 	ofstream dest(to.c_str(), ios::binary);
@@ -425,7 +417,7 @@ string get_home_path(void)
 #endif
 }
 
-void join_path(string& s1, string& s2)
+void join_path(string &s1, string &s2)
 {
 #ifdef _WIN32
 	s1.append("\\");
@@ -436,7 +428,7 @@ void join_path(string& s1, string& s2)
 	s1.append(s2);
 }
 
-string get_filename_from_path(const string& input)
+string get_filename_from_path(const string &input)
 {
 #ifdef _WIN32
 	return input.substr(input.rfind("\\") + 1);
@@ -445,7 +437,7 @@ string get_filename_from_path(const string& input)
 #endif
 }
 
-string get_foldername_from_path(const string& input)
+string get_foldername_from_path(const string &input)
 {
 #ifdef _WIN32
 	return input.substr(0, input.rfind("\\") + 1);
@@ -454,7 +446,7 @@ string get_foldername_from_path(const string& input)
 #endif
 }
 
-string get_basename_without_ending(const string& input)
+string get_basename_without_ending(const string &input)
 {
 	return input.substr(0, input.rfind("."));
 }
@@ -504,7 +496,7 @@ void write_template_confi()
 	return;
 };
 
-int program_confi(string& gaussian_path, string& turbomole_path, string& basis, int& ncpus, double& mem, bool debug, bool expert, unsigned int counter)
+int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
 	counter++;
 	if (counter == 3)
@@ -545,7 +537,7 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
 	conf.seekg(0);
 	getline(conf, line);
 	size_t length;
-	char* tempchar = new char[200];
+	char *tempchar = new char[200];
 	int run = 0;
 	while (!conf.eof())
 	{
@@ -589,20 +581,20 @@ int program_confi(string& gaussian_path, string& turbomole_path, string& basis, 
 	return 1;
 };
 
-bool check_bohr(WFN& wave, bool debug)
+bool check_bohr(WFN &wave, bool debug)
 {
 	double min_length = 300.0;
 	for (int i = 0; i < wave.get_ncen(); i++)
 	{
-		double atom1[3]{ 0, 0, 0 };
+		double atom1[3]{0, 0, 0};
 		for (int x = 0; x < 3; x++)
 			atom1[x] = wave.get_atom_coordinate(i, x);
 		for (int j = i + 1; j < wave.get_ncen(); j++)
 		{
-			double atom2[3]{ 0, 0, 0 };
+			double atom2[3]{0, 0, 0};
 			for (int x = 0; x < 3; x++)
 				atom2[x] = wave.get_atom_coordinate(j, x);
-			double d[3]{ 0, 0, 0 };
+			double d[3]{0, 0, 0};
 			d[0] = atom1[0] - atom2[0];
 			d[1] = atom1[1] - atom2[1];
 			d[2] = atom1[2] - atom2[2];
@@ -623,7 +615,7 @@ bool check_bohr(WFN& wave, bool debug)
 	return (!(min_length < 2));
 };
 
-int filetype_identifier(string& file, bool debug)
+int filetype_identifier(string &file, bool debug)
 {
 	/*
 	List of filetypes and correpsonding values:
@@ -638,14 +630,14 @@ int filetype_identifier(string& file, bool debug)
 	if (debug)
 	{
 		cout << "Testing WFN:  " << file.find(".wfn") << endl
-			<< "Testing out:  " << file.find(".out") << endl
-			<< "Testing FFN:  " << file.find(".ffn") << endl
-			<< "Testing CUB:  " << file.find(".cub") << endl
-			<< "Testing CUBE: " << file.find(".cube") << endl
-			<< "Testing Grid: " << file.find(".grd") << endl
-			<< "Testing fchk: " << file.find(".fchk") << endl
-			<< "Testing FChk: " << file.find(".FChk") << endl
-			<< "Testing Fchk: " << file.find(".Fchk") << endl;
+			 << "Testing out:  " << file.find(".out") << endl
+			 << "Testing FFN:  " << file.find(".ffn") << endl
+			 << "Testing CUB:  " << file.find(".cub") << endl
+			 << "Testing CUBE: " << file.find(".cube") << endl
+			 << "Testing Grid: " << file.find(".grd") << endl
+			 << "Testing fchk: " << file.find(".fchk") << endl
+			 << "Testing FChk: " << file.find(".FChk") << endl
+			 << "Testing Fchk: " << file.find(".Fchk") << endl;
 		cout << "string::npos: " << string::npos << endl;
 	}
 	int temp_type = 0;
@@ -653,12 +645,12 @@ int filetype_identifier(string& file, bool debug)
 	temp = 0;
 	if (debug)
 		cout << "Temp before any checks: " << temp << endl;
-	vector<string> types{ ".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk" };
+	vector<string> types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
 	if (file.find(".wfn") != string::npos)
 	{
 		if (debug)
 			cout << "Checking for"
-			<< ".wfn" << endl;
+				 << ".wfn" << endl;
 		temp_type = 2;
 		found = file.rfind(".wfn");
 		if (debug)
@@ -681,7 +673,7 @@ int filetype_identifier(string& file, bool debug)
 	{
 		if (debug)
 			cout << "Checking for"
-			<< ".out" << endl;
+				 << ".out" << endl;
 		temp_type = 1;
 		found = file.rfind(".out");
 		for (int i = 0; i < types.size(); i++)
@@ -696,7 +688,7 @@ int filetype_identifier(string& file, bool debug)
 	{
 		if (debug)
 			cout << "Checking for"
-			<< ".ffn" << endl;
+				 << ".ffn" << endl;
 		temp_type = 4;
 		found = file.rfind(".ffn");
 		for (int i = 0; i < types.size(); i++)
@@ -711,7 +703,7 @@ int filetype_identifier(string& file, bool debug)
 	{
 		if (debug)
 			cout << "Checking for"
-			<< ".cub" << endl;
+				 << ".cub" << endl;
 		temp_type = 3;
 		found = file.rfind(".cub");
 		for (int i = 0; i < types.size(); i++)
@@ -789,7 +781,7 @@ int filetype_identifier(string& file, bool debug)
 	return -1;
 }
 
-string go_get_string(ifstream& file, string search, bool rewind)
+string go_get_string(ifstream &file, string search, bool rewind)
 {
 	if (rewind)
 	{
@@ -805,7 +797,7 @@ string go_get_string(ifstream& file, string search, bool rewind)
 		return line;
 }
 
-string shrink_string(string& input)
+string shrink_string(string &input)
 {
 	while (input.find(" ") != -1)
 	{
@@ -862,7 +854,7 @@ string shrink_string(string& input)
 	return input;
 };
 
-string shrink_string_to_atom(string& input, const int& atom_number)
+string shrink_string_to_atom(string &input, const int &atom_number)
 {
 	while (input.find(" ") != -1)
 	{
@@ -1191,7 +1183,7 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 };
 */
 
-void select_cubes(vector<vector<unsigned int>>& selection, vector<WFN>& wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
 	// asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
 	// Returns values in selection[0][i] for iths selection of wavefunction and
@@ -1202,7 +1194,7 @@ void select_cubes(vector<vector<unsigned int>>& selection, vector<WFN>& wavy, un
 	else
 		cout << "." << endl;
 	cout << endl
-		<< endl;
+		 << endl;
 	for (int w = 0; w < wavy.size(); w++)
 	{
 		stringstream stream;
@@ -1215,7 +1207,7 @@ void select_cubes(vector<vector<unsigned int>>& selection, vector<WFN>& wavy, un
 		{
 			if (c == 0)
 				cout << "        |" << endl
-				<< "Cube    |" << endl;
+					 << "Cube    |" << endl;
 			else
 				cout << "        |" << endl;
 			if (!wfnonly)
@@ -1232,8 +1224,8 @@ void select_cubes(vector<vector<unsigned int>>& selection, vector<WFN>& wavy, un
 			cout << endl;
 		}
 		cout << "_____________________________________________________________" << endl
-			<< endl
-			<< endl;
+			 << endl
+			 << endl;
 	}
 	// bool happy = false;
 	unsigned int selected_cubes = 0;
@@ -1302,7 +1294,7 @@ void select_cubes(vector<vector<unsigned int>>& selection, vector<WFN>& wavy, un
 	} while (true);
 };
 
-bool unsaved_files(vector<WFN>& wavy)
+bool unsaved_files(vector<WFN> &wavy)
 {
 	for (int w = 0; w < wavy.size(); w++)
 		for (int c = 0; c < wavy[w].cub.size(); c++)
@@ -1328,9 +1320,9 @@ void progress_bar::write(double fraction)
 }
 
 void readxyzMinMax_fromWFN(
-	WFN& wavy,
-	double* CoordMinMax,
-	int* NbSteps,
+	WFN &wavy,
+	double *CoordMinMax,
+	int *NbSteps,
 	double Radius,
 	double Increments,
 	bool no_bohr)
@@ -1398,11 +1390,11 @@ void readxyzMinMax_fromWFN(
 
 void readxyzMinMax_fromCIF(
 	string cif,
-	double* CoordMinMax,
-	int* NbSteps,
-	vector<vector<double>>& cm,
+	double *CoordMinMax,
+	int *NbSteps,
+	vector<vector<double>> &cm,
 	double Resolution,
-	ofstream& file,
+	ofstream &file,
 	bool debug)
 {
 	if (debug)
@@ -1434,13 +1426,13 @@ void readxyzMinMax_fromCIF(
 	{
 		if (debug)
 			file << "While line! " << setw(80) << line
-			<< setw(10) << a << found[0]
-			<< setw(10) << b << found[1]
-			<< setw(10) << c << found[2]
-			<< setw(10) << alpha << found[3]
-			<< setw(10) << beta << found[4]
-			<< setw(10) << gamma << found[5]
-			<< setw(10) << v << found[6] << endl;
+				 << setw(10) << a << found[0]
+				 << setw(10) << b << found[1]
+				 << setw(10) << c << found[2]
+				 << setw(10) << alpha << found[3]
+				 << setw(10) << beta << found[4]
+				 << setw(10) << gamma << found[5]
+				 << setw(10) << v << found[6] << endl;
 		getline(cif_input, line);
 		for (int k = 0; k < cell_keywords.size(); k++)
 		{
@@ -1490,7 +1482,7 @@ void readxyzMinMax_fromCIF(
 
 	if (debug)
 		file << "Making cm" << endl
-		<< a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
+			 << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
 
 	cm[0][0] = a / 0.529177249;
 	cm[1][0] = 0.0;
@@ -1523,7 +1515,7 @@ void readxyzMinMax_fromCIF(
 	cif_input.close();
 }
 
-const double normgauss(const int& type, const double& exp)
+const double normgauss(const int &type, const double &exp)
 {
 	int t[3];
 	if (type > 0)
@@ -1534,7 +1526,7 @@ const double normgauss(const int& type, const double& exp)
 	long long int temp2 = constants::ft[2 * t[0]] * constants::ft[2 * t[1]] * constants::ft[2 * t[2]];
 	return pow(2 * exp / constants::PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vec>& p, vector<vec>& d, vector<vec>& f, vector<vec>& g)
+bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vector<vec> &g)
 {
 	//
 	// From 3P: P0 P1 P2
@@ -1662,7 +1654,7 @@ bool generate_sph2cart_mat(vector<vec>& p, vector<vec>& d, vector<vec>& f, vecto
 	g[14][4] = 3.0 / sqrt(7);
 	return true;
 }
-bool generate_cart2sph_mat(vector<vec>& d, vector<vec>& f, vector<vec>& g, vector<vec>& h)
+bool generate_cart2sph_mat(vector<vec> &d, vector<vec> &f, vector<vec> &g, vector<vec> &h)
 {
 	//
 	// From 5D: D 0, D + 1, D - 1, D + 2, D - 2
@@ -1847,66 +1839,66 @@ bool generate_cart2sph_mat(vector<vec>& d, vector<vec>& f, vector<vec>& g, vecto
 }
 
 const int type_vector[168]{
-		0, 0, 0,
-		1, 0, 0,
-		0, 1, 0,
-		0, 0, 1,
-		2, 0, 0,
-		0, 2, 0,
-		0, 0, 2,
-		1, 1, 0,
-		1, 0, 1,
-		0, 1, 1,
-		3, 0, 0,
-		0, 3, 0,
-		0, 0, 3,
-		2, 1, 0,
-		2, 0, 1,
-		0, 2, 1,
-		1, 2, 0,
-		1, 0, 2,
-		0, 1, 2,
-		1, 1, 1,
-		0, 0, 4,
-		0, 1, 3,
-		0, 2, 2,
-		0, 3, 1,
-		0, 4, 0,
-		1, 0, 3,
-		1, 1, 2,
-		1, 2, 1,
-		1, 3, 0,
-		2, 0, 2,
-		2, 1, 1,
-		2, 2, 0,
-		3, 0, 1,
-		3, 1, 0,
-		4, 0, 0,
-		0, 0, 5,
-		0, 1, 4,
-		0, 2, 3,
-		0, 3, 2,
-		0, 4, 1,
-		0, 5, 0,
-		1, 0, 4,
-		1, 1, 3,
-		1, 2, 2,
-		1, 3, 1,
-		1, 4, 0,
-		2, 0, 3,
-		2, 1, 2,
-		2, 2, 1,
-		2, 3, 0,
-		3, 0, 2,
-		3, 1, 1,
-		3, 2, 0,
-		4, 0, 1,
-		4, 1, 0,
-		5, 0, 0 };
+	0, 0, 0,
+	1, 0, 0,
+	0, 1, 0,
+	0, 0, 1,
+	2, 0, 0,
+	0, 2, 0,
+	0, 0, 2,
+	1, 1, 0,
+	1, 0, 1,
+	0, 1, 1,
+	3, 0, 0,
+	0, 3, 0,
+	0, 0, 3,
+	2, 1, 0,
+	2, 0, 1,
+	0, 2, 1,
+	1, 2, 0,
+	1, 0, 2,
+	0, 1, 2,
+	1, 1, 1,
+	0, 0, 4,
+	0, 1, 3,
+	0, 2, 2,
+	0, 3, 1,
+	0, 4, 0,
+	1, 0, 3,
+	1, 1, 2,
+	1, 2, 1,
+	1, 3, 0,
+	2, 0, 2,
+	2, 1, 1,
+	2, 2, 0,
+	3, 0, 1,
+	3, 1, 0,
+	4, 0, 0,
+	0, 0, 5,
+	0, 1, 4,
+	0, 2, 3,
+	0, 3, 2,
+	0, 4, 1,
+	0, 5, 0,
+	1, 0, 4,
+	1, 1, 3,
+	1, 2, 2,
+	1, 3, 1,
+	1, 4, 0,
+	2, 0, 3,
+	2, 1, 2,
+	2, 2, 1,
+	2, 3, 0,
+	3, 0, 2,
+	3, 1, 1,
+	3, 2, 0,
+	4, 0, 1,
+	4, 1, 0,
+	5, 0, 0};
 
 void type2vector(
-	const int& index,
-	int* vector)
+	const int &index,
+	int *vector)
 {
 	if (index < 1 || index > 56)
 	{
@@ -1921,7 +1913,7 @@ void type2vector(
 	vector[2] = type_vector[temp * 3 + 2];
 }
 
-bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& log3, bool debug)
+bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
 {
 	vector<vec> Uij, Cijk, Dijkl;
 	ifstream asym_cif_input(cif.c_str(), std::ios::in);
@@ -1930,7 +1922,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
 	string line;
 	vector<string> labels;
 	int count_fields = 0;
-	int position_field[3] = { 0, 0, 0 };
+	int position_field[3] = {0, 0, 0};
 	int label_field = 100;
 	vector<vector<double>> positions;
 	positions.resize(wavy.get_ncen());
@@ -1987,9 +1979,9 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
 					{
 						if (debug)
 							log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
-							<< "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
+								 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
 						wavy.atoms[i].label = fields[label_field];
-						wavy.atoms[i].frac_coords = { stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]]) };
+						wavy.atoms[i].frac_coords = {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])};
 						found_this_one = true;
 						break;
 					}
@@ -2005,7 +1997,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
 	asym_cif_input.clear();
 	asym_cif_input.seekg(0, asym_cif_input.beg);
 	count_fields = 0;
-	int ADP_field[15] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int ADP_field[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 	label_field = 100;
 	atoms_read = false;
 	Uij.resize(wavy.get_ncen());
@@ -2236,7 +2228,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN& wavy, cell& unit_cell, ofstream& 
 	return true;
 };
 
-bool read_fchk_integer_block(ifstream& in, string heading, ivec& result, bool rewind)
+bool read_fchk_integer_block(ifstream &in, string heading, ivec &result, bool rewind)
 {
 	if (result.size() != 0)
 		result.clear();
@@ -2257,7 +2249,7 @@ bool read_fchk_integer_block(ifstream& in, string heading, ivec& result, bool re
 	}
 	return true;
 };
-bool read_fchk_double_block(ifstream& in, string heading, vec& result, bool rewind)
+bool read_fchk_double_block(ifstream &in, string heading, vec &result, bool rewind)
 {
 	if (result.size() != 0)
 		result.clear();
@@ -2286,17 +2278,17 @@ double read_fchk_double(string in)
 {
 	return stod(in.substr(49, in.length() - 49));
 };
-int read_fchk_integer(std::ifstream& in, std::string search, bool rewind)
+int read_fchk_integer(std::ifstream &in, std::string search, bool rewind)
 {
 	string temp = go_get_string(in, search, rewind);
 	return stoi(temp.substr(49, temp.length() - 49));
 };
-double read_fchk_double(std::ifstream& in, std::string search, bool rewind)
+double read_fchk_double(std::ifstream &in, std::string search, bool rewind)
 {
 	string temp = go_get_string(in, search, rewind);
 	return stod(temp.substr(49, temp.length() - 49));
 };
-void swap_sort(ivec order, cvec& v)
+void swap_sort(ivec order, cvec &v)
 {
 	int i = 0;
 	while (i < v.size() - 1)
@@ -2319,7 +2311,7 @@ void swap_sort(ivec order, cvec& v)
 	}
 }
 
-void swap_sort_multi(ivec order, std::vector<ivec>& v)
+void swap_sort_multi(ivec order, std::vector<ivec> &v)
 {
 	int i = 0;
 	ivec temp;
@@ -2349,7 +2341,7 @@ void swap_sort_multi(ivec order, std::vector<ivec>& v)
 	}
 }
 
-double get_lambda_1(double* a)
+double get_lambda_1(double *a)
 {
 	vec bw, zw;
 	// int run = 0;
@@ -2375,15 +2367,15 @@ double get_lambda_1(double* a)
 		const double p2 = pow(a[0] - q, 2) + pow(a[4] - q, 2) + pow(a[8] - q, 2) + 2 * p1;
 		const double p = sqrt(p2 / 6);
 		const double B[9]{
-				a[0] - q,
-				a[1],
-				a[2],
-				a[3],
-				a[4] - q,
-				a[5],
-				a[6],
-				a[7],
-				a[8] - q };
+			a[0] - q,
+			a[1],
+			a[2],
+			a[3],
+			a[4] - q,
+			a[5],
+			a[6],
+			a[7],
+			a[8] - q};
 		const double r = (B[0] * B[4] * B[8] + B[1] * B[5] * B[6] + B[3] * B[4] * B[7] - B[0] * B[5] * B[7] - B[1] * B[3] * B[8] - B[2] * B[4] * B[6]) / 2;
 		double phi;
 		if (r <= -1)
@@ -2407,17 +2399,17 @@ double get_lambda_1(double* a)
 	}
 };
 
-const double gaussian_radial(primitive& p, double& r)
+const double gaussian_radial(primitive &p, double &r)
 {
 	return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
 }
 
-const double calc_density_ML(double& x,
-	double& y,
-	double& z,
-	vec& coefficients,
-	std::vector<atom>& atoms,
-	const int& exp_coefs)
+const double calc_density_ML(double &x,
+							 double &y,
+							 double &z,
+							 vec &coefficients,
+							 std::vector<atom> &atoms,
+							 const int &exp_coefs)
 {
 	double dens = 0, radial = 0;
 	int coef_counter = 0;
@@ -2425,11 +2417,11 @@ const double calc_density_ML(double& x,
 	for (int a = 0; a < atoms.size(); a++)
 	{
 		size = (int)atoms[a].basis_set.size();
-		basis_set_entry* bf;
+		basis_set_entry *bf;
 		double d[4]{
-				x - atoms[a].x,
-				y - atoms[a].y,
-				z - atoms[a].z, 0.0 };
+			x - atoms[a].x,
+			y - atoms[a].y,
+			z - atoms[a].z, 0.0};
 		// store r in last element
 		d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 		// normalize distances for spherical harmonic
@@ -2452,13 +2444,13 @@ const double calc_density_ML(double& x,
 	return dens;
 }
 
-const double calc_density_ML(double& x,
-	double& y,
-	double& z,
-	vec& coefficients,
-	std::vector<atom>& atoms,
-	const int& exp_coefs,
-	const int& atom_nr)
+const double calc_density_ML(double &x,
+							 double &y,
+							 double &z,
+							 vec &coefficients,
+							 std::vector<atom> &atoms,
+							 const int &exp_coefs,
+							 const int &atom_nr)
 {
 	double dens = 0, radial = 0;
 	int coef_counter = 0;
@@ -2468,11 +2460,11 @@ const double calc_density_ML(double& x,
 		if (a == atom_nr)
 		{
 			size = (int)atoms[a].basis_set.size();
-			basis_set_entry* bf;
+			basis_set_entry *bf;
 			double d[4]{
-					x - atoms[a].x,
-					y - atoms[a].y,
-					z - atoms[a].z, 0.0 };
+				x - atoms[a].x,
+				y - atoms[a].y,
+				z - atoms[a].z, 0.0};
 			// store r in last element
 			d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
 			// normalize distances for spherical harmonic
@@ -2504,13 +2496,13 @@ const double calc_density_ML(double& x,
 	return dens;
 }
 
-int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b)
+int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b)
 {
 	int nr_coefs = 0;
 	for (int i = 0; i < wavy.atoms.size(); i++)
 	{
 		int current_charge = wavy.atoms[i].charge - 1;
-		const primitive* basis = b[current_charge].data();
+		const primitive *basis = b[current_charge].data();
 		int size = (int)b[current_charge].size();
 		for (int e = 0; e < size; e++)
 		{
@@ -2521,7 +2513,7 @@ int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b)
 	return nr_coefs;
 }
 
-double get_decimal_precision_from_CIF_number(string& given_string)
+double get_decimal_precision_from_CIF_number(string &given_string)
 {
 	int len = (int)given_string.length();
 	int open_bracket = -1;
@@ -2709,8 +2701,8 @@ void options::digest_options()
 				cout << "Reading set ECPs" << endl;
 			int j = 0;
 			while (argc >= i + 2 * (j + 1) &&
-				string(arguments[i + j]).find("-") != 0 &&
-				string(arguments[i + j + 1]).find("-") != 0)
+				   string(arguments[i + j]).find("-") != 0 &&
+				   string(arguments[i + j + 1]).find("-") != 0)
 			{
 				ECP_nrs.push_back(stoi(arguments[i + j]));
 				ECP_elcounts.push_back(stoi(arguments[i + j + 1]));
@@ -2834,7 +2826,8 @@ void options::digest_options()
 			calc = rdg = true;
 		else if (temp.find("-rkpts") < 1)
 			read_k_pts = true;
-		else if (temp == "-rho_cube_test") {
+		else if (temp == "-rho_cube_test")
+		{
 			test_density_cubes(*this, log_file);
 			exit(0);
 		}
@@ -2867,17 +2860,20 @@ void options::digest_options()
 			wfn = arguments[i + 3];
 			dmin = fromString<double>(arguments[i + 4]);
 		}
-		else if (temp == "-spherical_harmonic") {
+		else if (temp == "-spherical_harmonic")
+		{
 			spherical_harmonic_test();
 			exit(0);
 		}
-		else if (temp == "-test-core") {
+		else if (temp == "-test-core")
+		{
 			test_core_dens();
 			exit(0);
 		}
 		else if (temp == "-test")
 			cout << "Running in test mode!" << endl, test = true;
-		else if (temp == "-thakkar_d_plot") {
+		else if (temp == "-thakkar_d_plot")
+		{
 			cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
 			exit(0);
 		}
@@ -2913,7 +2909,8 @@ void options::digest_options()
 			wfn = arguments[i + 1];
 			err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
 		}
-		else if (temp == "-xtb_test") {
+		else if (temp == "-xtb_test")
+		{
 			test_xtb_molden(*this, log_file);
 			exit(0);
 		}
@@ -2924,7 +2921,7 @@ void options::digest_options()
 	}
 };
 
-void options::look_for_debug(int& argc, char** argv)
+void options::look_for_debug(int &argc, char **argv)
 {
 	// This loop figures out command line options
 	for (int i = 0; i < argc; i++)
@@ -2943,7 +2940,7 @@ void options::look_for_debug(int& argc, char** argv)
 	}
 };
 
-const double spherical_harmonic(const int& l, const int& m, const double* d)
+const double spherical_harmonic(const int &l, const int &m, const double *d)
 {
 	/*Here d[0] = x
 				 d[1] = y
@@ -2951,8 +2948,8 @@ const double spherical_harmonic(const int& l, const int& m, const double* d)
 				 d[3] = r^2 IGNORED
 				 d[4] = r   IGNORED
 				 */
-				 // Will need extension for up to l=8
-				 // calc spherical harmonic
+	// Will need extension for up to l=8
+	// calc spherical harmonic
 	double SH = 0, x = d[0], y = d[1], z = d[2];
 	switch (l)
 	{
@@ -3051,7 +3048,7 @@ const double spherical_harmonic(const int& l, const int& m, const double* d)
 			break;
 		case 4: // G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
 			SH = constants::c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
-				(pow(y, 2) * (3 * pow(x, 2) - pow(y, 2))));
+										  (pow(y, 2) * (3 * pow(x, 2) - pow(y, 2))));
 			break;
 		case -4: // G -4 XY(X^2-Y^2)
 			SH = constants::c_315_16p * x * y * (pow(x, 2) - pow(y, 2));

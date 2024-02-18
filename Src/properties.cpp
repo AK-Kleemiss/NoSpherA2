@@ -21,8 +21,7 @@ void Calc_Spherical_Dens(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Spherical Density"};
   const int step = (int)max(floor(3 * CubeSpher.get_size(0) / 20.0), 1.0);
@@ -93,14 +92,13 @@ void Calc_Spherical_Dens(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Static_Def(
@@ -119,8 +117,7 @@ void Calc_Static_Def(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Deformation Density"};
   const int step = (int)max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
@@ -189,14 +186,13 @@ void Calc_Static_Def(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Static_Def(
@@ -216,8 +212,7 @@ void Calc_Static_Def(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Deformation Density"};
   const int step = (int)max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
@@ -276,14 +271,13 @@ void Calc_Static_Def(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Hirshfeld(
@@ -303,8 +297,7 @@ void Calc_Hirshfeld(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
@@ -376,14 +369,13 @@ void Calc_Hirshfeld(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Hirshfeld(
@@ -404,8 +396,7 @@ void Calc_Hirshfeld(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
@@ -463,14 +454,13 @@ void Calc_Hirshfeld(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Hirshfeld_atom(
@@ -491,8 +481,7 @@ void Calc_Hirshfeld_atom(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(3 * CubeHirsh.get_size(0) / 20.0), 1.0);
@@ -550,14 +539,13 @@ void Calc_Hirshfeld_atom(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Rho(
@@ -575,8 +563,7 @@ void Calc_Rho(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
@@ -632,14 +619,13 @@ void Calc_Rho(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Rho_spherical_harmonics(
@@ -649,8 +635,7 @@ void Calc_Rho_spherical_harmonics(
     ostream &file)
 {
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Rho"};
   const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
@@ -685,14 +670,13 @@ void Calc_Rho_spherical_harmonics(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_MO_spherical_harmonics(
@@ -710,8 +694,7 @@ void Calc_MO_spherical_harmonics(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
@@ -735,14 +718,13 @@ void Calc_MO_spherical_harmonics(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_S_Rho(
@@ -763,8 +745,7 @@ void Calc_S_Rho(
   if (nodate)
     nodate = nodate;
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
   const int step = (int)max(floor(Cube_S_Rho.get_size(0) * 3 / 20.0), 1.0);
@@ -792,14 +773,13 @@ void Calc_S_Rho(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void Calc_Prop(
@@ -823,8 +803,7 @@ void Calc_Prop(
   }
 #endif
 
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = NULL;
   if (!test)
@@ -971,14 +950,13 @@ void Calc_Prop(
   if (!test)
   {
     delete (progress);
-    time_t end;
-    std::time(&end);
-    if (difftime(end, start) < 60)
-      file << "Time to calculate Values: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-    else if (difftime(end, start) < 3600)
-      file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+    time_point end = get_time();
+    if (get_sec(start, end) < 60)
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
     else
-      file << "Time to calculate Values: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
   }
 };
 
@@ -997,8 +975,8 @@ void Calc_ESP(
       omp_set_nested(1);
   }
 #endif
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
+
   vector<vector<double>> d2;
   d2.resize(wavy.get_ncen());
   for (int i = 0; i < wavy.get_ncen(); i++)
@@ -1076,14 +1054,13 @@ void Calc_ESP(
   {
     delete (progress);
 
-    time_t end;
-    std::time(&end);
-    if (difftime(end, start) < 60)
-      file << "Time to calculate ESP: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-    else if (difftime(end, start) < 3600)
-      file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+    time_point end = get_time();
+    if (get_sec(start, end) < 60)
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
     else
-      file << "Time to calculate ESP: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+      file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
   }
 };
 
@@ -1103,8 +1080,7 @@ void Calc_MO(
       omp_set_nested(1);
   }
 #endif
-  time_t start;
-  std::time(&start);
+  time_point start = get_time();
 
   progress_bar *progress = new progress_bar{file, 50u, "Calculating MO"};
   const int step = (int)max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
@@ -1162,14 +1138,13 @@ void Calc_MO(
   }
   delete (progress);
 
-  time_t end;
-  std::time(&end);
-  if (difftime(end, start) < 60)
-    file << "Time to calculate MO: " << fixed << setprecision(0) << difftime(end, start) << " s" << endl;
-  else if (difftime(end, start) < 3600)
-    file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 60) << " m " << int(floor(difftime(end, start))) % 60 << " s" << endl;
+  time_point end = get_time();
+  if (get_sec(start, end) < 60)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+  else if (get_sec(start, end) < 3600)
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
   else
-    file << "Time to calculate MO: " << fixed << setprecision(0) << floor(difftime(end, start) / 3600) << " h " << (int(floor(difftime(end, start))) % 3600) / 60 << " m" << endl;
+    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 void properties_calculation(options &opt)
@@ -1421,17 +1396,20 @@ void properties_calculation(options &opt)
   }
 }
 
-void combine_mo(options& opt) {
+void combine_mo(options &opt)
+{
   using namespace std;
   WFN wavy1(2);
   WFN wavy2(2);
   WFN wavy3(2);
   wavy1.read_wfn(opt.combine_mo[0], false, cout);
   wavy2.read_wfn(opt.combine_mo[1], false, cout);
-  for (int i = 0; i < wavy1.get_ncen(); i++) {
+  for (int i = 0; i < wavy1.get_ncen(); i++)
+  {
     wavy3.push_back_atom(wavy1.get_atom(i));
   }
-  for (int i = 0; i < wavy2.get_ncen(); i++) {
+  for (int i = 0; i < wavy2.get_ncen(); i++)
+  {
     wavy3.push_back_atom(wavy2.get_atom(i));
   }
   cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
@@ -1444,23 +1422,27 @@ void combine_mo(options& opt) {
   readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
 
   cout << "Read input\nCalculating for MOs ";
-  for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
+  for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
+  {
     cout << opt.cmo1[v1] << " ";
   }
   cout << "of fragment 1 and MOs ";
-  for (int v1 = 0; v1 < opt.cmo2.size(); v1++) {
+  for (int v1 = 0; v1 < opt.cmo2.size(); v1++)
+  {
     cout << opt.cmo2[v1] << " ";
   }
   cout << "of fragment 2" << endl;
-  double MinMax[6]{ 100,100,100,-100,-100,-100 };
-  int steps[3]{ 0,0,0 };
-  for (int i = 0; i < 3; i++) {
+  double MinMax[6]{100, 100, 100, -100, -100, -100};
+  int steps[3]{0, 0, 0};
+  for (int i = 0; i < 3; i++)
+  {
     if (MinMax1[i] < MinMax[i])
       MinMax[i] = MinMax1[i];
     if (MinMax1[i + 3] > MinMax[i + 3])
       MinMax[i + 3] = MinMax1[i + 3];
   }
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     if (MinMax2[i] < MinMax[i])
       MinMax[i] = MinMax2[i];
     if (MinMax2[i + 3] > MinMax[i + 3])
@@ -1474,7 +1456,8 @@ void combine_mo(options& opt) {
   MO1.set_na(wavy3.get_ncen());
   cube MO2(steps[0], steps[1], steps[2], 0, true);
   vector<string> fns;
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     MO1.set_origin(i, MinMax[i]);
     MO1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     total.set_origin(i, MinMax[i]);
@@ -1482,10 +1465,12 @@ void combine_mo(options& opt) {
     MO2.set_origin(i, MinMax[i]);
     MO2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
   }
-  for (int v1 = 0; v1 < opt.cmo1.size(); v1++) {
+  for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
+  {
     MO1.set_zero();
     Calc_MO(MO1, opt.cmo1[v1] - 1, wavy1, -1, 400, std::cout);
-    for (int j = 0; j < opt.cmo2.size(); j++) {
+    for (int j = 0; j < opt.cmo2.size(); j++)
+    {
       counter++;
       cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
       string filename("");
