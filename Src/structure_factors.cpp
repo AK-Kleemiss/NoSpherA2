@@ -995,9 +995,8 @@ int make_hirshfeld_grids(const int &pbc,
 
 		int dur = get_sec(start, end_prototypes);
 
-		//	int diff = end - start;
 		if (dur < 1)
-			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " µs" << endl;
+			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
 		else
 			file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
 	}
@@ -2608,7 +2607,7 @@ static int make_hirshfeld_grids_RI(
 
 		//	int diff = end - start;
 		if (dur < 1)
-			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " µs" << endl;
+			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
 		else
 			file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
 	}
@@ -3422,7 +3421,7 @@ static int make_integration_grids(
 
 		int dur = get_sec(start, end_prototypes);
 		if (dur < 1)
-			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " µs" << endl;
+			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
 		else
 			file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
 	}
@@ -4043,7 +4042,7 @@ static int make_integration_grids_SALTED(
 
 		int dur = get_sec(start, end_prototypes);
 		if (dur < 1)
-			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " µs" << endl;
+			file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
 		else
 			file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
 	}
@@ -4436,38 +4435,38 @@ void calc_SF(const int &points,
 	{
 		int dur = get_sec(start, end1);
 		if (dur < 1)
-			file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " µs" << endl;
+			file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl;
 		else
 			file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl;
 	}
 
-	// #ifdef FLO_CUDA
-	//	double** gpu_k_pt = NULL,
-	//		** gpu_sf_r = NULL,
-	//		** gpu_sf_i = NULL;
-	//	vector <double> long_kpt;
-	//	long_kpt.resize(3 * k_pt_unique[0].size());
-	//	for (int i = 0; i < k_pt_unique[0].size(); i++) {
-	//		long_kpt[3 * i + 0] = k_pt_unique[0][i];
-	//		long_kpt[3 * i + 1] = k_pt_unique[1][i];
-	//		long_kpt[3 * i + 2] = k_pt_unique[2][i];
-	//	}
-	//	gpu_k_pt = (double**)malloc(sizeof(double*));
-	//	gpu_sf_r = (double**)malloc(sizeof(double*));
-	//	gpu_sf_i = (double**)malloc(sizeof(double*));
-	//	cudaMalloc((void**)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
-	//	cudaMalloc((void**)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-	//	cudaMalloc((void**)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-	//	cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
-	//
-	//	dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
-	//	gpu_make_sf <<<blocks, 1>>> (
-	//		gpu_sf_r[0],
-	//		gpu_sf_i[0],
-	//		gpu_k_pt[0],
-	//
-	//		);
-	// #else
+#ifdef FLO_CUDA
+	double** gpu_k_pt = NULL,
+		** gpu_sf_r = NULL,
+		** gpu_sf_i = NULL;
+	vector <double> long_kpt;
+	long_kpt.resize(3 * k_pt_unique[0].size());
+	for (int i = 0; i < k_pt_unique[0].size(); i++) {
+		long_kpt[3 * i + 0] = k_pt_unique[0][i];
+		long_kpt[3 * i + 1] = k_pt_unique[1][i];
+		long_kpt[3 * i + 2] = k_pt_unique[2][i];
+	}
+	gpu_k_pt = (double**)malloc(sizeof(double*));
+	gpu_sf_r = (double**)malloc(sizeof(double*));
+	gpu_sf_i = (double**)malloc(sizeof(double*));
+	cudaMalloc((void**)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
+	cudaMalloc((void**)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+	cudaMalloc((void**)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+	cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
+	
+	dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
+	gpu_make_sf <<<blocks, 1>>> (
+		gpu_sf_r[0],
+		gpu_sf_i[0],
+		gpu_k_pt[0],
+	
+		);
+#else
 
 	progress_bar *progress = new progress_bar{file, 60u, "Calculating scattering factors"};
 	const int step = max((int)floor(imax / 20), 1);
@@ -4511,7 +4510,7 @@ void calc_SF(const int &points,
 	}
 	delete (progress);
 
-	// #endif
+#endif
 }
 
 static void add_ECP_contribution(const vector<int> &asym_atom_list,
@@ -5097,16 +5096,16 @@ bool calculate_structure_factors_HF(
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
-							 start,
-							 end,
-							 end_becke,
-							 end_prototypes,
-							 end_spherical,
-							 end_prune,
-							 end_aspherical,
-							 before_kpts,
-							 after_kpts,
-							 end1);
+			start,
+			end,
+			end_prototypes,
+			end_becke,
+			end_spherical,
+			end_prune,
+			end_aspherical,
+			before_kpts,
+			after_kpts,
+			end1);
 	}
 
 	file << "Writing tsc file... " << flush;
@@ -5259,16 +5258,16 @@ bool calculate_structure_factors_RI(
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
-							 start,
-							 end,
-							 end_becke,
-							 end_prototypes,
-							 end_spherical,
-							 end_prune,
-							 end_aspherical,
-							 before_kpts,
-							 after_kpts,
-							 end1);
+			start,
+			end,
+			end_prototypes,
+			end_becke,
+			end_spherical,
+			end_prune,
+			end_aspherical,
+			before_kpts,
+			after_kpts,
+			end1);
 	}
 
 	file << "Writing tsc file... " << flush;
@@ -5450,16 +5449,16 @@ bool calculate_structure_factors_RI_No_H(
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
-							 start,
-							 end,
-							 end_becke,
-							 end_prototypes,
-							 end_spherical,
-							 end_prune,
-							 end_aspherical,
-							 before_kpts,
-							 after_kpts,
-							 end1);
+			start,
+			end,
+			end_prototypes,
+			end_becke,
+			end_spherical,
+			end_prune,
+			end_aspherical,
+			before_kpts,
+			after_kpts,
+			end1);
 	}
 
 	file << "Writing tsc file... " << flush;
@@ -5659,16 +5658,16 @@ tsc_block<int, cdouble> calculate_structure_factors_MTC(
 	if (!opt.no_date)
 	{
 		write_timing_to_file(file,
-							 start,
-							 end,
-							 end_becke,
-							 end_prototypes,
-							 end_spherical,
-							 end_prune,
-							 end_aspherical,
-							 before_kpts,
-							 after_kpts,
-							 end1);
+			start,
+			end,
+			end_prototypes,
+			end_becke,
+			end_spherical,
+			end_prune,
+			end_aspherical,
+			before_kpts,
+			after_kpts,
+			end1);
 	}
 
 	return blocky;

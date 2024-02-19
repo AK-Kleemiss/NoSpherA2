@@ -444,7 +444,7 @@ inline void write_timing_to_file(std::ostream &file,
 	int dur = get_sec(start, end);
 
 	if (dur < 1)
-		file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " µs\n";
+		file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " ms\n";
 	else if (dur < 60)
 		file << "Total Time: " << fixed << setprecision(0) << dur << " s\n";
 	else if (dur < 3600)
@@ -454,41 +454,68 @@ inline void write_timing_to_file(std::ostream &file,
 	file << endl;
 	file << "Time Breakdown:" << endl;
 	if (get_sec(start, end_prototypes) > 1)
-		file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
+		if (get_sec(start, end_prototypes) < 100)
+			file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
+		else
+			file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
 	else
-		file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " µs" << endl;
+		file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
 	if (get_sec(end_prototypes, end_becke) > 1)
-		file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
+		if (get_sec(end_prototypes, end_becke) < 100)
+      file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s " << get_msec(end_prototypes, end_becke) % 1000 << " ms" << endl;
+    else
+      file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
 	else
-		file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " µs" << endl;
+		file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " ms" << endl;
 	if (get_sec(end_becke, end_spherical) > 1)
-		file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
+		if (get_sec(end_becke, end_spherical) < 100)
+      file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s " << get_msec(end_becke, end_spherical) % 1000 << " ms" << endl;
+    else
+      file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
 	else
-		file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " µs" << endl;
+		file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " ms" << endl;
 	if (get_sec(end_spherical, end_prune) > 1)
-		file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
+		if (get_sec(end_spherical, end_prune) < 100)
+      file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s " << get_msec(end_spherical, end_prune) % 1000 << " ms" << endl;
+    else
+      file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
 	else
-		file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " µs" << endl;
+		file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " ms" << endl;
 	if (get_sec(end_prune, end_aspherical) > 1)
-		file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
+		if (get_sec(end_prune, end_aspherical) < 100)
+      file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s " << get_msec(end_prune, end_aspherical) % 1000 << " ms" << endl;
+    else
+      file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
 	else
-		file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " µs" << endl;
+		file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " ms" << endl;
 	if (get_sec(end_aspherical, before_kpts) > 1)
-		file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
+		if (get_sec(end_aspherical, before_kpts) < 100)
+      file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s " << get_msec(end_aspherical, before_kpts) % 1000 << " ms" << endl;
+    else
+      file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
 	else
-		file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " µs" << endl;
+		file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " ms" << endl;
 	if (get_sec(before_kpts, after_kpts) > 1)
-		file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
+		if (get_sec(before_kpts, after_kpts) < 100)
+      file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s " << get_msec(before_kpts, after_kpts) % 1000 << " ms" << endl;
+    else
+      file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
 	else
-		file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " µs" << endl;
+		file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " ms" << endl;
 	if (get_sec(after_kpts, end1) > 1)
-		file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
+		if (get_sec(after_kpts, end1) < 100)
+      file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s " << get_msec(after_kpts, end1) % 1000 << " ms" << endl;
+    else
+      file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
 	else
-		file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " µs" << endl;
+		file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " ms" << endl;
 	if (get_sec(end1, end) > 1)
-		file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
+		if (get_sec(end1, end) < 100)
+      file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s " << get_msec(end1, end) % 1000 << " ms" << endl;
+    else
+      file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
 	else
-		file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " µs" << endl;
+		file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
 inline int CountWords(const char *str)
