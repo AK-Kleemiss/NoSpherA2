@@ -1413,27 +1413,25 @@ void test_core_dens()
 	Thakkar T_Rb(37);
 	string base = "def2-ECP";
 	Gaussian_Atom G_Rb(37, base);
-	double PI = 3.14159265358979323846;
-	double TWO_PI = 2 * PI;
-	double FOUR_PI = 4 * PI;
-	ofstream out("core_dens.dat", ios::out);
+	ofstream out("core_dens.log", ios::out);
 	WFN ECP_way(9);
 	ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
 
 	WFN multi_ecp_wavy(9);
 	multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
 
-	// exit(0);
 	WFN wavy(9);
-	wavy.read_gbw("Rb.gbw", cout, false);
+	wavy.read_gbw("Rb.gbw", out, false);
 	wavy.delete_unoccupied_MOs();
 	WFN wavy2(9);
-	wavy2.read_gbw("Rb_+9.gbw", cout, false);
+	wavy2.read_gbw("Rb_+9.gbw", out, false);
 	wavy2.delete_unoccupied_MOs();
 
 	vector<vec> res(10);
 	for (int i = 0; i < 10; i++)
-		res[i].resize(130000, 0.0);
+		res[i].resize(500000, 0.0);
+
+	ofstream dat_out("core_dens.dat", ios::out);
 
 #pragma omp parallel for
 	for (int i = 0; i < res[0].size(); i++)
@@ -1452,16 +1450,17 @@ void test_core_dens()
 		res[8][i] = sr;
 		res[9][i] = ECP_way.compute_dens(sr, 0, 0, false);
 	}
-	cout << fixed;
+	dat_out << fixed;
 	for (int i = 0; i < res[0].size(); i++)
 	{
 		for (int j = 0; j < res.size(); j++)
 		{
 			auto t = res[j][i];
-			cout << t;
-			cout << " ";
+			dat_out << t;
+			dat_out << " ";
 		}
-		cout << "\n";
+		dat_out << "\n";
 	}
-	cout << flush;
+	dat_out << flush;
+	dat_out.close();
 }

@@ -31,16 +31,23 @@ coefs = [ 89.5001980000,
          -12.3169000000
 ]
 
-rad_exps = [0,
-           0,
-           0,
-           1,
-           1,
-           1,
-           2,
-           2,
-           2,
-           3
+rad_exps = [2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2
+]
+
+l_facs = [
+    0.28209479**2,
+    0.48860251**2,
+    0.63078313**2,
+    0.74635267**2
 ]
 
 def Rb_func(r, Z, coefs = None, exponent = None, rad_exp = None):
@@ -54,19 +61,17 @@ def Rb_func(r, Z, coefs = None, exponent = None, rad_exp = None):
     if Z < 0:
         raise ValueError("Z is negative")
     
-    UL = 4*coefs[-1]*exponent[-1]*np.exp(-exponent[-1]*r**2) * \
+    UL = l_facs[3] * 4*coefs[-1]*exponent[-1]*np.exp(-exponent[-1]*r**2) * \
         (exponent[-1]*r**2 - 1) + Z/r**3
     res = UL
     
     for l in range(3):
-        Ul = -UL
+        Ul = 0#-UL
         for k in range(3):
-            Ul += 4*coefs[l*3+k]*exponent[l*3+k]*np.exp(-exponent[l*3+k]*r**2) \
+            Ul += l_facs[l] * 4*coefs[l*3+k]*exponent[l*3+k]*np.exp(-exponent[l*3+k]*r**2) \
                * (exponent[l*3+k]*r**2 - 1)
         #Ul += Z/r**3
-        for m in range(-l,l+1,1):
-            fac = np.sqrt(2*(l+1)+1)*sp.factorial((l+1)-abs(m))/sp.factorial((l+1)+abs(m))
-            res += (Ul) * fac
+        res += Ul
     
     return res/(4*np.pi)**2
 
@@ -107,11 +112,11 @@ def get_numbers_from_filename(filename):
 
 def Slm(l,m,theta,phi):
     if m == 0:
-        return sp.sph_harm(m,l,phi,theta)
+        return np.real(sp.sph_harm(m,l,phi,theta))
     elif m > 0:
         if l == 1:
             return np.real(sp.sph_harm(-m,l,phi,theta) - sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
-        elif l == 2:
+        else:
             if m%2 == 1:
                 return np.real(sp.sph_harm(-m,l,phi,theta) - sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
             else:
@@ -119,7 +124,7 @@ def Slm(l,m,theta,phi):
     elif m < 0:
         if l == 1:
             return np.imag(sp.sph_harm(-m,l,phi,theta) + sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
-        elif l == 2:
+        else:
             if m%2 == 1:
                 return np.imag(sp.sph_harm(-m,l,phi,theta) + sp.sph_harm(m,l,phi,theta)) / np.sqrt(2)
             else:
@@ -127,45 +132,47 @@ def Slm(l,m,theta,phi):
     
 def Slm_self(l,m,theta,phi):
     if l==0:
-        return np.sqrt(1/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
+        if m != 0:
+            return 0.0
+        else:
+            return np.sqrt(1/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
     elif l==1:
         if m == 0:
             return np.sqrt(3/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
         elif m == 1:
-            return np.sqrt(3/4/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
+            return -np.sqrt(3/4/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
         elif m == -1:
-            return np.sqrt(3/4/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta))
+            return -np.sqrt(3/4/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta)) *2
         else:
-            return 0
+            return 0.0
     elif l==2:
         if m == 0:
             return np.sqrt(5/4/np.pi)*sp.lpmv(m,l,np.cos(theta))
         elif m == 1:
-            return np.sqrt(5/12/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
+            return -np.sqrt(5/12/np.pi)*np.cos(phi)*sp.lpmv(m,l,np.cos(theta))
         elif m == -1:
-            return np.sqrt(5/12/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta))
+            return -np.sqrt(5/12/np.pi)*np.sin(phi)*sp.lpmv(m,l,np.cos(theta))
         elif m == 2:
             return np.sqrt(5/48/np.pi)*np.cos(2*phi)*sp.lpmv(m,l,np.cos(theta))
         elif m == -2:
             return np.sqrt(5/48/np.pi)*np.sin(2*phi)*sp.lpmv(m,l,np.cos(theta))
         else:
-            return 0
+            return 0.0
 
 def check_SLM():
-    for l in range(3):
+    for l in range(4):
         for m in range(-l,l+1,1):
             print("l: ", l, "m: ", m)
             #Check if Slm and Slm_self are the same
-            for theta in np.linspace(0, np.pi, 100):
-                for phi in np.linspace(0, 2*np.pi, 100):
-                    if abs(Slm(l,m,theta,phi) - Slm_self(l,m,theta,phi)) > 1e-10:
-                        print("Slm and Slm_self are not the same")
+            for theta in np.linspace(0, np.pi, 1):
+                for phi in np.linspace(0, 2*np.pi, 1):
                         print("theta: ", theta, "phi: ", phi)
-                        print("Scipy:     ", Slm(l,m,theta,phi))
-                        print("selfbuild: ", Slm_self(l,m,theta,phi))
-                        exit(0)
+                        print(f"Scipy:     {Slm(l,m,theta,phi):14.8f}")
+                        #print(f"selfbuild: {Slm_self(l,m,theta,phi):14.8f}")
+                        
+#check_SLM()
 
-lf = os.path.join(dir, 'NoSpherA2.log')
+lf = os.path.join(dir, 'core_dens.dat')
 # Read the file
 # 0 = k
 # 1 = Thakakr FF
@@ -178,7 +185,7 @@ lf = os.path.join(dir, 'NoSpherA2.log')
 # 8 = r
 df = pd.read_csv(lf, delim_whitespace=True, header=None)
 
-upper = 2.5
+upper = 3.0
 nr = 500000
 
 x = np.linspace(0.000001, upper, nr)
@@ -215,69 +222,81 @@ def br_test():
     lanl_n4 = [1,2,2,2]
 
     for i in range(11):
-        y += d_br0[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
-        z += d_br1[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
-        a += d_br2[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        y += 0.28209479**2 *d_br0[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        z += 0.48860251**2 *d_br1[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
+        a += 0.63078313**2 *d_br2[i] * np.exp(-e_br[i]*x**2) * x**(n_br[i]-2)
         if n_br[i] == 2:
-            KG_dens -= 4 * d_br0[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
-                       3 * 4 * d_br1[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
-                       5 * 4 * d_br2[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2)
+            KG_dens += 0.28209479**2 * 4 * d_br0[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
+                       0.48860251**2 * 4 * d_br1[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2) + \
+                       0.63078313**2 * 4 * d_br2[i] *e_br[i] * np.exp(-e_br[i]*x**2) * (-1 + e_br[i]*x**2)
         elif n_br[i] == 1:
-            KG_dens -= d_br0[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x + \
-                       d_br1[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x + \
-                       d_br2[i] * np.exp(-e_br[i]*x**2) * (1 - 8*e_br[i]*x**2 + 4*e_br[i]**2 * x**4) / x
-        elif n_br[i] == 3:#  used to be 2
-            KG_dens -= 4*d_br2[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4) + \
-                       4*d_br1[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4) + \
-                       4*d_br0[i] * np.exp(-e_br[i]*x**2) * (1 - 3*e_br[i]*x**2 + e_br[i]**2 * x**4)
+            KG_dens += 0.28209479**2 *d_br0[i] * np.exp(-e_br[i]*x**2) * (1 + 4*e_br[i]**2 * x**4) / x**3 + \
+                       0.48860251**2 *d_br1[i] * np.exp(-e_br[i]*x**2) * (1 + 4*e_br[i]**2 * x**4) / x**3 + \
+                       0.63078313**2 *d_br2[i] * np.exp(-e_br[i]*x**2) * (1 + 4*e_br[i]**2 * x**4) / x**3
+        elif n_br[i] == 0:#  used to be 2
+            KG_dens += 0.28209479**2 *4*d_br2[i] * np.exp(-e_br[i]*x**2) * (1 + e_br[i]*x**2 + e_br[i]**2 * x**4) / x**4 + \
+                       0.48860251**2 *4*d_br1[i] * np.exp(-e_br[i]*x**2) * (1 + e_br[i]*x**2 + e_br[i]**2 * x**4) / x**4 + \
+                       0.63078313**2 *4*d_br0[i] * np.exp(-e_br[i]*x**2) * (1 + e_br[i]*x**2 + e_br[i]**2 * x**4) / x**4
+    
+    for i in range(4):
+        y_lanl += 0.28209479**2 *lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * x**(lanl_n1[i])
+        c_lanl += 0.74635267**2 *lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * x**(lanl_n4[i])
+        
+        
+        if lanl_n1[i] == 0:
+            lanl_density -= 0.28209479**2 *4*lanl_d1[i] *lanl_e1[i] * np.exp(-lanl_e1[i]*x**2) * (-1 + lanl_e1[i]*x**2)
+        elif lanl_n1[i] == 1:
+            lanl_density -= 0.28209479**2 *lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 8*lanl_e1[i]*x**2 + 4*lanl_e1[i]**2 * x**4) / x
+        elif lanl_n1[i] == 2:
+            lanl_density -= 0.28209479**2 *4*lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 3*lanl_e1[i]*x**2 + lanl_e1[i]**2 * x**4)
+        
+        if lanl_n4[i] == 0:
+            lanl_density -= 0.74635267**2 *4*lanl_d4[i] *lanl_e4[i] * np.exp(-lanl_e4[i]*x**2) * (-1 + lanl_e4[i]*x**2)
+        elif lanl_n4[i] == 1:
+            lanl_density -= 0.74635267**2 *lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 8*lanl_e4[i]*x**2 + 4*lanl_e4[i]**2 * x**4) / x
+        elif lanl_n4[i] == 2:
+            lanl_density -= 0.74635267**2 *4*lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 3*lanl_e4[i]*x**2 + lanl_e4[i]**2 * x**4)
+    for i in range(5):
+        z_lanl += 0.48860251**2 *lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * x**(lanl_n2[i])
+        a_lanl += 0.63078313**2 *lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * x**(lanl_n3[i])
+        
+        
+        if lanl_n2[i] == 0:
+            lanl_density -= 0.48860251**2 *4 * lanl_d2[i] *lanl_e2[i] * np.exp(-lanl_e2[i]*x**2) * (-1 + lanl_e2[i]*x**2)
+        elif lanl_n2[i] == 1:
+            lanl_density -= 0.48860251**2 *lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 8*lanl_e2[i]*x**2 + 4*lanl_e2[i]**2 * x**4) / x
+        elif lanl_n2[i] == 2:
+            lanl_density -= 0.48860251**2 *4*lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 3*lanl_e2[i]*x**2 + lanl_e2[i]**2 * x**4)
+        
+        if lanl_n3[i] == 0:
+            lanl_density -= 0.63078313**2 *4*lanl_d3[i] *lanl_e3[i] * np.exp(-lanl_e3[i]*x**2) * (-1 + lanl_e3[i]*x**2)
+        elif lanl_n3[i] == 1:
+            lanl_density -= 0.63078313**2 *lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 8*lanl_e3[i]*x**2 + 4*lanl_e3[i]**2 * x**4) / x
+        elif lanl_n3[i] == 2:
+            lanl_density -= 0.63078313**2 *4*lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 3*lanl_e3[i]*x**2 + lanl_e3[i]**2 * x**4)
+
+    b = a+z+y + 28/x
     y += 28/x
     z += 28/x
     a += 28/x
     KG_dens += 28/x**3
     
-    for i in range(4):
-        y_lanl += lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * x**(lanl_n1[i])
-        c_lanl += lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * x**(lanl_n4[i])
-        
-        
-        if lanl_n1[i] == 0:
-            lanl_density -= 4*lanl_d1[i] *lanl_e1[i] * np.exp(-lanl_e1[i]*x**2) * (-1 + lanl_e1[i]*x**2)
-        elif lanl_n1[i] == 1:
-            lanl_density -= lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 8*lanl_e1[i]*x**2 + 4*lanl_e1[i]**2 * x**4) / x
-        elif lanl_n1[i] == 2:
-            lanl_density -= 4*lanl_d1[i] * np.exp(-lanl_e1[i]*x**2) * (1 - 3*lanl_e1[i]*x**2 + lanl_e1[i]**2 * x**4)
-        
-        if lanl_n4[i] == 0:
-            lanl_density -= 4*lanl_d4[i] *lanl_e4[i] * np.exp(-lanl_e4[i]*x**2) * (-1 + lanl_e4[i]*x**2)
-        elif lanl_n4[i] == 1:
-            lanl_density -= lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 8*lanl_e4[i]*x**2 + 4*lanl_e4[i]**2 * x**4) / x
-        elif lanl_n4[i] == 2:
-            lanl_density -= 4*lanl_d4[i] * np.exp(-lanl_e4[i]*x**2) * (1 - 3*lanl_e4[i]*x**2 + lanl_e4[i]**2 * x**4)
-    for i in range(5):
-        z_lanl += lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * x**(lanl_n2[i])
-        a_lanl += lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * x**(lanl_n3[i])
-        
-        
-        if lanl_n2[i] == 0:
-            lanl_density -= 4 * lanl_d2[i] *lanl_e2[i] * np.exp(-lanl_e2[i]*x**2) * (-1 + lanl_e2[i]*x**2)
-        elif lanl_n2[i] == 1:
-            lanl_density -= lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 8*lanl_e2[i]*x**2 + 4*lanl_e2[i]**2 * x**4) / x
-        elif lanl_n2[i] == 2:
-            lanl_density -= 4*lanl_d2[i] * np.exp(-lanl_e2[i]*x**2) * (1 - 3*lanl_e2[i]*x**2 + lanl_e2[i]**2 * x**4)
-        
-        if lanl_n3[i] == 0:
-            lanl_density -= 4*lanl_d3[i] *lanl_e3[i] * np.exp(-lanl_e3[i]*x**2) * (-1 + lanl_e3[i]*x**2)
-        elif lanl_n3[i] == 1:
-            lanl_density -= lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 8*lanl_e3[i]*x**2 + 4*lanl_e3[i]**2 * x**4) / x
-        elif lanl_n3[i] == 2:
-            lanl_density -= 4*lanl_d3[i] * np.exp(-lanl_e3[i]*x**2) * (1 - 3*lanl_e3[i]*x**2 + lanl_e3[i]**2 * x**4)
-
-    b = a+z+y
-    
     KG_radial_dens = KG_dens * x**2 * 4 * np.pi
     lanl_radial_dens = lanl_density * x**2 * 4 * np.pi
     
     fig, axs = plt.subplots(4,1, figsize=(14, 8))
+    
+    axs[0].plot(x, y_lanl, linestyle='-', label='l=0')
+    axs[0].plot(x, z_lanl, linestyle='-', label='l=1')
+    axs[0].plot(x, a_lanl, linestyle='-', label='l=2')
+    axs[0].plot(x, y_lanl + z_lanl + a_lanl - c_lanl, linestyle='-', label='sum')
+    axs[0].plot(x, -c_lanl, linestyle='-', label='(-) l=3')
+    
+    axs[0].set_xlabel('r')
+    axs[0].set_ylabel(r'$U_l(r)$ LANL')
+    axs[0].legend()
+    #axs[0].set_ylim(0,15.0)
+    axs[0].set_xlim(0,2.5)
 
     axs[1].plot(x, y, linestyle='-', label='l=0')
     axs[1].plot(x, z, linestyle='-', label='l=1')
@@ -285,23 +304,11 @@ def br_test():
     axs[1].plot(x, b, linestyle='-', label='sum')
     
     axs[1].set_xlabel('r')
-    axs[1].set_ylabel(r'$r^2(U_l(r) - \frac{N_C}{r}) / r^2 + N_C/r$')
+    axs[1].set_ylabel(r'$(U_l(r) - \frac{N_C}{r})$ KG')
     axs[1].legend()
     axs[1].set_ylim(0.0,150.0)
     axs[1].set_xlim(0,2.5)
-    
-    axs[0].plot(x, y_lanl, linestyle='-', label='l=0')
-    axs[0].plot(x, z_lanl, linestyle='-', label='l=1')
-    axs[0].plot(x, a_lanl, linestyle='-', label='l=2')
-    axs[0].plot(x, y_lanl + z_lanl + a_lanl + c_lanl, linestyle='-', label='sum')
-    axs[0].plot(x, -c_lanl, linestyle='-', label='(-) l=3')
-    
-    axs[0].set_xlabel('r')
-    axs[0].set_ylabel(r'$U_l(r)$')
-    axs[0].legend()
-    axs[0].set_ylim(0,15.0)
-    axs[0].set_xlim(0,2.5)
-    
+
     axs[2].plot(x, KG_dens, linestyle='-', label='KG')
     axs[2].plot(x, lanl_density, linestyle='-', label='LANL')
     
@@ -321,7 +328,7 @@ def br_test():
     fig.savefig("Br_test.png", dpi=300, bbox_inches='tight')
     exit(0)
     
-br_test()
+#br_test()
 
 for i, v in enumerate(x):
     y[i] = Rb_func(v, 28, coefs, exps, rad_exps)
