@@ -458,8 +458,6 @@ void test_timing()
 		omp_set_num_threads(ncpus);
 		// print the number of threads used
 		std::cout << "Using " << opt.threads << " threads" << std::endl;
-		// and the actrual results form omp_get_num_threads
-		std::cout << "Actual number of threads: " << omp_get_max_threads() << " ";
 #pragma omp parallel
 		{
 #pragma omp single
