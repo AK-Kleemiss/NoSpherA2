@@ -6177,3 +6177,159 @@ double WFN::computeESP(const double* PosGrid, vector<vec>& d2)
 	}
 	return ESP;
 };
+
+double WFN::computeESP_noCore(const double* PosGrid, vector<vec>& d2)
+{
+	double ESP = 0;
+	double P[3]{ 0, 0, 0 };
+	double Pi[3]{ 0, 0, 0 };
+	double Pj[3]{ 0, 0, 0 };
+	double PC[3]{ 0, 0, 0 };
+	double Fn[11]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double Al[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double Am[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	double An[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int maplrsl[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int maplrsm[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int maplrsn[54]{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	int l_i[3]{ 0, 0, 0 };
+	int l_j[3]{ 0, 0, 0 };
+	int iat = 0, jat = 0, MaxFn = 0;
+	double ex_sum = 0,
+		sqd = 0,
+		sqpc = 0,
+		prefac = 0,
+		expc = 0,
+		term = 0,
+		addesp = 0,
+		fjtmp = 0,
+		twoexpc = 0,
+		iex = 0,
+		jex = 0;
+
+	const int MO = get_nmo(true);
+	const int nprim = get_nex();
+
+	double temp;
+	int maxl, maxm, maxn;
+	vector<vec> pos(3);
+	for (int i = 0; i < 3; i++)
+		pos[i].resize(get_ncen());
+
+	for (int iprim = 0; iprim < nprim; iprim++)
+	{
+		iat = get_center(iprim) - 1;
+		type2vector(get_type(iprim), l_i);
+		iex = get_exponent(iprim);
+		for (int jprim = iprim; jprim < nprim; jprim++)
+		{
+			jat = get_center(jprim) - 1;
+			type2vector(get_type(jprim), l_j);
+			ex_sum = get_exponent(iprim) + get_exponent(jprim);
+			jex = get_exponent(jprim);
+
+			sqd = d2[iat][jat];
+
+			prefac = constants::TWO_PI / ex_sum * exp(-iex * jex * sqd / ex_sum);
+			if (prefac < 1E-10)
+				continue;
+
+			for (int i = 0; i < 3; i++)
+			{
+				P[i] = (pos[i][iat] * iex + pos[i][jat] * jex) / ex_sum;
+				Pi[i] = P[i] - pos[i][iat];
+				Pj[i] = P[i] - pos[i][jat];
+				PC[i] = P[i] - PosGrid[i];
+			}
+
+			sqpc = pow(PC[0], 2) + pow(PC[1], 2) + pow(PC[2], 2);
+
+			expc = exp(-ex_sum * sqpc);
+			MaxFn = 0;
+			for (int i = 0; i < 3; i++)
+				MaxFn += l_i[i] + l_j[i];
+			temp = Integrate(MaxFn, ex_sum * sqpc, expc);
+			Fn[MaxFn] = temp;
+			twoexpc = 2 * ex_sum * sqpc;
+			for (int nu = MaxFn - 1; nu >= 0; nu--)
+				Fn[nu] = (expc + twoexpc * Fn[nu + 1]) / (2 * (nu + 1) - 1);
+
+			maxl = -1;
+			for (int l = 0; l <= l_i[0] + l_j[0]; l++)
+			{
+				if (l % 2 != 1)
+					fjtmp = fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // *factorial[l];
+				else
+					fjtmp = -fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // * factorial[l];
+				for (int r = 0; r <= l / 2; r++)
+					for (int s = 0; s <= (l - 2 * r) / 2; s++)
+					{
+						maxl++;
+						Al[maxl] = Afac(l, r, s, PC[0], ex_sum, fjtmp);
+						maplrsl[maxl] = l - 2 * r - s;
+					}
+			}
+			maxm = -1;
+			for (int l = 0; l <= l_i[1] + l_j[1]; l++)
+			{
+				if (l % 2 != 1)
+					fjtmp = fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // *factorial[l];
+				else
+					fjtmp = -fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // * factorial[l];
+				for (int r = 0; r <= l / 2; r++)
+					for (int s = 0; s <= (l - 2 * r) / 2; s++)
+					{
+						maxm++;
+						Am[maxm] = Afac(l, r, s, PC[1], ex_sum, fjtmp);
+						maplrsm[maxm] = l - 2 * r - s;
+					}
+			}
+			maxn = -1;
+			for (int l = 0; l <= l_i[2] + l_j[2]; l++)
+			{
+				if (l % 2 != 1)
+					fjtmp = fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // *factorial[l];
+				else
+					fjtmp = -fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // * factorial[l];
+				for (int r = 0; r <= l / 2; r++)
+					for (int s = 0; s <= (l - 2 * r) / 2; s++)
+					{
+						maxn++;
+						An[maxn] = Afac(l, r, s, PC[2], ex_sum, fjtmp);
+						maplrsn[maxn] = l - 2 * r - s;
+					}
+			}
+
+			term = 0.0;
+			for (int l = 0; l < maxl; l++)
+			{
+				if (Al[l] == 0)
+					continue;
+				for (int m = 0; m < maxm; m++)
+				{
+					if (Am[m] == 0)
+						continue;
+					for (int n = 0; n < maxn; n++)
+					{
+						if (An[n] == 0)
+							continue;
+						term += Al[l] * Am[m] * An[n] * Fn[maplrsl[l] + maplrsm[m] + maplrsn[n]];
+					}
+				}
+			}
+
+			if (term == 0)
+				continue;
+
+			if (iprim != jprim)
+				term *= 2.0;
+
+			term *= prefac;
+			addesp = 0.0;
+			for (int mo = 0; mo < MO; mo++)
+				addesp += get_MO_occ(mo) * get_MO_coef_f(mo, iprim) * get_MO_coef_f(mo, jprim);
+			ESP -= addesp * term;
+		}
+	}
+	return ESP;
+};

@@ -207,6 +207,7 @@ public:
 	double computeMO(const double* PosGrid, const int& mo);
 	double compute_MO_spherical(const double& Pos1, const double& Pos2, const double& Pos3, const int& MO);
 	double computeESP(const double* PosGrid, std::vector<std::vector<double> >& d2);
+	double computeESP_noCore(const double* PosGrid, std::vector<std::vector<double> >& d2);
 	//----------DM Handling--------------------------------
 	void push_back_DM(const double& value = 0.0);
 	bool set_DM(const int& nr, const double& value = 0.0);
