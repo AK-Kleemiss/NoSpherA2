@@ -2853,6 +2853,11 @@ void options::digest_options()
 			sfac_scan_ECP(*this, log_file);
 			exit(0);
 		}
+		else if (temp == "-test-ecp-pot")
+		{
+			test_esp_dens();
+			exit(0);
+		}
 		else if (temp == "-sfac_diffuse")
 		{
 			sfac_diffuse = fromString<double>(arguments[i + 1]);
