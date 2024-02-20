@@ -1320,15 +1320,6 @@ double gaussian(double *d)
 void ML_test()
 {
 	using namespace std;
-	// cout << "c_1_4p " << c_1_4p << endl;
-	// cout << "1/c_1_4p " << 1/ c_1_4p << endl;
-	// cout << "4pi " << FOUR_PI << endl;
-	// cout << "4/3 pi " << 4.0 / 3.0 * PI << endl;
-	// expected value integrating to r=1
-	// for f=one is 4/3 pi
-	// for f=gaussian: 0.789257
-	// for f=s_value = 1?
-	// numerical_3d_integral(s_value,0.002,10.0);
 
 	vector<unsigned long> shape{};
 	bool fortran_order;
@@ -1352,7 +1343,6 @@ void ML_test()
 	dummy2.read_xyz("water.xyz", std::cout);
 
 	nr_coefs = load_basis_into_WFN(dummy2, QZVP_JKfit);
-	;
 
 	cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
 	calc_cube(data, dummy2, nr_coefs);
@@ -1364,7 +1354,6 @@ void ML_test()
 	dummy3.read_xyz("alanine.xyz", std::cout);
 
 	nr_coefs = load_basis_into_WFN(dummy3, TZVP_JKfit);
-	;
 
 	cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
 	calc_cube(data, dummy3, nr_coefs);
@@ -1454,6 +1443,103 @@ void test_core_dens()
 	for (int i = 0; i < res[0].size(); i++)
 	{
 		for (int j = 0; j < res.size(); j++)
+		{
+			auto t = res[j][i];
+			dat_out << t;
+			dat_out << " ";
+		}
+		dat_out << "\n";
+	}
+	dat_out << flush;
+	dat_out.close();
+}
+
+double calc_pot_by_integral(Thakkar &T, const double& r, int core = 0)
+{
+  double res = 0;
+	const double dr = 0.0001;
+	const double dr3 = dr * dr * dr;
+	if (core == 0) {
+		for (double x = -10; x <= 10; x += dr)
+		{
+			for (double y = -10; y <= 10; y += dr)
+			{
+				for (double z = -10; z <= 10; z += dr) {
+					double d = sqrt((x - r) * (x - r) + y * y + z * z);
+					res += T.get_radial_density(d) * dr3;
+				}
+			}
+		}
+	}
+	else {
+		for (double x = -10; x <= 10; x += dr)
+		{
+			for (double y = -10; y <= 10; y += dr)
+			{
+				for (double z = -10; z <= 10; z += dr) {
+					double d = sqrt((x - r) * (x - r) + y * y + z * z);
+					res += T.get_core_density(d,core) * dr3;
+				}
+			}
+		}
+	}
+  return res / 4 / constants::PI;
+}
+
+void test_esp_dens()
+{
+	using namespace std;
+	Thakkar T_Li(3);
+	ofstream out("core_pot.log", ios::out);
+	WFN ECP_way(9);
+	ECP_way.read_gbw("Li_QZVP.gbw", out, true, false);
+	ECP_way.delete_unoccupied_MOs();
+
+	WFN ECP_way_core(9);
+	ECP_way_core.read_gbw("Li_QZVP.gbw", out, true, false);
+	ECP_way_core.delete_unoccupied_MOs();
+	ECP_way_core.delete_MO(1);
+
+	vector<vec> res(10);
+	for (int i = 0; i < 10; i++)
+		res[i].resize(1000000, 0.0);
+
+	ofstream dat_out("core_pot.dat", ios::out);
+	vector<vector<double>> d2;
+	d2.resize(ECP_way.get_ncen());
+	for (int i = 0; i < ECP_way.get_ncen(); i++)
+	{
+		d2[i].resize(ECP_way.get_ncen());
+		for (int j = 0; j < ECP_way.get_ncen(); j++)
+		{
+			if (i == j)
+			{
+				d2[i][j] = 0;
+				continue;
+			}
+			d2[i][j] = pow(ECP_way.atoms[i].x - ECP_way.atoms[j].x, 2) + pow(ECP_way.atoms[i].y - ECP_way.atoms[j].y, 2) + pow(ECP_way.atoms[i].z - ECP_way.atoms[j].z, 2);
+		}
+	}
+
+#pragma omp parallel for
+	for (int i = 0; i < res[0].size(); i++)
+	{
+		double sr = i * 0.00001;
+		double pos[3] = {0, 0, sr};
+		res[0][i] = sr;
+		res[1][i] = T_Li.get_core_density(sr, 2);
+		res[2][i] = T_Li.get_radial_density(sr);
+		res[3][i] = ECP_way.compute_dens(sr, 0, 0, false);
+		res[4][i] = ECP_way.computeESP_noCore(pos, d2);
+		res[5][i] = calc_pot_by_integral(T_Li, sr);
+		res[6][i] = calc_pot_by_integral(T_Li, sr, 2);
+		res[7][i] = ECP_way_core.compute_dens(sr, 0, 0, false);
+		res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);	
+	}
+	dat_out << fixed;
+	for (int i = 0; i < res[0].size(); i++)
+	{
+		for (int j = 0; j < 9; j++)
 		{
 			auto t = res[j][i];
 			dat_out << t;
