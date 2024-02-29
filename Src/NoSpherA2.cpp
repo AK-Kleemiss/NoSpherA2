@@ -270,6 +270,8 @@ int main(int argc, char **argv)
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
+    if (opt.write_CIF)
+      wavy[0].write_wfn_CIF(opt.wfn + ".cif");
     // log_file.close();
     return 0;
   }
@@ -294,6 +296,8 @@ int main(int argc, char **argv)
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
     std::cout << "Finished!" << endl;
+    if (opt.write_CIF)
+      wavy[0].write_wfn_CIF(opt.wfn + ".cif");
     return 0;
   }
   if (opt.coef_file != "")

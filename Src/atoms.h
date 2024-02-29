@@ -66,6 +66,7 @@ public:
 	void assign_ADPs(vec& second);
 	void assign_ADPs(double& Uiso);
 	std::vector<basis_set_entry> basis_set;
+	int basis_set_id;
 	std::vector<unsigned int> shellcount;
 	//The Order is:
 	//[0] = second order (U11, U22, U33, U12, U13, U23)
