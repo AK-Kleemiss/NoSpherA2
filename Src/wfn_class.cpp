@@ -57,7 +57,9 @@ WFN::WFN()
 	d_f_switch = false;
 	modified = false;
 	distance_switch = false;
+	basis_set_name = " ";
 	has_ECPs = false;
+	comment = "Test";
 	fill_pre();
 	fill_Afac_pre();
 };
@@ -6014,7 +6016,273 @@ double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtm
 		return temp;
 }
 
-double WFN::computeESP(const double* PosGrid, vector<vec>& d2)
+bool WFN::read_ptb(const string& filename, ostream file, const bool debug){
+	ifstream inFile(filename, ios::binary | ios::in);
+	if (!inFile)
+	{
+		cerr << "File could not be opened!\n";
+		return;
+	}
+	else
+	{
+		file << "Staring to read " << filename << endl;
+	}
+	inFile.seekg(0, ios::beg);
+	short one, two, three, four;
+	inFile.read(reinterpret_cast<char*>(&one), sizeof(one));
+	inFile.read(reinterpret_cast<char*>(&two), sizeof(two));
+	inFile.read(reinterpret_cast<char*>(&three), sizeof(three));
+	inFile.read(reinterpret_cast<char*>(&four), sizeof(four));
+
+	file << "one: " << one << endl;
+	file << "two: " << two << endl;
+	file << "three: " << three << endl;
+	file << "four: " << four << endl;
+
+	long long ncent, nbf, nmomax, nprims;
+	inFile.read(reinterpret_cast<char*>(&ncent), sizeof(ncent));
+	inFile.read(reinterpret_cast<char*>(&nbf), sizeof(nbf));
+	inFile.read(reinterpret_cast<char*>(&nmomax), sizeof(nmomax));
+	inFile.read(reinterpret_cast<char*>(&nprims), sizeof(nprims));
+
+	file << "ncent: " << ncent << endl;
+	file << "nbf: " << nbf << endl;
+	file << "nmomax: " << nmomax << endl;
+	file << "nprims: " << nprims << endl;
+
+	vector<char[2]> atyp(ncent);
+	for (int i = 0; i < ncent; ++i)
+	{
+		inFile.read(atyp[i], sizeof(char[2]));
+	}
+
+	vector<double> x(ncent), y(ncent), z(ncent), charge(ncent);
+	for (int i = 0; i < ncent; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&x[i]), sizeof(x[i]));
+		inFile.read(reinterpret_cast<char*>(&y[i]), sizeof(y[i]));
+		inFile.read(reinterpret_cast<char*>(&z[i]), sizeof(z[i]));
+		inFile.read(reinterpret_cast<char*>(&charge[i]), sizeof(charge[i]));
+	}
+
+	vector<int> lao(nprims), aoatcart(nprims), ipao(nprims);
+	for (int i = 0; i < nprims; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&lao[i]), sizeof(lao[i]));
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&aoatcart[i]), sizeof(aoatcart[i]));
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&ipao[i]), sizeof(ipao[i]));
+	}
+
+	vector<double> exps(nprims), contr(nprims);
+	for (int i = 0; i < nprims; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&exps[i]), sizeof(exps[i]));
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&contr[i]), sizeof(contr[i]));
+	}
+
+	vector<double> occ(nmomax), eval(nmomax);
+	for (int i = 0; i < nmomax; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&occ[i]), sizeof(occ[i]));
+	}
+	for (int i = 0; i < nmomax; ++i)
+	{
+		inFile.read(reinterpret_cast<char*>(&eval[i]), sizeof(eval[i]));
+	}
+	vector<vector<double>> momat(nmomax, vector<double>(nbf));
+	for (int i = 0; i < nmomax; ++i)
+	{
+		for (int j = 0; j < nbf; ++j)
+		{
+			inFile.read(reinterpret_cast<char*>(&momat[i][j]), sizeof(momat[i][j]));
+		}
+	}
+
+	// Print all the data to cout
+
+	for (int i = 0; i < ncent; ++i)
+	{
+		file << "atyp[" << i << "]: " << atyp[i] << endl;
+		file << "pos[" << i << "]: " << x[i] << " " << y[i] << " " << z[i] << endl;
+		file << "charge[" << i << "]: " << charge[i] << endl
+			<< endl;
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		file << "lao[" << i << "]: " << lao[i] << endl;
+		file << "aoatcart[" << i << "]: " << aoatcart[i] << endl;
+		file << "ipao[" << i << "]: " << ipao[i] << endl
+			<< endl;
+	}
+
+	for (int i = 0; i < nprims; ++i)
+	{
+		file << "exps[" << i << "]: " << exps[i] << endl;
+		file << "contr[" << i << "]: " << contr[i] << endl
+			<< endl;
+	}
+
+	for (int i = 0; i < nmomax; ++i)
+	{
+		file << "occ[" << i << "]: " << occ[i] << endl;
+		file << "eval[" << i << "]: " << eval[i] << endl << "momat: ";
+		for (int j = 0; j < nbf; ++j)
+		{
+			file << " " << momat[i][j];
+		}
+		file << endl;
+	}
+
+	inFile.close();
+}
+
+
+std::string WFN::get_basis_set_CIF(const int nr) {
+	// Make list of unique atom types:
+	vector<int> atom_types;
+	vector<int> atoms_with_type;
+	for (int i = 0; i < ncen; i++) {
+		if (find(atom_types.begin(), atom_types.end(), atoms[i].charge) == atom_types.end()) {
+      atom_types.push_back(atoms[i].charge);
+			atoms_with_type.push_back(i);
+    }
+  }
+	int _nr;
+	if (nr == 0) _nr = 1;
+	else _nr = nr;
+	stringstream ss;
+	ss << _nr << " '"<< basis_set_name << "' [\n";
+	for (int i = 0; i < atom_types.size(); i++) {
+    ss << "  {\n";
+    ss << "    'atom_site_label': '" << atoms[i].label << "'\n";
+    ss << "    'Z': " << atom_types[i] << "\n";
+		ss << "    'atom_type': " << atnr2letter(atom_types[i]) << "\n";
+		ss << "    'nr_shells': " << get_atom_shell_count(atoms_with_type[i]) << "\n";
+		ss << "    'shell_sizes': [";
+		for (int j = 0; j < get_atom_shell_count(atoms_with_type[i]); j++) {
+			ss << get_atom_shell_primitives(atoms_with_type[i],j);
+		}
+		ss << "]\n";
+		ss << "    'shell_types': [";
+		for (int j = 0; j < get_atom_shell_count(atoms_with_type[i]); j++) {
+			ss << get_shell_type(atoms_with_type[i],j);
+		}
+		ss << "]\n";
+		ss << "    'exponent_unit': 'a.u.'\n";
+    ss << "    'primitive_exponents': [";
+		for (int j = 0; j < atoms[atoms_with_type[i]].basis_set.size(); j++) {
+			ss << atoms[atoms_with_type[i]].basis_set[j].exponent;
+			if (j < atoms[atoms_with_type[i]].basis_set.size() - 1) {
+        ss << " ";
+      }
+    }
+		ss << "]\n";
+		ss << "    'primitive_coefficients': [";
+		for (int j = 0; j < atoms[atoms_with_type[i]].basis_set.size(); j++) {
+			ss << atoms[atoms_with_type[i]].basis_set[j].coefficient;
+			if (j < atoms[atoms_with_type[i]].basis_set.size() - 1) {
+        ss << " ";
+      }
+		}
+		ss << "]\n";
+    ss << "  }\n";
+  }
+  ss << "]\n";
+  return ss.str();
+}
+
+std::string WFN::get_CIF_table(const int nr) {
+	stringstream ss;
+	int _nr;
+	if (nr == 0) _nr = 1;
+	else _nr = nr;
+	ss << _nr << " 'Molecular' 'GTO' 'Cartesian' " << "{\n";
+	ss << "  'atoms': [\n";
+	for (int i = 0; i < ncen; i++) {
+    ss << "    {\n";
+		ss << "      'id': " << i << "\n";
+		ss << "      'atom_site_label': '" << atoms[i].label << "'\n";
+		ss << "      'cartesian_position': [" << atoms[i].x << " " << atoms[i].y << " " << atoms[i].z << "]\n";
+		ss << "      'sym_code': '.'\n";
+    ss << "      'Z': " << atoms[i].charge << "\n";
+    ss << "      'basis_set_id': " << atoms[i].basis_set_id << "\n";
+    ss << "    }\n";
+  }
+	ss << "  ]\n";
+	ss << "  'MOs': {\n";
+	ss << "    'spins': [";
+	for (int i = 0; i < nmo; i++) {
+		int spin = MOs[i].get_op();
+		if (spin == 0) {
+      ss << "alpha";
+    }
+		else if (spin == 1) {
+      ss << "beta";
+		}
+		else {
+      ss << "unknown";
+    }
+		if (i < nmo - 1) {
+      ss << " ";
+    }
+  }
+	ss << "]\n";
+	ss << "    'energies': [";
+	for (int i = 0; i < nmo; i++) {
+    ss << MOs[i].get_energy();
+		if (i < nmo - 1) {
+      ss << " ";
+    }
+  }
+	ss << "]\n";
+	ss << "    'occupancies': [";
+	for (int i = 0; i < nmo; i++) {
+    ss << MOs[i].get_occ();
+		if (i < nmo - 1) {
+      ss << " ";
+    }
+  }
+	ss << "]\n";
+	ss << "    'coefficients': [\n";
+	for (int i = 0; i < nmo; i++) {
+    ss << "      [";
+		for (int j = 0; j < nex; j++) {
+      ss << MOs[i].get_coefficient_f(j);
+			if (j < nex - 1) {
+        ss << " ";
+      }
+    }
+    ss << "]";
+		if (i < nmo - 1) {
+      ss << "\n";
+    }
+  }
+	ss << "    ]\n";
+	ss << "  }\n";
+	ss << "}\n";
+	return ss.str();
+}
+
+void WFN::write_wfn_CIF(const std::string& fileName) {
+	err_checkf(basis_set_name != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
+	ofstream file(fileName);
+	file << "loop_\n_basis.id\n_basis.name\n_basis.dict\n";
+	file << get_basis_set_CIF();
+	file << "\n\nloop_\n_wavefunction.id\n_wavefunction.type\n_wavefunction.radial_type\n_wavefunction.angular_type\n_wavefunction.dict\n";
+	file << get_CIF_table();
+	file.close();
+}
+
+double WFN::computeESP(const double* PosGrid, const vector<vec>& d2)
 {
 	double ESP = 0;
 	double P[3]{ 0, 0, 0 };
@@ -6145,15 +6413,15 @@ double WFN::computeESP(const double* PosGrid, vector<vec>& d2)
 			}
 
 			term = 0.0;
-			for (int l = 0; l < maxl; l++)
+			for (int l = 0; l <= maxl; l++)
 			{
 				if (Al[l] == 0)
 					continue;
-				for (int m = 0; m < maxm; m++)
+				for (int m = 0; m <= maxm; m++)
 				{
 					if (Am[m] == 0)
 						continue;
-					for (int n = 0; n < maxn; n++)
+					for (int n = 0; n <= maxn; n++)
 					{
 						if (An[n] == 0)
 							continue;
@@ -6178,7 +6446,7 @@ double WFN::computeESP(const double* PosGrid, vector<vec>& d2)
 	return ESP;
 };
 
-double WFN::computeESP_noCore(const double* PosGrid, vector<vec>& d2)
+double WFN::computeESP_noCore(const double* PosGrid, const vector<vec>& d2)
 {
 	double ESP = 0;
 	double P[3]{ 0, 0, 0 };
@@ -6301,15 +6569,15 @@ double WFN::computeESP_noCore(const double* PosGrid, vector<vec>& d2)
 			}
 
 			term = 0.0;
-			for (int l = 0; l < maxl; l++)
+			for (int l = 0; l <= maxl; l++)
 			{
 				if (Al[l] == 0)
 					continue;
-				for (int m = 0; m < maxm; m++)
+				for (int m = 0; m <= maxm; m++)
 				{
 					if (Am[m] == 0)
 						continue;
-					for (int n = 0; n < maxn; n++)
+					for (int n = 0; n <= maxn; n++)
 					{
 						if (An[n] == 0)
 							continue;

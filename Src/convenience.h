@@ -933,6 +933,7 @@ struct options
 	bool gbw2wfn = false;
 	bool old_tsc = false;
 	bool thakkar_d_plot = false;
+	bool write_CIF = false;
 	double d_sfac_scan = 0.0;
 	double sfac_diffuse = 0.0;
 	double dmin = 99.0;

@@ -25,27 +25,6 @@ using namespace std;
 #include "TargetConditionals.h"
 #endif
 
-#ifndef FLO_CUDA
-double linear_interpolate_spherical_density(
-	vector<double> &radial_dens,
-	vector<double> &spherical_dist,
-	const double dist,
-	const double lincr,
-	const double start)
-{
-	double result = 0;
-	if (dist > spherical_dist[spherical_dist.size() - 1])
-		return 0;
-	else if (dist < spherical_dist[0])
-		return radial_dens[0];
-	int nr = int(floor(log(dist / start) / lincr));
-	result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
-	if (result < 1E-10)
-		result = 0;
-	return result;
-}
-#endif
-
 void read_k_points(vector<vec> &k_pt, hkl_list &hkl, ostream &file)
 {
 	err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
