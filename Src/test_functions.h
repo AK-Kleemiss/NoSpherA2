@@ -1399,10 +1399,54 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
 void test_core_dens()
 {
 	using namespace std;
+	ofstream out("core_dens.log", ios::out);
+	vector<vec> res(12);
+	for (int i = 0; i < 12; i++)
+		res[i].resize(1000000, 0.0);
+
+	ofstream dat_out("core_dens_Li.dat", ios::out);
+
+	Thakkar T_Li(3);
+	
+	WFN ECP_way_LI(9);
+	ECP_way_LI.read_gbw("Li_ECP.gbw", out, true, true);
+
+	WFN wavy3_LI(9);
+	wavy3_LI.read_gbw("Li_QZVP.gbw", out, false);
+	wavy3_LI.delete_unoccupied_MOs();
+	WFN wavy4_LI(9);
+	wavy4_LI.read_gbw("Li_QZVP.gbw", cout, false);
+	wavy4_LI.delete_unoccupied_MOs();
+	wavy4_LI.delete_MO(1); // delete the 2nd MO
+#pragma omp parallel for
+	for (int i = 0; i < res[0].size(); i++)
+	{
+		double sr = i * 0.00001;
+		res[0][i] = sr;
+		res[1][i] = T_Li.get_core_density(sr, 2);
+		res[2][i] = T_Li.get_radial_density(sr);
+		res[3][i] = ECP_way_LI.compute_dens(sr, 0, 0, false);
+		res[4][i] = wavy3_LI.compute_dens(sr, 0, 0, false);
+		res[5][i] = wavy4_LI.compute_dens(sr, 0, 0, false);
+	}
+	dat_out << fixed;
+	for (int i = 0; i < res[0].size(); i++)
+	{
+		for (int j = 0; j < 6; j++)
+		{
+			auto t = res[j][i];
+			dat_out << t;
+			dat_out << " ";
+		}
+		dat_out << "\n";
+	}
+	dat_out << flush;
+	dat_out.close();
+	exit(0);
+
 	Thakkar T_Rb(37);
 	string base = "def2-ECP";
 	Gaussian_Atom G_Rb(37, base);
-	ofstream out("core_dens.log", ios::out);
 	WFN ECP_way(9);
 	ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
 
@@ -1413,14 +1457,25 @@ void test_core_dens()
 	wavy.read_gbw("Rb.gbw", out, false);
 	wavy.delete_unoccupied_MOs();
 	WFN wavy2(9);
-	wavy2.read_gbw("Rb_+9.gbw", out, false);
+	wavy2.read_gbw("Rb.gbw", cout, false);
 	wavy2.delete_unoccupied_MOs();
+	wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
+	wavy2.pop_back_MO();
+	wavy2.pop_back_MO();
+	wavy2.pop_back_MO();
+	wavy2.pop_back_MO();
 
-	vector<vec> res(10);
-	for (int i = 0; i < 10; i++)
-		res[i].resize(500000, 0.0);
-
-	ofstream dat_out("core_dens.dat", ios::out);
+	WFN wavy3(9);
+	wavy3.read_gbw("Rb_QZVP.gbw", out, false);
+	wavy3.delete_unoccupied_MOs();
+	WFN wavy4(9);
+	wavy4.read_gbw("Rb_QZVP.gbw", cout, false);
+	wavy4.delete_unoccupied_MOs();
+	wavy4.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
+	wavy4.pop_back_MO();
+	wavy4.pop_back_MO();
+	wavy4.pop_back_MO();
+	wavy4.pop_back_MO();
 
 #pragma omp parallel for
 	for (int i = 0; i < res[0].size(); i++)
@@ -1438,6 +1493,8 @@ void test_core_dens()
 		res[7][i] = wavy2.compute_dens(sr, 0, 0, false);
 		res[8][i] = sr;
 		res[9][i] = ECP_way.compute_dens(sr, 0, 0, false);
+		res[10][i] = wavy3.compute_dens(sr, 0, 0, false);
+		res[11][i] = wavy4.compute_dens(sr, 0, 0, false);
 	}
 	dat_out << fixed;
 	for (int i = 0; i < res[0].size(); i++)
@@ -1454,35 +1511,21 @@ void test_core_dens()
 	dat_out.close();
 }
 
-double calc_pot_by_integral(Thakkar &T, const double& r, int core = 0)
+double calc_pot_by_integral(std::vector<std::vector<std::vector<double>>> & grid, const double& r, const double& cube_dist, const double& dr)
 {
   double res = 0;
-	const double dr = 0.0001;
 	const double dr3 = dr * dr * dr;
-	if (core == 0) {
-		for (double x = -10; x <= 10; x += dr)
+	double d = 0;
+	for (int x = -cube_dist / dr; x <= cube_dist / dr; x++)
+	{
+		for (int y = -cube_dist / dr; y <= cube_dist / dr; y++)
 		{
-			for (double y = -10; y <= 10; y += dr)
-			{
-				for (double z = -10; z <= 10; z += dr) {
-					double d = sqrt((x - r) * (x - r) + y * y + z * z);
-					res += T.get_radial_density(d) * dr3;
-				}
+			for (int z = -cube_dist / dr; z <= cube_dist / dr; z++) {
+				d = sqrt((x - r) * (x - r) + y * y + z * z);
+				res += grid[x + cube_dist / dr][y + cube_dist/ dr][z + cube_dist / dr] / d * dr3;
 			}
 		}
-	}
-	else {
-		for (double x = -10; x <= 10; x += dr)
-		{
-			for (double y = -10; y <= 10; y += dr)
-			{
-				for (double z = -10; z <= 10; z += dr) {
-					double d = sqrt((x - r) * (x - r) + y * y + z * z);
-					res += T.get_core_density(d,core) * dr3;
-				}
-			}
-		}
-	}
+	}	
   return res / 4 / constants::PI;
 }
 
@@ -1499,10 +1542,13 @@ void test_esp_dens()
 	ECP_way_core.read_gbw("Li_QZVP.gbw", out, true, false);
 	ECP_way_core.delete_unoccupied_MOs();
 	ECP_way_core.delete_MO(1);
+	const int points = 100000;
+	const double len = 8;
+	const double dr = len / points;
 
 	vector<vec> res(10);
 	for (int i = 0; i < 10; i++)
-		res[i].resize(1000000, 0.0);
+		res[i].resize(points, 0.0);
 
 	ofstream dat_out("core_pot.dat", ios::out);
 	vector<vector<double>> d2;
@@ -1520,23 +1566,73 @@ void test_esp_dens()
 			d2[i][j] = pow(ECP_way.atoms[i].x - ECP_way.atoms[j].x, 2) + pow(ECP_way.atoms[i].y - ECP_way.atoms[j].y, 2) + pow(ECP_way.atoms[i].z - ECP_way.atoms[j].z, 2);
 		}
 	}
-
+	/*
+	const double incr = pow(1.005, max(1, 4));
+	const double lincr = log(incr);
+	const double min_dist = 0.0000001;
+	double current = 1;
+	double dist = min_dist;
+	vector<vector<double>> radial_density(1);
+	vector<vector<double>> radial_density_core(1);
+	vector<vector<double>> radial_dist(1);
+	const double cube_dist = 5.0;
+	while (dist < 2.3 * cube_dist)
+	{
+		radial_dist[0].push_back(dist);
+		current = T_Li.get_radial_density(dist);
+		radial_density[0].push_back(current);
+		current = T_Li.get_core_density(dist, 2);
+		radial_density_core[0].push_back(current);
+		dist *= incr;
+	}
+	vector<vector<vector<double>>> dens_grid;
+	double dr = 0.02;
+	const double dr3 = dr * dr * dr;
+	const int grid_size = (2*cube_dist / dr) + 1;
+	dens_grid.resize(grid_size);
+	int points = (int)cube_dist / dr;
 #pragma omp parallel for
+	for (int x = -points; x <= points; x++)
+	{
+		dens_grid[x + points].resize(grid_size);
+		for (int y = -points; y <= points; y++)
+		{
+			dens_grid[x + points][y + points].resize(grid_size, 0.0);
+		}
+	}
+	double NULLY = 0;
+#pragma omp parallel for
+	for (int x = -points; x <= points; x++)
+	{
+		for (int y = -points; y <= points; y++)
+		{
+			for (int z = -points; z <= points; z++) {
+				dens_grid[x+points][y + points][z + points] = linear_interpolate_spherical_density(radial_density[0], radial_dist[0], sqrt(x * x + y * y + z * z)*dr, lincr, 0.0000001);
+			}
+		}
+	}
+	out << "Done with radial densities" << endl;
+	*/
+
+	progress_bar *progress = new progress_bar{out, 50u, "Calculating Values", '-', 0.01};
+#pragma omp parallel for schedule(dynamic)
 	for (int i = 0; i < res[0].size(); i++)
 	{
-		double sr = i * 0.00001;
-		double pos[3] = {0, 0, sr};
+		double sr = i * dr;
+		double pos[3] = {sr, 0, 0};
 		res[0][i] = sr;
 		res[1][i] = T_Li.get_core_density(sr, 2);
 		res[2][i] = T_Li.get_radial_density(sr);
 		res[3][i] = ECP_way.compute_dens(sr, 0, 0, false);
 		res[4][i] = ECP_way.computeESP_noCore(pos, d2);
-		res[5][i] = calc_pot_by_integral(T_Li, sr);
-		res[6][i] = calc_pot_by_integral(T_Li, sr, 2);
+		//res[5][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
+		//res[6][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
 		res[7][i] = ECP_way_core.compute_dens(sr, 0, 0, false);
-		res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);	
+		res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);
+		if (i != 0 && i % int(points/100) == 0)
+      progress->write(i / double(res[0].size()));
 	}
-	dat_out << fixed;
+	dat_out << scientific << setprecision(14);
 	for (int i = 0; i < res[0].size(); i++)
 	{
 		for (int j = 0; j < 9; j++)

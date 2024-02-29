@@ -11,6 +11,25 @@ inline void not_implemented_SA(const std::string& file, const int& line, const s
 };
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
+inline double linear_interpolate_spherical_density(
+	const std::vector<double>& radial_dens,
+	const std::vector<double>& spherical_dist,
+	const double dist,
+	const double lincr,
+	const double start)
+{
+	double result = 0;
+	if (dist > spherical_dist[spherical_dist.size() - 1])
+		return 0;
+	else if (dist < spherical_dist[0])
+		return radial_dens[0];
+	int nr = int(floor(log(dist / start) / lincr));
+	result = radial_dens[nr] + (radial_dens[nr + 1] - radial_dens[nr]) / (spherical_dist[nr] - spherical_dist[nr - 1]) * (dist - spherical_dist[nr - 1]);
+	if (result < 1E-10)
+		result = 0;
+	return result;
+}
+
 class Spherical_Atom {
 protected:
 	int atomic_number;

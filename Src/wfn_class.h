@@ -104,6 +104,7 @@ public:
 	bool read_xyz(const std::string& filename, std::ostream& file, const bool debug = false);
 	bool read_molden(const std::string& filename, std::ostream& file, const bool debug = false);
 	bool read_gbw(const std::string& filename, std::ostream& file, const bool debug = false, const bool has_ECPs = false);
+	bool read_ptb(const std::string& filename, std::ostream& file, const bool debug = false);
 	bool write_wfn(const std::string& fileName, const bool& debug, const bool occupied);
 	bool set_path(std::string given_path) { path = given_path; return true; };
 	void print_primitive(const int& nr);
@@ -118,6 +119,9 @@ public:
 	int get_nmo(const bool& only_occ) const;
 	int get_origin() const { return origin; };
 	std::string get_comment() { return comment; };
+	std::string get_CIF_table(const int nr = 0);
+	std::string get_basis_set_CIF(const int nr = 0);
+	void write_wfn_CIF(const std::string& filename);
 	double get_exponent(int nr) const { return exponents[nr]; };
 	unsigned int get_nr_electrons();
 	unsigned int get_nr_ECP_electrons();
@@ -206,8 +210,8 @@ public:
 	void computeELF(const double* PosGrid, double& Elf);
 	double computeMO(const double* PosGrid, const int& mo);
 	double compute_MO_spherical(const double& Pos1, const double& Pos2, const double& Pos3, const int& MO);
-	double computeESP(const double* PosGrid, std::vector<std::vector<double> >& d2);
-	double computeESP_noCore(const double* PosGrid, std::vector<std::vector<double> >& d2);
+	double computeESP(const double* PosGrid, const std::vector<std::vector<double> >& d2);
+	double computeESP_noCore(const double* PosGrid, const std::vector<std::vector<double> >& d2);
 	//----------DM Handling--------------------------------
 	void push_back_DM(const double& value = 0.0);
 	bool set_DM(const int& nr, const double& value = 0.0);

@@ -2914,6 +2914,9 @@ void options::digest_options()
 			wfn = arguments[i + 1];
 			err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
 		}
+		else if (temp == "-wfn_cif") {
+			write_CIF = true;
+		}
 		else if (temp == "-xtb_test")
 		{
 			test_xtb_molden(*this, log_file);
