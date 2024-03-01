@@ -508,6 +508,8 @@ void WFN::read_known_wavefunction_format(const string& fileName, ostream& file, 
 		origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
 	else if (fileName.find(".gbw") != string::npos)
 		origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
+	else if (fileName.find(".xtb") != string::npos)
+		origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
 	else
 		err_checkf(false, "Unknown filetype!", file);
 };
