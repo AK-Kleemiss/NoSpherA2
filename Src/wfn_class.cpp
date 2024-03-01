@@ -6016,12 +6016,12 @@ double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtm
 		return temp;
 }
 
-bool WFN::read_ptb(const string& filename, ostream file, const bool debug){
+bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 	ifstream inFile(filename, ios::binary | ios::in);
 	if (!inFile)
 	{
 		cerr << "File could not be opened!\n";
-		return;
+		return false;
 	}
 	else
 	{
@@ -6050,10 +6050,12 @@ bool WFN::read_ptb(const string& filename, ostream file, const bool debug){
 	file << "nmomax: " << nmomax << endl;
 	file << "nprims: " << nprims << endl;
 
-	vector<char[2]> atyp(ncent);
+	vector<string> atyp(ncent);
+	char temp[2];
 	for (int i = 0; i < ncent; ++i)
 	{
-		inFile.read(atyp[i], sizeof(char[2]));
+		inFile.read(&temp[0], sizeof(char[2]));
+		atyp[i] = temp;
 	}
 
 	vector<double> x(ncent), y(ncent), z(ncent), charge(ncent);
@@ -6143,6 +6145,7 @@ bool WFN::read_ptb(const string& filename, ostream file, const bool debug){
 	}
 
 	inFile.close();
+	return true;
 }
 
 
