@@ -6018,7 +6018,7 @@ double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtm
 		return temp;
 }
 
-bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
+bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
 	ifstream inFile(filename, ios::binary | ios::in);
 	if (!inFile)
 	{
@@ -6030,7 +6030,8 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 		file << "Staring to read " << filename << endl;
 	}
 	inFile.seekg(0, ios::beg);
-	short one, two, three, four;
+	int one, two, three, four;
+	double dummy;
 	inFile.read(reinterpret_cast<char*>(&one), sizeof(one));
 	inFile.read(reinterpret_cast<char*>(&two), sizeof(two));
 	inFile.read(reinterpret_cast<char*>(&three), sizeof(three));
@@ -6041,7 +6042,7 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 	file << "three: " << three << endl;
 	file << "four: " << four << endl;
 
-	long long ncent, nbf, nmomax, nprims;
+	int ncent, nbf, nmomax, nprims;
 	inFile.read(reinterpret_cast<char*>(&ncent), sizeof(ncent));
 	inFile.read(reinterpret_cast<char*>(&nbf), sizeof(nbf));
 	inFile.read(reinterpret_cast<char*>(&nmomax), sizeof(nmomax));
@@ -6052,35 +6053,49 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 	file << "nmomax: " << nmomax << endl;
 	file << "nprims: " << nprims << endl;
 
+	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
+
+
 	vector<string> atyp(ncent);
-	char temp[2];
+	char temp[3];
 	for (int i = 0; i < ncent; ++i)
 	{
 		inFile.read(&temp[0], sizeof(char[2]));
+		temp[2] = '\0';
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 		atyp[i] = temp;
+		atyp[i].erase(remove(atyp[i].begin(), atyp[i].end(), ' '), atyp[i].end());
 	}
 
-	vector<double> x(ncent), y(ncent), z(ncent), charge(ncent);
+	vec x(ncent), y(ncent), z(ncent);
+	ivec charge(ncent);
 	for (int i = 0; i < ncent; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&x[i]), sizeof(x[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 		inFile.read(reinterpret_cast<char*>(&y[i]), sizeof(y[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 		inFile.read(reinterpret_cast<char*>(&z[i]), sizeof(z[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 		inFile.read(reinterpret_cast<char*>(&charge[i]), sizeof(charge[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	}
 
 	vector<int> lao(nprims), aoatcart(nprims), ipao(nprims);
 	for (int i = 0; i < nprims; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&lao[i]), sizeof(lao[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	}
 	for (int i = 0; i < nprims; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&aoatcart[i]), sizeof(aoatcart[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	}
 	for (int i = 0; i < nprims; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&ipao[i]), sizeof(ipao[i]));
+		inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	}
 
 	vector<double> exps(nprims), contr(nprims);
@@ -6088,20 +6103,24 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 	{
 		inFile.read(reinterpret_cast<char*>(&exps[i]), sizeof(exps[i]));
 	}
+	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	for (int i = 0; i < nprims; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&contr[i]), sizeof(contr[i]));
 	}
+	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 
 	vector<double> occ(nmomax), eval(nmomax);
 	for (int i = 0; i < nmomax; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&occ[i]), sizeof(occ[i]));
 	}
+	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	for (int i = 0; i < nmomax; ++i)
 	{
 		inFile.read(reinterpret_cast<char*>(&eval[i]), sizeof(eval[i]));
 	}
+	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
 	vector<vector<double>> momat(nmomax, vector<double>(nbf));
 	for (int i = 0; i < nmomax; ++i)
 	{
@@ -6115,36 +6134,69 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug){
 
 	for (int i = 0; i < ncent; ++i)
 	{
-		file << "atyp[" << i << "]: " << atyp[i] << endl;
-		file << "pos[" << i << "]: " << x[i] << " " << y[i] << " " << z[i] << endl;
-		file << "charge[" << i << "]: " << charge[i] << endl
-			<< endl;
+		file << "atyp[" << i << "]: " << atyp[i] << " pos[" << i << "]: " << x[i] << " " << y[i] << " " << z[i] << " charge[" << i << "]: " << charge[i] << endl;
 	}
 	for (int i = 0; i < nprims; ++i)
 	{
 		file << "lao[" << i << "]: " << lao[i] << endl;
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
 		file << "aoatcart[" << i << "]: " << aoatcart[i] << endl;
-		file << "ipao[" << i << "]: " << ipao[i] << endl
-			<< endl;
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		file << "ipao[" << i << "]: " << ipao[i] << endl;
 	}
 
 	for (int i = 0; i < nprims; ++i)
 	{
 		file << "exps[" << i << "]: " << exps[i] << endl;
-		file << "contr[" << i << "]: " << contr[i] << endl
-			<< endl;
+	}
+	for (int i = 0; i < nprims; ++i)
+	{
+		file << "contr[" << i << "]: " << contr[i] << endl;
 	}
 
 	for (int i = 0; i < nmomax; ++i)
 	{
 		file << "occ[" << i << "]: " << occ[i] << endl;
-		file << "eval[" << i << "]: " << eval[i] << endl << "momat: ";
+	}
+	for (int i = 0; i < nmomax; ++i)
+	{
+		file << "eval[" << i << "]: " << eval[i] << endl ;
+	}
+	for (int i = 0; i < nmomax; ++i)
+	{
+		file << "momat[" << i << "]: ";
 		for (int j = 0; j < nbf; ++j)
 		{
 			file << " " << momat[i][j];
 		}
 		file << endl;
 	}
+
+	//making it into the wavefunction data
+	ncen = ncent;
+	nmo = nmomax;
+	nex = nprims;
+
+	for (int i = 0; i < ncen; i++)
+	{
+		atoms.push_back(atom(atyp[i], i, x[i], y[i], z[i], charge[i]));
+  }
+
+	for (int i = 0; i < nmo; i++)
+	{
+		MOs.push_back(MO(i, occ[i], eval[i]));
+	}
+
+	int run = 0;
+	// To DO: we need to generate the primitive coefficients from the contr and exp from the momat, then we cann add them below
+	for (int i = 0; i < nprims; i++) {
+    add_primitive(aoatcart[i], lao[i], exps[i], momat[run].data());
+		run++;
+  }
 
 	inFile.close();
 	return true;
