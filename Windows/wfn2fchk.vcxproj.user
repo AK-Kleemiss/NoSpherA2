@@ -164,7 +164,13 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_IAM_SF|x64'">
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_IAM_SF</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
     <LocalDebuggerCommandArguments>-xyz sucrose.xyz -cif sucrose.cif -hkl sucrose.hkl -cpus 6 -IAM -v</LocalDebuggerCommandArguments>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
+    <LocalDebuggerCommandArguments>-wfn wfn.xtb -cif sucrose.cif -dmin 0.6</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_IAM_SF</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
