@@ -82,7 +82,7 @@ public:
 	int get_MO_primitive_count(const int& nr_mo) const;
 	bool push_back_MO(const int& nr, const double& occ, const double& ener);
 	bool push_back_MO(const int& nr, const double& occ, const double& ener, const int& oper);
-	bool push_back_MO(MO& given);
+	bool push_back_MO(const MO& given);
 	void pop_back_MO() { MOs.pop_back(); nmo--; };
 	void delete_MO(const int& nr);
 	double get_MO_energy(const int& mo) const;
@@ -150,7 +150,7 @@ public:
 	void set_dist_switch() { distance_switch = true; };
 	void set_dist_switch(const bool& g) { distance_switch = g; };
 	bool get_dist_switch() { return distance_switch; };
-	void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true, const bool& use_xTB = false);
+	void set_has_ECPs(const bool& in, const bool& apply_to_aotms = true, const int& ECP_mode = 1);
 	void set_ECPs(std::vector<int>& nr, std::vector<int>& elcount);
 	bool get_has_ECPs() const { return has_ECPs; };
 	void operator=(const WFN& right);

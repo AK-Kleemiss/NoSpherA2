@@ -19,6 +19,13 @@ const int ECP_electrons_xTB[] = { 0, 0,                                         
 36, 36,                                                         36, 36, 36, 36, 36, 36, 36, 36, 36, 46, 46, 46, 46, 46, 46, 46,
 54, 54, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 68, 68, 68, 68, 68, 68, 68, 68, 78, 78, 78, 78, 78, 78, 78 };
 
+const int ECP_electrons_pTB[] = { 0, 0,                                                                                      0,
+ 0,  0,                                                                                                  2,  2,  2,  2,  2,  2,
+ 2,  2,                                                                                                 10, 10, 10, 10, 10, 10,
+10, 10,                                                         10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 28, 28, 28, 28, 28, 28,
+28, 28,                                                         28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
+46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
+
 bool debug_wfn = false;
 bool debug_wfn_deep = false;
 
@@ -128,7 +135,7 @@ bool WFN::push_back_MO(const int& nr, const double& occ, const double& ener, con
 	return true;
 };
 
-bool WFN::push_back_MO(MO& given)
+bool WFN::push_back_MO(const MO& given)
 {
 	nmo++;
 	MOs.push_back(given);
@@ -3878,10 +3885,10 @@ bool WFN::sort_wfn(const int& g_order, const bool& debug)
 	return true;
 };
 
-void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms, const bool& use_xTB)
+void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms, const int& ECP_mode)
 {
 	has_ECPs = in;
-	if (apply_to_atoms && !use_xTB)
+	if (apply_to_atoms && ECP_mode == 1)
 	{
 #pragma omp parallel for
 		for (int i = 0; i < ncen; i++)
@@ -3892,13 +3899,23 @@ void WFN::set_has_ECPs(const bool& in, const bool& apply_to_atoms, const bool& u
 			}
 		}
 	}
-	if (apply_to_atoms && use_xTB) {
+	if (apply_to_atoms && ECP_mode == 2) {
 #pragma omp parallel for
 		for (int i = 0; i < ncen; i++)
 		{
 			if (ECP_electrons_xTB[atoms[i].charge] != 0)
 			{
 				atoms[i].ECP_electrons = ECP_electrons_xTB[atoms[i].charge];
+			}
+		}
+	}
+	if (apply_to_atoms && ECP_mode == 3) {
+#pragma omp parallel for
+		for (int i = 0; i < ncen; i++)
+		{
+			if (ECP_electrons_pTB[atoms[i].charge] != 0)
+			{
+				atoms[i].ECP_electrons = ECP_electrons_pTB[atoms[i].charge];
 			}
 		}
 	}
@@ -6025,10 +6042,6 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
 		cerr << "File could not be opened!\n";
 		return false;
 	}
-	else
-	{
-		file << "Staring to read " << filename << endl;
-	}
 	inFile.seekg(0, ios::beg);
 	int one, two, three, four;
 	double dummy;
@@ -6037,24 +6050,12 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
 	inFile.read(reinterpret_cast<char*>(&three), sizeof(three));
 	inFile.read(reinterpret_cast<char*>(&four), sizeof(four));
 
-	file << "one: " << one << endl;
-	file << "two: " << two << endl;
-	file << "three: " << three << endl;
-	file << "four: " << four << endl;
-
 	int ncent, nbf, nmomax, nprims;
 	inFile.read(reinterpret_cast<char*>(&ncent), sizeof(ncent));
 	inFile.read(reinterpret_cast<char*>(&nbf), sizeof(nbf));
 	inFile.read(reinterpret_cast<char*>(&nmomax), sizeof(nmomax));
 	inFile.read(reinterpret_cast<char*>(&nprims), sizeof(nprims));
-
-	file << "ncent: " << ncent << endl;
-	file << "nbf: " << nbf << endl;
-	file << "nmomax: " << nmomax << endl;
-	file << "nprims: " << nprims << endl;
-
 	inFile.read(reinterpret_cast<char*>(&dummy), sizeof(dummy));
-
 
 	vector<string> atyp(ncent);
 	char temp[3];
@@ -6130,74 +6131,30 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
 		}
 	}
 
-	// Print all the data to cout
-
-	for (int i = 0; i < ncent; ++i)
-	{
-		file << "atyp[" << i << "]: " << atyp[i] << " pos[" << i << "]: " << x[i] << " " << y[i] << " " << z[i] << " charge[" << i << "]: " << charge[i] << endl;
-	}
-	for (int i = 0; i < nprims; ++i)
-	{
-		file << "lao[" << i << "]: " << lao[i] << endl;
-	}
-	for (int i = 0; i < nprims; ++i)
-	{
-		file << "aoatcart[" << i << "]: " << aoatcart[i] << endl;
-	}
-	for (int i = 0; i < nprims; ++i)
-	{
-		file << "ipao[" << i << "]: " << ipao[i] << endl;
-	}
-
-	for (int i = 0; i < nprims; ++i)
-	{
-		file << "exps[" << i << "]: " << exps[i] << endl;
-	}
-	for (int i = 0; i < nprims; ++i)
-	{
-		file << "contr[" << i << "]: " << contr[i] << endl;
-	}
-
-	for (int i = 0; i < nmomax; ++i)
-	{
-		file << "occ[" << i << "]: " << occ[i] << endl;
-	}
-	for (int i = 0; i < nmomax; ++i)
-	{
-		file << "eval[" << i << "]: " << eval[i] << endl ;
-	}
-	for (int i = 0; i < nmomax; ++i)
-	{
-		file << "momat[" << i << "]: ";
-		for (int j = 0; j < nbf; ++j)
-		{
-			file << " " << momat[i][j];
-		}
-		file << endl;
-	}
-
 	//making it into the wavefunction data
-	ncen = ncent;
-	nmo = nmomax;
-	nex = nprims;
 
-	for (int i = 0; i < ncen; i++)
+	for (int i = 0; i < ncent; i++)
 	{
-		atoms.push_back(atom(atyp[i], i, x[i], y[i], z[i], charge[i]));
+		err_checkf(push_back_atom(atom(atyp[i], i, x[i], y[i], z[i], charge[i])),"Error adding atom to WFN!", file);
   }
+	err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 
-	for (int i = 0; i < nmo; i++)
+	for (int i = 0; i < nmomax; i++)
 	{
-		MOs.push_back(MO(i, occ[i], eval[i]));
+		err_checkf(push_back_MO(MO(i, occ[i], eval[i])), "Error adding MO to WFN!", file);
 	}
+	err_checkf(nmo == nmomax, "Error adding MOs to WFN!", file);
 
-	int run = 0;
-	// To DO: we need to generate the primitive coefficients from the contr and exp from the momat, then we cann add them below
+	// we need to generate the primitive coefficients from the contr and exp from the momat, then we cann add them MO-wise
 	for (int i = 0; i < nprims; i++) {
-    add_primitive(aoatcart[i], lao[i], exps[i], momat[run].data());
-		run++;
+		vec values;
+		for(int j = 0; j < nmomax; j++) 
+		{
+		  values.push_back(momat[j][ipao[i]-1] * contr[i]);
+		}
+    add_primitive(aoatcart[i], lao[i], exps[i], values.data());
   }
-
+	err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
 	inFile.close();
 	return true;
 }
