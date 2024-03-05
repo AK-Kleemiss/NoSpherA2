@@ -4528,7 +4528,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
 			}
 		}
 	}
-	else if (mode == 1 || mode == 2)
+	else if (mode == 1 || mode == 2 || mode == 3)
 	{ // Using a Thakkar core density
 		if (debug)
 			file << "Using a Thakkar core density" << endl;
