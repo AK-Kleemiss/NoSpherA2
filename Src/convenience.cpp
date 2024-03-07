@@ -63,8 +63,8 @@ string NoSpherA2_message()
 	t.append("      Emmanuel Hupf,\n");
 	t.append("      Alessandro Genoni,\n");
 	t.append("      and many more in communications or by feedback!\n");
-	t.append("NoSpherA2 was published at : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692\n");
-	t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174\n");
+	t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
+	t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
 	return t;
 }
 
@@ -2628,6 +2628,9 @@ void options::digest_options()
 				n++;
 			}
 		}
+		else if (temp == "-charge") {
+			charge = stoi(arguments[i + 1]);
+		}
 		else if (temp == "-coef")
 		{
 			coef_file = arguments[i + 1];
@@ -2807,6 +2810,24 @@ void options::digest_options()
 				n++;
 				const string _temp = arguments[i + n];
 				groups.push_back(split_string<int>(_temp, delimiter));
+				n++;
+			}
+		}
+		else if (temp == "-mtc_mult") {
+			combined_tsc_calc = true;
+			int n = 1;
+			while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+			{
+				combined_tsc_calc_mult.push_back(stoi(arguments[i + n]));
+				n++;
+			}
+		}
+		else if (temp == "-mtc_charge") {
+			combined_tsc_calc = true;
+			int n = 1;
+			while (i + n < argc && string(arguments[i + n]).find("-") > 0)
+			{
+				combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
 				n++;
 			}
 		}

@@ -231,7 +231,7 @@ const double Thakkar::get_form_factor(const double &k_vector)
 
 void set_core_counts(int *max_s, int *max_p, int *max_d, int *max_f, const int &core_els, const int &ECP_mode)
 {
-	if (ECP_mode == 1)
+	if (ECP_mode == 1 || ECP_mode == 3)
 	{
 		if (core_els == 2)
 		{

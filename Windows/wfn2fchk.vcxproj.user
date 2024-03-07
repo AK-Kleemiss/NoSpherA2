@@ -86,7 +86,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">
-    <LocalDebuggerCommandArguments>-wfn Au2Br2.gbw -cif Au2Br2.cif -ECP 1 -cpus 24 -test-ecp 2.0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Au2Br2.gbw -cif Au2Br2.cif -ECP 1 -cpus 24 -test-ecp 3.0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -133,6 +133,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">
+    <LocalDebuggerCommandArguments>-cif thpp_ptb.cif -dmin 0.6 -cpus 6 -acc 2 -v -mtc thpp_part1.xtb 0,1 thpp_part2.xtb 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -ECP 3</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
     <LocalDebuggerCommandArguments>-perf_benchmark</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
@@ -170,7 +176,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
-    <LocalDebuggerCommandArguments>-wfn wfn.xtb -cif sucrose.cif -dmin 0.6</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn wfn.xtb -cif sucrose.cif -dmin 0.6 -ECP 3</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_IAM_SF</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

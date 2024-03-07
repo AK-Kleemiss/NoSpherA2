@@ -957,6 +957,8 @@ struct options
 	std::string fract_name;
 	std::vector<std::string> combined_tsc_calc_files;
 	std::vector<std::string> combined_tsc_calc_cifs;
+	std::vector<unsigned int> combined_tsc_calc_mult;
+	std::vector<int> combined_tsc_calc_charge;
 	std::string wavename;
 	std::string gaussian_path;
 	std::string turbomole_path;
@@ -972,6 +974,7 @@ struct options
 	int ncpus = 0;
 	double mem = 0.0;
 	unsigned int mult = 0;
+	int charge = 0;
 	bool debug = false;
 	hkl_list m_hkl_list;
 

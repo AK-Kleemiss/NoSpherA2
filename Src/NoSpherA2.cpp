@@ -75,8 +75,11 @@ int main(int argc, char **argv)
     if (opt.combined_tsc_calc)
       err_checkf(opt.cif != "", "No cif specified", log_file);
     // First make sure all files exist
-    if (opt.cif_based_combined_tsc_calc)
+    if (opt.cif_based_combined_tsc_calc) {
       err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
+      err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and mults impossible!", log_file);
+      err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and charges impossible!", log_file);
+    }
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
     {
       err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
@@ -87,6 +90,11 @@ int main(int argc, char **argv)
     for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
     {
       log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
+      if (opt.debug) {
+        log_file << "m: " << opt.combined_tsc_calc_mult[i] << endl; log_file << "c: " << opt.combined_tsc_calc_charge[i] << "\n";
+      }
+      wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
+      wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
       wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file);
       if (opt.ECP)
       {
@@ -185,10 +193,12 @@ int main(int argc, char **argv)
     auto t = new WFN(0);
     wavy.push_back(*t);
     delete t;
-    log_file << "Reading: " << setw(44) << opt.wfn << flush;
-    wavy[0].read_known_wavefunction_format(opt.wfn, log_file, opt.debug);
     wavy[0].set_method(opt.method);
     wavy[0].set_multi(opt.mult);
+    wavy[0].set_charge(opt.charge);
+    if (opt.debug) log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
+    log_file << "Reading: " << setw(44) << opt.wfn << flush;
+    wavy[0].read_known_wavefunction_format(opt.wfn, log_file, opt.debug);
     if (opt.ECP)
     {
       wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
