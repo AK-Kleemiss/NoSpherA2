@@ -113,6 +113,7 @@ public:
 	int get_charge() const { return charge; };
 	int get_multi() const { return multi; };
 	void set_multi(unsigned int& in) { multi = in; };
+	void set_charge(const int& in) { charge = in; };
 	int get_nex() const { return nex; };
 	int get_ncen() const { return ncen; };
 	int get_nmo() const { return nmo; };
