@@ -2,7 +2,7 @@ RM := rm
 
 DIFF := diff -q -i -b
 
-all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP
+all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb
 
 sucrose_SF:
 	@echo 'Running test: $@'
@@ -53,6 +53,19 @@ sucrose_twin:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
+sucrose_ptb:
+	@echo 'Running test: $@'
+	cd sucrose_IAM_SF && ../../NoSpherA2 \
+		-cif sucrose.cif \
+		-dmin 0.8 \
+		-wfn wfn.xtb \
+		-mult 0 \
+		-charge 0 \
+		-no-date \
+		&& mv NoSpherA2.log $@.log\
+		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
 disorder_THPP:
 	@echo 'Running test: $@'
 	cd disorder && ../../NoSpherA2 \
@@ -60,6 +73,8 @@ disorder_THPP:
 		-hkl thpp.hkl \
 		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 \
 		olex2/Wfn_job/Part_2/thpp.wfx 0,2 \
+		-mtc_mult 1 1 \
+		-mtc_charge 0 0
 		-acc 0 \
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
@@ -106,6 +121,8 @@ rubredoxin_cmtc:
 		residues/2.gbw residues/2.cif 0,1 \
 		residues/3.gbw residues/3.cif 0,2 \
 		residues/4.gbw residues/4.cif 0 \
+		-mtc_mult 1 1 1 1 \
+		-mtc_charge 0 0 0 0 \
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
@@ -119,6 +136,8 @@ rubredoxin_cmtc_full:
 		residues/2.gbw residues/2.cif 0,1 \
 		residues/3.gbw residues/3.cif 0,2 \
 		residues/4.gbw residues/4.cif 0 \
+		-mtc_mult 1 1 1 1 \
+		-mtc_charge 0 0 0 0 \
 		-cpus 24
 	@echo 'Finished running: $@'
 	
@@ -135,7 +154,7 @@ wfn_reading:
 fchk_conversion:
 	@echo 'Running test: $@'
 	cd NiP3_fchk && ../../NoSpherA2 \
-        -b def2-TZVP -d ./ \
+                -b def2-TZVP -d ./ \
 		-wfn in.ffn -no-date \
 		&& ${DIFF} in.fchk good.fchk
 	@echo 'Finished running: $@'

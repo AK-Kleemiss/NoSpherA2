@@ -501,22 +501,33 @@ void WFN::read_known_wavefunction_format(const string& fileName, ostream& file, 
 		origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
 	else if (fileName.find(".ffn") != string::npos)
 		origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
-	else if (fileName.find(".wfx") != string::npos)
+	else if (fileName.find(".wfx") != string::npos) {
+		if (debug) file << "Reading wfx file" << endl;
 		origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
+	}
 	else if (fileName.find(".fch") != string::npos)
 	{
+		if(debug) file << "Reading fchk file" << endl;
 		origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
 		if (debug)
 			err_checkf(write_wfn("test.wfn", debug, false), "Problem writing test.wfn", file);
 	}
-	else if (fileName.find(".xyz") != string::npos)
+	else if (fileName.find(".xyz") != string::npos) {
+		if(debug) file << "Reading xyz file" << endl;
 		origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
-	else if (fileName.find(".molden") != string::npos)
+	}
+	else if (fileName.find(".molden") != string::npos) {
+		if(debug) file << "Reading molden file" << endl;
 		origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
-	else if (fileName.find(".gbw") != string::npos)
+	}
+	else if (fileName.find(".gbw") != string::npos) {
+		if(debug) file << "Reading gbw file" << endl;
 		origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
-	else if (fileName.find(".xtb") != string::npos)
+	}
+	else if (fileName.find(".xtb") != string::npos) {
+		if(debug) file << "Reading xtb file" << endl;
 		origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
+	}
 	else
 		err_checkf(false, "Unknown filetype!", file);
 };
@@ -6036,6 +6047,7 @@ double WFN::Afac(int& l, int& r, int& i, double& PC, double& gamma, double& fjtm
 }
 
 bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
+	if (debug) file << "Reading pTB file: " << filename << endl;
 	ifstream inFile(filename, ios::binary | ios::in);
 	if (!inFile)
 	{
@@ -6138,6 +6150,41 @@ bool WFN::read_ptb(const string& filename, ostream& file, const bool debug) {
 		err_checkf(push_back_atom(atom(atyp[i], i, x[i], y[i], z[i], charge[i])),"Error adding atom to WFN!", file);
   }
 	err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
+
+	// Since pTB writes all occupations to be 2 regardless of the actual occupation, we need to fix this
+	int elcount = 0;
+	elcount -= get_charge();
+	if (debug) file << "elcount: " << elcount << endl;
+	for (int i = 0; i < ncen; i++) {
+		elcount += get_atom_charge(i);
+		elcount -= ECP_electrons_pTB[get_atom_charge(i)];
+	}
+	if (debug) file << "elcount after: " << elcount << endl;
+	int alpha_els = 0, beta_els = 0, temp_els = elcount;
+	while (temp_els > 1) {
+		alpha_els++;
+		beta_els++;
+		temp_els -= 2;
+	}
+	alpha_els += temp_els;
+	if (debug) file << "al/be els:" << alpha_els << " " << beta_els << endl;
+	int diff = get_multi() - 1;
+	if (debug) file << "diff: " << diff << endl;
+	while (alpha_els - beta_els != diff) {
+		alpha_els++;
+		beta_els--;
+	}
+	for (int i = beta_els; i < alpha_els; i++) {
+    occ[i] = 1.0;
+  }
+	if (debug) {
+		file << "al/be els after:" << alpha_els << " " << beta_els << endl;
+		file << "occs: ";
+		for (int i = 0; i < nmomax; i++) {
+			file << occ[i] << " ";
+		}
+		file << endl;
+	}
 
 	for (int i = 0; i < nmomax; i++)
 	{
