@@ -1396,7 +1396,7 @@ void properties_calculation(options &opt)
   }
 }
 
-void combine_mo(options &opt)
+void do_combine_mo(options &opt)
 {
   using namespace std;
   WFN wavy1(2);

@@ -94,7 +94,7 @@ AtomGrid::AtomGrid(const double radial_precision,
 
   num_radial_grid_points_ = 0;
 
-  const double rb = constants::bragg_angstrom[proton_charge] / (5.0 * 0.529177249);
+  const double rb = constants::bragg_angstrom[proton_charge] / (5.0E10 * constants::a0);
   const double c = r_inner / (exp(h) - 1.0);
   const int num_radial = int(log(1.0 + (r_outer / c)) / h);
 

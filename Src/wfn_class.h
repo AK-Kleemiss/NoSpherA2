@@ -234,6 +234,7 @@ public:
 	int* get_ptr_centers() { return &centers[0]; };
 	double* get_ptr_exponents() { return &exponents[0]; };
 	double* get_ptr_mo_coefficients(const int& mo);
+	
 };
 
 #include "mo_class.h"
