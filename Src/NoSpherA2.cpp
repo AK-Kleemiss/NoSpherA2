@@ -53,21 +53,6 @@ int main(int argc, char **argv)
     std::cout << "Finished!" << endl;
     return 0;
   }
-  if (opt.sfac_diffuse > 0.0)
-  {
-    sfac_diffuse(opt, log_file);
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    return 0;
-  }
-  // perform combine_mo and quit
-  if (opt.combine_mo.size() != 0)
-  {
-    combine_mo(opt);
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Finished!" << endl;
-    exit(0);
-  }
   // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
   if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)
   {

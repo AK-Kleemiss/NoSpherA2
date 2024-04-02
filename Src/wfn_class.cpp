@@ -2412,12 +2412,6 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug, cons
 			int i2 = 0;
 			const int soi = 4;
 			const int sod = 8;
-			if (debug) {
-				file << "Size of int: " << soi << endl;
-				file << "Size of long int: " << sizeof(long int) << endl;
-				file << "Size of float: " << sizeof(float) << endl;
-				file << "Size of double: " << sod << endl;
-			}
 			rf.read((char*)&i1, 8);
 			file << "First line: " << i1 << endl;
 			for (int i = 0; i < i1; i++) {
@@ -2458,6 +2452,9 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug, cons
 						ECP_prims.push_back(ECP_primitive(center, type, e, c, n));
 					}
 				}
+				for(int i = 0; i<ncen; i++)
+					if (atoms[i].charge == Z)
+						atoms[i].ECP_electrons = nr_core;
 			}
 			if (debug) {
 				file << "Ended reading" << endl;

@@ -2605,6 +2605,23 @@ void options::digest_options()
 				n++;
 			}
 		}
+		else if (temp == "-atom_dens") {
+			wfn = arguments[i + 1];
+			err_checkf(exists(wfn), "WFN doesn't exist", cout);
+			int core_size1 = 0;
+			int offset = 0;
+			int core_size2 = 0;
+			if (argc >= i + 4) {
+				core_size1 = stoi(arguments[i + 2]);
+				cout << "Core size1: " << core_size1 << endl;
+				offset = stoi(arguments[i + 3]);
+				cout << "Offset: " << offset << endl;
+				core_size2 = stoi(arguments[i + 4]);
+				cout << "Core size2: " << core_size2 << endl;
+			}
+			spherically_averaged_density(*this, core_size1, offset, core_size2);
+			exit(0);
+		}
 		else if (temp == "-b")
 			basis_set = arguments[i + 1];
 		else if (temp == "-Cation")
@@ -2664,6 +2681,8 @@ void options::digest_options()
 		{
 			combine_mo.push_back(arguments[i + 1]);
 			combine_mo.push_back(arguments[i + 2]);
+			do_combine_mo(*this);
+			exit(0);
 		}
 		else if (temp == "-cmos1")
 		{
@@ -2837,8 +2856,10 @@ void options::digest_options()
 			no_date = true;
 		else if (temp == "-pbc")
 			pbc = stoi(arguments[i + 1]);
-		else if (temp == "-perf_benchmark")
+		else if (temp == "-perf_benchmark") {
 			test_timing();
+			exit(0);
+		}
 		else if (temp == "-radius")
 			radius = stod(arguments[i + 1]);
 		else if (temp == "-resolution")
@@ -2885,6 +2906,7 @@ void options::digest_options()
 			cif = arguments[i + 2];
 			wfn = arguments[i + 3];
 			dmin = fromString<double>(arguments[i + 4]);
+			calc_sfac_diffuse(*this, std::cout);
 		}
 		else if (temp == "-spherical_harmonic")
 		{

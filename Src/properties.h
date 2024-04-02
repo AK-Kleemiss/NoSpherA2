@@ -119,7 +119,7 @@ void Calc_Hirshfeld_atom(
 
 void properties_calculation(options& opt);
 
-void combine_mo(options& opt);
+void do_combine_mo(options& opt);
 
 #include "wfn_class.h"
 #include "cell.h"

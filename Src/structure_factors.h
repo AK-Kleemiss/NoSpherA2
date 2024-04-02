@@ -130,7 +130,7 @@ void calc_SF(const int &points,
              time_point &end1,
              bool debug = false);
 
-void sfac_diffuse(options &opt, std::ofstream &log_file);
+void calc_sfac_diffuse(options &opt, std::ostream &log_file);
 
 #include "wfn_class.h"
 #include "tsc_block.h"

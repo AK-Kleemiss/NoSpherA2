@@ -1479,7 +1479,7 @@ int make_hirshfeld_grids(const int &pbc,
 			file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
 			double current = 1;
 			double dist = min_dist;
-			if (accuracy > 3)
+			if (accuracy < 3)
 				while (current > 1E-10)
 				{
 					radial_dist[i].push_back(dist);
@@ -1509,7 +1509,7 @@ int make_hirshfeld_grids(const int &pbc,
 		{
 			double current = 1;
 			double dist = min_dist;
-			if (accuracy > 3)
+			if (accuracy < 3)
 				while (current > 1E-10)
 				{
 					radial_dist[i].push_back(dist);
@@ -4540,7 +4540,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
 			{
 				double k_0001 = temp[i].get_core_form_factor(0, wave.atoms[asym_atom_list[i]].ECP_electrons);
 				double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.atoms[asym_atom_list[i]].ECP_electrons);
-				file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " core f(0): "
+				file << "Atom nr: " << wave.atoms[asym_atom_list[i]].charge << " number of ECP electrons: " << wave.atoms[asym_atom_list[i]].ECP_electrons << " core f(0) : "
 					 << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
 			}
 		}
@@ -5652,7 +5652,7 @@ tsc_block<int, cdouble> calculate_structure_factors_MTC(
 	return blocky;
 }
 
-void sfac_diffuse(options &opt, std::ofstream &log_file)
+void calc_sfac_diffuse(options &opt, std::ostream &log_file)
 {
 	using namespace std;
 	std::vector<WFN> wavy;
@@ -5782,5 +5782,4 @@ void sfac_diffuse(options &opt, std::ofstream &log_file)
 		labels.push_back(wavy[0].atoms[asym_atom_list[i]].label);
 	tsc_block<double, cdouble> result(sf, labels, hkl);
 	result.write_tsc_file_non_integer(opt.cif);
-	log_file.close();
 }

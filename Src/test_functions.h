@@ -531,6 +531,90 @@ void test_timing()
 	exit(0);
 }
 
+template <typename T>
+std::vector<T> geomspace(T start, T stop, int num) {
+	std::vector<T> result;
+	T delta = (log(stop) - log(start)) / (num - 1);
+	for (int i = 0; i < num; i++) {
+		T exponent = log(start) + i * delta;
+		result.push_back(exp(exponent));
+	}
+	return result;
+}
+
+void spherically_averaged_density(options& opt, const int core_size = 0, const int offset = 0, const int core_size2 = 0) {
+	using namespace std;
+	WFN wavy(9);
+	wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+	wavy.delete_unoccupied_MOs();
+	cout << "Number of MOs before: " << wavy.get_nmo() << endl;
+	if (core_size > 0) {
+		for (int i = 0; i < core_size; i++)
+			wavy.delete_MO(0);
+		for (int i = 0; i < core_size2; i++)
+			wavy.delete_MO(offset);
+	}
+	cout << "Number of MOs after: " << wavy.get_nmo() << endl;
+	const long double da = constants::PI/360.0;
+	const int upper = int(constants::TWO_PI / da);
+	// Make angular grids
+	vector<long double> x0, y0, z0, st0;
+	for (long double phi = 0; phi <= constants::TWO_PI; phi+=da)
+	{
+		const long double cp = cos(phi);
+		const long double sp = sin(phi);
+		for (long double theta = 0; theta <= constants::PI; theta += da)
+		{
+			const long double st = sin(theta);
+			st0.push_back(st * da * da);
+			const long double ct = cos(theta);
+			x0.push_back(st * cp), y0.push_back(st * sp), z0.push_back(ct);
+		}
+	}
+	const long long int ang_size = x0.size();
+	cout << "Averaging over " << ang_size << " angular points" << endl;
+
+	// Make radial grids on logarithmic scale
+	vec radial_dist = geomspace<double>(1E-7, 15, 20000);	
+	const long long int upper_r = radial_dist.size();
+	cout << "Calculating " << long long int(upper_r * ang_size) << " points" << endl;
+	//Calcualte density on angular grid at each point of radial grid, average and integrate
+	long double tot_int = 0;
+	vec radial_dens(upper_r, 0.0);
+	
+#pragma omp parallel num_threads(opt.threads)
+	{
+		vector<vec> d;
+		vec phi(wavy.get_nmo(), 0.0);
+		d.resize(16);
+		for (int i = 0; i < 16; i++)
+			d[i].resize(1, 0.0);
+#pragma omp	for reduction (+: tot_int)
+		for (long long int _r = 0; _r < upper_r; _r++)
+		{
+			double r = radial_dist[_r];
+			long double v = 0;
+			for (long long int i = 0; i < ang_size; i++)
+			{
+				v += wavy.compute_dens(r * x0[i], r * y0[i], r * z0[i], d, phi, false) * st0[i];
+			}
+			if (_r >= 1)
+				tot_int += v * r * r * (r - radial_dist[_r - 1]);
+			else
+				tot_int += v * r * r * (r);
+			radial_dens[_r] = v / 4.0 / constants::PI;
+		}
+	}
+	cout << "Start writing the file" << endl;
+	string el = atnr2letter(wavy.get_atom_charge(0));
+	ofstream out(el + ".dat", ios::out);
+	out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int << "\n";
+	for(int i=0; i<upper_r; i++)
+		out << setw(24) << scientific << setprecision(15) << radial_dist[i] << setw(24) << scientific << setprecision(16) << radial_dens[i] << "\n";
+	out.flush();
+	out.close();
+}
+
 void add_ECP_contribution_test(const ivec &asym_atom_list,
 							   const WFN &wave,
 							   std::vector<cvec> &sf,
