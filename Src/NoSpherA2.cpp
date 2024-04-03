@@ -102,6 +102,7 @@ int main(int argc, char **argv)
     }
     Rho_diff.give_parent_wfn(wav);
     cout << "RSR between the two cubes: " << setw(16) << scientific << setprecision(16) << Rho1.rrs(Rho2) << endl;
+    cout << "Ne of shifted electrons: " << Rho_diff.diff_sum() << endl;
     cout << "Writing cube 1..." << flush;
     Rho1.write_file(Rho1.path, false);
     cout << " ... done!\nWriting cube 2..." << flush;
