@@ -947,6 +947,7 @@ struct options
 	bool all_mos = false;
 	bool test = false;
 	std::string wfn;
+	std::string wfn2;
 	std::string fchk;
 	std::string basis_set;
 	std::string hkl;

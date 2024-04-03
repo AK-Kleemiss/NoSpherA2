@@ -53,6 +53,66 @@ int main(int argc, char **argv)
     std::cout << "Finished!" << endl;
     return 0;
   }
+  // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
+  if (opt.wfn2.length() != 0) {
+    WFN wav(9), wav2(9);
+    wav.read_known_wavefunction_format(opt.wfn, log_file, opt.debug), wav2.read_known_wavefunction_format(opt.wfn2, log_file, opt.debug);
+    if (opt.debug)
+        cout << opt.wfn << opt.wfn2 << endl;
+    wav.delete_unoccupied_MOs();
+    wav2.delete_unoccupied_MOs();
+    readxyzMinMax_fromWFN(wav, opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
+    cube Rho1(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wav.get_ncen(), true);
+    cube Rho2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wav.get_ncen(), true);
+    Rho1.give_parent_wfn(wav);
+    Rho2.give_parent_wfn(wav2);
+    double len[3]{ 0,0,0 };
+    for (int i = 0; i < 3; i++) {
+        len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        Rho1.set_origin(i, opt.MinMax[i]);
+        Rho2.set_origin(i, opt.MinMax[i]);
+        Rho1.set_vector(i, i, len[i]);
+        Rho2.set_vector(i, i, len[i]);
+    }
+    Rho1.set_comment1("Calculated density using NoSpherA2");
+    Rho1.set_comment2("from " + wav.get_path());
+    Rho2.set_comment1("Calculated density using NoSpherA2");
+    Rho2.set_comment2("from " + wav2.get_path());
+    Rho1.path = get_basename_without_ending(wav.get_path()) + "_rho.cube";
+    Rho2.path = get_basename_without_ending(wav2.get_path()) + "_rho.cube";
+    Calc_Rho_no_trans(Rho1, wav, opt.threads, opt.radius, log_file);
+    Calc_Rho_no_trans(Rho2, wav2, opt.threads, opt.radius, log_file);
+    cube Rho_diff(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wav.get_ncen(), true);
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < Rho1.get_size(0); i++)
+    {
+        for (int j = 0; j < Rho1.get_size(1); j++)
+            for (int k = 0; k < Rho1.get_size(2); k++)
+            {
+                 Rho_diff.set_value(i, j, k, Rho1.get_value(i,j,k) - Rho2.get_value(i,j,k));
+            }
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        Rho_diff.set_origin(i, opt.MinMax[i]);
+        Rho_diff.set_vector(i, i, len[i]);
+    }
+    Rho_diff.give_parent_wfn(wav);
+    cout << "RSR between the two cubes: " << setw(16) << scientific << setprecision(16) << Rho1.rrs(Rho2) << endl;
+    cout << "Writing cube 1..." << flush;
+    Rho1.write_file(Rho1.path, false);
+    cout << " ... done!\nWriting cube 2..." << flush;
+    Rho2.write_file(Rho2.path, false);
+    Rho_diff.path = get_basename_without_ending(wav2.get_path()) + "_diff.cube";
+    cout << " ... done\nWriting difference..." << flush;
+    Rho_diff.write_file(Rho_diff.path, false);
+    cout << " ... done :)" << endl;
+    cout << "Bye Bye!" << endl;
+    return 0;
+  }
   // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
   if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)
   {

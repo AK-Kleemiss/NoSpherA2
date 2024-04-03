@@ -36,8 +36,8 @@ public:
   bool set_value(int x, int y, int z, double value);
   bool read_file(bool full, bool header, bool expert = false);
   bool write_file(bool force = false, bool absolute = false);
-  bool write_file(std::string& given_path, bool debug);
-  bool write_xdgraph(std::string& given_path, bool debug);
+  bool write_file(std::string& given_path, bool debug = false);
+  bool write_xdgraph(std::string& given_path, bool debug = false);
   bool fractal_dimension(const double stepsize);
   double get_vector(int i, int j) const;
   bool set_vector(int i, int j, double value);
