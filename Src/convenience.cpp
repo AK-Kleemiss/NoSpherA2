@@ -2704,6 +2704,9 @@ void options::digest_options()
 		}
 		else if (temp == "-def" || temp == "-DEF")
 			def = calc = true;
+		else if (temp == "-density_difference" || temp == "-density-difference") {
+			wfn2 = arguments[i+1];
+		}
 		else if (temp == "-dmin")
 			dmin = stod(arguments[i + 1]);
 		else if (temp == "-d")

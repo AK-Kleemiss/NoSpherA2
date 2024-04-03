@@ -38,6 +38,13 @@ void Calc_Rho(
 	double radius,
 	std::ostream& file
 );
+void Calc_Rho_no_trans(
+	cube& CubeRho,
+	WFN& wavy,
+	int cpus,
+	double radius,
+	std::ostream& file
+);
 void Calc_Rho_spherical_harmonics(
 	cube& CubeRho,
 	WFN& wavy,

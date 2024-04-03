@@ -628,6 +628,64 @@ void Calc_Rho(
     file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
+void Calc_Rho_no_trans(
+    cube& CubeRho,
+    WFN& wavy,
+    int cpus,
+    double radius,
+    ostream& file)
+{
+#ifdef _OPENMP
+    if (cpus != -1)
+    {
+        if (cpus > 1)
+            omp_set_nested(1);
+    }
+#endif
+
+    time_point start = get_time();
+
+    progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
+    const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
+
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < CubeRho.get_size(0); i++)
+    {
+        for (int j =0; j < CubeRho.get_size(1); j++)
+            for (int k = 0; k < CubeRho.get_size(2); k++)
+            {
+
+                double PosGrid[3]{
+                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
+                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
+                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) },
+                    Rho = 0;
+
+                bool skip = true;
+                for (int a = 0; a < wavy.get_ncen(); a++)
+                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < radius / 0.52)
+                        skip = false;
+                if (skip)
+                    continue;
+
+                Rho = wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2]);
+
+                CubeRho.set_value(i, j, k, Rho);
+            }
+        if (i != 0 && i % step == 0)
+            progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+    }
+    delete (progress);
+
+    time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+};
+
 void Calc_Rho_spherical_harmonics(
     cube &CubeRho,
     WFN &wavy,
