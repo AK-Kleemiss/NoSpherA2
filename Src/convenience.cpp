@@ -2,6 +2,7 @@
 #include "cell.h"
 #include "tsc_block.h"
 #include "test_functions.h"
+#include "ML_density.h"
 
 using namespace std;
 
@@ -27,7 +28,7 @@ string help_message()
 	t.append("   -hkl            <FILENAME>.hkl         hkl file (ideally merged) to use for calculation of form factors.\n");
 	t.append("   -group          <LIST OF INT NUMBERS>  Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
 	t.append("   -acc            0,1,2,3,4...           Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
-	t.append("                                          anything above will most likely introduce numberical error and is just implemented for testing purposes.");
+	t.append("                                          anything above will most likely introduce numberical error and is just implemented for testing purposes.\n");
 	t.append("   -gbw2wfn                               Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
 	t.append("   -tscb           <FILENAME>.tsb         Convert binary tsc file to bigger, less accurate human-readable form.\n");
 	t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
@@ -2818,6 +2819,17 @@ void options::digest_options()
 		else if (temp == "-ML_test")
 		{
 			ML_test();
+			exit(0);
+		}
+		else if (temp == "-ML_diff" || temp == "ML-diff")
+		{
+			ML_test2 = true;
+			string xyz_File = arguments[i + 1];
+			ML::calc_diff(xyz_File);
+
+			//string fileName = "orca.gbw";
+			//dummy.gbw2DM(fileName , std::cout , debug);
+			//dummy.cubeDiffDaniel();
 			exit(0);
 		}
 		else if (temp == "-mtc")

@@ -2160,7 +2160,7 @@ bool WFN::read_gbw(const string& filename, ostream& file, const bool debug, cons
 			err_checkf(rf.good(), "Error reading cores", file);
 			if (debug)
 			{
-				file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
+				file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;	
 			}
 			for (int j = 0; j < dimension; j++)
 			{
