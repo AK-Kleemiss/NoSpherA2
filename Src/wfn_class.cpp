@@ -4320,7 +4320,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
 				MOocc[i] = 0.0;
 		}
 #pragma omp parallel for
-		for (int i = (int)aMOene.size(); i < int(aMOene.size() + bMOene.size()); i++)
+		for (int i = static_cast<int>(aMOene.size()); i < static_cast<int>(aMOene.size() + bMOene.size()); i++)
 		{
 			if (i - aMOene.size() < bel)
 				MOocc[i] = 1.0;
@@ -4703,7 +4703,7 @@ bool WFN::read_fchk(const string& filename, ostream& log, const bool debug)
 	if (r_u_ro_switch == 1)
 	{
 #pragma omp parallel for
-		for (int i = (int)aMOene.size(); i < int(aMOene.size() + bMOene.size()); i++)
+		for (int i = static_cast<int>(aMOene.size()); i < static_cast<int>(aMOene.size() + bMOene.size()); i++)
 		{
 			const int b_step = i - (int)aMOene.size();
 			MOs[i].set_ener(bMOene[b_step]);

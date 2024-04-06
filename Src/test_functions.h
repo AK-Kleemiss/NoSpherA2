@@ -370,7 +370,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
 				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
 			if (s != 0 && s % step == 0)
-				progress->write(s / double(smax));
+				progress->write(s / static_cast<double>(smax));
 		}
 	}
 	delete (progress);
@@ -556,7 +556,7 @@ void spherically_averaged_density(options& opt, const int core_size = 0, const i
 	}
 	cout << "Number of MOs after: " << wavy.get_nmo() << endl;
 	const long double da = constants::PI/360.0;
-	const int upper = int(constants::TWO_PI / da);
+	const int upper = static_cast<int>(constants::TWO_PI / da);
 	// Make angular grids
 	vector<long double> x0, y0, z0, st0;
 	for (long double phi = 0; phi <= constants::TWO_PI; phi+=da)
@@ -577,7 +577,7 @@ void spherically_averaged_density(options& opt, const int core_size = 0, const i
 	// Make radial grids on logarithmic scale
 	vec radial_dist = geomspace<double>(1E-7, 15, 20000);	
 	const long long int upper_r = radial_dist.size();
-	const long long int total_points = long long int(upper_r * ang_size);
+	const long long int total_points = static_cast<long long int>(upper_r * ang_size);
 	cout << "Calculating " << total_points << " points" << endl;
 	//Calcualte density on angular grid at each point of radial grid, average and integrate
 	long double tot_int = 0;
@@ -1319,7 +1319,7 @@ void calc_cube(vec data, WFN &dummy, int &exp_coef, int atom = -1)
 					CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef, atom));
 			}
 		if (i != 0 && i % step == 0)
-			progress->write(i / double(CubeRho.get_size(0)));
+			progress->write(i / static_cast<double>(CubeRho.get_size(0)));
 	}
 	delete (progress);
 
@@ -1348,7 +1348,7 @@ double numerical_3d_integral(std::function<double(double *)> f, double stepsize 
 	double tot_int = 0;
 	double da = stepsize * constants::PI;
 	double dr = stepsize;
-	int upper = int(constants::TWO_PI / da);
+	int upper = static_cast<int>(constants::TWO_PI / da);
 	long long int total_calcs = upper * (long long int)(constants::PI / da * r_max / dr);
 	std::cout << "Integrating over " << total_calcs << " points" << std::endl;
 
@@ -1377,7 +1377,7 @@ double numerical_3d_integral(std::function<double(double *)> f, double stepsize 
 			}
 		}
 		if (phic != 0 && phic % step == 0)
-			progress->write((double)phic / (double)upper);
+			progress->write(static_cast<double>(phic) / static_cast<double>(upper));
 	}
 
 	std::cout << "\ntotal integral : " << std::fixed << std::setprecision(4) << tot_int << std::endl;
@@ -1708,8 +1708,8 @@ void test_esp_dens()
 		//res[6][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
 		res[7][i] = ECP_way_core.compute_dens(sr, 0, 0, false);
 		res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);
-		if (i != 0 && i % int(points/100) == 0)
-      progress->write(i / double(res[0].size()));
+		if (i != 0 && i % static_cast<int>(points/100) == 0)
+      progress->write(i / static_cast<double>(res[0].size()));
 	}
 	dat_out << scientific << setprecision(14);
 	for (int i = 0; i < res[0].size(); i++)

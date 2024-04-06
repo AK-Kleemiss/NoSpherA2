@@ -1242,7 +1242,7 @@ inline cdouble hypergeometric(double a, double b, double c, cdouble x)
 	while (std::abs(term) > TOLERANCE)
 	{
 		a++, b++, c++, n++;
-		term *= a * b * x / c / (double)n;
+		term *= a * b * x / c / static_cast<double>(n);
 		value += term;
 	}
 
