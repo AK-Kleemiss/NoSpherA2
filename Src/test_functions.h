@@ -577,7 +577,8 @@ void spherically_averaged_density(options& opt, const int core_size = 0, const i
 	// Make radial grids on logarithmic scale
 	vec radial_dist = geomspace<double>(1E-7, 15, 20000);	
 	const long long int upper_r = radial_dist.size();
-	cout << "Calculating " << long long int(upper_r * ang_size) << " points" << endl;
+	const long long int total_points = long long int(upper_r * ang_size);
+	cout << "Calculating " << total_points << " points" << endl;
 	//Calcualte density on angular grid at each point of radial grid, average and integrate
 	long double tot_int = 0;
 	vec radial_dens(upper_r, 0.0);
