@@ -55,31 +55,10 @@ public:
   const double get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
-  double* get_coefficient_ptr() {
+  const double* get_coefficient_ptr() {
     return coefficients.data();
   };
-  void change_coefficient(int _nr) {
-    // Check, if Element (nr) is a valid Vector-Entry
-    if (_nr - 1 < 0)
-      return;
-    if (size_t(_nr) - 1 >= coefficients.size())
-      return;
-
-    bool end = false;
-    while (!end) {
-      std::cout << "What is the value for the new exponent?\n";
-      double temp_coef = 0.0;
-      std::cin >> temp_coef;
-      if (temp_coef > 1000 || temp_coef < -1000) {
-        std::cout << "That's suspiciusly big for a MO-coefficient, please select something smaler...\n";
-        continue;
-      }
-      coefficients[size_t(_nr) - 1] = temp_coef;
-      end = true;
-    }
-    cls();
-  };
-  const bool change_coefficient(const int& _nr, const double& value) {
+  const bool set_coefficient(const int& _nr, const double& value) {
     // Check, if Element (nr) is a valid Vector-Entry
     if (_nr < 0) {
       err_checkf(false,"nr below 0!", std::cout);
@@ -96,11 +75,11 @@ public:
   void set_occ(const int& iocc) { occ = iocc; };
   void set_occ(const double& iocc) { occ = iocc; };
   void set_op(const int& oper) { op = oper; };
-  double get_occ() const { return occ; };
-  int get_op() const { return op; };
+  const double get_occ() const { return occ; };
+  const int get_op() const { return op; };
   void set_ener(const double& iener) { ener = iener; };
-  int get_primitive_count() const { return (int) coefficients.size(); };
-  std::string hdr() {
+  const int get_primitive_count() const { return (int) coefficients.size(); };
+  const std::string hdr() {
     std::string temp;
     temp = "MO";
     if (nr < 10 && nr>0) temp.append("    ");
@@ -140,7 +119,7 @@ public:
   const double get_energy() const {
     return ener;
   };
-  double* get_ptr_coefficients() { return &coefficients[0]; };
+  const double* get_ptr_coefficients() { return &coefficients[0]; };
   const std::vector<double>& get_ptr_coef_vector() const { return coefficients; };
   void assign_coefs(const std::vector<double>& values) { coefficients.resize(values.size()); coefficients = values; }
 };

@@ -1373,7 +1373,6 @@ void readxyzMinMax_fromWFN(
 			if (CoordMinMax[5] < PosAtoms[j][2])
 				CoordMinMax[5] = PosAtoms[j][2];
 		}
-		j++;
 	}
 	double temp_rad = constants::ang2bohr(Radius);
 	CoordMinMax[0] -= temp_rad;
