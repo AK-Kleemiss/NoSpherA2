@@ -1395,12 +1395,6 @@ double one(double *d)
 	return 1;
 }
 
-double gaussian(double *d)
-{
-	double g = exp(-3.5 * d[3] * d[3]);
-	return g;
-}
-
 void ML_test()
 {
 	using namespace std;
