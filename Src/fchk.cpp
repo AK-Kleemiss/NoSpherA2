@@ -1177,7 +1177,7 @@ bool free_fchk(ofstream& file, const string& fchk_name, const string& basis_set_
     }
     fchk << "Nuclear charges                            R   N=" << setw(12) << wave.get_ncen() << "\n";
     for (int i = 0; i < wave.get_ncen(); i++) {
-      fchk << uppercase << scientific << setw(16) << setprecision(8) << (double)wave.get_atom_charge(i);
+      fchk << uppercase << scientific << setw(16) << setprecision(8) << static_cast<double>(wave.get_atom_charge(i));
       if (((i + 1) % 5 == 0 && i != 0) || i == wave.get_ncen() - 1) 
         fchk << "\n";
     }

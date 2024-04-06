@@ -130,9 +130,9 @@ void read_hkl(const string &hkl_filename,
 		for (const ivec &hkl__ : hkl)
 			for (int i = 0; i < twin_law.size(); i++)
 				hkl.emplace(ivec{
-					int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
-					int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-					int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
+					static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+					static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+					static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
 	}
 	if (debug)
 		file << "Number of reflections after twin: " << hkl.size() << endl;
@@ -4485,7 +4485,7 @@ void calc_SF(const int &points,
 			}
 		}
 		if (i != 0 && i % step == 0)
-			progress->write(i / double(imax));
+			progress->write(i / static_cast<double>(imax));
 	}
 	delete (progress);
 
@@ -5773,7 +5773,7 @@ void calc_sfac_diffuse(options &opt, std::ostream &log_file)
 				sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
 			}
 			if (i != 0 && i % step == 0)
-				progress->write(i / double(imax));
+				progress->write(i / static_cast<double>(imax));
 		}
 	}
 	delete (progress);

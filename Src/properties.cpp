@@ -88,7 +88,7 @@ void Calc_Spherical_Dens(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeSpher.get_size(0)) / double(3 * CubeSpher.get_size(0)));
+      progress->write((i + CubeSpher.get_size(0)) / static_cast<double>(3 * CubeSpher.get_size(0)));
   }
   delete (progress);
 
@@ -182,7 +182,7 @@ void Calc_Static_Def(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeDEF.get_size(0)) / double(3 * CubeDEF.get_size(0)));
+      progress->write((i + CubeDEF.get_size(0)) / static_cast<double>(3 * CubeDEF.get_size(0)));
   }
   delete (progress);
 
@@ -267,7 +267,7 @@ void Calc_Static_Def(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeDEF.get_size(0)) / double(3 * CubeDEF.get_size(0)));
+      progress->write((i + CubeDEF.get_size(0)) / static_cast<double>(3 * CubeDEF.get_size(0)));
   }
   delete (progress);
 
@@ -365,7 +365,7 @@ void Calc_Hirshfeld(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeHDEF.get_size(0)) / double(3 * CubeHDEF.get_size(0)));
+      progress->write((i + CubeHDEF.get_size(0)) / static_cast<double>(3 * CubeHDEF.get_size(0)));
   }
   delete (progress);
 
@@ -450,7 +450,7 @@ void Calc_Hirshfeld(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeHDEF.get_size(0)) / double(3 * CubeHDEF.get_size(0)));
+      progress->write((i + CubeHDEF.get_size(0)) / static_cast<double>(3 * CubeHDEF.get_size(0)));
   }
   delete (progress);
 
@@ -535,7 +535,7 @@ void Calc_Hirshfeld_atom(
         && omp_get_thread_num() == 0
 #endif
     )
-      progress->write((i + CubeHirsh.get_size(0)) / double(3 * CubeHirsh.get_size(0)));
+      progress->write((i + CubeHirsh.get_size(0)) / static_cast<double>(3 * CubeHirsh.get_size(0)));
   }
   delete (progress);
 
@@ -615,7 +615,7 @@ void Calc_Rho(
         CubeRho.set_value(temp_i, temp_j, temp_k, CubeRho.get_value(temp_i, temp_j, temp_k) + Rho);
       }
     if (i != 0 && i % step == 0)
-      progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+      progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
   }
   delete (progress);
 
@@ -673,7 +673,7 @@ void Calc_Rho_no_trans(
                 CubeRho.set_value(i, j, k, Rho);
             }
         if (i != 0 && i % step == 0)
-            progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+            progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
     }
     delete (progress);
 
@@ -723,7 +723,7 @@ void Calc_Rho_spherical_harmonics(
           CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
         }
       if (i != 0 && i % step == 0)
-        progress->write((i) / double(CubeRho.get_size(0)));
+        progress->write((i) / static_cast<double>(CubeRho.get_size(0)));
     }
   }
   delete (progress);
@@ -772,7 +772,7 @@ void Calc_MO_spherical_harmonics(
         CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(PosGrid[0], PosGrid[1], PosGrid[2], MO));
       }
     if (i != 0 && i % step == 0)
-      progress->write((i) / double(CubeMO.get_size(0)));
+      progress->write((i) / static_cast<double>(CubeMO.get_size(0)));
   }
   delete (progress);
 
@@ -827,7 +827,7 @@ void Calc_S_Rho(
         Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
       }
     if (i != 0 && i % step == 0)
-      progress->write((i) / double(Cube_S_Rho.get_size(0)));
+      progress->write((i) / static_cast<double>(Cube_S_Rho.get_size(0)));
   }
   delete (progress);
 
@@ -1002,7 +1002,7 @@ void Calc_Prop(
     if (!test)
     {
       if (i != 0 && i % step == 0)
-        progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));
+        progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
     }
   }
   if (!test)
@@ -1105,7 +1105,7 @@ void Calc_ESP(
     if (!no_date)
     {
       if (i != 0 && i % step == 0)
-        progress->write((i + CubeESP.get_size(0)) / double(CubeESP.get_size(0) * 3));
+        progress->write((i + CubeESP.get_size(0)) / static_cast<double>(CubeESP.get_size(0) * 3));
     }
   }
   if (!no_date)
@@ -1192,7 +1192,7 @@ void Calc_MO(
         CubeMO.set_value(temp_i, temp_j, temp_k, CubeMO.get_value(temp_i, temp_j, temp_k) + MO);
       }
     if (i != 0 && i % step == 0)
-      progress->write((i + CubeMO.get_size(0)) / double(CubeMO.get_size(0) * 3));
+      progress->write((i + CubeMO.get_size(0)) / static_cast<double>(CubeMO.get_size(0) * 3));
   }
   delete (progress);
 
