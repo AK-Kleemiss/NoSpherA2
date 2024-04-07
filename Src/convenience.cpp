@@ -2835,7 +2835,6 @@ void options::digest_options()
 			}
 		}
 		else if (temp == "-mtc_mult") {
-			combined_tsc_calc = true;
 			int n = 1;
 			while (i + n < argc && string(arguments[i + n]).find("-") > 0)
 			{
@@ -2844,7 +2843,6 @@ void options::digest_options()
 			}
 		}
 		else if (temp == "-mtc_charge") {
-			combined_tsc_calc = true;
 			int n = 1;
 			while (i + n < argc && string(arguments[i + n]).find("-") > 0)
 			{

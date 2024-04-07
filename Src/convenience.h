@@ -266,6 +266,7 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
 void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
+inline std::streambuf* coutbuf = std::cout.rdbuf(); //save old buf
 inline char asciitolower(char in)
 {
 	if (in <= 'Z' && in >= 'A')
@@ -278,6 +279,8 @@ inline void error_check(const bool condition, const std::string &file, const int
 	{
 		log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
 		log_file.flush();
+		std::cout.rdbuf(coutbuf); //reset to standard output again
+		std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
 		exit(-1);
 	}
 };
@@ -285,6 +288,8 @@ inline void not_implemented(const std::string &file, const int &line, const std:
 {
 	log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
 	log_file.flush();
+	std::cout.rdbuf(coutbuf); //reset to standard output again
+	std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << " not yet implemented!" << std::endl;
 	exit(-1);
 };
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
