@@ -314,7 +314,6 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
         } // end while line != }
         if (debug_dens)
             cout << "I found }: " << line << endl;
-        shell = 0;
         ifile.seekg(0);
     } // end for element_list.size()
     if (debug_dens)
@@ -581,7 +580,6 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
         } // end while line != }
         if (debug_dens)
             cout << "I found }: " << line << endl;
-        shell = 0;
         ifile.seekg(0);
     } // end for element_list.size()
     if (debug_dens)
@@ -873,7 +871,6 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
         } // end while line != }
         if (debug_dens)
             cout << "I found }!" << endl;
-        shell = 0;
         ifile.seekg(0);
     } // end for element_list.size()
     if (debug_dens)
