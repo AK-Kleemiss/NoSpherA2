@@ -2028,7 +2028,7 @@
     <ClCompile Include="../Src/cube.cpp" />
     <ClCompile Include="../Src/fchk.cpp" />
     <ClCompile Include="../Src/sphere_lebedev_rule.cpp" />
-    <ClCompile Include="../Src/structure_factors.cpp" />
+    <ClCompile Include="../Src/scattering_factors.cpp" />
     <ClCompile Include="../Src/NoSpherA2.cpp" />
     <ClCompile Include="../Src/wfn_class.cpp" />
     <ClCompile Include="../Src/properties.cpp" />
@@ -2043,7 +2043,7 @@
     <ClInclude Include="../Src/fchk.h" />
     <ClInclude Include="../Src/mo_class.h" />
     <ClInclude Include="../Src/sphere_lebedev_rule.h" />
-    <ClInclude Include="../Src/structure_factors.h" />
+    <ClInclude Include="../Src/scattering_factors.h" />
     <ClInclude Include="../Src/wfn_class.h" />
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />

@@ -1114,7 +1114,7 @@
     <ClCompile Include="../Src/cube.cpp" />
     <ClCompile Include="../Src/fchk.cpp" />
     <ClCompile Include="../Src/sphere_lebedev_rule.cpp" />
-    <CudaCompile Include="../Src/structure_factors.cpp">
+    <CudaCompile Include="../Src/scattering_factors.cpp">
       <GenerateLineInfo Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</GenerateLineInfo>
       <CodeGeneration Condition="'$(Configuration)|$(Platform)'=='Release|x64'">compute_75,sm_75;compute_61,sm_61</CodeGeneration>
     </CudaCompile>
@@ -1132,7 +1132,7 @@
     <ClInclude Include="../Src/fchk.h" />
     <ClInclude Include="../Src/mo_class.h" />
     <ClInclude Include="../Src/sphere_lebedev_rule.h" />
-    <ClInclude Include="../Src/structure_factors.h" />
+    <ClInclude Include="../Src/scattering_factors.h" />
     <ClInclude Include="../Src/wfn_class.h" />
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />

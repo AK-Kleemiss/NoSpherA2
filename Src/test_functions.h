@@ -1,6 +1,6 @@
 #pragma once
 #include "spherical_density.h"
-#include "structure_factors.h"
+#include "scattering_factors.h"
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
@@ -494,7 +494,7 @@ void test_timing()
 			known_scatterer = result.get_scatterers();
 			if (wavy[i].get_origin() != 7)
 			{
-				result.append(calculate_structure_factors_MTC(
+				result.append(calculate_scattering_factors_MTC(
 								  opt,
 								  wavy,
 								  std::cout,
@@ -1468,7 +1468,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
 		opt.cif = "Co2.cif";
 		opt.dmin = 0.5;
 		cout << "STARTING CALC" << endl;
-		calculate_structure_factors_HF(
+		calculate_scattering_factors_HF(
 			opt,
 			wavy,
 			log_file);

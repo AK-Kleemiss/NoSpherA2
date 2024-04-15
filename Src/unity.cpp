@@ -5,7 +5,7 @@
 #include "./basis_set.cpp"
 #include "./convenience.cpp"
 #include "./sphere_lebedev_rule.cpp"
-#include "./structure_factors.cpp"
+#include "./scattering_factors.cpp"
 #include "./cube.cpp"
 #include "./fchk.cpp"
 #include "./NoSpherA2.cpp"
