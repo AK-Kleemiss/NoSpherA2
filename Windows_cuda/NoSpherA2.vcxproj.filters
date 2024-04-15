@@ -33,7 +33,7 @@
     <ClCompile Include="../Src/sphere_lebedev_rule.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../Src/structure_factors.cpp">
+    <ClCompile Include="../Src/scattering_factors.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="../Src/wfn_class.cpp">
@@ -74,7 +74,7 @@
     <ClInclude Include="../Src/sphere_lebedev_rule.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../Src/structure_factors.h">
+    <ClInclude Include="../Src/scattering_factors.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../Src/wfn_class.h">
@@ -109,7 +109,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="../structure_factors.cpp">
+    <CudaCompile Include="../scattering_factors.cpp">
       <Filter>Quelldateien</Filter>
     </CudaCompile>
   </ItemGroup>

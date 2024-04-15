@@ -844,7 +844,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>D:\git\wfn2fchk\Windows\x64\Release\AtomGrid.obj;D:\git\wfn2fchk\Windows\x64\Release\basis_set.obj;D:\git\wfn2fchk\Windows\x64\Release\convenience.obj;D:\git\wfn2fchk\Windows\x64\Release\cube.obj;D:\git\wfn2fchk\Windows\x64\Release\fchk.obj;D:\git\wfn2fchk\Windows\x64\Release\properties.obj;D:\git\wfn2fchk\Windows\x64\Release\sphere_lebedev_rule.obj;D:\git\wfn2fchk\Windows\x64\Release\spherical_density.obj;D:\git\wfn2fchk\Windows\x64\Release\structure_factors.obj;D:\git\wfn2fchk\Windows\x64\Release\wfn_class.obj;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>D:\git\wfn2fchk\Windows\x64\Release\AtomGrid.obj;D:\git\wfn2fchk\Windows\x64\Release\basis_set.obj;D:\git\wfn2fchk\Windows\x64\Release\convenience.obj;D:\git\wfn2fchk\Windows\x64\Release\cube.obj;D:\git\wfn2fchk\Windows\x64\Release\fchk.obj;D:\git\wfn2fchk\Windows\x64\Release\properties.obj;D:\git\wfn2fchk\Windows\x64\Release\sphere_lebedev_rule.obj;D:\git\wfn2fchk\Windows\x64\Release\spherical_density.obj;D:\git\wfn2fchk\Windows\x64\Release\scattering_factors.obj;D:\git\wfn2fchk\Windows\x64\Release\wfn_class.obj;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
