@@ -7,7 +7,7 @@ public:
     void ld_by_order(const int &order, double *x, double *y, double *z, double *w);
 
 private:
-    int gen_oh(const int &code, const double &a, const double &b, const double &v, double *x, double *y, double *z, double *w);
+    const int gen_oh(const int &code, const double &a, const double &b, const double &v, double *x, double *y, double *z, double *w);
     void ld0006(double *x, double *y, double *z, double *w);
     void ld0014(double *x, double *y, double *z, double *w);
     void ld0026(double *x, double *y, double *z, double *w);
