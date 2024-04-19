@@ -109,12 +109,14 @@ namespace constants
     constexpr int hardness = 3;
     constexpr double cutoff = 1.0e-20;
     constexpr double PI = 3.14159265358979323846;
+    constexpr double INV_PI = 1.0 / PI;
+    constexpr double PI_2 = PI / 2.0;
     constexpr double TWO_PI = 2 * PI;
     constexpr double FOUR_PI = 4 * PI;
     constexpr double C0 = SQRT2 * FOUR_PI;
     const double sqr_pi = sqrt(PI);
     constexpr double PI2 = PI * PI;
-    constexpr double PI3 = PI * PI * PI;
+    constexpr double PI3 = PI2 * PI;
     constexpr double PI_180 = PI / 180.0;
     const double TG32 = tgamma(3.0 / 2.0);
     constexpr double ED_fact = 0.023934;

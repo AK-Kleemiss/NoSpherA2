@@ -456,7 +456,7 @@ bool cube::fractal_dimension(const double stepsize)
                 lv2 = values[x][y][z + 1];
 #pragma omp parallel for
                 for (int i = 0; i < steps; i++)
-                    if ((lv1 < iso[i] && lv2 > iso[i]) || (lv1 > iso[i] && lv2 < iso[i]))
+                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
                         bins[i]++;
             }
     for (int z = 0; z < size[2]; z++)
@@ -467,7 +467,7 @@ bool cube::fractal_dimension(const double stepsize)
                 lv2 = values[x][y + 1][z];
 #pragma omp parallel for
                 for (int i = 0; i < steps; i++)
-                    if ((lv1 < iso[i] && lv2 > iso[i]) || (lv1 > iso[i] && lv2 < iso[i]))
+                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
                         bins[i]++;
             }
     for (int y = 0; y < size[1]; y++)
@@ -478,7 +478,7 @@ bool cube::fractal_dimension(const double stepsize)
                 lv2 = values[x + 1][y][z];
 #pragma omp parallel for
                 for (int i = 0; i < steps; i++)
-                    if ((lv1 < iso[i] && lv2 > iso[i]) || (lv1 > iso[i] && lv2 < iso[i]))
+                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
                         bins[i]++;
             }
     const double third = -1.0 / 3.0;
