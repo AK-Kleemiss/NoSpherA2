@@ -427,15 +427,20 @@ bool cube::write_xdgraph(string &given_path, bool debug)
 bool cube::fractal_dimension(const double stepsize)
 {
     double min = 100, max = -100;
-    for (int i = 0; i < size[0]; i++)
-        for (int j = 0; j < size[1]; j++)
-            for (int k = 0; k < size[2]; k++)
-            {
-                if (values[i][j][k] < min)
-                    min = values[i][j][k];
-                if (values[i][j][k] > max)
-                    max = values[i][j][k];
-            }
+    for (const auto& inner_vec : values) {
+      for (const auto& innerest_vec : inner_vec) {
+        auto local_min_it = std::min_element(innerest_vec.begin(), innerest_vec.end());
+        auto local_max_it = std::max_element(innerest_vec.begin(), innerest_vec.end());
+
+        if (*local_min_it < min) {
+          min = *local_min_it;
+        }
+
+        if (*local_max_it > max) {
+          max = *local_max_it;
+        }
+      }
+    }
     const double map_min = min, map_max = max;
     vec e = double_sum();
     min -= 2 * stepsize, max += 2 * stepsize;
@@ -448,41 +453,46 @@ bool cube::fractal_dimension(const double stepsize)
         iso[i] = round((min + i * stepsize) * 100) / 100;
     const int comparisons = size[0] * size[1] * (size[2] - 1) + size[0] * size[2] * (size[1] - 1) + size[2] * size[1] * (size[0] - 1);
     double lv1, lv2;
-    for (int x = 0; x < size[0]; x++)
+#pragma omp parallel
+    {
+#pragma omp for collapse(3)
+      for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
-            for (int z = 0; z < size[2] - 1; z++)
-            {
-                lv1 = values[x][y][z];
-                lv2 = values[x][y][z + 1];
-#pragma omp parallel for
-                for (int i = 0; i < steps; i++)
-                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
-                        bins[i]++;
-            }
-    for (int z = 0; z < size[2]; z++)
+          for (int z = 0; z < size[2] - 1; z++)
+          {
+            lv1 = values[x][y][z];
+            lv2 = values[x][y][z + 1];
+            for (int i = 0; i < steps; i++)
+              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+#pragma omp atomic
+                bins[i]++;
+          }
+#pragma omp for collapse(3)
+      for (int z = 0; z < size[2]; z++)
         for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1] - 1; y++)
-            {
-                lv1 = values[x][y][z];
-                lv2 = values[x][y + 1][z];
-#pragma omp parallel for
-                for (int i = 0; i < steps; i++)
-                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
-                        bins[i]++;
-            }
-    for (int y = 0; y < size[1]; y++)
+          for (int y = 0; y < size[1] - 1; y++)
+          {
+            lv1 = values[x][y][z];
+            lv2 = values[x][y + 1][z];
+            for (int i = 0; i < steps; i++)
+              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+#pragma omp atomic
+                bins[i]++;
+          }
+#pragma omp for collapse(3)
+      for (int y = 0; y < size[1]; y++)
         for (int z = 0; z < size[2]; z++)
-            for (int x = 0; x < size[0] - 1; x++)
-            {
-                lv1 = values[x][y][z];
-                lv2 = values[x + 1][y][z];
-#pragma omp parallel for
-                for (int i = 0; i < steps; i++)
-                    if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
-                        bins[i]++;
-            }
-    const double third = -1.0 / 3.0;
-    const double epsilon = log(1 / (pow(comparisons, third)));
+          for (int x = 0; x < size[0] - 1; x++)
+          {
+            lv1 = values[x][y][z];
+            lv2 = values[x + 1][y][z];
+            for (int i = 0; i < steps; i++)
+              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+#pragma omp atomic
+                bins[i]++;
+          }
+    }
+    const double epsilon = log(1 / (pow(comparisons, -constants::c_13)));
     for (int i = 0; i < steps; i++)
     {
         if (bins[i] == 0)

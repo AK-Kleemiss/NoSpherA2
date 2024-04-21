@@ -74,7 +74,7 @@ disorder_THPP:
 		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 \
 		olex2/Wfn_job/Part_2/thpp.wfx 0,2 \
 		-mtc_mult 1 1 \
-		-mtc_charge 0 0
+		-mtc_charge 0 0 \
 		-acc 0 \
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
