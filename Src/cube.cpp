@@ -453,44 +453,48 @@ bool cube::fractal_dimension(const double stepsize)
         iso[i] = round((min + i * stepsize) * 100) / 100;
     const int comparisons = size[0] * size[1] * (size[2] - 1) + size[0] * size[2] * (size[1] - 1) + size[2] * size[1] * (size[0] - 1);
     double lv1, lv2;
-#pragma omp parallel
+#pragma omp parallel private(lv1,lv2)
     {
-#pragma omp for collapse(3)
-      for (int x = 0; x < size[0]; x++)
-        for (int y = 0; y < size[1]; y++)
-          for (int z = 0; z < size[2] - 1; z++)
-          {
-            lv1 = values[x][y][z];
-            lv2 = values[x][y][z + 1];
-            for (int i = 0; i < steps; i++)
-              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+      int x, y, z;
+#pragma omp for
+      for (long long int i = 0; i < size[0] * size[1] * (size[2] - 1); i++)
+      {
+        x = i / (size[1] * (size[2] - 1));
+        y = (i / (size[2] - 1)) % size[1];
+        z = i % (size[2] - 1);
+        lv1 = values[x][y][z];
+        lv2 = values[x][y][z + 1];
+        for (int i = 0; i < steps; i++)
+          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
 #pragma omp atomic
-                bins[i]++;
-          }
-#pragma omp for collapse(3)
-      for (int z = 0; z < size[2]; z++)
-        for (int x = 0; x < size[0]; x++)
-          for (int y = 0; y < size[1] - 1; y++)
-          {
-            lv1 = values[x][y][z];
-            lv2 = values[x][y + 1][z];
-            for (int i = 0; i < steps; i++)
-              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+            bins[i]++;
+      }
+#pragma omp for
+      for (long long int i = 0; i < size[0] * size[2] * (size[1] - 1); i++)
+      {
+        z = i / (size[0] * (size[1] - 1));
+        x = (i / (size[1] - 1)) % size[0];
+        y = i % (size[1] - 1);
+        lv1 = values[x][y][z];
+        lv2 = values[x][y + 1][z];
+        for (int i = 0; i < steps; i++)
+          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
 #pragma omp atomic
-                bins[i]++;
-          }
-#pragma omp for collapse(3)
-      for (int y = 0; y < size[1]; y++)
-        for (int z = 0; z < size[2]; z++)
-          for (int x = 0; x < size[0] - 1; x++)
-          {
-            lv1 = values[x][y][z];
-            lv2 = values[x + 1][y][z];
-            for (int i = 0; i < steps; i++)
-              if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+            bins[i]++;
+      }
+#pragma omp for
+      for (long long int i = 0; i < size[1] * size[2] * (size[0] - 1); i++)
+      {
+        y = i / ((size[0] - 1) * size[2]);
+        z = (i / (size[0] - 1)) % size[2];
+        x = i % (size[0] - 1);
+        lv1 = values[x][y][z];
+        lv2 = values[x + 1][y][z];
+        for (int i = 0; i < steps; i++)
+          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
 #pragma omp atomic
-                bins[i]++;
-          }
+            bins[i]++;
+      }
     }
     const double epsilon = log(1 / (pow(comparisons, -constants::c_13)));
     for (int i = 0; i < steps; i++)
