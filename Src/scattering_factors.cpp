@@ -2147,7 +2147,7 @@ int make_hirshfeld_grids(const int &pbc,
 
     file << "Applying hirshfeld weights and integrating charges..." << flush;
     double el_sum_becke = 0.0;
-    double el_sum_spherical = 0.0;
+    //double el_sum_spherical = 0.0;
     double el_sum_hirshfeld = 0.0;
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
@@ -2161,7 +2161,7 @@ int make_hirshfeld_grids(const int &pbc,
     if (debug)
         file << "before loop" << endl;
         // Generate Electron sums
-#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_spherical, el_sum_hirshfeld)
+#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) //, el_sum_spherical)
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         // if (debug) file << "i=" << i << endl;
@@ -2181,13 +2181,13 @@ int make_hirshfeld_grids(const int &pbc,
             }
         }
         el_sum_becke += atom_els[0][i];
-        el_sum_spherical += atom_els[1][i];
+        //el_sum_spherical += atom_els[1][i];
         el_sum_hirshfeld += atom_els[2][i];
         if (wave.get_has_ECPs())
         {
             int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
             el_sum_becke += n;
-            el_sum_spherical += n;
+            //el_sum_spherical += n;
             el_sum_hirshfeld += n;
             atom_els[0][i] += n;
             atom_els[2][i] += n;
@@ -3060,7 +3060,7 @@ static int make_hirshfeld_grids_RI(
 
     file << "Applying hirshfeld weights and integrating charges..." << flush;
     double el_sum_becke = 0.0;
-    double el_sum_spherical = 0.0;
+    //double el_sum_spherical = 0.0;
     double el_sum_hirshfeld = 0.0;
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
@@ -3074,7 +3074,7 @@ static int make_hirshfeld_grids_RI(
     if (debug)
         file << "before loop" << endl;
         // Generate Electron sums
-#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_spherical, el_sum_hirshfeld)
+#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) // el_sum_spherical)
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         // if (debug) file << "i=" << i << endl;
@@ -3095,13 +3095,13 @@ static int make_hirshfeld_grids_RI(
             }
         }
         el_sum_becke += atom_els[0][i];
-        el_sum_spherical += atom_els[1][i];
+        //el_sum_spherical += atom_els[1][i];
         el_sum_hirshfeld += atom_els[2][i];
         if (wave.get_has_ECPs())
         {
             int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
             el_sum_becke += n;
-            el_sum_spherical += n;
+            //el_sum_spherical += n;
             el_sum_hirshfeld += n;
             atom_els[0][i] += n;
             atom_els[2][i] += n;
@@ -3644,7 +3644,7 @@ static int make_integration_grids(
     // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=wavefunction density, 5=MW
     vector<vec> total_grid(6);
 
-    int type_list_number = -1;
+    //int type_list_number = -1;
 
     if (debug)
     {
@@ -4291,7 +4291,7 @@ static int make_integration_grids_SALTED(
     // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=atomic density
     vector<vec> total_grid(5);
 
-    int type_list_number = -1;
+    //int type_list_number = -1;
 
     double _cutoff;
     if (accuracy < 3)

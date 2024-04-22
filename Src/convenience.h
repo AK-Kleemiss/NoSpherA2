@@ -50,7 +50,7 @@ typedef std::vector<int> ivec;
 typedef std::vector<cdouble> cvec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
-inline double vec_sum(const vec &in)
+inline double vec_sum(const vec& in)
 {
     double res = 0.0;
     for (int i = 0; i < in.size(); i++)
@@ -58,7 +58,7 @@ inline double vec_sum(const vec &in)
     return res;
 }
 
-inline cdouble vec_sum(const cvec &in)
+inline cdouble vec_sum(const cvec& in)
 {
     cdouble res = 0.0;
     for (int i = 0; i < in.size(); i++)
@@ -76,14 +76,11 @@ namespace constants
 {
 #include <limits>
 
-    namespace Detail
+    double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
-        double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
-        {
-            return curr == prev
-                       ? curr
-                       : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
-        }
+        return curr == prev
+            ? curr
+            : sqrtNewtonRaphson(x, 0.5 * (curr + x / curr), curr);
     }
 
     /*
@@ -96,8 +93,8 @@ namespace constants
     double constexpr sqrt(double x)
     {
         return x >= 0 && x < std::numeric_limits<double>::infinity()
-                   ? Detail::sqrtNewtonRaphson(x, x, 0)
-                   : std::numeric_limits<double>::quiet_NaN();
+            ? sqrtNewtonRaphson(x, x, 0)
+            : std::numeric_limits<double>::quiet_NaN();
     }
     // Constants for later use
     constexpr double SQRT2 = sqrt(2.0);
@@ -124,11 +121,11 @@ namespace constants
     constexpr int MAG = 5810;
     //                       3,     5     7,    9,    11,   13,   15,   17
     //                      19,    21
-    constexpr int lebedev_table[33] = {6, 14, 26, 38, 50, 74, 86, 110,
+    constexpr int lebedev_table[33] = { 6, 14, 26, 38, 50, 74, 86, 110,
                                        146, 170, 194, 230, 266, 302, 350, 434,
                                        590, 770, 974, 1202, 1454, 1730, 2030, 2354,
-                                       2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810};
-    constexpr long long int ft[21]{1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000};
+                                       2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
+    constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
     constexpr double alpha_coef = 0.1616204596739954813316614;
     constexpr double c_13 = 1.0 / 3.0;
     constexpr double c_43 = 4.0 / 3.0;
@@ -193,7 +190,7 @@ namespace constants
     constexpr double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
     constexpr double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
 
-    inline const long long int ft_fun(const int &nr)
+    inline const long long int ft_fun(const int& nr)
     {
         if (nr >= 0 && nr <= 20)
             return ft[nr];
@@ -203,12 +200,12 @@ namespace constants
             return ft_fun(nr - 1) * nr;
     }
 
-    constexpr double bohr2ang(const double &inp)
+    constexpr double bohr2ang(const double& inp)
     {
         return inp * 0.529177249;
     }
 
-    constexpr double bohr2ang_p(const double &inp, const int &p)
+    constexpr double bohr2ang_p(const double& inp, const int& p)
     {
         if (p == 0)
             return 1.0;
@@ -218,11 +215,11 @@ namespace constants
             return bohr2ang_p(bohr2ang(inp), p - 1);
     }
 
-    constexpr double ang2bohr(const double &inp)
+    constexpr double ang2bohr(const double& inp)
     {
         return inp / 0.529177249;
     }
-    inline const double ang2bohr_p(const double &inp, const int &p)
+    inline const double ang2bohr_p(const double& inp, const int& p)
     {
         if (p == 0)
             return 1.0;
@@ -232,12 +229,12 @@ namespace constants
             return ang2bohr_p(ang2bohr(inp), p - 1);
     }
 
-    constexpr double cubic_ang2bohr(const double &inp)
+    constexpr double cubic_ang2bohr(const double& inp)
     {
         return inp / (0.529177249 * 0.529177249 * 0.529177249);
     }
 
-    constexpr double cubic_bohr2ang(const double &inp)
+    constexpr double cubic_bohr2ang(const double& inp)
     {
         return inp * (0.529177249 * 0.529177249 * 0.529177249);
     }
@@ -251,7 +248,7 @@ namespace constants
         2.20, 1.80, 1.60, 1.40, 1.35, 1.40, 1.40, 1.40, 1.35, 1.35, 1.35, 1.35, 1.30, 1.25, 1.15, 1.15, 1.15, 1.10,
         2.35, 2.00, 1.80, 1.55, 1.45, 1.45, 1.35, 1.30, 1.35, 1.40, 1.60, 1.55, 1.55, 1.45, 1.45, 1.40, 1.40, 1.40,
         2.60, 2.15, 1.95, 1.85, 1.85, 1.85, 1.85, 1.85, 1.85, 1.80, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.75, 1.55, 1.45, 1.35, 1.30, 1.30, 1.35, 1.35, 1.35, 1.50, 1.90, 1.75, 1.60, 1.90, 1.50, 1.50,
-        2.80, 2.35, 2.15, 2.05, 2.05, 2.05, 2.05, 2.05, 2.05, 2.00, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95};
+        2.80, 2.35, 2.15, 2.05, 2.05, 2.05, 2.05, 2.05, 2.05, 2.00, 1.95, 1.95, 1.95, 1.95, 1.95, 1.95 };
 
     // Covalent Radii according to the CSD
     constexpr double covalent_radii[114]{
@@ -262,7 +259,7 @@ namespace constants
         2.03, 1.76, 1.7, 1.6, 1.53, 1.39, 1.61, 1.52, 1.26, 1.24, 1.32, 1.22, 1.22, 1.17, 1.21, 1.22, 1.21, 1.5,
         2.2, 1.95, 1.9, 1.75, 1.64, 1.54, 1.47, 1.46, 1.42, 1.39, 1.45, 1.54, 1.42, 1.39, 1.39, 1.47, 1.4, 1.5,
         2.44, 2.15, 2.07, 2.04, 2.03, 2.01, 1.99, 1.98, 1.98, 1.96, 1.94, 1.92, 1.92, 1.89, 1.9, 1.87, 1.87, 1.75, 1.7, 1.62, 1.51, 1.44, 1.41, 1.36, 1.36, 1.32, 1.45, 1.46, 1.48, 1.4, 1.21, 1.5,
-        2.6, 2.21, 2.15, 2.06, 2.00, 1.96, 1.9, 1.87, 1.8, 1.69, 1.54, 1.83, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5};
+        2.6, 2.21, 2.15, 2.06, 2.00, 1.96, 1.9, 1.87, 1.8, 1.69, 1.54, 1.83, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5 };
 
     // Integer atom masses
     constexpr unsigned int integer_masses[]{
@@ -271,7 +268,7 @@ namespace constants
         23, 24, 27, 28, 31, 32, 35, 40,
         39, 40, 45, 48, 51, 52, 55, 56, 59, 58, 63, 64, 69, 74, 75, 80, 79, 84,
         85, 87, 88, 91, 92, 96, 98, 101, 103, 106, 108, 112, 115, 119, 122, 128, 127, 131,
-        132, 137, 139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222};
+        132, 137, 139, 140, 141, 144, 145, 150, 152, 157, 159, 163, 165, 167, 169, 173, 175, 178, 181, 184, 186, 190, 192, 195, 197, 201, 204, 207, 209, 209, 210, 222 };
 
     constexpr double real_masses[]{
         1.0079, 4.0026,
@@ -279,23 +276,23 @@ namespace constants
         22.99, 24.305, 26.986, 28.086, 30.974, 32.065, 35.453, 39.948,
         39.098, 40.078, 44.956, 47.867, 50.942, 51.996, 54.938, 55.845, 58.933, 58.693, 63.546, 65.38, 69.723, 72.64, 74.922, 78.96, 79.904, 83.798,
         85.468, 87.62, 88.906, 91.224, 92.906, 95.96, 97.90, 101.07, 102.91, 106.42, 107.87, 112.41, 114.82, 118.71, 121.76, 127.6, 126.9, 131.29,
-        132.91, 137.33, 139.91, 140.12, 140.91, 144.24, 144.9, 150.36, 151.96, 157.25, 158.93, 162.5, 164.93, 167.26, 168.93, 173.05, 174.97, 178.49, 180.95, 183.84, 186.21, 190.23, 192.22, 195.08, 196.97, 200.59, 204.38, 207.2, 208.98, 208.9, 209.9, 222.0};
+        132.91, 137.33, 139.91, 140.12, 140.91, 144.24, 144.9, 150.36, 151.96, 157.25, 158.93, 162.5, 164.93, 167.26, 168.93, 173.05, 174.97, 178.49, 180.95, 183.84, 186.21, 190.23, 192.22, 195.08, 196.97, 200.59, 204.38, 207.2, 208.98, 208.9, 209.9, 222.0 };
 }
 // bool yesno();
-bool is_similar_rel(const double &first, const double &second, const double &tolerance);
-bool is_similar(const double &first, const double &second, const double &tolerance);
-bool is_similar_abs(const double &first, const double &second, const double &tolerance);
+bool is_similar_rel(const double& first, const double& second, const double& tolerance);
+bool is_similar(const double& first, const double& second, const double& tolerance);
+bool is_similar_abs(const double& first, const double& second, const double& tolerance);
 void cls();
 std::string get_home_path(void);
-void join_path(std::string &s1, std::string &s2);
-inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
+void join_path(std::string& s1, std::string& s2);
+inline std::streambuf* coutbuf = std::cout.rdbuf(); // save old buf
 inline char asciitolower(char in)
 {
     if (in <= 'Z' && in >= 'A')
         return in - ('Z' - 'z');
     return in;
 }
-inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout)
+inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file = std::cout)
 {
     if (!condition)
     {
@@ -306,7 +303,7 @@ inline void error_check(const bool condition, const std::string &file, const int
         exit(-1);
     }
 };
-inline void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
+inline void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
 {
     log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
     log_file.flush();
@@ -319,21 +316,21 @@ inline void not_implemented(const std::string &file, const int &line, const std:
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
 
-bool generate_sph2cart_mat(std::vector<vec> &p, std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g);
-bool generate_cart2sph_mat(std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g, std::vector<vec> &h);
-std::string go_get_string(std::ifstream &file, std::string search, bool rewind = true);
+bool generate_sph2cart_mat(std::vector<vec>& p, std::vector<vec>& d, std::vector<vec>& f, std::vector<vec>& g);
+bool generate_cart2sph_mat(std::vector<vec>& d, std::vector<vec>& f, std::vector<vec>& g, std::vector<vec>& h);
+std::string go_get_string(std::ifstream& file, std::string search, bool rewind = true);
 
-inline const int sht2nbas(const int &type)
+inline const int sht2nbas(const int& type)
 {
-    const int st2bas[6]{1, 3, 6, 10, 15, 21};
-    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
+    const int st2bas[6]{ 1, 3, 6, 10, 15, 21 };
+    const int nst2bas[6]{ 11, 9, 7, 5, 4, 1 };
     if (type >= 0)
         return st2bas[type];
     else
         return nst2bas[5 + type];
 };
 
-inline const int shell2function(const int &type, const int &prim)
+inline const int shell2function(const int& type, const int& prim)
 {
     switch (type)
     {
@@ -385,11 +382,11 @@ inline const int shell2function(const int &type, const int &prim)
     return 0;
 }
 
-const double normgauss(const int &type, const double &exp);
-const double spherical_harmonic(const int &l, const int &m, const double *d);
+const double normgauss(const int& type, const double& exp);
+const double spherical_harmonic(const int& l, const int& m, const double* d);
 
 template <class T>
-std::string toString(const T &t)
+std::string toString(const T& t)
 {
     std::ostringstream stream;
     stream << t;
@@ -397,7 +394,7 @@ std::string toString(const T &t)
 }
 
 template <class T>
-T fromString(const std::string &s)
+T fromString(const std::string& s)
 {
     std::istringstream stream(s);
     T t;
@@ -406,14 +403,14 @@ T fromString(const std::string &s)
 }
 
 template <typename T>
-void shrink_vector(std::vector<T> &g)
+void shrink_vector(std::vector<T>& g)
 {
     g.clear();
     std::vector<T>(g).swap(g);
 }
 
 template <class T>
-std::vector<T> split_string(const std::string &input, const std::string delimiter)
+std::vector<T> split_string(const std::string& input, const std::string delimiter)
 {
     std::string input_copy = input + delimiter; // Need to add one delimiter in the end to return all elements
     std::vector<T> result;
@@ -426,7 +423,7 @@ std::vector<T> split_string(const std::string &input, const std::string delimite
     return result;
 };
 
-inline void remove_empty_elements(std::vector<std::string> &input, const std::string &empty = " ")
+inline void remove_empty_elements(std::vector<std::string>& input, const std::string& empty = " ")
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")
@@ -461,17 +458,17 @@ inline int get_sec(std::chrono::high_resolution_clock::time_point start, std::ch
     return sec.count();
 }
 
-inline void write_timing_to_file(std::ostream &file,
-                                 time_point start,
-                                 time_point end,
-                                 time_point end_prototypes,
-                                 time_point end_becke,
-                                 time_point end_spherical,
-                                 time_point end_prune,
-                                 time_point end_aspherical,
-                                 time_point before_kpts,
-                                 time_point after_kpts,
-                                 time_point end1)
+inline void write_timing_to_file(std::ostream& file,
+    time_point start,
+    time_point end,
+    time_point end_prototypes,
+    time_point end_becke,
+    time_point end_spherical,
+    time_point end_prune,
+    time_point end_aspherical,
+    time_point before_kpts,
+    time_point after_kpts,
+    time_point end1)
 {
     // writes the timing of different things to a file
     using namespace std;
@@ -552,7 +549,7 @@ inline void write_timing_to_file(std::ostream &file,
         file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
-inline int CountWords(const char *str)
+inline int CountWords(const char* str)
 {
     if (str == NULL)
         return -1;
@@ -578,9 +575,9 @@ inline int CountWords(const char *str)
     return numWords;
 };
 
-inline bool exists(const std::string &name)
+inline bool exists(const std::string& name)
 {
-    if (FILE *file = fopen(name.c_str(), "r"))
+    if (FILE* file = fopen(name.c_str(), "r"))
     {
         fclose(file);
         return true;
@@ -591,33 +588,33 @@ inline bool exists(const std::string &name)
     }
 };
 
-std::string atnr2letter(const int &nr);
-void copy_file(std::string &from, std::string &to);
-std::string shrink_string(std::string &input);
-std::string shrink_string_to_atom(std::string &input, const int &atom_number);
-std::string get_filename_from_path(const std::string &input);
-std::string get_foldername_from_path(const std::string &input);
-std::string get_basename_without_ending(const std::string &input);
+std::string atnr2letter(const int& nr);
+void copy_file(std::string& from, std::string& to);
+std::string shrink_string(std::string& input);
+std::string shrink_string_to_atom(std::string& input, const int& atom_number);
+std::string get_filename_from_path(const std::string& input);
+std::string get_foldername_from_path(const std::string& input);
+std::string get_basename_without_ending(const std::string& input);
 //------------------Functions to read from .fchk files----------------------------------
-bool read_fchk_integer_block(std::ifstream &in, std::string heading, ivec &result, bool rewind = true);
-bool read_fchk_double_block(std::ifstream &in, std::string heading, vec &result, bool rewind = true);
+bool read_fchk_integer_block(std::ifstream& in, std::string heading, ivec& result, bool rewind = true);
+bool read_fchk_double_block(std::ifstream& in, std::string heading, vec& result, bool rewind = true);
 int read_fchk_integer(std::string in);
-int read_fchk_integer(std::ifstream &in, std::string search, bool rewind = true);
+int read_fchk_integer(std::ifstream& in, std::string search, bool rewind = true);
 double read_fchk_double(std::string in);
-double read_fchk_double(std::ifstream &in, std::string search, bool rewind = true);
+double read_fchk_double(std::ifstream& in, std::string search, bool rewind = true);
 //------------------Functions to work with configuration files--------------------------
 void write_template_confi();
-int program_confi(std::string &gaussian_path, std::string &turbomole_path,
-                  std::string &basis, int &ncpus, double &mem, bool debug = false, bool expert = false, unsigned int counter = 0);
-bool check_bohr(WFN &wave, bool debug);
-int filetype_identifier(std::string &file, bool debug = false);
+int program_confi(std::string& gaussian_path, std::string& turbomole_path,
+    std::string& basis, int& ncpus, double& mem, bool debug = false, bool expert = false, unsigned int counter = 0);
+bool check_bohr(WFN& wave, bool debug);
+int filetype_identifier(std::string& file, bool debug = false);
 
 /*bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
 bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given);
 bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings);*/
-void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
-bool unsaved_files(std::vector<WFN> &wavy);
-int get_Z_from_label(const char *tmp);
+void select_cubes(std::vector<std::vector<unsigned int>>& selection, std::vector<WFN>& wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
+bool unsaved_files(std::vector<WFN>& wavy);
+int get_Z_from_label(const char* tmp);
 
 inline int sum_of_bools(const std::vector<bool> in)
 {
@@ -628,7 +625,7 @@ inline int sum_of_bools(const std::vector<bool> in)
     return result;
 }
 
-inline std::string trim(const std::string &s)
+inline std::string trim(const std::string& s)
 {
     if (s == "")
         return "";
@@ -653,20 +650,20 @@ class progress_bar
 {
     static const auto overhead = sizeof " [100%]";
 
-    std::ostream &os;
+    std::ostream& os;
     const std::size_t bar_width;
     std::string message;
     const std::string full_bar;
     const double precision;
 
 public:
-    progress_bar(std::ostream &os, std::size_t line_width,
-                 std::string message_, const char symbol = '=', const double p = 0.05)
-        : os{os},
-          bar_width{line_width - overhead},
-          message{std::move(message_)},
-          full_bar{std::string(bar_width, symbol) + std::string(bar_width, ' ')},
-          precision{p}
+    progress_bar(std::ostream& os, std::size_t line_width,
+        std::string message_, const char symbol = '=', const double p = 0.05)
+        : os{ os },
+        bar_width{ line_width - overhead },
+        message{ std::move(message_) },
+        full_bar{ std::string(bar_width, symbol) + std::string(bar_width, ' ') },
+        precision{ p }
     {
         if (message.size() + 1 >= bar_width || message.find('\n') != message.npos)
         {
@@ -681,8 +678,8 @@ public:
     }
 
     // not copyable
-    progress_bar(const progress_bar &) = delete;
-    progress_bar &operator=(const progress_bar &) = delete;
+    progress_bar(const progress_bar&) = delete;
+    progress_bar& operator=(const progress_bar&) = delete;
 
     ~progress_bar()
     {
@@ -731,27 +728,27 @@ struct cosinus
 };
 */
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
+    WFN& wavy,
+    double* CoordMinMax,
+    int* NbSteps,
     double Radius,
     double Increments,
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
     std::string cif,
-    double *CoordMinMax,
-    int *NbSteps,
-    std::vector<std::vector<double>> &cm,
+    double* CoordMinMax,
+    int* NbSteps,
+    std::vector<std::vector<double>>& cm,
     double Resolution,
-    std::ofstream &file,
+    std::ofstream& file,
     bool debug = false);
 
 void type2vector(
-    const int &index,
-    int *vector);
+    const int& index,
+    int* vector);
 
-bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+bool read_fracs_ADPs_from_CIF(std::string cif, WFN& wavy, cell& unit_cell, std::ofstream& log3, bool debug);
 
 inline double double_from_string_with_esd(std::string in)
 {
@@ -761,19 +758,19 @@ inline double double_from_string_with_esd(std::string in)
         return stod(in.substr(0, in.find('(')));
 }
 
-void swap_sort(ivec order, cvec &v);
+void swap_sort(ivec order, cvec& v);
 
-void swap_sort_multi(ivec order, std::vector<ivec> &v);
+void swap_sort_multi(ivec order, std::vector<ivec>& v);
 
 // Given a 3x3 matrix in a single array of double will find and sort eigenvalues and return biggest eigenvalue
-double get_lambda_1(double *a);
+double get_lambda_1(double* a);
 
-double get_decimal_precision_from_CIF_number(std::string &given_string);
+double get_decimal_precision_from_CIF_number(std::string& given_string);
 
 template <typename numtype = int>
 struct hashFunction
 {
-    size_t operator()(const std::vector<numtype> &myVector) const
+    size_t operator()(const std::vector<numtype>& myVector) const
     {
         std::hash<numtype> hasher;
         size_t answer = 0;
@@ -788,7 +785,7 @@ struct hashFunction
 template <typename numtype = int>
 struct hkl_equal
 {
-    bool operator()(const std::vector<numtype> &vec1, const std::vector<numtype> &vec2) const
+    bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const
     {
         const int size = vec1.size();
         if (size != vec2.size())
@@ -811,7 +808,7 @@ struct hkl_equal
 template <typename numtype = int>
 struct hkl_less
 {
-    bool operator()(const std::vector<numtype> &vec1, const std::vector<numtype> &vec2) const
+    bool operator()(const std::vector<numtype>& vec1, const std::vector<numtype>& vec2) const
     {
         if (vec1[0] < vec2[0])
         {
@@ -914,25 +911,25 @@ typedef std::set<vec>::const_iterator hkl_list_it_d;
 
 //---------------- Object for handling all input options -------------------------------
 struct options
-/**
- * @brief The `options` class represents a collection of options and settings for a program.
- *
- * It contains various member variables that store different configuration parameters.
- * These parameters control the behavior and functionality of the program.
- *
- * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
- *
- * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
- */
+    /**
+     * @brief The `options` class represents a collection of options and settings for a program.
+     *
+     * It contains various member variables that store different configuration parameters.
+     * These parameters control the behavior and functionality of the program.
+     *
+     * The `options` class also provides constructors and member functions to initialize and manipulate these parameters.
+     *
+     * @note This class is used to configure the behavior of a specific program and may have different member variables and functions depending on the program's requirements.
+     */
 {
-    std::ostream &log_file;
+    std::ostream& log_file;
     double resolution = 0.1;
     double radius = 2.0;
     double d_sfac_scan = 0.0;
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
     double mem = 0.0;
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     ivec MOs;
     std::vector<ivec> groups;
     std::vector<vec> twin_law;
@@ -995,7 +992,7 @@ struct options
     bool ECP = false;
     bool set_ECPs = false;
     int hirsh_number = 0;
-    int NbSteps[3]{0, 0, 0};
+    int NbSteps[3]{ 0, 0, 0 };
     int accuracy = 2;
     int threads = -1;
     int pbc = 0;
@@ -1015,7 +1012,7 @@ struct options
      * @param argv An array of C-style strings representing the command line arguments.
      *
      */
-    void look_for_debug(int &argc, char **argv);
+    void look_for_debug(int& argc, char** argv);
     /**
      * @brief Digests the options.
      *
@@ -1029,35 +1026,35 @@ struct options
     {
         groups.resize(1);
     };
-    options(int &argc, char **argv, std::ostream &log) : log_file(log)
+    options(int& argc, char** argv, std::ostream& log) : log_file(log)
     {
         groups.resize(1);
         look_for_debug(argc, argv);
     };
 
-    options(int accuracy, int threads, int pbc, double resolution, double radius, bool becke, bool electron_diffraction, bool ECP, bool set_ECPs, int ECP_mode, bool calc, bool eli, bool esp, bool elf, bool lap, bool rdg, bool hdef, bool def, bool fract, bool hirsh, bool s_rho, bool SALTED, bool SALTED_BECKE, bool Olex2_1_3_switch, bool iam_switch, bool read_k_pts, bool save_k_pts, bool combined_tsc_calc, bool binary_tsc, bool cif_based_combined_tsc_calc, bool density_test_cube, bool no_date, bool gbw2wfn, bool old_tsc, bool thakkar_d_plot, bool spherical_harmonic, bool ML_test, double sfac_scan, double sfac_diffuse, double dmin, int hirsh_number, const ivec &MOs, const std::vector<ivec> &groups, const std::vector<vec> &twin_law, const std::vector<ivec> &combined_tsc_groups, bool all_mos, bool test, const std::string &wfn, const std::string &fchk, const std::string &basis_set, const std::string &hkl, const std::string &cif, const std::string &method, const std::string &xyz_file, const std::string &coef_file, const std::string &fract_name, const std::vector<std::string> &combined_tsc_calc_files, const std::vector<std::string> &combined_tsc_calc_cifs, const std::string &wavename, const std::string &gaussian_path, const std::string &turbomole_path, const std::string &basis_set_path, const std::vector<std::string> &arguments, const std::vector<std::string> &combine_mo, const std::vector<std::string> &Cations, const std::vector<std::string> &Anions, const ivec &cmo1, const ivec &cmo2, const ivec &ECP_nrs, const ivec &ECP_elcounts, int ncpus, double mem, unsigned int mult, bool debug, const hkl_list &m_hkl_list, std::ostream &log_file)
+    options(int accuracy, int threads, int pbc, double resolution, double radius, bool becke, bool electron_diffraction, bool ECP, bool set_ECPs, int ECP_mode, bool calc, bool eli, bool esp, bool elf, bool lap, bool rdg, bool hdef, bool def, bool fract, bool hirsh, bool s_rho, bool SALTED, bool SALTED_BECKE, bool Olex2_1_3_switch, bool iam_switch, bool read_k_pts, bool save_k_pts, bool combined_tsc_calc, bool binary_tsc, bool cif_based_combined_tsc_calc, bool density_test_cube, bool no_date, bool gbw2wfn, bool old_tsc, bool thakkar_d_plot, bool spherical_harmonic, bool ML_test, double sfac_scan, double sfac_diffuse, double dmin, int hirsh_number, const ivec& MOs, const std::vector<ivec>& groups, const std::vector<vec>& twin_law, const std::vector<ivec>& combined_tsc_groups, bool all_mos, bool test, const std::string& wfn, const std::string& fchk, const std::string& basis_set, const std::string& hkl, const std::string& cif, const std::string& method, const std::string& xyz_file, const std::string& coef_file, const std::string& fract_name, const std::vector<std::string>& combined_tsc_calc_files, const std::vector<std::string>& combined_tsc_calc_cifs, const std::string& wavename, const std::string& gaussian_path, const std::string& turbomole_path, const std::string& basis_set_path, const std::vector<std::string>& arguments, const std::vector<std::string>& combine_mo, const std::vector<std::string>& Cations, const std::vector<std::string>& Anions, const ivec& cmo1, const ivec& cmo2, const ivec& ECP_nrs, const ivec& ECP_elcounts, int ncpus, double mem, unsigned int mult, bool debug, const hkl_list& m_hkl_list, std::ostream& log_file)
         : accuracy(accuracy), threads(threads), pbc(pbc), resolution(resolution), radius(radius), becke(becke), electron_diffraction(electron_diffraction), ECP(ECP), set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc), eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg), hdef(hdef), def(def), fract(fract), hirsh(hirsh), s_rho(s_rho), SALTED(SALTED), SALTED_BECKE(SALTED_BECKE), Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch), read_k_pts(read_k_pts), save_k_pts(save_k_pts), combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc), cif_based_combined_tsc_calc(cif_based_combined_tsc_calc), no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc), thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan), sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number), MOs(MOs), groups(groups), twin_law(twin_law), combined_tsc_groups(combined_tsc_groups), all_mos(all_mos), test(test), wfn(wfn), fchk(fchk), basis_set(basis_set), hkl(hkl), cif(cif), method(method), xyz_file(xyz_file), coef_file(coef_file), fract_name(fract_name), combined_tsc_calc_files(combined_tsc_calc_files), combined_tsc_calc_cifs(combined_tsc_calc_cifs), wavename(wavename), gaussian_path(gaussian_path), turbomole_path(turbomole_path), basis_set_path(basis_set_path), arguments(arguments), combine_mo(combine_mo), Cations(Cations), Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs), ECP_elcounts(ECP_elcounts), ncpus(ncpus), mem(mem), mult(mult), debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
     {
     }
 };
 
-const double gaussian_radial(primitive &p, double &r);
+const double gaussian_radial(primitive& p, double& r);
 
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs);
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs,
-                             const int &atom_nr);
+const double calc_density_ML(double& x,
+    double& y,
+    double& z,
+    vec& coefficients,
+    std::vector<atom>& atoms,
+    const int& exp_coefs);
+const double calc_density_ML(double& x,
+    double& y,
+    double& z,
+    vec& coefficients,
+    std::vector<atom>& atoms,
+    const int& exp_coefs,
+    const int& atom_nr);
 
-int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b);
+int load_basis_into_WFN(WFN& wavy, const std::vector<std::vector<primitive>>& b);
 
 inline const std::vector<std::vector<primitive>> TZVP_JKfit(
     {
@@ -1305,7 +1302,7 @@ inline cdouble hypergeometric(double a, double b, double c, cdouble x)
     return value;
 }
 
-inline bool ends_with(const std::string &str, const std::string &suffix)
+inline bool ends_with(const std::string& str, const std::string& suffix)
 {
     if (str.length() >= suffix.length())
     {

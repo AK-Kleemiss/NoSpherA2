@@ -178,7 +178,7 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
             if (line.find("}") != string::npos)
                 break;
             int count = 0;
-            int nr_exp = 0;
+            //int nr_exp = 0;
             double pi = 3.14159265358979;
             char c_temp = '?';
             double temp_vals[2]{0, 0};
@@ -301,7 +301,7 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
                         } // end switch of types
                     }     // end if(find atom_label + :
                 }         // end for h = ncen
-                nr_exp++;
+                //nr_exp++;
                 if (debug_dens)
                     cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
                 if (dum > count)
@@ -494,7 +494,7 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
             if (line.find("}") != string::npos)
                 break;
             int count = 0;
-            int nr_exp = 0;
+            //int nr_exp = 0;
             char c_temp = '?';
             double temp_vals[2]{0, 0};
             int dum = 0;
@@ -567,7 +567,7 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
                                  << " and exp: " << temp_vals[0] << " and type " << type << endl;
                     } // end if(find atom_label + :
                 }     // end for h = ncen
-                nr_exp++;
+                //nr_exp++;
                 if (debug_dens)
                     cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
                 if (dum > count)
@@ -755,7 +755,7 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
             stringstream stream;
             stream << line;
             int count = 0;
-            int nr_exp = 0;
+            //int nr_exp = 0;
             char c_temp = '?';
             double temp_num[2]{0, 0};
             int dum = 0;
@@ -858,7 +858,7 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
                         } // end switch of types
                     }     // end if(find atom_label + :
                 }         // end for h = ncen
-                nr_exp++;
+                //nr_exp++;
                 if (debug_dens)
                     cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
                 if (dum > count)

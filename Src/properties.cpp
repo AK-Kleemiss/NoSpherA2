@@ -800,9 +800,6 @@ void Calc_S_Rho(
     }
 #endif
 
-    if (nodate)
-        nodate = nodate;
-
     time_point start = get_time();
 
     progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
@@ -1452,6 +1449,10 @@ void properties_calculation(options &opt)
         ESP.write_file(true);
         log2 << "  done!" << endl;
     }
+    // return output to cout
+    std::cout.rdbuf(coutbuf);
+    log2.close();
+    std::cout<< "Properties calculation done!" << std::endl;
 }
 
 void do_combine_mo(options &opt)
