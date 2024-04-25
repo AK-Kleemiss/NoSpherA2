@@ -1,4 +1,5 @@
 #include "./wfn_class.cpp"
+#include "./atoms.cpp"
 #include "./properties.cpp"
 #include "./spherical_density.cpp"
 #include "./AtomGrid.cpp"
