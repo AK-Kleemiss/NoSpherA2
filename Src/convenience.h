@@ -437,7 +437,7 @@ inline std::chrono::high_resolution_clock::time_point get_time()
     return time;
 }
 
-inline int get_µsec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+inline int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
 {
     // gets the time difference in microseconds
     std::chrono::microseconds µsec = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
