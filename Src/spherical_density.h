@@ -68,8 +68,6 @@ public:
 		_offset((atomic_number-1) * 19), _first_ex(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL) {
 		ECP_mode = ECP_m;
 		charge = 0;
-		_first_ex = first_ex();
-		_prev_coef = previous_element_coef();
 	};
 	Spherical_Atom() : _first_ex(0), _offset(0), _prev_coef(0), c(NULL), n(NULL), nd(NULL), ns(NULL), np(NULL), nf(NULL), nex(NULL), occ(NULL), z(NULL) {
 		ECP_mode = 1;
