@@ -364,16 +364,21 @@ void generate_fractional_hkl(const double &dmin,
     const int extreme = 201;
     double dmin_l = 0.9 * dmin;
     const int lim = extreme / stepsize;
-    for (double h = -extreme; h < extreme; h += stepsize)
+#pragma omp parallel for private(hkl_)
+    for (int h = -lim; h < lim; h ++)
     {
+			double _h = h * stepsize;
         for (double k = -extreme; k < extreme; k += stepsize)
         {
             // only need 0 to extreme, since we have no DISP signal
             for (int l = 0; l < lim; l++)
             {
-                hkl_ = {h, k, l * stepsize};
+                hkl_ = {_h, k, l * stepsize};
                 if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
-                    hkl.emplace(hkl_);
+                {
+#pragma omp critical
+                  hkl.emplace(hkl_);
+                }
                 else
                     break;
             }
@@ -4609,11 +4614,14 @@ void calc_SF(const int &points,
              bool debug,
              bool no_date = false)
 {
-    const int imax = (int)dens.size();
+    const long long int imax = static_cast<long long int>(dens.size());
+    const long long int step = std::max(static_cast<long long int>(std::floor(imax / 20)), 1LL);
+    const long long int smax = static_cast<long long int>(k_pt[0].size());
+    sf.reserve(imax * smax);
     sf.resize(imax);
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
-        sf[i].resize(k_pt[0].size(), complex<double>(0.0, 0.0));
+        sf[i].resize(smax, constants::cnull);
 
     if (debug)
         file << "Initialized FFs" << endl
@@ -4658,9 +4666,7 @@ void calc_SF(const int &points,
 #else
 
     progress_bar *progress = new progress_bar{file, 60u, "Calculating scattering factors"};
-    const int step = max((int)floor(imax / 20), 1);
-    const int smax = (int)k_pt[0].size();
-    int pmax;
+    long long int pmax;
     double *dens_local, *d1_local, *d2_local, *d3_local;
     complex<double> *sf_local;
     const double *k1_local = k_pt[0].data();
@@ -4669,16 +4675,16 @@ void calc_SF(const int &points,
     double work, rho;
     for (int i = 0; i < imax; i++)
     {
-        pmax = (int)dens[i].size();
+        pmax = static_cast<long long int>(dens[i].size());
         dens_local = dens[i].data();
         d1_local = d1[i].data();
         d2_local = d2[i].data();
         d3_local = d3[i].data();
         sf_local = sf[i].data();
 #pragma omp parallel for private(work, rho)
-        for (int s = 0; s < smax; s++)
+        for (long long int s = 0; s < smax; s++)
         {
-            for (int p = pmax - 1; p >= 0; p--)
+            for (long long int p = pmax - 1; p >= 0; p--)
             {
                 rho = dens_local[p];
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
@@ -5945,9 +5951,9 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     std::vector<WFN> wavy;
     wavy.emplace_back(1);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
-    Thakkar O(wavy[0].atoms[0].charge);
-    Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
-    Thakkar_Anion O_an(wavy[0].atoms[0].charge);
+    //set number of threads
+		if (opt.threads > 0)
+			omp_set_num_threads(opt.threads);
     err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
@@ -5999,7 +6005,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     hkl_list_d hkl;
     generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
 
-    const int size = (int)hkl.size();
+    const long long int size = static_cast<long long int>(hkl.size());
     vector<vec> k_pt;
     k_pt.reserve(3 * size);
     k_pt.resize(3);
@@ -6027,15 +6033,16 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     // below is a strip of Calc_SF without the file IO or progress bar
     vector<vector<complex<double>>> sf;
 
-    const int imax = (int)dens.size();
-    const int smax = (int)k_pt[0].size();
-    int pmax = (int)dens[0].size();
-    const int step = max((int)floor(smax / 20), 1);
+    const int imax = static_cast<int>(dens.size());
+    const long long int smax = static_cast<long long int>(k_pt[0].size());
+    long long int pmax = static_cast<long long int>(dens[0].size());
+    const int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
     std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
+		sf.reserve(imax * smax);
     sf.resize(imax);
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
-        sf[i].resize(k_pt[0].size());
+        sf[i].resize(smax);
     double *dens_local, *d1_local, *d2_local, *d3_local;
     complex<double> *sf_local;
     const double *k1_local = k_pt[0].data();
@@ -6045,20 +6052,29 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
     for (int i = 0; i < imax; i++)
     {
-        pmax = (int)dens[i].size();
+        pmax = static_cast<long long int>(dens[i].size());
         dens_local = dens[i].data();
         d1_local = d1[i].data();
         d2_local = d2[i].data();
         d3_local = d3[i].data();
         sf_local = sf[i].data();
-#pragma omp parallel for private(work, rho, dens_local, d1_local, d2_local, d3_local, k1_local, k2_local, k3_local, pmax)
-        for (int s = 0; s < smax; s++)
+#pragma omp parallel for private(work, rho)
+        for (long long int s = 0; s < smax; s++)
         {
-            for (int p = pmax - 1; p >= 0; p--)
+            for (long long int p = pmax - 1; p >= 0; p--)
             {
-                rho = dens_local[p];
-                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-                sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
+              rho = dens_local[p];
+              work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+#ifdef __APPLE__
+#if TARGET_OS_MAC
+              if (rho < 0)
+              {
+                rho = -rho;
+                work += M_PI;
+              }
+#endif
+#endif
+              sf_local[s] += polar(rho, work);
             }
             if (i != 0 && i % step == 0)
                 progress->write(i / static_cast<double>(imax));

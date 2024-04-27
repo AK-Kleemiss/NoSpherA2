@@ -42,6 +42,7 @@ public:
   double get_vector(int i, int j) const;
   bool set_vector(int i, int j, double value);
   double get_origin(unsigned int i) const;
+	double get_dv() const { return dv; };
   bool set_origin(unsigned int i, double value);
   int get_na() const { return na; };
   void set_na(int g_na) { na = g_na; };
@@ -53,6 +54,7 @@ public:
   std::string get_comment1() const { return comment1; };
   std::string get_comment2() const { return comment2; };
 private:
+  double dv;
   int na;
   bool loaded;
   std::string comment1;
