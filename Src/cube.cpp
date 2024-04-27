@@ -15,6 +15,7 @@ cube::cube()
     loaded = false;
     na = 0;
     parent_wavefunction = new WFN(6);
+    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
 cube::cube(int x, int y, int z, int g_na, bool grow_values)
@@ -40,6 +41,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     }
     na = g_na;
     parent_wavefunction = new WFN(6);
+    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
 cube::cube(const string &filepath, bool read, WFN &wave, ostream &file, bool expert)
@@ -50,6 +52,7 @@ cube::cube(const string &filepath, bool read, WFN &wave, ostream &file, bool exp
     path = filepath;
     err_checkf(read_file(read, true, expert), "Sorry, something went wrong while reading!", file);
     loaded = read;
+    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
 cube::cube(int g_na, const ivec &g_size, const vector<double> &g_origin, const vector<vec> &g_vectors, const vector<vector<vec>> &g_values)
@@ -80,6 +83,7 @@ cube::cube(int g_na, const ivec &g_size, const vector<double> &g_origin, const v
         }
     }
     loaded = true;
+    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
 cube::cube(const cube &given)
@@ -88,6 +92,7 @@ cube::cube(const cube &given)
     path = given.path;
     comment1 = given.get_comment1();
     comment2 = given.get_comment2();
+		dv = given.get_dv();
     vectors.resize(3);
     size.resize(3);
     for (int i = 0; i < 3; i++)
@@ -455,7 +460,7 @@ bool cube::fractal_dimension(const double stepsize)
     double lv1, lv2;
 #pragma omp parallel private(lv1,lv2)
     {
-      int x, y, z;
+      long long int x, y, z;
 #pragma omp for
       for (long long int i = 0; i < size[0] * size[1] * (size[2] - 1); i++)
       {
@@ -464,10 +469,10 @@ bool cube::fractal_dimension(const double stepsize)
         z = i % (size[2] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x][y][z + 1];
-        for (int i = 0; i < steps; i++)
-          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+        for (int _i = 0; _i < steps; _i++)
+          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[i]++;
+            bins[_i]++;
       }
 #pragma omp for
       for (long long int i = 0; i < size[0] * size[2] * (size[1] - 1); i++)
@@ -477,10 +482,10 @@ bool cube::fractal_dimension(const double stepsize)
         y = i % (size[1] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x][y + 1][z];
-        for (int i = 0; i < steps; i++)
-          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+        for (int _i = 0; _i < steps; _i++)
+          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[i]++;
+            bins[_i]++;
       }
 #pragma omp for
       for (long long int i = 0; i < size[1] * size[2] * (size[0] - 1); i++)
@@ -490,10 +495,10 @@ bool cube::fractal_dimension(const double stepsize)
         x = i % (size[0] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x + 1][y][z];
-        for (int i = 0; i < steps; i++)
-          if ((lv1 - iso[i]) * (lv2 - iso[i]) < 0)
+        for (int _i = 0; _i < steps; _i++)
+          if ((lv1 - iso[_i]) * (lv2 - iso[_i]) < 0)
 #pragma omp atomic
-            bins[i]++;
+            bins[_i]++;
       }
     }
     const double epsilon = log(1 / (pow(comparisons, -constants::c_13)));
@@ -1065,15 +1070,14 @@ double cube::sum()
     for (int i = 0; i < 3; i++)
         if (size[i] == 0)
             return (-1);
-    double s = 0.0;
-#pragma omp parallel for reduction(+ : s)
+    double _s = 0.0;
+#pragma omp parallel for reduction(+ : _s)
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
-                s += values[x][y][z];
+                _s += values[x][y][z];
 
-    double dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
-    return (s * dv); // RETURN Sum of values inside the cube
+    return (_s * dv); // RETURN Sum of values inside the cube
 };
 
 double cube::diff_sum()
@@ -1081,15 +1085,14 @@ double cube::diff_sum()
     for (int i = 0; i < 3; i++)
         if (size[i] == 0)
             return (-1);
-    double s = 0.0;
-#pragma omp parallel for reduction(+ : s)
+    double _s = 0.0;
+#pragma omp parallel for reduction(+ : _s)
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
-                s += abs(values[x][y][z]) / 2;
+                _s += abs(values[x][y][z]) / 2;
 
-    double dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
-    return (s * dv); // RETURN Sum of values inside the cube
+    return (_s * dv); // RETURN Sum of values inside the cube
 };
 
 vec cube::double_sum()
@@ -1099,22 +1102,21 @@ vec cube::double_sum()
         if (size[i] == 0)
             return (vec(1, 0));
     }
-    double s = 0.0;
-    double s2 = 0.0;
-#pragma omp parallel for reduction(+ : s, s2)
+    double _s = 0.0;
+    double _s2 = 0.0;
+#pragma omp parallel for reduction(+ : _s, _s2)
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
             {
-                s += abs(values[x][y][z]) / 2;
-                s2 += values[x][y][z];
+                _s += abs(values[x][y][z]) / 2;
+                _s2 += values[x][y][z];
             }
 
-    double dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
     vec result;
     result.resize(2);
-    result[0] = s * dv;
-    result[1] = s2 * dv;
+    result[0] = _s * dv;
+    result[1] = _s2 * dv;
     return (result); // RETURN Sums of values inside the cube
 };
 

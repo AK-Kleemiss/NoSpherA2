@@ -162,6 +162,7 @@ namespace constants
     constexpr double el_charge = 1.602176634E-19;          // in C
     constexpr double speed_of_light = 2.99792458E8;        // m/s
     constexpr double null = 0.0;
+		constexpr cdouble cnull = cdouble(0.0, 0.0);
 
     const double ctelf = 10 * pow(2, -2.0 / 3.0) * pow(3, c_m53) * pow(PI, -c_43);
     constexpr double c_1_4p = sqrt(1.0 / (FOUR_PI));
