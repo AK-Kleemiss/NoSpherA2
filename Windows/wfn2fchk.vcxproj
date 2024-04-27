@@ -2035,6 +2035,7 @@
     <ClCompile Include="../Src/wfn_class.cpp" />
     <ClCompile Include="../Src/properties.cpp" />
     <ClCompile Include="../Src/spherical_density.cpp" />
+    <ClCompile Include="..\Src\atoms.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
