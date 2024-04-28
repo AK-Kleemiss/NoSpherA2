@@ -83,11 +83,7 @@ public:
     bool push_back_MO(const int &nr, const double &occ, const double &ener);
     bool push_back_MO(const int &nr, const double &occ, const double &ener, const int &oper);
     bool push_back_MO(const MO &given);
-    void pop_back_MO()
-    {
-        MOs.pop_back();
-        nmo--;
-    };
+    void pop_back_MO();
     void delete_MO(const int &nr);
     const double get_MO_energy(const int &mo) const;
     const int get_center(const int &nr) const { return centers[nr]; };
