@@ -17,8 +17,10 @@ jobs:
     - name: make_OpenMP
       run: >
           git clone --depth 1 https://github.com/llvm/llvm-project.git &&
-          cd llvm-project/openmp && mkdir build && cd build &&
+          cd llvm-project/openmp && mkdir build && mkdir build_x64 && cd build &&
           cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 .. &&
+          make && cd ../build_x64 &&
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 .. &&
           make
     - name: make_MacOS
       run: >
