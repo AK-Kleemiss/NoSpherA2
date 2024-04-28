@@ -5310,6 +5310,12 @@ const double WFN::compute_dens_spherical(
     return Rho;
 }
 
+void WFN::pop_back_MO()
+{
+		MOs.pop_back();
+		nmo--;
+}
+
 const void WFN::computeValues(
     const double* PosGrid, // [3] vector with current position on te grid
     double& Rho,           // Value of Electron Density
