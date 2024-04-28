@@ -24,7 +24,7 @@ jobs:
           make
     - name: make_MacOS
       run: >
-          brew install libomp && cd Mac && make && mv NoSpherA2 NoSpherA2_Mac && mv universal_NoSpherA2 NoSpherA2_Mac_universal
+          brew install libomp && cd Mac && make && mv universal_NoSpherA2 NoSpherA2_Mac_universal
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -35,7 +35,6 @@ jobs:
       with:
         name: executable_MacOS
         path: |
-          Mac/NoSpherA2_Mac
           Mac/NoSpherA2_Mac_universal
 
   build_windows:
