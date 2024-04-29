@@ -1,10 +1,6 @@
 #include "sphere_lebedev_rule.h"
 #include "convenience.h"
 
-constexpr int NMAX = 65;
-constexpr int MMAX((NMAX * 2 + 3) * (NMAX * 2 + 3) / 3);
-double null = 0.0;
-
 const int lebedev_sphere::gen_oh(const int &code,
                            const double &a,
                            const double &b,
