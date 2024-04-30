@@ -31,25 +31,21 @@ Windows/*/*/unity_*.cpp
 Linux/NoSpherA2
 NoSpherA2
 *.tscb
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_lap.cube
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_eli.cube
+*_rho.cube
+*_lap.cube
+*_eli.cube
+*_rho.cube
 tests/epoxide_gbw/converted.wfn
 *.FileListAbsolute.txt
-tests/sucrose_fchk_SF/olex2/Wfn_job/sucrose_rho.cube
-Windows/.vs/NoSpherA2/v16/.suo
+Windows/.vs/NoSpherA2/v*/.suo
 *.deps
 *.pch
-tests/reading_SALTED/alanine_rho.cube
 tests/reading_SALTED/ORCA/water_monomer.densities
 tests/reading_SALTED/ORCA/water_monomer.gbw
 tests/reading_SALTED/ORCA/water_monomer.inp
 tests/reading_SALTED/ORCA/water_monomer.wfn
 tests/reading_SALTED/ORCA/water_monomer.wfx
 tests/reading_SALTED/ORCA/water_monomer_property.txt
-tests/reading_SALTED/visualize water
-tests/reading_SALTED/water_monomer_rho.cube
-tests/reading_SALTED/water_rho.cube
 *std.compat.ixx*
 *std.ixx*
 *.ixx.ifc*
@@ -58,3 +54,4 @@ tests/reading_SALTED/water_rho.cube
 *.densities
 *_property.txt
 tests/ECP_SF/Atomic_densities/*.gbw
+*temp_wavefunction.wfn

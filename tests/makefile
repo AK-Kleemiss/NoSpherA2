@@ -2,7 +2,7 @@ RM := rm
 
 DIFF := diff -q -i -b
 
-all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb
+all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
 
 sucrose_SF:
 	@echo 'Running test: $@'
@@ -139,6 +139,20 @@ rubredoxin_cmtc_full:
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
 		-cpus 24
+	@echo 'Finished running: $@'
+
+Hybrid_mode:
+	@echo 'Running test: $@'
+	cd Hybrid && ../../NoSpherA2 \
+		-cif ZP2.cif \
+		-dmin 0.9 \
+		-acc 0 \
+		-mtc ZP2_part1.gbw 0,1 ZP2_part2.gbw 0,2 \
+		-mtc_mult 1 1 \
+		-mtc_charge 0 0 \
+		-no-date \
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 	
 wfn_reading:

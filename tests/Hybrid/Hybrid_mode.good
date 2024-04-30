@@ -1,0 +1,117 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+List of contributors of pieces of code or funcitonality:
+      Florian Kleemiss,
+      Emmanuel Hupf,
+      Alessandro Genoni,
+      and many more in communications or by feedback!
+NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.
+Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.
+Reading:                                ZP2_part1.gbw done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 251
+Reading:                                ZP2_part2.gbw done!
+Number of atoms in Wavefunction file: 25 Number of MOs: 251
+Number of protons: 106
+Number of electrons: 106
+Reading:                                   ZP2.cif... done!
+There are:
+  25 atoms read from the wavefunction, of which 
+  25 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 2826
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 2826
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 2826 with 106.637167 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+       F11     0.266     0.501    -0.077
+       F12     0.321     0.517    -0.022
+       O11    -0.145     0.280    -0.303
+       N11     0.115     0.146     0.081
+       N12    -0.153     0.086    -0.150
+       N13     0.322     0.459     0.013
+       C11    -0.509    -0.485     0.067
+       C12    -0.130    -0.131     0.073
+       C13    -0.265    -0.346     0.112
+       C14    -0.283    -0.325     0.117
+       C15    -0.218    -0.019    -0.045
+       C16    -0.154     0.040    -0.023
+       C17    -0.223    -0.045    -0.002
+       C18    -0.170     0.153    -0.112
+       H11     0.120    -0.018     0.137
+       H13     0.014    -0.086     0.117
+      H15a     0.094     0.058     0.054
+      H15b     0.046     0.027     0.046
+      H16a     0.093     0.069     0.039
+      H16b     0.030     0.006     0.041
+      H17a     0.081     0.054     0.038
+      H17b     0.042     0.016     0.046
+      H18a    -0.019    -0.050     0.030
+      H18b     0.065     0.023     0.052
+      H18c     0.023    -0.009     0.046
+Total number of electrons in the wavefunction: 106.637
+ and Hirshfeld electrons (asym unit): 105.625
+Generating hkl indices up to d=:              0.90... done!
+Nr of reflections generated:                  8237
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 8237
+
+Number of k-points to evaluate: 8237 for 2826 gridpoints.
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Number of protons: 106
+Number of electrons: 106.00
+Reading:                                   ZP2.cif... done!
+There are:
+  25 atoms read from the wavefunction, of which 
+  25 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 3078
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 3078
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 3078 with 106.207781 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+       F21     0.300     0.514    -0.045
+       F22     0.322     0.514    -0.019
+       O21    -0.144     0.278    -0.290
+       N21     0.189     0.206     0.094
+       N22    -0.081     0.101    -0.111
+       N23    -0.007     0.132     0.014
+       C21    -0.301    -0.377     0.139
+       C22    -0.217    -0.118     0.012
+       C23    -0.296    -0.321     0.085
+       C24    -0.298    -0.305     0.075
+       C25    -0.043     0.101     0.003
+       C26    -0.124     0.068    -0.062
+       C27    -0.064     0.111    -0.059
+       C28     0.021     0.258    -0.123
+       H21     0.100    -0.046     0.142
+       H23     0.085    -0.026     0.118
+      H25a     0.050     0.006     0.051
+      H25b     0.052     0.016     0.064
+      H26a     0.046     0.022     0.049
+      H26b     0.070     0.033     0.044
+      H27a     0.034     0.005     0.051
+      H27b     0.042     0.010     0.038
+      H28a     0.037     0.002     0.036
+      H28b    -0.022    -0.053     0.038
+      H28c     0.040    -0.005     0.045
+Total number of electrons in the wavefunction: 106.208
+ and Hirshfeld electrons (asym unit): 105.609
+Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+Final number of atoms in .tsc file: 50
+Writing tsc file...  ... done!
