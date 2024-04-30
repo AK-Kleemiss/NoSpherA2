@@ -5952,8 +5952,10 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     wavy.emplace_back(1);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     //set number of threads
-		if (opt.threads > 0)
-			omp_set_num_threads(opt.threads);
+#ifdef _OPENMP
+    if (opt.threads > 0)
+        omp_set_num_threads(opt.threads);
+#endif
     err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);

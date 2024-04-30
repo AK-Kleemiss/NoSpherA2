@@ -126,9 +126,10 @@ int main(int argc, char **argv)
         if (opt.cif_based_combined_tsc_calc)
         {
             err_checkf(opt.combined_tsc_calc_files.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and WFNs impossible!", log_file);
-            err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and mults impossible!", log_file);
-            err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_cifs.size(), "Unequal number of CIFs and charges impossible!", log_file);
         }
+        err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
+        err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
+        
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
