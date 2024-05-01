@@ -12,5 +12,14 @@
             "console": "integratedTerminal",
             "justMyCode": true
         }
+        {
+            "name": "Python: Optimizer",
+            "type": "python",
+            "request": "launch",
+            "program": "D:\\git\\wfn2fchk\\tests\\ECP_SF\\Atomic_densities\\Rb_fit_minimize.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "nodebug": true
+        }
     ]
 }

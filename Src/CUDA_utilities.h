@@ -836,7 +836,7 @@ __global__ void gpu_calc_dens(
 	free(phi);
 }
 
-void printCUDA(const cudaDeviceProp* prop, const int nDevices, ofstream& file)
+void printCUDA(const cudaDeviceProp* prop, const int nDevices, ostream& file)
 {
 	file << endl << "Number of CUDA-capable devices : " << nDevices << endl;
 	/*table with the properties of the devices*/
