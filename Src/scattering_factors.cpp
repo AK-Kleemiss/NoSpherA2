@@ -1084,6 +1084,7 @@ int make_hirshfeld_grids(const int &pbc,
 
     radial_density.resize(atom_type_list.size());
     radial_dist.resize(atom_type_list.size());
+    vector<vector<double>> spherical_density(atoms_with_grids);
     spherical_density.resize(asym_atom_list.size());
     for (int i = 0; i < asym_atom_list.size(); i++)
         spherical_density[i].resize(num_points[i]);
@@ -5049,7 +5050,7 @@ bool thakkar_sfac(
     for (int i = 0; i < asym_atom_list.size(); i++)
         labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
-    tsc_block blocky(
+    tsc_block<int,double> blocky(
         sf,
         labels,
         hkl);

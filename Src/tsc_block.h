@@ -726,7 +726,7 @@ inline bool merge_tscs_without_checks(
   std::string header_string("");
   for (size_t h_loc = 0; h_loc < header.size(); h_loc++)
     header_string += header[h_loc] + "\n";
-  tsc_block combined(form_fact, labels, indices, header_string);
+  tsc_block<int,cdouble> combined(form_fact, labels, indices, header_string);
   if (!old_tsc)
   {
     combined.write_tscb_file("combined.tscb");

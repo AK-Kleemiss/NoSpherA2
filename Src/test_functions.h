@@ -551,19 +551,34 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
     wavy.delete_unoccupied_MOs();
     cout << "Number of MOs before: " << wavy.get_nmo() << endl;
+    vector<bool> MOs_to_delete(wavy.get_nmo(), false);
+    int deleted = 0;
     if (val_els_alpha.size() > 0)
     {
         // Delete core orbitals
         int offset = wavy.get_MO_op_count(0);
-        for (int i = offset - 1; i > 0; i--)
+        for (int i = offset - 1; i >= 0; i--)
             // only delete if i is not an element of core-size
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
+            {
+                cout << "Deleting from Alpha: " << i << endl;
                 wavy.delete_MO(i);
+                MOs_to_delete[i] = true;
+                deleted++;
+            }
         offset = wavy.get_MO_op_count(0);
-        for (int i = wavy.get_nmo() - 1; i > offset; i--)
-            if (find(val_els_beta.begin(), val_els_beta.end(), i) == val_els_beta.end())
+        for (int i = wavy.get_nmo() - 1; i >= offset; i--)
+            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
+            {
+                cout << "Deleting from Beta: " << i - offset << endl;
                 wavy.delete_MO(i);
+                MOs_to_delete[i + deleted] = true;
+            }
     }
+    cout << "MOs deleted: " << deleted << endl;
+    cout << "MO map:" << endl;
+    for (int i = 0; i < MOs_to_delete.size(); i++)
+        cout << i << " " << MOs_to_delete[i] << endl;
     cout << "Number of MOs after: " << wavy.get_nmo() << endl;
     const long double da = constants::PI / 360.0;
     const int upper = static_cast<int>(constants::TWO_PI / da);

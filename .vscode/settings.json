@@ -1,0 +1,26 @@
+{
+    // Place your settings here
+    // This file is used to configure Visual Studio Code settings
+    // Learn more about configuring settings: https://code.visualstudio.com/docs/getstarted/settings
+    // Editor settings
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "on",
+    // Language specific settings
+    "[typescript]": {
+        "editor.formatOnSave": true
+    },
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "--line-length",
+        "120"
+    ],
+    "[python]": {
+        "formatting.provider": "black",
+        "formatting.blackArgs": [
+            "--line-length",
+            "120"
+        ],
+        "editor.formatOnSave": true
+    }
+}
