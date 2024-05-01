@@ -2597,19 +2597,22 @@ void options::digest_options()
         {
             wfn = arguments[i + 1];
             err_checkf(exists(wfn), "WFN doesn't exist", cout);
-            int core_size1 = 0;
-            int offset = 0;
-            int core_size2 = 0;
-            if (argc >= i + 4)
+            ivec val_MOs;
+            ivec val_MOs_beta;
+            if (argc >= i + 3)
             {
-                core_size1 = stoi(arguments[i + 2]);
-                cout << "Core size1: " << core_size1 << endl;
-                offset = stoi(arguments[i + 3]);
-                cout << "Offset: " << offset << endl;
-                core_size2 = stoi(arguments[i + 4]);
-                cout << "Core size2: " << core_size2 << endl;
+                val_MOs = split_string<int>(arguments[i + 2], ",");
+                cout << "Alpha MOs to keep: ";
+                for (int j = 0; j < val_MOs.size(); j++)
+                    cout << val_MOs[j] << " ";
+                cout << endl;
+                val_MOs_beta = split_string<int>(arguments[i + 3], ",");
+                cout << "Beta MOs to keep: ";
+                for (int j = 0; j < val_MOs_beta.size(); j++)
+                    cout << val_MOs_beta[j] << " ";
+                cout << endl;
             }
-            spherically_averaged_density(*this, core_size1, offset, core_size2);
+            spherically_averaged_density(*this, val_MOs, val_MOs_beta);
             exit(0);
         }
         else if (temp == "-b")

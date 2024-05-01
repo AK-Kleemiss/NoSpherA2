@@ -92,6 +92,7 @@ public:
     const int get_MO_op(const int &nr) const;
     void delete_unoccupied_MOs();
     const MO &get_MO(const int &n) const;
+    const int get_MO_op_count(const int &op) const;
 
     //--------------------in and output----------------------------------------
     void change_basis_set_name(std::string name) { basis_set_name = name; };
