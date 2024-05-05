@@ -13,7 +13,7 @@ endif
 all:
 	@echo "I think this is $(NAME)"
 ifeq ($(NAME),WINDOWS)
-	cd Windows && msbuild NoSpherA2.sln
+	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
 endif
 ifeq ($(NAME),LINUX)
 	@echo "Start making Linux executable"
