@@ -3,6 +3,7 @@
     // This file is used to configure Visual Studio Code settings
     // Learn more about configuring settings: https://code.visualstudio.com/docs/getstarted/settings
     // Editor settings
+    "terminal.integrated.scrollback": 100000,
     "editor.tabSize": 4,
     "editor.insertSpaces": true,
     "editor.wordWrap": "on",
@@ -10,11 +11,6 @@
     "[typescript]": {
         "editor.formatOnSave": true
     },
-    "python.formatting.provider": "black",
-    "python.formatting.blackArgs": [
-        "--line-length",
-        "120"
-    ],
     "[python]": {
         "formatting.provider": "black",
         "formatting.blackArgs": [
@@ -22,5 +18,18 @@
             "120"
         ],
         "editor.formatOnSave": true
-    }
+    },
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": [
+                "-ExecutionPolicy",
+                "ByPass",
+                "-NoExit",
+                "-Command",
+                ". \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1\"; cd ${workspaceFolder}"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
 }
