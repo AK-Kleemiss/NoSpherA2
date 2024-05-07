@@ -363,7 +363,7 @@ void generate_fractional_hkl(const double &dmin,
     string line, temp;
     const int extreme = 201;
     double dmin_l = 0.9 * dmin;
-    const int lim = extreme / stepsize;
+    const int lim = static_cast<int>(extreme / stepsize);
 #pragma omp parallel for private(hkl_)
     for (int h = -lim; h < lim; h++)
     {
@@ -1070,7 +1070,7 @@ int make_hirshfeld_grids(const int &pbc,
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(start, end_prototypes);
 
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
@@ -2710,7 +2710,7 @@ static int make_hirshfeld_grids_RI(
     end_prototypes = get_time();
     if (debug)
     {
-        int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(start, end_prototypes);
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
@@ -3557,7 +3557,7 @@ static int make_integration_grids(
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(start, end_prototypes);
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
         else
@@ -4206,7 +4206,7 @@ static int make_integration_grids_SALTED(
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(start, end_prototypes);
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
         else
@@ -4630,7 +4630,7 @@ void calc_SF(const int &points,
     end1 = get_time();
     if (!no_date)
     {
-        int dur = get_sec(start, end1);
+        long long int dur = get_sec(start, end1);
         if (dur < 1)
             file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl;
         else
@@ -6040,10 +6040,10 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     // below is a strip of Calc_SF without the file IO or progress bar
     vector<vector<complex<double>>> sf;
 
-    const int imax = static_cast<int>(dens.size());
+    const long long int imax = static_cast<long long int>(dens.size());
     const long long int smax = static_cast<long long int>(k_pt[0].size());
     long long int pmax = static_cast<long long int>(dens[0].size());
-    const int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
+    const long long int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
     std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.reserve(imax * smax);
     sf.resize(imax);
@@ -6057,7 +6057,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     const double *k3_local = k_pt[2].data();
     double work, rho;
     progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
-    for (int i = 0; i < imax; i++)
+    for (long long int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
         dens_local = dens[i].data();

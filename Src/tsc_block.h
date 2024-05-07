@@ -1,7 +1,7 @@
 #pragma once
 
 #include "convenience.h"
-template <typename numtype_index = int, typename numtype = std::complex<double>>
+template <typename numtype_index, typename numtype>
 class tsc_block
 {
 private:
@@ -75,7 +75,7 @@ public:
     for (const std::vector<double> &hkl : given_index)
     {
       for (int i = 0; i < 3; i++)
-        index[i].push_back(hkl[i]);
+        index[i].push_back(static_cast<numtype_index>(hkl[i]));
     }
     anomalous_dispersion = false;
   };
@@ -649,7 +649,7 @@ inline bool merge_tscs_without_checks(
       std::string name = files[f];
       std::string new_name = get_basename_without_ending(name) + ".tsc";
       std::cout << "Converting to: " << new_name << std::endl;
-      tsc_block<int> blocky(name);
+      tsc_block<int, cdouble> blocky(name);
       blocky.write_tsc_file(new_name, new_name);
       local_files[f] = new_name;
       std::cout << "Now reading converted: " << new_name << std::endl;
@@ -726,7 +726,7 @@ inline bool merge_tscs_without_checks(
   std::string header_string("");
   for (size_t h_loc = 0; h_loc < header.size(); h_loc++)
     header_string += header[h_loc] + "\n";
-  tsc_block<int,cdouble> combined(form_fact, labels, indices, header_string);
+  tsc_block<int, cdouble> combined(form_fact, labels, indices, header_string);
   if (!old_tsc)
   {
     combined.write_tscb_file("combined.tscb");

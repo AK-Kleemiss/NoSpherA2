@@ -3,6 +3,8 @@
 #include <vector>
 #include <iostream>
 
+#include "def2-ECPs_corrections.h"
+
 inline void not_implemented_SA(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
 {
 	log_file << function << " at: " << file << ":" << line << " " << error_mesasge << std::endl;
@@ -257,22 +259,23 @@ public:
 																			   ECP_mode(ECP_m),
 																			   charge(0)
 	{
+		int temp_Z;
 		switch (ECP_m)
 		{
 		case 2:
-			int temp_Z = atomic_number - 2;
+			temp_Z = atomic_number - 2;
 			if (temp_Z < 0)
 				err_not_impl_SA();
-			nex = ptb_corrections::c[temp_Z].size();
+			nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
 			z = ptb_corrections::z[temp_Z].data();
 			c = ptb_corrections::c[temp_Z].data();
 			break;
 		case 1:
 		case 3:
-			int temp_Z = atomic_number - 2;
+			temp_Z = atomic_number - 2;
 			if (temp_Z < 0)
 				err_not_impl_SA();
-			nex = def_corrections::c[temp_Z].size();
+			nex = static_cast<int>(def_corrections::c[temp_Z].size());
 			z = def_corrections::z[temp_Z].data();
 			c = def_corrections::c[temp_Z].data();
 			break;

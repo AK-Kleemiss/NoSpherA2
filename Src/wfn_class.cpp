@@ -2445,7 +2445,7 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
                         rf.read((char *)&e, sod);
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
                         file << fun << " " << c << " " << e << " " << n << endl;
-                        ECP_prims.push_back(ECP_primitive(center, type, e, c, n));
+                        ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
                     }
                 }
                 for (int i = 0; i < ncen; i++)
@@ -3078,7 +3078,7 @@ const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsi
 
 const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell)
 {
-    if (nr_atom <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
     {
         int primitive_counter = 0;
         while (atoms[nr_atom].basis_set[primitive_counter].shell != nr_shell)
@@ -3091,7 +3091,7 @@ const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &n
 
 const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell)
 {
-    if (nr_atom <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
         return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
     else
         return -1;
@@ -3099,11 +3099,11 @@ const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int 
 
 const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell)
 {
-    if (nr_atom <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
     {
         int primitive_counter = 0;
 #pragma loop(no_vector)
-        for (int s = 0; s < nr_shell; s++)
+        for (int s = 0; s < static_cast<int>(nr_shell); s++)
             primitive_counter += atoms[nr_atom].shellcount[s];
         return primitive_counter;
     }
@@ -3113,10 +3113,10 @@ const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &
 
 const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell)
 {
-    if (nr_atom <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
     {
         int primitive_counter = 0;
-        for (int a = 0; a < nr_atom; a++)
+        for (int a = 0; a < static_cast<int>(nr_atom); a++)
             for (int s = 0; s < atoms[a].shellcount.size(); s++)
                 switch (get_shell_type(a, s))
                 {
@@ -3133,7 +3133,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
                     primitive_counter += (10 * atoms[a].shellcount[s]);
                     break;
                 }
-        for (int s = 0; s < nr_shell; s++)
+        for (int s = 0; s < static_cast<int>(nr_shell); s++)
         {
             switch (get_shell_type(nr_atom, s))
             {
@@ -3159,7 +3159,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 
 const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell)
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && nr_shell >= 0)
+    if (static_cast<int>(nr_atom) <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && static_cast<int>(nr_atom) >= 0)
     {
         if (nr_shell == atoms[nr_atom].shellcount.size() - 1)
             return (int)atoms[nr_atom].basis_set.size() - 1;
@@ -3176,7 +3176,7 @@ const string WFN::get_atom_label(const unsigned int &nr)
 {
     string error_return;
     error_return = '?';
-    if (nr < ncen && nr >= 0)
+    if (nr < static_cast<unsigned int>(ncen))
         return atoms[nr].label;
     else
         return error_return;
@@ -6111,7 +6111,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb)
     for (int i = max(0, j - m); i <= min(j, l); i++)
     {
         // pre = factorial[l] / factorial[l - i] / factorial[i] * factorial[m] / factorial[m - j + i] / factorial[j - i];
-        temp2 = pre[j][l][m][i];
+        temp2 = static_cast<double>(pre[j][l][m][i]);
         a = l - i;
         b = m + i - j;
         if (a != 0)

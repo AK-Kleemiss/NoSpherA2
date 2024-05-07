@@ -448,7 +448,7 @@ void test_timing()
     opt.binary_tsc = true;
 
     int max_threads = 48;
-    vector<int> time(max_threads);
+    vector<long long int> time(max_threads);
 
     for (int ncpus = 1; ncpus < 49; ncpus++)
     {
@@ -1619,14 +1619,15 @@ double calc_pot_by_integral(std::vector<std::vector<std::vector<double>>> &grid,
     double res = 0;
     const double dr3 = dr * dr * dr;
     double d = 0;
-    for (int x = -cube_dist / dr; x <= cube_dist / dr; x++)
+    for (double x = -cube_dist / dr; x <= cube_dist / dr; x++)
     {
-        for (int y = -cube_dist / dr; y <= cube_dist / dr; y++)
+        for (double y = -cube_dist / dr; y <= cube_dist / dr; y++)
         {
-            for (int z = -cube_dist / dr; z <= cube_dist / dr; z++)
+            for (double z = -cube_dist / dr; z <= cube_dist / dr; z++)
             {
                 d = sqrt((x - r) * (x - r) + y * y + z * z);
-                res += grid[x + cube_dist / dr][y + cube_dist / dr][z + cube_dist / dr] / d * dr3;
+                int offset = static_cast<int>(cube_dist / dr);
+                res += grid[static_cast<int>(x) + offset][static_cast<int>(y) + offset][static_cast<int>(z) + offset] / d * dr3;
             }
         }
     }
