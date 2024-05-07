@@ -1963,7 +1963,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>/Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>
       </EnableEnhancedInstructionSet>
@@ -2098,7 +2098,8 @@
     <ClInclude Include="../Src/wfn_class.h" />
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />
-    <ClInclude Include="../Src/def2-ECPs.h" />
+    <ClInclude Include="../Src/def2-ECPs_GA.h" />
+    <ClInclude Include="../Src/def2-ECPs_corrections.h" />
     <ClInclude Include="../Src/npy.h" />
     <ClInclude Include="../Src/properties.h" />
     <ClInclude Include="../Src/spherical_density.h" />
