@@ -32,4 +32,7 @@
         }
     },
     "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "files.associations": {
+        "functional": "cpp"
+    },
 }

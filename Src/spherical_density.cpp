@@ -1,7 +1,8 @@
 #include "spherical_density.h"
 #include "convenience.h"
 #include "Thakkar_coefs.h"
-#include "def2-ECPs.h"
+#include "def2-ECPs_GA.h"
+#include "def2-ECPs_corrections.h"
 
 Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom(g_atom_number, ECP_m)
 {
@@ -803,3 +804,29 @@ const double Gaussian_Atom::get_radial_density(double &dist)
 	}
 	return Rho / (constants::FOUR_PI); // 4pi is the angular function
 };
+
+const double Spherical_Gaussian_Density::get_radial_density(double &dist)
+{
+	double res = 0;
+	double d2 = dist * dist;
+	for (int i = 0; i < nex; i++)
+	{
+		res += c[i] * exp(-z[i] * d2);
+	}
+	return res;
+}
+
+const double Spherical_Gaussian_Density::get_form_factor(const double &k_vector)
+{
+	std::function<double(const int &, const double &, const double &, const int &, const double &)> func;
+	if (k_vector == 0)
+		func = calc_Gaussian_int_at_k0;
+	else
+		func = calc_Gaussian_int;
+	double res = 0;
+	for (int i = 0; i < nex; i++)
+	{
+		res += func(1, c[i], z[i], 0, k_vector);
+	}
+	return res;
+}

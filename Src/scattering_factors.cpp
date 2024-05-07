@@ -365,9 +365,9 @@ void generate_fractional_hkl(const double &dmin,
     double dmin_l = 0.9 * dmin;
     const int lim = extreme / stepsize;
 #pragma omp parallel for private(hkl_)
-    for (int h = -lim; h < lim; h ++)
+    for (int h = -lim; h < lim; h++)
     {
-			double _h = h * stepsize;
+        double _h = h * stepsize;
         for (double k = -extreme; k < extreme; k += stepsize)
         {
             // only need 0 to extreme, since we have no DISP signal
@@ -377,7 +377,7 @@ void generate_fractional_hkl(const double &dmin,
                 if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
                 {
 #pragma omp critical
-                  hkl.emplace(hkl_);
+                    hkl.emplace(hkl_);
                 }
                 else
                     break;
@@ -2153,7 +2153,7 @@ int make_hirshfeld_grids(const int &pbc,
 
     file << "Applying hirshfeld weights and integrating charges..." << flush;
     double el_sum_becke = 0.0;
-    //double el_sum_spherical = 0.0;
+    // double el_sum_spherical = 0.0;
     double el_sum_hirshfeld = 0.0;
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
@@ -2187,13 +2187,13 @@ int make_hirshfeld_grids(const int &pbc,
             }
         }
         el_sum_becke += atom_els[0][i];
-        //el_sum_spherical += atom_els[1][i];
+        // el_sum_spherical += atom_els[1][i];
         el_sum_hirshfeld += atom_els[2][i];
         if (wave.get_has_ECPs())
         {
             int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
             el_sum_becke += n;
-            //el_sum_spherical += n;
+            // el_sum_spherical += n;
             el_sum_hirshfeld += n;
             atom_els[0][i] += n;
             atom_els[2][i] += n;
@@ -3066,7 +3066,7 @@ static int make_hirshfeld_grids_RI(
 
     file << "Applying hirshfeld weights and integrating charges..." << flush;
     double el_sum_becke = 0.0;
-    //double el_sum_spherical = 0.0;
+    // double el_sum_spherical = 0.0;
     double el_sum_hirshfeld = 0.0;
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
@@ -3101,13 +3101,13 @@ static int make_hirshfeld_grids_RI(
             }
         }
         el_sum_becke += atom_els[0][i];
-        //el_sum_spherical += atom_els[1][i];
+        // el_sum_spherical += atom_els[1][i];
         el_sum_hirshfeld += atom_els[2][i];
         if (wave.get_has_ECPs())
         {
             int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
             el_sum_becke += n;
-            //el_sum_spherical += n;
+            // el_sum_spherical += n;
             el_sum_hirshfeld += n;
             atom_els[0][i] += n;
             atom_els[2][i] += n;
@@ -3650,7 +3650,7 @@ static int make_integration_grids(
     // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=wavefunction density, 5=MW
     vector<vec> total_grid(6);
 
-    //int type_list_number = -1;
+    // int type_list_number = -1;
 
     if (debug)
     {
@@ -4297,7 +4297,7 @@ static int make_integration_grids_SALTED(
     // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=atomic density
     vector<vec> total_grid(5);
 
-    //int type_list_number = -1;
+    // int type_list_number = -1;
 
     double _cutoff;
     if (accuracy < 3)
@@ -4782,7 +4782,11 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
                 if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+                {
+                    Spherical_Gaussian_Density C(wave.atoms[asym_atom_list[i]].charge, mode);
+                    sf[i][s] += C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
                     sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
+                }
             }
         }
     }
@@ -5050,7 +5054,7 @@ bool thakkar_sfac(
     for (int i = 0; i < asym_atom_list.size(); i++)
         labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
-    tsc_block<int,double> blocky(
+    tsc_block<int, double> blocky(
         sf,
         labels,
         hkl);
@@ -5952,7 +5956,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     std::vector<WFN> wavy;
     wavy.emplace_back(1);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
-    //set number of threads
+    // set number of threads
 #ifdef _OPENMP
     if (opt.threads > 0)
         omp_set_num_threads(opt.threads);
@@ -6041,7 +6045,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     long long int pmax = static_cast<long long int>(dens[0].size());
     const int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
     std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
-		sf.reserve(imax * smax);
+    sf.reserve(imax * smax);
     sf.resize(imax);
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
@@ -6066,18 +6070,18 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
         {
             for (long long int p = pmax - 1; p >= 0; p--)
             {
-              rho = dens_local[p];
-              work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
+                rho = dens_local[p];
+                work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
 #ifdef __APPLE__
 #if TARGET_OS_MAC
-              if (rho < 0)
-              {
-                rho = -rho;
-                work += M_PI;
-              }
+                if (rho < 0)
+                {
+                    rho = -rho;
+                    work += M_PI;
+                }
 #endif
 #endif
-              sf_local[s] += polar(rho, work);
+                sf_local[s] += polar(rho, work);
             }
             if (i != 0 && i % step == 0)
                 progress->write(i / static_cast<double>(imax));
