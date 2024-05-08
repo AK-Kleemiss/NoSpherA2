@@ -51,9 +51,21 @@ typedef std::vector<int> ivec;
 typedef std::vector<cdouble> cvec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
+inline int vec_sum(const ivec& in)
+{
+    int res = 0;
+#pragma omp parallel for reduction(+ \
+                                   : res)
+    for (int i = 0; i < in.size(); i++)
+        res += in[i];
+    return res;
+}
+
 inline double vec_sum(const vec &in)
 {
     double res = 0.0;
+#pragma omp parallel for reduction(+ \
+                                   : res)
     for (int i = 0; i < in.size(); i++)
         res += in[i];
     return res;
