@@ -2083,8 +2083,7 @@ int make_hirshfeld_grids(const int &pbc,
                     total_grid[1][i],
                     total_grid[2][i],
                     d_temp,
-                    phi_temp,
-                    false);
+                    phi_temp);
             }
             for (int i = 0; i < 4; i++)
                 shrink_vector<double>(d_temp[i]);
@@ -2122,7 +2121,7 @@ int make_hirshfeld_grids(const int &pbc,
                         {
                             periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
                                                                     total_grid[1][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
-                                                                    total_grid[2][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2), true);
+                                                                    total_grid[2][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
                         }
                         j++;
                     }

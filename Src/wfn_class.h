@@ -64,9 +64,9 @@ private:
     void fill_Afac_pre();
     const double fj(int &j, int &l, int &m, double &aa, double &bb);
     const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp);
-    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi, const bool &add_ECP_dens);
+    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
     const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi, const bool &add_ECP_dens);
+    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
 
 public:
     WFN();
@@ -219,11 +219,11 @@ public:
     //----------Calcualtion of Properties-----------------
     // double compute_dens(const double* PosGrid, const int atom = -1);
     // This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
-    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, const bool &add_ECP_dens = true);
-    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi, const bool &add_ECP_dens = true);
+    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3);
+    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
     const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3);
     const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap, const bool &add_ECP_dens = true);
+    const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap);
     const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap);
     const void computeELIELF(const double *PosGrid, double &Elf, double &Eli);
     const void computeLapELI(const double *PosGrid, double &Eli, double &Lap);

@@ -548,6 +548,15 @@ bool cube::set_value(int x, int y, int z, double value)
     return (true);
 };
 
+void cube::set_dv(const double& given)
+{
+    dv = given;
+};
+
+void cube::calc_dv() {
+    dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
+};
+
 void cube::operator=(cube &right)
 {
     size.resize(3);

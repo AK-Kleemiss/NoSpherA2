@@ -1326,7 +1326,6 @@ void readxyzMinMax_fromWFN(
         PosAtoms[j][2] = wavy.atoms[j].z;
         if (!bohrang)
         {
-            cout << "Dividing atom positions!" << endl;
             for (int i = 0; i < 3; i++)
                 PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
         }
@@ -2810,11 +2809,6 @@ void options::digest_options()
                 all_mos = true;
             calc = true;
         }
-        else if (temp == "-ML_test")
-        {
-            ML_test();
-            exit(0);
-        }
         else if (temp == "-mtc")
         {
             combined_tsc_calc = true;
@@ -2870,6 +2864,19 @@ void options::digest_options()
         else if (temp == "-rho_cube_test")
         {
             test_density_cubes(*this, log_file);
+            exit(0);
+        }
+        else if (temp == "-rho_cube")
+        {
+            string wfn_name = arguments[i + 1];
+            WFN wavy(0);
+            cout << "Reading wavefunction: " << wfn_name << endl;
+            wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+            cout << "Assigning ECPs" << endl;
+            if (ECP)
+                wavy.set_has_ECPs(true);
+            cout << "Starting cube calculation" << endl;
+            calc_rho_cube(wavy);
             exit(0);
         }
         else if (temp.find("-s_rho") < 1)

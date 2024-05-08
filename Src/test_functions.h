@@ -622,7 +622,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
             long double v = 0;
             for (long long int i = 0; i < ang_size; i++)
             {
-                v += wavy.compute_dens(r * x0[i], r * y0[i], r * z0[i], d, phi, false) * st0[i];
+                v += wavy.compute_dens(r * x0[i], r * y0[i], r * z0[i], d, phi) * st0[i];
             }
             if (_r >= 1)
                 tot_int += v * r * r * (r - radial_dist[_r - 1]);
@@ -1301,7 +1301,7 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube(vec data, WFN &dummy, int &exp_coef, int atom = -1)
+void calc_cube_ML(vec data, WFN &dummy, int &exp_coef, int atom = -1)
 {
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
@@ -1367,6 +1367,93 @@ void calc_cube(vec data, WFN &dummy, int &exp_coef, int atom = -1)
     }
 };
 
+void calc_rho_cube(WFN& dummy)
+{
+    using namespace std;
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    readxyzMinMax_fromWFN(dummy, MinMax, steps, 3., 0.05, true);
+    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    dummy.delete_unoccupied_MOs();
+    CubeRho.give_parent_wfn(dummy);
+    cout << "Starting work..." << endl;
+
+    for (int i = 0; i < 3; i++)
+    {
+        CubeRho.set_origin(i, MinMax[i]);
+        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+    CubeRho.set_comment1("Calculated density using NoSpherA2");
+    CubeRho.set_comment2("from " + dummy.get_path());
+    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
+
+    time_point start = get_time();
+    const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;;
+    cout << "Lets go into the loop! There is " << total_size << " points" << endl;
+    progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
+    const int step = (int)std::max(floor(s1 / 20.0), 1.0);
+    
+    vec v1{
+    CubeRho.get_vector(0, 0),
+    CubeRho.get_vector(1, 0),
+    CubeRho.get_vector(2, 0)
+    }, v2{
+    CubeRho.get_vector(0, 1),
+    CubeRho.get_vector(1, 1),
+    CubeRho.get_vector(2, 1)
+    }, v3{
+    CubeRho.get_vector(0, 2),
+    CubeRho.get_vector(1, 2),
+    CubeRho.get_vector(2, 2)
+    }, orig{
+    CubeRho.get_origin(0),
+    CubeRho.get_origin(1),
+    CubeRho.get_origin(2)
+    };
+
+
+#pragma omp parallel
+    {
+        vector<vec> d;
+        vec phi(dummy.get_nmo(), 0.0);
+        d.resize(16);
+        for (int i = 0; i < 16; i++)
+            d[i].resize(dummy.get_ncen(), 0.0);
+#pragma omp for schedule(dynamic)
+        for (int index = 0; index < total_size; index++)
+        {
+            int i = index / (s2 * s3);
+            int j = (index / s3) % s2;
+            int k = index % s3;
+
+            vec PosGrid{
+                i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
+                i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
+                i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
+
+
+            CubeRho.set_value(i, j, k, dummy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+            if (i != 0 && i % step == 0 && j == 0 && k == 0)
+                progress->write(i / static_cast<double>(s1));
+        }
+    }
+    delete (progress);
+
+    using namespace std;
+    time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    CubeRho.calc_dv();
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
+
+    std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho.cube");
+    CubeRho.write_file(fn, false);
+};
+
 double numerical_3d_integral(std::function<double(double *)> f, double stepsize = 0.001, double r_max = 10.0)
 {
     double tot_int = 0;
@@ -1420,50 +1507,6 @@ double one(double *d)
     return 1;
 }
 
-void ML_test()
-{
-    using namespace std;
-
-    vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    string path{"coefficients_conf0.npy"};
-    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
-
-    WFN dummy(7);
-    dummy.read_xyz("water_monomer.xyz", std::cout);
-
-    int nr_coefs = load_basis_into_WFN(dummy, QZVP_JKfit);
-
-    cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
-    calc_cube(data, dummy, nr_coefs);
-
-    path = "prediction_conf0.npy";
-    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
-
-    WFN dummy2(7);
-    dummy2.read_xyz("water.xyz", std::cout);
-
-    nr_coefs = load_basis_into_WFN(dummy2, QZVP_JKfit);
-
-    cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
-    calc_cube(data, dummy2, nr_coefs);
-
-    path = "alanine2.npy";
-    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
-
-    WFN dummy3(7);
-    dummy3.read_xyz("alanine.xyz", std::cout);
-
-    nr_coefs = load_basis_into_WFN(dummy3, TZVP_JKfit);
-
-    cout << data.size() << " vs. " << nr_coefs << " ceofficients" << endl;
-    calc_cube(data, dummy3, nr_coefs);
-
-    cout << "Done :)" << endl;
-}
-
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 {
     std::vector<unsigned long> shape{};
@@ -1476,10 +1519,10 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 
     int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    calc_cube(data, dummy, nr_coefs);
+    calc_cube_ML(data, dummy, nr_coefs);
 
     for (int i = 0; i < dummy.get_ncen(); i++)
-        calc_cube(data, dummy, nr_coefs, i);
+        calc_cube_ML(data, dummy, nr_coefs, i);
 }
 
 void test_xtb_molden(options &opt, std::ostream &log_file)
@@ -1528,9 +1571,9 @@ void test_core_dens()
         res[0][i] = sr;
         res[1][i] = T_Li.get_core_density(sr, 2);
         res[2][i] = T_Li.get_radial_density(sr);
-        res[3][i] = ECP_way_LI.compute_dens(sr, 0, 0, false);
-        res[4][i] = wavy3_LI.compute_dens(sr, 0, 0, false);
-        res[5][i] = wavy4_LI.compute_dens(sr, 0, 0, false);
+        res[3][i] = ECP_way_LI.compute_dens(sr, 0, 0);
+        res[4][i] = wavy3_LI.compute_dens(sr, 0, 0);
+        res[5][i] = wavy4_LI.compute_dens(sr, 0, 0);
     }
     dat_out << fixed;
     for (int i = 0; i < res[0].size(); i++)
@@ -1592,12 +1635,12 @@ void test_core_dens()
         res[3][i] = T_Rb.get_core_density(sr, 28);
         res[4][i] = G_Rb.get_radial_density(sr);
         res[5][i] = T_Rb.get_radial_density(sr);
-        res[6][i] = wavy.compute_dens(sr, 0, 0, false);
-        res[7][i] = wavy2.compute_dens(sr, 0, 0, false);
+        res[6][i] = wavy.compute_dens(sr, 0, 0);
+        res[7][i] = wavy2.compute_dens(sr, 0, 0);
         res[8][i] = sr;
-        res[9][i] = ECP_way.compute_dens(sr, 0, 0, false);
-        res[10][i] = wavy3.compute_dens(sr, 0, 0, false);
-        res[11][i] = wavy4.compute_dens(sr, 0, 0, false);
+        res[9][i] = ECP_way.compute_dens(sr, 0, 0);
+        res[10][i] = wavy3.compute_dens(sr, 0, 0);
+        res[11][i] = wavy4.compute_dens(sr, 0, 0);
     }
     dat_out << fixed;
     for (int i = 0; i < res[0].size(); i++)
@@ -1728,11 +1771,11 @@ void test_esp_dens()
         res[0][i] = sr;
         res[1][i] = T_Li.get_core_density(sr, 2);
         res[2][i] = T_Li.get_radial_density(sr);
-        res[3][i] = ECP_way.compute_dens(sr, 0, 0, false);
+        res[3][i] = ECP_way.compute_dens(sr, 0, 0);
         res[4][i] = ECP_way.computeESP_noCore(pos, d2);
         // res[5][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
         // res[6][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
-        res[7][i] = ECP_way_core.compute_dens(sr, 0, 0, false);
+        res[7][i] = ECP_way_core.compute_dens(sr, 0, 0);
         res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);
         if (i != 0 && i % static_cast<int>(points / 100) == 0)
             progress->write(i / static_cast<double>(res[0].size()));

@@ -4740,28 +4740,26 @@ const double WFN::compute_dens(
     const double &Pos2,
     const double &Pos3,
     vector<vec> &d,
-    vec &phi,
-    const bool &add_ECP_dens)
+    vec &phi)
 {
     if (d_f_switch)
     {
         err_checkf(d.size() >= 5, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
     }
     else
     {
         err_checkf(d.size() >= 4, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     }
 };
 
 const double WFN::compute_dens(
     const double &Pos1,
     const double &Pos2,
-    const double &Pos3,
-    const bool &add_ECP_dens)
+    const double &Pos3)
 {
     vector<vec> d;
     vec phi(nmo, 0.0);
@@ -4772,14 +4770,14 @@ const double WFN::compute_dens(
         for (int i = 0; i < 5; i++)
             d[i].resize(ncen, 0.0);
         err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
     }
     else
     {
         d.resize(16);
         for (int i = 0; i < 16; i++)
             d[i].resize(ncen, 0.0);
-        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi, add_ECP_dens);
+        return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     }
 };
 
@@ -4795,7 +4793,7 @@ const double WFN::compute_spin_dens(
         err_checkf(d.size() >= 5, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
         err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, true);
+        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
     }
     else
     {
@@ -4812,14 +4810,14 @@ const double WFN::compute_spin_dens(
 {
     vector<vec> d;
     vec phi(nmo, 0.0);
-    // const int n = get_nmo(true);
+
     if (d_f_switch)
     {
         d.resize(5);
         for (int i = 0; i < 5; i++)
             d[i].resize(ncen, 0.0);
         err_not_impl_f("Nah.. not yet implemented correctly", std::cout);
-        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi, true);
+        return compute_dens_spherical(Pos1, Pos2, Pos3, d, phi);
     }
     else
     {
@@ -4835,8 +4833,7 @@ const double WFN::compute_dens_cartesian(
     const double &Pos2,
     const double &Pos3,
     vector<vec> &d,
-    vec &phi,
-    const bool &add_ECP_dens)
+    vec &phi)
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double Rho = 0.0;
@@ -4864,10 +4861,6 @@ const double WFN::compute_dens_cartesian(
         d[13][iat] = d[0][iat] * d[10][iat];
         d[14][iat] = d[1][iat] * d[11][iat];
         d[15][iat] = d[2][iat] * d[12][iat];
-        if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0)
-        {                                                                               // This adds a tight core density based on
-            Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3][iat]); // a spherical gaussian to fill in the gap
-        }                                                                               // left by ECPs integrating to the correct number of electrons
     }
 
     for (j = 0; j < nex; j++)
@@ -5155,8 +5148,7 @@ const double WFN::compute_dens_spherical(
     const double &Pos2,
     const double &Pos3,
     vector<vec> &d,
-    vec &phi,
-    const bool &add_ECP_dens)
+    vec &phi)
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
     return 0.0;
@@ -5176,10 +5168,6 @@ const double WFN::compute_dens_spherical(
         d[1][iat] = Pos2 - atoms[iat].y;
         d[2][iat] = Pos3 - atoms[iat].z;
         d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0)
-        {
-            Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3][iat]);
-        }
         d[4][iat] = sqrt(d[3][iat]);
     }
     /*Here d[0] = x
@@ -5334,8 +5322,8 @@ const void WFN::computeValues(
     double *Hess,          // Hessian Matrix, later used to determine lambda2
     double &Elf,           // Value of the ELF
     double &Eli,           // Value of the ELI
-    double &Lap,           // Value for the Laplacian
-    const bool &add_ECP_dens)
+    double &Lap            // Value for the Laplacian
+)
 {
     const int _nmo = get_nmo(false);
     vec phi(10 * _nmo, 0.0);
@@ -5367,10 +5355,6 @@ const void WFN::computeValues(
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
         d[3] = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
-        if (add_ECP_dens && has_ECPs && atoms[iat].ECP_electrons != 0)
-        {
-            Rho += 8 * atoms[iat].ECP_electrons * exp(-constants::FOUR_PI * d[3]);
-        }
         double temp = -get_exponent(j) * (d[3]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
