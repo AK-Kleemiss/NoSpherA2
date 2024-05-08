@@ -2072,9 +2072,9 @@ int make_hirshfeld_grids(const int &pbc,
             vector<vec> d_temp(16);
             for (int i = 0; i < 16; i++)
             {
-                d_temp[i].resize(nr_cen);
+                d_temp[i].resize(nr_cen, 0.0);
             }
-            vec phi_temp(nr_mos);
+            vec phi_temp(nr_mos, 0.0);
 #pragma omp for
             for (int i = 0; i < nr_atoms; i++)
             {
@@ -2085,7 +2085,7 @@ int make_hirshfeld_grids(const int &pbc,
                     d_temp,
                     phi_temp);
             }
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 16; i++)
                 shrink_vector<double>(d_temp[i]);
             shrink_vector<vec>(d_temp);
             shrink_vector<double>(phi_temp);

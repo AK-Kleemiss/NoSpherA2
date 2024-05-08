@@ -1372,7 +1372,7 @@ void calc_rho_cube(WFN& dummy)
     using namespace std;
     double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     int steps[3]{ 0, 0, 0 };
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, 3., 0.05, true);
+    readxyzMinMax_fromWFN(dummy, MinMax, steps, 3., 0.025, true);
     cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);
@@ -1391,7 +1391,7 @@ void calc_rho_cube(WFN& dummy)
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;;
     cout << "Lets go into the loop! There is " << total_size << " points" << endl;
     progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
-    const int step = (int)std::max(floor(s1 / 20.0), 1.0);
+    const int step = (int)std::max(floor(total_size / 20.0), 1.0);
     
     vec v1{
     CubeRho.get_vector(0, 0),
@@ -1433,8 +1433,8 @@ void calc_rho_cube(WFN& dummy)
 
 
             CubeRho.set_value(i, j, k, dummy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
-            if (i != 0 && i % step == 0 && j == 0 && k == 0)
-                progress->write(i / static_cast<double>(s1));
+            if (index != 0 && index % step == 0)
+                progress->write(index / static_cast<double>(total_size));
         }
     }
     delete (progress);
