@@ -110,7 +110,10 @@
     <ClInclude Include="../Src/Thakkar_coefs.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../Src/def2-ECPs.h">
+    <ClInclude Include="../Src/def2-ECPs_corrections.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/def2-ECPs_GA.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
@@ -130,10 +133,5 @@
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\tests\ECP_SF\NoSpherA2.log">
-      <Filter>Ressourcendateien\Tests</Filter>
-    </Text>
   </ItemGroup>
 </Project>

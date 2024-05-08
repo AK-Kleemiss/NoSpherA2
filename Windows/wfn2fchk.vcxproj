@@ -2051,7 +2051,7 @@
       <OpenMPSupport>true</OpenMPSupport>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <ForceConformanceInForLoopScope>true</ForceConformanceInForLoopScope>
-      <AdditionalOptions>/Qvec-report:1 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions)</AdditionalOptions>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableEnhancedInstructionSet>
       </EnableEnhancedInstructionSet>
@@ -2113,9 +2113,6 @@
     <None Include="..\Linux\makefile" />
     <None Include="..\Mac\makefile" />
     <None Include="..\tests\makefile" />
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\tests\ECP_SF\NoSpherA2.log" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
