@@ -61,6 +61,8 @@ sucrose_ptb:
 		-wfn wfn.xtb \
 		-mult 0 \
 		-charge 0 \
+		-acc 0 \
+		-ECP 2 \
 		-no-date \
 		&& mv NoSpherA2.log $@.log\
 		&& ${DIFF} $@.log $@.good
