@@ -16,6 +16,20 @@
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64",
             "compileCommands": "${workspaceFolder}/Windows/NoSpherA2/x64/Release + Copy/NoSpherA2.ClangTidy/compile_commands.json"
+        },
+        {
+            "name": "Mac",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/opt/homebrew/bin/g++-13",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-gcc-arm64"
         }
     ],
     "version": 4

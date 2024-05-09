@@ -55,7 +55,7 @@ cube::cube(const string &filepath, bool read, WFN &wave, ostream &file, bool exp
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(int g_na, const ivec &g_size, const vector<double> &g_origin, const vector<vec> &g_vectors, const vector<vector<vec>> &g_values)
+cube::cube(int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
 {
     na = g_na;
     parent_wavefunction = new WFN(6);

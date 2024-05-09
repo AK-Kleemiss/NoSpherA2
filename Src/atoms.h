@@ -24,11 +24,11 @@ public:
 	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
 	atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
 	atom operator=(const atom &rhs);
-	void print_values();
+	void print_values() const;
 	bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
-	void print_values_long();
-	bool get_basis_set_loaded();
-	bool is_anharm();
+	void print_values_long() const;
+	bool get_basis_set_loaded() const;
+	bool is_anharm() const;
 	void assign_ADPs(vec &second, vec &third, vec &fourth);
 	void assign_ADPs(vec& second);
 	void assign_ADPs(double& Uiso);

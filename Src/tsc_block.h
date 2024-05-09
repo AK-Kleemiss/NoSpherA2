@@ -494,7 +494,7 @@ inline bool merge_tscs(
             labels.push_back(new_label);
           temp_labels.erase(0, pos + delimiter.length());
         }
-        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
+        nr_new_scatterers = vec_sum(is_a_new_scatterer);
         std::cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << std::endl;
         form_fact.resize(labels.size());
       }
@@ -682,7 +682,7 @@ inline bool merge_tscs_without_checks(
             labels.push_back(new_label);
           temp_labels.erase(0, pos + delimiter.length());
         }
-        nr_new_scatterers = sum_of_bools(is_a_new_scatterer);
+        nr_new_scatterers = vec_sum(is_a_new_scatterer);
         std::cout << "Read " << nr_scatterers << " atoms, " << nr_new_scatterers << " are new." << std::endl;
         form_fact.resize(labels.size());
       }

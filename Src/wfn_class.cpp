@@ -175,7 +175,7 @@ bool WFN::erase_center(const int &g_nr)
     return true;
 };
 
-const string WFN::get_centers(const bool &bohr)
+const string WFN::get_centers(const bool &bohr) const
 {
     string temp;
     for (int i = 0; i < ncen; i++)
@@ -201,7 +201,7 @@ const string WFN::get_centers(const bool &bohr)
     return temp;
 };
 
-const void WFN::list_centers()
+const void WFN::list_centers() const
 {
     for (int i = 0; i < ncen; i++)
     {
@@ -354,7 +354,7 @@ bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &v
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
 };
 
-const void WFN::list_primitives()
+const void WFN::list_primitives() const
 {
     for (int i = 0; i < nex; i++)
     {
@@ -413,7 +413,7 @@ const int WFN::get_MO_primitive_count(const int &nr_mo) const
     return MOs[nr_mo].get_primitive_count();
 };
 
-const string WFN::hdr(const bool &occupied)
+const string WFN::hdr(const bool &occupied) const
 {
     string temp = "GAUSSIAN            ";
     if (!occupied)
@@ -2465,7 +2465,7 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
     return true;
 };
 
-const vec WFN::get_norm_const(ostream &file, bool debug)
+const vec WFN::get_norm_const(ostream &file, bool debug) const
 {
     err_checkf(get_nr_basis_set_loaded() != 0, "No basis set loaded!", file);
     err_checkf(get_nr_basis_set_loaded() == get_ncen(), "Not all atoms have a basis set loaded!", file);
@@ -2657,7 +2657,7 @@ const vec WFN::get_norm_const(ostream &file, bool debug)
     return norm_const;
 }
 
-const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int &axis)
+const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int &axis) const
 {
     err_checkf(!((int)nr >= ncen || axis > 2), "This input is invalid for get_atom_coordinate!", std::cout);
     switch (axis)
@@ -2938,7 +2938,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
     return true;
 };
 
-void WFN::print_primitive(const int &nr)
+void WFN::print_primitive(const int &nr) const
 {
     cout << "center assignement: " << centers[nr] << " type: " << types[nr]
          << " exponent: " << exponents[nr] << endl
@@ -2970,7 +2970,7 @@ const int WFN::get_nmo(const bool &only_occ) const
     }
 };
 
-const unsigned int WFN::get_nr_electrons()
+const unsigned int WFN::get_nr_electrons() const
 {
     unsigned int count = 0;
     for (int i = 0; i < ncen; i++)
@@ -2979,7 +2979,7 @@ const unsigned int WFN::get_nr_electrons()
     return count;
 };
 
-const unsigned int WFN::get_nr_ECP_electrons()
+const unsigned int WFN::get_nr_ECP_electrons() const
 {
     unsigned int count = 0;
     for (int i = 0; i < ncen; i++)
@@ -2987,7 +2987,7 @@ const unsigned int WFN::get_nr_ECP_electrons()
     return count;
 }
 
-double WFN::count_nr_electrons(void)
+double WFN::count_nr_electrons(void) const 
 {
     double count = 0;
     for (int i = 0; i < nmo; i++)
@@ -2995,7 +2995,7 @@ double WFN::count_nr_electrons(void)
     return count;
 };
 
-const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim)
+const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {
     if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].basis_set[nr_prim].exponent;
@@ -3003,7 +3003,7 @@ const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_
         return -1;
 };
 
-const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim)
+const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const
 {
     if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].basis_set[nr_prim].coefficient;
@@ -3031,7 +3031,7 @@ bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_pr
     return true;
 };
 
-const int WFN::get_atom_primitive_count(const int &nr)
+const int WFN::get_atom_primitive_count(const int &nr) const
 {
     if (nr <= ncen && nr >= 0)
         return (int)atoms[nr].basis_set.size();
@@ -3050,7 +3050,7 @@ bool WFN::erase_atom_primitive(const unsigned int &nr, const unsigned int &nr_pr
         return false;
 };
 
-const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim)
+const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim) const
 {
     if ((int)nr_atom <= ncen && atoms[nr_atom].basis_set.size() >= (int)nr_prim)
     {
@@ -3060,7 +3060,7 @@ const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned i
         return -1;
 };
 
-const int WFN::get_atom_shell_count(const unsigned int &nr)
+const int WFN::get_atom_shell_count(const unsigned int &nr) const
 {
     if ((int)nr <= ncen)
         return (int)atoms[nr].shellcount.size();
@@ -3068,7 +3068,7 @@ const int WFN::get_atom_shell_count(const unsigned int &nr)
         return -1;
 };
 
-const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if ((int)nr_atom <= ncen && (int)nr_shell < atoms[nr_atom].shellcount.size())
         return atoms[nr_atom].shellcount[nr_shell];
@@ -3076,7 +3076,7 @@ const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsi
         return -1;
 };
 
-const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
     {
@@ -3089,7 +3089,7 @@ const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &n
         return -1;
 };
 
-const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
         return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
@@ -3097,7 +3097,7 @@ const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int 
         return -1;
 };
 
-const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
     {
@@ -3111,7 +3111,7 @@ const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &
         return -1;
 };
 
-const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
     {
@@ -3157,7 +3157,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
         return -1;
 };
 
-const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell)
+const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
     if (static_cast<int>(nr_atom) <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && static_cast<int>(nr_atom) >= 0)
     {
@@ -3172,7 +3172,7 @@ const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr
         return -1;
 };
 
-const string WFN::get_atom_label(const unsigned int &nr)
+const string WFN::get_atom_label(const unsigned int &nr) const
 {
     string error_return;
     error_return = '?';
@@ -3182,7 +3182,7 @@ const string WFN::get_atom_label(const unsigned int &nr)
         return error_return;
 };
 
-const int WFN::get_nr_basis_set_loaded()
+const int WFN::get_nr_basis_set_loaded() const
 {
     int count = 0;
     for (int a = 0; a < ncen; a++)
@@ -3191,7 +3191,7 @@ const int WFN::get_nr_basis_set_loaded()
     return count;
 };
 
-const bool WFN::get_atom_basis_set_loaded(const int &nr)
+const bool WFN::get_atom_basis_set_loaded(const int &nr) const
 {
     if (nr <= ncen && nr >= 0)
         return atoms[nr].get_basis_set_loaded();
@@ -3223,7 +3223,7 @@ void WFN::resize_DM(const int &size, const double &value)
     DensityMatrix.resize(size, value);
 };
 
-const double WFN::get_DM(const int &nr)
+const double WFN::get_DM(const int &nr) const
 {
     if (nr >= 0 && nr < DensityMatrix.size())
         return DensityMatrix[nr];
@@ -3258,7 +3258,7 @@ void WFN::resize_SDM(const int &size, const double &value)
     SpinDensityMatrix.resize(size, value);
 };
 
-const double WFN::get_SDM(const int &nr)
+const double WFN::get_SDM(const int &nr) const
 {
     if (nr >= 0 && nr < SpinDensityMatrix.size())
         return SpinDensityMatrix[nr];
@@ -3283,7 +3283,7 @@ bool WFN::set_SDM(const int &nr, const double &value)
     }
 };
 
-int WFN::check_order(const bool &debug)
+int WFN::check_order(const bool &debug) const
 {
     for (int i = 0; i < ncen; i++)
     {
@@ -4739,8 +4739,8 @@ const double WFN::compute_dens(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    vector<vec> &d,
-    vec &phi)
+    vec2 &d,
+    vec &phi) const
 {
     if (d_f_switch)
     {
@@ -4759,9 +4759,9 @@ const double WFN::compute_dens(
 const double WFN::compute_dens(
     const double &Pos1,
     const double &Pos2,
-    const double &Pos3)
+    const double &Pos3) const
 {
-    vector<vec> d;
+    vec2 d;
     vec phi(nmo, 0.0);
 
     if (d_f_switch)
@@ -4785,8 +4785,8 @@ const double WFN::compute_spin_dens(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    vector<vec> &d,
-    vec &phi)
+    vec2 &d,
+    vec &phi) const
 {
     if (d_f_switch)
     {
@@ -4806,9 +4806,9 @@ const double WFN::compute_spin_dens(
 const double WFN::compute_spin_dens(
     const double &Pos1,
     const double &Pos2,
-    const double &Pos3)
+    const double &Pos3) const
 {
-    vector<vec> d;
+    vec2 d;
     vec phi(nmo, 0.0);
 
     if (d_f_switch)
@@ -4833,7 +4833,7 @@ const double WFN::compute_dens_cartesian(
     const double &Pos2,
     const double &Pos3,
     vector<vec> &d,
-    vec &phi)
+    vec &phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double Rho = 0.0;
@@ -4889,7 +4889,7 @@ const double WFN::compute_dens_cartesian(
                 ex *= d[k + 13][iat];
         }
         double *run = phi.data();
-        MO *run2 = MOs.data();
+        const MO *run2 = MOs.data();
         for (mo = 0; mo < nmo; mo++)
         {
             *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
@@ -4898,7 +4898,7 @@ const double WFN::compute_dens_cartesian(
     }
 
     double *run = phi.data();
-    MO *run2 = MOs.data();
+    const MO *run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++)
     {
         Rho += (*run2).get_occ() * pow(*run, 2);
@@ -4912,8 +4912,8 @@ const double WFN::compute_spin_dens_cartesian(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    vector<vec> &d,
-    vec &phi)
+    vec2 &d,
+    vec &phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
     double alpha = 0.0, beta = 0.0;
@@ -4968,7 +4968,7 @@ const double WFN::compute_spin_dens_cartesian(
                 ex *= d[k + 13][iat];
         }
         double *run = phi.data();
-        MO *run2 = MOs.data();
+        const MO *run2 = MOs.data();
         for (mo = 0; mo < nmo; mo++)
         {
             *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
@@ -4977,7 +4977,7 @@ const double WFN::compute_spin_dens_cartesian(
     }
 
     double *run = phi.data();
-    MO *run2 = MOs.data();
+    const MO *run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++)
     {
         if ((*run2).get_op())
@@ -4994,7 +4994,7 @@ const double WFN::compute_MO_spherical(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    const int &MO)
+    const int &MO) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
     return 0.0;
@@ -5147,8 +5147,8 @@ const double WFN::compute_dens_spherical(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    vector<vec> &d,
-    vec &phi)
+    vec2 &d,
+    vec &phi) const
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
     return 0.0;
@@ -5323,7 +5323,7 @@ const void WFN::computeValues(
     double &Elf,           // Value of the ELF
     double &Eli,           // Value of the ELI
     double &Lap            // Value for the Laplacian
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(10 * _nmo, 0.0);
@@ -5456,7 +5456,7 @@ const void WFN::computeELIELF(
     const double *PosGrid, // [3] vector with current position on te grid
     double &Elf,           // Value of the ELF
     double &Eli            // Value of the ELI
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
@@ -5561,7 +5561,7 @@ const void WFN::computeELIELF(
 const void WFN::computeELI(
     const double *PosGrid, // [3] vector with current position on te grid
     double &Eli            // Value of the ELI
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
@@ -5662,7 +5662,7 @@ const void WFN::computeELI(
 const void WFN::computeELF(
     const double *PosGrid, // [3] vector with current position on te grid
     double &Elf            // Value of the ELF
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(4 * _nmo, 0.0);
@@ -5765,7 +5765,7 @@ const void WFN::computeLapELIELF(
     double &Elf,           // Value of the ELF
     double &Eli,           // Value of the ELI
     double &Lap            // Value for the Laplacian
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(7 * _nmo, 0.0);
@@ -5879,7 +5879,7 @@ const void WFN::computeLapELI(
     const double *PosGrid, // [3] vector with current position on te grid
     double &Eli,           // Value of the ELI
     double &Lap            // Value for the Laplacian
-)
+) const
 {
     const int _nmo = get_nmo(false);
     vec phi(7 * _nmo, 0.0);
@@ -5988,7 +5988,7 @@ const void WFN::computeLapELI(
 
 const double WFN::computeMO(
     const double *PosGrid, // [3] array with current position on the grid
-    const int &mo)
+    const int &mo) const
 {
     double result = 0.0;
     int iat = 0;
@@ -5997,7 +5997,7 @@ const double WFN::computeMO(
     double temp = 0;
 
     // x, y, z and dsqd
-    vector<vec> d(4);
+    vec2 d(4);
     for (int i = 0; i < 4; i++)
         d[i].resize(ncen);
 
@@ -6087,7 +6087,7 @@ double Integrate(int &m, double i, double &expn)
     }
     return -1;
 };
-const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb)
+const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
 {
     double temp = 0.0;
     double temp2 = 0.0;
@@ -6107,7 +6107,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb)
     return temp;
 };
 
-const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp)
+const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const
 {
     double temp = fjtmp * pow(0.25 / gamma, r + i) / Afac_pre[l][r][i];
     int num = l - 2 * r - 2 * i;
@@ -6295,11 +6295,11 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     return true;
 }
 
-const std::string WFN::get_basis_set_CIF(const int nr)
+const std::string WFN::get_basis_set_CIF(const int nr) const
 {
     // Make list of unique atom types:
-    vector<int> atom_types;
-    vector<int> atoms_with_type;
+    ivec atom_types;
+    ivec atoms_with_type;
     for (int i = 0; i < ncen; i++)
     {
         if (find(atom_types.begin(), atom_types.end(), atoms[i].charge) == atom_types.end())
@@ -6361,7 +6361,7 @@ const std::string WFN::get_basis_set_CIF(const int nr)
     return ss.str();
 }
 
-const std::string WFN::get_CIF_table(const int nr)
+const std::string WFN::get_CIF_table(const int nr) const
 {
     stringstream ss;
     int _nr;
@@ -6451,7 +6451,7 @@ const std::string WFN::get_CIF_table(const int nr)
     return ss.str();
 }
 
-void WFN::write_wfn_CIF(const std::string &fileName)
+void WFN::write_wfn_CIF(const std::string &fileName) const
 {
     err_checkf(basis_set_name != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     ofstream file(fileName);
@@ -6462,7 +6462,7 @@ void WFN::write_wfn_CIF(const std::string &fileName)
     file.close();
 }
 
-const double WFN::computeESP(const double *PosGrid, const vector<vec> &d2)
+const double WFN::computeESP(const double *PosGrid, const vec2 &d2) const
 {
     double ESP = 0;
     double P[3]{0, 0, 0};
@@ -6496,7 +6496,7 @@ const double WFN::computeESP(const double *PosGrid, const vector<vec> &d2)
 
     double temp;
     int maxl, maxm, maxn;
-    vector<vec> pos(3);
+    vec2 pos(3);
     for (int i = 0; i < 3; i++)
         pos[i].resize(get_ncen());
 
@@ -6626,7 +6626,7 @@ const double WFN::computeESP(const double *PosGrid, const vector<vec> &d2)
     return ESP;
 };
 
-const double WFN::computeESP_noCore(const double *PosGrid, const vector<vec> &d2)
+const double WFN::computeESP_noCore(const double *PosGrid, const vec2 &d2) const
 {
     double ESP = 0;
     double P[3]{0, 0, 0};
@@ -6660,7 +6660,7 @@ const double WFN::computeESP_noCore(const double *PosGrid, const vector<vec> &d2
 
     double temp;
     int maxl, maxm, maxn;
-    vector<vec> pos(3);
+    vec2 pos(3);
     for (int i = 0; i < 3; i++)
         pos[i].resize(get_ncen());
 

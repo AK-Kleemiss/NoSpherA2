@@ -45,41 +45,30 @@ class WFN;
 class cell;
 class atom;
 
+inline std::streambuf* coutbuf = std::cout.rdbuf(); // save old buf
+inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file = std::cout);
+inline void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file);
+#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
+
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
+typedef std::vector<vec> vec2;
+typedef std::vector<vec2> vec3;
 typedef std::vector<int> ivec;
 typedef std::vector<cdouble> cvec;
+typedef std::vector<cvec> cvec2;
+typedef std::vector<bool> bvec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
-inline int vec_sum(const ivec& in)
-{
-    int res = 0;
-#pragma omp parallel for reduction(+ \
-                                   : res)
-    for (int i = 0; i < in.size(); i++)
-        res += in[i];
-    return res;
-}
+int vec_sum(const bvec& in);
+int vec_sum(const ivec& in);
+double vec_sum(const vec& in);
+cdouble vec_sum(const cvec& in);
 
-inline double vec_sum(const vec &in)
-{
-    double res = 0.0;
-#pragma omp parallel for reduction(+ \
-                                   : res)
-    for (int i = 0; i < in.size(); i++)
-        res += in[i];
-    return res;
-}
-
-inline cdouble vec_sum(const cvec &in)
-{
-    cdouble res = 0.0;
-    for (int i = 0; i < in.size(); i++)
-        res += in[i];
-    return res;
-}
-
-inline const std::complex<double> c_one(0, 1.0);
+constexpr const std::complex<double> c_one(0, 1.0);
 
 std::string help_message();
 std::string NoSpherA2_message();
@@ -301,102 +290,15 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
 void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
-inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
-inline char asciitolower(char in)
-{
-    if (in <= 'Z' && in >= 'A')
-        return in - ('Z' - 'z');
-    return in;
-}
-inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout)
-{
-    if (!condition)
-    {
-        log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
-        log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
-        exit(-1);
-    }
-};
-inline void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
-{
-    log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
-    log_file.flush();
-    std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << " not yet implemented!" << std::endl;
-    exit(-1);
-};
-#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
+char asciitolower(char in);
 
 bool generate_sph2cart_mat(std::vector<vec> &p, std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g);
 bool generate_cart2sph_mat(std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g, std::vector<vec> &h);
 std::string go_get_string(std::ifstream &file, std::string search, bool rewind = true);
 
-inline const int sht2nbas(const int &type)
-{
-    const int st2bas[6]{1, 3, 6, 10, 15, 21};
-    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
-    if (type >= 0)
-        return st2bas[type];
-    else
-        return nst2bas[5 + type];
-};
+const int sht2nbas(const int &type);
 
-inline const int shell2function(const int &type, const int &prim)
-{
-    switch (type)
-    {
-    case (-5):
-        return -32 + prim;
-    case (-4):
-        return -21 + prim;
-    case (-3):
-        return -12 + prim;
-    case (-2):
-        return -5 + prim;
-    case (-1):
-        return 1 + prim;
-    case (0):
-        return 1;
-    case (1):
-        return 2 + prim;
-    case (2):
-        return 5 + prim;
-    case (3):
-        if (prim == 0)
-            return 11;
-        if (prim == 1)
-            return 12;
-        if (prim == 2)
-            return 13;
-        if (prim == 3)
-            return 17;
-        if (prim == 4)
-            return 14;
-        if (prim == 5)
-            return 15;
-        if (prim == 6)
-            return 18;
-        if (prim == 7)
-            return 19;
-        if (prim == 8)
-            return 16;
-        if (prim == 9)
-            return 20;
-        break;
-    case (4):
-        return 21 + prim;
-    case (5):
-        return 36 + prim;
-    default:
-        return 0;
-    }
-    return 0;
-}
+const int shell2function(const int& type, const int& prim);
 
 const double normgauss(const int &type, const double &exp);
 const double spherical_harmonic(const int &l, const int &m, const double *d);
@@ -439,170 +341,27 @@ std::vector<T> split_string(const std::string &input, const std::string delimite
     return result;
 };
 
-inline void remove_empty_elements(std::vector<std::string> &input, const std::string &empty = " ")
-{
-    for (int i = (int)input.size() - 1; i >= 0; i--)
-        if (input[i] == empty || input[i] == "")
-            input.erase(input.begin() + i);
-}
+void remove_empty_elements(std::vector<std::string>& input, const std::string& empty = " ");
+std::chrono::high_resolution_clock::time_point get_time();
+long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
+long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
+long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 
-inline std::chrono::high_resolution_clock::time_point get_time()
-{
-    // gets the current time using std chrono library
-    std::chrono::high_resolution_clock::time_point time = std::chrono::high_resolution_clock::now();
-    return time;
-}
+void write_timing_to_file(std::ostream& file,
+    time_point start,
+    time_point end,
+    time_point end_prototypes,
+    time_point end_becke,
+    time_point end_spherical,
+    time_point end_prune,
+    time_point end_aspherical,
+    time_point before_kpts,
+    time_point after_kpts,
+    time_point end1);
 
-inline long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
-{
-    // gets the time difference in microseconds
-    std::chrono::microseconds musec = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    return musec.count();
-}
+int CountWords(const char *str);
 
-inline long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
-{
-    // gets the time difference in milliseconds
-    std::chrono::milliseconds msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-    return msec.count();
-}
-
-inline long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
-{
-    // gets the time difference in seconds
-    std::chrono::seconds sec = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-    return sec.count();
-}
-
-inline void write_timing_to_file(std::ostream &file,
-                                 time_point start,
-                                 time_point end,
-                                 time_point end_prototypes,
-                                 time_point end_becke,
-                                 time_point end_spherical,
-                                 time_point end_prune,
-                                 time_point end_aspherical,
-                                 time_point before_kpts,
-                                 time_point after_kpts,
-                                 time_point end1)
-{
-    // writes the timing of different things to a file
-    using namespace std;
-    long long int dur = get_sec(start, end);
-
-    if (dur < 1)
-        file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " ms\n";
-    else if (dur < 60)
-        file << "Total Time: " << fixed << setprecision(0) << dur << " s\n";
-    else if (dur < 3600)
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 60) << " m " << dur % 60 << " s\n";
-    else
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 3600) << " h " << (dur % 3600) / 60 << " m\n";
-    file << endl;
-    file << "Time Breakdown:" << endl;
-    if (get_sec(start, end_prototypes) > 1)
-        if (get_sec(start, end_prototypes) < 100)
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
-        else
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
-    else
-        file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
-    if (get_sec(end_prototypes, end_becke) > 1)
-        if (get_sec(end_prototypes, end_becke) < 100)
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s " << get_msec(end_prototypes, end_becke) % 1000 << " ms" << endl;
-        else
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
-    else
-        file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " ms" << endl;
-    if (get_sec(end_becke, end_spherical) > 1)
-        if (get_sec(end_becke, end_spherical) < 100)
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s " << get_msec(end_becke, end_spherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
-    else
-        file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " ms" << endl;
-    if (get_sec(end_spherical, end_prune) > 1)
-        if (get_sec(end_spherical, end_prune) < 100)
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s " << get_msec(end_spherical, end_prune) % 1000 << " ms" << endl;
-        else
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
-    else
-        file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " ms" << endl;
-    if (get_sec(end_prune, end_aspherical) > 1)
-        if (get_sec(end_prune, end_aspherical) < 100)
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s " << get_msec(end_prune, end_aspherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
-    else
-        file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " ms" << endl;
-    if (get_sec(end_aspherical, before_kpts) > 1)
-        if (get_sec(end_aspherical, before_kpts) < 100)
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s " << get_msec(end_aspherical, before_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
-    else
-        file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " ms" << endl;
-    if (get_sec(before_kpts, after_kpts) > 1)
-        if (get_sec(before_kpts, after_kpts) < 100)
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s " << get_msec(before_kpts, after_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
-    else
-        file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " ms" << endl;
-    if (get_sec(after_kpts, end1) > 1)
-        if (get_sec(after_kpts, end1) < 100)
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s " << get_msec(after_kpts, end1) % 1000 << " ms" << endl;
-        else
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
-    else
-        file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " ms" << endl;
-    if (get_sec(end1, end) > 1)
-        if (get_sec(end1, end) < 100)
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s " << get_msec(end1, end) % 1000 << " ms" << endl;
-        else
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
-    else
-        file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
-}
-
-inline int CountWords(const char *str)
-{
-    if (str == NULL)
-        return -1;
-
-    bool inSpaces = true;
-    int numWords = 0;
-
-    while (*str != '\0')
-    {
-        if (std::isspace(*str))
-        {
-            inSpaces = true;
-        }
-        else if (inSpaces)
-        {
-            numWords++;
-            inSpaces = false;
-        }
-
-        ++str;
-    }
-
-    return numWords;
-};
-
-inline bool exists(const std::string &name)
-{
-    if (FILE *file = fopen(name.c_str(), "r"))
-    {
-        fclose(file);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-};
+bool exists(const std::string &name);
 
 std::string atnr2letter(const int &nr);
 void copy_file(std::string &from, std::string &to);
@@ -632,33 +391,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char *tmp);
 
-inline int sum_of_bools(const std::vector<bool> in)
-{
-    int result = 0;
-    for (int i = 0; i < in.size(); i++)
-        if (in[i])
-            result++;
-    return result;
-}
-
-inline std::string trim(const std::string &s)
-{
-    if (s == "")
-        return "";
-    auto start = s.begin();
-    while (start != s.end() && std::isspace(*start))
-    {
-        start++;
-    }
-
-    auto end = s.end();
-    do
-    {
-        end--;
-    } while (std::distance(start, end) > 0 && std::isspace(*end));
-
-    return std::string(start, end + 1);
-}
+std::string trim(const std::string& s);
 
 //-------------------------Progress_bar--------------------------------------------------
 
@@ -766,13 +499,7 @@ void type2vector(
 
 bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 
-inline double double_from_string_with_esd(std::string in)
-{
-    if (in.find('(') == std::string::npos)
-        return stod(in);
-    else
-        return stod(in.substr(0, in.find('(')));
-}
+double double_from_string_with_esd(std::string in);
 
 void swap_sort(ivec order, cvec &v);
 
@@ -853,7 +580,7 @@ struct hkl_less
     }
 };
 
-inline unsigned int doublefactorial(int n)
+constexpr unsigned int doublefactorial(int n)
 {
     if (n <= 1)
         return 1;
@@ -1284,69 +1011,16 @@ inline const std::vector<std::vector<primitive>> QZVP_JKfit(
         {}                               // Ne
     });
 
-inline double hypergeometric(double a, double b, double c, double x)
-{
-    const double TOLERANCE = 1.0e-10;
-    double term = a * b * x / c;
-    double value = 1.0 + term;
-    int n = 1;
+double hypergeometric(double a, double b, double c, double x);
 
-    while (std::abs(term) > TOLERANCE)
-    {
-        a++, b++, c++, n++;
-        term *= a * b * x / c / n;
-        value += term;
-    }
+cdouble hypergeometric(double a, double b, double c, cdouble x);
 
-    return value;
-}
+bool ends_with(const std::string& str, const std::string& suffix);
 
-inline cdouble hypergeometric(double a, double b, double c, cdouble x)
-{
-    const double TOLERANCE = 1.0e-10;
-    cdouble term = a * b * x / c;
-    cdouble value = 1.0 + term;
-    int n = 1;
-
-    while (std::abs(term) > TOLERANCE)
-    {
-        a++, b++, c++, n++;
-        term *= a * b * x / c / static_cast<double>(n);
-        value += term;
-    }
-
-    return value;
-}
-
-inline bool ends_with(const std::string &str, const std::string &suffix)
-{
-    if (str.length() >= suffix.length())
-    {
-        return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
-    }
-    return false;
-}
-
-template <typename T>
-inline bool is_nan(T in)
-{
-    if (typeid(in) == typeid(double))
-    {
-        return in != in;
-    }
-    else if (typeid(in) == typeid(float))
-    {
-        return in != in;
-    }
-    else if (typeid(in) == typeid(long double))
-    {
-        return in != in;
-    }
-    else
-    {
-        return false;
-    }
-}
+bool is_nan(double& in);
+bool is_nan(float& in);
+bool is_nan(long double& in);
+bool is_nan(cdouble& in);
 
 #include "wfn_class.h"
 #include "atoms.h"

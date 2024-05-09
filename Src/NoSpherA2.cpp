@@ -142,7 +142,7 @@ int main(int argc, char **argv)
             log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
             if (opt.debug)
             {
-                log_file << "m: " << opt.combined_tsc_calc_mult[i] << endl;
+                log_file << "\nm: " << opt.combined_tsc_calc_mult[i] << endl;
                 log_file << "c: " << opt.combined_tsc_calc_charge[i] << "\n";
             }
             wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
         }
 
         vector<string> known_scatterer;
-        vector<vec> known_kpts;
+        vec2 known_kpts;
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
@@ -224,9 +224,7 @@ int main(int argc, char **argv)
         }
         err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
         err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
-        auto t = new WFN(0);
-        wavy.push_back(*t);
-        delete t;
+        wavy.emplace_back(0);
         wavy[0].read_known_wavefunction_format(opt.xyz_file, log_file, opt.debug);
 
         if (opt.electron_diffraction && opt.debug)
@@ -242,9 +240,7 @@ int main(int argc, char **argv)
     // This one has conversion to fchk and calculation of one single tsc file
     if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
-        auto t = new WFN(0);
-        wavy.push_back(*t);
-        delete t;
+        wavy.emplace_back(0);
         wavy[0].set_method(opt.method);
         wavy[0].set_multi(opt.mult);
         wavy[0].set_charge(opt.charge);
@@ -263,6 +259,7 @@ int main(int argc, char **argv)
         }
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
+        //this one is for generation of an fchk file
         if (opt.basis_set != "" || opt.fchk != "")
         {
             // Make a fchk out of the wfn/wfx file
@@ -304,6 +301,8 @@ int main(int argc, char **argv)
                 wavy[0].assign_multi(opt.mult);
             free_fchk(log_file, outputname, "", wavy[0], opt.debug, true);
         }
+
+        //This one will calcualte a single tsc/tscb file form a single wfn
         if (opt.cif != "" || opt.hkl != "")
         {
             // Calculate tsc file from given files
@@ -345,9 +344,7 @@ int main(int argc, char **argv)
     if (opt.gbw2wfn)
     {
         err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
-        auto t = new WFN(9);
-        wavy.push_back(*t);
-        delete t;
+        wavy.emplace_back(9);
         wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
         wavy[0].write_wfn("converted.wfn", false, false);
         log_file.flush();
@@ -361,23 +358,21 @@ int main(int argc, char **argv)
     {
         if (opt.cif != "" && opt.xyz_file != "")
         {
-            auto t = new WFN(7);
-            wavy.push_back(*t);
-            delete t;
+            wavy.emplace_back(7);
             // Read the xyzfile
             wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
             // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
             int nr_coefs = load_basis_into_WFN(wavy[0], TZVP_JKfit);
             // Run generation of tsc file
             if (opt.SALTED_BECKE || opt.SALTED)
-                err_checkf(calculate_scattering_factors_RI_No_H(
+                err_checkf(calculate_scattering_factors_ML_No_H(
                                opt,
                                wavy[0],
                                log_file,
                                nr_coefs),
                            "Error during ML-SF Calcualtion", log_file);
             else
-                err_checkf(calculate_scattering_factors_RI(
+                err_checkf(calculate_scattering_factors_ML(
                                opt,
                                wavy[0],
                                log_file,

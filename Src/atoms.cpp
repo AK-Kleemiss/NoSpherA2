@@ -85,15 +85,15 @@ atom atom::operator= (const atom& rhs) {
 	return *this;
 };
 
-void atom::print_values() {
+void atom::print_values() const {
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 };
 
-bool atom::is_anharm() {
+bool atom::is_anharm() const {
 	return ADPs.size() > 1;
 };
 
-void atom::print_values_long() {
+void atom::print_values_long() const {
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 	if (basis_set.size() > 0) {
 		for (unsigned int i = 0; i < basis_set.size(); i++) {
@@ -124,7 +124,7 @@ bool atom::push_back_basis_set(const double& exponent, const double& coefficient
 	}
 };
 
-bool atom::get_basis_set_loaded() {
+bool atom::get_basis_set_loaded() const {
 	if (basis_set.size() > 0) return true;
 	else return false;
 };

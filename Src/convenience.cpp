@@ -3200,3 +3200,375 @@ const double spherical_harmonic(const int &l, const int &m, const double *d)
     }
     return SH;
 }
+
+bool is_nan(double& in) {
+    return in != in;
+};
+bool is_nan(float& in) {
+    return in != in;
+};
+bool is_nan(long double& in) {
+    return in != in;
+};
+bool is_nan(cdouble& in) {
+    return in != in;
+};
+
+bool ends_with(const std::string& str, const std::string& suffix)
+{
+    if (str.length() >= suffix.length())
+    {
+        return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
+    }
+    return false;
+}
+
+cdouble hypergeometric(double a, double b, double c, cdouble x)
+{
+    const double TOLERANCE = 1.0e-10;
+    cdouble term = a * b * x / c;
+    cdouble value = 1.0 + term;
+    int n = 1;
+
+    while (std::abs(term) > TOLERANCE)
+    {
+        a++, b++, c++, n++;
+        term *= a * b * x / c / static_cast<double>(n);
+        value += term;
+    }
+
+    return value;
+}
+
+double hypergeometric(double a, double b, double c, double x)
+{
+    const double TOLERANCE = 1.0e-10;
+    double term = a * b * x / c;
+    double value = 1.0 + term;
+    int n = 1;
+
+    while (std::abs(term) > TOLERANCE)
+    {
+        a++, b++, c++, n++;
+        term *= a * b * x / c / n;
+        value += term;
+    }
+
+    return value;
+}
+
+double double_from_string_with_esd(std::string in)
+{
+    if (in.find('(') == std::string::npos)
+        return stod(in);
+    else
+        return stod(in.substr(0, in.find('(')));
+}
+
+std::string trim(const std::string& s)
+{
+    if (s == "")
+        return "";
+    auto start = s.begin();
+    while (start != s.end() && std::isspace(*start))
+    {
+        start++;
+    }
+
+    auto end = s.end();
+    do
+    {
+        end--;
+    } while (std::distance(start, end) > 0 && std::isspace(*end));
+
+    return std::string(start, end + 1);
+}
+
+bool exists(const std::string& name)
+{
+    if (FILE* file = fopen(name.c_str(), "r"))
+    {
+        fclose(file);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+};
+
+int CountWords(const char* str)
+{
+    if (str == NULL)
+        return -1;
+
+    bool inSpaces = true;
+    int numWords = 0;
+
+    while (*str != '\0')
+    {
+        if (std::isspace(*str))
+        {
+            inSpaces = true;
+        }
+        else if (inSpaces)
+        {
+            numWords++;
+            inSpaces = false;
+        }
+
+        ++str;
+    }
+
+    return numWords;
+};
+
+void write_timing_to_file(std::ostream& file,
+    time_point start,
+    time_point end,
+    time_point end_prototypes,
+    time_point end_becke,
+    time_point end_spherical,
+    time_point end_prune,
+    time_point end_aspherical,
+    time_point before_kpts,
+    time_point after_kpts,
+    time_point end1)
+{
+    // writes the timing of different things to a file
+    using namespace std;
+    long long int dur = get_sec(start, end);
+
+    if (dur < 1)
+        file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " ms\n";
+    else if (dur < 60)
+        file << "Total Time: " << fixed << setprecision(0) << dur << " s\n";
+    else if (dur < 3600)
+        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 60) << " m " << dur % 60 << " s\n";
+    else
+        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 3600) << " h " << (dur % 3600) / 60 << " m\n";
+    file << endl;
+    file << "Time Breakdown:" << endl;
+    if (get_sec(start, end_prototypes) > 1)
+        if (get_sec(start, end_prototypes) < 100)
+            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
+        else
+            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
+    else
+        file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
+    if (get_sec(end_prototypes, end_becke) > 1)
+        if (get_sec(end_prototypes, end_becke) < 100)
+            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s " << get_msec(end_prototypes, end_becke) % 1000 << " ms" << endl;
+        else
+            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
+    else
+        file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " ms" << endl;
+    if (get_sec(end_becke, end_spherical) > 1)
+        if (get_sec(end_becke, end_spherical) < 100)
+            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s " << get_msec(end_becke, end_spherical) % 1000 << " ms" << endl;
+        else
+            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
+    else
+        file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " ms" << endl;
+    if (get_sec(end_spherical, end_prune) > 1)
+        if (get_sec(end_spherical, end_prune) < 100)
+            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s " << get_msec(end_spherical, end_prune) % 1000 << " ms" << endl;
+        else
+            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
+    else
+        file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " ms" << endl;
+    if (get_sec(end_prune, end_aspherical) > 1)
+        if (get_sec(end_prune, end_aspherical) < 100)
+            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s " << get_msec(end_prune, end_aspherical) % 1000 << " ms" << endl;
+        else
+            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
+    else
+        file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " ms" << endl;
+    if (get_sec(end_aspherical, before_kpts) > 1)
+        if (get_sec(end_aspherical, before_kpts) < 100)
+            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s " << get_msec(end_aspherical, before_kpts) % 1000 << " ms" << endl;
+        else
+            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
+    else
+        file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " ms" << endl;
+    if (get_sec(before_kpts, after_kpts) > 1)
+        if (get_sec(before_kpts, after_kpts) < 100)
+            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s " << get_msec(before_kpts, after_kpts) % 1000 << " ms" << endl;
+        else
+            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
+    else
+        file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " ms" << endl;
+    if (get_sec(after_kpts, end1) > 1)
+        if (get_sec(after_kpts, end1) < 100)
+            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s " << get_msec(after_kpts, end1) % 1000 << " ms" << endl;
+        else
+            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
+    else
+        file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " ms" << endl;
+    if (get_sec(end1, end) > 1)
+        if (get_sec(end1, end) < 100)
+            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s " << get_msec(end1, end) % 1000 << " ms" << endl;
+        else
+            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
+    else
+        file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
+}
+
+void remove_empty_elements(std::vector<std::string>& input, const std::string& empty)
+{
+    for (int i = (int)input.size() - 1; i >= 0; i--)
+        if (input[i] == empty || input[i] == "")
+            input.erase(input.begin() + i);
+}
+
+std::chrono::high_resolution_clock::time_point get_time()
+{
+    // gets the current time using std chrono library
+    std::chrono::high_resolution_clock::time_point time = std::chrono::high_resolution_clock::now();
+    return time;
+}
+
+long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in microseconds
+    std::chrono::microseconds musec = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    return musec.count();
+}
+
+long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in milliseconds
+    std::chrono::milliseconds msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    return msec.count();
+}
+
+long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in seconds
+    std::chrono::seconds sec = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    return sec.count();
+}
+
+const int shell2function(const int& type, const int& prim)
+{
+    switch (type)
+    {
+    case (-5):
+        return -32 + prim;
+    case (-4):
+        return -21 + prim;
+    case (-3):
+        return -12 + prim;
+    case (-2):
+        return -5 + prim;
+    case (-1):
+        return 1 + prim;
+    case (0):
+        return 1;
+    case (1):
+        return 2 + prim;
+    case (2):
+        return 5 + prim;
+    case (3):
+        if (prim == 0)
+            return 11;
+        if (prim == 1)
+            return 12;
+        if (prim == 2)
+            return 13;
+        if (prim == 3)
+            return 17;
+        if (prim == 4)
+            return 14;
+        if (prim == 5)
+            return 15;
+        if (prim == 6)
+            return 18;
+        if (prim == 7)
+            return 19;
+        if (prim == 8)
+            return 16;
+        if (prim == 9)
+            return 20;
+        break;
+    case (4):
+        return 21 + prim;
+    case (5):
+        return 36 + prim;
+    default:
+        return 0;
+    }
+    return 0;
+}
+
+const int sht2nbas(const int& type)
+{
+    const int st2bas[6]{ 1, 3, 6, 10, 15, 21 };
+    const int nst2bas[6]{ 11, 9, 7, 5, 4, 1 };
+    if (type >= 0)
+        return st2bas[type];
+    else
+        return nst2bas[5 + type];
+};
+
+char asciitolower(char in)
+{
+    if (in <= 'Z' && in >= 'A')
+        return in - ('Z' - 'z');
+    return in;
+}
+
+int vec_sum(const bvec& in) {
+    int res = 0;
+#pragma omp parallel for reduction(+:res)
+    for (int i = 0; i < in.size(); i++)
+        if (in[i])
+            res++;
+    return res;
+}
+
+int vec_sum(const ivec& in)
+{
+    int res = 0;
+#pragma omp parallel for reduction(+ : res)
+    for (int i = 0; i < in.size(); i++)
+        res += in[i];
+    return res;
+}
+
+double vec_sum(const vec& in)
+{
+    double res = 0.0;
+#pragma omp parallel for reduction(+ : res)
+    for (int i = 0; i < in.size(); i++)
+        res += in[i];
+    return res;
+}
+
+cdouble vec_sum(const cvec& in)
+{
+    cdouble res = 0.0;
+    for (int i = 0; i < in.size(); i++)
+        res += in[i];
+    return res;
+}
+
+void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
+{
+    if (!condition)
+    {
+        log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
+        log_file.flush();
+        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
+        exit(-1);
+    }
+};
+void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
+{
+    log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+    log_file.flush();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+    exit(-1);
+};

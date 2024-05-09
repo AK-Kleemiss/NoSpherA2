@@ -62,11 +62,11 @@ private:
     void fill_pre();
     long long int Afac_pre[9][5][9];
     void fill_Afac_pre();
-    const double fj(int &j, int &l, int &m, double &aa, double &bb);
-    const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp);
-    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
+    const double fj(int &j, int &l, int &m, double &aa, double &bb) const;
+    const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const;
+    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
 
 public:
     WFN();
@@ -112,7 +112,7 @@ public:
         path = given_path;
         return true;
     };
-    void print_primitive(const int &nr);
+    void print_primitive(const int &nr) const;
     void assign_charge(const int &i_charge) { charge = i_charge; };
     void assign_multi(const int &i_multi) { multi = i_multi; };
     const int get_charge() const { return charge; };
@@ -124,38 +124,38 @@ public:
     const int get_nmo() const { return nmo; };
     const int get_nmo(const bool &only_occ) const;
     const int get_origin() const { return origin; };
-    const std::string get_comment() { return comment; };
-    const std::string get_CIF_table(const int nr = 0);
-    const std::string get_basis_set_CIF(const int nr = 0);
-    void write_wfn_CIF(const std::string &filename);
+    const std::string get_comment() const { return comment; };
+    const std::string get_CIF_table(const int nr = 0) const;
+    const std::string get_basis_set_CIF(const int nr = 0) const;
+    void write_wfn_CIF(const std::string &filename) const;
     const double get_exponent(int nr) const { return exponents[nr]; };
-    const unsigned int get_nr_electrons();
-    const unsigned int get_nr_ECP_electrons();
-    double count_nr_electrons(void);
-    const std::string get_centers(const bool &bohr);
-    const std::string get_basis_set_name() { return basis_set_name; };
+    const unsigned int get_nr_electrons() const;
+    const unsigned int get_nr_ECP_electrons() const;
+    double count_nr_electrons(void) const;
+    const std::string get_centers(const bool &bohr) const;
+    const std::string get_basis_set_name() const { return basis_set_name; };
     void set_basis_set_name(const std::string &input) { basis_set_name = input; };
-    const std::string get_path() { return path; };
-    const std::string hdr(const bool &occupied);
+    const std::string get_path() const { return path; };
+    const std::string hdr(const bool &occupied) const;
     void set_method(const std::string &input) { method = input; };
-    const std::string get_method() { return method; };
+    const std::string get_method() const { return method; };
     bool erase_atom(const int &nr);
-    const void list_primitives();
-    const void list_centers();
+    const void list_primitives() const;
+    const void list_centers() const;
     bool remove_center(const int &nr);
     bool remove_primitive(const int &nr);
     void change_center(const int &nr);
     void change_type(const int &nr);
     void change_exponent(const int &nr);
     void set_modified() { modified = true; };
-    const bool get_modified() { return modified; };
+    const bool get_modified() const { return modified; };
     void set_d_f_switch(const bool &in) { d_f_switch = in; };
-    const bool get_d_f_switch() { return d_f_switch; };
-    int check_order(const bool &debug);
+    const bool get_d_f_switch() const { return d_f_switch; };
+    int check_order(const bool &debug) const;
     bool sort_wfn(const int &g_order, const bool &debug);
     void set_dist_switch() { distance_switch = true; };
     void set_dist_switch(const bool &g) { distance_switch = g; };
-    const bool get_dist_switch() { return distance_switch; };
+    const bool get_dist_switch() const { return distance_switch; };
     void set_has_ECPs(const bool &in, const bool &apply_to_aotms = true, const int &ECP_mode = 1);
     void set_ECPs(std::vector<int> &nr, std::vector<int> &elcount);
     const bool get_has_ECPs() const { return has_ECPs; };
@@ -163,7 +163,7 @@ public:
     int calculate_charge();
     int calculate_charge(std::ostream &file);
     bool guess_multiplicity(std::ostream &file);
-    const std::vector<double> get_norm_const(std::ostream &file, const bool debug = false);
+    const std::vector<double> get_norm_const(std::ostream &file, const bool debug = false) const;
     /**
      * Deletes the basis set information from the given WFN object.
      *
@@ -172,16 +172,16 @@ public:
      */
     bool delete_basis_set();
     //-------------------atom handling--------------------------------------------------------------
-    const double get_atom_coordinate(const unsigned int &nr, const unsigned int &axis);
-    const std::string get_atom_label(const unsigned int &nr);
-    const int get_nr_basis_set_loaded();
-    const bool get_atom_basis_set_loaded(const int &nr);
-    const double get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim);
-    const double get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim);
+    const double get_atom_coordinate(const unsigned int &nr, const unsigned int &axis) const;
+    const std::string get_atom_label(const unsigned int &nr) const;
+    const int get_nr_basis_set_loaded() const;
+    const bool get_atom_basis_set_loaded(const int &nr) const;
+    const double get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const;
+    const double get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const;
     bool change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value);
     bool change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value);
-    const int get_atom_primitive_count(const int &nr);
-    const int get_atom_primitive_type(const int &nr_atom, const int &nr_prim)
+    const int get_atom_primitive_count(const int &nr) const;
+    const int get_atom_primitive_type(const int &nr_atom, const int &nr_prim) const
     {
         if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].basis_set.size() && nr_prim >= 0)
             return atoms[nr_atom].basis_set[nr_prim].type;
@@ -189,14 +189,14 @@ public:
             return -1;
     };
     bool erase_atom_primitive(const unsigned int &nr, const unsigned int &nr_prim);
-    const int get_atom_shell_count(const unsigned int &nr);
-    const int get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell);
-    const int get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell);
-    const int get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell);
-    const int get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim);
-    const int get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell);
-    const int get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell);
-    const int get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell);
+    const int get_atom_shell_count(const unsigned int &nr) const;
+    const int get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
+    const int get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
+    const int get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
+    const int get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim) const;
+    const int get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
+    const int get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
+    const int get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
     bool push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &charge);
     bool push_back_atom(const atom &given);
     // atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
@@ -207,7 +207,7 @@ public:
         else
             return false;
     };
-    void print_atom_long(const int &nr)
+    void print_atom_long(const int &nr) const
     {
         if (nr <= ncen && nr >= 0)
             atoms[nr].print_values_long();
@@ -219,31 +219,31 @@ public:
     //----------Calcualtion of Properties-----------------
     // double compute_dens(const double* PosGrid, const int atom = -1);
     // This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
-    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3);
-    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3);
-    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi);
-    const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap);
-    const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap);
-    const void computeELIELF(const double *PosGrid, double &Elf, double &Eli);
-    const void computeLapELI(const double *PosGrid, double &Eli, double &Lap);
-    const void computeELI(const double *PosGrid, double &Eli);
-    const void computeELF(const double *PosGrid, double &Elf);
-    const double computeMO(const double *PosGrid, const int &mo);
-    const double compute_MO_spherical(const double &Pos1, const double &Pos2, const double &Pos3, const int &MO);
-    const double computeESP(const double *PosGrid, const std::vector<std::vector<double>> &d2);
-    const double computeESP_noCore(const double *PosGrid, const std::vector<std::vector<double>> &d2);
+    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3) const;
+    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3) const;
+    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap) const;
+    const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap) const;
+    const void computeELIELF(const double *PosGrid, double &Elf, double &Eli) const;
+    const void computeLapELI(const double *PosGrid, double &Eli, double &Lap) const;
+    const void computeELI(const double *PosGrid, double &Eli) const;
+    const void computeELF(const double *PosGrid, double &Elf) const;
+    const double computeMO(const double *PosGrid, const int &mo) const;
+    const double compute_MO_spherical(const double &Pos1, const double &Pos2, const double &Pos3, const int &MO) const;
+    const double computeESP(const double *PosGrid, const std::vector<std::vector<double>> &d2) const;
+    const double computeESP_noCore(const double *PosGrid, const std::vector<std::vector<double>> &d2) const;
     //----------DM Handling--------------------------------
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);
-    const double get_DM(const int &nr);
-    const int get_DM_size() { return (int)DensityMatrix.size(); };
+    const double get_DM(const int &nr) const;
+    const int get_DM_size() const { return (int)DensityMatrix.size(); };
     void resize_DM(const int &size, const double &value = 0.0);
     //----------S_DM Handling--------------------------------
     void push_back_SDM(const double &value = 0.0);
     bool set_SDM(const int &nr, const double &value = 0.0);
-    const double get_SDM(const int &nr);
-    const int get_SDM_size() { return (int)SpinDensityMatrix.size(); };
+    const double get_SDM(const int &nr) const;
+    const int get_SDM_size() const { return (int)SpinDensityMatrix.size(); };
     void resize_SDM(const int &size, const double &value = 0.0);
     //-----------Cube handling-------------------------
     bool push_back_cube(const std::string &filepath, const bool &full, const bool &expert = false);

@@ -37,7 +37,7 @@ using namespace std;
  *
  * @throws runtime_error If the file does not exist or cannot be read.
  */
-void read_k_points(vector<vec> &k_pt, hkl_list &hkl, ostream &file)
+void read_k_points(vec2 &k_pt, hkl_list &hkl, ostream &file)
 {
     err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
     file << "Reading: kpts.dat" << flush;
@@ -77,7 +77,7 @@ void read_k_points(vector<vec> &k_pt, hkl_list &hkl, ostream &file)
  * @param k_pt A vector of vectors containing the k-points.
  * @param hkl A list containing the hkl values corresponding to the k-points.
  */
-void save_k_points(vector<vec> &k_pt, hkl_list &hkl)
+void save_k_points(vec2 &k_pt, hkl_list &hkl)
 {
     ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
     int nr[1] = {(int)k_pt[0].size()};
@@ -112,7 +112,7 @@ void save_k_points(vector<vec> &k_pt, hkl_list &hkl)
  */
 void read_hkl(const string &hkl_filename,
               hkl_list &hkl,
-              const vector<vec> &twin_law,
+              const vec2 &twin_law,
               cell &unit_cell,
               ostream &file,
               bool debug = false)
@@ -169,7 +169,7 @@ void read_hkl(const string &hkl_filename,
     if (debug)
         file << "Number of reflections after twin: " << hkl.size() << endl;
 
-    vector<vector<vector<int>>> sym(3);
+    vector<vector<ivec>> sym(3);
     for (int i = 0; i < 3; i++)
         sym[i].resize(3);
     sym = unit_cell.get_sym();
@@ -240,7 +240,7 @@ void read_hkl(const string &hkl_filename,
  */
 void generate_hkl(const double &dmin,
                   hkl_list &hkl,
-                  const vector<vec> &twin_law,
+                  const vec2 &twin_law,
                   cell &unit_cell,
                   ostream &file,
                   bool debug)
@@ -281,7 +281,7 @@ void generate_hkl(const double &dmin,
     if (debug)
         file << "Number of reflections after twin: " << hkl.size() << endl;
 
-    vector<vector<vector<int>>> sym(3);
+    vector<vector<ivec>> sym(3);
     for (int i = 0; i < 3; i++)
         sym[i].resize(3);
     sym = unit_cell.get_sym();
@@ -352,7 +352,7 @@ void generate_hkl(const double &dmin,
  */
 void generate_fractional_hkl(const double &dmin,
                              hkl_list_d &hkl,
-                             const vector<vec> &twin_law,
+                             const vec2 &twin_law,
                              cell &unit_cell,
                              ostream &file,
                              double stepsize,
@@ -418,15 +418,15 @@ void generate_fractional_hkl(const double &dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-void read_atoms_from_CIF(ifstream &cif_input,
+vector<string> read_atoms_from_CIF(ifstream &cif_input,
                          const vector<int> &input_groups,
                          const cell &unit_cell,
-                         WFN &wave,
+                         const WFN &wave,
                          const vector<string> &known_atoms,
-                         vector<int> &atom_type_list,
-                         vector<int> &asym_atom_to_type_list,
-                         vector<int> &asym_atom_list,
-                         vector<bool> &needs_grid,
+                         ivec &atom_type_list,
+                         ivec &asym_atom_to_type_list,
+                         ivec &asym_atom_list,
+                         bvec &needs_grid,
                          ostream &file,
                          const bool debug)
 {
@@ -439,13 +439,14 @@ void read_atoms_from_CIF(ifstream &cif_input,
     string line;
     cif_input.clear();
     cif_input.seekg(0, cif_input.beg);
+    vector<string> labels(wave.get_ncen(),"");
     if (debug && input_groups.size() > 0)
         file << "Group size: " << input_groups.size() << endl;
     while (!cif_input.eof() && !atoms_read)
     {
         getline(cif_input, line);
-        if (debug)
-            file << "line: " << line << endl;
+        // if (debug)
+        //     file << "line: " << line << endl;
         if (line.find("loop_") != string::npos)
         {
             getline(cif_input, line);
@@ -616,7 +617,7 @@ void read_atoms_from_CIF(ifstream &cif_input,
                                 }
                             }
                         }
-                        wave.atoms[i].label = fields[label_field];
+                        labels[i] = fields[label_field];
                         asym_atom_list.push_back(i);
                         needs_grid[i] = true;
                         nr = i;
@@ -697,117 +698,83 @@ void read_atoms_from_CIF(ifstream &cif_input,
             file << setw(4) << wave.get_atom_charge(i);
         file << endl;
     }
+    int size = asym_atom_list.size();
+    vector<string> labels2;
+    for (int i = 0; i < size; i++)
+        labels2.emplace_back(labels[asym_atom_list[i]]);
+    return labels2;
 }
 
-/**
- * Generates Hirshfeld grids based on the specified parameters.
- *
- * @param pbc The periodic boundary condition flag.
- * @param accuracy The accuracy level for grid generation.
- * @param unit_cell The cell object representing the unit cell.
- * @param wave The WFN object containing wavefunction information.
- * @param atom_type_list The list of atom types.
- * @param asym_atom_list The list of asymmetric atoms.
- * @param needs_grid The vector indicating whether each atom needs a grid.
- * @param d1 The vector of grid vectors in the x-direction.
- * @param d2 The vector of grid vectors in the y-direction.
- * @param d3 The vector of grid vectors in the z-direction.
- * @param dens The vector of density vectors.
- * @param file The output stream for writing the grid data.
- * @param start The start time point for timing measurements.
- * @param end_becke The end time point for the Becke grid generation.
- * @param end_prototypes The end time point for the prototype grid generation.
- * @param end_spherical The end time point for the spherical grid generation.
- * @param end_prune The end time point for the pruning step.
- * @param end_aspherical The end time point for the aspherical grid generation.
- * @param debug Flag indicating whether to enable debug mode.
- * @param no_date Flag indicating whether to exclude the date in the output.
- *
- * @return The number of grid points in the final total grid.
- */
-int make_hirshfeld_grids(const int &pbc,
-                         const int &accuracy,
-                         cell &unit_cell,
-                         const WFN &wave,
-                         const ivec &atom_type_list,
-                         const ivec &asym_atom_list,
-                         vector<bool> &needs_grid,
-                         vector<vec> &d1,
-                         vector<vec> &d2,
-                         vector<vec> &d3,
-                         vector<vec> &dens,
-                         ostream &file,
-                         time_point &start,
-                         time_point &end_becke,
-                         time_point &end_prototypes,
-                         time_point &end_spherical,
-                         time_point &end_prune,
-                         time_point &end_aspherical,
-                         bool debug,
-                         bool no_date)
-{
-    int atoms_with_grids = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (needs_grid[i])
-            atoms_with_grids++;
-    }
-    ivec num_points(atoms_with_grids);
-    vector<vector<vec>> grid(atoms_with_grids);
-    const int nr_of_atoms = (wave.get_ncen() * (int)pow(pbc * 2 + 1, 3));
-    vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
-    ivec atom_z(nr_of_atoms);
+vector<AtomGrid> make_Prototype_atoms(
+    const ivec &atom_type_list,
+    const ivec& cif2wfn_list,
+    const bool& debug,
+    ostream& file,
+    const int& accuracy,
+    const WFN& wave,
+    int basis_mode) {
     vec alpha_max(wave.get_ncen());
+    vec2 alpha_min(wave.get_ncen());
     ivec max_l(wave.get_ncen());
     int max_l_overall = 0;
-#pragma omp parallel for
-    for (int i = 0; i < atoms_with_grids; i++)
-        grid[i].resize(6);
-        // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
-        // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4= molecular becke weight, 5=total spherical density],
-        // p = point in this grid
 
+    if (basis_mode == 1) {
         // Accumulate vectors with information about all atoms
 #pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        atom_z[i] = wave.get_atom_charge(i);
-        x[i] = wave.atoms[i].x;
-        y[i] = wave.atoms[i].y;
-        z[i] = wave.atoms[i].z;
-        // if(debug)
-        //     file << "xyz= 000 position: " << x[i] << " " << y[i] << " " << z[i] << " Charge: " << atom_z[i] << endl;
-        if (pbc != 0)
+        for (int i = 0; i < wave.get_ncen(); i++)
         {
-            int j = 0;
-            for (int pbc_x = -pbc; pbc_x < pbc + 1; pbc_x++)
-                for (int pbc_y = -pbc; pbc_y < pbc + 1; pbc_y++)
-                    for (int pbc_z = -pbc; pbc_z < pbc + 1; pbc_z++)
-                    {
-                        if (pbc_x == 0 && pbc_y == 0 && pbc_z == 0)
-                            continue;
-                        else
-                        {
-                            j++;
-                            atom_z[i + j * wave.get_ncen()] = wave.get_atom_charge(i);
-                            x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
-                            y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
-                            z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
-                            if (debug)
-                                file << "xyz= " << pbc_x << pbc_y << pbc_z << " j = " << j << " position: " << x[i + j * wave.get_ncen()] << " " << y[i + j * wave.get_ncen()] << " " << z[i + j * wave.get_ncen()] << " Charge: " << atom_z[i + j * wave.get_ncen()] << endl;
-                        }
-                    }
-        }
-        alpha_max[i] = 0.0;
-        max_l[i] = 0;
-        for (int b = 0; b < wave.get_nex(); b++)
-        {
-            if (wave.get_center(b) != i + 1)
-                continue;
-            if (wave.get_exponent(b) > alpha_max[i])
-                alpha_max[i] = wave.get_exponent(b);
-            if (wave.get_type(b) > max_l[i])
+            alpha_max[i] = 0.0;
+            max_l[i] = 0;
+            for (int b = 0; b < wave.get_nex(); b++)
             {
+                if (wave.get_center(b) != i + 1)
+                    continue;
+                if (wave.get_exponent(b) > alpha_max[i])
+                    alpha_max[i] = wave.get_exponent(b);
+                if (wave.get_type(b) > max_l[i])
+                {
+                    int l = wave.get_type(b);
+                    if (l == 1)
+                        l = 1;
+                    else if (l >= 2 && l <= 4)
+                        l = 2;
+                    else if (l >= 5 && l <= 10)
+                        l = 3;
+                    else if (l >= 11 && l <= 20)
+                        l = 4;
+                    else if (l >= 21 && l <= 35)
+                        l = 5;
+                    max_l[i] = l;
+#pragma omp critical
+                    {
+                        if (l > max_l_overall)
+                            max_l_overall = l;
+                    }
+                }
+            }
+        }
+
+        if (debug)
+        {
+            file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
+        }
+        for (int i = 0; i < wave.get_ncen(); i++)
+            alpha_min[i].resize(max_l_overall, 100000000.0);
+
+#pragma omp parallel for
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            for (int b = 0; b < max_l_overall; b++)
+                alpha_min[i][b] = 100000000.0;
+        }
+
+#pragma omp parallel for
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            for (int b = 0; b < wave.get_nex(); b++)
+            {
+                if (wave.get_center(b) != i + 1)
+                    continue;
                 int l = wave.get_type(b);
                 if (l == 1)
                     l = 1;
@@ -819,110 +786,89 @@ int make_hirshfeld_grids(const int &pbc,
                     l = 4;
                 else if (l >= 21 && l <= 35)
                     l = 5;
-                max_l[i] = l;
-#pragma omp critical
+                else if (l >= 36 && l <= 56)
+                    l = 6;
+                if (wave.get_exponent(b) < alpha_min[i][l - 1])
+                    alpha_min[i][l - 1] = wave.get_exponent(b);
+            }
+        }
+    }
+    else if (basis_mode == 2) {
+        // Accumulate vectors with information about all atoms
+#pragma omp parallel for
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            const atom* ai = &(wave.atoms[i]);
+            alpha_max[i] = 0.0;
+            max_l[i] = 0;
+            for (int b = 0; b < ai->basis_set.size(); b++)
+            {
+                if (ai->basis_set[b].exponent > alpha_max[i])
+                    alpha_max[i] = ai->basis_set[b].exponent * 2;
+                int l = ai->basis_set[b].type;
+                if (l > max_l[i])
                 {
-                    if (l > max_l_overall)
-                        max_l_overall = l;
+                    max_l[i] = l;
+#pragma omp critical
+                    {
+                        if (l > max_l_overall)
+                            max_l_overall = l;
+                    }
                 }
+            }
+        }
+
+        if (debug)
+        {
+            file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
+            for (int i = 0; i < max_l.size(); i++)
+                file << "max_l: " << setw(5) << max_l[i] << endl;
+        }
+
+        vector<vec> alpha_min(wave.get_ncen());
+        for (int i = 0; i < wave.get_ncen(); i++)
+            alpha_min[i].resize(max_l_overall, 100000000.0);
+
+#pragma omp parallel for
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            for (int b = 0; b < max_l_overall; b++)
+                alpha_min[i][b] = 100000000.0;
+        }
+
+#pragma omp parallel for
+        for (int i = 0; i < wave.get_ncen(); i++)
+        {
+            const atom* ai = &(wave.atoms[i]);
+            for (int b = 0; b < ai->basis_set.size(); b++)
+            {
+                int l = ai->basis_set[b].type;
+                if (ai->basis_set[b].exponent < alpha_min[i][l])
+                    alpha_min[i][l] = ai->basis_set[b].exponent;
+            }
+        }
+
+        if (debug)
+        {
+            for (int i = 0; i < wave.get_ncen(); i++)
+            {
+                file << "alpha_min: ";
+                for (int b = 0; b < max_l_overall; b++)
+                    file << setw(14) << scientific << alpha_min[i][b];
+                file << endl;
             }
         }
     }
 
     if (debug)
-    {
-        file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
-        for (int i = 0; i < max_l.size(); i++)
-            file << "max_l: " << setw(5) << max_l[i] << endl;
-    }
-
-    vector<vec> alpha_min(wave.get_ncen());
-    for (int i = 0; i < wave.get_ncen(); i++)
-        alpha_min[i].resize(max_l_overall, 100000000.0);
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        for (int b = 0; b < max_l_overall; b++)
-            alpha_min[i][b] = 100000000.0;
-    }
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        for (int b = 0; b < wave.get_nex(); b++)
-        {
-            if (wave.get_center(b) != i + 1)
-                continue;
-            int l = wave.get_type(b);
-            if (l == 1)
-                l = 1;
-            else if (l >= 2 && l <= 4)
-                l = 2;
-            else if (l >= 5 && l <= 10)
-                l = 3;
-            else if (l >= 11 && l <= 20)
-                l = 4;
-            else if (l >= 21 && l <= 35)
-                l = 5;
-            else if (l >= 36 && l <= 56)
-                l = 6;
-            if (wave.get_exponent(b) < alpha_min[i][l - 1])
-                alpha_min[i][l - 1] = wave.get_exponent(b);
-        }
-    }
-
-    if (debug)
-    {
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-            file << "alpha_min: ";
-            for (int b = 0; b < max_l_overall; b++)
-                file << setw(14) << scientific << alpha_min[i][b];
-            file << endl;
-        }
-    }
-
-    if (debug)
         file << "alpha_min is there!" << endl
-             << "Nr of asym atoms: " << asym_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << " atoms that needs a grid: " << atoms_with_grids << endl;
+        << "Nr of asym atoms: " << cif2wfn_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << endl;
     else
         file << "There are:\n"
-             << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
-             //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
-             << setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
-#ifdef FLO_CUDA
-    int nDevices;                  /*Number of devices available (running time)*/
-    cudaGetDeviceCount(&nDevices); /*Get the number of devices*/
-    int dev = 0;
-    cudaDeviceProp *prop = NULL;
-    cudaDeviceProp deviceProp;
-    prop = (cudaDeviceProp *)malloc(sizeof(cudaDeviceProp) * nDevices);
-    for (int devl = 0; devl < nDevices; devl++)
-    { // Make CUDA information available in prop
-        cudaGetDeviceProperties(&(deviceProp), devl);
-        prop[devl] = deviceProp;
-    }
-    cudaSetDevice(dev);
-    printCUDA(prop, nDevices, file);
-    gpuErrchk(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
-#endif
-
-    if (no_date)
-        file << "\nMaking Becke Grids..." << flush;
-    else
-    {
-        if (debug)
-            file << "max_l_overall: " << max_l_overall << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
-        else
-            file << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
-    }
-
-    // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids;
-
+        << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
+        //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
+        << setw(4) << cif2wfn_list.size() << " are identified as asymmetric unit atoms!" << endl;
+    vector<AtomGrid> res;
     for (int i = 0; i < atom_type_list.size(); i++)
     {
         if (debug)
@@ -938,13 +884,6 @@ int make_hirshfeld_grids(const int &pbc,
             }
             if (wave.get_atom_charge(j) == atom_type_list[i])
             {
-                if (debug)
-                {
-                    file << alpha_max[j] << " " << max_l[j] - 1 << " ";
-                    for (int l = 0; l < max_l_overall; l++)
-                        file << alpha_min[j][l] << " ";
-                    file << endl;
-                }
                 alpha_max_temp = alpha_max[j];
                 max_l_temp = max_l[j] - 1;
                 for (int l = 0; l <= max_l_temp; l++)
@@ -1053,20 +992,463 @@ int make_hirshfeld_grids(const int &pbc,
                 radial_acc = 1e-15;
             }
         }
-        Prototype_grids.push_back(AtomGrid(radial_acc,
-                                           lebedev_low,
-                                           lebedev_high,
-                                           atom_type_list[i],
-                                           alpha_max_temp,
-                                           max_l_temp,
-                                           alpha_min_temp.data(),
-                                           file));
+        res.push_back(AtomGrid(radial_acc,
+            lebedev_low,
+            lebedev_high,
+            atom_type_list[i],
+            alpha_max_temp,
+            max_l_temp,
+            alpha_min_temp.data(),
+            file));
+    }
+    if (debug)
+        file << "max_l_overall: " << max_l_overall << endl;
+    return res;
+}
+
+ivec make_atomic_grids(
+    const vec&x,
+    const vec&y,
+    const vec&z,
+    const ivec&atom_z,
+    const bvec& needs_grid,
+    const WFN& wave,
+    const int& pbc,
+    const ivec& atom_type_list,
+    const ivec& cif2wfn_list,
+    const vector<AtomGrid>& Prototype_grids,
+    vector<vector<vec>>& grid,
+    ostream& file,
+    bool debug) {
+    ivec num_points(cif2wfn_list.size(), 0);
+    for (int i = 0; i < cif2wfn_list.size(); i++)
+    {
+        if (debug)
+        {
+            file << "Making grid for atom " << i << endl;
+        }
+        int type = 0;
+        for (int j = 0; j < atom_type_list.size(); j++)
+            if (atom_type_list[j] == wave.get_atom_charge(cif2wfn_list[i]))
+                type = j;
+
+        num_points[i] = Prototype_grids[type].get_num_grid_points();
+
+        for (int n = 0; n < 6; n++)
+            grid[i][n].resize(num_points[i], 0.0);
+
+        Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
+            cif2wfn_list[i],
+            &x[0],
+            &y[0],
+            &z[0],
+            &atom_z[0],
+            grid[i][0].data(),
+            grid[i][1].data(),
+            grid[i][2].data(),
+            grid[i][3].data(),
+            grid[i][5].data());
+    }
+    if (debug)
+    {
+        int run = 0;
+        file << "  label  | wfn  | grid | number of gridpoints\n";
+        for (int j = 0; j < wave.get_ncen(); j++)
+        {
+            file << setw(8) << wave.atoms[j].label;
+            if (needs_grid[j])
+            {
+
+                size_t index = find(cif2wfn_list.begin(), cif2wfn_list.end(), j) - cif2wfn_list.begin();
+                file << " | " << setw(4) << cif2wfn_list.at(index) << " | " << setw(4) << index << " |";
+                file << setw(7) << num_points[index];
+                run++;
+            }
+            else
+            {
+                file << setw(7) << "---";
+            }
+            file << "\n";
+        }
+        file << flush;
+    }
+    return num_points;
+}
+
+double make_sphericals(
+    vec2& dens, 
+    vec2& dist, 
+    const ivec& atom_type_list, 
+    ostream& file, 
+    bool debug = false, 
+    double incr_start = 1.005, 
+    double min_dist = 0.0000001, 
+    int accuracy = 2) {
+    const double incr = pow(incr_start, max(1, accuracy - 1));
+    const double lincr = log(incr);
+    vector<Thakkar> sphericals;
+    for (int i = 0; i < atom_type_list.size(); i++)
+        sphericals.push_back(Thakkar(atom_type_list[i]));
+    // Make radial grids
+    if (debug)
+    {
+        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
+        for (int i = 0; i < atom_type_list.size(); i++)
+        {
+            file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
+            double current = 1;
+            double _dist = min_dist;
+            if (accuracy > 3)
+                while (current > 1E-10)
+                {
+                    dist[i].push_back(_dist);
+                    current = sphericals[i].get_radial_density(_dist);
+                    if (current == -20)
+                        return -1000;
+                    dens[i].push_back(current);
+                    _dist *= incr;
+                }
+            else
+                while (current > 1E-12)
+                {
+                    dist[i].push_back(_dist);
+                    current = sphericals[i].get_radial_density(_dist);
+                    if (current == -20)
+                        return false;
+                    dens[i].push_back(current);
+                    _dist *= incr;
+                }
+            file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << dens[i].size() << endl;
+        }
+    }
+    else
+    {
+#pragma omp parallel for
+        for (int i = 0; i < atom_type_list.size(); i++)
+        {
+            double current = 1;
+            double _dist = min_dist;
+            if (accuracy > 3)
+                while (current > 1E-10)
+                {
+                    dist[i].push_back(_dist);
+                    current = sphericals[i].get_radial_density(_dist);
+                    dens[i].push_back(current);
+                    _dist *= incr;
+                }
+            else
+                while (current > 1E-12)
+                {
+                    dist[i].push_back(_dist);
+                    current = sphericals[i].get_radial_density(_dist);
+                    dens[i].push_back(current);
+                    _dist *= incr;
+                }
+        }
+    }
+    sphericals.clear();
+    if (debug)
+    {
+        file << "Cleared the sphericals!" << endl;
+    }
+    return lincr;
+}
+
+void fill_xyzc(
+    vec& x,
+    vec& y,
+    vec& z,
+    ivec& atom_z,
+    int pbc,
+    const WFN& wave,
+    const cell& unit_cell
+    ) 
+{
+    // Accumulate vectors with information about all atoms
+#pragma omp parallel for
+    for (int i = 0; i < wave.get_ncen(); i++)
+    {
+        atom_z[i] = wave.get_atom_charge(i);
+        x[i] = wave.atoms[i].x;
+        y[i] = wave.atoms[i].y;
+        z[i] = wave.atoms[i].z;
+        if (pbc != 0)
+        {
+            int j = 0;
+            for (int pbc_x = -pbc; pbc_x < pbc + 1; pbc_x++)
+                for (int pbc_y = -pbc; pbc_y < pbc + 1; pbc_y++)
+                    for (int pbc_z = -pbc; pbc_z < pbc + 1; pbc_z++)
+                    {
+                        if (pbc_x == 0 && pbc_y == 0 && pbc_z == 0)
+                            continue;
+                        else
+                        {
+                            j++;
+                            atom_z[i + j * wave.get_ncen()] = wave.get_atom_charge(i);
+                            x[i + j * wave.get_ncen()] = wave.atoms[i].x + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
+                            y[i + j * wave.get_ncen()] = wave.atoms[i].y + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
+                            z[i + j * wave.get_ncen()] = wave.atoms[i].z + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
+                        }
+                    }
+        }
+    }
+};
+
+void calc_spherical_values(
+    const WFN& wave,
+    const int atoms_with_grids,
+    vec3& grid,
+    vec2& spherical_density,
+    const vec2& radial_density,
+    const vec2& radial_dist,
+    const ivec& atom_type_list,
+    const ivec& num_points,
+    const ivec& cif2wfn_list,
+    ostream& file,
+    const double lincr,
+    const int pbc,
+    const cell& unit_cell,
+    bool debug = false
+)
+{
+    int type_list_number = -1;
+    if (debug)
+    {
+        file << "Cleared the sphericals!" << endl;
+    }
+#pragma omp parallel for
+    for (int g = 0; g < atoms_with_grids; g++)
+    {
+        spherical_density[g].resize(num_points[g], 0.0);
+    }
+    for (int i = 0; i < wave.get_ncen(); i++)
+    {
+        type_list_number = -1;
+        // Determine which type in the type list of sphericals to use
+        for (int j = 0; j < atom_type_list.size(); j++)
+            if (wave.get_atom_charge(i) == atom_type_list[j]) {
+                type_list_number = j;
+                break;
+            }
+        if (debug && type_list_number != -1)
+        {
+            file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
+        }
+        if (type_list_number == -1)
+        {
+            file << "I skipped an atom! make sure this is okay!" << endl;
+            continue;
+        }
+#pragma omp for
+        for (int g = 0; g < atoms_with_grids; g++)
+        {
+            for (int p = 0; p < num_points[g]; p++)
+            {
+                double d = sqrt(pow(grid[g][0][p] - wave.atoms[i].x, 2) + pow(grid[g][1][p] - wave.atoms[i].y, 2) + pow(grid[g][2][p] - wave.atoms[i].z, 2));
+                double temp =
+                    linear_interpolate_spherical_density(
+                        radial_density[type_list_number],
+                        radial_dist[type_list_number],
+                        d,
+                        lincr,
+                        1.0E-7);
+                if (i == cif2wfn_list[g])
+                    spherical_density[g][p] += temp;
+                grid[g][4][p] += temp;
+            }
+        }
+    }
+    // fill out with priodic information
+    if (pbc != 0)
+    {
+        for (int _x = -pbc; _x < pbc + 1; _x++)
+            for (int _y = -pbc; _y < pbc + 1; _y++)
+                for (int _z = -pbc; _z < pbc + 1; _z++)
+                {
+                    if (_x == 0 && _y == 0 && _z == 0)
+                        continue;
+                    for (int i = 0; i < wave.get_ncen(); i++)
+                    {
+                        type_list_number = -1;
+                        // int nr = all_atom_list[i];
+                        for (int j = 0; j < atom_type_list.size(); j++)
+                            if (wave.get_atom_charge(i) == atom_type_list[j])
+                                type_list_number = j;
+                        for (int g = 0; g < atoms_with_grids; g++)
+                        {
+#pragma omp parallel for
+                            for (int p = 0; p < num_points[g]; p++)
+                                grid[g][4][p] += linear_interpolate_spherical_density(
+                                    radial_density[type_list_number],
+                                    radial_dist[type_list_number],
+                                    sqrt(
+                                        pow(grid[g][0][p] - (wave.atoms[i].x + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][1][p] - (wave.atoms[i].y + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][2][p] - (wave.atoms[i].z + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
+                                    lincr,
+                                    1.0E-7);
+                        }
+                    }
+                }
+    }
+}
+
+double cutoff(int accuracy) {
+    if (accuracy < 3)
+        return 1E-10;
+    else if (accuracy == 3)
+        return 1E-14;
+    else
+        return 1E-30;
+}
+
+void prune_hirshfeld(
+    vec3& grid, 
+    vec2& total_grid, 
+    vec2& spherical_density, 
+    ivec& num_points, 
+    double cutoff) {
+    ivec new_gridsize(num_points.size(), 0);
+    ivec reductions(num_points.size(), 0);
+    int final_size = 0;
+#pragma omp parallel for reduction(+ : final_size)
+    for (int i = 0; i < num_points.size(); i++)
+    {
+        for (int p = 0; p < num_points[i]; p++)
+        {
+            if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > cutoff)
+            {
+                new_gridsize[i]++;
+            }
+        }
+        reductions[i] = num_points[i] - new_gridsize[i];
+        final_size += new_gridsize[i];
+    }
+    for (int k = 0; k < 7; k++)
+        total_grid[k].resize(final_size);
+#pragma omp parallel for
+    for (int i = 0; i < num_points.size(); i++)
+    {
+        int offset = 0;
+        for (int j = 0; j < i; j++)
+        {
+            offset += new_gridsize[j];
+        }
+        int reduction = 0, pr = 0;
+        for (int p = 0; p < num_points[i]; p++)
+        {
+            pr = p - reduction;
+            if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][pr] / grid[i][4][p]) > cutoff)
+            {
+                for (int k = 0; k < 5; k++)
+                    total_grid[k][pr + offset] = grid[i][k][p];
+                total_grid[6][pr + offset] = grid[i][5][p];
+            }
+            else
+            {
+                spherical_density[i].erase(spherical_density[i].begin() + pr);
+                reduction++;
+            }
+        }
+        num_points[i] -= reduction;
+        shrink_vector<vec>(grid[i]);
     }
 
+    shrink_vector<vector<vec>>(grid);
+}
+
+/**
+ * Generates Hirshfeld grids based on the specified parameters.
+ *
+ * @param pbc The periodic boundary condition flag.
+ * @param accuracy The accuracy level for grid generation.
+ * @param unit_cell The cell object representing the unit cell.
+ * @param wave The WFN object containing wavefunction information.
+ * @param atom_type_list The list of atom types.
+ * @param asym_atom_list The list of asymmetric atoms.
+ * @param needs_grid The vector indicating whether each atom needs a grid.
+ * @param d1 The vector of grid vectors in the x-direction.
+ * @param d2 The vector of grid vectors in the y-direction.
+ * @param d3 The vector of grid vectors in the z-direction.
+ * @param dens The vector of density vectors.
+ * @param file The output stream for writing the grid data.
+ * @param start The start time point for timing measurements.
+ * @param end_becke The end time point for the Becke grid generation.
+ * @param end_prototypes The end time point for the prototype grid generation.
+ * @param end_spherical The end time point for the spherical grid generation.
+ * @param end_prune The end time point for the pruning step.
+ * @param end_aspherical The end time point for the aspherical grid generation.
+ * @param debug Flag indicating whether to enable debug mode.
+ * @param no_date Flag indicating whether to exclude the date in the output.
+ *
+ * @return The number of grid points in the final total grid.
+ */
+int make_hirshfeld_grids(
+    const int &pbc,
+    const int &accuracy,
+    cell &unit_cell,
+    const WFN &wave,
+    const ivec &atom_type_list,
+    const ivec &cif2wfn_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
+    const vector<string>& labels,
+    ostream &file,
+    time_point &start,
+    time_point &end_becke,
+    time_point &end_prototypes,
+    time_point &end_spherical,
+    time_point &end_prune,
+    time_point &end_aspherical,
+    bool debug,
+    bool no_date)
+{
+    int atoms_with_grids = vec_sum(needs_grid);
+    err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
+    err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", file);
+    err_checkf(atoms_with_grids == cif2wfn_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", file);
+    vec3 grid(atoms_with_grids);
+    const int nr_of_atoms = (wave.get_ncen() * (int)pow(pbc * 2 + 1, 3));
+    vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
+    ivec atom_z(nr_of_atoms);
+#pragma omp parallel for
+    for (int i = 0; i < atoms_with_grids; i++)
+        grid[i].resize(6);
+    // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
+    // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4= molecular becke weight, 5=total spherical density],
+    // p = point in this grid
+
+    fill_xyzc(x, y, z, atom_z, pbc, wave, unit_cell);
+#ifdef FLO_CUDA
+    int nDevices;                  /*Number of devices available (running time)*/
+    cudaGetDeviceCount(&nDevices); /*Get the number of devices*/
+    int dev = 0;
+    cudaDeviceProp *prop = NULL;
+    cudaDeviceProp deviceProp;
+    prop = (cudaDeviceProp *)malloc(sizeof(cudaDeviceProp) * nDevices);
+    for (int devl = 0; devl < nDevices; devl++)
+    { // Make CUDA information available in prop
+        cudaGetDeviceProperties(&(deviceProp), devl);
+        prop[devl] = deviceProp;
+    }
+    cudaSetDevice(dev);
+    printCUDA(prop, nDevices, file);
+    gpuErrchk(cudaSetDeviceFlags(cudaDeviceScheduleBlockingSync));
+#endif
+
+    // Make Prototype grids with only single atom weights for all elements
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, cif2wfn_list, debug, file, accuracy, wave, 1);
+    if (no_date)
+        file << "\nMaking Becke Grids..." << flush;
+    else
+    {
+        file << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+    }
     end_prototypes = get_time();
     if (debug)
     {
-
+        file << "\n";
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
@@ -1355,96 +1737,37 @@ int make_hirshfeld_grids(const int &pbc,
         gpuErrchk(cudaFree(gpu_atomgrid_z[0][i]));
     }
 #else
-    vector<vector<double>> radial_density(atom_type_list.size());
-    vector<vector<double>> radial_dist(atom_type_list.size());
     if (!debug)
     {
         file << " ...  " << flush;
     }
-    // get_grid is parallelized, therefore not parallel here
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        // skip atoms, that do not need a grid
-        if (!needs_grid[i])
-        {
-            continue;
-        }
-        if (debug)
-        {
-            file << "Making grid for atom " << i << endl;
-        }
-        int type = 0;
-        for (int j = 0; j < atom_type_list.size(); j++)
-            if (atom_type_list[j] == wave.get_atom_charge(i))
-                type = j;
-
-        int grid_number = 0;
-        for (int j = 0; j < i; j++)
-        {
-            if (needs_grid[j])
-            {
-                grid_number++;
-            }
-        }
-        num_points[grid_number] = Prototype_grids[type].get_num_grid_points();
-
-        for (int n = 0; n < 6; n++)
-            grid[grid_number][n].resize(num_points[grid_number], 0.0);
-
-        Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
-                                       i,
-                                       &x[0],
-                                       &y[0],
-                                       &z[0],
-                                       &atom_z[0],
-                                       grid[grid_number][0].data(),
-                                       grid[grid_number][1].data(),
-                                       grid[grid_number][2].data(),
-                                       grid[grid_number][3].data(),
-                                       grid[grid_number][5].data());
-    }
-    if (debug)
-    {
-        int run = 0;
-        file << "  label | needs_grid | number of gridpoints\n";
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            file << setw(8) << wave.atoms[j].label << setw(13) << needs_grid[j];
-            if (needs_grid[j])
-            {
-                file << setw(7) << num_points[run];
-                run++;
-            }
-            else
-            {
-                file << setw(6) << "---";
-            }
-            file << endl;
-        }
-    }
+    ivec num_points = make_atomic_grids(
+        x, 
+        y, 
+        z, 
+        atom_z, 
+        needs_grid, 
+        wave, 
+        pbc, 
+        atom_type_list, 
+        cif2wfn_list, 
+        Prototype_grids, 
+        grid, 
+        file, 
+        debug);
     Prototype_grids.clear();
 #endif
 
-    int points = 0;
-    for (int i = 0; i < atoms_with_grids; i++)
-        points += num_points[i];
+    int points = vec_sum(num_points);
     if (debug)
         file << "Becke Grid exists" << endl;
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_becke = get_time();
 
     file << "Calculating spherical densities..." << flush;
 
-    // Total grid as a sum of all atomic grids.
-    // Dimensions: [c] [p]
-    // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
 #ifdef FLO_CUDA
     vector<vector<float>> total_grid(7);
     float ***gpu_spherical_density = NULL,
@@ -1556,156 +1879,43 @@ int make_hirshfeld_grids(const int &pbc,
     }
 
 #else
-    vector<vector<double>> total_grid(7);
+    
     // density of spherical atom at each
     // Dimensions: [a] [d]
     // a = atom number in atom type list for which the weight is calcualted
     // d = distance to look at obtained from point_to_distance_map
-    vector<vector<double>> spherical_density(atoms_with_grids);
+    vec2 spherical_density(atoms_with_grids);
+    vec2 radial_density(atom_type_list.size());
+    vec2 radial_dist(atom_type_list.size());
 
-    const double incr = pow(1.005, max(1, accuracy - 1));
-    const double lincr = log(incr);
-    const double min_dist = 0.0000001;
-    vector<Thakkar> sphericals;
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.push_back(Thakkar(atom_type_list[i]));
-    // Make radial grids
-    if (debug)
-    {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
-            double current = 1;
-            double dist = min_dist;
-            if (accuracy < 3)
-                while (current > 1E-10)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    if (current == -20)
-                        return false;
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    if (current == -20)
-                        return false;
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            double current = 1;
-            double dist = min_dist;
-            if (accuracy < 3)
-                while (current > 1E-10)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-        }
-    }
-    // sphericals.clear();
-    int type_list_number = -1;
-    if (debug)
-    {
-        file << "Cleared the sphericals!" << endl;
-    }
-#pragma omp parallel
-    {
-#pragma omp for
-        for (int g = 0; g < atoms_with_grids; g++)
-        {
-            spherical_density[g].resize(num_points[g]);
-        }
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-#pragma omp single
-            {
-                type_list_number = -1;
-                // Determine which type in the type list of sphericals to use
-                for (int j = 0; j < atom_type_list.size(); j++)
-                    if (wave.get_atom_charge(i) == atom_type_list[j])
-                        type_list_number = j;
-                if (debug && type_list_number != -1)
-                {
-                    file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
-                }
-            }
-            if (type_list_number == -1)
-            {
-#pragma omp single
-                {
-                    file << "I skipped an atom! make sure this is okay!" << endl;
-                }
-                continue;
-            }
-#pragma omp for
-            for (int g = 0; g < atoms_with_grids; g++)
-            {
-                for (int p = 0; p < num_points[g]; p++)
-                {
-                    double temp =
-                        linear_interpolate_spherical_density(radial_density[type_list_number], radial_dist[type_list_number], sqrt(pow(grid[g][0][p] - wave.atoms[i].x, 2) + pow(grid[g][1][p] - wave.atoms[i].y, 2) + pow(grid[g][2][p] - wave.atoms[i].z, 2)), lincr, min_dist);
-                    if (i == asym_atom_list[g])
-                        spherical_density[g][p] = temp;
-                    grid[g][4][p] += temp;
-                }
-            }
-        }
-    }
-    // fill out with priodic information
-    if (pbc != 0)
-    {
-        for (int _x = -pbc; _x < pbc + 1; _x++)
-            for (int _y = -pbc; _y < pbc + 1; _y++)
-                for (int _z = -pbc; _z < pbc + 1; _z++)
-                {
-                    if (_x == 0 && _y == 0 && _z == 0)
-                        continue;
-                    for (int i = 0; i < wave.get_ncen(); i++)
-                    {
-                        type_list_number = -1;
-                        // int nr = all_atom_list[i];
-                        for (int j = 0; j < atom_type_list.size(); j++)
-                            if (wave.get_atom_charge(i) == atom_type_list[j])
-                                type_list_number = j;
-                        for (int g = 0; g < atoms_with_grids; g++)
-                        {
-#pragma omp parallel for
-                            for (int p = 0; p < num_points[g]; p++)
-                                grid[g][4][p] += linear_interpolate_spherical_density(
-                                    radial_density[type_list_number],
-                                    radial_dist[type_list_number],
-                                    sqrt(
-                                        pow(grid[g][0][p] - (wave.atoms[i].x + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][1][p] - (wave.atoms[i].y + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][2][p] - (wave.atoms[i].z + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
-                                    lincr,
-                                    min_dist);
-                        }
-                    }
-                }
-    }
+    const double lincr = make_sphericals(
+        radial_density,
+        radial_dist,
+        atom_type_list,
+        file,
+        debug,
+        1.005,
+        1.0E-7,
+        accuracy
+        );
+    err_checkf(lincr != -1000, "error during creations of sphericals", file);
+
+    calc_spherical_values(
+        wave,
+        atoms_with_grids,
+        grid,
+        spherical_density,
+        radial_density,
+        radial_dist,
+        atom_type_list,
+        num_points,
+        cif2wfn_list,
+        file,
+        lincr,
+        pbc,
+        unit_cell,
+        debug
+        );
     for (int i = 0; i < atoms_with_grids; i++)
         err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 #endif
@@ -1715,86 +1925,19 @@ int make_hirshfeld_grids(const int &pbc,
     shrink_vector<vec>(radial_density);
     shrink_vector<vec>(radial_dist);
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_spherical = get_time();
 
-    double _cutoff;
-    if (accuracy < 3)
-        _cutoff = 1E-10;
-    else if (accuracy == 3)
-        _cutoff = 1E-14;
-    else
-        _cutoff = 1E-30;
 #ifndef FLO_CUDA
-    ivec new_gridsize(atoms_with_grids, 0);
-    ivec reductions(atoms_with_grids, 0);
-    int final_size = 0;
-    bool prune = true;
-    if (prune)
-    {
-        file << "Pruning Grid..." << flush;
-#pragma omp parallel for reduction(+ : final_size)
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > _cutoff)
-                {
-                    new_gridsize[i]++;
-                }
-            }
-            reductions[i] = num_points[i] - new_gridsize[i];
-            final_size += new_gridsize[i];
-        }
-        for (int k = 0; k < 7; k++)
-            total_grid[k].resize(final_size);
-#pragma omp parallel for
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            int offset = 0;
-            for (int j = 0; j < i; j++)
-            {
-                offset += new_gridsize[j];
-            }
-            int reduction = 0;
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > _cutoff)
-                {
-                    for (int k = 0; k < 5; k++)
-                        total_grid[k][p + offset - reduction] = grid[i][k][p];
-                    total_grid[6][p + offset - reduction] = grid[i][5][p];
-                }
-                else
-                {
-                    spherical_density[i].erase(spherical_density[i].begin() + (p - reduction));
-                    reduction++;
-                }
-            }
-            num_points[i] -= reduction;
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    else
-    {
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                for (int k = 0; k < 5; k++)
-                    total_grid[k].push_back(grid[i][k][p]);
-                total_grid[6].push_back(grid[i][5][p]);
-            }
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    shrink_vector<vector<vec>>(grid);
-    points = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        points += num_points[i];
+    
+    // Total grid as a sum of all atomic grids.
+    // Dimensions: [c] [p]
+    // p = the number of gridpoint
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    vec2 total_grid(7);
+    file << "Pruning Grid..." << flush;
+
+    prune_hirshfeld(grid, total_grid, spherical_density, num_points, cutoff(accuracy));
+    points = vec_sum(num_points);
 
     // total_grid[5].resize(total_grid[0].size());
     if (debug)
@@ -1803,14 +1946,10 @@ int make_hirshfeld_grids(const int &pbc,
         file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 #endif
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_prune = get_time();
 
     file << "Calculating non-spherical densities..." << flush;
-    vector<vector<double>> periodic_grid;
+    vec2 periodic_grid;
 
 #ifdef FLO_CUDA
     // Vector containing integrated numbers of electrons
@@ -2058,7 +2197,7 @@ int make_hirshfeld_grids(const int &pbc,
     {
         WFN temp = wave;
         temp.delete_unoccupied_MOs();
-        const int nr_atoms = (int)total_grid[0].size();
+        const int nr_pts = static_cast<int>(total_grid[0].size());
         const int nr_mos = temp.get_nmo(true);
         const int nr_cen = temp.get_ncen();
         if (debug)
@@ -2066,17 +2205,18 @@ int make_hirshfeld_grids(const int &pbc,
             file << endl
                  << "Using " << temp.get_nmo() << " MOs in temporary wavefunction" << endl;
             temp.write_wfn("temp_wavefunction.wfn", false, true);
+            file << "There are " << nr_pts << " points to evaluate." << endl;
         }
 #pragma omp parallel
         {
-            vector<vec> d_temp(16);
+            vec2 d_temp(16);
             for (int i = 0; i < 16; i++)
             {
                 d_temp[i].resize(nr_cen, 0.0);
             }
             vec phi_temp(nr_mos, 0.0);
 #pragma omp for
-            for (int i = 0; i < nr_atoms; i++)
+            for (int i = 0; i < nr_pts; i++)
             {
                 total_grid[5][i] = temp.compute_dens(
                     total_grid[0][i],
@@ -2157,17 +2297,21 @@ int make_hirshfeld_grids(const int &pbc,
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
     // dimension 1: atoms of asym_atom_list
-    vector<vector<double>> atom_els(3);
+    vec2 atom_els(3);
     for (int n = 0; n < 3; n++)
     {
-        atom_els[n].resize(asym_atom_list.size(), 0.0);
+        atom_els[n].resize(cif2wfn_list.size(), 0.0);
     }
 
     if (debug)
-        file << "before loop" << endl;
-        // Generate Electron sums
+    {
+        file << "before loop\n asym atom list: " << endl;
+        for (int i = 0; i < cif2wfn_list.size(); i++)
+            file << cif2wfn_list[i] << " ";
+    }
+    // Generate Electron sums
 #pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) //, el_sum_spherical)
-    for (int i = 0; i < asym_atom_list.size(); i++)
+    for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         // if (debug) file << "i=" << i << endl;
         int start_p = 0;
@@ -2175,7 +2319,7 @@ int make_hirshfeld_grids(const int &pbc,
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
-            if (abs(total_grid[6][p]) > _cutoff)
+            if (abs(total_grid[6][p]) > cutoff(accuracy))
             {
                 atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
                 atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
@@ -2190,7 +2334,7 @@ int make_hirshfeld_grids(const int &pbc,
         el_sum_hirshfeld += atom_els[2][i];
         if (wave.get_has_ECPs())
         {
-            int n = wave.atoms[asym_atom_list[i]].ECP_electrons;
+            int n = wave.atoms[cif2wfn_list[i]].ECP_electrons;
             el_sum_becke += n;
             // el_sum_spherical += n;
             el_sum_hirshfeld += n;
@@ -2203,7 +2347,7 @@ int make_hirshfeld_grids(const int &pbc,
     {
         file << "Becke grid with hirshfeld weights done!" << endl;
         file << "atom_els[2]: ";
-        for (int i = 0; i < asym_atom_list.size(); i++)
+        for (int i = 0; i < cif2wfn_list.size(); i++)
             file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
         file << endl;
     }
@@ -2223,10 +2367,10 @@ int make_hirshfeld_grids(const int &pbc,
          << "    Atom       Becke   Spherical Hirshfeld" << endl;
 
     int counter = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++)
+    for (int i = 0; i < cif2wfn_list.size(); i++)
     {
-        int a = asym_atom_list[i];
-        file << setw(10) << wave.atoms[a].label
+        int a = cif2wfn_list[i];
+        file << setw(10) << labels[i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
@@ -2247,12 +2391,12 @@ int make_hirshfeld_grids(const int &pbc,
     }
     end_aspherical = get_time();
 
-    dens.resize(asym_atom_list.size());
+    dens.resize(cif2wfn_list.size());
     if (debug)
         file << "resized outer dens" << endl;
-    d1.resize(asym_atom_list.size());
-    d2.resize(asym_atom_list.size());
-    d3.resize(asym_atom_list.size());
+    d1.resize(cif2wfn_list.size());
+    d2.resize(cif2wfn_list.size());
+    d3.resize(cif2wfn_list.size());
     if (debug)
         file << "resized outer d1-3" << endl;
 #ifdef FLO_CUDA
@@ -2329,16 +2473,16 @@ int make_hirshfeld_grids(const int &pbc,
 #else
     points = 0;
 #pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
+    for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         dens[i].resize(num_points[i]);
         d1[i].resize(num_points[i]);
         d2[i].resize(num_points[i]);
         d3[i].resize(num_points[i]);
     }
-    double upper = 0, diffs = 0, avg = 0, lower = 0;
+    double upper = 0, diffs = 0, avg = 0, lower = 0, _cut = cutoff(accuracy);
 #pragma omp parallel for reduction(+ : points, upper, avg, diffs, lower)
-    for (int i = 0; i < asym_atom_list.size(); i++)
+    for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         int start_p = 0;
         int run = 0;
@@ -2351,25 +2495,25 @@ int make_hirshfeld_grids(const int &pbc,
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
             res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
-            if (abs(res) > _cutoff)
+            if (abs(res) > _cut)
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.atoms[asym_atom_list[i]].x);
-                d2[i][run] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
-                d3[i][run] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
+                d1[i][run] = (total_grid[0][p] - wave.atoms[cif2wfn_list[i]].x);
+                d2[i][run] = (total_grid[1][p] - wave.atoms[cif2wfn_list[i]].y);
+                d3[i][run] = (total_grid[2][p] - wave.atoms[cif2wfn_list[i]].z);
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-                if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
-                {
-                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                    int type_list_number = -1;
-                    // Determine which type in the type list of sphericals to use
-                    for (int j = 0; j < atom_type_list.size(); j++)
-                        if (wave.get_atom_charge(i) == atom_type_list[j])
-                            type_list_number = j;
-                    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons) * total_grid[3][p];
-                    diff += densy;
-                }
+                //if (wave.atoms[cif2wfn_list[i]].ECP_electrons != 0)
+                //{
+                //    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
+                //    int type_list_number = -1;
+                //    // Determine which type in the type list of sphericals to use
+                //    for (int j = 0; j < atom_type_list.size(); j++)
+                //        if (wave.get_atom_charge(i) == atom_type_list[j])
+                //            type_list_number = j;
+                //    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[cif2wfn_list[i]].ECP_electrons) * total_grid[3][p];
+                //    diff += densy;
+                //}
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
@@ -2430,18 +2574,19 @@ int make_hirshfeld_grids(const int &pbc,
  *
  * @return number of gridpoints in the final total grid
  */
-static int make_hirshfeld_grids_RI(
+static int make_hirshfeld_grids_ML(
     const int &accuracy,
     const WFN &wave,
     const string coef_filename,
-    const vector<int> &atom_type_list,
-    const vector<int> &asym_atom_list,
-    vector<bool> &needs_grid,
-    vector<vec> &d1,
-    vector<vec> &d2,
-    vector<vec> &d3,
-    vector<vec> &dens,
+    const ivec &atom_type_list,
+    const ivec &asym_atom_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
     const int exp_coefs,
+    const vector<string>& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -2452,259 +2597,26 @@ static int make_hirshfeld_grids_RI(
     bool debug,
     bool no_date)
 {
-    int atoms_with_grids = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (needs_grid[i])
-            atoms_with_grids++;
-    }
-    ivec num_points(atoms_with_grids);
+    int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
     // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4=total spherical density, 5=molecular becke weight],
     // p = point in this grid
-    vector<vector<vec>> grid(atoms_with_grids);
+    vec3 grid(atoms_with_grids);
     const int nr_of_atoms = (wave.get_ncen());
     vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
     ivec atom_z(nr_of_atoms);
-    vec alpha_max(wave.get_ncen());
-    ivec max_l(wave.get_ncen());
-    int max_l_overall = 0;
 #pragma omp parallel for
     for (int i = 0; i < atoms_with_grids; i++)
         grid[i].resize(6);
 
-        // Accumulate vectors with information about all atoms
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        atom_z[i] = wave.get_atom_charge(i);
-        x[i] = ai->x;
-        y[i] = ai->y;
-        z[i] = ai->z;
-        alpha_max[i] = 0.0;
-        max_l[i] = 0;
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            if (ai->basis_set[b].exponent > alpha_max[i])
-                alpha_max[i] = ai->basis_set[b].exponent * 2;
-            int l = ai->basis_set[b].type;
-            if (l > max_l[i])
-            {
-                max_l[i] = l;
-#pragma omp critical
-                {
-                    if (l > max_l_overall)
-                        max_l_overall = l;
-                }
-            }
-        }
-    }
+    fill_xyzc(x, y, z, atom_z, 0, wave, cell());
 
-    if (debug)
-    {
-        file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
-        for (int i = 0; i < max_l.size(); i++)
-            file << "max_l: " << setw(5) << max_l[i] << endl;
-    }
-
-    vector<vec> alpha_min(wave.get_ncen());
-    for (int i = 0; i < wave.get_ncen(); i++)
-        alpha_min[i].resize(max_l_overall, 100000000.0);
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        for (int b = 0; b < max_l_overall; b++)
-            alpha_min[i][b] = 100000000.0;
-    }
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            int l = ai->basis_set[b].type;
-            if (ai->basis_set[b].exponent < alpha_min[i][l])
-                alpha_min[i][l] = ai->basis_set[b].exponent;
-        }
-    }
-
-    if (debug)
-    {
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-            file << "alpha_min: ";
-            for (int b = 0; b < max_l_overall; b++)
-                file << setw(14) << scientific << alpha_min[i][b];
-            file << endl;
-        }
-    }
-
-    if (debug)
-        file << "alpha_min is there!" << endl
-             << "Nr of asym atoms: " << asym_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << " atoms that needs a grid: " << atoms_with_grids << endl;
-    else
-        file << "There are:\n"
-             << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
-             //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
-             << setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
-
+    // Make Prototype grids with only single atom weights for all elements
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list,asym_atom_list,debug,file, accuracy, wave, 2);
     if (no_date)
         file << "\nMaking Becke Grids..." << flush;
     else
-    {
-        if (debug)
-            file << "max_l_overall: " << max_l_overall << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
-        else
-            file << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
-    }
-
-    // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids;
-
-    for (int i = 0; i < atom_type_list.size(); i++)
-    {
-        if (debug)
-            file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
-        double alpha_max_temp(0);
-        int max_l_temp(0);
-        vec alpha_min_temp(max_l_overall);
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            if (wave.get_atom_charge(j) == 119)
-            {
-                continue;
-            }
-            if (wave.get_atom_charge(j) == atom_type_list[i])
-            {
-                if (debug)
-                {
-                    file << alpha_max[j] << " " << max_l[j] - 1 << " ";
-                    for (int l = 0; l < max_l_overall; l++)
-                        file << alpha_min[j][l] << " ";
-                    file << endl;
-                }
-                alpha_max_temp = alpha_max[j];
-                max_l_temp = max_l[j];
-                for (int l = 0; l <= max_l_temp; l++)
-                    alpha_min_temp[l] = alpha_min[j][l];
-                break;
-            }
-        }
-
-        if (debug)
-        {
-            file << "max_l: " << defaultfloat << max_l_temp << " alpha_max: " << scientific << alpha_max_temp << " alpha_min: ";
-            for (int l = 0; l <= max_l_temp; l++)
-                file << setw(14) << scientific << alpha_min_temp[l];
-            file << " accuracy: " << accuracy << endl;
-        }
-        int lebedev_high, lebedev_low;
-        double radial_acc;
-        err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
-        if (accuracy == 0)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-3;
-            }
-        }
-        else if (accuracy == 1)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
-                radial_acc = 1e-5;
-            }
-        }
-        else if (accuracy == 2)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                radial_acc = 1e-5;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                radial_acc = 1e-6;
-            }
-        }
-        else if (accuracy == 3)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
-                radial_acc = 1e-10;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
-                radial_acc = 1e-11;
-            }
-        }
-        else if (accuracy == 4)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
-                radial_acc = 1e-15;
-            }
-        }
-        else
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
-                radial_acc = 1e-15;
-            }
-        }
-        Prototype_grids.push_back(AtomGrid(radial_acc,
-                                           lebedev_low,
-                                           lebedev_high,
-                                           atom_type_list[i],
-                                           alpha_max_temp,
-                                           max_l_temp,
-                                           alpha_min_temp.data(),
-                                           file));
-    }
+        file << endl << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
 
     end_prototypes = get_time();
     if (debug)
@@ -2719,215 +2631,62 @@ static int make_hirshfeld_grids_RI(
         else
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
-
-    vector<vec> radial_density(atom_type_list.size());
-    vector<vec> radial_dist(atom_type_list.size());
-    if (!debug)
-    {
+    else
         file << " ...  " << flush;
-    }
-    // get_grid is parallelized, therefore not parallel here
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        // skip atoms, that do not need a grid
-        if (!needs_grid[i])
-        {
-            continue;
-        }
-        if (debug)
-        {
-            file << "Making grid for atom " << i << endl;
-        }
-        int type = 0;
-        for (int j = 0; j < atom_type_list.size(); j++)
-            if (atom_type_list[j] == wave.get_atom_charge(i))
-                type = j;
 
-        int grid_number = 0;
-        for (int j = 0; j < i; j++)
-        {
-            if (needs_grid[j])
-            {
-                grid_number++;
-            }
-        }
-        num_points[grid_number] = Prototype_grids[type].get_num_grid_points();
-
-        for (int n = 0; n < 6; n++)
-            grid[grid_number][n].resize(num_points[grid_number], 0.0);
-
-        Prototype_grids[type].get_grid(int(wave.get_ncen()),
-                                       i,
-                                       &x[0],
-                                       &y[0],
-                                       &z[0],
-                                       &atom_z[0],
-                                       grid[grid_number][0].data(),
-                                       grid[grid_number][1].data(),
-                                       grid[grid_number][2].data(),
-                                       grid[grid_number][3].data(),
-                                       grid[grid_number][5].data());
-    }
-    if (debug)
-    {
-        int run = 0;
-        file << "  label | needs_grid | number of gridpoints\n";
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            file << setw(8) << wave.atoms[j].label << setw(13) << needs_grid[j];
-            if (needs_grid[j])
-            {
-                file << setw(7) << num_points[run];
-                run++;
-            }
-            else
-            {
-                file << setw(6) << "---";
-            }
-            file << endl;
-        }
-    }
+    ivec num_points = make_atomic_grids(
+        x,
+        y,
+        z,
+        atom_z,
+        needs_grid,
+        wave,
+        0,
+        atom_type_list,
+        asym_atom_list,
+        Prototype_grids,
+        grid,
+        file,
+        debug);
     Prototype_grids.clear();
 
-    int points = 0;
-    for (int i = 0; i < atoms_with_grids; i++)
-        points += num_points[i];
+    int points = vec_sum(num_points);
     if (debug)
         file << "Becke Grid exists" << endl;
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_becke = get_time();
 
     file << "Calculating spherical densities..." << flush;
 
-    // Total grid as a sum of all atomic grids.
-    // Dimensions: [c] [p]
-    // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    vector<vec> total_grid(7);
+    
     // density of spherical atom at each
     // Dimensions: [a] [d]
     // a = atom number in atom type list for which the weight is calcualted
     // d = distance to look at obtained from point_to_distance_map
     vector<vec> spherical_density(atoms_with_grids);
-
-    const double incr = pow(1.005, max(1, accuracy - 1));
-    const double lincr = log(incr);
-    const double min_dist = 0.0000001;
-    vector<Thakkar> sphericals;
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.push_back(Thakkar(atom_type_list[i]));
-    // Make radial grids
-    if (debug)
-    {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
-            double current = 1;
-            double dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    if (current == -20)
-                        return false;
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    if (current == -20)
-                        return false;
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << radial_density[i].size() << endl;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            double current = 1;
-            double dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    radial_dist[i].push_back(dist);
-                    current = sphericals[i].get_radial_density(dist);
-                    radial_density[i].push_back(current);
-                    dist *= incr;
-                }
-        }
-    }
-    sphericals.clear();
-    int type_list_number = -1;
-    if (debug)
-    {
-        file << "Cleared the sphericals!" << endl;
-    }
-#pragma omp parallel
-    {
-#pragma omp for
-        for (int g = 0; g < atoms_with_grids; g++)
-        {
-            spherical_density[g].resize(num_points[g]);
-        }
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-#pragma omp single
-            {
-                type_list_number = -1;
-                // Determine which type in the type list of sphericals to use
-                for (int j = 0; j < atom_type_list.size(); j++)
-                    if (wave.get_atom_charge(i) == atom_type_list[j])
-                        type_list_number = j;
-                if (debug && type_list_number != -1)
-                {
-                    file << type_list_number << " Atom type: " << atom_type_list[type_list_number] << endl;
-                }
-            }
-            if (type_list_number == -1)
-            {
-#pragma omp single
-                {
-                    file << "I skipped an atom! make sure this is okay!" << endl;
-                }
-                continue;
-            }
-#pragma omp for
-            for (int g = 0; g < atoms_with_grids; g++)
-            {
-                for (int p = 0; p < num_points[g]; p++)
-                {
-                    double temp =
-                        linear_interpolate_spherical_density(radial_density[type_list_number], radial_dist[type_list_number], sqrt(pow(grid[g][0][p] - wave.atoms[i].x, 2) + pow(grid[g][1][p] - wave.atoms[i].y, 2) + pow(grid[g][2][p] - wave.atoms[i].z, 2)), lincr, min_dist);
-                    if (i == asym_atom_list[g])
-                        spherical_density[g][p] = temp;
-                    grid[g][4][p] += temp;
-                }
-            }
-        }
-    }
+    vector<vec> radial_density(atom_type_list.size());
+    vector<vec> radial_dist(atom_type_list.size());
+    const double lincr = make_sphericals(radial_density, radial_dist, atom_type_list, file, debug);
+    err_checkf(lincr != -1000, "Error during making of spherical density vectors!", file);
+    
+    calc_spherical_values(
+        wave,
+        atoms_with_grids,
+        grid,
+        spherical_density,
+        radial_density,
+        radial_dist,
+        atom_type_list,
+        num_points,
+        asym_atom_list,
+        file,
+        lincr,
+        0,
+        cell(),
+        debug
+    );
     for (int i = 0; i < atoms_with_grids; i++)
         err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
 
@@ -2936,10 +2695,6 @@ static int make_hirshfeld_grids_RI(
     shrink_vector<vec>(radial_density);
     shrink_vector<vec>(radial_dist);
 
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_spherical = get_time();
 
     double _cutoff;
@@ -2953,69 +2708,15 @@ static int make_hirshfeld_grids_RI(
     ivec new_gridsize(atoms_with_grids, 0);
     ivec reductions(atoms_with_grids, 0);
     int final_size = 0;
-    bool prune = true;
-    if (prune)
-    {
-        file << "Pruning Grid..." << flush;
-#pragma omp parallel for reduction(+ : final_size)
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > _cutoff)
-                {
-                    new_gridsize[i]++;
-                }
-            }
-            reductions[i] = num_points[i] - new_gridsize[i];
-            final_size += new_gridsize[i];
-        }
-        for (int k = 0; k < 7; k++)
-            total_grid[k].resize(final_size);
-#pragma omp parallel for
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            int offset = 0;
-            for (int j = 0; j < i; j++)
-            {
-                offset += new_gridsize[j];
-            }
-            int reduction = 0;
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p - reduction] / grid[i][4][p]) > _cutoff)
-                {
-                    for (int k = 0; k < 5; k++)
-                        total_grid[k][p + offset - reduction] = grid[i][k][p];
-                    total_grid[6][p + offset - reduction] = grid[i][5][p];
-                }
-                else
-                {
-                    spherical_density[i].erase(spherical_density[i].begin() + (p - reduction));
-                    reduction++;
-                }
-            }
-            num_points[i] -= reduction;
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    else
-    {
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                for (int k = 0; k < 5; k++)
-                    total_grid[k].push_back(grid[i][k][p]);
-                total_grid[6].push_back(grid[i][5][p]);
-            }
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    shrink_vector<vector<vec>>(grid);
-    points = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        points += num_points[i];
+    // Total grid as a sum of all atomic grids.
+    // Dimensions: [c] [p]
+    // p = the number of gridpoint
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    vec2 total_grid(7);
+
+    file << "Pruning Grid..." << flush;
+    prune_hirshfeld(grid, total_grid, spherical_density, num_points, cutoff(accuracy));
+    points = vec_sum(num_points);
 
     // total_grid[5].resize(total_grid[0].size());
     if (debug)
@@ -3070,7 +2771,7 @@ static int make_hirshfeld_grids_RI(
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
     // dimension 1: atoms of asym_atom_list
-    vector<vector<double>> atom_els(3);
+    vec2 atom_els(3);
     for (int n = 0; n < 3; n++)
     {
         atom_els[n].resize(asym_atom_list.size(), 0.0);
@@ -3139,7 +2840,7 @@ static int make_hirshfeld_grids_RI(
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
-        file << setw(10) << wave.atoms[a].label
+        file << setw(10) << labels[i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
@@ -3200,17 +2901,17 @@ static int make_hirshfeld_grids_RI(
                 d2[i][run] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
                 d3[i][run] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-                if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
-                {
-                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                    int type_list_number = -1;
-                    // Determine which type in the type list of sphericals to use
-                    for (int j = 0; j < atom_type_list.size(); j++)
-                        if (wave.get_atom_charge(i) == atom_type_list[j])
-                            type_list_number = j;
-                    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons);
-                    diff += densy;
-                }
+                //if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+                //{
+                //    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
+                //    int type_list_number = -1;
+                //    // Determine which type in the type list of sphericals to use
+                //    for (int j = 0; j < atom_type_list.size(); j++)
+                //        if (wave.get_atom_charge(i) == atom_type_list[j])
+                //            type_list_number = j;
+                //    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons);
+                //    diff += densy;
+                //}
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
@@ -3272,14 +2973,15 @@ static int make_integration_grids(
     cell &unit_cell,
     const WFN &wave,
     const string coef_filename,
-    const vector<int> &atom_type_list,
-    const vector<int> &asym_atom_list,
-    vector<bool> &needs_grid,
-    vector<vec> &d1,
-    vector<vec> &d2,
-    vector<vec> &d3,
-    vector<vec> &dens,
+    const ivec &atom_type_list,
+    const ivec &asym_atom_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
     const int exp_coefs,
+    const vector<string>& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -3290,263 +2992,33 @@ static int make_integration_grids(
     bool debug,
     bool no_date)
 {
-    int atoms_with_grids = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (needs_grid[i])
-            atoms_with_grids++;
-    }
-    // counts number of points inside each atomic grid
-    ivec num_points(atoms_with_grids);
+    int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p]
     // a = atom [0,ncen],
     // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4=molecular weight],
     // p = point in this grid
-    vector<vector<vec>> grid(atoms_with_grids);
+    vec3 grid(atoms_with_grids);
 #pragma omp parallel for
     for (int i = 0; i < atoms_with_grids; i++)
-        grid[i].resize(5);
+        grid[i].resize(6);
 
     const int nr_of_atoms = (wave.get_ncen());
     // positions
     vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
     // charges
     ivec atom_z(nr_of_atoms);
-    vec alpha_max(wave.get_ncen());
-    ivec max_l(wave.get_ncen());
-    int max_l_overall = 0;
 
-    // Accumulate vectors with information about all atoms
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        atom_z[i] = wave.get_atom_charge(i);
-        x[i] = ai->x;
-        y[i] = ai->y;
-        z[i] = ai->z;
-        alpha_max[i] = 0.0;
-        max_l[i] = 0;
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            if (ai->basis_set[b].exponent > alpha_max[i])
-                alpha_max[i] = ai->basis_set[b].exponent * 2;
-            int l = ai->basis_set[b].type;
-            if (l > max_l[i])
-            {
-                max_l[i] = l;
-#pragma omp critical
-                {
-                    if (l > max_l_overall)
-                        max_l_overall = l;
-                }
-            }
-        }
-    }
+    fill_xyzc(x, y, z, atom_z, 0, wave, cell());
 
-    if (debug)
-    {
-        file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
-        for (int i = 0; i < max_l.size(); i++)
-            file << "max_l: " << setw(5) << max_l[i] << endl;
-    }
-
-    vector<vec> alpha_min(wave.get_ncen());
-    for (int i = 0; i < wave.get_ncen(); i++)
-        alpha_min[i].resize(max_l_overall, 100000000.0);
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        for (int b = 0; b < max_l_overall; b++)
-            alpha_min[i][b] = 100000000.0;
-    }
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            int l = ai->basis_set[b].type;
-            if (ai->basis_set[b].exponent < alpha_min[i][l])
-                alpha_min[i][l] = ai->basis_set[b].exponent;
-        }
-    }
-
-    if (debug)
-    {
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-            file << "alpha_min: ";
-            for (int b = 0; b < max_l_overall; b++)
-                file << setw(14) << scientific << alpha_min[i][b];
-            file << endl;
-        }
-    }
-
-    if (debug)
-        file << "alpha_min is there!" << endl
-             << "Nr of asym atoms: " << asym_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << " atoms that needs a grid: " << atoms_with_grids << endl;
-    else
-        file << "There are:\n"
-             << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
-             //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
-             << setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
-
+    // Make Prototype grids with only single atom weights for all elements
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, asym_atom_list, debug, file, accuracy, wave, 2);
     if (no_date)
         file << "\nMaking Becke Grids..." << flush;
     else
     {
-        if (debug)
-            file << "max_l_overall: " << max_l_overall << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
-        else
-            file << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
-    }
 
-    // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids;
-
-    for (int i = 0; i < atom_type_list.size(); i++)
-    {
-        if (debug)
-            file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
-        double alpha_max_temp(0);
-        int max_l_temp(0);
-        vec alpha_min_temp(max_l_overall);
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            if (wave.get_atom_charge(j) == 119)
-            {
-                continue;
-            }
-            if (wave.get_atom_charge(j) == atom_type_list[i])
-            {
-                if (debug)
-                {
-                    file << alpha_max[j] << " " << max_l[j] - 1 << " ";
-                    for (int l = 0; l < max_l_overall; l++)
-                        file << alpha_min[j][l] << " ";
-                    file << endl;
-                }
-                alpha_max_temp = alpha_max[j];
-                max_l_temp = max_l[j];
-                for (int l = 0; l <= max_l_temp; l++)
-                    alpha_min_temp[l] = alpha_min[j][l];
-                break;
-            }
-        }
-
-        if (debug)
-        {
-            file << "max_l: " << defaultfloat << max_l_temp << " alpha_max: " << scientific << alpha_max_temp << " alpha_min: ";
-            for (int l = 0; l <= max_l_temp; l++)
-                file << setw(14) << scientific << alpha_min_temp[l];
-            file << " accuracy: " << accuracy << endl;
-        }
-        int lebedev_high, lebedev_low;
-        double radial_acc;
-        err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
-        if (accuracy == 0)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-3;
-            }
-        }
-        else if (accuracy == 1)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
-                radial_acc = 1e-5;
-            }
-        }
-        else if (accuracy == 2)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                radial_acc = 1e-5;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                radial_acc = 1e-6;
-            }
-        }
-        else if (accuracy == 3)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
-                radial_acc = 1e-10;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
-                radial_acc = 1e-11;
-            }
-        }
-        else if (accuracy == 4)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
-                radial_acc = 1e-15;
-            }
-        }
-        else
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
-                radial_acc = 1e-15;
-            }
-        }
-        Prototype_grids.push_back(AtomGrid(radial_acc,
-                                           lebedev_low,
-                                           lebedev_high,
-                                           atom_type_list[i],
-                                           alpha_max_temp,
-                                           max_l_temp,
-                                           alpha_min_temp.data(),
-                                           file));
+        file << endl
+            << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
     }
 
     end_prototypes = get_time();
@@ -3567,72 +3039,23 @@ static int make_integration_grids(
     {
         file << " ...  " << flush;
     }
-    // get_grid is parallelized, therefore not parallel here
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        // skip atoms, that do not need a grid
-        if (!needs_grid[i])
-        {
-            continue;
-        }
-        if (debug)
-        {
-            file << "Making grid for atom " << i << endl;
-        }
-        int type = 0;
-        for (int j = 0; j < atom_type_list.size(); j++)
-            if (atom_type_list[j] == wave.get_atom_charge(i))
-                type = j;
-
-        int grid_number = 0;
-        for (int j = 0; j < i; j++)
-        {
-            if (needs_grid[j])
-            {
-                grid_number++;
-            }
-        }
-        num_points[grid_number] = Prototype_grids[type].get_num_grid_points();
-
-        for (int n = 0; n < grid[grid_number].size(); n++)
-            grid[grid_number][n].resize(num_points[grid_number], 0.0);
-
-        Prototype_grids[type].get_grid(wave.get_ncen(),
-                                       i,
-                                       &x[0],
-                                       &y[0],
-                                       &z[0],
-                                       &atom_z[0],
-                                       grid[grid_number][0].data(),
-                                       grid[grid_number][1].data(),
-                                       grid[grid_number][2].data(),
-                                       grid[grid_number][3].data(),
-                                       grid[grid_number][4].data());
-    }
-    if (debug)
-    {
-        int run = 0;
-        file << "  label | needs_grid | number of gridpoints\n";
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            file << setw(8) << wave.atoms[j].label << setw(13) << needs_grid[j];
-            if (needs_grid[j])
-            {
-                file << setw(7) << num_points[run];
-                run++;
-            }
-            else
-            {
-                file << setw(6) << "---";
-            }
-            file << endl;
-        }
-    }
+    ivec num_points = make_atomic_grids(
+        x,
+        y,
+        z,
+        atom_z,
+        needs_grid,
+        wave,
+        0,
+        atom_type_list,
+        asym_atom_list,
+        Prototype_grids,
+        grid,
+        file,
+        debug);
     Prototype_grids.clear();
 
-    int points = 0;
-    for (int i = 0; i < atoms_with_grids; i++)
-        points += num_points[i];
+    int points = vec_sum(num_points);
     if (debug)
         file << "Becke Grid exists" << endl;
     else
@@ -3643,18 +3066,6 @@ static int make_integration_grids(
         file << "Taking time..." << endl;
     }
     end_becke = get_time();
-    // Total grid as a sum of all atomic grids.
-    // Dimensions: [c] [p]
-    // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=wavefunction density, 5=MW
-    vector<vec> total_grid(6);
-
-    // int type_list_number = -1;
-
-    if (debug)
-    {
-        file << "Taking time..." << endl;
-    }
     end_spherical = get_time();
 
     double _cutoff;
@@ -3667,64 +3078,54 @@ static int make_integration_grids(
     ivec new_gridsize(atoms_with_grids, 0);
     ivec reductions(atoms_with_grids, 0);
     int final_size = 0;
-    bool prune = true;
-    if (prune)
-    {
-        file << "Pruning Grid..." << flush;
+    // Total grid as a sum of all atomic grids.
+    // Dimensions: [c] [p]
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=wavefunction density, 5=MW
+    // p = the number of gridpoint
+    vec2 total_grid(6);
+
+    file << "Pruning Grid..." << flush;
 #pragma omp parallel for reduction(+ : final_size)
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (abs(grid[i][4][p]) > _cutoff)
-                {
-                    new_gridsize[i]++;
-                }
-            }
-            reductions[i] = num_points[i] - new_gridsize[i];
-            final_size += new_gridsize[i];
-        }
-        for (int k = 0; k < total_grid.size(); k++)
-            total_grid[k].resize(final_size);
-#pragma omp parallel for
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            int offset = 0;
-            for (int j = 0; j < i; j++)
-            {
-                offset += new_gridsize[j];
-            }
-            int reduction = 0;
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (abs(grid[i][4][p]) > _cutoff)
-                {
-                    for (int k = 0; k < 4; k++)
-                        total_grid[k][p + offset - reduction] = grid[i][k][p];
-                    total_grid[5][p + offset - reduction] = grid[i][4][p];
-                }
-                else
-                {
-                    reduction++;
-                }
-            }
-            num_points[i] -= reduction;
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    else
+    for (int i = 0; i < atoms_with_grids; i++)
     {
-        for (int i = 0; i < atoms_with_grids; i++)
+        for (int p = 0; p < num_points[i]; p++)
         {
-            for (int p = 0; p < num_points[i]; p++)
+            if (abs(grid[i][5][p]) > _cutoff)
+            {
+                new_gridsize[i]++;
+            }
+        }
+        reductions[i] = num_points[i] - new_gridsize[i];
+        final_size += new_gridsize[i];
+    }
+    for (int k = 0; k < total_grid.size(); k++)
+        total_grid[k].resize(final_size);
+#pragma omp parallel for
+    for (int i = 0; i < atoms_with_grids; i++)
+    {
+        int offset = 0;
+        for (int j = 0; j < i; j++)
+        {
+            offset += new_gridsize[j];
+        }
+        int reduction = 0;
+        for (int p = 0; p < num_points[i]; p++)
+        {
+            if (abs(grid[i][5][p]) > _cutoff)
             {
                 for (int k = 0; k < 4; k++)
-                    total_grid[k].push_back(grid[i][k][p]);
-                total_grid[5].push_back(grid[i][4][p]);
+                    total_grid[k][p + offset - reduction] = grid[i][k][p];
+                total_grid[5][p + offset - reduction] = grid[i][5][p];
             }
-            shrink_vector<vec>(grid[i]);
+            else
+            {
+                reduction++;
+            }
         }
+        num_points[i] -= reduction;
+        shrink_vector<vec>(grid[i]);
     }
+
     shrink_vector<vector<vec>>(grid);
     points = 0;
     for (int i = 0; i < asym_atom_list.size(); i++)
@@ -3827,7 +3228,7 @@ static int make_integration_grids(
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
-        file << setw(10) << wave.atoms[a].label
+        file << setw(10) << labels[i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
         counter++;
         file << endl;
@@ -3922,14 +3323,15 @@ static int make_integration_grids_SALTED(
     cell &unit_cell,
     const WFN &wave,
     const string coef_filename,
-    const vector<int> &atom_type_list,
-    const vector<int> &asym_atom_list,
-    vector<bool> &needs_grid,
-    vector<vec> &d1,
-    vector<vec> &d2,
-    vector<vec> &d3,
-    vector<vec> &dens,
+    const ivec &atom_type_list,
+    const ivec &asym_atom_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
     const int exp_coefs,
+    const vector<string>& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -3939,263 +3341,32 @@ static int make_integration_grids_SALTED(
     bool debug,
     bool no_date)
 {
-    int atoms_with_grids = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (needs_grid[i])
-            atoms_with_grids++;
-    }
-    // counts number of points inside each atomic grid
-    ivec num_points(atoms_with_grids);
+    int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p]
     // a = atom [0,ncen],
     // c = coordinate [0=x, 1=y, 2=z, 3=atomic weight],
     // p = point in this grid
-    vector<vector<vec>> grid(atoms_with_grids);
+    vec3 grid(atoms_with_grids);
 #pragma omp parallel for
     for (int i = 0; i < atoms_with_grids; i++)
-        grid[i].resize(4);
+        grid[i].resize(6);
 
     const int nr_of_atoms = (wave.get_ncen());
     // positions
     vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
     // charges
     ivec atom_z(nr_of_atoms);
-    vec alpha_max(wave.get_ncen());
-    ivec max_l(wave.get_ncen());
-    int max_l_overall = 0;
 
-    // Accumulate vectors with information about all atoms
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        atom_z[i] = wave.get_atom_charge(i);
-        x[i] = ai->x;
-        y[i] = ai->y;
-        z[i] = ai->z;
-        alpha_max[i] = 0.0;
-        max_l[i] = 0;
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            if (ai->basis_set[b].exponent > alpha_max[i])
-                alpha_max[i] = ai->basis_set[b].exponent * 2;
-            int l = ai->basis_set[b].type;
-            if (l > max_l[i])
-            {
-                max_l[i] = l;
-#pragma omp critical
-                {
-                    if (l > max_l_overall)
-                        max_l_overall = l;
-                }
-            }
-        }
-    }
+    fill_xyzc(x, y, z, atom_z, 0, wave, cell());
 
-    if (debug)
-    {
-        file << "Atoms are there! max_l:" << setw(5) << max_l_overall << endl;
-        for (int i = 0; i < max_l.size(); i++)
-            file << "max_l: " << setw(5) << max_l[i] << endl;
-    }
-
-    vector<vec> alpha_min(wave.get_ncen());
-    for (int i = 0; i < wave.get_ncen(); i++)
-        alpha_min[i].resize(max_l_overall, 100000000.0);
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        for (int b = 0; b < max_l_overall; b++)
-            alpha_min[i][b] = 100000000.0;
-    }
-
-#pragma omp parallel for
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        const atom *ai = &(wave.atoms[i]);
-        for (int b = 0; b < ai->basis_set.size(); b++)
-        {
-            int l = ai->basis_set[b].type;
-            if (ai->basis_set[b].exponent < alpha_min[i][l])
-                alpha_min[i][l] = ai->basis_set[b].exponent;
-        }
-    }
-
-    if (debug)
-    {
-        for (int i = 0; i < wave.get_ncen(); i++)
-        {
-            file << "alpha_min: ";
-            for (int b = 0; b < max_l_overall; b++)
-                file << setw(14) << scientific << alpha_min[i][b];
-            file << endl;
-        }
-    }
-
-    if (debug)
-        file << "alpha_min is there!" << endl
-             << "Nr of asym atoms: " << asym_atom_list.size() << " Number of atoms in wfn: " << wave.get_ncen() << " atoms that needs a grid: " << atoms_with_grids << endl;
-    else
-        file << "There are:\n"
-             << setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
-             //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
-             << setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << endl;
-
+    // Make Prototype grids with only single atom weights for all elements
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, asym_atom_list, debug, file, accuracy, wave, 2);
     if (no_date)
         file << "\nMaking Becke Grids..." << flush;
     else
     {
-        if (debug)
-            file << "max_l_overall: " << max_l_overall << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grid for" << endl;
-        else
-            file << endl
-                 << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
-    }
-
-    // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids;
-
-    for (int i = 0; i < atom_type_list.size(); i++)
-    {
-        if (debug)
-            file << "Atom Type " << i << ": " << atom_type_list[i] << endl;
-        double alpha_max_temp(0);
-        int max_l_temp(0);
-        vec alpha_min_temp(max_l_overall);
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            if (wave.get_atom_charge(j) == 119)
-            {
-                continue;
-            }
-            if (wave.get_atom_charge(j) == atom_type_list[i])
-            {
-                if (debug)
-                {
-                    file << alpha_max[j] << " " << max_l[j] - 1 << " ";
-                    for (int l = 0; l < max_l_overall; l++)
-                        file << alpha_min[j][l] << " ";
-                    file << endl;
-                }
-                alpha_max_temp = alpha_max[j];
-                max_l_temp = max_l[j];
-                for (int l = 0; l <= max_l_temp; l++)
-                    alpha_min_temp[l] = alpha_min[j][l];
-                break;
-            }
-        }
-
-        if (debug)
-        {
-            file << "max_l: " << defaultfloat << max_l_temp << " alpha_max: " << scientific << alpha_max_temp << " alpha_min: ";
-            for (int l = 0; l <= max_l_temp; l++)
-                file << setw(14) << scientific << alpha_min_temp[l];
-            file << " accuracy: " << accuracy << endl;
-        }
-        int lebedev_high, lebedev_low;
-        double radial_acc;
-        err_checkf(accuracy >= 0, "Negative accuracy is not defined!", file);
-        if (accuracy == 0)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[0] : constants::lebedev_table[1];
-                radial_acc = 1e-3;
-            }
-        }
-        else if (accuracy == 1)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[3] : constants::lebedev_table[4];
-                radial_acc = 1e-4;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[2] : constants::lebedev_table[3];
-                radial_acc = 1e-5;
-            }
-        }
-        else if (accuracy == 2)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[12];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[7] : constants::lebedev_table[8];
-                radial_acc = 1e-5;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[10] : constants::lebedev_table[11];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[6] : constants::lebedev_table[7];
-                radial_acc = 1e-6;
-            }
-        }
-        else if (accuracy == 3)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[16];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[12] : constants::lebedev_table[14];
-                radial_acc = 1e-10;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[15];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[11] : constants::lebedev_table[13];
-                radial_acc = 1e-11;
-            }
-        }
-        else if (accuracy == 4)
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[19] : constants::lebedev_table[21];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[14] : constants::lebedev_table[17];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[18] : constants::lebedev_table[20];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[13] : constants::lebedev_table[16];
-                radial_acc = 1e-15;
-            }
-        }
-        else
-        {
-            if (atom_type_list[i] != 1)
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[31] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[29] : constants::lebedev_table[31];
-                radial_acc = 1e-20;
-            }
-            else
-            {
-                lebedev_high = (max_l_temp < 3) ? constants::lebedev_table[30] : constants::lebedev_table[32];
-                lebedev_low = (max_l_temp < 3) ? constants::lebedev_table[28] : constants::lebedev_table[30];
-                radial_acc = 1e-15;
-            }
-        }
-        Prototype_grids.push_back(AtomGrid(radial_acc,
-                                           lebedev_low,
-                                           lebedev_high,
-                                           atom_type_list[i],
-                                           alpha_max_temp,
-                                           max_l_temp,
-                                           alpha_min_temp.data(),
-                                           file));
+        file << endl
+            << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
     }
 
     end_prototypes = get_time();
@@ -4215,70 +3386,23 @@ static int make_integration_grids_SALTED(
     {
         file << " ...  " << flush;
     }
-    // get_grid is parallelized, therefore not parallel here
-    for (int i = 0; i < wave.get_ncen(); i++)
-    {
-        // skip atoms, that do not need a grid
-        if (!needs_grid[i])
-        {
-            continue;
-        }
-        if (debug)
-        {
-            file << "Making grid for atom " << i << endl;
-        }
-        int type = 0;
-        for (int j = 0; j < atom_type_list.size(); j++)
-            if (atom_type_list[j] == wave.get_atom_charge(i))
-                type = j;
-
-        int grid_number = 0;
-        for (int j = 0; j < i; j++)
-        {
-            if (needs_grid[j])
-            {
-                grid_number++;
-            }
-        }
-        num_points[grid_number] = Prototype_grids[type].get_num_grid_points();
-
-        for (int n = 0; n < grid[grid_number].size(); n++)
-            grid[grid_number][n].resize(num_points[grid_number], 0.0);
-
-        Prototype_grids[type].get_atomic_grid(
-            i,
-            &x[0],
-            &y[0],
-            &z[0],
-            grid[grid_number][0].data(),
-            grid[grid_number][1].data(),
-            grid[grid_number][2].data(),
-            grid[grid_number][3].data());
-    }
-    if (debug)
-    {
-        int run = 0;
-        file << "  label | needs_grid | number of gridpoints\n";
-        for (int j = 0; j < wave.get_ncen(); j++)
-        {
-            file << setw(8) << wave.atoms[j].label << setw(13) << needs_grid[j];
-            if (needs_grid[j])
-            {
-                file << setw(7) << num_points[run];
-                run++;
-            }
-            else
-            {
-                file << setw(6) << "---";
-            }
-            file << endl;
-        }
-    }
+    ivec num_points = make_atomic_grids(
+        x,
+        y,
+        z,
+        atom_z,
+        needs_grid,
+        wave,
+        0,
+        atom_type_list,
+        asym_atom_list,
+        Prototype_grids,
+        grid,
+        file,
+        debug);
     Prototype_grids.clear();
 
-    int points = 0;
-    for (int i = 0; i < atoms_with_grids; i++)
-        points += num_points[i];
+    int points = vec_sum(num_points);
     if (debug)
         file << "Becke Grid exists" << endl;
     else
@@ -4294,79 +3418,52 @@ static int make_integration_grids_SALTED(
     // Dimensions: [c] [p]
     // p = the number of gridpoint
     // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=atomic density
-    vector<vec> total_grid(5);
+    vec2 total_grid(5);
 
-    // int type_list_number = -1;
-
-    double _cutoff;
-    if (accuracy < 3)
-        _cutoff = 1E-10;
-    else if (accuracy == 3)
-        _cutoff = 1E-14;
-    else
-        _cutoff = 1E-30;
+    double _cutoff = cutoff(accuracy);
     ivec new_gridsize(atoms_with_grids, 0);
     int final_size = 0;
-    bool prune = false;
-    if (prune)
-    {
-        file << "Pruning Grid..." << flush;
+    file << "Pruning Grid..." << flush;
 #pragma omp parallel for reduction(+ : final_size)
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (abs(grid[i][3][p]) > _cutoff)
-                {
-                    new_gridsize[i]++;
-                }
-            }
-            final_size += new_gridsize[i];
-        }
-        for (int k = 0; k < total_grid.size(); k++)
-            total_grid[k].resize(final_size, 0.0);
-#pragma omp parallel for
-        for (int i = 0; i < atoms_with_grids; i++)
-        {
-            int offset = 0;
-            for (int j = 0; j < i; j++)
-            {
-                offset += new_gridsize[j];
-            }
-            int reduction = 0;
-            for (int p = 0; p < num_points[i]; p++)
-            {
-                if (abs(grid[i][3][p]) > _cutoff)
-                {
-                    for (int k = 0; k < 4; k++)
-                        total_grid[k][p + offset - reduction] = grid[i][k][p];
-                }
-                else
-                {
-                    reduction++;
-                }
-            }
-            num_points[i] -= reduction;
-            shrink_vector<vec>(grid[i]);
-        }
-    }
-    else
+    for (int i = 0; i < atoms_with_grids; i++)
     {
-        for (int i = 0; i < atoms_with_grids; i++)
+        for (int p = 0; p < num_points[i]; p++)
         {
-            for (int p = 0; p < num_points[i]; p++)
+            if (abs(grid[i][3][p]) > _cutoff)
+            {
+                new_gridsize[i]++;
+            }
+        }
+        final_size += new_gridsize[i];
+    }
+    for (int k = 0; k < total_grid.size(); k++)
+        total_grid[k].resize(final_size, 0.0);
+#pragma omp parallel for
+    for (int i = 0; i < atoms_with_grids; i++)
+    {
+        int offset = 0;
+        for (int j = 0; j < i; j++)
+        {
+            offset += new_gridsize[j];
+        }
+        int reduction = 0;
+        for (int p = 0; p < num_points[i]; p++)
+        {
+            if (abs(grid[i][3][p]) > _cutoff)
             {
                 for (int k = 0; k < 4; k++)
-                    total_grid[k].push_back(grid[i][k][p]);
-                total_grid[4].push_back(0);
+                    total_grid[k][p + offset - reduction] = grid[i][k][p];
             }
-            shrink_vector<vec>(grid[i]);
+            else
+            {
+                reduction++;
+            }
         }
+        num_points[i] -= reduction;
+        shrink_vector<vec>(grid[i]);
     }
     shrink_vector<vector<vec>>(grid);
-    points = 0;
-    for (int i = 0; i < atoms_with_grids; i++)
-        points += num_points[i];
+    points = vec_sum(num_points);
 
     file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
@@ -4386,19 +3483,6 @@ static int make_integration_grids_SALTED(
 
     string path{coef_filename};
     npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
-
-    // #pragma omp parallel for
-    //   for (int i = 0; i < nr_pts; i++) {
-    //     total_grid[4][i] = calc_density_ML(
-    //       total_grid[0][i],
-    //       total_grid[1][i],
-    //       total_grid[2][i],
-    //       data,
-    //       temp.atoms,
-    //       exp_coefs,
-    //
-    //     );
-    //   }
 
     if (debug)
         file << endl
@@ -4465,7 +3549,7 @@ static int make_integration_grids_SALTED(
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
-        file << setw(10) << wave.atoms[a].label
+        file << setw(10) << labels[i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[counter];
         counter++;
         file << endl;
@@ -4544,7 +3628,7 @@ void make_k_pts(const bool &read_k_pts,
                 const int gridsize,
                 const cell &unit_cell,
                 hkl_list &hkl,
-                vector<vec> &k_pt,
+                vec2 &k_pt,
                 ostream &file,
                 bool debug = false)
 {
@@ -4602,12 +3686,12 @@ void make_k_pts(const bool &read_k_pts,
  * @param no_date Flag indicating whether to exclude the date in the output.
  */
 void calc_SF(const int &points,
-             vector<vec> &k_pt,
-             vector<vec> &d1,
-             vector<vec> &d2,
-             vector<vec> &d3,
-             vector<vec> &dens,
-             vector<cvec> &sf,
+             vec2 &k_pt,
+             vec2 &d1,
+             vec2 &d2,
+             vec2 &d3,
+             vec2 &dens,
+             cvec2 &sf,
              ostream &file,
              time_point &start,
              time_point &end1,
@@ -4807,7 +3891,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
  */
 void convert_to_ED(const std::vector<int> &asym_atom_list,
                    const WFN &wave,
-                   std::vector<std::vector<std::complex<double>>> &sf,
+                   cvec2 &sf,
                    const cell &unit_cell,
                    const hkl_list &hkl)
 {
@@ -4837,7 +3921,7 @@ void convert_to_ED(const std::vector<int> &asym_atom_list,
 bool thakkar_sfac(
     const options &opt,
     ostream &file,
-    WFN &wave)
+    const WFN &wave)
 {
     if (opt.hkl != "")
     {
@@ -4852,13 +3936,13 @@ bool thakkar_sfac(
     cell unit_cell(opt.cif, file, opt.debug);
 
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave.get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave.get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wave,
@@ -5014,7 +4098,7 @@ bool thakkar_sfac(
 
     file << "Calculating scattering factors for " << amax << " types of atoms with " << imax << " atoms in the asymmetric unit." << endl;
 
-    vector<vector<double>> sf;
+    vec2 sf;
     sf.resize(asym_atom_list.size());
 #pragma omp parallel for
     for (int i = 0; i < asym_atom_list.size(); i++)
@@ -5048,10 +4132,6 @@ bool thakkar_sfac(
              << "SFs are made, now just write them!" << endl;
     file << endl
          << "Writing tsc file..." << endl;
-
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
     tsc_block<int, double> blocky(
         sf,
@@ -5093,12 +4173,12 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave[nr].get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave[nr].get_ncen(), false);
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[nr],
                         unit_cell,
                         wave[nr],
@@ -5147,8 +4227,8 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
         spherical_atoms.push_back(Thakkar(atom_type_list[i]));
 
     const int imax = (int)asym_atom_list.size();
-    // const int amax = (int) atom_type_list.size();
-    vector<vector<cdouble>> sf;
+
+    cvec2 sf;
     sf.resize(asym_atom_list.size());
 #pragma omp parallel for
     for (int i = 0; i < asym_atom_list.size(); i++)
@@ -5183,10 +4263,6 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
     file << endl
          << "Writing tsc file..." << endl;
 
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
-
     tsc_block<int, cdouble> blocky(
         sf,
         labels,
@@ -5205,7 +4281,7 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
  */
 bool calculate_scattering_factors_HF(
     const options &opt,
-    WFN &wave,
+    const WFN &wave,
     ostream &file)
 {
 #ifdef FLO_CUDA
@@ -5228,13 +4304,13 @@ bool calculate_scattering_factors_HF(
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave.get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave.get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wave,
@@ -5265,7 +4341,7 @@ bool calculate_scattering_factors_HF(
 
     if (opt.debug)
         file << "made it post CIF, now make grids!" << endl;
-    vector<vec> d1, d2, d3, dens;
+    vec2 d1, d2, d3, dens;
 
     int points = make_hirshfeld_grids(opt.pbc,
                                       opt.accuracy,
@@ -5275,6 +4351,7 @@ bool calculate_scattering_factors_HF(
                                       asym_atom_list,
                                       needs_grid,
                                       d1, d2, d3, dens,
+                                      labels,
                                       file,
                                       start,
                                       end_becke,
@@ -5287,7 +4364,7 @@ bool calculate_scattering_factors_HF(
 
     time_point before_kpts = get_time();
 
-    vector<vec> k_pt;
+    vec2 k_pt;
     make_k_pts(
         opt.read_k_pts,
         opt.save_k_pts,
@@ -5300,7 +4377,7 @@ bool calculate_scattering_factors_HF(
 
     time_point after_kpts = get_time();
 
-    vector<cvec> sf;
+    cvec2 sf;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
@@ -5332,10 +4409,6 @@ bool calculate_scattering_factors_HF(
                       unit_cell,
                       hkl);
     }
-
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
     tsc_block<int, cdouble> blocky(
         sf,
@@ -5382,9 +4455,9 @@ bool calculate_scattering_factors_HF(
  * @param exp_coefs The expected coefficients to use.
  * @return True if the scattering factors were calculated successfully, false otherwise.
  */
-bool calculate_scattering_factors_RI(
+bool calculate_scattering_factors_ML(
     const options &opt,
-    WFN &wave,
+    const WFN &wave,
     ostream &file,
     const int exp_coefs)
 {
@@ -5398,13 +4471,13 @@ bool calculate_scattering_factors_RI(
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave.get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave.get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wave,
@@ -5435,9 +4508,9 @@ bool calculate_scattering_factors_RI(
 
     if (opt.debug)
         file << "made it post CIF, now make grids!" << endl;
-    vector<vec> d1, d2, d3, dens;
+    vec2 d1, d2, d3, dens;
 
-    int points = make_hirshfeld_grids_RI(
+    int points = make_hirshfeld_grids_ML(
         opt.accuracy,
         wave,
         opt.coef_file,
@@ -5446,6 +4519,7 @@ bool calculate_scattering_factors_RI(
         needs_grid,
         d1, d2, d3, dens,
         exp_coefs,
+        labels,
         file,
         start,
         end_becke,
@@ -5458,7 +4532,7 @@ bool calculate_scattering_factors_RI(
 
     time_point before_kpts = get_time();
 
-    vector<vec> k_pt;
+    vec2 k_pt;
     make_k_pts(
         opt.read_k_pts,
         opt.save_k_pts,
@@ -5471,7 +4545,7 @@ bool calculate_scattering_factors_RI(
 
     time_point after_kpts = get_time();
 
-    vector<cvec> sf;
+    cvec2 sf;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
@@ -5503,10 +4577,6 @@ bool calculate_scattering_factors_RI(
                       unit_cell,
                       hkl);
     }
-
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
     tsc_block<int, cdouble> blocky(
         sf,
@@ -5544,9 +4614,9 @@ bool calculate_scattering_factors_RI(
     return true;
 }
 
-bool calculate_scattering_factors_RI_No_H(
+bool calculate_scattering_factors_ML_No_H(
     const options &opt,
-    WFN &wave,
+    const WFN &wave,
     ostream &file,
     const int exp_coefs)
 {
@@ -5560,13 +4630,13 @@ bool calculate_scattering_factors_RI_No_H(
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave.get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave.get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wave,
@@ -5597,7 +4667,7 @@ bool calculate_scattering_factors_RI_No_H(
 
     if (opt.debug)
         file << "made it post CIF, now make grids!" << endl;
-    vector<vec> d1, d2, d3, dens;
+    vec2 d1, d2, d3, dens;
     int points = 0;
     if (opt.SALTED)
     {
@@ -5612,6 +4682,7 @@ bool calculate_scattering_factors_RI_No_H(
             needs_grid,
             d1, d2, d3, dens,
             exp_coefs,
+            labels,
             file,
             start,
             end_becke,
@@ -5634,6 +4705,7 @@ bool calculate_scattering_factors_RI_No_H(
             needs_grid,
             d1, d2, d3, dens,
             exp_coefs,
+            labels,
             file,
             start,
             end_becke,
@@ -5649,7 +4721,7 @@ bool calculate_scattering_factors_RI_No_H(
 
     time_point before_kpts = get_time();
 
-    vector<vec> k_pt;
+    vec2 k_pt;
     make_k_pts(
         opt.read_k_pts,
         opt.save_k_pts,
@@ -5662,7 +4734,7 @@ bool calculate_scattering_factors_RI_No_H(
 
     time_point after_kpts = get_time();
 
-    vector<vector<complex<double>>> sf;
+    cvec2 sf;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
@@ -5694,10 +4766,6 @@ bool calculate_scattering_factors_RI_No_H(
                       unit_cell,
                       hkl);
     }
-
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave.atoms[asym_atom_list[i]].label);
 
     tsc_block<int, cdouble> blocky(
         sf,
@@ -5748,11 +4816,11 @@ bool calculate_scattering_factors_RI_No_H(
  */
 tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     options &opt,
-    vector<WFN> &wave,
+    const vector<WFN> &wave,
     ostream &file,
     vector<string> &known_atoms,
     const int &nr,
-    vector<vec> *kpts)
+    vec2 *kpts)
 {
 #ifdef FLO_CUDA
 
@@ -5789,12 +4857,12 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
 
     cell unit_cell(cif, file, opt.debug);
     ifstream cif_input(cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wave[nr].get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wave[nr].get_ncen(), false);
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[nr],
                         unit_cell,
                         wave[nr],
@@ -5823,6 +4891,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
                                             asym_atom_list,
                                             needs_grid,
                                             d1, d2, d3, dens,
+                                            labels,
                                             file,
                                             start,
                                             end_becke,
@@ -5839,14 +4908,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     hkl_list hkl;
     if (opt.m_hkl_list.size() != 0)
     {
-        hkl = opt.m_hkl_list; /*
- #pragma omp parallel for
-         for (int i = 0; i < known_indices[0].size(); i++) {
-             ivectemp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
- #pragma omp critical
-             hkl.emplace(temp_hkl);
-         }
-         */
+        hkl = opt.m_hkl_list;
     }
     else if (nr == 0 && opt.read_k_pts == false)
     {
@@ -5915,10 +4977,6 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
                       hkl);
     }
 
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wave[nr].atoms[asym_atom_list[i]].label);
-
     tsc_block<int, cdouble> blocky(
         sf,
         labels,
@@ -5975,7 +5033,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     vector<bool> needs_grid(wavy[0].get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wavy[0],
@@ -5998,6 +5056,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                          asym_atom_list,
                          needs_grid,
                          d1, d2, d3, dens,
+        labels,
                          std::cout,
                          start,
                          end_becke,
@@ -6087,9 +5146,6 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
         }
     }
     delete (progress);
-    vector<string> labels;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        labels.push_back(wavy[0].atoms[asym_atom_list[i]].label);
     tsc_block<double, cdouble> result(sf, labels, hkl);
     result.write_tsc_file_non_integer(opt.cif);
 }

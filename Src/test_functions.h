@@ -268,7 +268,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     vector<bool> needs_grid(wavy[0].get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wavy[0],
@@ -291,6 +291,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                          asym_atom_list,
                          needs_grid,
                          d1, d2, d3, dens,
+                         labels,
                          std::cout,
                          start,
                          end_becke,
@@ -438,8 +439,8 @@ void test_timing()
     opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_1\\thpp.wfx");
     opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_2\\thpp.wfx");
     opt.accuracy = 2;
-    vector<int> t1 = {0, 1};
-    vector<int> t2 = {0, 2};
+    ivec t1 = {0, 1};
+    ivec t2 = {0, 2};
     opt.groups.pop_back();
     opt.groups.push_back(t1);
     opt.groups.push_back(t2);
@@ -487,7 +488,7 @@ void test_timing()
         }
 
         std::vector<string> known_scatterer;
-        std::vector<vec> known_kpts;
+        vec2 known_kpts;
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
@@ -551,7 +552,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
     wavy.delete_unoccupied_MOs();
     cout << "Number of MOs before: " << wavy.get_nmo() << endl;
-    vector<bool> MOs_to_delete(wavy.get_nmo(), false);
+    bvec MOs_to_delete(wavy.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
     {
@@ -610,7 +611,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 
 #pragma omp parallel num_threads(opt.threads)
     {
-        vector<vec> d;
+        vec2 d;
         vec phi(wavy.get_nmo(), 0.0);
         d.resize(16);
         for (int i = 0; i < 16; i++)
@@ -675,17 +676,11 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
 #endif
     using namespace std;
     std::vector<WFN> wavy;
-    auto t = new WFN(1);
-    wavy.push_back(*t);
-    delete t;
+    wavy.emplace_back(1);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
-    t = new WFN(9);
-    wavy.push_back(*t);
-    delete t;
+    wavy.emplace_back(9);
     wavy[1].read_known_wavefunction_format("Au_def2.gbw", std::cout, opt.debug);
-    t = new WFN(9);
-    wavy.push_back(*t);
-    delete t;
+    wavy.emplace_back(9);
     wavy[2].read_known_wavefunction_format("Au_alle.gbw", std::cout, opt.debug);
     Thakkar Au(wavy[0].atoms[0].charge);
     if (opt.ECP)
@@ -709,13 +704,13 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
 
     cell unit_cell(opt.cif, log_file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wavy[0].get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wavy[0].get_ncen(), false);
     vector<string> known_atoms;
 
-    read_atoms_from_CIF(cif_input,
+    auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
                         unit_cell,
                         wavy[0],
@@ -738,6 +733,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          asym_atom_list,
                          needs_grid,
                          d1, d2, d3, dens,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -761,6 +757,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_def2,
                          ng_def2,
                          d1_def2, d2_def2, d3_def2, dens_def2,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -784,6 +781,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_all, d2_all, d3_all, dens_all,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -810,6 +808,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_all_val, d2_all_val, d3_all_val, dens_all_val,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -832,6 +831,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -858,6 +858,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -880,6 +881,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_x2c, d2_x2c, d3_x2c, dens_x2c,
+                         labels,
                          log_file,
                          start,
                          end_becke,
@@ -906,6 +908,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          aal_all,
                          ng_all,
                          d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val,
+                         labels,
                          log_file,
                          start,
                          end_becke,
