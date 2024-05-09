@@ -698,7 +698,7 @@ vector<string> read_atoms_from_CIF(ifstream &cif_input,
             file << setw(4) << wave.get_atom_charge(i);
         file << endl;
     }
-    int size = asym_atom_list.size();
+    int size = static_cast<int>(asym_atom_list.size());
     vector<string> labels2;
     for (int i = 0; i < size; i++)
         labels2.emplace_back(labels[asym_atom_list[i]]);
@@ -2490,6 +2490,8 @@ int make_hirshfeld_grids(
         double diff;
         double dist = 0;
         double densy;
+        int c = wave.atoms[cif2wfn_list[i]].charge;
+        Thakkar spherical_temp(c, wave.get_ECP_mode());
         for (int a = 0; a < i; a++)
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
@@ -2503,17 +2505,14 @@ int make_hirshfeld_grids(
                 d2[i][run] = (total_grid[1][p] - wave.atoms[cif2wfn_list[i]].y);
                 d3[i][run] = (total_grid[2][p] - wave.atoms[cif2wfn_list[i]].z);
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-                //if (wave.atoms[cif2wfn_list[i]].ECP_electrons != 0)
-                //{
-                //    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                //    int type_list_number = -1;
-                //    // Determine which type in the type list of sphericals to use
-                //    for (int j = 0; j < atom_type_list.size(); j++)
-                //        if (wave.get_atom_charge(i) == atom_type_list[j])
-                //            type_list_number = j;
-                //    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[cif2wfn_list[i]].ECP_electrons) * total_grid[3][p];
-                //    diff += densy;
-                //}
+                if (wave.atoms[cif2wfn_list[i]].ECP_electrons != 0)
+                {
+                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
+                    densy = spherical_temp.get_core_density(dist, wave.atoms[cif2wfn_list[i]].ECP_electrons) * total_grid[3][p];
+                    if (wave.get_ECP_mode())
+                        densy -= Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                    diff += densy;
+                }
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
@@ -2878,7 +2877,7 @@ static int make_hirshfeld_grids_ML(
         d2[i].resize(num_points[i]);
         d3[i].resize(num_points[i]);
     }
-    double upper = 0, diffs = 0, avg = 0, lower = 0;
+    double upper = 0, diffs = 0, avg = 0, lower = 0, _cut = cutoff(accuracy);
 #pragma omp parallel for reduction(+ : points, upper, avg, diffs, lower)
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
@@ -2888,12 +2887,14 @@ static int make_hirshfeld_grids_ML(
         double diff;
         double dist = 0;
         double densy;
+        int c = wave.atoms[asym_atom_list[i]].charge;
+        Thakkar spherical_temp(c, wave.get_ECP_mode());
         for (int a = 0; a < i; a++)
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
             res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
-            if (abs(res) > _cutoff)
+            if (abs(res) > _cut)
             {
                 densy = 0;
                 dens[i][run] = (res);
@@ -2901,17 +2902,14 @@ static int make_hirshfeld_grids_ML(
                 d2[i][run] = (total_grid[1][p] - wave.atoms[asym_atom_list[i]].y);
                 d3[i][run] = (total_grid[2][p] - wave.atoms[asym_atom_list[i]].z);
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-                //if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
-                //{
-                //    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                //    int type_list_number = -1;
-                //    // Determine which type in the type list of sphericals to use
-                //    for (int j = 0; j < atom_type_list.size(); j++)
-                //        if (wave.get_atom_charge(i) == atom_type_list[j])
-                //            type_list_number = j;
-                //    densy = sphericals[type_list_number].get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons);
-                //    diff += densy;
-                //}
+                if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
+                {
+                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
+                    densy = spherical_temp.get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons) * total_grid[3][p];
+                    if (wave.get_ECP_mode())
+                        densy -= Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                    diff += densy;
+                }
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
@@ -3867,7 +3865,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
                 if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
                 {
                     Spherical_Gaussian_Density C(wave.atoms[asym_atom_list[i]].charge, mode);
-                    sf[i][s] += C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
+                    sf[i][s] -= C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
                     sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
                 }
             }

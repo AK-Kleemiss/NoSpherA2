@@ -17,6 +17,7 @@ private:
     int nmo;
     int nex;
     int charge;
+    int ECP_m;
     unsigned int multi;
     int origin; // 0=NOT_YET_DEFINED; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
     double total_energy;
@@ -124,6 +125,7 @@ public:
     const int get_nmo() const { return nmo; };
     const int get_nmo(const bool &only_occ) const;
     const int get_origin() const { return origin; };
+    const int get_ECP_mode() const { return ECP_m; };
     const std::string get_comment() const { return comment; };
     const std::string get_CIF_table(const int nr = 0) const;
     const std::string get_basis_set_CIF(const int nr = 0) const;

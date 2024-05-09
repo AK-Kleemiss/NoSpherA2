@@ -272,7 +272,7 @@ public:
 			break;
 		case 1:
 		case 3:
-			temp_Z = atomic_number - 2;
+			temp_Z = atomic_number - 37;
 			if (temp_Z < 0)
 				err_not_impl_SA();
 			nex = static_cast<int>(def_corrections::c[temp_Z].size());

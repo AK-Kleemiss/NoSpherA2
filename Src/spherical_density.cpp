@@ -826,7 +826,7 @@ const double Spherical_Gaussian_Density::get_form_factor(const double &k_vector)
 	double res = 0;
 	for (int i = 0; i < nex; i++)
 	{
-		res += func(1, c[i], z[i], 0, k_vector);
+		res += func(1, c[i], z[i], 1, k_vector);
 	}
 	return res;
 }

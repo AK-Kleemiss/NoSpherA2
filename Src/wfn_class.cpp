@@ -59,6 +59,7 @@ WFN::WFN()
     charge = 0;
     multi = 0;
     origin = 0;
+    ECP_m = 0;
     total_energy = 0.0;
     virial_ratio = 0.0;
     d_f_switch = false;
@@ -79,6 +80,7 @@ WFN::WFN(int given_origin)
     nex = 0;
     charge = 0;
     multi = 0;
+    ECP_m = 0;
     total_energy = 0.0;
     origin = given_origin;
     d_f_switch = false;
@@ -2172,12 +2174,6 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
                 // }
                 for (int p = 0; p < expected_coefs; p++)
                 {
-                    if (debug && j == 0)
-                    {
-                        file << setw(4) << p;
-                        if ((p + 1) % 20 == 0)
-                            file << endl;
-                    }
                     switch (prims[basis_run].type)
                     {
                     case 1:
@@ -3892,6 +3888,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
 void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &ECP_mode)
 {
     has_ECPs = in;
+    ECP_m = ECP_mode;
     if (apply_to_atoms && ECP_mode == 1)
     {
 #pragma omp parallel for
