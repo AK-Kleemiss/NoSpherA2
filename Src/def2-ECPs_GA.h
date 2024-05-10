@@ -100,7 +100,7 @@ const int def2_occ[] = {
     1, 1, 1, 1, 0, 0, // Rn
 };
 // Its all just 2s so we initialize it during construction
-std::vector<int> def2_n;
+ivec def2_n;
 const double def2_z[] = {
     5.0365510, 1.9708490, 3.8431140, // Rb
     4.2583410, 1.4707090, 3.8431140,

@@ -865,7 +865,7 @@ __host__ int cu_make_hirshfeld_grids(
     vec2& d2,
     vec2& d3,
     vec2& dens,
-    const vector<string>& labels,
+    const svec& labels,
     ostream& file,
     time_point& start,
     time_point& end_becke,
@@ -931,12 +931,12 @@ __host__ int cu_make_hirshfeld_grids(
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
 
-    vector<vector<double>> radial_density;
-    vector<vector<double>> radial_dist;
+    vec2 radial_density;
+    vec2 radial_dist;
 
     radial_density.resize(atom_type_list.size());
     radial_dist.resize(atom_type_list.size());
-    vector<vector<double>> spherical_density(atoms_with_grids);
+    vec2 spherical_density(atoms_with_grids);
     spherical_density.resize(asym_atom_list.size());
     for (int i = 0; i < asym_atom_list.size(); i++)
         spherical_density[i].resize(num_points[i]);
@@ -1342,7 +1342,7 @@ __host__ int cu_make_hirshfeld_grids(
     // Vector containing integrated numbers of electrons
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
     // dimension 1: atoms of asym_atom_list
-    vector<vector<double>> atom_els;
+    vec2 atom_els;
     atom_els.resize(3);
     for (int i = 0; i < asym_atom_list.size(); i++)
         for (int n = 0; n < 3; n++)

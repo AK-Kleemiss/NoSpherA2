@@ -166,7 +166,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   com << wave.get_centers(check_bohr(wave, true, debug));
   //	com << wave.get_centers (false);
   com << endl;
-  vector<string> elements_list;
+  svec elements_list;
   if (debug) cout << "elements_list.size()= " << elements_list.size() << endl;
   for (int a = 0; a < wave.get_ncen(); a++) {
     string label_temp;
@@ -224,7 +224,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
 bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, const bool& read) {
   wave.set_modified();
   if (debug) debug_fchk = true;
-  vector<double> CMO;
+  vec CMO;
   int nao = 0;
   int nshell = 0;
   int naotr = 0;
@@ -242,7 +242,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     double pi = 3.14159265358979;
     //---------------normalize basis set---------------------------------
     if (debug) cout << "starting to normalize the basis set" << endl;
-    vector<double> norm_const;
+    vec norm_const;
     //-----------debug output---------------------------------------------------------
     if (debug) {
       cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
@@ -514,7 +514,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     }
     //------------------ make the DM -----------------------------
     naotr = nao * (nao + 1) / 2;
-    vector<double> kp;
+    vec kp;
     for (int i = 0; i < naotr; i++) wave.push_back_DM(0.0);
     if (debug) cout << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
     for (int iu = 0; iu < nao; iu++) {
@@ -731,8 +731,8 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", file);
     }
     // wave.set_modified();
-    vector<double> CMO;
-    vector<double> CMO_beta;
+    vec CMO;
+    vec CMO_beta;
     if (debug)
     {
         file << "Origin: " << wave.get_origin() << endl;
@@ -760,7 +760,7 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         }
 
         //-------------------normalize the basis set shell wise into a copy vector---------
-        vector<vector<double>> basis_coefficients(wave.get_ncen());
+        vec2 basis_coefficients(wave.get_ncen());
 #pragma omp parallel for
         for (int a = 0; a < wave.get_ncen(); a++)
         {
@@ -950,7 +950,7 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         }
         //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
         int run = 0;
-        vector<vector<double>> changed_coefs;
+        vec2 changed_coefs;
         changed_coefs.resize(wave.get_nmo());
         if (debug)
         {

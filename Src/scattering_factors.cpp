@@ -418,11 +418,11 @@ void generate_fractional_hkl(const double &dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-vector<string> read_atoms_from_CIF(ifstream &cif_input,
-                         const vector<int> &input_groups,
+svec read_atoms_from_CIF(ifstream &cif_input,
+                         const ivec &input_groups,
                          const cell &unit_cell,
                          const WFN &wave,
-                         const vector<string> &known_atoms,
+                         const svec &known_atoms,
                          ivec &atom_type_list,
                          ivec &asym_atom_to_type_list,
                          ivec &asym_atom_list,
@@ -439,7 +439,7 @@ vector<string> read_atoms_from_CIF(ifstream &cif_input,
     string line;
     cif_input.clear();
     cif_input.seekg(0, cif_input.beg);
-    vector<string> labels(wave.get_ncen(),"");
+    svec labels(wave.get_ncen(),"");
     if (debug && input_groups.size() > 0)
         file << "Group size: " << input_groups.size() << endl;
     while (!cif_input.eof() && !atoms_read)
@@ -481,7 +481,7 @@ vector<string> read_atoms_from_CIF(ifstream &cif_input,
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 int nr = -1;
                 for (int i = 0; i < count_fields; i++)
@@ -493,11 +493,11 @@ vector<string> read_atoms_from_CIF(ifstream &cif_input,
                          << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
                          << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
                          << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
-                vector<double> position = unit_cell.get_coords_cartesian(
+                vec position = unit_cell.get_coords_cartesian(
                     stod(fields[position_field[0]]),
                     stod(fields[position_field[1]]),
                     stod(fields[position_field[2]]));
-                vector<double> precisions = unit_cell.get_coords_cartesian(
+                vec precisions = unit_cell.get_coords_cartesian(
                     get_decimal_precision_from_CIF_number(fields[position_field[0]]),
                     get_decimal_precision_from_CIF_number(fields[position_field[1]]),
                     get_decimal_precision_from_CIF_number(fields[position_field[2]]));
@@ -699,7 +699,7 @@ vector<string> read_atoms_from_CIF(ifstream &cif_input,
         file << endl;
     }
     int size = static_cast<int>(asym_atom_list.size());
-    vector<string> labels2;
+    svec labels2;
     for (int i = 0; i < size; i++)
         labels2.emplace_back(labels[asym_atom_list[i]]);
     return labels2;
@@ -1393,7 +1393,7 @@ int make_hirshfeld_grids(
     vec2 &d2,
     vec2 &d3,
     vec2 &dens,
-    const vector<string>& labels,
+    const svec& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -1878,7 +1878,7 @@ static int make_hirshfeld_grids_ML(
     vec2 &d3,
     vec2 &dens,
     const int exp_coefs,
-    const vector<string>& labels,
+    const svec& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -2011,7 +2011,7 @@ static int make_hirshfeld_grids_ML(
     end_prune = get_time();
 
     file << "Calculating non-spherical densities..." << flush;
-    vector<vector<double>> periodic_grid;
+    vec2 periodic_grid;
 
     {
         WFN temp = wave;
@@ -2253,7 +2253,7 @@ static int make_integration_grids(
     vec2 &d3,
     vec2 &dens,
     const int exp_coefs,
-    const vector<string>& labels,
+    const svec& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -2578,7 +2578,7 @@ static int make_integration_grids_SALTED(
     vec2 &d3,
     vec2 &dens,
     const int exp_coefs,
-    const vector<string>& labels,
+    const svec& labels,
     ostream &file,
     time_point &start,
     time_point &end_becke,
@@ -3039,9 +3039,9 @@ void calc_SF(const int &points,
  * @param mode The mode of operation. 0 = Gaussian tight core function, 1,2,3 = Thakkar core density based on the ECP type used
  * @param debug Flag indicating whether to enable debug mode.
  */
-static void add_ECP_contribution(const vector<int> &asym_atom_list,
+static void add_ECP_contribution(const ivec &asym_atom_list,
                                  const WFN &wave,
-                                 vector<vector<complex<double>>> &sf,
+                                 cvec2 &sf,
                                  const cell &cell,
                                  hkl_list &hkl,
                                  ostream &file,
@@ -3124,7 +3124,7 @@ static void add_ECP_contribution(const vector<int> &asym_atom_list,
  * @param unit_cell The unit cell.
  * @param hkl The hkl list.
  */
-void convert_to_ED(const std::vector<int> &asym_atom_list,
+void convert_to_ED(const ivec &asym_atom_list,
                    const WFN &wave,
                    cvec2 &sf,
                    const cell &unit_cell,
@@ -3138,7 +3138,7 @@ void convert_to_ED(const std::vector<int> &asym_atom_list,
         it = next(hkl.begin(), s);
         h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
         for (int i = 0; i < asym_atom_list.size(); i++)
-            sf[i][s] = std::complex<double>(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
+            sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
     }
 }
 
@@ -3175,7 +3175,7 @@ bool thakkar_sfac(
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wave.get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -3396,7 +3396,7 @@ bool thakkar_sfac(
 tsc_block<int, cdouble> MTC_thakkar_sfac(
     options &opt,
     ostream &file,
-    vector<string> &known_atoms,
+    svec &known_atoms,
     vector<WFN> &wave,
     const int &nr)
 {
@@ -3543,7 +3543,7 @@ bool calculate_scattering_factors_HF(
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wave.get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -3710,7 +3710,7 @@ bool calculate_scattering_factors_ML(
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wave.get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -3869,7 +3869,7 @@ bool calculate_scattering_factors_ML_No_H(
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wave.get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -4053,7 +4053,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     options &opt,
     const vector<WFN> &wave,
     ostream &file,
-    vector<string> &known_atoms,
+    svec &known_atoms,
     const int &nr,
     vec2 *kpts)
 {
@@ -4266,7 +4266,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wavy[0].get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],

@@ -55,7 +55,7 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
         cout << "File of basis set to load: " << temp << endl;
     ifstream ifile(temp.c_str(), ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
@@ -372,7 +372,7 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
         cout << "File of basis set to load: " << temp_name << endl;
     ifstream ifile(temp_name.c_str(), ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
@@ -638,7 +638,7 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
         cout << "File of basis set to load: " << temp << endl;
     ifstream ifile(temp.c_str(), ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {

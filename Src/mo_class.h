@@ -9,7 +9,7 @@ private:
   int nr;
   double occ;
   double ener;
-  std::vector<double> coefficients;
+  vec coefficients;
   int op; //0=alpha, 1=beta
 public:
   MO() {
@@ -120,6 +120,6 @@ public:
     return ener;
   };
   const double* get_ptr_coefficients() { return &coefficients[0]; };
-  const std::vector<double>& get_ptr_coef_vector() const { return coefficients; };
-  void assign_coefs(const std::vector<double>& values) { coefficients.resize(values.size()); coefficients = values; }
+  const vec& get_ptr_coef_vector() const { return coefficients; };
+  void assign_coefs(const vec& values) { coefficients.resize(values.size()); coefficients = values; }
 };

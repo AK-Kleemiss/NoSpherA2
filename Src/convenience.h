@@ -62,6 +62,7 @@ typedef std::vector<ivec> ivec2;
 typedef std::vector<cdouble> cvec;
 typedef std::vector<cvec> cvec2;
 typedef std::vector<bool> bvec;
+typedef std::vector<std::string> svec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
 int vec_sum(const bvec& in);
@@ -342,7 +343,7 @@ std::vector<T> split_string(const std::string &input, const std::string delimite
     return result;
 };
 
-void remove_empty_elements(std::vector<std::string>& input, const std::string& empty = " ");
+void remove_empty_elements(svec& input, const std::string& empty = " ");
 std::chrono::high_resolution_clock::time_point get_time();
 long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
@@ -386,8 +387,8 @@ bool check_bohr(WFN &wave, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
 
 /*bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
-bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings, const std::string &filename_given);
-bool save_file_dialog(std::string &path, bool debug, const std::vector<std::string> &endings);*/
+bool save_file_dialog(std::string &path, bool debug, const svec &endings, const std::string &filename_given);
+bool save_file_dialog(std::string &path, bool debug, const svec &endings);*/
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char *tmp);
@@ -489,7 +490,7 @@ void readxyzMinMax_fromCIF(
     std::string cif,
     double *CoordMinMax,
     int *NbSteps,
-    std::vector<std::vector<double>> &cm,
+    vec2 &cm,
     double Resolution,
     std::ofstream &file,
     bool debug = false);
@@ -678,14 +679,14 @@ struct options
     ivec2 groups;
     vec2 twin_law;
     ivec2 combined_tsc_groups;
-    std::vector<std::string> combined_tsc_calc_files;
-    std::vector<std::string> combined_tsc_calc_cifs;
+    svec combined_tsc_calc_files;
+    svec combined_tsc_calc_cifs;
     std::vector<unsigned int> combined_tsc_calc_mult;
     ivec combined_tsc_calc_charge;
-    std::vector<std::string> arguments;
-    std::vector<std::string> combine_mo;
-    std::vector<std::string> Cations;
-    std::vector<std::string> Anions;
+    svec arguments;
+    svec combine_mo;
+    svec Cations;
+    svec Anions;
     ivec cmo1;
     ivec cmo2;
     ivec ECP_nrs;
@@ -776,8 +777,109 @@ struct options
         look_for_debug(argc, argv);
     };
 
-    options(int accuracy, int threads, int pbc, double resolution, double radius, bool becke, bool electron_diffraction, bool ECP, bool set_ECPs, int ECP_mode, bool calc, bool eli, bool esp, bool elf, bool lap, bool rdg, bool hdef, bool def, bool fract, bool hirsh, bool s_rho, bool SALTED, bool SALTED_BECKE, bool Olex2_1_3_switch, bool iam_switch, bool read_k_pts, bool save_k_pts, bool combined_tsc_calc, bool binary_tsc, bool cif_based_combined_tsc_calc, bool density_test_cube, bool no_date, bool gbw2wfn, bool old_tsc, bool thakkar_d_plot, bool spherical_harmonic, bool ML_test, double sfac_scan, double sfac_diffuse, double dmin, int hirsh_number, const ivec &MOs, const std::vector<ivec> &groups, const std::vector<vec> &twin_law, const std::vector<ivec> &combined_tsc_groups, bool all_mos, bool test, const std::string &wfn, const std::string &fchk, const std::string &basis_set, const std::string &hkl, const std::string &cif, const std::string &method, const std::string &xyz_file, const std::string &coef_file, const std::string &fract_name, const std::vector<std::string> &combined_tsc_calc_files, const std::vector<std::string> &combined_tsc_calc_cifs, const std::string &wavename, const std::string &gaussian_path, const std::string &turbomole_path, const std::string &basis_set_path, const std::vector<std::string> &arguments, const std::vector<std::string> &combine_mo, const std::vector<std::string> &Cations, const std::vector<std::string> &Anions, const ivec &cmo1, const ivec &cmo2, const ivec &ECP_nrs, const ivec &ECP_elcounts, int ncpus, double mem, unsigned int mult, bool debug, const hkl_list &m_hkl_list, std::ostream &log_file)
-        : accuracy(accuracy), threads(threads), pbc(pbc), resolution(resolution), radius(radius), becke(becke), electron_diffraction(electron_diffraction), ECP(ECP), set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc), eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg), hdef(hdef), def(def), fract(fract), hirsh(hirsh), s_rho(s_rho), SALTED(SALTED), SALTED_BECKE(SALTED_BECKE), Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch), read_k_pts(read_k_pts), save_k_pts(save_k_pts), combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc), cif_based_combined_tsc_calc(cif_based_combined_tsc_calc), no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc), thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan), sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number), MOs(MOs), groups(groups), twin_law(twin_law), combined_tsc_groups(combined_tsc_groups), all_mos(all_mos), test(test), wfn(wfn), fchk(fchk), basis_set(basis_set), hkl(hkl), cif(cif), method(method), xyz_file(xyz_file), coef_file(coef_file), fract_name(fract_name), combined_tsc_calc_files(combined_tsc_calc_files), combined_tsc_calc_cifs(combined_tsc_calc_cifs), wavename(wavename), gaussian_path(gaussian_path), turbomole_path(turbomole_path), basis_set_path(basis_set_path), arguments(arguments), combine_mo(combine_mo), Cations(Cations), Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs), ECP_elcounts(ECP_elcounts), ncpus(ncpus), mem(mem), mult(mult), debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
+    options(int accuracy, 
+        int threads, 
+        int pbc, 
+        double resolution, 
+        double radius, 
+        bool becke, 
+        bool electron_diffraction, 
+        bool ECP, 
+        bool set_ECPs, 
+        int ECP_mode, 
+        bool calc,
+        bool eli,
+        bool esp,
+        bool elf,
+        bool lap, 
+        bool rdg,
+        bool hdef, 
+        bool def, 
+        bool fract, 
+        bool hirsh, 
+        bool s_rho, 
+        bool SALTED, 
+        bool SALTED_BECKE, 
+        bool Olex2_1_3_switch, 
+        bool iam_switch, 
+        bool read_k_pts, 
+        bool save_k_pts, 
+        bool combined_tsc_calc, 
+        bool binary_tsc, 
+        bool cif_based_combined_tsc_calc, 
+        bool density_test_cube, 
+        bool no_date, 
+        bool gbw2wfn, 
+        bool old_tsc, 
+        bool thakkar_d_plot, 
+        bool spherical_harmonic, 
+        bool ML_test, 
+        double sfac_scan, 
+        double sfac_diffuse, 
+        double dmin, 
+        int hirsh_number, 
+        const ivec &MOs, 
+        const ivec2 &groups, 
+        const vec2 &twin_law, 
+        const ivec2 &combined_tsc_groups, 
+        bool all_mos, 
+        bool test, 
+        const std::string &wfn, 
+        const std::string &fchk, 
+        const std::string &basis_set, 
+        const std::string &hkl, 
+        const std::string &cif, 
+        const std::string &method, 
+        const std::string &xyz_file, 
+        const std::string &coef_file, 
+        const std::string &fract_name, 
+        const svec &combined_tsc_calc_files, 
+        const svec &combined_tsc_calc_cifs, 
+        const std::string &wavename, 
+        const std::string &gaussian_path, 
+        const std::string &turbomole_path, 
+        const std::string &basis_set_path, 
+        const svec &arguments, 
+        const svec &combine_mo, 
+        const svec &Cations, 
+        const svec &Anions, 
+        const ivec &cmo1, 
+        const ivec &cmo2, 
+        const ivec &ECP_nrs, 
+        const ivec &ECP_elcounts, 
+        int ncpus, 
+        double mem, 
+        unsigned int mult, 
+        bool debug, 
+        const hkl_list &m_hkl_list, 
+        std::ostream &log_file)
+        : accuracy(accuracy), threads(threads), pbc(pbc), 
+          resolution(resolution), radius(radius), becke(becke), 
+          electron_diffraction(electron_diffraction), ECP(ECP), 
+          set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc), 
+          eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg), 
+          hdef(hdef), def(def), fract(fract), hirsh(hirsh), 
+          s_rho(s_rho), SALTED(SALTED), SALTED_BECKE(SALTED_BECKE), 
+          Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch), 
+          read_k_pts(read_k_pts), save_k_pts(save_k_pts), 
+          combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc), 
+          cif_based_combined_tsc_calc(cif_based_combined_tsc_calc), 
+          no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc), 
+          thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan), 
+          sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number), 
+          MOs(MOs), groups(groups), twin_law(twin_law), 
+          combined_tsc_groups(combined_tsc_groups), all_mos(all_mos), 
+          test(test), wfn(wfn), fchk(fchk), basis_set(basis_set), 
+          hkl(hkl), cif(cif), method(method), xyz_file(xyz_file), 
+          coef_file(coef_file), fract_name(fract_name), 
+          combined_tsc_calc_files(combined_tsc_calc_files), 
+          combined_tsc_calc_cifs(combined_tsc_calc_cifs), 
+          wavename(wavename), gaussian_path(gaussian_path), 
+          turbomole_path(turbomole_path), basis_set_path(basis_set_path), 
+          arguments(arguments), combine_mo(combine_mo), Cations(Cations), 
+          Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs), 
+          ECP_elcounts(ECP_elcounts), ncpus(ncpus), mem(mem), mult(mult), 
+          debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
     {
     }
 };

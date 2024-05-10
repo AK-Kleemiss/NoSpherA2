@@ -266,7 +266,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wavy[0].get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -487,7 +487,7 @@ void test_timing()
             std::cout << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
 
-        std::vector<string> known_scatterer;
+        svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
@@ -708,7 +708,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec needs_grid(wavy[0].get_ncen(), false);
-    vector<string> known_atoms;
+    svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                         opt.groups[0],
@@ -768,10 +768,10 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          opt.debug,
                          opt.no_date);
 
-    vector<vec> d1_all, d2_all, d3_all, dens_all;
+    vec2 d1_all, d2_all, d3_all, dens_all;
     ivec atl_all{79};
     ivec aal_all{0};
-    vector<bool> ng_all(1, true);
+    bvec ng_all(1, true);
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -798,7 +798,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
         wavy_all_val.delete_MO(0);
     for (int i = 0; i < 7; i++)
         wavy_all_val.delete_MO(1);
-    vector<vec> d1_all_val, d2_all_val, d3_all_val, dens_all_val;
+    vec2 d1_all_val, d2_all_val, d3_all_val, dens_all_val;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -821,7 +821,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
 
     WFN wavy_ZORA(9);
     wavy_ZORA.read_known_wavefunction_format("Au_alle_ZORA.gbw", std::cout, opt.debug);
-    vector<vec> d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA;
+    vec2 d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -848,7 +848,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
         wavy_ZORA_val.delete_MO(0);
     for (int i = 0; i < 7; i++)
         wavy_ZORA_val.delete_MO(1);
-    vector<vec> d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val;
+    vec2 d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -871,7 +871,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
 
     WFN wavy_x2c(9);
     wavy_x2c.read_known_wavefunction_format("Au_alle_x2c.gbw", std::cout, opt.debug);
-    vector<vec> d1_x2c, d2_x2c, d3_x2c, dens_x2c;
+    vec2 d1_x2c, d2_x2c, d3_x2c, dens_x2c;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -898,7 +898,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
         wavy_x2c_val.delete_MO(0);
     for (int i = 0; i < 7; i++)
         wavy_x2c_val.delete_MO(1);
-    vector<vec> d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val;
+    vec2 d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -1660,7 +1660,7 @@ void test_core_dens()
     dat_out.close();
 }
 
-double calc_pot_by_integral(std::vector<std::vector<std::vector<double>>> &grid, const double &r, const double &cube_dist, const double &dr)
+double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist, const double &dr)
 {
     double res = 0;
     const double dr3 = dr * dr * dr;
@@ -1723,9 +1723,9 @@ void test_esp_dens()
     const double min_dist = 0.0000001;
     double current = 1;
     double dist = min_dist;
-    vector<vector<double>> radial_density(1);
-    vector<vector<double>> radial_density_core(1);
-    vector<vector<double>> radial_dist(1);
+    vec2 radial_density(1);
+    vec2 radial_density_core(1);
+    vec2 radial_dist(1);
     const double cube_dist = 5.0;
     while (dist < 2.3 * cube_dist)
     {
@@ -1736,7 +1736,7 @@ void test_esp_dens()
         radial_density_core[0].push_back(current);
         dist *= incr;
     }
-    vector<vector<vector<double>>> dens_grid;
+    vec3 dens_grid;
     double dr = 0.02;
     const double dr3 = dr * dr * dr;
     const int grid_size = (2*cube_dist / dr) + 1;

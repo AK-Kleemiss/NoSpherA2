@@ -51,7 +51,7 @@ bool thakkar_sfac(const options &opt, std::ostream &file, const WFN &wave);
 itsc_block MTC_thakkar_sfac(
     options &opt, 
     std::ostream &file, 
-    std::vector<std::string> &known_atoms, 
+    svec &known_atoms, 
     std::vector<WFN> &wave, 
     const int &nr);
 
@@ -106,7 +106,7 @@ itsc_block calculate_scattering_factors_MTC(
     options &opt, 
     const std::vector<WFN> &wave, 
     std::ostream &file, 
-    std::vector<std::string> &known_atoms, 
+    svec &known_atoms, 
     const int &nr, 
     vec2 *kpts = NULL);
 
@@ -183,12 +183,12 @@ cdouble convert_to_ED_single(
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
-std::vector<std::string> read_atoms_from_CIF(
+svec read_atoms_from_CIF(
     std::ifstream &cif_input, 
     const ivec &input_groups, 
     const cell &unit_cell, 
     const WFN &wave, 
-    const std::vector<std::string> &known_atoms, 
+    const svec &known_atoms, 
     ivec &atom_type_list, 
     ivec &asym_atom_to_type_list, 
     ivec &asym_atom_list, 
@@ -232,7 +232,7 @@ int make_hirshfeld_grids(
     vec2 &d2, 
     vec2 &d3, 
     vec2 &dens, 
-    const std::vector<std::string>& labels,
+    const svec& labels,
     std::ostream &file, 
     time_point &start, 
     time_point &end_becke, 

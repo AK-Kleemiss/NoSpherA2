@@ -14,8 +14,8 @@ inline void not_implemented_SA(const std::string &file, const int &line, const s
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
 inline double linear_interpolate_spherical_density(
-	const std::vector<double> &radial_dens,
-	const std::vector<double> &spherical_dist,
+	const vec &radial_dens,
+	const vec &spherical_dist,
 	const double dist,
 	const double lincr,
 	const double start)

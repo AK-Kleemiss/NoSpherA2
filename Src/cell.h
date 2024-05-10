@@ -16,7 +16,7 @@ private:
     double cm[3][3];
     double upper;
     std::string crystal_system;
-    std::vector<std::vector<std::vector<int>>> sym;
+    std::vector<ivec2> sym;
     const double PI = 3.14159265358979323846;
     const double bohr2angs = 0.529177249;
 
@@ -77,7 +77,7 @@ public:
     double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };
     double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / constants::TWO_PI; };
     double get_sym(int i, int j, int k) const { return sym[i][j][k]; };
-    std::vector<std::vector<std::vector<int>>> get_sym() const { return sym; };
+    std::vector<ivec2> get_sym() const { return sym; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };
@@ -216,9 +216,9 @@ public:
      * @param in_bohr flag to indicate if the coordinates are in Bohr
      * @return resulting Cartesian coordinates
      */
-    std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
+    vec get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
     {
-        std::vector<double> positions_cart{0., 0., 0.};
+        vec positions_cart{0., 0., 0.};
         positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
         positions_cart[1] = (b * sg * frac_y + c * (ca - cb * cg) / sg * frac_z);
         positions_cart[2] = V / (a * b * sg) * frac_z;
@@ -240,12 +240,12 @@ public:
     bool read_CIF(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
     {
         std::ifstream cif_input(filename.c_str(), std::ios::in);
-        std::vector<bool> found;
+        bvec found;
         found.resize(7);
         for (int k = 0; k < 7; k++)
             found[k] = false;
         double v = 0.0;
-        std::vector<std::string> cell_keywords;
+        svec cell_keywords;
         std::string line;
         cell_keywords.push_back("_cell_length_a");
         cell_keywords.push_back("_cell_length_b");
@@ -404,12 +404,12 @@ public:
                         file << "Reading operation!" << line << std::endl;
                     symm_found = true;
                     std::stringstream s(line);
-                    std::vector<std::string> fields;
+                    svec fields;
                     fields.resize(count_fields);
                     int sym_from_cif[3][3]{0, 0, 0, 0, 0, 0, 0, 0, 0};
                     for (int i = 0; i < count_fields; i++)
                         s >> fields[i];
-                    std::vector<std::string> vectors;
+                    svec vectors;
                     vectors.resize(3);
                     int column = 0;
                     for (int c_ = 0; c_ < fields[operation_field].length(); c_++)

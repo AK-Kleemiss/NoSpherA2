@@ -28,7 +28,7 @@ private:
     std::string method;
 
     std::vector<MO> MOs;
-    std::vector<int> centers;
+    ivec centers;
     // For cartesian the order of types is:
     // 1                                            = S,
     // 2,3,4                                        = X,Y,Z
@@ -41,10 +41,10 @@ private:
     // 2,3,4 = 0, 1, -1
     // 5,6,7,8,9 = 0, +1, -1, +2, -2
     // 10,11,12,13,14,15,16 = 0, +1, -1, +2, -2, +3, -3 etc...
-    std::vector<int> types;
-    std::vector<double> exponents;
-    std::vector<double> DensityMatrix;
-    std::vector<double> SpinDensityMatrix;
+    ivec types;
+    vec exponents;
+    vec DensityMatrix;
+    vec SpinDensityMatrix;
 
     bool erase_center(const int &g_nr);
     bool erase_type(const int &nr);
@@ -53,7 +53,7 @@ private:
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
     void push_back_MO_coef(const int &nr, const double &value);
-    void assign_MO_coefs(const int &nr, std::vector<double> &values);
+    void assign_MO_coefs(const int &nr, vec &values);
     bool modified;
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;
@@ -65,9 +65,9 @@ private:
     void fill_Afac_pre();
     const double fj(int &j, int &l, int &m, double &aa, double &bb) const;
     const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const;
-    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
-    const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
-    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
+    const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
+    const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
 
 public:
     WFN();
@@ -159,13 +159,13 @@ public:
     void set_dist_switch(const bool &g) { distance_switch = g; };
     const bool get_dist_switch() const { return distance_switch; };
     void set_has_ECPs(const bool &in, const bool &apply_to_aotms = true, const int &ECP_mode = 1);
-    void set_ECPs(std::vector<int> &nr, std::vector<int> &elcount);
+    void set_ECPs(ivec &nr, ivec &elcount);
     const bool get_has_ECPs() const { return has_ECPs; };
     void operator=(const WFN &right);
     int calculate_charge();
     int calculate_charge(std::ostream &file);
     bool guess_multiplicity(std::ostream &file);
-    const std::vector<double> get_norm_const(std::ostream &file, const bool debug = false) const;
+    const vec get_norm_const(std::ostream &file, const bool debug = false) const;
     /**
      * Deletes the basis set information from the given WFN object.
      *
@@ -222,9 +222,9 @@ public:
     // double compute_dens(const double* PosGrid, const int atom = -1);
     // This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
     const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3) const;
-    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3) const;
-    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, std::vector<std::vector<double>> &d, std::vector<double> &phi) const;
+    const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap) const;
     const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap) const;
     const void computeELIELF(const double *PosGrid, double &Elf, double &Eli) const;
@@ -233,8 +233,8 @@ public:
     const void computeELF(const double *PosGrid, double &Elf) const;
     const double computeMO(const double *PosGrid, const int &mo) const;
     const double compute_MO_spherical(const double &Pos1, const double &Pos2, const double &Pos3, const int &MO) const;
-    const double computeESP(const double *PosGrid, const std::vector<std::vector<double>> &d2) const;
-    const double computeESP_noCore(const double *PosGrid, const std::vector<std::vector<double>> &d2) const;
+    const double computeESP(const double *PosGrid, const vec2 &d2) const;
+    const double computeESP_noCore(const double *PosGrid, const vec2 &d2) const;
     //----------DM Handling--------------------------------
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);

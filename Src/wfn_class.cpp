@@ -150,7 +150,7 @@ void WFN::push_back_MO_coef(const int &nr, const double &value)
     MOs[nr].push_back_coef(value);
 };
 
-void WFN::assign_MO_coefs(const int &nr, std::vector<double> &values)
+void WFN::assign_MO_coefs(const int &nr, vec &values)
 {
     err_checkf(nr < nmo, "not enough MOs", std::cout);
     MOs[nr].assign_coefs(values);
@@ -568,10 +568,10 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "e_nmo: " << e_nmo << ", e_nex: " << e_nex << ", e_nuc : " << e_nuc << endl;
     }
     //----------------------------- Read Atoms ------------------------------------------------------------
-    vector<unsigned int> dum_nr, dum_ch;
+    ivec dum_nr, dum_ch;
     dum_nr.resize(e_nuc);
     dum_ch.resize(e_nuc);
-    vector<string> dum_label;
+    svec dum_label;
     vec dum_x, dum_y, dum_z;
     dum_x.resize(e_nuc);
     dum_y.resize(e_nuc);
@@ -606,7 +606,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         dum_label.push_back(shrink_string_to_atom(temp, dum_ch[i]));
     }
     //------------------------------------ Read center assignements -------------------------------------------
-    vector<unsigned int> dum_center;
+    ivec dum_center;
     dum_center.resize(e_nex);
     if (debug)
         for (int i = 0; i < e_nex; i++)
@@ -957,10 +957,10 @@ bool WFN::read_xyz(const string &filename, ostream &file, const bool debug)
     getline(rf, line);
     comment = line;
     //----------------------------- Read Atoms ------------------------------------------------------------
-    vector<unsigned int> dum_nr, dum_ch;
+    ivec dum_nr, dum_ch;
     dum_nr.resize(e_nuc);
     dum_ch.resize(e_nuc);
-    vector<string> dum_label;
+    svec dum_label;
     vec dum_x, dum_y, dum_z;
     dum_x.resize(e_nuc);
     dum_y.resize(e_nuc);
@@ -968,7 +968,7 @@ bool WFN::read_xyz(const string &filename, ostream &file, const bool debug)
     dum_label.resize(e_nuc);
     for (int i = 0; i < e_nuc; i++)
     {
-        vector<string> temp;
+        svec temp;
         getline(rf, line);
         stream.str(line);
         if (debug)
@@ -1038,7 +1038,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     rf.seekg(0);
     while (line.find("<Atomic Numbers>") == string::npos)
         getline(rf, line);
-    vector<int> nrs;
+    ivec nrs;
     while (true)
     {
         getline(rf, line);
@@ -1051,7 +1051,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     rf.seekg(0);
     while (line.find("<Nuclear Cartesian Coordinates>") == string::npos)
         getline(rf, line);
-    vector<vector<double>> pos;
+    vec2 pos;
     pos.resize(3);
     double temp[3]{0, 0, 0};
     while (true)
@@ -1147,7 +1147,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     rf.seekg(0);
     while (line.find("<Molecular Orbital Occupation Numbers>") == string::npos)
         getline(rf, line);
-    vector<double> occ;
+    vec occ;
     while (true)
     {
         getline(rf, line);
@@ -1173,7 +1173,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     rf.seekg(0);
     while (line.find("<Molecular Orbital Energies>") == string::npos)
         getline(rf, line);
-    vector<double> ener;
+    vec ener;
     while (true)
     {
         getline(rf, line);
@@ -1216,7 +1216,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     rf.seekg(0);
     while (line.find("<Molecular Orbital Primitive Coefficients>") == string::npos)
         getline(rf, line);
-    vector<double> coef;
+    vec coef;
     while (line.find("</Molecular Orbital Primitive Coefficients>") == string::npos)
     {
         while (line.find("<MO Number>") == string::npos)
@@ -1286,7 +1286,7 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
     else if (split_string<string>(line, "]")[1].find("Angs") != string::npos)
         au_bohr = true;
     getline(rf, line);
-    vector<string> temp;
+    svec temp;
     while (line.find("]") == string::npos)
     {
         temp = split_string<string>(line, " ");
@@ -1312,7 +1312,7 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
     int atoms_with_basis = 0;
     while (atoms_with_basis < ncen && line.find("[") == string::npos)
     {
-        vector<string> line_digest = split_string<string>(line, " ");
+        svec line_digest = split_string<string>(line, " ");
         remove_empty_elements(line_digest);
         const int atom_based = stoi(line_digest[0]) - 1;
         getline(rf, line);
@@ -2465,9 +2465,9 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
 {
     err_checkf(get_nr_basis_set_loaded() != 0, "No basis set loaded!", file);
     err_checkf(get_nr_basis_set_loaded() == get_ncen(), "Not all atoms have a basis set loaded!", file);
-    vector<double> norm_const;
+    vec norm_const;
     //-------------------normalize the basis set shell wise into a copy vector---------
-    vector<vector<double>> basis_coefficients;
+    vec2 basis_coefficients;
     basis_coefficients.resize(ncen);
     for (int a = 0; a < ncen; a++)
         for (int p = 0; p < get_atom_primitive_count(a); p++)
@@ -3778,13 +3778,13 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                     break;
                 case 4:
                 {
-                    vector<int> temp_center;
+                    ivec temp_center;
                     temp_center.resize(10);
-                    vector<int> temp_type;
+                    ivec temp_type;
                     temp_type.resize(10);
-                    vector<double> temp_exponent;
+                    vec temp_exponent;
                     temp_exponent.resize(10);
-                    vector<vector<double>> temp_MO_coefficients;
+                    vec2 temp_MO_coefficients;
                     temp_MO_coefficients.resize(nmo);
                     for (int m = 0; m < nmo; m++)
                         temp_MO_coefficients[m].resize(10);
@@ -3798,7 +3798,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
                         }
-                        vector<int> mask{0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+                        ivec mask{0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
                         for (int j = 0; j < 10; j++)
                         {
                             centers[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_center[mask[j]];
@@ -3830,13 +3830,13 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                     break;
                 case 4:
                 {
-                    vector<int> temp_center;
+                    ivec temp_center;
                     temp_center.resize(10);
-                    vector<int> temp_type;
+                    ivec temp_type;
                     temp_type.resize(10);
-                    vector<double> temp_exponent;
+                    vec temp_exponent;
                     temp_exponent.resize(10);
-                    vector<vector<double>> temp_MO_coefficients;
+                    vec2 temp_MO_coefficients;
                     temp_MO_coefficients.resize(nmo);
                     for (int m = 0; m < nmo; m++)
                         temp_MO_coefficients[m].resize(10);
@@ -3850,7 +3850,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 temp_MO_coefficients[m][j] = MOs[m].get_coefficient(get_shell_start_in_primitives(a, s) + 10 * i + j);
                         }
-                        vector<int> mask{0, 1, 2, 3, 4, 6, 5, 7, 8, 9};
+                        ivec mask{0, 1, 2, 3, 4, 6, 5, 7, 8, 9};
                         for (int j = 0; j < 10; j++)
                         {
                             centers[get_shell_start_in_primitives(a, s) + 10 * i + j] = temp_center[mask[j]];
@@ -4230,7 +4230,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         atoms[i].y = coords[3 * i + 1];
         atoms[i].z = coords[3 * i + 2];
     }
-    vector<int> shell_types;
+    ivec shell_types;
     if (!read_fchk_integer_block(fchk, "Shell types", shell_types, false))
     {
         log << "Error reading shell types" << endl;
@@ -4243,25 +4243,25 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     if (debug)
         log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << endl
             << "Loading basis set information..." << endl;
-    vector<int> nr_prims_shell;
+    ivec nr_prims_shell;
     if (!read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell))
     {
         log << "Error reading primitives per shell" << endl;
         return false;
     }
-    vector<int> shell2atom;
+    ivec shell2atom;
     if (!read_fchk_integer_block(fchk, "Shell to atom map", shell2atom))
     {
         log << "Error reading shell2atom" << endl;
         return false;
     }
-    vector<double> exp;
+    vec exp;
     if (!read_fchk_double_block(fchk, "Primitive exponents", exp))
     {
         log << "Error reading Primitive exponents" << endl;
         return false;
     }
-    vector<double> contraction;
+    vec contraction;
     if (!read_fchk_double_block(fchk, "Contraction coefficients", contraction))
     {
         log << "Error reading Contraction coefficients" << endl;
@@ -6141,7 +6141,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     inFile.read(reinterpret_cast<char *>(&nprims), sizeof(nprims));
     inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
 
-    vector<string> atyp(ncent);
+    svec atyp(ncent);
     char temp[3]{0, 0, 0};
     for (int i = 0; i < ncent; ++i)
     {
@@ -6166,7 +6166,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
         inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
     }
 
-    vector<int> lao(nprims), aoatcart(nprims), ipao(nprims);
+    ivec lao(nprims), aoatcart(nprims), ipao(nprims);
     for (int i = 0; i < nprims; ++i)
     {
         inFile.read(reinterpret_cast<char *>(&lao[i]), sizeof(lao[i]));
@@ -6183,7 +6183,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
         inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
     }
 
-    vector<double> exps(nprims), contr(nprims);
+    vec exps(nprims), contr(nprims);
     for (int i = 0; i < nprims; ++i)
     {
         inFile.read(reinterpret_cast<char *>(&exps[i]), sizeof(exps[i]));
@@ -6195,7 +6195,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     }
     inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
 
-    vector<double> occ(nmomax), eval(nmomax);
+    vec occ(nmomax), eval(nmomax);
     for (int i = 0; i < nmomax; ++i)
     {
         inFile.read(reinterpret_cast<char *>(&occ[i]), sizeof(occ[i]));
@@ -6206,7 +6206,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
         inFile.read(reinterpret_cast<char *>(&eval[i]), sizeof(eval[i]));
     }
     inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    vector<vector<double>> momat(nmomax, vector<double>(nbf));
+    vec2 momat(nmomax, vec(nbf));
     for (int i = 0; i < nmomax; ++i)
     {
         for (int j = 0; j < nbf; ++j)

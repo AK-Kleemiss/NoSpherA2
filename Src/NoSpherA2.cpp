@@ -159,7 +159,7 @@ int main(int argc, char **argv)
             log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
 
-        vector<string> known_scatterer;
+        svec known_scatterer;
         vec2 known_kpts;
         tsc_block<int, cdouble> result;
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)

@@ -114,7 +114,7 @@ void cls()
 
 string atnr2letter(const int &nr)
 {
-    vector<string> Labels{"DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"};
+    svec Labels{"DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"};
     if (nr == 0)
     {
         // Exception for Q peaks in residual maps
@@ -645,7 +645,7 @@ int filetype_identifier(string &file, bool debug)
     temp = 0;
     if (debug)
         cout << "Temp before any checks: " << temp << endl;
-    vector<string> types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
+    svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
     if (file.find(".wfn") != string::npos)
     {
         if (debug)
@@ -1311,7 +1311,7 @@ void readxyzMinMax_fromWFN(
     double Increments,
     bool no_bohr)
 {
-    vector<vector<double>> PosAtoms;
+    vec2 PosAtoms;
     PosAtoms.resize(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
         PosAtoms[i].resize(3);
@@ -1374,7 +1374,7 @@ void readxyzMinMax_fromCIF(
     string cif,
     double *CoordMinMax,
     int *NbSteps,
-    vector<vector<double>> &cm,
+    vec2 &cm,
     double Resolution,
     ofstream &file,
     bool debug)
@@ -1387,14 +1387,14 @@ void readxyzMinMax_fromCIF(
         return;
     }
     ifstream cif_input(cif.c_str(), ios::in);
-    vector<bool> found;
+    bvec found;
     string line;
     found.resize(7);
     for (int k = 0; k < 7; k++)
         found[k] = false;
     double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
     double alpha = 0.0, beta = 0.0, gamma = 0.0;
-    vector<string> cell_keywords;
+    svec cell_keywords;
     cell_keywords.push_back("_cell_length_a");
     cell_keywords.push_back("_cell_length_b");
     cell_keywords.push_back("_cell_length_c");
@@ -1907,7 +1907,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
     string line;
-    vector<string> labels;
+    svec labels;
     int count_fields = 0;
     int position_field[3] = {0, 0, 0};
     int label_field = 100;
@@ -1950,7 +1950,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2024,7 +2024,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2099,7 +2099,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2184,7 +2184,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2582,7 +2582,7 @@ void options::digest_options()
                 if (i + n - 1 > arguments.size())
                     break;
                 store = arguments[i + n];
-                vector<string> Z = split_string<string>(store, " ");
+                svec Z = split_string<string>(store, " ");
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
@@ -2627,7 +2627,7 @@ void options::digest_options()
                 if (i + n - 1 > arguments.size())
                     break;
                 store = arguments[i + n];
-                vector<string> Z = split_string<string>(store, " ");
+                svec Z = split_string<string>(store, " ");
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
@@ -2779,7 +2779,7 @@ void options::digest_options()
             method = arguments[i + 1];
         else if (temp == "-merge")
         {
-            vector<string> filenames;
+            svec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -2791,7 +2791,7 @@ void options::digest_options()
         }
         else if (temp == "-merge_nocheck")
         {
-            vector<string> filenames;
+            svec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -3414,7 +3414,7 @@ void write_timing_to_file(std::ostream& file,
         file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
-void remove_empty_elements(std::vector<std::string>& input, const std::string& empty)
+void remove_empty_elements(svec& input, const std::string& empty)
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")

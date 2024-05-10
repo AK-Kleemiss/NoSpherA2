@@ -1032,7 +1032,7 @@ void Calc_ESP(
 #endif
     time_point start = get_time();
 
-    vector<vector<double>> d2;
+    vec2 d2;
     d2.resize(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
@@ -1224,7 +1224,7 @@ void properties_calculation(options &opt)
     if (opt.debug)
         log2 << "Size of MOs: " << opt.MOs.size() << endl;
 
-    vector<vector<double>> cell_matrix;
+    vec2 cell_matrix;
     cell_matrix.resize(3);
     for (int i = 0; i < 3; i++)
         cell_matrix[i].resize(3);
@@ -1514,7 +1514,7 @@ void do_combine_mo(options &opt)
     MO1.give_parent_wfn(wavy3);
     MO1.set_na(wavy3.get_ncen());
     cube MO2(steps[0], steps[1], steps[2], 0, true);
-    vector<string> fns;
+    svec fns;
     for (int i = 0; i < 3; i++)
     {
         MO1.set_origin(i, MinMax[i]);

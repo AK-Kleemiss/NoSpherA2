@@ -6,7 +6,7 @@ class tsc_block
 {
 private:
   std::vector<std::vector<std::complex<double>>> sf; //[#scatterer] [#reflection]
-  std::vector<std::string> scatterer;                // Labels of reflections the correpsonding entry of sf belonds to
+  svec scatterer;                // Labels of reflections the correpsonding entry of sf belonds to
   std::vector<std::vector<numtype_index>> index;     //[3] [miller_index]
   std::string header;
   bool anomalous_dispersion;
@@ -14,7 +14,7 @@ private:
 public:
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
-      std::vector<std::string> &given_scatterer,
+      svec &given_scatterer,
       std::vector<std::vector<numtype_index>> &given_index,
       std::string &given_header)
   {
@@ -36,7 +36,7 @@ public:
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
-      std::vector<std::string> &given_scatterer,
+      svec &given_scatterer,
       std::vector<std::vector<numtype_index>> &given_index)
   {
     sf.resize(given_sf.size());
@@ -56,7 +56,7 @@ public:
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
-      std::vector<std::string> &given_scatterer,
+      svec &given_scatterer,
       hkl_list_d &given_index)
   {
     sf.resize(given_sf.size());
@@ -72,7 +72,7 @@ public:
     }
     scatterer = given_scatterer;
     index.resize(3);
-    for (const std::vector<double> &hkl : given_index)
+    for (const vec &hkl : given_index)
     {
       for (int i = 0; i < 3; i++)
         index[i].push_back(static_cast<numtype_index>(hkl[i]));
@@ -81,7 +81,7 @@ public:
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
-      std::vector<std::string> &given_scatterer,
+      svec &given_scatterer,
       hkl_list &given_index)
   {
     sf.resize(given_sf.size());
@@ -193,7 +193,7 @@ public:
     err_checkf(nr < scatterer.size(), "Invalid nr of scatterer", log);
     return scatterer[nr];
   };
-  const std::vector<std::string> get_scatterers() const { return scatterer; }
+  const svec get_scatterers() const { return scatterer; }
   const std::string scatterers_string()
   {
     std::string result;
@@ -268,7 +268,7 @@ public:
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
     int new_scatterers = 0;
-    std::vector<bool> is_new(rhs.scatterer_size(), true);
+    bvec is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+ : new_scatterers)
     for (int s = 0; s < (int)rhs.scatterer_size(); s++)
     {
@@ -311,7 +311,7 @@ public:
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
     unsigned int new_scatterers = 0;
-    std::vector<bool> is_new(rhs.scatterer_size(), true);
+    bvec is_new(rhs.scatterer_size(), true);
 #pragma omp parallel for reduction(+ : new_scatterers)
     for (int s = 0; s < rhs.scatterer_size(); s++)
     {
@@ -434,7 +434,7 @@ public:
 
 inline bool merge_tscs(
     const std::string &mode,
-    const std::vector<std::string> &files,
+    const svec &files,
     const bool old_tsc)
 {
   // Currently only for Mode "pure merge"
@@ -444,12 +444,12 @@ inline bool merge_tscs(
   }
   if (files.size() == 0)
     return false;
-  std::vector<std::string> labels;
-  std::vector<std::string> local_files(files);
-  std::vector<std::vector<int>> indices;                    //[i] is h,k or l, [j] is the number of the reflection
-  std::vector<std::vector<std::complex<double>>> form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
+  svec labels;
+  svec local_files(files);
+  ivec2  indices;                    //[i] is h,k or l, [j] is the number of the reflection
+  cvec2 form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
 
-  std::vector<std::string> header;
+  svec header;
 
   size_t offset = 0;
   indices.resize(3);
@@ -469,7 +469,7 @@ inline bool merge_tscs(
     std::ifstream inf(local_files[f].c_str(), std::ios::in);
     std::string line;
     bool data = false;
-    std::vector<bool> is_a_new_scatterer;
+    bvec is_a_new_scatterer;
     int nr_scatterers = 0;
     int nr_new_scatterers;
     while (!data)
@@ -511,7 +511,7 @@ inline bool merge_tscs(
     while (!inf.eof())
     {
       getline(inf, line);
-      std::vector<std::string> digest = split_string<std::string>(line, " ");
+      svec digest = split_string<std::string>(line, " ");
       if (digest.size() == 1 && digest[0] == "")
         continue;
       const int l_indices[3] = {stoi(digest[0]), stoi(digest[1]), stoi(digest[2])};
@@ -542,7 +542,7 @@ inline bool merge_tscs(
           for (int p = 0; p < i; p++)
             if (is_a_new_scatterer[p])
               nr_in_new_scats++;
-          std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+          svec re_im = split_string<std::string>(digest[i + 3], ",");
           form_fact[offset + nr_in_new_scats].push_back(std::complex<double>(stod(re_im[0]), stod(re_im[1])));
         }
       }
@@ -574,7 +574,7 @@ inline bool merge_tscs(
               for (int p = 0; p < i; p++)
                 if (is_a_new_scatterer[p])
                   nr_in_new_scats++;
-              std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+              svec re_im = split_string<std::string>(digest[i + 3], ",");
               form_fact[offset + nr_in_new_scats][run] = std::complex<double>(stod(re_im[0]), stod(re_im[1]));
             }
             found = true;
@@ -590,7 +590,7 @@ inline bool merge_tscs(
               for (int p = 0; p < i; p++)
                 if (is_a_new_scatterer[p])
                   nr_in_new_scats++;
-              std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+              svec re_im = split_string<std::string>(digest[i + 3], ",");
               form_fact[offset + nr_in_new_scats][run] = std::complex<double>(stod(re_im[0]), -stod(re_im[1]));
             }
             found = true;
@@ -623,7 +623,7 @@ inline bool merge_tscs(
 
 inline bool merge_tscs_without_checks(
     const std::string &mode,
-    const std::vector<std::string> &files,
+    const svec &files,
     const bool old_tsc)
 {
   // Currently only for Mode "pure merge"
@@ -633,11 +633,11 @@ inline bool merge_tscs_without_checks(
   }
   if (files.size() == 0)
     return false;
-  std::vector<std::string> labels;
-  std::vector<std::string> local_files(files);
-  std::vector<std::vector<int>> indices;                    //[i] is h,k or l, [j] is the number of the reflection
-  std::vector<std::vector<std::complex<double>>> form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
-  std::vector<std::string> header;
+  svec labels;
+  svec local_files(files);
+  ivec2 indices;                    //[i] is h,k or l, [j] is the number of the reflection
+  cvec2 form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
+  svec header;
 
   size_t offset = 0;
   indices.resize(3);
@@ -657,7 +657,7 @@ inline bool merge_tscs_without_checks(
     std::ifstream inf(local_files[f].c_str(), std::ios::in);
     std::string line;
     bool data = false;
-    std::vector<bool> is_a_new_scatterer;
+    bvec is_a_new_scatterer;
     int nr_scatterers = 0;
     int nr_new_scatterers;
     while (!data)
@@ -699,7 +699,7 @@ inline bool merge_tscs_without_checks(
     while (!inf.eof())
     {
       getline(inf, line);
-      std::vector<std::string> digest = split_string<std::string>(line, " ");
+      svec digest = split_string<std::string>(line, " ");
       if (digest.size() == 1 && digest[0] == "")
         continue;
       if (f == 0)
@@ -714,7 +714,7 @@ inline bool merge_tscs_without_checks(
         for (int p = 0; p < i; p++)
           if (is_a_new_scatterer[p])
             nr_in_new_scats++;
-        std::vector<std::string> re_im = split_string<std::string>(digest[i + 3], ",");
+        svec re_im = split_string<std::string>(digest[i + 3], ",");
         form_fact[offset + nr_in_new_scats].push_back(std::complex<double>(stod(re_im[0]), stod(re_im[1])));
       }
     }
