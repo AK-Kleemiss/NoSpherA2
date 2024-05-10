@@ -814,7 +814,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
     }
     int linecount = 0;
     int monum = 0;
-    vector<vec> temp_val;
+    vec2 temp_val;
     temp_val.resize(e_nmo);
     for (int i = 0; i < e_nmo; i++)
         temp_val[i].resize(e_nex);
@@ -1426,10 +1426,10 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
         }
         getline(rf, line);
         int MO_run = 0;
-        vector<vec> p_pure_2_cart;
-        vector<vec> d_pure_2_cart;
-        vector<vec> f_pure_2_cart;
-        vector<vec> g_pure_2_cart;
+        vec2 p_pure_2_cart;
+        vec2 d_pure_2_cart;
+        vec2 f_pure_2_cart;
+        vec2 g_pure_2_cart;
         err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
         while (!rf.eof() && rf.good() && line.size() > 2 && line.find("[") == string::npos)
         {
@@ -1455,13 +1455,13 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
             push_back_MO(run, occup, ene, spin);
             // int run_coef = 0;
             int p_run = 0;
-            vector<vec> p_temp(3);
+            vec2 p_temp(3);
             int d_run = 0;
-            vector<vec> d_temp(5);
+            vec2 d_temp(5);
             int f_run = 0;
-            vector<vec> f_temp(7);
+            vec2 f_temp(7);
             int g_run = 0;
-            vector<vec> g_temp(9);
+            vec2 g_temp(9);
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
@@ -1742,13 +1742,13 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
             push_back_MO(run, occup, ene, spin);
             // int run_coef = 0;
             int p_run = 0;
-            vector<vec> p_temp(3);
+            vec2 p_temp(3);
             int d_run = 0;
-            vector<vec> d_temp(6);
+            vec2 d_temp(6);
             int f_run = 0;
-            vector<vec> f_temp(10);
+            vec2 f_temp(10);
             int g_run = 0;
-            vector<vec> g_temp(15);
+            vec2 g_temp(15);
             int basis_run = 0;
             for (int i = 0; i < expected_coefs; i++)
             {
@@ -2098,10 +2098,10 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
         }
         // int norm_const_run = 0;
         int MO_run = 0;
-        vector<vec> p_pure_2_cart;
-        vector<vec> d_pure_2_cart;
-        vector<vec> f_pure_2_cart;
-        vector<vec> g_pure_2_cart;
+        vec2 p_pure_2_cart;
+        vec2 d_pure_2_cart;
+        vec2 f_pure_2_cart;
+        vec2 g_pure_2_cart;
         err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
         if (debug)
             file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
@@ -2120,11 +2120,11 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
         rf.read((char *)&dimension, 4);
         err_checkf(rf.good(), "Error reading dimnesion", file);
         size_t coef_nr = size_t(dimension) * size_t(dimension);
-        vector<vec> coefficients(operators);
-        vector<vec> occupations(operators);
-        vector<vec> energies(operators);
-        vector<ivec> irreps(operators);
-        vector<ivec> cores(operators);
+        vec2 coefficients(operators);
+        vec2 occupations(operators);
+        vec2 energies(operators);
+        ivec2 irreps(operators);
+        ivec2 cores(operators);
         for (int i = 0; i < operators; i++)
         {
             coefficients[i].resize(coef_nr, 0);
@@ -2161,13 +2161,13 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
                 push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j], i);
                 // int run_coef = 0;
                 int p_run = 0;
-                vector<vec> p_temp(3);
+                vec2 p_temp(3);
                 int d_run = 0;
-                vector<vec> d_temp(5);
+                vec2 d_temp(5);
                 int f_run = 0;
-                vector<vec> f_temp(7);
+                vec2 f_temp(7);
                 int g_run = 0;
-                vector<vec> g_temp(9);
+                vec2 g_temp(9);
                 int basis_run = 0;
                 // if (debug) {
                 //   file << "Starting the " << j << ". loop... wish me luck... " << endl;
@@ -3586,7 +3586,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                         temp_types.resize(3 * get_atom_shell_primitives(a, s));
                         vec temp_exponents;
                         temp_exponents.resize(3 * get_atom_shell_primitives(a, s));
-                        vector<vec> temp_MO_coefficients;
+                        vec2 temp_MO_coefficients;
                         temp_MO_coefficients.resize(get_atom_shell_primitives(a, s) * 3);
                         for (int i = 0; i < get_atom_shell_primitives(a, s) * 3; i++)
                             temp_MO_coefficients[i].resize(nmo);
@@ -3621,7 +3621,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                         temp_types.resize(6 * get_atom_shell_primitives(a, s));
                         vec temp_exponents;
                         temp_exponents.resize(get_atom_shell_primitives(a, s) * 6);
-                        vector<vec> temp_MO_coefficients;
+                        vec2 temp_MO_coefficients;
                         temp_MO_coefficients.resize(get_atom_shell_primitives(a, s) * 6);
                         for (int i = 0; i < get_atom_shell_primitives(a, s) * 6; i++)
                             temp_MO_coefficients[i].resize(nmo);
@@ -3660,7 +3660,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                         temp_types.resize(10 * get_atom_shell_primitives(a, s));
                         vec temp_exponents;
                         temp_exponents.resize(get_atom_shell_primitives(a, s) * 10);
-                        vector<vec> temp_MO_coefficients;
+                        vec2 temp_MO_coefficients;
                         temp_MO_coefficients.resize(get_atom_shell_primitives(a, s) * 10);
                         for (int i = 0; i < get_atom_shell_primitives(a, s) * 10; i++)
                             temp_MO_coefficients[i].resize(nmo);
@@ -4142,7 +4142,7 @@ void WFN::delete_unoccupied_MOs()
 
 bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
 {
-    vector<vec> mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
+    vec2 mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
     if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h))
         log << "Error during geenration of matrix" << endl;
     int r_u_ro_switch = 0;
@@ -4406,7 +4406,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         }
     }
     // vector<primitive> basis;
-    vector<vec> COa, COb, CObasa, CObasb, CObasa_spherical, CObasb_spherical;
+    vec2 COa, COb, CObasa, CObasb, CObasa_spherical, CObasb_spherical;
     // ivec basshell, bascen, bastype, basstart, basend, primstart, primend;
     vec primconnorm;
     // create arrays
@@ -4829,7 +4829,7 @@ const double WFN::compute_dens_cartesian(
     const double &Pos1,
     const double &Pos2,
     const double &Pos3,
-    vector<vec> &d,
+    vec2 &d,
     vec &phi) const
 {
     std::fill(phi.begin(), phi.end(), 0.0);
@@ -5000,7 +5000,7 @@ const double WFN::compute_MO_spherical(
     int l = 0;
     // ex will carry information about radial function
     double ex;
-    vector<vec> d(5);
+    vec2 d(5);
     for (int i = 0; i < 5; i++)
         d[i].resize(ncen);
     double phi(0.0);

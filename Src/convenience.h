@@ -58,6 +58,7 @@ typedef std::vector<double> vec;
 typedef std::vector<vec> vec2;
 typedef std::vector<vec2> vec3;
 typedef std::vector<int> ivec;
+typedef std::vector<ivec> ivec2;
 typedef std::vector<cdouble> cvec;
 typedef std::vector<cvec> cvec2;
 typedef std::vector<bool> bvec;
@@ -292,8 +293,8 @@ std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
 char asciitolower(char in);
 
-bool generate_sph2cart_mat(std::vector<vec> &p, std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g);
-bool generate_cart2sph_mat(std::vector<vec> &d, std::vector<vec> &f, std::vector<vec> &g, std::vector<vec> &h);
+bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
+bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h);
 std::string go_get_string(std::ifstream &file, std::string search, bool rewind = true);
 
 const int sht2nbas(const int &type);
@@ -674,13 +675,13 @@ struct options
     double mem = 0.0;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
-    std::vector<ivec> groups;
-    std::vector<vec> twin_law;
-    std::vector<ivec> combined_tsc_groups;
+    ivec2 groups;
+    vec2 twin_law;
+    ivec2 combined_tsc_groups;
     std::vector<std::string> combined_tsc_calc_files;
     std::vector<std::string> combined_tsc_calc_cifs;
     std::vector<unsigned int> combined_tsc_calc_mult;
-    std::vector<int> combined_tsc_calc_charge;
+    ivec combined_tsc_calc_charge;
     std::vector<std::string> arguments;
     std::vector<std::string> combine_mo;
     std::vector<std::string> Cations;

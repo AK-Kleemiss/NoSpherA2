@@ -262,10 +262,10 @@ void sfac_scan(options &opt, std::ostream &log_file)
 
     cell unit_cell(opt.cif, std::cout, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    vector<int> atom_type_list;
-    vector<int> asym_atom_to_type_list;
-    vector<int> asym_atom_list;
-    vector<bool> needs_grid(wavy[0].get_ncen(), false);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec needs_grid(wavy[0].get_ncen(), false);
     vector<string> known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
@@ -281,7 +281,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                         opt.debug);
 
     cif_input.close();
-    vector<vec> d1, d2, d3, dens;
+    vec2 d1, d2, d3, dens;
 
     make_hirshfeld_grids(opt.pbc,
                          opt.accuracy,
@@ -311,7 +311,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
 
     // This bit is basically the substitute for make_k_pts, where we sample the whole sphere
     //  by iterating over both spherical angles by a fixed step defined above
-    vector<vec> k_pt;
+    vec2 k_pt;
     k_pt.resize(4);
 #pragma omp parallel for
     for (int i = 0; i < 4; i++)
@@ -335,7 +335,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
         }
     }
     // below is a strip of Calc_SF without the file IO or progress bar
-    vector<vector<complex<double>>> sf;
+    cvec2 sf;
 
     const int imax = (int)dens.size();
     const int smax = (int)k_pt[0].size();
@@ -644,8 +644,8 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 
 void add_ECP_contribution_test(const ivec &asym_atom_list,
                                const WFN &wave,
-                               std::vector<cvec> &sf,
-                               std::vector<vec> &k_pt,
+                               cvec2 &sf,
+                               vec2 &k_pt,
                                std::ostream &file,
                                const bool debug)
 {
@@ -723,7 +723,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                         opt.debug);
 
     cif_input.close();
-    vector<vec> d1, d2, d3, dens;
+    vec2 d1, d2, d3, dens;
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -744,10 +744,10 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          opt.debug,
                          opt.no_date);
 
-    vector<vec> d1_def2, d2_def2, d3_def2, dens_def2;
+    vec2 d1_def2, d2_def2, d3_def2, dens_def2;
     ivec atl_def2{79};
     ivec aal_def2{0};
-    vector<bool> ng_def2(1, true);
+    bvec ng_def2(1, true);
 
     make_hirshfeld_grids(opt.pbc,
                          4,
@@ -928,7 +928,7 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
 
     // This bit is basically the substitute for make_k_pts, where we sample the whole sphere
     //  by iterating over both spherical angles by a fixed step defined above
-    vector<vec> k_pt;
+    vec2 k_pt;
     k_pt.resize(4);
 #pragma omp parallel for
     for (int i = 0; i < 4; i++)
@@ -952,14 +952,14 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
         }
     }
     // below is a strip of Calc_SF without the file IO or progress bar
-    vector<cvec> sf;
-    vector<cvec> sf_def2;
-    vector<cvec> sf_all;
-    vector<cvec> sf_all_val;
-    vector<cvec> sf_ZORA;
-    vector<cvec> sf_ZORA_val;
-    vector<cvec> sf_x2c;
-    vector<cvec> sf_x2c_val;
+    cvec2 sf;
+    cvec2 sf_def2;
+    cvec2 sf_all;
+    cvec2 sf_all_val;
+    cvec2 sf_ZORA;
+    cvec2 sf_ZORA_val;
+    cvec2 sf_x2c;
+    cvec2 sf_x2c_val;
     const int smax = (int)k_pt[0].size();
     int pmax = (int)dens[0].size();
     std::cout << "Done with making k_pt " << smax << " " << pmax << endl;
@@ -1417,7 +1417,7 @@ void calc_rho_cube(WFN& dummy)
 
 #pragma omp parallel
     {
-        vector<vec> d;
+        vec2 d;
         vec phi(dummy.get_nmo(), 0.0);
         d.resize(16);
         for (int i = 0; i < 16; i++)
@@ -1549,7 +1549,7 @@ void test_core_dens()
 {
     using namespace std;
     ofstream out("core_dens.log", ios::out);
-    vector<vec> res(12);
+    vec2 res(12);
     for (int i = 0; i < 12; i++)
         res[i].resize(1000000, 0.0);
 
@@ -1697,12 +1697,12 @@ void test_esp_dens()
     const double len = 8;
     const double dr = len / points;
 
-    vector<vec> res(10);
+    vec2 res(10);
     for (int i = 0; i < 10; i++)
         res[i].resize(points, 0.0);
 
     ofstream dat_out("core_pot.dat", ios::out);
-    vector<vector<double>> d2;
+    vec2 d2;
     d2.resize(ECP_way.get_ncen());
     for (int i = 0; i < ECP_way.get_ncen(); i++)
     {

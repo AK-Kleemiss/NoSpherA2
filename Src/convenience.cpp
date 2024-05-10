@@ -1513,7 +1513,7 @@ const double normgauss(const int &type, const double &exp)
     long long int temp2 = constants::ft[2 * t[0]] * constants::ft[2 * t[1]] * constants::ft[2 * t[2]];
     return pow(2 * exp / constants::PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
 };
-bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vector<vec> &g)
+bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
 {
     //
     // From 3P: P0 P1 P2
@@ -1641,7 +1641,7 @@ bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vecto
     g[14][4] = 3.0 / sqrt(7);
     return true;
 }
-bool generate_cart2sph_mat(vector<vec> &d, vector<vec> &f, vector<vec> &g, vector<vec> &h)
+bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
 {
     //
     // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
@@ -1902,7 +1902,7 @@ void type2vector(
 
 bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
 {
-    vector<vec> Uij, Cijk, Dijkl;
+    vec2 Uij, Cijk, Dijkl;
     ifstream asym_cif_input(cif.c_str(), std::ios::in);
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
@@ -1911,7 +1911,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
     int count_fields = 0;
     int position_field[3] = {0, 0, 0};
     int label_field = 100;
-    vector<vector<double>> positions;
+    vec2 positions;
     positions.resize(wavy.get_ncen());
 
 #pragma omp parallel for schedule(dynamic)

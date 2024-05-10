@@ -281,6 +281,9 @@ public:
 			break;
 		default:
 			err_not_impl_SA();
+			z = NULL;
+			c = NULL;
+			nex = 0;
 		}
 	};
 	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1){};
