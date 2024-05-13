@@ -624,7 +624,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
                 length = line.copy(tempchar, 3, 20 + 3 * i);
                 tempchar[length] = '\0';
                 dum_center[exnum] = stoi(tempchar);
-                if (dum_center[exnum] > (unsigned int)e_nuc)
+                if (dum_center[exnum] > e_nuc)
                 {
                     cout << "this center doesn't exist.. some weird problem!\n";
                     return false;
@@ -641,7 +641,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
                     length = line.copy(tempchar, 3, 20 + 3 * i);
                     tempchar[length] = '\0';
                     dum_center[exnum] = stoi(tempchar);
-                    if (dum_center[exnum] > (unsigned int)e_nuc)
+                    if (dum_center[exnum] > e_nuc)
                     {
                         file << "this center doesn't exist.. some weird problem!\n";
                         return false;

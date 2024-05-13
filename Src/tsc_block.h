@@ -5,7 +5,7 @@ template <typename numtype_index, typename numtype>
 class tsc_block
 {
 private:
-  std::vector<std::vector<std::complex<double>>> sf; //[#scatterer] [#reflection]
+  cvec2 sf; //[#scatterer] [#reflection]
   svec scatterer;                // Labels of reflections the correpsonding entry of sf belonds to
   std::vector<std::vector<numtype_index>> index;     //[3] [miller_index]
   std::string header;
@@ -173,12 +173,12 @@ public:
       shrink_vector<numtype_index>(index[i]);
     }
   };
-  const std::vector<std::complex<double>> get_sf_for_scatterer(const unsigned int nr)
+  const cvec get_sf_for_scatterer(const unsigned int nr)
   {
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", std::cout);
     return sf[nr];
   };
-  const std::vector<std::complex<double>> get_sf_for_scatterer(const unsigned int nr, std::ostream &log)
+  const cvec get_sf_for_scatterer(const unsigned int nr, std::ostream &log)
   {
     err_checkf(nr < scatterer.size(), "Wrong number in get SF", log);
     return sf[nr];

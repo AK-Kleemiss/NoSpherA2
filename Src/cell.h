@@ -63,15 +63,15 @@ public:
             }
         }
     };
-    double get_as() { return as; };
-    double get_bs() { return bs; };
-    double get_cs() { return cs; };
-    double get_ca() { return ca; };
-    double get_cb() { return cb; };
-    double get_cg() { return cg; };
-    double get_sa() { return sa; };
-    double get_sb() { return sb; };
-    double get_sg() { return sg; };
+    double get_as() const { return as; };
+    double get_bs() const { return bs; };
+    double get_cs() const { return cs; };
+    double get_ca() const { return ca; };
+    double get_cb() const { return cb; };
+    double get_cg() const { return cg; };
+    double get_sa() const { return sa; };
+    double get_sb() const { return sb; };
+    double get_sg() const { return sg; };
     double get_rcm(int i, int j) const { return rcm[i][j]; };
     double get_cm(int i, int j) const { return cm[i][j]; };
     double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };

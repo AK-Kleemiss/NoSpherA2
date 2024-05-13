@@ -602,7 +602,7 @@ struct primitive
     {
         coefficient /= normalization_constant();
     };
-    double normalization_constant()
+    double normalization_constant() const
     {
         // assuming type is equal to angular momentum
         return norm_const;
@@ -636,7 +636,7 @@ struct tonto_primitive
     {
         coefficient /= normalization_constant();
     };
-    double normalization_constant()
+    double normalization_constant() const
     {
         // assuming type is equal to angular momentum
         return norm_const;

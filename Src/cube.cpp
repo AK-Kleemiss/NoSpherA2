@@ -130,28 +130,32 @@ bool cube::read_file(bool full, bool header, bool expert)
         getline(file, comment2);
         getline(file, line);
         origin.resize(3);
-        sscanf(line.c_str(), "%d %lf %lf %lf", &na, &origin[0], &origin[1], &origin[2]); // na=number of atoms in the cube file
+        std::istringstream iss(line);
+        iss >> na >> origin[0] >> origin[1] >> origin[2];
+
         size.resize(3);
         vectors.resize(3);
         for (int i = 0; i < 3; i++)
             vectors[i].resize(3);
-        getline(file, line);
-        sscanf(line.c_str(), "%d%lf%lf%lf", &size[0], &vectors[0][0], &vectors[0][1], &vectors[0][2]);
-        getline(file, line);
-        sscanf(line.c_str(), "%d%lf%lf%lf", &size[1], &vectors[1][0], &vectors[1][1], &vectors[1][2]);
-        getline(file, line);
-        sscanf(line.c_str(), "%d%lf%lf%lf", &size[2], &vectors[2][0], &vectors[2][1], &vectors[2][2]);
+
+        for (int i = 0; i < 3; i++) {
+            getline(file, line);
+            iss = std::istringstream(line);
+            iss >> size[i] >> vectors[i][0] >> vectors[i][1] >> vectors[i][2];
+        }
+
         int atnr;
-        double atp[3] = {0, 0, 0};
+        double atp[3] = { 0, 0, 0 };
         bool read_atoms = true;
         if (!expert && parent_wavefunction->get_ncen() != 0)
             read_atoms = false;
         if (read_atoms)
             for (int i = 0; i < na; i++)
-            { // loop of the positions of the atoms to get to the start of the values
+            {
                 getline(file, line);
+                iss = std::istringstream(line);
                 double dum;
-                sscanf(line.c_str(), "%d %lf %lf %lf %lf", &atnr, &dum, &atp[0], &atp[1], &atp[2]);
+                iss >> atnr >> dum >> atp[0] >> atp[1] >> atp[2];
                 parent_wavefunction->push_back_atom(atnr2letter(atnr), atp[0], atp[1], atp[2], atnr);
             }
     }

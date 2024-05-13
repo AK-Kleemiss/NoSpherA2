@@ -825,7 +825,6 @@ vector<AtomGrid> make_Prototype_atoms(
                 file << "max_l: " << setw(5) << max_l[i] << endl;
         }
 
-        vec2 alpha_min(wave.get_ncen());
         for (int i = 0; i < wave.get_ncen(); i++)
             alpha_min[i].resize(max_l_overall, 100000000.0);
 
