@@ -498,9 +498,9 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                     stod(fields[position_field[1]]),
                     stod(fields[position_field[2]]));
                 vec precisions = unit_cell.get_coords_cartesian(
-                    get_decimal_precision_from_CIF_number(fields[position_field[0]]),
-                    get_decimal_precision_from_CIF_number(fields[position_field[1]]),
-                    get_decimal_precision_from_CIF_number(fields[position_field[2]]));
+                    min(0.01,get_decimal_precision_from_CIF_number(fields[position_field[0]])),
+                    min(0.01,get_decimal_precision_from_CIF_number(fields[position_field[1]])),
+                    min(0.01,get_decimal_precision_from_CIF_number(fields[position_field[2]])));
                 for (int i = 0; i < 3; i++)
                 {
                     precisions[i] = abs(precisions[i]);
@@ -574,14 +574,14 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                                 continue;
                             }
                         }
-                        if (label.find(element) == string::npos)
+                        if (label.find(element) == string::npos || label.find(element) > 2)
                         {
                             if (element != "h")
                             {
                                 if (debug)
                                 {
                                     file << "\nElement symbol not found in label, this is a problem!\n checking type...";
-                                    if (type.find(element) == string::npos)
+                                    if (type.find(element) == string::npos || label.find(element) > 2)
                                     {
                                         file << " ALSO FAILED! WILL IGNORE ATOM!\n";
                                         continue;
@@ -589,7 +589,7 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                                 }
                                 else
                                 {
-                                    if (type.find(element) == string::npos)
+                                    if (type.find(element) == string::npos || label.find(element) > 2)
                                     {
                                         file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
                                         continue;
@@ -601,7 +601,7 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                                 if (debug)
                                 {
                                     file << "\nElement symbol not found in label, this is a problem!\n will check type...";
-                                    if (type.find(element) == string::npos)
+                                    if (type.find(element) == string::npos || label.find(element) > 2)
                                     {
                                         file << " ALSO FAILED! WILL IGNORE ATOM!\n";
                                         continue;
@@ -609,7 +609,7 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                                 }
                                 else
                                 {
-                                    if (type.find(element) == string::npos)
+                                    if (type.find(element) == string::npos || label.find(element) > 2)
                                     {
                                         file << "\nAtom " << label << " was not matching by element determined by label reduction or type field, skipping!\n";
                                         continue;
@@ -1427,6 +1427,27 @@ int make_hirshfeld_grids(
         no_date)
 #endif
     int atoms_with_grids = vec_sum(needs_grid);
+    if (debug)
+    {
+      int run = 0;
+      file << "  label  | wfn  | grid\n";
+      for (int j = 0; j < wave.get_ncen(); j++)
+      {
+        file << setw(8) << wave.atoms[j].label;
+        if (needs_grid[j])
+        {
+          size_t index = find(cif2wfn_list.begin(), cif2wfn_list.end(), j) - cif2wfn_list.begin();
+          file << " | " << setw(4) << cif2wfn_list.at(index) << " | " << setw(4) << index;
+          run++;
+        }
+        else
+        {
+          file << setw(7) << "---";
+        }
+        file << "\n";
+      }
+      file << flush;
+    }
     err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", file);
     err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", file);
     err_checkf(atoms_with_grids == cif2wfn_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", file);
