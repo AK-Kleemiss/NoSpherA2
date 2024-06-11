@@ -10,33 +10,37 @@ string help_message()
     std::string t = "\n----------------------------------------------------------------------------\n";
     t.append("          These commands and arguments are known by NoSpherA2:\n");
     t.append("----------------------------------------------------------------------------\n\n");
+    t.append(":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n");
     t.append("   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n");
     t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; fch* (UNTESTED!)\n");
     t.append("   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n");
     t.append("   -b              <FILENAME>               Read this basis set\n");
     t.append("   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n");
-    t.append("   -dmin		     <NUMBER>                   Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n");
+    t.append("   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n");
+    t.append("   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n");
+    t.append("                                            [1]: def2-ECP\n");
     t.append("   --help/-help/--h                         print this help\n");
     t.append("   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
     t.append("   -v2                                      Even more stuff\n");
     t.append("   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
-    t.append("   -method         <METHOD NAME>            Can be RKS or RHF to distinguish between DFT and HF\n");
+    t.append("   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n");
     t.append("   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n");
     t.append("   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n");
     t.append("   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n");
     t.append("   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n");
     t.append("   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
-    t.append("   -acc            0,1,2,3,4...             Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
+    t.append("   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
     t.append("                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.");
     t.append("   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
-    t.append("   -tscb           <FILENAME>.tsb           Convert binary tsc file to bigger, less accurate human-readable form.\n");
-    t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
-    t.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
-    t.append("   -merge          <List of .tsc files>     Names/Paths to .tsc files to be merged.\n");
-    t.append("   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
+    t.append("   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n");
+    t.append("   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
+    t.append("                                            If there is more than a single twin law to be used, use the twin command multiple times.\n");
+    t.append("   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n");
+    t.append("   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n");
     t.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
     t.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
     t.append("                                            without spaces.\n   Typical use Examples:\n");
+    t.append("   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n");
     t.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
     t.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
     t.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
@@ -495,6 +499,113 @@ void write_template_confi()
 #endif
     return;
 };
+
+options::options(int accuracy,
+        int threads,
+        int pbc,
+        double resolution,
+        double radius,
+        bool becke,
+        bool electron_diffraction,
+        bool ECP,
+        bool set_ECPs,
+        int ECP_mode,
+        bool calc,
+        bool eli,
+        bool esp,
+        bool elf,
+        bool lap,
+        bool rdg,
+        bool hdef,
+        bool def,
+        bool fract,
+        bool hirsh,
+        bool s_rho,
+        bool SALTED,
+        bool SALTED_BECKE,
+        bool Olex2_1_3_switch,
+        bool iam_switch,
+        bool read_k_pts,
+        bool save_k_pts,
+        bool combined_tsc_calc,
+        bool binary_tsc,
+        bool cif_based_combined_tsc_calc,
+        bool density_test_cube,
+        bool no_date,
+        bool gbw2wfn,
+        bool old_tsc,
+        bool thakkar_d_plot,
+        bool spherical_harmonic,
+        bool ML_test,
+        double sfac_scan,
+        double sfac_diffuse,
+        double dmin,
+        int hirsh_number,
+        const ivec& MOs,
+        const ivec2& _groups,
+        const vec2& twin_law,
+        const ivec2& combined_tsc_groups,
+        bool all_mos,
+        bool test,
+        const std::string& wfn,
+        const std::string& fchk,
+        const std::string& basis_set,
+        const std::string& hkl,
+        const std::string& cif,
+        const std::string& method,
+        const std::string& xyz_file,
+        const std::string& coef_file,
+        const std::string& fract_name,
+        const svec& combined_tsc_calc_files,
+        const svec& combined_tsc_calc_cifs,
+        const std::string& wavename,
+        const std::string& gaussian_path,
+        const std::string& turbomole_path,
+        const std::string& basis_set_path,
+        const svec& arguments,
+        const svec& combine_mo,
+        const svec& Cations,
+        const svec& Anions,
+        const ivec& cmo1,
+        const ivec& cmo2,
+        const ivec& ECP_nrs,
+        const ivec& ECP_elcounts,
+        int ncpus,
+        double mem,
+        unsigned int mult,
+        bool debug,
+        const hkl_list& m_hkl_list,
+        std::ostream& log_file)
+        : accuracy(accuracy), threads(threads), pbc(pbc),
+        resolution(resolution), radius(radius), becke(becke),
+        electron_diffraction(electron_diffraction), ECP(ECP),
+        set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
+        eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
+        hdef(hdef), def(def), fract(fract), hirsh(hirsh),
+        s_rho(s_rho), SALTED(SALTED), SALTED_BECKE(SALTED_BECKE),
+        Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
+        read_k_pts(read_k_pts), save_k_pts(save_k_pts),
+        combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
+        cif_based_combined_tsc_calc(cif_based_combined_tsc_calc),
+        no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc),
+        thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan),
+        sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number),
+        MOs(MOs), groups(_groups), twin_law(twin_law),
+        combined_tsc_groups(combined_tsc_groups), all_mos(all_mos),
+        test(test), wfn(wfn), fchk(fchk), basis_set(basis_set),
+        hkl(hkl), cif(cif), method(method), xyz_file(xyz_file),
+        coef_file(coef_file), fract_name(fract_name),
+        combined_tsc_calc_files(combined_tsc_calc_files),
+        combined_tsc_calc_cifs(combined_tsc_calc_cifs),
+        wavename(wavename), gaussian_path(gaussian_path),
+        turbomole_path(turbomole_path), basis_set_path(basis_set_path),
+        arguments(arguments), combine_mo(combine_mo), Cations(Cations),
+        Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs),
+        ECP_elcounts(ECP_elcounts), mem(mem), mult(mult),
+        debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
+    {
+            groups.resize(1);
+    };
 
 int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
@@ -2694,6 +2805,16 @@ void options::digest_options()
                 cmo2.push_back(stoi(arguments[i + j]));
                 j++;
             }
+        }
+        else if (temp == "-core_dens-corrected") {
+            double prec = stod(arguments[i + 1]);
+            test_core_dens_corrected(prec, threads);
+            exit(0);
+        }
+        else if (temp == "-core_tsc-corrected") {
+            double prec = stod(arguments[i + 1]);
+            test_core_sfac_corrected(prec, threads);
+            exit(0);
         }
         else if (temp == "-def" || temp == "-DEF")
             def = calc = true;

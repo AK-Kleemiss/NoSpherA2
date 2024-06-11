@@ -4,6 +4,9 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
 
 void thakkar_d_test(options &opt)
 {
@@ -545,13 +548,121 @@ std::vector<T> geomspace(T start, T stop, int num)
     return result;
 }
 
+double calc_spherically_averaged_at_r(const WFN& wavy,
+    const double& r,
+    const double rel_precision = 1E-4,
+    const double start_angle = 5.0,
+    const bool print = false) {
+    double old_result = 1E100;
+    double new_result = 0.9E100;
+    double angle = start_angle;
+    double ratio = abs(old_result / new_result - 1.0);
+    vec2 d;
+    vec _phi(wavy.get_nmo(), 0.0);
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
+        d[i].resize(1, 0.0);
+
+    while (ratio > rel_precision && angle / constants::PI < 1E4) {
+        const double da = constants::PI / angle;
+        const double da2 = da * da;
+        // Make angular grids
+        double x0, y0, z0, st0;
+        double v = 0;
+        for (double phi = 0; phi <= constants::TWO_PI; phi += da)
+        {
+            const double cp = cos(phi);
+            const double sp = sin(phi);
+            for (double theta = da; theta <= constants::PI; theta += da)
+            {
+                const double st = sin(theta);
+                st0 = st * da2;
+                x0 = st * cp, y0 = st * sp, z0 = cos(theta);
+                v += wavy.compute_dens(r * x0, r * y0, r * z0, d, _phi) * st0;
+            }
+        }
+        if (v != 0.0) {
+            old_result = new_result;
+            new_result = v / constants::FOUR_PI;
+            ratio = abs(old_result / new_result - 1.0);
+        }
+        angle *= 1.2;
+    }
+    if(print)
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::endl;
+    return new_result;
+}
+
+cdouble calc_spherically_averaged_at_k(const WFN& wavy,
+    vec2& d1, vec2& d2, vec2& d3, vec2& dens,
+    const double& k,
+    const double rel_precision = 1E-4,
+    const double start_angle = 5.0,
+    const bool print = false) {
+    cdouble old_result = 1E100;
+    cdouble new_result = 0.9E100;
+    double angle = start_angle;
+    double ratio = abs(old_result / new_result - 1.0);
+    double phi_ratio = 2.0;
+    double rho, work;
+    double* d1_local, * d2_local, * d3_local, * dens_local;
+    int pmax;
+
+
+    while ((ratio > rel_precision || phi_ratio > rel_precision) && angle / constants::PI < 1E5) {
+        const double da = constants::PI / angle;
+        const double da2 = da * da;
+        // Make angular grids
+        double x0, y0, z0, st0;
+        cdouble sf_local;
+        for (double phi = 0; phi <= constants::TWO_PI; phi += da)
+        {
+            const double cp = cos(phi);
+            const double sp = sin(phi);
+            for (double theta = da; theta <= constants::PI; theta += da)
+            {
+                const double st = sin(theta);
+                st0 = st * da2;
+                x0 = st * cp, y0 = st * sp, z0 = cos(theta);
+
+                pmax = (int)dens[0].size();
+                dens_local = dens[0].data();
+                d1_local = d1[0].data();
+                d2_local = d2[0].data();
+                d3_local = d3[0].data();
+                for (int p = pmax - 1; p >= 0; p--)
+                {
+                    rho = dens_local[p];
+                    work = k * x0 * d1_local[p] + k * y0 * d2_local[p] + k * z0 * d3_local[p];
+                    sf_local += cdouble(rho * cos(work), rho * sin(work)) * st0;
+                }
+            }
+        }
+        if (sf_local != 0.0) {
+            old_result = new_result;
+            new_result = sf_local / cdouble(constants::FOUR_PI);
+            phi_ratio = std::abs(std::arg(old_result) - std::arg(new_result));
+            //if(print)
+            //    std::cout << "Phi ratio: " << phi_ratio << " " << std::arg(old_result) << " " << std::arg(new_result) << std::endl;
+            ratio = std::abs(std::abs(old_result) / std::abs(new_result) - 1.0);
+            //if(print)
+            //    std::cout << "Ratio:     " << ratio << " " << std::abs(old_result) << " " << std::abs(new_result) << std::endl;
+        }
+        angle *= 1.2;
+    }
+    if (print)
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << k << " " << (ratio > rel_precision) << " " << angle << std::endl;
+    return new_result;
+}
+
+
 void spherically_averaged_density(options &opt, const ivec val_els_alpha, const ivec val_els_beta)
 {
     using namespace std;
     WFN wavy(9);
     wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
     wavy.delete_unoccupied_MOs();
-    cout << "Number of MOs before: " << wavy.get_nmo() << endl;
+    cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
     bvec MOs_to_delete(wavy.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -559,7 +670,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         // Delete core orbitals
         int offset = wavy.get_MO_op_count(0);
         for (int i = offset - 1; i >= 0; i--)
-            // only delete if i is not an element of core-size
+            // only delete if i is not an element of val_els
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
             {
                 cout << "Deleting from Alpha: " << i << endl;
@@ -581,63 +692,37 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     for (int i = 0; i < MOs_to_delete.size(); i++)
         cout << i << " " << MOs_to_delete[i] << endl;
     cout << "Number of MOs after: " << wavy.get_nmo() << endl;
-    const long double da = constants::PI / 360.0;
-    const int upper = static_cast<int>(constants::TWO_PI / da);
-    // Make angular grids
-    vector<long double> x0, y0, z0, st0;
-    for (long double phi = 0; phi <= constants::TWO_PI; phi += da)
-    {
-        const long double cp = cos(phi);
-        const long double sp = sin(phi);
-        for (long double theta = 0; theta <= constants::PI; theta += da)
-        {
-            const long double st = sin(theta);
-            st0.push_back(st * da * da);
-            const long double ct = cos(theta);
-            x0.push_back(st * cp), y0.push_back(st * sp), z0.push_back(ct);
-        }
-    }
-    const long long int ang_size = x0.size();
-    cout << "Averaging over " << ang_size << " angular points" << endl;
+    cout << "\n\nEnergies after:" << endl;
+    for (int i = 0; i < wavy.get_nmo(); i++)
+        cout << wavy.get_MO_energy(i) << " " << wavy.get_MO_occ(i) << endl;
 
     // Make radial grids on logarithmic scale
-    vec radial_dist = geomspace<double>(1E-7, 15, 20000);
-    const long long int upper_r = radial_dist.size();
-    const long long int total_points = static_cast<long long int>(upper_r * ang_size);
-    cout << "Calculating " << total_points << " points" << endl;
+    const double dr = 0.00008;
+    const long long int upper_r = 250000;
     // Calcualte density on angular grid at each point of radial grid, average and integrate
     long double tot_int = 0;
     vec radial_dens(upper_r, 0.0);
+    progress_bar* progress = new progress_bar{ cout, 60u, "Calculating densities" };
+    const long long int step = max(static_cast<long long int>(floor(upper_r / 20)), 1LL);
 
-#pragma omp parallel num_threads(opt.threads)
+#pragma omp parallel for reduction(+ : tot_int) num_threads(opt.threads) schedule(dynamic)
+    for (long long int _r = 1; _r < upper_r; _r++)
     {
-        vec2 d;
-        vec phi(wavy.get_nmo(), 0.0);
-        d.resize(16);
-        for (int i = 0; i < 16; i++)
-            d[i].resize(1, 0.0);
-#pragma omp for reduction(+ : tot_int)
-        for (long long int _r = 0; _r < upper_r; _r++)
-        {
-            double r = radial_dist[_r];
-            long double v = 0;
-            for (long long int i = 0; i < ang_size; i++)
-            {
-                v += wavy.compute_dens(r * x0[i], r * y0[i], r * z0[i], d, phi) * st0[i];
-            }
-            if (_r >= 1)
-                tot_int += v * r * r * (r - radial_dist[_r - 1]);
-            else
-                tot_int += v * r * r * (r);
-            radial_dens[_r] = v / 4.0 / constants::PI;
-        }
+        double r = _r * dr;
+        double v = calc_spherically_averaged_at_r(wavy, r, 1E-4, 20);
+        radial_dens[_r] = v;
+        if (_r >= 1)
+            tot_int += v * r * r * (r - (_r - 1) * dr);
+        if (_r != 0 && _r % step == 0)
+            progress->write(_r / static_cast<double>(upper_r));
     }
+    delete(progress);
     cout << "Start writing the file" << endl;
     string el = atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
     out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int << "\n";
     for (int i = 0; i < upper_r; i++)
-        out << setw(24) << scientific << setprecision(15) << radial_dist[i] << setw(24) << scientific << setprecision(16) << radial_dens[i] << "\n";
+        out << setw(24) << scientific << setprecision(15) << i * dr << setw(24) << scientific << setprecision(16) << radial_dens[i] << "\n";
     out.flush();
     out.close();
 }
@@ -1660,6 +1745,277 @@ void test_core_dens()
     dat_out.close();
 }
 
+void test_core_dens_corrected(double& precisison, int ncpus = 4)
+{
+    if (ncpus == -1)
+        ncpus = 4;
+    using namespace std;
+    ofstream out("core_dens_corrected.log", ios::out);
+#ifdef _OPENMP
+    omp_set_num_threads(ncpus);
+#endif
+    vec2 res(6);
+    for (int i = 0; i < res.size(); i++)
+        res[i].resize(100000, 0.0);
+
+    ofstream dat_out("core_dens_Au.dat", ios::out);
+
+    Thakkar T_Au(79);
+
+    WFN ECP_way_Au(9);
+    ECP_way_Au.read_gbw("Au_def2TZVP.gbw", out, false, false);
+
+    WFN wavy_full_Au(9);
+    wavy_full_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_full_Au.delete_unoccupied_MOs();
+    WFN wavy_val_Au(9);
+    wavy_val_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_val_Au.delete_unoccupied_MOs();
+    cout << "Energies before:" << endl;
+    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
+        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+    wavy_val_Au.delete_MO(30);
+    wavy_val_Au.delete_MO(29);
+    wavy_val_Au.delete_MO(28);
+    wavy_val_Au.delete_MO(27);
+    wavy_val_Au.delete_MO(26);
+    wavy_val_Au.delete_MO(25);
+    wavy_val_Au.delete_MO(24);
+    wavy_val_Au.delete_MO(22);
+    wavy_val_Au.delete_MO(21);
+    wavy_val_Au.delete_MO(20);
+    wavy_val_Au.delete_MO(19);
+    wavy_val_Au.delete_MO(18);
+    wavy_val_Au.delete_MO(17);
+    wavy_val_Au.delete_MO(16);
+    wavy_val_Au.delete_MO(15);
+    wavy_val_Au.delete_MO(14);
+    wavy_val_Au.delete_MO(13);
+    wavy_val_Au.delete_MO(12);
+    wavy_val_Au.delete_MO(11);
+    wavy_val_Au.delete_MO(10);
+    wavy_val_Au.delete_MO(9);
+    wavy_val_Au.delete_MO(8);
+    wavy_val_Au.delete_MO(7);
+    wavy_val_Au.delete_MO(6);
+    wavy_val_Au.delete_MO(5);
+    wavy_val_Au.delete_MO(4);
+    wavy_val_Au.delete_MO(3);
+    wavy_val_Au.delete_MO(2);
+    wavy_val_Au.delete_MO(1);
+    wavy_val_Au.delete_MO(0);
+    // 10 alpha electrons remain
+    for (int i = 0; i < 23; i++)
+        wavy_val_Au.delete_MO(10);
+    // keep the 5s, delete 4f
+    for (int i = 0; i < 7; i++)
+        wavy_val_Au.delete_MO(11);
+
+    cout << "\n\nEnergies after:" << endl;
+    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
+        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+
+    time_point start = get_time();
+
+    progress_bar* progress = new progress_bar{ out, 60u, "Calculating densities" };
+    const int upper = static_cast<int>(res[0].size());
+    const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 1; i < upper; i++)
+    {
+        double sr = i * 0.0001;
+        res[0][i] = sr;
+        res[1][i] = T_Au.get_core_density(sr, 60);
+        res[2][i] = T_Au.get_radial_density(sr);
+        res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison);
+        res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison);
+        res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison);
+        if (i != 0 && i % step == 0)
+            progress->write(i / static_cast<double>(upper));
+    }
+    delete(progress);
+    time_point end = get_time();
+    out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
+    dat_out << scientific << setprecision(12) << setw(20);
+    for (int i = 0; i < res[0].size(); i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            auto t = res[j][i];
+            dat_out << t;
+            dat_out << " ";
+        }
+        dat_out << "\n";
+    }
+    dat_out << flush;
+    dat_out.close();
+}
+
+void test_core_sfac_corrected(double& precisison, int ncpus = 4)
+{
+    if (ncpus == -1)
+        ncpus = 4;
+    using namespace std;
+    ofstream out("core_sfac_corrected.log", ios::out);
+#ifdef _OPENMP
+    omp_set_num_threads(ncpus);
+#endif
+    cvec2 res(6);
+    for (int i = 0; i < res.size(); i++)
+        res[i].resize(1000, 0.0);
+
+    ofstream dat_out("core_sfac_Au.dat", ios::out);
+
+    Thakkar T_Au(79);
+
+    WFN ECP_way_Au(9);
+    ECP_way_Au.read_gbw("Au_def2TZVP.gbw", out, false, false);
+
+    WFN wavy_full_Au(9);
+    wavy_full_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_full_Au.delete_unoccupied_MOs();
+    WFN wavy_val_Au(9);
+    wavy_val_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_val_Au.delete_unoccupied_MOs();
+    cout << "Energies before:" << endl;
+    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
+        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+    wavy_val_Au.delete_MO(30);
+    wavy_val_Au.delete_MO(29);
+    wavy_val_Au.delete_MO(28);
+    wavy_val_Au.delete_MO(27);
+    wavy_val_Au.delete_MO(26);
+    wavy_val_Au.delete_MO(25);
+    wavy_val_Au.delete_MO(24);
+    wavy_val_Au.delete_MO(22);
+    wavy_val_Au.delete_MO(21);
+    wavy_val_Au.delete_MO(20);
+    wavy_val_Au.delete_MO(19);
+    wavy_val_Au.delete_MO(18);
+    wavy_val_Au.delete_MO(17);
+    wavy_val_Au.delete_MO(16);
+    wavy_val_Au.delete_MO(15);
+    wavy_val_Au.delete_MO(14);
+    wavy_val_Au.delete_MO(13);
+    wavy_val_Au.delete_MO(12);
+    wavy_val_Au.delete_MO(11);
+    wavy_val_Au.delete_MO(10);
+    wavy_val_Au.delete_MO(9);
+    wavy_val_Au.delete_MO(8);
+    wavy_val_Au.delete_MO(7);
+    wavy_val_Au.delete_MO(6);
+    wavy_val_Au.delete_MO(5);
+    wavy_val_Au.delete_MO(4);
+    wavy_val_Au.delete_MO(3);
+    wavy_val_Au.delete_MO(2);
+    wavy_val_Au.delete_MO(1);
+    wavy_val_Au.delete_MO(0);
+    // 10 alpha electrons remain
+    for (int i = 0; i < 23; i++)
+        wavy_val_Au.delete_MO(10);
+    // keep the 5s, delete 4f
+    for (int i = 0; i < 7; i++)
+        wavy_val_Au.delete_MO(11);
+
+    cout << "\n\nEnergies after:" << endl;
+    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
+        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+
+    time_point start = get_time(), end_becke, end_prototypes, end_spherical, end_aspherical, end_prune;
+    ivec atom_type_list({ 79 });
+    ivec asym_atom_list({ 0 });
+    bvec needs_grid({ true });
+    vec2 d1_ECP, d2_ECP, d3_ECP, dens_ECP;
+    vec2 d1_all, d2_all, d3_all, dens_all;
+    vec2 d1_val, d2_val, d3_val, dens_val;
+    svec labels({ "Au" });
+
+    auto temp_cell = cell();
+    make_hirshfeld_grids(0,
+        3,
+        temp_cell,
+        ECP_way_Au,
+        atom_type_list,
+        asym_atom_list,
+        needs_grid,
+        d1_ECP, d2_ECP, d3_ECP, dens_ECP,
+        labels,
+        out,
+        start,
+        end_becke,
+        end_prototypes,
+        end_spherical,
+        end_prune,
+        end_aspherical);
+    make_hirshfeld_grids(0,
+        3,
+        temp_cell,
+        wavy_full_Au,
+        atom_type_list,
+        asym_atom_list,
+        needs_grid,
+        d1_all, d2_all, d3_all, dens_all,
+        labels,
+        out,
+        start,
+        end_becke,
+        end_prototypes,
+        end_spherical,
+        end_prune,
+        end_aspherical);
+    make_hirshfeld_grids(0,
+        3,
+        temp_cell,
+        wavy_val_Au,
+        atom_type_list,
+        asym_atom_list,
+        needs_grid,
+        d1_val, d2_val, d3_val, dens_val,
+        labels,
+        out,
+        start,
+        end_becke,
+        end_prototypes,
+        end_spherical,
+        end_prune,
+        end_aspherical);
+
+    progress_bar* progress = new progress_bar{ out, 60u, "Calculating SFACs" };
+    const int upper = static_cast<int>(res[0].size());
+    const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 1; i < upper; i++)
+    {
+        double sr = i * 0.01;
+        res[0][i] = sr;
+        res[1][i] = T_Au.get_core_form_factor(sr, 60);
+        res[2][i] = T_Au.get_form_factor(sr);
+        res[3][i] = calc_spherically_averaged_at_k(ECP_way_Au, d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
+        res[4][i] = calc_spherically_averaged_at_k(wavy_full_Au, d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
+        res[5][i] = calc_spherically_averaged_at_k(wavy_val_Au, d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0, true);
+        if (i != 0 && i % step == 0)
+            progress->write(i / static_cast<double>(upper));
+    }
+    delete(progress);
+
+    time_point end = get_time();
+    out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
+    dat_out << scientific << setprecision(12) << setw(20);
+    double t = 0;
+    for (int i = 0; i < res[0].size(); i++)
+    {
+        for (int j = 0; j < 6; j++)
+        {
+            t = res[j][i].real();
+            dat_out << t;
+            dat_out << " ";
+        }
+        dat_out << "\n";
+    }
+    dat_out << flush;
+    dat_out.close();
+}
+
 double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist, const double &dr)
 {
     double res = 0;
@@ -1677,7 +2033,7 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
             }
         }
     }
-    return res / 4 / constants::PI;
+    return res / constants::FOUR_PI;
 }
 
 void test_esp_dens()
