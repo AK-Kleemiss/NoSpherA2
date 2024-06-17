@@ -4,6 +4,7 @@
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
+#include "JKFit.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif

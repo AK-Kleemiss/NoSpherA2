@@ -2106,6 +2106,7 @@
     <ClInclude Include="../Src/test_functions.h" />
     <ClInclude Include="../Src/tsc_block.h" />
     <ClInclude Include="../Src/Thakkar_coefs.h" />
+    <ClInclude Include="..\Src\JKFit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml" />

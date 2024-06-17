@@ -1,6 +1,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include "tsc_block.h"
 #include "convenience.h"
+#include "JKFit.h"
 #include "fchk.h"
 #include "cube.h"
 #include "scattering_factors.h"
@@ -362,7 +363,7 @@ int main(int argc, char **argv)
             // Read the xyzfile
             wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
             // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-            int nr_coefs = load_basis_into_WFN(wavy[0], TZVP_JKfit);
+            int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
             // Run generation of tsc file
             if (opt.SALTED_BECKE || opt.SALTED)
                 err_checkf(calculate_scattering_factors_ML_No_H(
