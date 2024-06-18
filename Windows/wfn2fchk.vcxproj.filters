@@ -54,6 +54,9 @@
     <ClCompile Include="..\Src\atoms.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\JKFit.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">

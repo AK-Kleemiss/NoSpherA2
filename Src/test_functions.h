@@ -1390,7 +1390,7 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube_ML(vec data, WFN &dummy, int &exp_coef, int atom = -1)
+void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1)
 {
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
@@ -1606,7 +1606,9 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     WFN dummy(7);
     dummy.read_xyz(xyzfile, std::cout);
 
-    int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
+    const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
+
+    const int nr_coefs = load_basis_into_WFN(dummy, basis);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
     calc_cube_ML(data, dummy, nr_coefs);
 
