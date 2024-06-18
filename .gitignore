@@ -55,3 +55,4 @@ tests/reading_SALTED/ORCA/water_monomer_property.txt
 *_property.txt
 tests/ECP_SF/Atomic_densities/*.gbw
 *temp_wavefunction.wfn
+/tests/reading_ML_Coeffs
