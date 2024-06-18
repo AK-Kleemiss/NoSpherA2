@@ -134,7 +134,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|x64'">
-    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -cpus 6 -acc 2 -v -mtc olex2\Wfn_Job\Part_1\thpp.wfx 0,1 olex2\Wfn_Job\Part_2\thpp.wfx 0,2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -cpus 6 -acc 0 -v -mtc olex2\Wfn_Job\Part_1\thpp.wfx 0,1 olex2\Wfn_Job\Part_2\thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -152,8 +152,14 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_MTC_Disorder|x64'">
-    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -acc 2 -v -mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 olex2/Wfn_job/Part_2/thpp.wfx 0,2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -acc 2 -v -mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 olex2/Wfn_job/Part_2/thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SF_Hybrid|x64'">
+    <LocalDebuggerCommandArguments>-cif ZP2.cif -dmin 0.66 -acc 1 -v -mtc ZP2_part1.gbw 0,1 ZP2_part2.gbw 0,2 -mtc_mult 1 1 -mtc_charge 0 0 </LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Hybrid\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>

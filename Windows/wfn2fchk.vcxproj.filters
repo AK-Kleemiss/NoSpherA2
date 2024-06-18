@@ -36,7 +36,7 @@
     <ClCompile Include="../Src/sphere_lebedev_rule.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="../Src/structure_factors.cpp">
+    <ClCompile Include="../Src/scattering_factors.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="../Src/wfn_class.cpp">
@@ -51,7 +51,7 @@
     <ClCompile Include="../Src/spherical_density.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ML_density.cpp">
+    <ClCompile Include="..\Src\atoms.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -80,7 +80,7 @@
     <ClInclude Include="../Src/sphere_lebedev_rule.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../Src/structure_factors.h">
+    <ClInclude Include="../Src/scattering_factors.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../Src/wfn_class.h">
@@ -110,7 +110,13 @@
     <ClInclude Include="../Src/Thakkar_coefs.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../Src/def2-ECPs.h">
+    <ClInclude Include="../Src/def2-ECPs_corrections.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/def2-ECPs_GA.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\JKFit.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\ML_density.h">
@@ -133,10 +139,5 @@
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\tests\ECP_SF\NoSpherA2.log">
-      <Filter>Ressourcendateien\Tests</Filter>
-    </Text>
   </ItemGroup>
 </Project>

@@ -1,0 +1,38 @@
+{
+    // Place your settings here
+    // This file is used to configure Visual Studio Code settings
+    // Learn more about configuring settings: https://code.visualstudio.com/docs/getstarted/settings
+    // Editor settings
+    "terminal.integrated.scrollback": 100000,
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "editor.wordWrap": "on",
+    // Language specific settings
+    "[typescript]": {
+        "editor.formatOnSave": true
+    },
+    "[python]": {
+        "formatting.provider": "black",
+        "formatting.blackArgs": [
+            "--line-length",
+            "120"
+        ],
+        "editor.formatOnSave": true
+    },
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "args": [
+                "-ExecutionPolicy",
+                "ByPass",
+                "-NoExit",
+                "-Command",
+                ". \"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\Tools\\Launch-VsDevShell.ps1\"; cd ${workspaceFolder}"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "files.associations": {
+        "functional": "cpp"
+    },
+}
