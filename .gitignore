@@ -58,3 +58,4 @@ tests/reading_SALTED/water_rho.cube
 *.densities
 *_property.txt
 tests/ECP_SF/Atomic_densities/*.gbw
+/tests/reading_ML_Coeffs

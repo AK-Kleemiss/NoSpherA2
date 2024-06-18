@@ -2825,7 +2825,7 @@ void options::digest_options()
 		{
 			ML_test2 = true;
 			string xyz_File = arguments[i + 1];
-			ML::calc_diff(xyz_File);
+			ML::calc_diff(xyz_File, *this);
 
 			//string fileName = "orca.gbw";
 			//dummy.gbw2DM(fileName , std::cout , debug);
@@ -3015,7 +3015,7 @@ const double spherical_harmonic(const int &l, const int &m, const double *d)
 				 d[4] = r   IGNORED
 				 */
 	// Will need extension for up to l=8
-	// calc spherical harmonic
+	// calc spherical harmonicl
 	double SH = 0, x = d[0], y = d[1], z = d[2];
 	switch (l)
 	{
