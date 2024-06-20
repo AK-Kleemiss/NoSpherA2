@@ -3027,6 +3027,10 @@ void options::digest_options()
             test_esp_dens();
             exit(0);
         }
+        else if (temp == "-test-rascaline") {
+            test_rascaline_interface();
+            exit(0);
+        }
         else if (temp == "-sfac_diffuse")
         {
             sfac_diffuse = fromString<double>(arguments[i + 1]);

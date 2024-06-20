@@ -5,6 +5,10 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
+#ifdef _WIN32
+//#include "rascaline.h"
+#include "rascaline.hpp"
+#endif
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
@@ -2155,4 +2159,51 @@ void test_esp_dens()
     }
     dat_out << flush;
     dat_out.close();
+}
+
+void test_rascaline_interface() {
+    std::cout << "sucrose.xyz exists: " << exists("sucrose.xyz") << std::endl;
+    try {
+        auto systems = rascaline::BasicSystems();
+        // pass hyper-parameters as JSON
+        const char* parameters = R"({
+        "cutoff": 5.0,
+        "max_radial": 6,
+        "max_angular": 4,
+        "atomic_gaussian_width": 0.3,
+        "center_atom_weight": 1.0,
+        "gradients": false,
+        "radial_basis": {
+            "Gto": {"spline_accuracy": 1e-6}
+        },
+        "cutoff_function": {
+            "ShiftedCosine": {"width": 0.1}
+        }
+    })";
+
+        // create the calculator with its name and parameters
+        auto calculator = rascaline::Calculator("soap_spherical_expansion", parameters);
+
+        // run the calculation
+        auto descriptor = calculator.compute(systems);
+
+        // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
+        // We can transform it to a single block containing a dense representation,
+        // with one sample for each atom-centered environment.
+        descriptor.keys_to_samples("center_type");
+        descriptor.keys_to_properties("neighbor_type");
+
+        // extract values from the descriptor in the only remaining block
+        auto block = descriptor.block_by_id(0);
+        auto values = block.values();
+        std::cout << values.data() << std::endl;
+        block = descriptor.block_by_id(1);
+        values = block.values();
+    }
+    catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+    }
+
+    
+
 }
