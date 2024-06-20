@@ -6,7 +6,6 @@
 #include "properties.h"
 #include "JKFit.h"
 #ifdef _WIN32
-//#include "rascaline.h"
 #include "rascaline.hpp"
 #endif
 #ifdef __APPLE__
@@ -2161,6 +2160,8 @@ void test_esp_dens()
     dat_out.close();
 }
 
+#ifdef _WIN32
+
 void test_rascaline_interface() {
     std::cout << "sucrose.xyz exists: " << exists("sucrose.xyz") << std::endl;
     try {
@@ -2203,7 +2204,5 @@ void test_rascaline_interface() {
     catch (const std::exception& e) {
         std::cout << e.what() << std::endl;
     }
-
-    
-
 }
+#endif
