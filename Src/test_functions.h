@@ -2164,7 +2164,7 @@ void test_esp_dens()
 void test_rascaline_interface() {
     std::cout << "sucrose.xyz exists: " << exists("sucrose.xyz") << std::endl;
     try {
-        auto systems = rascaline::BasicSystems();
+        auto systems = rascaline::BasicSystems("sucrose.xyz");
         // pass hyper-parameters as JSON
         const char* parameters = R"({
         "cutoff": 5.0,
@@ -2182,7 +2182,7 @@ void test_rascaline_interface() {
     })";
 
         // create the calculator with its name and parameters
-        auto calculator = rascaline::Calculator("soap_spherical_expansion", parameters);
+        auto calculator = rascaline::Calculator("spherical_expansion", parameters);
 
         // run the calculation
         auto descriptor = calculator.compute(systems);
