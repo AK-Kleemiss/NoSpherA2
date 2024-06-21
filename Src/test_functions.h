@@ -2232,7 +2232,7 @@ void test_rascaline_interface() {
 
         descriptor.save("descriptor.npy");
         // extract values from the descriptor in the only remaining block
-        auto block = descriptor.block_by_id("o3_lambda"= 1);
+        metatensor::TensorBlock block = descriptor.block_by_id(0);
     }
     catch (const std::exception& e) {
         std::cout << e.what() << std::endl;
