@@ -2138,6 +2138,7 @@
     <ClCompile Include="../Src/properties.cpp" />
     <ClCompile Include="../Src/spherical_density.cpp" />
     <ClCompile Include="..\Src\atoms.cpp" />
+    <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\ML_density.cpp" />
     <ClCompile Include="..\Src\ML_predict.cpp" />
   </ItemGroup>
@@ -2163,8 +2164,10 @@
     <ClInclude Include="../Src/tsc_block.h" />
     <ClInclude Include="../Src/Thakkar_coefs.h" />
     <ClInclude Include="..\Src\JKFit.h" />
+    <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\ML_density.h" />
     <ClInclude Include="..\Src\ML_predict.h" />
+    <ClInclude Include="..\Src\rascaline.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml" />

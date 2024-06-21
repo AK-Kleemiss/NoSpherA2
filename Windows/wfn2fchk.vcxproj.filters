@@ -60,6 +60,9 @@
     <ClCompile Include="..\Src\ML_density.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\JKFit.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -129,6 +132,12 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\ML_density.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\metatensor.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\rascaline.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
