@@ -2,7 +2,7 @@
 using namespace std;
 
 
-void ML::calc_cube(
+void ML_density::calc_cube(
 	cube& CubeRho,
 	WFN& wavy,
 	int cpus,
@@ -61,7 +61,7 @@ void ML::calc_cube(
 };
 
 
-cube ML::data_2_Cube(const string& xyz_File, const string& npy_Coeffs, int cpus)
+cube ML_density::data_2_Cube(const string& xyz_File, const string& npy_Coeffs, int cpus)
 {
 	using namespace std;
 	vector<unsigned long> shape{};
@@ -109,7 +109,7 @@ cube ML::data_2_Cube(const string& xyz_File, const string& npy_Coeffs, int cpus)
 	return CubeRho;
 }
 
-void ML::calc_diff(const string xyz_File, options& opt) {
+void ML_density::calc_diff(const string xyz_File, options& opt) {
 	cout << xyz_File + ".xyz" << endl;
 	cout << "Calculating Reference:" << endl;
 	//cube cube_DFT = data_2_Cube(xyz_File + ".xyz", xyz_File + "_DFT.npy", opt.threads);
@@ -166,7 +166,7 @@ void ML::calc_diff(const string xyz_File, options& opt) {
 }
 
 
-void ML::cubeDiffDaniel() {
+void ML_density::cubeDiffDaniel() {
 	//ofstream log2("NoSpherA2_cube.log", ios::out);
 	//auto coutbuf = cout.rdbuf(log2.rdbuf()); // save and redirect
 	//log2 << NoSpherA2_message();
@@ -183,7 +183,7 @@ void ML::cubeDiffDaniel() {
 }
 
 
-void ML::gbw2DM(string& fn, ostream& file, bool& debug) {
+void ML_density::gbw2DM(string& fn, ostream& file, bool& debug) {
 	ifstream rf(fn.c_str(), ios::binary);
 	if (!rf.good())
 		err_checkf(false, "Nope!", file);

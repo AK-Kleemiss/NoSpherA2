@@ -262,7 +262,7 @@ public:
 		int temp_Z;
 		switch (ECP_m)
 		{
-		case 2:
+		case 3:
 			temp_Z = atomic_number - 2;
 			if (temp_Z < 0)
 				err_not_impl_SA();
@@ -271,7 +271,7 @@ public:
 			c = ptb_corrections::c[temp_Z].data();
 			break;
 		case 1:
-		case 3:
+		case 2:
 			temp_Z = atomic_number - 37;
 			if (temp_Z < 0)
 				err_not_impl_SA();

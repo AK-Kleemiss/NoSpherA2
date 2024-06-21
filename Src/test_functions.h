@@ -5,6 +5,10 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
+#ifdef _WIN32
+#include "rascaline.hpp"
+#include "metatensor.h"
+#endif
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
@@ -1390,7 +1394,7 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube_ML(vec data, WFN &dummy, int &exp_coef, int atom = -1)
+void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1)
 {
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
@@ -1606,7 +1610,9 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     WFN dummy(7);
     dummy.read_xyz(xyzfile, std::cout);
 
-    int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
+    const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
+
+    const int nr_coefs = load_basis_into_WFN(dummy, basis);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
     calc_cube_ML(data, dummy, nr_coefs);
 
@@ -2154,3 +2160,82 @@ void test_esp_dens()
     dat_out << flush;
     dat_out.close();
 }
+
+
+#ifdef _WIN32
+
+void test_rascaline_interface() {
+    std::cout << "sucrose.xyz exists: " << exists("sucrose.xyz") << std::endl;
+    try {
+        auto systems = rascaline::BasicSystems("sucrose.xyz");
+
+        // pass hyper-parameters as JSON
+        const char* parameters = R"({
+        "cutoff": 4.0,
+        "max_radial": 5,
+        "max_angular": 7,
+        "atomic_gaussian_width": 0.3,
+        "center_atom_weight": 1.0,
+        "radial_basis": {
+            "Gto": {"spline_accuracy": 1e-6}
+        },
+        "cutoff_function": {
+            "ShiftedCosine": {"width": 0.1}
+        }
+    })";
+
+        double rcut1 = 4.0;
+        int nrad1 = 5;
+        int nang1 = 7;
+        double sig1 = 0.3;
+        std::vector<std::string> neighspe1 = { "H", "C", "O" };
+        std::vector<std::string> species = { "H", "C", "O" };
+
+
+        std::map<std::string, int> atomic_numbers = { {"H", 1}, {"C", 6}, {"O", 8} };
+        int nspe1 = neighspe1.size();
+        std::vector<std::vector<int32_t>> keys_array; // Note: This is highly unusual and not recommended
+
+        for (int l = 0; l <= nang1 + 1; ++l) {
+            for (const std::string& specen : species) {
+                for (const std::string& speneigh : neighspe1) {
+                    // Directly emplace back initializer_lists into keys_array
+
+                    keys_array.emplace_back(std::vector<int32_t>{l, 1, atomic_numbers[specen], atomic_numbers[speneigh]});
+                }
+            }
+        }
+
+        // Assuming metatensor::Labels expects a flat sequence of integers for each label
+        std::vector<int32_t> flattened_keys;
+        for (const auto& subVector : keys_array) {
+            flattened_keys.insert(flattened_keys.end(), subVector.begin(), subVector.end());
+        }
+
+        // Convert keys_array to rascaline::Labels
+        std::vector<std::string> names = { "o3_lambda", "o3_sigma", "center_type", "neighbor_type" };
+        metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
+
+        // create the calculator with its name and parameters
+        rascaline::Calculator calculator = rascaline::Calculator("spherical_expansion", parameters);
+
+        rascaline::CalculationOptions calc_opts;
+        calc_opts.selected_keys = keys_selection;
+        // run the calculation
+        metatensor::TensorMap descriptor = calculator.compute(systems, calc_opts);
+
+        // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
+        // We can transform it to a single block containing a dense representation,
+        // with one sample for each atom-centered environment.
+        descriptor = descriptor.keys_to_samples("center_type");
+        descriptor = descriptor.keys_to_properties("neighbor_type");
+
+        descriptor.save("descriptor.npy");
+        // extract values from the descriptor in the only remaining block
+        auto block = descriptor.block_by_id("o3_lambda"= 1);
+    }
+    catch (const std::exception& e) {
+        std::cout << e.what() << std::endl;
+    }
+}
+#endif

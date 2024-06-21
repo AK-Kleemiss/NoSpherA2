@@ -363,7 +363,8 @@ int main(int argc, char **argv)
             // Read the xyzfile
             wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
             // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-            int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
+            const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+            int nr_coefs = load_basis_into_WFN(wavy[0], basis);
             // Run generation of tsc file
             if (opt.SALTED_BECKE || opt.SALTED)
                 err_checkf(calculate_scattering_factors_ML_No_H(
@@ -382,6 +383,7 @@ int main(int argc, char **argv)
         }
         else
         {
+            std::cout << "Please provide a cif and " << endl;
             // #include "test_functions.h"
             //       cube_from_coef_npy(opt.coef_file, opt.xyz_file);
         }

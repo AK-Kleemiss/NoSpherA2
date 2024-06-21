@@ -5,7 +5,7 @@
 #include "npy.h"
 #include "properties.h"
 
-class ML {
+class ML_density {
 public:
 	static void calc_diff(const std::string xyz_File, options& opt);
 	void gbw2DM(std::string& fn, std::ostream& file, bool& debug);
