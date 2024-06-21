@@ -870,7 +870,7 @@ const double calc_density_ML(double &x,
                              const int &exp_coefs,
                              const int &atom_nr);
 
-int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b);
+int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 35> &b);
 
 double hypergeometric(double a, double b, double c, double x);
 

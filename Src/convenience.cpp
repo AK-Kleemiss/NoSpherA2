@@ -2595,7 +2595,7 @@ const double calc_density_ML(double &x,
     return dens;
 }
 
-int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b)
+int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 35> &b)
 {
     int nr_coefs = 0;
     for (int i = 0; i < wavy.atoms.size(); i++)
