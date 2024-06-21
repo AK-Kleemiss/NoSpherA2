@@ -3,6 +3,7 @@
 #include "tsc_block.h"
 #include "test_functions.h"
 #include "ML_density.h"
+#include "ML_predict.h"
 
 using namespace std;
 
@@ -3005,8 +3006,11 @@ void options::digest_options()
             s_rho = true;
         else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
             SALTED_BECKE = true;
-        else if (temp == "-SALTED" || temp == "-salted")
+        else if (temp == "-SALTED" || temp == "-salted") {
             SALTED = true;
+            predict();
+            exit(0);
+        }
         else if (temp == "-skpts")
             save_k_pts = true;
         else if (temp == "-sfac_scan")
@@ -3026,10 +3030,6 @@ void options::digest_options()
         else if (temp == "-test-ecp-pot")
         {
             test_esp_dens();
-            exit(0);
-        }
-        else if (temp == "-test-rascaline") {
-            test_rascaline_interface();
             exit(0);
         }
         else if (temp == "-sfac_diffuse")
