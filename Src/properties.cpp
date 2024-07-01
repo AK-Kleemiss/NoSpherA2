@@ -742,7 +742,8 @@ void Calc_MO_spherical_harmonics(
     WFN &wavy,
     int cpus,
     int MO,
-    ostream &file)
+    ostream &file,
+    bool nodate)
 {
 #ifdef _OPENMP
     if (cpus != -1)
@@ -754,7 +755,9 @@ void Calc_MO_spherical_harmonics(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    progress_bar* progress = NULL;
+    if (!nodate)
+        progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -771,26 +774,28 @@ void Calc_MO_spherical_harmonics(
 
                 CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(PosGrid[0], PosGrid[1], PosGrid[2], MO));
             }
-        if (i != 0 && i % step == 0)
+        if (i != 0 && i % step == 0&& !nodate)
             progress->write((i) / static_cast<double>(CubeMO.get_size(0)));
     }
-    delete (progress);
+    if (!nodate) {
+        delete (progress);
 
-    time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        time_point end = get_time();
+        if (get_sec(start, end) < 60)
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+        else if (get_sec(start, end) < 3600)
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+        else
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    }
 };
 
 void Calc_S_Rho(
-    cube &Cube_S_Rho,
-    WFN &wavy,
+    cube& Cube_S_Rho,
+    WFN& wavy,
     int cpus,
-    ostream &file,
-    bool &nodate)
+    ostream& file,
+    bool& nodate)
 {
 #ifdef _OPENMP
     if (cpus != -1)
@@ -801,8 +806,9 @@ void Calc_S_Rho(
 #endif
 
     time_point start = get_time();
-
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    progress_bar* progress = NULL;
+    if(!nodate)
+        progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
     const int step = (int)max(floor(Cube_S_Rho.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -819,22 +825,24 @@ void Calc_S_Rho(
                 double PosGrid[3]{
                     i * Cube_S_Rho.get_vector(0, 0) + j * Cube_S_Rho.get_vector(0, 1) + k * Cube_S_Rho.get_vector(0, 2) + Cube_S_Rho.get_origin(0),
                     i * Cube_S_Rho.get_vector(1, 0) + j * Cube_S_Rho.get_vector(1, 1) + k * Cube_S_Rho.get_vector(1, 2) + Cube_S_Rho.get_origin(1),
-                    i * Cube_S_Rho.get_vector(2, 0) + j * Cube_S_Rho.get_vector(2, 1) + k * Cube_S_Rho.get_vector(2, 2) + Cube_S_Rho.get_origin(2)};
+                    i * Cube_S_Rho.get_vector(2, 0) + j * Cube_S_Rho.get_vector(2, 1) + k * Cube_S_Rho.get_vector(2, 2) + Cube_S_Rho.get_origin(2) };
 
                 Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
             }
-        if (i != 0 && i % step == 0)
+        if (i != 0 && i % step == 0 && !nodate)
             progress->write((i) / static_cast<double>(Cube_S_Rho.get_size(0)));
     }
-    delete (progress);
+    if (!nodate) {
+        delete (progress);
 
-    time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+        time_point end = get_time();
+        if (get_sec(start, end) < 60)
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+        else if (get_sec(start, end) < 3600)
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+        else
+            file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    }
 };
 
 void Calc_Prop(

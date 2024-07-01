@@ -8,6 +8,7 @@ using ComplexCube_double = vector<cvec2>;
 using Cube_double = vec3;
 using Complex4DVec_double = vector<vector<cvec2>>;
 
+#ifdef _WIN32
 Matrix_double readHDF5(H5::H5File file, string dataset_name)
 {
     /*
@@ -98,6 +99,7 @@ Matrix_double readHDF5(H5::H5File file, string dataset_name)
 
     return {};
 }
+#endif
 
 template <typename Scalar>
 void read_npy(string filename, std::vector<Scalar> &data)
@@ -487,7 +489,7 @@ Matrix_double elementWiseExponentiation(const Matrix_double &matrix, double expo
 void equicombsparse(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                     const vector<vector<vector<vector<complex<double>>>>> &v1,
                     const vector<vector<vector<vector<complex<double>>>>> &v2,
-                    int wigdim, const vector<double> &w3j, int llmax,
+                    const vector<double> &w3j, int llmax,
                     const vector<vector<int>> &llvec, int lam,
                     const vector<vector<complex<double>>> &c2r,
                     int featsize, int nfps, const vector<int64_t> &vfps,
@@ -500,7 +502,7 @@ void equicombsparse(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize)
     for (iat = 0; iat < natoms; ++iat)
     {
         const int l21 = 2 * lam +1;
@@ -567,7 +569,7 @@ void equicombsparse(int natoms, int nang1, int nang2, int nrad1, int nrad2,
 void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
               Complex4DVec_double &v1,
               Complex4DVec_double &v2,
-              int wigdim, vector<double> &w3j, int llmax,
+              vector<double> &w3j, int llmax,
               vector<vector<int>> &llvec, int lam,
               ComplexMatrix_double &c2r, int featsize,
               Cube_double &p)
@@ -578,11 +580,11 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     p = Cube_double(2 * lam + 1, Matrix_double(featsize, vector<double>(natoms, 0.0)));
 
     // Parallel region
-#pragma omp parallel for default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, wigdim, w3j, llmax, llvec, lam, c2r, featsize, p)
+#pragma omp parallel for default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize, p)
     for (int iat = 0; iat < natoms; ++iat)
     {
         double inner = 0.0;
-        Matrix_double ptemp(2 * lam + 1, vector<double>(featsize, 0.0));
+        Matrix_double ptemp(2 * lam + 1, vec(featsize, 0.0));
         int ifeat = 0;
         for (int n1 = 0; n1 < nrad1; ++n1)
         {
@@ -593,7 +595,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                 {
                     int l1 = llvec[0][il];
                     int l2 = llvec[1][il];
-                    vector<complex<double>> pcmplx(2 * lam + 1, complex<double>(0.0, 0.0));
+                    cvec pcmplx(2 * lam + 1, complex<double>(0.0, 0.0));
                     for (int imu = 0; imu < 2 * lam + 1; ++imu)
                     {
                         int mu = imu - lam;
@@ -609,11 +611,11 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                             }
                         }
                     }
-                    std::vector<double> preal(2 * lam + 1);
+                    vec preal(2 * lam + 1);
                     // Matrix multiplication c2r * pcmplx
                     for (int i = 0; i < 2 * lam + 1; ++i)
                     {
-                        std::complex<double> sum = 0.0;
+                        cdouble sum = 0.0;
                         for (int j = 0; j < 2 * lam + 1; ++j)
                         {
                             sum += c2r[i][j] * pcmplx[j];
@@ -626,8 +628,8 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                 }
             }
         }
-        double normfact = std::sqrt(inner);
-        for (int ifeat = 0; ifeat < featsize; ++ifeat)
+        const double normfact = std::sqrt(inner);
+        for (ifeat = 0; ifeat < featsize; ++ifeat)
         {
             for (int imu = 0; imu < 2 * lam + 1; ++imu)
             {
@@ -766,6 +768,7 @@ string gen_parameters(double rcut, int nrad, int nang, double atomic_gaussian_wi
     return json_string;
 }
 
+#ifdef _WIN32
 // RASCALINE1
 metatensor::TensorMap get_feats_projs(string filepath, double rcut1, int nrad1, int nang1, double atomic_gaussian_width, std::vector<std::string> neighspe, std::vector<std::string> species)
 {
@@ -863,6 +866,7 @@ Complex4DVec_double get_expansion_coeffs(vector<uint8_t> spx_buff, int n_atoms, 
     }
     return v;
 }
+#endif
 
 // Function to filter out atoms that belong to species not available for the model selected
 std::vector<std::string> filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species)
@@ -1092,7 +1096,7 @@ vec predict(WFN wavy, string model_folder)
     unordered_map<string, int> lmax{};
     unordered_map<string, int> nmax{};
     set_lmax_nmax(lmax, nmax, QZVP_JKfit, config.species);
-
+#ifdef _WIN32
     // RASCALINE (Generate descriptors)
     metatensor::TensorMap spx = get_feats_projs(config.predict_filename, config.rcut1, config.nrad1, config.nang1, config.sig1, config.neighspe1, config.species);
     vector<uint8_t> spx_buf = spx.save_buffer();
@@ -1102,6 +1106,10 @@ vec predict(WFN wavy, string model_folder)
     vector<uint8_t> spx_buf_2 = spx.save_buffer();
     Complex4DVec_double v2 = get_expansion_coeffs(spx_buf_2, natoms, config.nang2, config.nrad2, nspe2);
     // END RASCALINE
+#else
+    err_not_impl_f("RASCALINE is only supported on Windows", std::cout);
+    Complex4DVec_double v2, v1;
+#endif
 
     // Read Model variables
     unordered_map<string, Matrix_double> Vmat{};
@@ -1111,6 +1119,7 @@ vec predict(WFN wavy, string model_folder)
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
+#ifdef _WIN32
     H5::H5File features(model_folder + "/GPR_data/FEAT_M-" + to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(model_folder + "/GPR_data/projector_M" + to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
     for (string spe : config.species)
@@ -1133,6 +1142,7 @@ vec predict(WFN wavy, string model_folder)
     }
     features.close();
     projectors.close();
+#endif
 
     unordered_map<int, vector<int64_t>> vfps{};
     if (config.sparsify)
@@ -1183,7 +1193,6 @@ vec predict(WFN wavy, string model_folder)
         }
 
         vector<double> wigner3j = readVectorFromFile<double>(model_folder + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
-        int wigdim = static_cast<int>(wigner3j.size());
 
         ComplexMatrix_double c2r = complex_to_real_transformation({2 * lam + 1})[0];
 
@@ -1193,12 +1202,12 @@ vec predict(WFN wavy, string model_folder)
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-            equicombsparse(natoms, config.nang1, config.nang2, (nspe1 * config.nrad1), (nspe2 * config.nrad2), v1, v2, wigdim, wigner3j, llmax, llvec_t, lam, c2r, featsize, nfps, vfps[lam], p);
+            equicombsparse(natoms, config.nang1, config.nang2, (nspe1 * config.nrad1), (nspe2 * config.nrad2), v1, v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, nfps, vfps[lam], p);
             featsize = config.ncut;
         }
         else
         {
-            equicomb(natoms, config.nang1, config.nang2, (nspe1 * config.nrad1), (nspe2 * config.nrad2), v1, v2, wigdim, wigner3j, llmax, llvec_t, lam, c2r, featsize, p);
+            equicomb(natoms, config.nang1, config.nang2, (nspe1 * config.nrad1), (nspe2 * config.nrad2), v1, v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, p);
         }
         wigner3j.clear();
 
@@ -1240,7 +1249,7 @@ vec predict(WFN wavy, string model_folder)
         for (int lam = 1; lam <= lmax[spe]; ++lam)
         {
             int featsize = static_cast<int>(pvec[lam][0][0].size());
-            Matrix_double power_env_sparse_t = transpose<double>(power_env_sparse[spe + to_string(lam)]);
+            power_env_sparse_t = transpose<double>(power_env_sparse[spe + to_string(lam)]);
             Cube_double pVec_Rows = collectRows(pvec[lam], atom_idx[spe]);
             Matrix_double pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{natom_dict[spe] * (2 * lam + 1), featsize});
 
@@ -1347,7 +1356,7 @@ vec predict(WFN wavy, string model_folder)
 
     if (config.average)
     {
-        for (int i = 0; i < Tsize; i++)
+        for (i = 0; i < Tsize; i++)
         {
             pred_coefs[i] += Av_coeffs[i];
         }

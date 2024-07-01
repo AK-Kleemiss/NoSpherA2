@@ -1833,10 +1833,10 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            for (int i = 0; i < 3; i++)
-                                push_back_MO_coef(MO_run, d_temp[i][s]);
-                            for (int i = 3; i < 6; i++)
-                                push_back_MO_coef(MO_run, d_temp[i][s] * sqrt(3));
+                            for (int _i = 0; _i < 3; _i++)
+                                push_back_MO_coef(MO_run, d_temp[_i][s]);
+                            for (int _i = 3; _i < 6; _i++)
+                                push_back_MO_coef(MO_run, d_temp[_i][s] * sqrt(3));
                             for (int cart = 0; cart < 6; cart++)
                             {
                                 if (MO_run == 0)
@@ -1955,7 +1955,7 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
     return true;
 };
 
-bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, const bool has_ECPs)
+bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, const bool _has_ECPs)
 {
     // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
     err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
@@ -2386,8 +2386,9 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
             file << "\nI read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
             file << "There are " << nex << " primitives after conversion" << endl;
         }
-        if (has_ECPs)
+        if (_has_ECPs)
         {
+            has_ECPs = true;
             vector<ECP_primitive> ECP_prims;
             // Reading ECPs?
             rf.seekg(32, ios::beg);
@@ -2444,9 +2445,9 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
                         ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
                     }
                 }
-                for (int i = 0; i < ncen; i++)
-                    if (atoms[i].charge == Z)
-                        atoms[i].ECP_electrons = nr_core;
+                for (int _i = 0; _i < ncen; _i++)
+                    if (atoms[_i].charge == Z)
+                        atoms[_i].ECP_electrons = nr_core;
             }
             if (debug)
             {

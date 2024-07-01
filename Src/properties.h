@@ -117,7 +117,8 @@ void Calc_MO_spherical_harmonics(
     WFN &wavy,
     int cpus,
     int MO,
-    std::ostream &file);
+    std::ostream &file,
+    bool nodate = false);
 /**
  * Calculates the properties of the given cubes and WFN object.
  *

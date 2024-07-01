@@ -20,7 +20,6 @@
 #include <H5public.h>
 #include <H5Dpublic.h>
 #include <H5Opublic.h>
-
 #endif
 
 #include <complex>

@@ -34,8 +34,7 @@ void ML_density::calc_cube(
 				double PosGrid[3]{
 					i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
 					i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-					i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) },
-					Rho = 0;
+					i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) };
 
 				bool skip = true;
 				for (int a = 0; a < wavy.get_ncen(); a++)
@@ -184,6 +183,7 @@ void ML_density::cubeDiffDaniel() {
 
 
 void ML_density::gbw2DM(string& fn, ostream& file, bool& debug) {
+	//UNTESTED AND NOT USED AT THE MOMENT
 	ifstream rf(fn.c_str(), ios::binary);
 	if (!rf.good())
 		err_checkf(false, "Nope!", file);
@@ -254,11 +254,7 @@ void ML_density::gbw2DM(string& fn, ostream& file, bool& debug) {
 			}
 		}
 	}
-	npy::npy_data<double> data;
-	data.data = DM;
-	data.fortran_order = false;
-	data.shape = { unsigned long(naotr) };
-	npy::write_npy("coeffs_by_black_magic.npy", data);
+	//npy::write_npy("coeffs_by_black_magic.npy", DM);
 }
 
 
