@@ -1865,7 +1865,7 @@ int make_hirshfeld_grids(
  *
  * @param accuracy The accuracy of the grids.
  * @param wave The wavefunction.
- * @param coef_filename The coefficient filename.
+ * @param coefs The coefficient vector.
  * @param atom_type_list The list of atom types.
  * @param asym_atom_list The list of asymmetric atoms.
  * @param needs_grid The vector indicating if a grid is needed for each atom.
@@ -1889,7 +1889,7 @@ int make_hirshfeld_grids(
 static int make_hirshfeld_grids_ML(
     const int &accuracy,
     const WFN &wave,
-    const string coef_filename,
+    vec coefs,
     const ivec &atom_type_list,
     const ivec &asym_atom_list,
     bvec &needs_grid,
@@ -2036,12 +2036,6 @@ static int make_hirshfeld_grids_ML(
     {
         WFN temp = wave;
         const int nr_pts = (int)total_grid[0].size();
-        vector<unsigned long> shape{};
-        bool fortran_order;
-        vec data{};
-
-        string path{coef_filename};
-        npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
 #pragma omp parallel for
         for (int i = 0; i < nr_pts; i++)
@@ -2050,11 +2044,11 @@ static int make_hirshfeld_grids_ML(
                 total_grid[0][i],
                 total_grid[1][i],
                 total_grid[2][i],
-                data,
+                coefs,
                 temp.atoms,
                 exp_coefs);
         }
-        shrink_vector<double>(data);
+        shrink_vector<double>(coefs);
     }
 
     if (debug)
@@ -2264,7 +2258,7 @@ static int make_integration_grids(
     const int &accuracy,
     cell &unit_cell,
     const WFN &wave,
-    const string coef_filename,
+    vec coefs,
     const ivec &atom_type_list,
     const ivec &asym_atom_list,
     bvec &needs_grid,
@@ -2417,12 +2411,6 @@ static int make_integration_grids(
 
     WFN temp = wave;
     const int nr_pts = (int)total_grid[0].size();
-    vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    string path{coef_filename};
-    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
 #pragma omp parallel for
     for (int i = 0; i < nr_pts; i++)
@@ -2431,11 +2419,11 @@ static int make_integration_grids(
             total_grid[0][i],
             total_grid[1][i],
             total_grid[2][i],
-            data,
+            coefs,
             temp.atoms,
             exp_coefs);
     }
-    shrink_vector<double>(data);
+    shrink_vector<double>(coefs);
 
     if (debug)
         file << endl
@@ -2565,7 +2553,7 @@ static int make_integration_grids(
  * @param accuracy The accuracy level of the integration grids.
  * @param unit_cell The unit cell object.
  * @param wave The WFN object.
- * @param coef_filename The filename of the coefficient file.
+ * @param coefs The vector of coefficients.
  * @param atom_type_list The list of atom types.
  * @param asym_atom_list The list of asymmetric atoms.
  * @param needs_grid The vector indicating whether each atom needs a grid.
@@ -2589,7 +2577,7 @@ static int make_integration_grids_SALTED(
     const int &accuracy,
     cell &unit_cell,
     const WFN &wave,
-    const string coef_filename,
+    vec coefs,
     const ivec &atom_type_list,
     const ivec &asym_atom_list,
     bvec &needs_grid,
@@ -2736,12 +2724,6 @@ static int make_integration_grids_SALTED(
 
     WFN temp = wave;
     const int nr_pts = (int)total_grid[0].size();
-    vector<unsigned long> shape{};
-    bool fortran_order;
-    vec data{};
-
-    string path{coef_filename};
-    npy::LoadArrayFromNumpy(path, shape, fortran_order, data);
 
     if (debug)
         file << endl
@@ -2772,7 +2754,7 @@ static int make_integration_grids_SALTED(
                                    total_grid[0][i],
                                    total_grid[1][i],
                                    total_grid[2][i],
-                                   data,
+                                   coefs,
                                    temp.atoms,
                                    exp_coefs,
                                    asym_atom_list[i]) *
@@ -2787,7 +2769,7 @@ static int make_integration_grids_SALTED(
             atom_els[i] += n;
         }
     }
-    shrink_vector<double>(data);
+    shrink_vector<double>(coefs);
 
     if (debug)
     {
@@ -3714,7 +3696,8 @@ bool calculate_scattering_factors_ML(
     const options &opt,
     const WFN &wave,
     ostream &file,
-    const int exp_coefs)
+    const int exp_coefs,
+    vec coefs)
 {
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3768,7 +3751,7 @@ bool calculate_scattering_factors_ML(
     int points = make_hirshfeld_grids_ML(
         opt.accuracy,
         wave,
-        opt.coef_file,
+        coefs,
         atom_type_list,
         asym_atom_list,
         needs_grid,
@@ -3873,7 +3856,8 @@ bool calculate_scattering_factors_ML_No_H(
     const options &opt,
     const WFN &wave,
     ostream &file,
-    const int exp_coefs)
+    const int exp_coefs,
+    vec coefs)
 {
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3924,14 +3908,14 @@ bool calculate_scattering_factors_ML_No_H(
         file << "made it post CIF, now make grids!" << endl;
     vec2 d1, d2, d3, dens;
     int points = 0;
-    if (opt.SALTED)
+    if (opt.SALTED_NO_H)
     {
         file << "Making pure SALTED densities\n";
         points = make_integration_grids_SALTED(
             opt.accuracy,
             unit_cell,
             wave,
-            opt.coef_file,
+            coefs,
             atom_type_list,
             asym_atom_list,
             needs_grid,
@@ -3954,7 +3938,7 @@ bool calculate_scattering_factors_ML_No_H(
             opt.accuracy,
             unit_cell,
             wave,
-            opt.coef_file,
+            coefs,
             atom_type_list,
             asym_atom_list,
             needs_grid,

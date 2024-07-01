@@ -3,7 +3,6 @@
 #include "tsc_block.h"
 #include "test_functions.h"
 #include "ML_density.h"
-#include "ML_predict.h"
 
 using namespace std;
 
@@ -524,6 +523,7 @@ options::options(int accuracy,
         bool hirsh,
         bool s_rho,
         bool SALTED,
+        bool SALTED_NO_H,
         bool SALTED_BECKE,
         bool Olex2_1_3_switch,
         bool iam_switch,
@@ -564,6 +564,7 @@ options::options(int accuracy,
         const std::string& gaussian_path,
         const std::string& turbomole_path,
         const std::string& basis_set_path,
+        const std::string& SALTED_DIR,
         const svec& arguments,
         const svec& combine_mo,
         const svec& Cations,
@@ -584,7 +585,7 @@ options::options(int accuracy,
         set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
         eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
         hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-        s_rho(s_rho), SALTED(SALTED), SALTED_BECKE(SALTED_BECKE),
+        s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR),
         Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
         read_k_pts(read_k_pts), save_k_pts(save_k_pts),
         combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
@@ -2754,11 +2755,11 @@ void options::digest_options()
         {
             charge = stoi(arguments[i + 1]);
         }
-        else if (temp == "-coef")
-        {
-            coef_file = arguments[i + 1];
-            err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
-        }
+        //else if (temp == "-coef")
+        //{
+        //    coef_file = arguments[i + 1];
+        //    err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+        //}
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
@@ -3004,12 +3005,15 @@ void options::digest_options()
         }
         else if (temp.find("-s_rho") < 1)
             s_rho = true;
-        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
-            SALTED_BECKE = true;
-        else if (temp == "-SALTED" || temp == "-salted") {
+        else if (temp == "-SALTED" || temp == "-salted"){
             SALTED = true;
-            predict();
-            exit(0);
+            SALTED_DIR = arguments[i + 1];
+        }
+        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1) {
+            SALTED_BECKE = true;
+        }
+        else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h") {
+            SALTED_NO_H = true;
         }
         else if (temp == "-skpts")
             save_k_pts = true;
@@ -3114,7 +3118,7 @@ void options::look_for_debug(int &argc, char **argv)
         arguments.push_back(temp);
         if (temp.find("-") > 0)
             continue;
-        else if (temp == "-v" || temp == "-v2")
+        else if (temp == "-v" || temp == "-v2" || temp == "-debug")
             cout << "Turning on verbose mode!" << endl, debug = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {

@@ -487,6 +487,8 @@ namespace npy {
     const dtype_t dtype = dtype_map.at(std::type_index(typeid(Scalar)));
 
     if (header.dtype.tie() != dtype.tie()) {
+      std::cout << "header.dtype: " << header.dtype.str() << std::endl;
+      std::cout << "dtype: " << dtype.str() << std::endl;
       throw std::runtime_error("formatting error: typestrings not matching");
     }
 

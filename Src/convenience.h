@@ -691,6 +691,7 @@ struct options
     ivec cmo2;
     ivec ECP_nrs;
     ivec ECP_elcounts;
+    std::string SALTED_DIR;
     std::string wfn;
     std::string wfn2;
     std::string fchk;
@@ -717,7 +718,7 @@ struct options
     bool fract = false;
     bool hirsh = false;
     bool s_rho = false;
-    bool SALTED = false, SALTED_BECKE = false;
+    bool SALTED = false, SALTED_NO_H = false, SALTED_BECKE = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
     bool read_k_pts = false;
@@ -798,6 +799,7 @@ struct options
         bool hirsh,
         bool s_rho,
         bool SALTED,
+        bool SALTED_NO_H,
         bool SALTED_BECKE,
         bool Olex2_1_3_switch,
         bool iam_switch,
@@ -838,6 +840,7 @@ struct options
         const std::string& gaussian_path,
         const std::string& turbomole_path,
         const std::string& basis_set_path,
+        const std::string& SALTED_DIR,
         const svec& arguments,
         const svec& combine_mo,
         const svec& Cations,

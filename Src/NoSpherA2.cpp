@@ -6,7 +6,7 @@
 #include "cube.h"
 #include "scattering_factors.h"
 #include "properties.h"
-
+#include "ML_predict.h"
 using namespace std;
 
 int main(int argc, char **argv)
@@ -306,23 +306,77 @@ int main(int argc, char **argv)
         //This one will calcualte a single tsc/tscb file form a single wfn
         if (opt.cif != "" || opt.hkl != "")
         {
-            // Calculate tsc file from given files
-            if (opt.debug)
-                log_file << "Entering scattering Factor Calculation!" << endl;
-            if (opt.electron_diffraction)
-                log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-            if (wavy[0].get_origin() != 7)
-                err_checkf(calculate_scattering_factors_HF(
-                               opt,
-                               wavy[0],
-                               log_file),
-                           "Error during SF Calcualtion", log_file);
-            else
-                err_checkf(thakkar_sfac(
-                               opt,
-                               log_file,
-                               wavy[0]),
-                           "Error during SF Calcualtion", log_file);
+            if (!opt.SALTED && !opt.SALTED_BECKE && !opt.SALTED_NO_H)
+            {
+                // Calculate tsc file from given files
+                if (opt.debug)
+                    log_file << "Entering scattering Factor Calculation!" << endl;
+                if (opt.electron_diffraction)
+                    log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+                if (wavy[0].get_origin() != 7)
+                    err_checkf(calculate_scattering_factors_HF(
+                        opt,
+                        wavy[0],
+                        log_file),
+                        "Error during SF Calcualtion", log_file);
+                else
+                    err_checkf(thakkar_sfac(
+                        opt,
+                        log_file,
+                        wavy[0]),
+                        "Error during SF Calcualtion", log_file);
+            }
+            else {
+                if(opt.debug) log_file << "Entering scattering ML Factor Calculation!" << endl;
+                // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
+                //const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+                int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
+                // Run generation of tsc file
+
+                vec coefs = predict(wavy[0], opt.SALTED_DIR);
+                if (opt.debug) log_file << "Finished ML Density Prediction!" << endl;
+
+                if (opt.debug && (opt.wfn == string("test_cysteine.xyz") || opt.wfn == string("test_sucrose.xyz"))) {
+                    vector<unsigned long> shape{};
+                    bool fortran_order;
+                    vec ref_coefs{};
+                    //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
+                    if (opt.wfn == string("test_sucrose.xyz"))
+						npy::LoadArrayFromNumpy("sucrose_ref.npy", shape, fortran_order, ref_coefs);
+					else
+                        npy::LoadArrayFromNumpy("cysteine_ref.npy", shape, fortran_order, ref_coefs);
+                    // Compare coefs with the reference
+                    vector<double> diff_vec;
+                    double diff = 0.0;
+                    for (int i = 0; i < coefs.size(); i++)
+                    {
+                        diff += abs(coefs[i] - ref_coefs[i]);
+                        if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
+							log_file << "Difference in coef " << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;}
+                        diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
+                    }
+                    log_file << "Difference between calculated and reference coefs: " << diff << endl;
+                    log_file << "Maximum ((pred / ref) -1): " << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
+                }
+                if (opt.SALTED_BECKE || opt.SALTED_NO_H)
+                    err_checkf(calculate_scattering_factors_ML_No_H(
+                        opt,
+                        wavy[0],
+                        log_file,
+                        nr_coefs,
+                        coefs),
+                        "Error during ML-SF Calcualtion", log_file);
+                else {
+                    if (opt.debug) log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+                    err_checkf(calculate_scattering_factors_ML(
+                        opt,
+                        wavy[0],
+                        log_file,
+                        nr_coefs,
+                        coefs),
+                        "Error during ML-SF Calcualtion", log_file);
+                }
+            }
         }
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
@@ -353,42 +407,6 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn + ".cif");
-        return 0;
-    }
-    if (opt.coef_file != "")
-    {
-        if (opt.cif != "" && opt.xyz_file != "")
-        {
-            wavy.emplace_back(7);
-            // Read the xyzfile
-            wavy[0].read_xyz(opt.xyz_file, std::cout, opt.debug);
-            // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-            //const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-            int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
-            // Run generation of tsc file
-            if (opt.SALTED_BECKE || opt.SALTED)
-                err_checkf(calculate_scattering_factors_ML_No_H(
-                               opt,
-                               wavy[0],
-                               log_file,
-                               nr_coefs),
-                           "Error during ML-SF Calcualtion", log_file);
-            else
-                err_checkf(calculate_scattering_factors_ML(
-                               opt,
-                               wavy[0],
-                               log_file,
-                               nr_coefs),
-                           "Error during ML-SF Calcualtion", log_file);
-        }
-        else
-        {
-            std::cout << "Please provide a cif and " << endl;
-            // #include "test_functions.h"
-            //       cube_from_coef_npy(opt.coef_file, opt.xyz_file);
-        }
-        std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Finished!" << endl;
         return 0;
     }
     std::cout << NoSpherA2_message();
