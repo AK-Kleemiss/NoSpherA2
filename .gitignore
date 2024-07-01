@@ -59,3 +59,5 @@ tests/reading_SALTED/water_rho.cube
 *_property.txt
 tests/ECP_SF/Atomic_densities/*.gbw
 /tests/reading_ML_Coeffs
+*NoSpherA2.lib
+*NoSpherA2.exp

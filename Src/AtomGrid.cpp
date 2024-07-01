@@ -167,7 +167,7 @@ void AtomGrid::get_grid(const int num_centers,
     {
       vec pa(num_centers);
       double temp;
-#pragma omp for schedule(dynamic)
+#pragma omp for
       for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
         grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
         grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
@@ -342,7 +342,17 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
+// JCP 88, 2547 (1988), eq. 20
 constexpr double f3(const double& x)
+{
+  double f = x;
+  f *= (1.5 - 0.5 * f * f); // First iteration
+  f *= (1.5 - 0.5 * f * f); // Second iteration
+  f *= (1.5 - 0.5 * f * f); // Third iteration
+  return f;
+}
+
+constexpr double f(const double& x)
 {
   double f = x;
   for (int i = 0; i < constants::hardness; i++)
@@ -411,7 +421,7 @@ double get_becke_w(const int& num_centers,
         // JCP 88, 2547 (1988), eq. A3
         if (a_ab > 0.5)
           a_ab = 0.5;
-        if (a_ab < -0.5)
+        else if (a_ab < -0.5)
           a_ab = -0.5;
 
         nu_ab = mu_ab + a_ab * (1.0 - mu_ab * mu_ab);

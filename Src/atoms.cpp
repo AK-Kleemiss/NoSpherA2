@@ -15,6 +15,7 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 	exponent = g_exponent;
 	type = g_type;
 	shell = g_shell;
+	p = primitive(0, type, exponent, coefficient);
 };
 
 basis_set_entry basis_set_entry::operator=(const basis_set_entry& rhs) {
@@ -22,6 +23,7 @@ basis_set_entry basis_set_entry::operator=(const basis_set_entry& rhs) {
 	exponent = rhs.exponent;
 	type = rhs.type;
 	shell = rhs.shell;
+	p = rhs.p;
 	return *this;
 };
 

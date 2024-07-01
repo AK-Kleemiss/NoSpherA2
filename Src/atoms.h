@@ -12,6 +12,7 @@ struct basis_set_entry{
 	basis_set_entry();
 	basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
 	bool operator==(const basis_set_entry& other) const;
+	primitive p;
 };
 
 class atom {

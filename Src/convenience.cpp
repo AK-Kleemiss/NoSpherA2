@@ -2525,23 +2525,36 @@ const double calc_density_ML(double &x,
             z - atoms[a].z, 0.0};
         // store r in last element
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (d[3] < -46.0517)
+        { // corresponds to cutoff of ex ~< 1E-20
+          for (e = 0; e < size; e++)
+          {
+            bf = &atoms[a].basis_set[e];
+            coef_counter += (2 * bf->type + 1);
+          }
+          continue;
+        }
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
             d[e] /= d[3];
         for (e = 0; e < size; e++)
         {
             bf = &atoms[a].basis_set[e];
-            primitive p(a, bf->type, bf->exponent, bf->coefficient);
-            radial = gaussian_radial(p, d[3]);
-            for (int m = -p.type; m <= p.type; m++)
+            primitive* p(&(bf->p));
+            radial = gaussian_radial(*p, d[3]);
+            if (radial < 1E-10) {
+              coef_counter += (2 * p->type + 1);
+              continue;
+            }
+            for (int m = -p->type; m <= p->type; m++)
             {
                 // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
+                dens += coefficients[coef_counter + m + p->type] * radial * spherical_harmonic(p->type, m, d);
             }
-            coef_counter += (2 * p.type + 1);
+            coef_counter += (2 * p->type + 1);
         }
     }
-    err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+    //err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
 }
 

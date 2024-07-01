@@ -342,8 +342,8 @@ int main(int argc, char **argv)
                     vec ref_coefs{};
                     //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
                     if (opt.wfn == string("test_sucrose.xyz"))
-						npy::LoadArrayFromNumpy("sucrose_ref.npy", shape, fortran_order, ref_coefs);
-					else
+						            npy::LoadArrayFromNumpy("sucrose_ref.npy", shape, fortran_order, ref_coefs);
+					          else
                         npy::LoadArrayFromNumpy("cysteine_ref.npy", shape, fortran_order, ref_coefs);
                     // Compare coefs with the reference
                     vector<double> diff_vec;
@@ -352,7 +352,8 @@ int main(int argc, char **argv)
                     {
                         diff += abs(coefs[i] - ref_coefs[i]);
                         if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
-							log_file << "Difference in coef " << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;}
+							              log_file << "Difference in coef " << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
+                        }
                         diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
                     }
                     log_file << "Difference between calculated and reference coefs: " << diff << endl;

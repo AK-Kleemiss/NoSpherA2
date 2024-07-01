@@ -16,6 +16,9 @@
     <Filter Include="Ressourcendateien\Tests">
       <UniqueIdentifier>{45d99421-05f7-4085-b74e-695a8a4377e4}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Quelldateien\HDF5">
+      <UniqueIdentifier>{a9c7438a-421e-46c9-aefe-b0d46e8373f0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -62,6 +65,99 @@
     </ClCompile>
     <ClCompile Include="..\Src\JKFit.cpp">
       <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5AbstractDs.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5ArrayType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5AtomType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Attribute.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5CommonFG.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5CompType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DaccProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DataSet.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DataSpace.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DataType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DcreatProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5DxferProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5EnumType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Exception.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5FaccProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5FcreatProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5File.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5FloatType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Group.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5IdComponent.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5IntType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5LaccProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5LcreatProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Library.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Location.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5Object.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5OcreatProp.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5PredType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5PropList.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5StrType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\H5VarLenType.cpp">
+      <Filter>Quelldateien\HDF5</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
