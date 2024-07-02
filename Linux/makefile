@@ -13,8 +13,6 @@ CPP_SRCS += ../unity.cpp
 
 OBJS += ./unity.o 
 
-HDF5 += ./hdf5.o
-
 CPP_DEPS += ./unity.d 
 
 -include ${CPP_DEPS}
@@ -33,12 +31,7 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-./hdf5.o: ./hdf5.cpp
-	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -I../Lib -hdf5_serial -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-NoSpherA2_rascaline: ${OBJS} ${HDF5}
+NoSpherA2_rascaline: ${OBJS}
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2_rascaline" ${LIBOMP} ${LIBRASCALINE} ${LIBMETATENSOR} ${LIBHDF5} ${OBJS} ${LIBS} -lrascaline -lmetatensor -lhdf5_serial -I../ -I../Lib/ -L../Lib/
 	cp NoSpherA2_rascaline ../
