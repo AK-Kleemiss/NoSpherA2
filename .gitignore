@@ -61,3 +61,5 @@ tests/ECP_SF/Atomic_densities/*.gbw
 /tests/reading_ML_Coeffs
 *NoSpherA2.lib
 *NoSpherA2.exp
+Linux/NoSpherA2_rascaline
+NoSpherA2_rascaline

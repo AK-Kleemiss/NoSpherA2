@@ -3,17 +3,19 @@ RM := rm -f
 
 LIBS := -lgomp -static-libgcc -static-libstdc++
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
+LIBRASCALINE := ../Lib/librascaline.a
+LIBMETATENSOR := ../Lib/libmetatensor.a
+LIBHDF5 := ../Lib/libhdf5_serial.a
 
 all: clean NoSpherA2
 
-CPP_SRCS += \
-../unity.cpp 
+CPP_SRCS += ../unity.cpp 
 
-OBJS += \
-./unity.o 
+OBJS += ./unity.o 
 
-CPP_DEPS += \
-./unity.d 
+HDF5 += ./hdf5.o
+
+CPP_DEPS += ./unity.d 
 
 -include ${CPP_DEPS}
 
@@ -30,6 +32,17 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
+
+./hdf5.o: ./hdf5.cpp
+	@echo 'Building file: $<'
+	g++ ${GCC_OPTS} -I../Lib -hdf5_serial -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@echo 'Finished building: $<'
+
+NoSpherA2_rascaline: ${OBJS} ${HDF5}
+	@echo 'Building target: $@'
+	g++ -o "NoSpherA2_rascaline" ${LIBOMP} ${LIBRASCALINE} ${LIBMETATENSOR} ${LIBHDF5} ${OBJS} ${LIBS} -lrascaline -lmetatensor -lhdf5_serial -I../ -I../Lib/ -L../Lib/
+	cp NoSpherA2_rascaline ../
+	@echo 'Done building rascaline version of NoSpherA2'
 
 clean:
 	-${RM} NoSpherA2 ../NoSpherA2

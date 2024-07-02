@@ -8,7 +8,7 @@ using ComplexCube_double = vector<cvec2>;
 using Cube_double = vec3;
 using Complex4DVec_double = vector<vector<cvec2>>;
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
 Matrix_double readHDF5(H5::H5File file, string dataset_name)
 {
     /*
@@ -278,7 +278,7 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
 #pragma omp parallel
     {
         vector<T> local_result(total_size, 0.0);
-        int i,j,k,flatIndex;
+        int i, j, k, flatIndex;
 
 #pragma omp for schedule(static)
         for (long long int n = 0; n < totalIterations; ++n)
@@ -505,7 +505,7 @@ void equicombsparse(int natoms, int nang1, int nang2, int nrad1, int nrad2,
 #pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize)
     for (iat = 0; iat < natoms; ++iat)
     {
-        const int l21 = 2 * lam +1;
+        const int l21 = 2 * lam + 1;
         vec2 ptemp(l21, vector<double>(featsize, 0.0));
         cvec pcmplx(l21, complex<double>(0.0, 0.0));
         vec preal(l21, 0.0);
@@ -645,7 +645,8 @@ vector<ComplexMatrix_double> complex_to_real_transformation(vector<int> sizes)
     for (int i = 0; i < sizes.size(); i++)
     {
         int lval = (sizes[i] - 1) / 2;
-        int st = (lval & 1) ? -1 : 1;;
+        int st = (lval & 1) ? -1 : 1;
+        ;
         ComplexMatrix_double transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
         for (int j = 0; j < lval; j++)
         {
@@ -768,7 +769,7 @@ string gen_parameters(double rcut, int nrad, int nang, double atomic_gaussian_wi
     return json_string;
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
 // RASCALINE1
 metatensor::TensorMap get_feats_projs(string filepath, double rcut1, int nrad1, int nang1, double atomic_gaussian_width, std::vector<std::string> neighspe, std::vector<std::string> species)
 {
@@ -777,7 +778,7 @@ metatensor::TensorMap get_feats_projs(string filepath, double rcut1, int nrad1, 
     string temp_p = gen_parameters(rcut1, nrad1, nang1, atomic_gaussian_width);
     const char *parameters = temp_p.c_str();
 
-    //size_t nspe1 = neighspe.size();
+    // size_t nspe1 = neighspe.size();
     std::vector<std::vector<int32_t>> keys_array;
     for (int l = 0; l < nang1 + 1; ++l)
     {
@@ -1096,7 +1097,7 @@ vec predict(WFN wavy, string model_folder)
     unordered_map<string, int> lmax{};
     unordered_map<string, int> nmax{};
     set_lmax_nmax(lmax, nmax, QZVP_JKfit, config.species);
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
     // RASCALINE (Generate descriptors)
     metatensor::TensorMap spx = get_feats_projs(config.predict_filename, config.rcut1, config.nrad1, config.nang1, config.sig1, config.neighspe1, config.species);
     vector<uint8_t> spx_buf = spx.save_buffer();
@@ -1107,7 +1108,7 @@ vec predict(WFN wavy, string model_folder)
     Complex4DVec_double v2 = get_expansion_coeffs(spx_buf_2, natoms, config.nang2, config.nrad2, nspe2);
     // END RASCALINE
 #else
-    err_not_impl_f("RASCALINE is only supported on Windows", std::cout);
+    err_not_impl_f("RASCALINE is not supported by this build", std::cout);
     Complex4DVec_double v2, v1;
 #endif
 
@@ -1119,7 +1120,7 @@ vec predict(WFN wavy, string model_folder)
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
     H5::H5File features(model_folder + "/GPR_data/FEAT_M-" + to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(model_folder + "/GPR_data/projector_M" + to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
     for (string spe : config.species)

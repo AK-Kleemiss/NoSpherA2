@@ -5,7 +5,7 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif
@@ -277,16 +277,16 @@ void sfac_scan(options &opt, std::ostream &log_file)
     svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
-                        opt.groups[0],
-                        unit_cell,
-                        wavy[0],
-                        known_atoms,
-                        atom_type_list,
-                        asym_atom_to_type_list,
-                        asym_atom_list,
-                        needs_grid,
-                        std::cout,
-                        opt.debug);
+                                      opt.groups[0],
+                                      unit_cell,
+                                      wavy[0],
+                                      known_atoms,
+                                      atom_type_list,
+                                      asym_atom_to_type_list,
+                                      asym_atom_list,
+                                      needs_grid,
+                                      std::cout,
+                                      opt.debug);
 
     cif_input.close();
     vec2 d1, d2, d3, dens;
@@ -553,11 +553,12 @@ std::vector<T> geomspace(T start, T stop, int num)
     return result;
 }
 
-double calc_spherically_averaged_at_r(const WFN& wavy,
-    const double& r,
-    const double rel_precision = 1E-4,
-    const double start_angle = 5.0,
-    const bool print = false) {
+double calc_spherically_averaged_at_r(const WFN &wavy,
+                                      const double &r,
+                                      const double rel_precision = 1E-4,
+                                      const double start_angle = 5.0,
+                                      const bool print = false)
+{
     double old_result = 1E100;
     double new_result = 0.9E100;
     double angle = start_angle;
@@ -568,7 +569,8 @@ double calc_spherically_averaged_at_r(const WFN& wavy,
     for (int i = 0; i < 16; i++)
         d[i].resize(1, 0.0);
 
-    while (ratio > rel_precision && angle / constants::PI < 1E4) {
+    while (ratio > rel_precision && angle / constants::PI < 1E4)
+    {
         const double da = constants::PI / angle;
         const double da2 = da * da;
         // Make angular grids
@@ -586,35 +588,37 @@ double calc_spherically_averaged_at_r(const WFN& wavy,
                 v += wavy.compute_dens(r * x0, r * y0, r * z0, d, _phi) * st0;
             }
         }
-        if (v != 0.0) {
+        if (v != 0.0)
+        {
             old_result = new_result;
             new_result = v / constants::FOUR_PI;
             ratio = abs(old_result / new_result - 1.0);
         }
         angle *= 1.2;
     }
-    if(print)
+    if (print)
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::endl;
     return new_result;
 }
 
-cdouble calc_spherically_averaged_at_k(const WFN& wavy,
-    vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-    const double& k,
-    const double rel_precision = 1E-4,
-    const double start_angle = 5.0,
-    const bool print = false) {
+cdouble calc_spherically_averaged_at_k(const WFN &wavy,
+                                       vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
+                                       const double &k,
+                                       const double rel_precision = 1E-4,
+                                       const double start_angle = 5.0,
+                                       const bool print = false)
+{
     cdouble old_result = 1E100;
     cdouble new_result = 0.9E100;
     double angle = start_angle;
     double ratio = abs(old_result / new_result - 1.0);
     double phi_ratio = 2.0;
     double rho, work;
-    double* d1_local, * d2_local, * d3_local, * dens_local;
+    double *d1_local, *d2_local, *d3_local, *dens_local;
     int pmax;
 
-
-    while ((ratio > rel_precision || phi_ratio > rel_precision) && angle / constants::PI < 1E5) {
+    while ((ratio > rel_precision || phi_ratio > rel_precision) && angle / constants::PI < 1E5)
+    {
         const double da = constants::PI / angle;
         const double da2 = da * da;
         // Make angular grids
@@ -643,15 +647,16 @@ cdouble calc_spherically_averaged_at_k(const WFN& wavy,
                 }
             }
         }
-        if (sf_local != 0.0) {
+        if (sf_local != 0.0)
+        {
             old_result = new_result;
             new_result = sf_local / cdouble(constants::FOUR_PI);
             phi_ratio = std::abs(std::arg(old_result) - std::arg(new_result));
-            //if(print)
-            //    std::cout << "Phi ratio: " << phi_ratio << " " << std::arg(old_result) << " " << std::arg(new_result) << std::endl;
+            // if(print)
+            //     std::cout << "Phi ratio: " << phi_ratio << " " << std::arg(old_result) << " " << std::arg(new_result) << std::endl;
             ratio = std::abs(std::abs(old_result) / std::abs(new_result) - 1.0);
-            //if(print)
-            //    std::cout << "Ratio:     " << ratio << " " << std::abs(old_result) << " " << std::abs(new_result) << std::endl;
+            // if(print)
+            //     std::cout << "Ratio:     " << ratio << " " << std::abs(old_result) << " " << std::abs(new_result) << std::endl;
         }
         angle *= 1.2;
     }
@@ -659,7 +664,6 @@ cdouble calc_spherically_averaged_at_k(const WFN& wavy,
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << k << " " << (ratio > rel_precision) << " " << angle << std::endl;
     return new_result;
 }
-
 
 void spherically_averaged_density(options &opt, const ivec val_els_alpha, const ivec val_els_beta)
 {
@@ -707,7 +711,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     // Calcualte density on angular grid at each point of radial grid, average and integrate
     long double tot_int = 0;
     vec radial_dens(upper_r, 0.0);
-    progress_bar* progress = new progress_bar{ cout, 60u, "Calculating densities" };
+    progress_bar *progress = new progress_bar{cout, 60u, "Calculating densities"};
     const long long int step = max(static_cast<long long int>(floor(upper_r / 20)), 1LL);
 
 #pragma omp parallel for reduction(+ : tot_int) num_threads(opt.threads) schedule(dynamic)
@@ -721,7 +725,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         if (_r != 0 && _r % step == 0)
             progress->write(_r / static_cast<double>(upper_r));
     }
-    delete(progress);
+    delete (progress);
     cout << "Start writing the file" << endl;
     string el = atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
@@ -801,16 +805,16 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
     svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
-                        opt.groups[0],
-                        unit_cell,
-                        wavy[0],
-                        known_atoms,
-                        atom_type_list,
-                        asym_atom_to_type_list,
-                        asym_atom_list,
-                        needs_grid,
-                        log_file,
-                        opt.debug);
+                                      opt.groups[0],
+                                      unit_cell,
+                                      wavy[0],
+                                      known_atoms,
+                                      atom_type_list,
+                                      asym_atom_to_type_list,
+                                      asym_atom_list,
+                                      needs_grid,
+                                      log_file,
+                                      opt.debug);
 
     cif_input.close();
     vec2 d1, d2, d3, dens;
@@ -1460,11 +1464,11 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
     }
 };
 
-void calc_rho_cube(WFN& dummy)
+void calc_rho_cube(WFN &dummy)
 {
     using namespace std;
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
+    double MinMax[6]{0, 0, 0, 0, 0, 0};
+    int steps[3]{0, 0, 0};
     readxyzMinMax_fromWFN(dummy, MinMax, steps, 3., 0.025, true);
     cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
@@ -1481,29 +1485,28 @@ void calc_rho_cube(WFN& dummy)
     CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
 
     time_point start = get_time();
-    const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;;
+    const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
+    ;
     cout << "Lets go into the loop! There is " << total_size << " points" << endl;
-    progress_bar* progress = new progress_bar{ std::cout, 50u, "Calculating Values" };
+    progress_bar *progress = new progress_bar{std::cout, 50u, "Calculating Values"};
     const int step = (int)std::max(floor(total_size / 20.0), 1.0);
-    
-    vec v1{
-    CubeRho.get_vector(0, 0),
-    CubeRho.get_vector(1, 0),
-    CubeRho.get_vector(2, 0)
-    }, v2{
-    CubeRho.get_vector(0, 1),
-    CubeRho.get_vector(1, 1),
-    CubeRho.get_vector(2, 1)
-    }, v3{
-    CubeRho.get_vector(0, 2),
-    CubeRho.get_vector(1, 2),
-    CubeRho.get_vector(2, 2)
-    }, orig{
-    CubeRho.get_origin(0),
-    CubeRho.get_origin(1),
-    CubeRho.get_origin(2)
-    };
 
+    vec v1{
+        CubeRho.get_vector(0, 0),
+        CubeRho.get_vector(1, 0),
+        CubeRho.get_vector(2, 0)},
+        v2{
+            CubeRho.get_vector(0, 1),
+            CubeRho.get_vector(1, 1),
+            CubeRho.get_vector(2, 1)},
+        v3{
+            CubeRho.get_vector(0, 2),
+            CubeRho.get_vector(1, 2),
+            CubeRho.get_vector(2, 2)},
+        orig{
+            CubeRho.get_origin(0),
+            CubeRho.get_origin(1),
+            CubeRho.get_origin(2)};
 
 #pragma omp parallel
     {
@@ -1522,8 +1525,7 @@ void calc_rho_cube(WFN& dummy)
             vec PosGrid{
                 i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
                 i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
-                i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
-
+                i * v1[2] + j * v2[2] + k * v3[2] + orig[2]};
 
             CubeRho.set_value(i, j, k, dummy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
             if (index != 0 && index % step == 0)
@@ -1610,7 +1612,7 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     WFN dummy(7);
     dummy.read_xyz(xyzfile, std::cout);
 
-    //const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
+    // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
 
     const int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
@@ -1752,7 +1754,7 @@ void test_core_dens()
     dat_out.close();
 }
 
-void test_core_dens_corrected(double& precisison, int ncpus = 4)
+void test_core_dens_corrected(double &precisison, int ncpus = 4)
 {
     if (ncpus == -1)
         ncpus = 4;
@@ -1824,7 +1826,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4)
 
     time_point start = get_time();
 
-    progress_bar* progress = new progress_bar{ out, 60u, "Calculating densities" };
+    progress_bar *progress = new progress_bar{out, 60u, "Calculating densities"};
     const int upper = static_cast<int>(res[0].size());
     const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
 #pragma omp parallel for schedule(dynamic)
@@ -1840,7 +1842,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4)
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(upper));
     }
-    delete(progress);
+    delete (progress);
     time_point end = get_time();
     out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
     dat_out << scientific << setprecision(12) << setw(20);
@@ -1858,7 +1860,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4)
     dat_out.close();
 }
 
-void test_core_sfac_corrected(double& precisison, int ncpus = 4)
+void test_core_sfac_corrected(double &precisison, int ncpus = 4)
 {
     if (ncpus == -1)
         ncpus = 4;
@@ -1929,65 +1931,65 @@ void test_core_sfac_corrected(double& precisison, int ncpus = 4)
         cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
 
     time_point start = get_time(), end_becke, end_prototypes, end_spherical, end_aspherical, end_prune;
-    ivec atom_type_list({ 79 });
-    ivec asym_atom_list({ 0 });
-    bvec needs_grid({ true });
+    ivec atom_type_list({79});
+    ivec asym_atom_list({0});
+    bvec needs_grid({true});
     vec2 d1_ECP, d2_ECP, d3_ECP, dens_ECP;
     vec2 d1_all, d2_all, d3_all, dens_all;
     vec2 d1_val, d2_val, d3_val, dens_val;
-    svec labels({ "Au" });
+    svec labels({"Au"});
 
     auto temp_cell = cell();
     make_hirshfeld_grids(0,
-        3,
-        temp_cell,
-        ECP_way_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_ECP, d2_ECP, d3_ECP, dens_ECP,
-        labels,
-        out,
-        start,
-        end_becke,
-        end_prototypes,
-        end_spherical,
-        end_prune,
-        end_aspherical);
+                         3,
+                         temp_cell,
+                         ECP_way_Au,
+                         atom_type_list,
+                         asym_atom_list,
+                         needs_grid,
+                         d1_ECP, d2_ECP, d3_ECP, dens_ECP,
+                         labels,
+                         out,
+                         start,
+                         end_becke,
+                         end_prototypes,
+                         end_spherical,
+                         end_prune,
+                         end_aspherical);
     make_hirshfeld_grids(0,
-        3,
-        temp_cell,
-        wavy_full_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_all, d2_all, d3_all, dens_all,
-        labels,
-        out,
-        start,
-        end_becke,
-        end_prototypes,
-        end_spherical,
-        end_prune,
-        end_aspherical);
+                         3,
+                         temp_cell,
+                         wavy_full_Au,
+                         atom_type_list,
+                         asym_atom_list,
+                         needs_grid,
+                         d1_all, d2_all, d3_all, dens_all,
+                         labels,
+                         out,
+                         start,
+                         end_becke,
+                         end_prototypes,
+                         end_spherical,
+                         end_prune,
+                         end_aspherical);
     make_hirshfeld_grids(0,
-        3,
-        temp_cell,
-        wavy_val_Au,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1_val, d2_val, d3_val, dens_val,
-        labels,
-        out,
-        start,
-        end_becke,
-        end_prototypes,
-        end_spherical,
-        end_prune,
-        end_aspherical);
+                         3,
+                         temp_cell,
+                         wavy_val_Au,
+                         atom_type_list,
+                         asym_atom_list,
+                         needs_grid,
+                         d1_val, d2_val, d3_val, dens_val,
+                         labels,
+                         out,
+                         start,
+                         end_becke,
+                         end_prototypes,
+                         end_spherical,
+                         end_prune,
+                         end_aspherical);
 
-    progress_bar* progress = new progress_bar{ out, 60u, "Calculating SFACs" };
+    progress_bar *progress = new progress_bar{out, 60u, "Calculating SFACs"};
     const int upper = static_cast<int>(res[0].size());
     const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
 #pragma omp parallel for schedule(dynamic)
@@ -2003,7 +2005,7 @@ void test_core_sfac_corrected(double& precisison, int ncpus = 4)
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(upper));
     }
-    delete(progress);
+    delete (progress);
 
     time_point end = get_time();
     out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
@@ -2160,4 +2162,3 @@ void test_esp_dens()
     dat_out << flush;
     dat_out.close();
 }
-

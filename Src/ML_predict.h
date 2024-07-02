@@ -6,14 +6,12 @@
 #include <set>
 #include <algorithm>
 
-
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
-//#include "equicomb.h"
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
 #include "H5Cpp.h"
 #include "rascaline.hpp"
 #include "metatensor.h"
@@ -27,5 +25,3 @@
 #include <omp.h>
 
 vec predict(WFN wavy, std::string model_folder);
-
-
