@@ -25,7 +25,11 @@
  * it via H5public.h.  The #ifndef H5public_H guard above would
  * prevent repeated include.
  */
+#ifdef _WIN32
 #include "H5pubconf.h" /* From configure */
+#else
+#include "H5pubconf_lin.h"
+#endif
 
 /* API Version macro wrapper definitions */
 #include "H5version.h"

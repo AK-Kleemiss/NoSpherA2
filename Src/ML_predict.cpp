@@ -205,12 +205,16 @@ template <typename T>
 vector<T> flatten(const vector<vector<T>> &vec2D)
 {
     vector<T> flatVec;
+    size_t totalSize = 0;
+    for (const auto& row : vec2D)
+    {
+        totalSize += row.size();
+    }
+    flatVec.reserve(totalSize);
     for (const vector<T> &row : vec2D)
     {
-        for (const T &elem : row)
-        {
-            flatVec.push_back(elem);
-        }
+        // Use std::copy to copy the entire row at once
+        flatVec.insert(flatVec.end(), row.begin(), row.end());
     }
     return flatVec;
 }
@@ -220,14 +224,21 @@ template <typename T>
 vector<T> flatten(const vector<vector<vector<T>>> &vec3D)
 {
     vector<T> flatVec;
+    size_t totalSize = 0;
+    for (const auto& row : vec3D)
+    {
+      for (const auto& innerRow : row)
+      {
+        totalSize += innerRow.size();
+      }
+    }
+    flatVec.reserve(totalSize);
     for (const vector<vector<T>> &row : vec3D)
     {
         for (const vector<T> &innerRow : row)
         {
-            for (const T &elem : innerRow)
-            {
-                flatVec.push_back(elem);
-            }
+          // Use std::copy to copy the entire innerRow at once
+          flatVec.insert(flatVec.end(), innerRow.begin(), innerRow.end());
         }
     }
     return flatVec;
@@ -1032,6 +1043,7 @@ void populateConfigFromFile(const std::string &filename, Config &config)
 vec predict(WFN& wavy, const string& model_folder)
 {
     // Read the configuration file
+    cout << "Starting prediction... " << flush;
     Config config;
     string _f_path("inputs.txt");
     string _path = model_folder;
@@ -1366,7 +1378,7 @@ vec predict(WFN& wavy, const string& model_folder)
         }
     }
 
-    cout << pred_coefs.size() << endl;
+    cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
     // npy::npy_data<double> coeffs;
     // coeffs.data = pred_coefs;
     // coeffs.fortran_order = false;

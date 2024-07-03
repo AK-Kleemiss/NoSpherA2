@@ -67,7 +67,15 @@ string NoSpherA2_message()
     t.append("      Florian Kleemiss,\n");
     t.append("      Emmanuel Hupf,\n");
     t.append("      Alessandro Genoni,\n");
+    t.append("      Lukas Seifert,\n");
     t.append("      and many more in communications or by feedback!\n");
+#if defined(_WIN32) || defined (__RASCALINE__)
+    t.append("NoSpherA2 uses Rascaline, Metatensor and the HDF5 library.\n");
+    t.append("Please see, respectively:\n");
+    t.append("   https://github.com/Luthaf/rascaline\n");
+    t.append("   https://github.com/lab-cosmo/metatensor\n");
+    t.append("   https://github.com/HDFGroup/hdf5\n");
+#endif
     t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
     t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     return t;
