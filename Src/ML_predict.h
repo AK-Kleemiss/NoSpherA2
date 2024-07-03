@@ -24,4 +24,4 @@
 #include <cmath>
 #include <omp.h>
 
-vec predict(WFN wavy, std::string model_folder);
+vec predict(WFN& wavy, const std::string& model_folder);
