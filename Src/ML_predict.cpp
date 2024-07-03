@@ -1029,11 +1029,14 @@ void populateConfigFromFile(const std::string &filename, Config &config)
     }
 }
 
-vec predict(WFN wavy, string model_folder)
+vec predict(WFN& wavy, const string& model_folder)
 {
     // Read the configuration file
     Config config;
-    populateConfigFromFile(model_folder + "\\inputs.txt", config);
+    string _f_path("inputs.txt");
+    string _path = model_folder;
+    join_path(_path, _f_path);
+    populateConfigFromFile(_path, config);
 
     config.predict_filename = wavy.get_path();
     int nspe1 = static_cast<int>(config.neighspe1.size());
