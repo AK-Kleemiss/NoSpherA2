@@ -291,7 +291,7 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         vector<T> local_result(total_size, 0.0);
         int i, j, k, flatIndex;
 
-#pragma omp for schedule(static)
+#pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
         for (long long int n = 0; n < totalIterations; ++n)
         {
             i = static_cast<int>(n / (cols2 * cols1));
