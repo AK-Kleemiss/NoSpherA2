@@ -69,7 +69,7 @@ string NoSpherA2_message()
     t.append("      Alessandro Genoni,\n");
     t.append("      Lukas Seifert,\n");
     t.append("      and many more in communications or by feedback!\n");
-#if defined(_WIN32) || defined (__RASCALINE__)
+#if defined(_WIN32) || defined(__RASCALINE__)
     t.append("NoSpherA2 uses Rascaline, Metatensor and the HDF5 library.\n");
     t.append("Please see, respectively:\n");
     t.append("   https://github.com/Luthaf/rascaline\n");
@@ -510,113 +510,113 @@ void write_template_confi()
 };
 
 options::options(int accuracy,
-        int threads,
-        int pbc,
-        double resolution,
-        double radius,
-        bool becke,
-        bool electron_diffraction,
-        bool ECP,
-        bool set_ECPs,
-        int ECP_mode,
-        bool calc,
-        bool eli,
-        bool esp,
-        bool elf,
-        bool lap,
-        bool rdg,
-        bool hdef,
-        bool def,
-        bool fract,
-        bool hirsh,
-        bool s_rho,
-        bool SALTED,
-        bool SALTED_NO_H,
-        bool SALTED_BECKE,
-        bool Olex2_1_3_switch,
-        bool iam_switch,
-        bool read_k_pts,
-        bool save_k_pts,
-        bool combined_tsc_calc,
-        bool binary_tsc,
-        bool cif_based_combined_tsc_calc,
-        bool density_test_cube,
-        bool no_date,
-        bool gbw2wfn,
-        bool old_tsc,
-        bool thakkar_d_plot,
-        bool spherical_harmonic,
-        bool ML_test,
-        double sfac_scan,
-        double sfac_diffuse,
-        double dmin,
-        int hirsh_number,
-        const ivec& MOs,
-        const ivec2& _groups,
-        const vec2& twin_law,
-        const ivec2& combined_tsc_groups,
-        bool all_mos,
-        bool test,
-        const std::string& wfn,
-        const std::string& fchk,
-        const std::string& basis_set,
-        const std::string& hkl,
-        const std::string& cif,
-        const std::string& method,
-        const std::string& xyz_file,
-        const std::string& coef_file,
-        const std::string& fract_name,
-        const svec& combined_tsc_calc_files,
-        const svec& combined_tsc_calc_cifs,
-        const std::string& wavename,
-        const std::string& gaussian_path,
-        const std::string& turbomole_path,
-        const std::string& basis_set_path,
-        const std::string& SALTED_DIR,
-        const svec& arguments,
-        const svec& combine_mo,
-        const svec& Cations,
-        const svec& Anions,
-        const ivec& cmo1,
-        const ivec& cmo2,
-        const ivec& ECP_nrs,
-        const ivec& ECP_elcounts,
-        int ncpus,
-        double mem,
-        unsigned int mult,
-        bool debug,
-        const hkl_list& m_hkl_list,
-        std::ostream& log_file)
-        : accuracy(accuracy), threads(threads), pbc(pbc),
-        resolution(resolution), radius(radius), becke(becke),
-        electron_diffraction(electron_diffraction), ECP(ECP),
-        set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
-        eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
-        hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-        s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR),
-        Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
-        read_k_pts(read_k_pts), save_k_pts(save_k_pts),
-        combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
-        cif_based_combined_tsc_calc(cif_based_combined_tsc_calc),
-        no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc),
-        thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan),
-        sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number),
-        MOs(MOs), groups(_groups), twin_law(twin_law),
-        combined_tsc_groups(combined_tsc_groups), all_mos(all_mos),
-        test(test), wfn(wfn), fchk(fchk), basis_set(basis_set),
-        hkl(hkl), cif(cif), method(method), xyz_file(xyz_file),
-        coef_file(coef_file), fract_name(fract_name),
-        combined_tsc_calc_files(combined_tsc_calc_files),
-        combined_tsc_calc_cifs(combined_tsc_calc_cifs),
-        wavename(wavename), gaussian_path(gaussian_path),
-        turbomole_path(turbomole_path), basis_set_path(basis_set_path),
-        arguments(arguments), combine_mo(combine_mo), Cations(Cations),
-        Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs),
-        ECP_elcounts(ECP_elcounts), mem(mem), mult(mult),
-        debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
-    {
-            groups.resize(1);
-    };
+                 int threads,
+                 int pbc,
+                 double resolution,
+                 double radius,
+                 bool becke,
+                 bool electron_diffraction,
+                 bool ECP,
+                 bool set_ECPs,
+                 int ECP_mode,
+                 bool calc,
+                 bool eli,
+                 bool esp,
+                 bool elf,
+                 bool lap,
+                 bool rdg,
+                 bool hdef,
+                 bool def,
+                 bool fract,
+                 bool hirsh,
+                 bool s_rho,
+                 bool SALTED,
+                 bool SALTED_NO_H,
+                 bool SALTED_BECKE,
+                 bool Olex2_1_3_switch,
+                 bool iam_switch,
+                 bool read_k_pts,
+                 bool save_k_pts,
+                 bool combined_tsc_calc,
+                 bool binary_tsc,
+                 bool cif_based_combined_tsc_calc,
+                 bool density_test_cube,
+                 bool no_date,
+                 bool gbw2wfn,
+                 bool old_tsc,
+                 bool thakkar_d_plot,
+                 bool spherical_harmonic,
+                 bool ML_test,
+                 double sfac_scan,
+                 double sfac_diffuse,
+                 double dmin,
+                 int hirsh_number,
+                 const ivec &MOs,
+                 const ivec2 &_groups,
+                 const vec2 &twin_law,
+                 const ivec2 &combined_tsc_groups,
+                 bool all_mos,
+                 bool test,
+                 const std::string &wfn,
+                 const std::string &fchk,
+                 const std::string &basis_set,
+                 const std::string &hkl,
+                 const std::string &cif,
+                 const std::string &method,
+                 const std::string &xyz_file,
+                 const std::string &coef_file,
+                 const std::string &fract_name,
+                 const svec &combined_tsc_calc_files,
+                 const svec &combined_tsc_calc_cifs,
+                 const std::string &wavename,
+                 const std::string &gaussian_path,
+                 const std::string &turbomole_path,
+                 const std::string &basis_set_path,
+                 const std::string &SALTED_DIR,
+                 const svec &arguments,
+                 const svec &combine_mo,
+                 const svec &Cations,
+                 const svec &Anions,
+                 const ivec &cmo1,
+                 const ivec &cmo2,
+                 const ivec &ECP_nrs,
+                 const ivec &ECP_elcounts,
+                 int ncpus,
+                 double mem,
+                 unsigned int mult,
+                 bool debug,
+                 const hkl_list &m_hkl_list,
+                 std::ostream &log_file)
+    : accuracy(accuracy), threads(threads), pbc(pbc),
+      resolution(resolution), radius(radius), becke(becke),
+      electron_diffraction(electron_diffraction), ECP(ECP),
+      set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
+      eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
+      hdef(hdef), def(def), fract(fract), hirsh(hirsh),
+      s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR),
+      Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
+      read_k_pts(read_k_pts), save_k_pts(save_k_pts),
+      combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
+      cif_based_combined_tsc_calc(cif_based_combined_tsc_calc),
+      no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc),
+      thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan),
+      sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number),
+      MOs(MOs), groups(_groups), twin_law(twin_law),
+      combined_tsc_groups(combined_tsc_groups), all_mos(all_mos),
+      test(test), wfn(wfn), fchk(fchk), basis_set(basis_set),
+      hkl(hkl), cif(cif), method(method), xyz_file(xyz_file),
+      coef_file(coef_file), fract_name(fract_name),
+      combined_tsc_calc_files(combined_tsc_calc_files),
+      combined_tsc_calc_cifs(combined_tsc_calc_cifs),
+      wavename(wavename), gaussian_path(gaussian_path),
+      turbomole_path(turbomole_path), basis_set_path(basis_set_path),
+      arguments(arguments), combine_mo(combine_mo), Cations(Cations),
+      Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs),
+      ECP_elcounts(ECP_elcounts), mem(mem), mult(mult),
+      debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
+{
+    groups.resize(1);
+};
 
 int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
@@ -2535,12 +2535,12 @@ const double calc_density_ML(double &x,
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (d[3] < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
-          for (e = 0; e < size; e++)
-          {
-            bf = &atoms[a].basis_set[e];
-            coef_counter += (2 * bf->type + 1);
-          }
-          continue;
+            for (e = 0; e < size; e++)
+            {
+                bf = &atoms[a].basis_set[e];
+                coef_counter += (2 * bf->type + 1);
+            }
+            continue;
         }
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
@@ -2548,11 +2548,12 @@ const double calc_density_ML(double &x,
         for (e = 0; e < size; e++)
         {
             bf = &atoms[a].basis_set[e];
-            primitive* p(&(bf->p));
+            primitive *p(&(bf->p));
             radial = gaussian_radial(*p, d[3]);
-            if (radial < 1E-10) {
-              coef_counter += (2 * p->type + 1);
-              continue;
+            if (radial < 1E-10)
+            {
+                coef_counter += (2 * p->type + 1);
+                continue;
             }
             for (int m = -p->type; m <= p->type; m++)
             {
@@ -2562,7 +2563,7 @@ const double calc_density_ML(double &x,
             coef_counter += (2 * p->type + 1);
         }
     }
-    //err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
 }
 
@@ -2776,11 +2777,11 @@ void options::digest_options()
         {
             charge = stoi(arguments[i + 1]);
         }
-        //else if (temp == "-coef")
+        // else if (temp == "-coef")
         //{
-        //    coef_file = arguments[i + 1];
-        //    err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
-        //}
+        //     coef_file = arguments[i + 1];
+        //     err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+        // }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
@@ -2830,12 +2831,14 @@ void options::digest_options()
                 j++;
             }
         }
-        else if (temp == "-core_dens-corrected") {
+        else if (temp == "-core_dens-corrected")
+        {
             double prec = stod(arguments[i + 1]);
             test_core_dens_corrected(prec, threads);
             exit(0);
         }
-        else if (temp == "-core_tsc-corrected") {
+        else if (temp == "-core_tsc-corrected")
+        {
             double prec = stod(arguments[i + 1]);
             test_core_sfac_corrected(prec, threads);
             exit(0);
@@ -3026,14 +3029,17 @@ void options::digest_options()
         }
         else if (temp.find("-s_rho") < 1)
             s_rho = true;
-        else if (temp == "-SALTED" || temp == "-salted"){
+        else if (temp == "-SALTED" || temp == "-salted")
+        {
             SALTED = true;
             SALTED_DIR = arguments[i + 1];
         }
-        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1) {
+        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
+        {
             SALTED_BECKE = true;
         }
-        else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h") {
+        else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h")
+        {
             SALTED_NO_H = true;
         }
         else if (temp == "-skpts")
@@ -3352,20 +3358,24 @@ const double spherical_harmonic(const int &l, const int &m, const double *d)
     return SH;
 }
 
-bool is_nan(double& in) {
+bool is_nan(double &in)
+{
     return in != in;
 };
-bool is_nan(float& in) {
+bool is_nan(float &in)
+{
     return in != in;
 };
-bool is_nan(long double& in) {
+bool is_nan(long double &in)
+{
     return in != in;
 };
-bool is_nan(cdouble& in) {
+bool is_nan(cdouble &in)
+{
     return in != in;
 };
 
-bool ends_with(const std::string& str, const std::string& suffix)
+bool ends_with(const std::string &str, const std::string &suffix)
 {
     if (str.length() >= suffix.length())
     {
@@ -3416,7 +3426,7 @@ double double_from_string_with_esd(std::string in)
         return stod(in.substr(0, in.find('(')));
 }
 
-std::string trim(const std::string& s)
+std::string trim(const std::string &s)
 {
     if (s == "")
         return "";
@@ -3435,9 +3445,9 @@ std::string trim(const std::string& s)
     return std::string(start, end + 1);
 }
 
-bool exists(const std::string& name)
+bool exists(const std::string &name)
 {
-    if (FILE* file = fopen(name.c_str(), "r"))
+    if (FILE *file = fopen(name.c_str(), "r"))
     {
         fclose(file);
         return true;
@@ -3448,7 +3458,7 @@ bool exists(const std::string& name)
     }
 };
 
-int CountWords(const char* str)
+int CountWords(const char *str)
 {
     if (str == NULL)
         return -1;
@@ -3474,17 +3484,17 @@ int CountWords(const char* str)
     return numWords;
 };
 
-void write_timing_to_file(std::ostream& file,
-    time_point start,
-    time_point end,
-    time_point end_prototypes,
-    time_point end_becke,
-    time_point end_spherical,
-    time_point end_prune,
-    time_point end_aspherical,
-    time_point before_kpts,
-    time_point after_kpts,
-    time_point end1)
+void write_timing_to_file(std::ostream &file,
+                          time_point start,
+                          time_point end,
+                          time_point end_prototypes,
+                          time_point end_becke,
+                          time_point end_spherical,
+                          time_point end_prune,
+                          time_point end_aspherical,
+                          time_point before_kpts,
+                          time_point after_kpts,
+                          time_point end1)
 {
     // writes the timing of different things to a file
     using namespace std;
@@ -3565,7 +3575,7 @@ void write_timing_to_file(std::ostream& file,
         file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
-void remove_empty_elements(svec& input, const std::string& empty)
+void remove_empty_elements(svec &input, const std::string &empty)
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")
@@ -3600,7 +3610,7 @@ long long int get_sec(std::chrono::high_resolution_clock::time_point start, std:
     return sec.count();
 }
 
-const int shell2function(const int& type, const int& prim)
+const int shell2function(const int &type, const int &prim)
 {
     switch (type)
     {
@@ -3652,10 +3662,10 @@ const int shell2function(const int& type, const int& prim)
     return 0;
 }
 
-const int sht2nbas(const int& type)
+const int sht2nbas(const int &type)
 {
-    const int st2bas[6]{ 1, 3, 6, 10, 15, 21 };
-    const int nst2bas[6]{ 11, 9, 7, 5, 4, 1 };
+    const int st2bas[6]{1, 3, 6, 10, 15, 21};
+    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
     if (type >= 0)
         return st2bas[type];
     else
@@ -3669,16 +3679,17 @@ char asciitolower(char in)
     return in;
 }
 
-int vec_sum(const bvec& in) {
+int vec_sum(const bvec &in)
+{
     int res = 0;
-#pragma omp parallel for reduction(+:res)
+#pragma omp parallel for reduction(+ : res)
     for (int i = 0; i < in.size(); i++)
         if (in[i])
             res++;
     return res;
 }
 
-int vec_sum(const ivec& in)
+int vec_sum(const ivec &in)
 {
     int res = 0;
 #pragma omp parallel for reduction(+ : res)
@@ -3687,7 +3698,7 @@ int vec_sum(const ivec& in)
     return res;
 }
 
-double vec_sum(const vec& in)
+double vec_sum(const vec &in)
 {
     double res = 0.0;
 #pragma omp parallel for reduction(+ : res)
@@ -3696,7 +3707,7 @@ double vec_sum(const vec& in)
     return res;
 }
 
-cdouble vec_sum(const cvec& in)
+cdouble vec_sum(const cvec &in)
 {
     cdouble res = 0.0;
     for (int i = 0; i < in.size(); i++)
@@ -3704,7 +3715,7 @@ cdouble vec_sum(const cvec& in)
     return res;
 }
 
-void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
+void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
 {
     if (!condition)
     {
@@ -3715,7 +3726,7 @@ void error_check(const bool condition, const std::string& file, const int& line,
         exit(-1);
     }
 };
-void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file)
+void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
 {
     log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
     log_file.flush();
@@ -3723,3 +3734,121 @@ void not_implemented(const std::string& file, const int& line, const std::string
     std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << " not yet implemented!" << std::endl;
     exit(-1);
 };
+
+void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
+{
+    uint32_t w[64];
+    uint32_t a, b, c, d, e, f, g, h;
+
+    for (int i = 0; i < 16; ++i)
+    {
+        w[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16) |
+               (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
+    }
+
+    for (int i = 16; i < 64; ++i)
+    {
+        w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
+    }
+
+    a = state[0];
+    b = state[1];
+    c = state[2];
+    d = state[3];
+    e = state[4];
+    f = state[5];
+    g = state[6];
+    h = state[7];
+
+    for (int i = 0; i < 64; ++i)
+    {
+        uint32_t temp1 = h + EP1(e) + CH(e, f, g) + k[i] + w[i];
+        uint32_t temp2 = EP0(a) + MAJ(a, b, c);
+        h = g;
+        g = f;
+        f = e;
+        e = d + temp1;
+        d = c;
+        c = b;
+        b = a;
+        a = temp1 + temp2;
+    }
+
+    state[0] += a;
+    state[1] += b;
+    state[2] += c;
+    state[3] += d;
+    state[4] += e;
+    state[5] += f;
+    state[6] += g;
+    state[7] += h;
+}
+
+// SHA-256 update function
+void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen)
+{
+    for (size_t i = 0; i < len; ++i)
+    {
+        buffer[bitlen / 8 % 64] = data[i];
+        bitlen += 8;
+        if (bitlen % 512 == 0)
+        {
+            sha256_transform(state, buffer);
+        }
+    }
+}
+
+// SHA-256 padding and final hash computation
+void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, uint8_t hash[32])
+{
+    size_t i = bitlen / 8 % 64;
+
+    buffer[i++] = 0x80;
+    if (i > 56)
+    {
+        while (i < 64)
+        {
+            buffer[i++] = 0x00;
+        }
+        sha256_transform(state, buffer);
+        i = 0;
+    }
+
+    while (i < 56)
+    {
+        buffer[i++] = 0x00;
+    }
+
+    bitlen = custom_bswap_64(bitlen);
+    memcpy(buffer + 56, &bitlen, 8);
+    sha256_transform(state, buffer);
+
+    for (i = 0; i < 8; ++i)
+    {
+        state[i] = custom_bswap_32(state[i]);
+        memcpy(hash + i * 4, &state[i], 4);
+    }
+}
+
+// Function to calculate SHA-256 hash
+std::string sha::sha256(const std::string &input)
+{
+    uint32_t state[8] = {
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+
+    uint8_t buffer[64] = {0};
+    uint8_t hash[32];
+    uint64_t bitlen = 0;
+
+    sha256_update(state, buffer, reinterpret_cast<const uint8_t *>(input.c_str()), input.length(), bitlen);
+    sha256_final(state, buffer, bitlen, hash);
+
+    std::stringstream ss;
+    for (int i = 0; i < 32; ++i)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+    }
+
+    return ss.str();
+}

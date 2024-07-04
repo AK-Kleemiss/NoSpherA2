@@ -21,7 +21,6 @@
 *.db-wal
 *.suo
 *.bin
-NoSpherA2_linux/bin/*/*/NoSpherA2*
 *.cubin
 *.ptx
 *.cache
