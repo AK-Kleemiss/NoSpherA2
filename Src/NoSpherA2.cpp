@@ -1,3 +1,11 @@
+/*
+Original Code by: 
+	Authors:    Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, Zekun Lou, Alan Lewis
+	Date:       2024
+	License:    GPL-3.0
+    GitHub:     https://github.com/andreagrisafi/SALTED
+    Article:    https://pubs.acs.org/doi/10.1021/acscentsci.8b00551
+*/
 #define WIN32_LEAN_AND_MEAN
 #include "tsc_block.h"
 #include "convenience.h"
@@ -6,7 +14,6 @@
 #include "cube.h"
 #include "scattering_factors.h"
 #include "properties.h"
-#include "ML_predict.h"
 using namespace std;
 
 int main(int argc, char **argv)
@@ -327,45 +334,18 @@ int main(int argc, char **argv)
                         "Error during SF Calcualtion", log_file);
             }
             else {
-                if(opt.debug) log_file << "Entering scattering ML Factor Calculation!" << endl;
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 //const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
                 int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
-                // Run generation of tsc file
+                if(opt.debug) log_file << "Entering scattering ML Factor Calculation!" << endl;
+                
 
-                vec coefs = predict(wavy[0], opt.SALTED_DIR);
-                if (opt.debug) log_file << "Finished ML Density Prediction!" << endl;
-
-                if (opt.debug && (opt.wfn == string("test_cysteine.xyz") || opt.wfn == string("test_sucrose.xyz"))) {
-                    vector<unsigned long> shape{};
-                    bool fortran_order;
-                    vec ref_coefs{};
-                    //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
-                    if (opt.wfn == string("test_sucrose.xyz"))
-						            npy::LoadArrayFromNumpy("sucrose_ref.npy", shape, fortran_order, ref_coefs);
-					          else
-                        npy::LoadArrayFromNumpy("cysteine_ref.npy", shape, fortran_order, ref_coefs);
-                    // Compare coefs with the reference
-                    vector<double> diff_vec;
-                    double diff = 0.0;
-                    for (int i = 0; i < coefs.size(); i++)
-                    {
-                        diff += abs(coefs[i] - ref_coefs[i]);
-                        if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
-							              log_file << "Difference in coef " << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
-                        }
-                        diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
-                    }
-                    log_file << "Difference between calculated and reference coefs: " << diff << endl;
-                    log_file << "Maximum ((pred / ref) -1): " << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
-                }
                 if (opt.SALTED_BECKE || opt.SALTED_NO_H)
                     err_checkf(calculate_scattering_factors_ML_No_H(
                         opt,
                         wavy[0],
                         log_file,
-                        nr_coefs,
-                        coefs),
+                        nr_coefs),
                         "Error during ML-SF Calcualtion", log_file);
                 else {
                     if (opt.debug) log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
@@ -373,8 +353,7 @@ int main(int argc, char **argv)
                         opt,
                         wavy[0],
                         log_file,
-                        nr_coefs,
-                        coefs),
+                        nr_coefs),
                         "Error during ML-SF Calcualtion", log_file);
                 }
             }

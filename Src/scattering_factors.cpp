@@ -3690,14 +3690,14 @@ bool calculate_scattering_factors_HF(
  * @param wave The WFN object representing the wave.
  * @param file The output stream to write the results to.
  * @param exp_coefs The expected coefficients to use.
+ * @param coefs The coefficients to use.
  * @return True if the scattering factors were calculated successfully, false otherwise.
  */
 bool calculate_scattering_factors_ML(
     const options &opt,
     const WFN &wave,
     ostream &file,
-    const int exp_coefs,
-    vec coefs)
+    const int exp_coefs)
 {
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3705,7 +3705,7 @@ bool calculate_scattering_factors_ML(
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
     time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    time_point end_SALTED, end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -3728,6 +3728,9 @@ bool calculate_scattering_factors_ML(
                         opt.debug);
 
     cif_input.close();
+
+    //Generation of SALTED densitie coefficients
+    vec coefs = gen_SALTED_densities(wave, opt, start, end_SALTED);
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -3827,6 +3830,7 @@ bool calculate_scattering_factors_ML(
         write_timing_to_file(file,
                              start,
                              end,
+                             end_SALTED,
                              end_prototypes,
                              end_becke,
                              end_spherical,
@@ -3856,8 +3860,7 @@ bool calculate_scattering_factors_ML_No_H(
     const options &opt,
     const WFN &wave,
     ostream &file,
-    const int exp_coefs,
-    vec coefs)
+    const int exp_coefs)
 {
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3865,7 +3868,7 @@ bool calculate_scattering_factors_ML_No_H(
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
     time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    time_point end_SALTED, end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -3888,6 +3891,8 @@ bool calculate_scattering_factors_ML_No_H(
                         opt.debug);
 
     cif_input.close();
+
+    vec coefs = gen_SALTED_densities(wave, opt, start, end_SALTED);
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -4017,6 +4022,7 @@ bool calculate_scattering_factors_ML_No_H(
         write_timing_to_file(file,
                              start,
                              end,
+                             end_SALTED,
                              end_prototypes,
                              end_becke,
                              end_spherical,

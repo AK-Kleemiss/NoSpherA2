@@ -1072,27 +1072,12 @@ vec predict(WFN& wavy, const string& model_folder)
      int nspe1 = neighspe1.size();
      int nspe2 = nspe2;*/
 
-    // # Define system excluding atoms that belong to species not listed in SALTED input
-    //     atomic_symbols = structure.get_chemical_symbols()
-    //     natoms_tot = len(atomic_symbols)
-    //     excluded_species = []
-    //     for iat in range(natoms_tot) :
-    //         spe = atomic_symbols[iat]
-    //         if spe not in species :
-    // excluded_species.append(spe)
-    //     excluded_species = set(excluded_species)
-    //     for spe in excluded_species :
-    // atomic_symbols = list(filter(lambda a : a != spe, atomic_symbols))
-    //     natoms = int(len(atomic_symbols))
-    // Convert this python to c++ without sorting the atomic symbols
-
-    // TODO: sanitize input to only inclue atoms that are included in the model
     vector<string> atomic_symbols{};
     for (int i = 0; i < wavy.atoms.size(); i++)
     {
         atomic_symbols.push_back(wavy.atoms[i].label);
     }
-
+    //# Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = filter_species(atomic_symbols, config.species);
     //// Output the result
     // for (const auto& symbol : atomic_symbols) {
@@ -1385,4 +1370,45 @@ vec predict(WFN& wavy, const string& model_folder)
     // coeffs.shape = { unsigned long(pred_coefs.size()) };
     // npy::write_npy("coeffs_by_black_magic.npy", coeffs);
     return pred_coefs;
+}
+
+//Wrapper function to generate the ML density prediction
+vec gen_SALTED_densities(WFN wave, options opt, time_point& start, time_point& end_SALTED) {
+    // Run generation of tsc file
+    if (opt.debug) cout << "Finished ML Density Prediction!" << endl;
+    vec coefs = predict(wave, opt.SALTED_DIR);
+    end_SALTED = get_time();
+    if (opt.debug) {
+        long long int dur = get_sec(start, end_SALTED);
+        cout << "Finished ML Density Prediction!" << endl;
+        if (dur < 1)
+            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << get_msec(start, end_SALTED) << " ms" << endl;
+        else
+            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << dur << " s" << endl;
+    }
+    if (opt.debug && (opt.wfn == string("test_cysteine.xyz") || opt.wfn == string("test_sucrose.xyz"))) {
+        vector<unsigned long> shape{};
+        bool fortran_order;
+        vec ref_coefs{};
+        //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
+        if (opt.wfn == string("test_sucrose.xyz"))
+            npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
+        else
+            npy::LoadArrayFromNumpy("cysteine_ref.npy", shape, fortran_order, ref_coefs);
+        // Compare coefs with the reference
+        vector<double> diff_vec;
+        double diff = 0.0;
+        for (int i = 0; i < coefs.size(); i++)
+        {
+            diff += abs(coefs[i] - ref_coefs[i]);
+            if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
+                cout << "Difference in coef " << fixed << setprecision(3) << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
+            }
+            diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
+        }
+        cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
+        cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
+    }
+
+    return coefs;
 }
