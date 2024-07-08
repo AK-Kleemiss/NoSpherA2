@@ -652,7 +652,7 @@ vector<cvec2> complex_to_real_transformation(vector<int> sizes)
     for (int i = 0; i < sizes.size(); i++)
     {
         int lval = (sizes[i] - 1) / 2;
-        int st = (lval & 1) ? -1 : 1;
+        int st = (lval & 1) ? 1 : -1;;
         ;
         cvec2 transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
         for (int j = 0; j < lval; j++)
