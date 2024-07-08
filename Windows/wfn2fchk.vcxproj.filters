@@ -17,7 +17,7 @@
       <UniqueIdentifier>{45d99421-05f7-4085-b74e-695a8a4377e4}</UniqueIdentifier>
     </Filter>
     <Filter Include="Quelldateien\HDF5">
-      <UniqueIdentifier>{a9c7438a-421e-46c9-aefe-b0d46e8373f0}</UniqueIdentifier>
+      <UniqueIdentifier>{ebea8f13-613b-4d5d-929c-4d0f78a02eb4}</UniqueIdentifier>
     </Filter>
     <Filter Include="Headerdateien\HDF5">
       <UniqueIdentifier>{69057bb4-4285-4930-a8d0-4351e3ed4492}</UniqueIdentifier>

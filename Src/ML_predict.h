@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "convenience.h"
+#include "wfn_class.h"
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
@@ -24,6 +25,6 @@
 #include <cmath>
 #include <omp.h>
 
-vec predict(WFN wavy, std::string model_folder);
-vec gen_SALTED_densities(WFN wave, options opt, time_point& start, time_point& end_SALTED);
+vec predict(const WFN& wavy, std::string model_folder);
+vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_point& end_SALTED);
 

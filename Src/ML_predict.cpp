@@ -2,14 +2,10 @@
 using namespace std;
 
 // Define types for simplicity
-using ComplexMatrix_double = cvec2;
-using Matrix_double = vec2;
-using ComplexCube_double = vector<cvec2>;
-using Cube_double = vec3;
-using Complex4DVec_double = vector<vector<cvec2>>;
+using cvec4 = vector<vector<cvec2>>;
 
 #if defined(_WIN32) || defined(__RASCALINE__)
-Matrix_double readHDF5(H5::H5File file, string dataset_name)
+vec2 readHDF5(H5::H5File file, string dataset_name)
 {
     /*
      * Try block to detect exceptions raised by any of the calls inside it
@@ -52,7 +48,7 @@ Matrix_double readHDF5(H5::H5File file, string dataset_name)
         dataset.read(data.data(), H5::PredType::NATIVE_DOUBLE);
 
         // Reorder the results to match the original matrix
-        Matrix_double retData(dims_out[0], vector<double>(dims_out[1]));
+        vec2 retData(dims_out[0], vector<double>(dims_out[1]));
         for (int i = 0; i < dims_out[0]; i++)
         {
             for (int j = 0; j < dims_out[1]; j++)
@@ -434,14 +430,14 @@ vector<vector<vector<T>>> reorder3D(const vector<vector<vector<T>>> &original)
 }
 
 // Function to collect rows from a matrix based on a vector of indices
-Matrix_double collectRows(const Matrix_double &matrix, const vector<int> &indices)
+vec2 collectRows(const vec2 &matrix, const vector<int> &indices)
 {
     // If no indices are provided, return empty matrix
     if (indices.empty())
     {
         return {};
     }
-    Matrix_double result;
+    vec2 result;
     for (int index : indices)
     {
         if (index < matrix.size())
@@ -458,14 +454,14 @@ Matrix_double collectRows(const Matrix_double &matrix, const vector<int> &indice
 }
 
 // Function to collect rows from a Cube based on a vector of indices
-Cube_double collectRows(const Cube_double &cube, const vector<int> &indices)
+vec3 collectRows(const vec3 &cube, const vector<int> &indices)
 {
     // If no indices are provided, return empty matrix
     if (indices.empty())
     {
         return {};
     }
-    Cube_double result;
+    vec3 result;
     for (int index : indices)
     {
         if (index < cube.size())
@@ -482,9 +478,9 @@ Cube_double collectRows(const Cube_double &cube, const vector<int> &indices)
 }
 
 // Element-wise exponentiation of a matrix
-Matrix_double elementWiseExponentiation(const Matrix_double &matrix, double exponent)
+vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 {
-    Matrix_double result = matrix; // Copy the original matrix to preserve its dimensions
+    vec2 result = matrix; // Copy the original matrix to preserve its dimensions
 
     for (size_t i = 0; i < matrix.size(); ++i)
     { // Iterate over rows
@@ -578,24 +574,24 @@ void equicombsparse(int natoms, int nang1, int nang2, int nrad1, int nrad2,
 }
 
 void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
-              Complex4DVec_double &v1,
-              Complex4DVec_double &v2,
+              cvec4 &v1,
+              cvec4 &v2,
               vector<double> &w3j, int llmax,
               vector<vector<int>> &llvec, int lam,
-              ComplexMatrix_double &c2r, int featsize,
-              Cube_double &p)
+              cvec2 &c2r, int featsize,
+              vec3 &p)
 {
 
     cout << "WARNING EQUICOMB IS HAS NOT BEEN TESTED, PROCEED WITH CAUTION!!!" << endl;
     // Initialize p with zeros
-    p = Cube_double(2 * lam + 1, Matrix_double(featsize, vector<double>(natoms, 0.0)));
+    p = vec3(2 * lam + 1, vec2(featsize, vector<double>(natoms, 0.0)));
 
     // Parallel region
 #pragma omp parallel for default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, featsize, p)
     for (int iat = 0; iat < natoms; ++iat)
     {
         double inner = 0.0;
-        Matrix_double ptemp(2 * lam + 1, vec(featsize, 0.0));
+        vec2 ptemp(2 * lam + 1, vec(featsize, 0.0));
         int ifeat = 0;
         for (int n1 = 0; n1 < nrad1; ++n1)
         {
@@ -650,15 +646,15 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     }
 }
 
-vector<ComplexMatrix_double> complex_to_real_transformation(vector<int> sizes)
+vector<cvec2> complex_to_real_transformation(vector<int> sizes)
 {
-    vector<ComplexMatrix_double> matrices{};
+    vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
     {
         int lval = (sizes[i] - 1) / 2;
         int st = (lval & 1) ? -1 : 1;
         ;
-        ComplexMatrix_double transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
+        cvec2 transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
         for (int j = 0; j < lval; j++)
         {
             transformed_matrix[j][j] = complex<double>(0.0, 1.0);
@@ -833,13 +829,13 @@ metatensor::TensorMap get_feats_projs(string filepath, double rcut1, int nrad1, 
 }
 
 // RASCALINE2
-Complex4DVec_double get_expansion_coeffs(vector<uint8_t> spx_buff, int n_atoms, int nang, int nrad, int nspe)
+cvec4 get_expansion_coeffs(vector<uint8_t> spx_buff, int n_atoms, int nang, int nrad, int nspe)
 {
     metatensor::TensorMap spx = metatensor::TensorMap::load_buffer(spx_buff);
     vector<vector<vector<vector<complex<double>>>>> omega(nang + 1, vector<vector<vector<complex<double>>>>(n_atoms, vector<vector<complex<double>>>(2 * nang + 1, vector<complex<double>>(nspe * nrad, {0.0, 0.0}))));
     for (int l = 0; l < nang + 1; ++l)
     {
-        ComplexMatrix_double c2r = complex_to_real_transformation({(2 * l) + 1})[0];
+        cvec2 c2r = complex_to_real_transformation({(2 * l) + 1})[0];
         metatensor::TensorBlock spx_block = spx.block_by_id(l);
         metatensor::NDArray<double> spx_values = spx_block.values();
 
@@ -1040,7 +1036,7 @@ void populateConfigFromFile(const std::string &filename, Config &config)
     }
 }
 
-vec predict(WFN& wavy, const string& model_folder)
+vec predict(const WFN& wavy, const string model_folder)
 {
     // Read the configuration file
     cout << "Starting prediction... " << flush;
@@ -1101,21 +1097,21 @@ vec predict(WFN& wavy, const string& model_folder)
     // RASCALINE (Generate descriptors)
     metatensor::TensorMap spx = get_feats_projs(config.predict_filename, config.rcut1, config.nrad1, config.nang1, config.sig1, config.neighspe1, config.species);
     vector<uint8_t> spx_buf = spx.save_buffer();
-    Complex4DVec_double v1 = get_expansion_coeffs(spx_buf, natoms, config.nang1, config.nrad1, nspe1);
+    cvec4 v1 = get_expansion_coeffs(spx_buf, natoms, config.nang1, config.nrad1, nspe1);
 
     metatensor::TensorMap spx_2 = get_feats_projs(config.predict_filename, config.rcut2, config.nrad2, config.nang2, config.sig2, config.neighspe2, config.species);
     vector<uint8_t> spx_buf_2 = spx.save_buffer();
-    Complex4DVec_double v2 = get_expansion_coeffs(spx_buf_2, natoms, config.nang2, config.nrad2, nspe2);
+    cvec4 v2 = get_expansion_coeffs(spx_buf_2, natoms, config.nang2, config.nrad2, nspe2);
     // END RASCALINE
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
-    Complex4DVec_double v2, v1;
+    cvec4 v2, v1;
 #endif
 
     // Read Model variables
-    unordered_map<string, Matrix_double> Vmat{};
+    unordered_map<string, vec2> Vmat{};
     unordered_map<string, int> Mspe{};
-    unordered_map<string, Matrix_double> power_env_sparse{};
+    unordered_map<string, vec2> power_env_sparse{};
     // Define zeta as a string with one decimal
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
@@ -1136,7 +1132,7 @@ vec predict(WFN& wavy, const string& model_folder)
             }
             if (config.zeta == 1)
             {
-                Matrix_double Vmat_t = transpose<double>(Vmat[spe + to_string(lam)]);
+                vec2 Vmat_t = transpose<double>(Vmat[spe + to_string(lam)]);
                 power_env_sparse[spe + to_string(lam)] = dot<double>(Vmat_t, power_env_sparse[spe + to_string(lam)]);
             }
         }
@@ -1151,7 +1147,7 @@ vec predict(WFN& wavy, const string& model_folder)
         vfps = read_fps<int64_t>(model_folder + "/GPR_data/fps" + to_string(config.ncut) + "-", get_lmax_max(lmax));
     };
 
-    int ntrain = config.Ntrain * config.trainfrac;
+    int ntrain = static_cast<int>(config.Ntrain * config.trainfrac);
     vector<double> weights{};
     if (config.field)
     {
@@ -1165,8 +1161,8 @@ vec predict(WFN& wavy, const string& model_folder)
     // END READ MODEL VARIABLES
 
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    Matrix_double pvec_l0{};
-    unordered_map<int, Cube_double> pvec{};
+    vec2 pvec_l0{};
+    unordered_map<int, vec3> pvec{};
     for (int lam = 0; lam < get_lmax_max(lmax) + 1; lam++)
     {
         int llmax = 0;
@@ -1195,10 +1191,10 @@ vec predict(WFN& wavy, const string& model_folder)
 
         vector<double> wigner3j = readVectorFromFile<double>(model_folder + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
 
-        ComplexMatrix_double c2r = complex_to_real_transformation({2 * lam + 1})[0];
+        cvec2 c2r = complex_to_real_transformation({2 * lam + 1})[0];
 
         int featsize = nspe1 * nspe2 * config.nrad1 * config.nrad2 * llmax;
-        Cube_double p;
+        vec3 p;
         vector<vector<int>> llvec_t = transpose<int>(llvec);
         if (config.sparsify)
         {
@@ -1212,7 +1208,7 @@ vec predict(WFN& wavy, const string& model_folder)
         }
         wigner3j.clear();
 
-        Cube_double p_t = reorder3D<double>(p);
+        vec3 p_t = reorder3D<double>(p);
         vector<double> flat_p = flatten<double>(p_t);
 
         if (lam == 0)
@@ -1226,7 +1222,7 @@ vec predict(WFN& wavy, const string& model_folder)
         flat_p.clear();
     }
 
-    unordered_map<string, Matrix_double> psi_nm{};
+    unordered_map<string, vec2> psi_nm{};
 
     for (const string &spe : config.species)
     {
@@ -1234,8 +1230,8 @@ vec predict(WFN& wavy, const string& model_folder)
         {
             continue;
         }
-        Matrix_double power_env_sparse_t = transpose<double>(power_env_sparse[spe + "0"]);
-        Matrix_double kernell0_nm;
+        vec2 power_env_sparse_t = transpose<double>(power_env_sparse[spe + "0"]);
+        vec2 kernell0_nm;
         if (config.zeta == 1)
         {
             psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse_t);
@@ -1243,7 +1239,7 @@ vec predict(WFN& wavy, const string& model_folder)
         else
         {
             kernell0_nm = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse_t);
-            Matrix_double kernel_nm = elementWiseExponentiation(kernell0_nm, config.zeta);
+            vec2 kernel_nm = elementWiseExponentiation(kernell0_nm, config.zeta);
             psi_nm[spe + "0"] = dot<double>(kernel_nm, Vmat[spe + "0"]);
         }
 
@@ -1251,8 +1247,8 @@ vec predict(WFN& wavy, const string& model_folder)
         {
             int featsize = static_cast<int>(pvec[lam][0][0].size());
             power_env_sparse_t = transpose<double>(power_env_sparse[spe + to_string(lam)]);
-            Cube_double pVec_Rows = collectRows(pvec[lam], atom_idx[spe]);
-            Matrix_double pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{natom_dict[spe] * (2 * lam + 1), featsize});
+            vec3 pVec_Rows = collectRows(pvec[lam], atom_idx[spe]);
+            vec2 pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{natom_dict[spe] * (2 * lam + 1), featsize});
 
             if (config.zeta == 1)
             {
@@ -1260,7 +1256,7 @@ vec predict(WFN& wavy, const string& model_folder)
             }
             else
             {
-                Matrix_double kernel_nm = dot<double>(pvec_lam, power_env_sparse_t);
+                vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse_t);
                 for (size_t i1 = 0; i1 < natom_dict[spe]; ++i1)
                 {
                     for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
@@ -1278,7 +1274,7 @@ vec predict(WFN& wavy, const string& model_folder)
             }
         }
     }
-
+    
     unordered_map<string, vector<double>> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
@@ -1373,7 +1369,7 @@ vec predict(WFN& wavy, const string& model_folder)
 }
 
 //Wrapper function to generate the ML density prediction
-vec gen_SALTED_densities(WFN wave, options opt, time_point& start, time_point& end_SALTED) {
+vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_point& end_SALTED) {
     // Run generation of tsc file
     if (opt.debug) cout << "Finished ML Density Prediction!" << endl;
     vec coefs = predict(wave, opt.SALTED_DIR);
@@ -1394,7 +1390,7 @@ vec gen_SALTED_densities(WFN wave, options opt, time_point& start, time_point& e
         if (opt.wfn == string("test_sucrose.xyz"))
             npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
         else
-            npy::LoadArrayFromNumpy("cysteine_ref.npy", shape, fortran_order, ref_coefs);
+            npy::LoadArrayFromNumpy("cysteine_ref_Cysteine.npy", shape, fortran_order, ref_coefs);
         // Compare coefs with the reference
         vector<double> diff_vec;
         double diff = 0.0;
@@ -1408,6 +1404,10 @@ vec gen_SALTED_densities(WFN wave, options opt, time_point& start, time_point& e
         }
         cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
         cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
+        if (diff > 0.1) {
+			cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
+            exit(1);
+        }
     }
 
     return coefs;

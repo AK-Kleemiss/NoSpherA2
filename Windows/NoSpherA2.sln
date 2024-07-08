@@ -89,6 +89,8 @@ Global
 		Publish|x86 = Publish|x86
 		Release + Copy|x64 = Release + Copy|x64
 		Release + Copy|x86 = Release + Copy|x86
+		Release_SALTED|x64 = Release_SALTED|x64
+		Release_SALTED|x86 = Release_SALTED|x86
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
@@ -249,6 +251,10 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release + Copy|x64.Build.0 = Release + Copy|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release + Copy|x86.ActiveCfg = Release + Copy|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release + Copy|x86.Build.0 = Release + Copy|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release_SALTED|x64.ActiveCfg = Release_SALTED|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release_SALTED|x64.Build.0 = Release_SALTED|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release_SALTED|x86.ActiveCfg = Release_SALTED|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release_SALTED|x86.Build.0 = Release_SALTED|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.ActiveCfg = Release|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.Build.0 = Release|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x86.ActiveCfg = Release|x64
@@ -359,6 +365,8 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release + Copy|x64.ActiveCfg = Release|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release + Copy|x86.ActiveCfg = Release|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release + Copy|x86.Build.0 = Release|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release_SALTED|x64.ActiveCfg = Release|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release_SALTED|x86.ActiveCfg = Release|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release|x64.ActiveCfg = Release|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Release|x86.ActiveCfg = Release|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_def2_ECP|x64.ActiveCfg = D_def2_ECP|x64
@@ -463,6 +471,8 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release + Copy|x64.ActiveCfg = Release|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release + Copy|x86.ActiveCfg = Release|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release + Copy|x86.Build.0 = Release|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release_SALTED|x64.ActiveCfg = Release_SALTED|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release_SALTED|x86.ActiveCfg = Release_SALTED|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|x64.ActiveCfg = Release|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|x86.ActiveCfg = Release|Win32
 	EndGlobalSection
