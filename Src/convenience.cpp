@@ -3,6 +3,7 @@
 #include "tsc_block.h"
 #include "test_functions.h"
 #include "ML_density.h"
+#include "properties.h"
 
 using namespace std;
 
@@ -2854,6 +2855,10 @@ void options::digest_options()
             dmin = stod(arguments[i + 1]);
         else if (temp == "-d")
             basis_set_path = arguments[i + 1];
+        else if (temp == "-dipole_moments") {
+            dipole_moments(*this);
+            exit(0);
+        }
         else if (temp == "-ECP")
         {
             ECP = true;

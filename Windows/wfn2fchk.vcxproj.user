@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cpus 36 -v -acc 1 -dmin 0.54 -wfn olex2/Wfn_job/fk_03422_int_db.gbw -cif olex2/Wfn_job/fk_03422_int_db.cif</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>E:\Temp\test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-resolution 0.025 -radius 2.0 -wfn .\epoxide.gbw -dipole_moments</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(ProjectDir)\..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">

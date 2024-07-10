@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #define WIN32_LEAN_AND_MEAN
 #include <algorithm>
 #include <chrono>
@@ -222,6 +222,8 @@ namespace constants
     constexpr double angstrom2keV = 12.3984193;
     constexpr double f_to_mu = 4208.031548;
     constexpr double barns_to_electrons = 1.43110541E-8;
+    constexpr double SI2Debye = 3.33564E-30;               // in C*m
+    constexpr double e_A2Debye = 0.2081943; 							 // in e*Angstrom
     constexpr double a0 = 0.529177210903E-10;              // in m
     constexpr double h = 6.62607015E-34 / 1.602176634E-19; // in eV*s
     constexpr double Ryd_ener = 13.6056923;                // in eV

@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <ostream>
 
 class WFN;
 class cell;
@@ -270,6 +271,8 @@ void properties_calculation(options &opt);
  * @param opt The options specifying the details of the combination process.
  */
 void do_combine_mo(options &opt);
+
+void dipole_moments(options& opt, std::ostream& log2 = std::cout);
 
 #include "wfn_class.h"
 #include "cell.h"
