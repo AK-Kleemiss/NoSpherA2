@@ -1,3 +1,12 @@
+/*
+Original Code by:
+    Authors:    Andrea Grisafi, Alberto Fabrizio, David M. Wilkins, Benjamin A. R. Meyer, Clemence Corminboeuf, Michele Ceriotti, Zekun Lou, Alan Lewis
+    Date:       2024
+    License:    GPL-3.0
+    GitHub:     https://github.com/andreagrisafi/SALTED
+    Article:    https://pubs.acs.org/doi/10.1021/acscentsci.8b00551
+*/
+
 #include "ML_predict.h"
 using namespace std;
 
