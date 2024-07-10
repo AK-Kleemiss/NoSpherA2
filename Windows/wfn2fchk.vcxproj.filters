@@ -25,6 +25,12 @@
     <Filter Include="Headerdateien\Rascaline">
       <UniqueIdentifier>{2956515b-99de-4bf4-957b-7289c85b4f7b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headerdateien\SALTED">
+      <UniqueIdentifier>{68029808-cd9d-47d7-a879-f60a08d33d76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\SALTED">
+      <UniqueIdentifier>{411a5573-0e6b-43bd-8cf5-f94a2d53f41a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -61,12 +67,6 @@
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\atoms.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\ML_predict.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\ML_density.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\JKFit.cpp">
@@ -165,6 +165,15 @@
     <ClCompile Include="..\Lib\H5VarLenType.cpp">
       <Filter>Quelldateien\HDF5</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\SALTED_math.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ML_predict.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ML_density.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -228,12 +237,6 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\JKFit.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\ML_predict.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\ML_density.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Lib\H5AbstractDs.h">
@@ -934,6 +937,15 @@
     </ClInclude>
     <ClInclude Include="..\Src\rascaline.hpp">
       <Filter>Headerdateien\Rascaline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\ML_density.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\ML_predict.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_math.h">
+      <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

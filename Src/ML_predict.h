@@ -1,11 +1,4 @@
 #pragma once
-#include <vector>
-#include <string>
-#include <sstream>
-#include <iostream>
-#include <set>
-#include <algorithm>
-
 #include "convenience.h"
 #include "wfn_class.h"
 #include "npy.h"
@@ -21,9 +14,10 @@
 #include <H5Opublic.h>
 #endif
 
-#include <complex>
-#include <cmath>
-#include <omp.h>
+#include "SALTED_math.h"
+
+// Define types for simplicity
+using cvec4 = std::vector<std::vector<cvec2>>;
 
 vec predict(const WFN& wavy, std::string model_folder);
 vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_point& end_SALTED);

@@ -152,7 +152,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Cysteine -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.4 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_sucrose.cif -wfn test_sucrose.xyz -dmin 0.4 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
