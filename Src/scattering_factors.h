@@ -9,7 +9,7 @@
 #include <vector>
 #include <fstream>
 #include "convenience.h"
-#include "ML_predict.h"
+#include "SALTED_predictor.h"
 
 /**
  * @class WFN

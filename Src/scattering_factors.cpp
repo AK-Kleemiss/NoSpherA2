@@ -3730,7 +3730,8 @@ bool calculate_scattering_factors_ML(
     cif_input.close();
 
     //Generation of SALTED densitie coefficients
-    vec coefs = gen_SALTED_densities(wave, opt, start, end_SALTED);
+    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities(start, end_SALTED);
+
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -3892,7 +3893,7 @@ bool calculate_scattering_factors_ML_No_H(
 
     cif_input.close();
 
-    vec coefs = gen_SALTED_densities(wave, opt, start, end_SALTED);
+    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities(start, end_SALTED);
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;

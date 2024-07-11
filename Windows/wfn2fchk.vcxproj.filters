@@ -174,6 +174,18 @@
     <ClCompile Include="..\Src\ML_density.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\SALTED_io.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_equicomb.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_utilities.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_predictor.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -945,6 +957,18 @@
       <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\SALTED_math.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_utilities.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_io.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_equicomb.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_predictor.h">
       <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2410,7 +2410,11 @@
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\ML_density.cpp" />
     <ClCompile Include="..\Src\ML_predict.cpp" />
+    <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
+    <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\SALTED_math.cpp" />
+    <ClCompile Include="..\Src\SALTED_predictor.cpp" />
+    <ClCompile Include="..\Src\SALTED_utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
@@ -2669,7 +2673,11 @@
     <ClInclude Include="..\Src\ML_predict.h" />
     <ClInclude Include="..\Src\rascaline.h" />
     <ClInclude Include="..\Src\rascaline.hpp" />
+    <ClInclude Include="..\Src\SALTED_equicomb.h" />
+    <ClInclude Include="..\Src\SALTED_io.h" />
     <ClInclude Include="..\Src\SALTED_math.h" />
+    <ClInclude Include="..\Src\SALTED_predictor.h" />
+    <ClInclude Include="..\Src\SALTED_utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml" />
