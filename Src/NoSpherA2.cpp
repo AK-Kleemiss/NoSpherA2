@@ -129,7 +129,7 @@ int main(int argc, char **argv)
         }
         err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
         err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
-        
+
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
@@ -259,7 +259,7 @@ int main(int argc, char **argv)
         }
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
-        //this one is for generation of an fchk file
+        // this one is for generation of an fchk file
         if (opt.basis_set != "" || opt.fchk != "")
         {
             // Make a fchk out of the wfn/wfx file
@@ -302,7 +302,7 @@ int main(int argc, char **argv)
             free_fchk(log_file, outputname, "", wavy[0], opt.debug, true);
         }
 
-        //This one will calcualte a single tsc/tscb file form a single wfn
+        // This one will calcualte a single tsc/tscb file form a single wfn
         if (opt.cif != "" || opt.hkl != "")
         {
             if (!opt.SALTED && !opt.SALTED_BECKE && !opt.SALTED_NO_H)
@@ -314,39 +314,42 @@ int main(int argc, char **argv)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
                 if (wavy[0].get_origin() != 7)
                     err_checkf(calculate_scattering_factors_HF(
-                        opt,
-                        wavy[0],
-                        log_file),
-                        "Error during SF Calcualtion", log_file);
+                                   opt,
+                                   wavy[0],
+                                   log_file),
+                               "Error during SF Calcualtion", log_file);
                 else
                     err_checkf(thakkar_sfac(
-                        opt,
-                        log_file,
-                        wavy[0]),
-                        "Error during SF Calcualtion", log_file);
+                                   opt,
+                                   log_file,
+                                   wavy[0]),
+                               "Error during SF Calcualtion", log_file);
             }
-            else {
+            else
+            {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
-                //const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+                // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
                 int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit);
-                if(opt.debug) log_file << "Entering scattering ML Factor Calculation!" << endl;
-                
+                if (opt.debug)
+                    log_file << "Entering scattering ML Factor Calculation!" << endl;
 
                 if (opt.SALTED_BECKE || opt.SALTED_NO_H)
                     err_checkf(calculate_scattering_factors_ML_No_H(
-                        opt,
-                        wavy[0],
-                        log_file,
-                        nr_coefs),
-                        "Error during ML-SF Calcualtion", log_file);
-                else {
-                    if (opt.debug) log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+                                   opt,
+                                   wavy[0],
+                                   log_file,
+                                   nr_coefs),
+                               "Error during ML-SF Calcualtion", log_file);
+                else
+                {
+                    if (opt.debug)
+                        log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
                     err_checkf(calculate_scattering_factors_ML(
-                        opt,
-                        wavy[0],
-                        log_file,
-                        nr_coefs),
-                        "Error during ML-SF Calcualtion", log_file);
+                                   opt,
+                                   wavy[0],
+                                   log_file,
+                                   nr_coefs),
+                               "Error during ML-SF Calcualtion", log_file);
                 }
             }
         }

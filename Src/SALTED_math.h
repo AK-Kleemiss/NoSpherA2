@@ -65,3 +65,5 @@ std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>&
 
 //Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2& matrix, double exponent);
+
+void test_dot();

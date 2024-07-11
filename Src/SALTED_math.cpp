@@ -1,4 +1,8 @@
 #include "SALTED_math.h"
+#ifdef _WIN32
+#include "cblas.h"
+#endif
+#include <cassert>
 
 using namespace std;
 
@@ -42,43 +46,43 @@ template vector<vector<vector<int>>> reshape(vector<int> flatVec, Shape3D sizes)
 
 // Flatten Vectors 2D
 template <typename T>
-vector<T> flatten(const vector<vector<T>>& vec2D)
+vector<T> flatten(const vector<vector<T>> &vec2D)
 {
     vector<T> flatVec;
     size_t totalSize = 0;
-    for (const auto& row : vec2D)
+    for (const auto &row : vec2D)
     {
         totalSize += row.size();
     }
     flatVec.reserve(totalSize);
-    for (const vector<T>& row : vec2D)
+    for (const vector<T> &row : vec2D)
     {
         // Use std::copy to copy the entire row at once
         flatVec.insert(flatVec.end(), row.begin(), row.end());
     }
     return flatVec;
 }
-template vector<double> flatten(const vector<vector<double>>& vec2D);
-template vector<cdouble> flatten(const vector<vector<cdouble>>& vec2D);
-template vector<int> flatten(const vector<vector<int>>& vec2D);
+template vector<double> flatten(const vector<vector<double>> &vec2D);
+template vector<cdouble> flatten(const vector<vector<cdouble>> &vec2D);
+template vector<int> flatten(const vector<vector<int>> &vec2D);
 
 // Flatten Vectors 3D
 template <typename T>
-vector<T> flatten(const vector<vector<vector<T>>>& vec3D)
+vector<T> flatten(const vector<vector<vector<T>>> &vec3D)
 {
     vector<T> flatVec;
     size_t totalSize = 0;
-    for (const auto& row : vec3D)
+    for (const auto &row : vec3D)
     {
-        for (const auto& innerRow : row)
+        for (const auto &innerRow : row)
         {
             totalSize += innerRow.size();
         }
     }
     flatVec.reserve(totalSize);
-    for (const vector<vector<T>>& row : vec3D)
+    for (const vector<vector<T>> &row : vec3D)
     {
-        for (const vector<T>& innerRow : row)
+        for (const vector<T> &innerRow : row)
         {
             // Use std::copy to copy the entire innerRow at once
             flatVec.insert(flatVec.end(), innerRow.begin(), innerRow.end());
@@ -86,12 +90,12 @@ vector<T> flatten(const vector<vector<vector<T>>>& vec3D)
     }
     return flatVec;
 }
-template vector<double> flatten(const vector<vector<vector<double>>>& vec3D);
-template vector<cdouble> flatten(const vector<vector<vector<cdouble>>>& vec3D);
-template vector<int> flatten(const vector<vector<vector<int>>>& vec3D);
+template vector<double> flatten(const vector<vector<vector<double>>> &vec3D);
+template vector<cdouble> flatten(const vector<vector<vector<cdouble>>> &vec3D);
+template vector<int> flatten(const vector<vector<vector<int>>> &vec3D);
 
 // SLICE Operation
-vector<double> slice(const vector<double>& vec, size_t start, size_t length)
+vector<double> slice(const vector<double> &vec, size_t start, size_t length)
 {
     if (start + length > vec.size())
     {
@@ -110,7 +114,7 @@ vector<double> slice(const vector<double>& vec, size_t start, size_t length)
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
 template <typename T>
-vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& mat2)
+vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2)
 {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
@@ -128,6 +132,72 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
     {
         throw std::invalid_argument("Matrix dimensions do not match for multiplication");
     }
+
+#ifdef _WIN32
+    vector<T> flatMat1 = flatten(mat1);
+    vector<T> flatMat2 = flatten(mat2);
+
+    vector<T> result_flat(rows1 * cols2, 0.0);
+    if constexpr (std::is_same_v<T, float>)
+    {
+        cblas_sgemm(CblasRowMajor, 
+          CblasNoTrans, 
+          CblasNoTrans, 
+          rows1, 
+          cols2, 
+          cols1, 
+          1.0f, 
+          flatMat1.data(), 
+          cols1, 
+          flatMat2.data(), 
+          cols2, 
+          0.0f, 
+          result_flat.data(), 
+          cols2);
+    }
+    else if constexpr (std::is_same_v<T, double>)
+    {
+        cblas_dgemm(CblasRowMajor, 
+          CblasNoTrans, 
+          CblasNoTrans, 
+          rows1, 
+          cols2, 
+          cols1, 
+          1.0, 
+          flatMat1.data(), 
+          cols1, 
+          flatMat2.data(), 
+          cols2, 
+          0.0, 
+          result_flat.data(), 
+          cols2);
+    }
+    else if constexpr (std::is_same_v<T, cdouble>)
+    {
+      cdouble one = cdouble(1.0, 0.0);
+      cdouble zero = cdouble(0.0, 0.0);
+        cblas_zgemm(CblasRowMajor, 
+          CblasNoTrans, 
+          CblasNoTrans, 
+          rows1, 
+          cols2, 
+          cols1, 
+          &(one), 
+          reinterpret_cast<const cdouble *>(flatMat1.data()), 
+          cols1, 
+          reinterpret_cast<const cdouble *>(flatMat2.data()), 
+          cols2, 
+          &(zero), 
+          reinterpret_cast<cdouble *>(result_flat.data()), 
+          cols2);
+    }
+    else
+    {
+        throw std::invalid_argument("Unsupported data type for matrix multiplication");
+    }
+    Shape2D sizes = {rows1, cols2};
+    vector<vector<T>> result = reshape(result_flat, sizes);
+#else
 
     vector<vector<T>> result(rows1, vector<T>(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
@@ -159,16 +229,68 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
             }
         }
     }
+#endif
 
     return result;
 }
-template vector<vector<double>> dot(const vector<vector<double>>& mat1, const vector<vector<double>>& mat2);
-template vector<vector<cdouble>> dot(const vector<vector<cdouble>>& mat1, const vector<vector<cdouble>>& mat2);
+template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2);
+template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2);
 
+void test_dot()
+{
+    vector<vector<double>> mat1 = {{1, 2, 3}, {4, 5, 6}};
+    vector<vector<double>> mat2 = {{7, 8}, {9, 10}, {11, 12}};
+    vector<vector<double>> result = dot(mat1, mat2);
+
+    size_t rows1 = mat1.size();
+    size_t cols1 = mat1[0].size();
+    size_t rows2 = mat2.size();
+    size_t cols2 = mat2[0].size();
+
+    vector<vector<double>> result_old(rows1, vector<double>(cols2, 0.0));
+    const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
+    size_t total_size = rows1 * cols2;
+#pragma omp parallel
+    {
+        vector<double> local_result(total_size, 0.0);
+        int i, j, k, flatIndex;
+
+#pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
+        for (long long int n = 0; n < totalIterations; ++n)
+        {
+            i = static_cast<int>(n / (cols2 * cols1));
+            j = static_cast<int>((n / cols1) % cols2);
+            k = static_cast<int>(n % cols1);
+            flatIndex = i * cols2 + j;
+            local_result[flatIndex] += mat1[i][k] * mat2[k][j];
+        }
+
+#pragma omp critical
+        {
+            for (i = 0; i < rows1; ++i)
+            {
+                for (j = 0; j < cols2; ++j)
+                {
+                    flatIndex = i * cols2 + j;
+                    result_old[i][j] += local_result[flatIndex];
+                }
+            }
+        }
+    }
+    for (int i = 0; i < rows1; ++i)
+    {
+        for (int j = 0; j < cols2; ++j)
+        {
+          cout << result[i][j] << " " << result_old[i][j] << endl;
+            assert(result[i][j] == result_old[i][j]);
+        }
+    }
+    exit(0);
+}
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
-vector<T> dot(const vector<vector<T>>& mat, const vector<T>& vec)
+vector<T> dot(const vector<vector<T>> &mat, const vector<T> &vec)
 {
     int mat_rows = static_cast<int>(mat.size());
     int mat_cols = static_cast<int>(mat[0].size());
@@ -203,13 +325,13 @@ vector<T> dot(const vector<vector<T>>& mat, const vector<T>& vec)
 
     return result;
 }
-template vector<double> dot(const vector<vector<double>>& mat, const vector<double>& vec);
-template vector<cdouble> dot(const vector<vector<cdouble>>& mat, const vector<cdouble>& vec);
+template vector<double> dot(const vector<vector<double>> &mat, const vector<double> &vec);
+template vector<cdouble> dot(const vector<vector<cdouble>> &mat, const vector<cdouble> &vec);
 
 // TRANSPOSES
 // 3D MATRIX
 template <typename T>
-vector<vector<vector<T>>> transpose(const vector<vector<vector<T>>>& originalVec)
+vector<vector<vector<T>>> transpose(const vector<vector<vector<T>>> &originalVec)
 {
     if (originalVec.empty() || originalVec[0].empty() || originalVec[0][0].empty())
     {
@@ -235,13 +357,13 @@ vector<vector<vector<T>>> transpose(const vector<vector<vector<T>>>& originalVec
 
     return transposedVec;
 }
-template vector<vector<vector<double>>> transpose(const vector<vector<vector<double>>>& originalVec);
-template vector<vector<vector<cdouble>>> transpose(const vector<vector<vector<cdouble>>>& originalVec);
-template vector<vector<vector<int>>> transpose(const vector<vector<vector<int>>>& originalVec);
+template vector<vector<vector<double>>> transpose(const vector<vector<vector<double>>> &originalVec);
+template vector<vector<vector<cdouble>>> transpose(const vector<vector<vector<cdouble>>> &originalVec);
+template vector<vector<vector<int>>> transpose(const vector<vector<vector<int>>> &originalVec);
 
 // 2D MATRIX
 template <class T>
-vector<vector<T>> transpose(const vector<vector<T>>& mat)
+vector<vector<T>> transpose(const vector<vector<T>> &mat)
 {
     int rows = static_cast<int>(mat.size());
     int cols = static_cast<int>(mat[0].size());
@@ -256,13 +378,13 @@ vector<vector<T>> transpose(const vector<vector<T>>& mat)
     }
     return result;
 }
-template vector<vector<double>> transpose(const vector<vector<double>>& mat);
-template vector<vector<cdouble>> transpose(const vector<vector<cdouble>>& mat);
-template vector<vector<int>> transpose(const vector<vector<int>>& mat);
+template vector<vector<double>> transpose(const vector<vector<double>> &mat);
+template vector<vector<cdouble>> transpose(const vector<vector<cdouble>> &mat);
+template vector<vector<int>> transpose(const vector<vector<int>> &mat);
 
 // Reorder 3D Vectors following a given order
 template <typename T>
-vector<vector<vector<T>>> reorder3D(const vector<vector<vector<T>>>& original)
+vector<vector<vector<T>>> reorder3D(const vector<vector<vector<T>>> &original)
 {
     if (original.empty() || original[0].empty() || original[0][0].empty())
     {
@@ -289,10 +411,10 @@ vector<vector<vector<T>>> reorder3D(const vector<vector<vector<T>>>& original)
 
     return transposed;
 }
-template vector<vector<vector<double>>> reorder3D(const vector<vector<vector<double>>>& original);
+template vector<vector<vector<double>>> reorder3D(const vector<vector<vector<double>>> &original);
 
 // Function to collect rows from a matrix based on a vector of indices
-vec2 collectRows(const vec2& matrix, const vector<int>& indices)
+vec2 collectRows(const vec2 &matrix, const vector<int> &indices)
 {
     // If no indices are provided, return empty matrix
     if (indices.empty())
@@ -316,7 +438,7 @@ vec2 collectRows(const vec2& matrix, const vector<int>& indices)
 }
 
 // Function to collect rows from a Cube based on a vector of indices
-vec3 collectRows(const vec3& cube, const vector<int>& indices)
+vec3 collectRows(const vec3 &cube, const vector<int> &indices)
 {
     // If no indices are provided, return empty matrix
     if (indices.empty())
@@ -340,7 +462,7 @@ vec3 collectRows(const vec3& cube, const vector<int>& indices)
 }
 
 // Element-wise exponentiation of a matrix
-vec2 elementWiseExponentiation(const vec2& matrix, double exponent)
+vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 {
     vec2 result = matrix; // Copy the original matrix to preserve its dimensions
 

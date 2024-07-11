@@ -989,4 +989,7 @@
       <Filter>Ressourcendateien</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll" />
+  </ItemGroup>
 </Project>
