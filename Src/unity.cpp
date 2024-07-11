@@ -14,3 +14,7 @@
 #include "./ML_density.cpp"
 #include "./ML_predict.cpp"
 #include "./SALTED_math.cpp"
+#include "./SALTED_equicomb.cpp"
+#include "./SALTED_io"
+#include "./SALTED_utilities"
+#include "./SALTED_predictor"
