@@ -1,5 +1,5 @@
 #include "SALTED_math.h"
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
 #include "cblas.h"
 #endif
 #include <cassert>
@@ -133,7 +133,7 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         throw std::invalid_argument("Matrix dimensions do not match for multiplication");
     }
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__RASCALINE__)
     vector<T> flatMat1 = flatten(mat1);
     vector<T> flatMat2 = flatten(mat2);
 

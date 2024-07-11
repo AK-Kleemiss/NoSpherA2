@@ -13,8 +13,3 @@
 #include "./NoSpherA2.cpp"
 #include "./ML_density.cpp"
 #include "./ML_predict.cpp"
-#include "./SALTED_math.cpp"
-#include "./SALTED_equicomb.cpp"
-#include "./SALTED_io.cpp"
-#include "./SALTED_utilities.cpp"
-#include "./SALTED_predictor.cpp"
