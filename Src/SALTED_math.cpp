@@ -1,5 +1,5 @@
 #include "SALTED_math.h"
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
 #include "cblas.h"
 #endif
 #include <cassert>
@@ -133,63 +133,63 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         throw std::invalid_argument("Matrix dimensions do not match for multiplication");
     }
 
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
     vector<T> flatMat1 = flatten(mat1);
     vector<T> flatMat2 = flatten(mat2);
 
     vector<T> result_flat(rows1 * cols2, 0.0);
     if constexpr (std::is_same_v<T, float>)
     {
-        cblas_sgemm(CblasRowMajor, 
-          CblasNoTrans, 
-          CblasNoTrans, 
-          rows1, 
-          cols2, 
-          cols1, 
-          1.0f, 
-          flatMat1.data(), 
-          cols1, 
-          flatMat2.data(), 
-          cols2, 
-          0.0f, 
-          result_flat.data(), 
-          cols2);
+        cblas_sgemm(CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    rows1,
+                    cols2,
+                    cols1,
+                    1.0f,
+                    flatMat1.data(),
+                    cols1,
+                    flatMat2.data(),
+                    cols2,
+                    0.0f,
+                    result_flat.data(),
+                    cols2);
     }
     else if constexpr (std::is_same_v<T, double>)
     {
-        cblas_dgemm(CblasRowMajor, 
-          CblasNoTrans, 
-          CblasNoTrans, 
-          rows1, 
-          cols2, 
-          cols1, 
-          1.0, 
-          flatMat1.data(), 
-          cols1, 
-          flatMat2.data(), 
-          cols2, 
-          0.0, 
-          result_flat.data(), 
-          cols2);
+        cblas_dgemm(CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    rows1,
+                    cols2,
+                    cols1,
+                    1.0,
+                    flatMat1.data(),
+                    cols1,
+                    flatMat2.data(),
+                    cols2,
+                    0.0,
+                    result_flat.data(),
+                    cols2);
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
-      cdouble one = cdouble(1.0, 0.0);
-      cdouble zero = cdouble(0.0, 0.0);
-        cblas_zgemm(CblasRowMajor, 
-          CblasNoTrans, 
-          CblasNoTrans, 
-          rows1, 
-          cols2, 
-          cols1, 
-          &(one), 
-          reinterpret_cast<const cdouble *>(flatMat1.data()), 
-          cols1, 
-          reinterpret_cast<const cdouble *>(flatMat2.data()), 
-          cols2, 
-          &(zero), 
-          reinterpret_cast<cdouble *>(result_flat.data()), 
-          cols2);
+        cdouble one = cdouble(1.0, 0.0);
+        cdouble zero = cdouble(0.0, 0.0);
+        cblas_zgemm(CblasRowMajor,
+                    CblasNoTrans,
+                    CblasNoTrans,
+                    rows1,
+                    cols2,
+                    cols1,
+                    &(one),
+                    reinterpret_cast<const cdouble *>(flatMat1.data()),
+                    cols1,
+                    reinterpret_cast<const cdouble *>(flatMat2.data()),
+                    cols2,
+                    &(zero),
+                    reinterpret_cast<cdouble *>(result_flat.data()),
+                    cols2);
     }
     else
     {
@@ -281,7 +281,7 @@ void test_dot()
     {
         for (int j = 0; j < cols2; ++j)
         {
-          cout << result[i][j] << " " << result_old[i][j] << endl;
+            cout << result[i][j] << " " << result_old[i][j] << endl;
             assert(result[i][j] == result_old[i][j]);
         }
     }

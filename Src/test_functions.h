@@ -5,7 +5,7 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif

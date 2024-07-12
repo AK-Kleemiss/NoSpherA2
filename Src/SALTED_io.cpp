@@ -2,7 +2,7 @@
 
 using namespace std;
 
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
 vec2 readHDF5(H5::H5File file, string dataset_name)
 {
     /*
@@ -96,14 +96,14 @@ vec2 readHDF5(H5::H5File file, string dataset_name)
 #endif
 
 template <typename Scalar>
-void read_npy(string filename, vector<Scalar>& data)
+void read_npy(string filename, vector<Scalar> &data)
 {
     vector<unsigned long> shape{};
     bool fortran_order;
     npy::LoadArrayFromNumpy(filename, shape, fortran_order, data);
 }
-template void read_npy(string filename, vector<double>& data);
-template void read_npy(string filename, vector<float>& data);
+template void read_npy(string filename, vector<double> &data);
+template void read_npy(string filename, vector<float> &data);
 
 template <typename T>
 unordered_map<int, vector<T>> read_fps(string filename, int lmax_max)
@@ -121,9 +121,8 @@ unordered_map<int, vector<T>> read_fps(string filename, int lmax_max)
 template unordered_map<int, vector<double>> read_fps(string filename, int lmax_max);
 template unordered_map<int, vector<int64_t>> read_fps(string filename, int lmax_max);
 
-
 template <class T>
-vector<T> readVectorFromFile(const string& filename)
+vector<T> readVectorFromFile(const string &filename)
 {
     std::vector<T> result;
     std::ifstream file(filename);
@@ -141,7 +140,7 @@ vector<T> readVectorFromFile(const string& filename)
             double value = std::stod(line);
             result.push_back(value);
         }
-        catch (const std::invalid_argument& e)
+        catch (const std::invalid_argument &e)
         {
             // Handle the case where the line cannot be converted to double
             // For now, we'll just skip the line
@@ -152,118 +151,116 @@ vector<T> readVectorFromFile(const string& filename)
 
     return result;
 }
-template vector<double> readVectorFromFile(const string& filename);
-template vector<int> readVectorFromFile(const string& filename);
+template vector<double> readVectorFromFile(const string &filename);
+template vector<int> readVectorFromFile(const string &filename);
 
-
-//void populateConfigFromFile(const std::string& filename, Config& config)
+// void populateConfigFromFile(const std::string& filename, Config& config)
 //{
-//    err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", std::cout);
-//    std::ifstream file(filename);
-//    std::string line;
+//     err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", std::cout);
+//     std::ifstream file(filename);
+//     std::string line;
 //
-//    while (std::getline(file, line))
-//    {
-//        std::istringstream iss(line);
-//        std::string key;
-//        if (std::getline(iss, key, '='))
-//        {
-//            std::string value;
-//            if (std::getline(iss, value))
-//            {
-//                // Remove leading and trailing whitespaces from value
-//                value = trim(value);
-//                key = trim(key);
+//     while (std::getline(file, line))
+//     {
+//         std::istringstream iss(line);
+//         std::string key;
+//         if (std::getline(iss, key, '='))
+//         {
+//             std::string value;
+//             if (std::getline(iss, value))
+//             {
+//                 // Remove leading and trailing whitespaces from value
+//                 value = trim(value);
+//                 key = trim(key);
 //
-//                // Populate the Config struct based on key
-//                if (key == "average")
-//                    config.average = (value == "True");
-//                else if (key == "field")
-//                    config.field = (value == "True");
-//                else if (key == "sparsify")
-//                    config.sparsify = (value == "True");
-//                else if (key == "ncut")
-//                    config.ncut = std::stoi(value);
-//                else if (key == "species")
-//                {
-//                    // Parse the species vector
-//                    size_t start = value.find("[");
-//                    size_t end = value.find("]");
-//                    std::string speciesList = value.substr(start + 1, end - start - 1);
-//                    // Remove quotes and spaces from individual species
-//                    speciesList.erase(std::remove_if(speciesList.begin(), speciesList.end(), [](char c)
-//                        { return std::isspace(c) || c == '"' || c == '\''; }),
-//                        speciesList.end());
-//                    std::istringstream speciesStream(speciesList);
-//                    std::string speciesItem;
-//                    while (std::getline(speciesStream, speciesItem, ','))
-//                    {
-//                        config.species.push_back(speciesItem);
-//                    }
-//                }
-//                else if (key == "rcut1")
-//                    config.rcut1 = std::stod(value);
-//                else if (key == "rcut2")
-//                    config.rcut2 = std::stod(value);
-//                else if (key == "nang1")
-//                    config.nang1 = std::stoi(value);
-//                else if (key == "nang2")
-//                    config.nang2 = std::stoi(value);
-//                else if (key == "nrad1")
-//                    config.nrad1 = std::stoi(value);
-//                else if (key == "nrad2")
-//                    config.nrad2 = std::stoi(value);
-//                else if (key == "sig1")
-//                    config.sig1 = std::stod(value);
-//                else if (key == "sig2")
-//                    config.sig2 = std::stod(value);
-//                else if (key == "neighspe1")
-//                {
-//                    // Parse the neighspe1 vector
-//                    size_t start = value.find("[");
-//                    size_t end = value.find("]");
-//                    std::string neighspe1List = value.substr(start + 1, end - start - 1);
-//                    neighspe1List.erase(std::remove_if(neighspe1List.begin(), neighspe1List.end(), [](char c)
-//                        { return std::isspace(c) || c == '"' || c == '\''; }),
-//                        neighspe1List.end());
-//                    std::istringstream neighspe1Stream(neighspe1List);
-//                    std::string neighspe1Item;
-//                    while (std::getline(neighspe1Stream, neighspe1Item, ','))
-//                    {
-//                        config.neighspe1.push_back(neighspe1Item);
-//                    }
-//                }
-//                else if (key == "neighspe2")
-//                {
-//                    // Parse the neighspe2 vector
-//                    size_t start = value.find("[");
-//                    size_t end = value.find("]");
-//                    std::string neighspe2List = value.substr(start + 1, end - start - 1);
-//                    neighspe2List.erase(std::remove_if(neighspe2List.begin(), neighspe2List.end(), [](char c)
-//                        { return std::isspace(c) || c == '"' || c == '\''; }),
-//                        neighspe2List.end());
-//                    std::istringstream neighspe2Stream(neighspe2List);
-//                    std::string neighspe2Item;
-//                    while (std::getline(neighspe2Stream, neighspe2Item, ','))
-//                    {
-//                        config.neighspe2.push_back(neighspe2Item);
-//                    }
-//                }
-//                else if (key == "zeta")
-//                    config.zeta = std::stod(value);
-//                else if (key == "Menv")
-//                    config.Menv = std::stoi(value);
-//                else if (key == "Ntrain")
-//                    config.Ntrain = std::stoi(value);
-//                else if (key == "trainfrac")
-//                    config.trainfrac = std::stof(value);
-//            }
-//        }
-//    }
-//}
+//                 // Populate the Config struct based on key
+//                 if (key == "average")
+//                     config.average = (value == "True");
+//                 else if (key == "field")
+//                     config.field = (value == "True");
+//                 else if (key == "sparsify")
+//                     config.sparsify = (value == "True");
+//                 else if (key == "ncut")
+//                     config.ncut = std::stoi(value);
+//                 else if (key == "species")
+//                 {
+//                     // Parse the species vector
+//                     size_t start = value.find("[");
+//                     size_t end = value.find("]");
+//                     std::string speciesList = value.substr(start + 1, end - start - 1);
+//                     // Remove quotes and spaces from individual species
+//                     speciesList.erase(std::remove_if(speciesList.begin(), speciesList.end(), [](char c)
+//                         { return std::isspace(c) || c == '"' || c == '\''; }),
+//                         speciesList.end());
+//                     std::istringstream speciesStream(speciesList);
+//                     std::string speciesItem;
+//                     while (std::getline(speciesStream, speciesItem, ','))
+//                     {
+//                         config.species.push_back(speciesItem);
+//                     }
+//                 }
+//                 else if (key == "rcut1")
+//                     config.rcut1 = std::stod(value);
+//                 else if (key == "rcut2")
+//                     config.rcut2 = std::stod(value);
+//                 else if (key == "nang1")
+//                     config.nang1 = std::stoi(value);
+//                 else if (key == "nang2")
+//                     config.nang2 = std::stoi(value);
+//                 else if (key == "nrad1")
+//                     config.nrad1 = std::stoi(value);
+//                 else if (key == "nrad2")
+//                     config.nrad2 = std::stoi(value);
+//                 else if (key == "sig1")
+//                     config.sig1 = std::stod(value);
+//                 else if (key == "sig2")
+//                     config.sig2 = std::stod(value);
+//                 else if (key == "neighspe1")
+//                 {
+//                     // Parse the neighspe1 vector
+//                     size_t start = value.find("[");
+//                     size_t end = value.find("]");
+//                     std::string neighspe1List = value.substr(start + 1, end - start - 1);
+//                     neighspe1List.erase(std::remove_if(neighspe1List.begin(), neighspe1List.end(), [](char c)
+//                         { return std::isspace(c) || c == '"' || c == '\''; }),
+//                         neighspe1List.end());
+//                     std::istringstream neighspe1Stream(neighspe1List);
+//                     std::string neighspe1Item;
+//                     while (std::getline(neighspe1Stream, neighspe1Item, ','))
+//                     {
+//                         config.neighspe1.push_back(neighspe1Item);
+//                     }
+//                 }
+//                 else if (key == "neighspe2")
+//                 {
+//                     // Parse the neighspe2 vector
+//                     size_t start = value.find("[");
+//                     size_t end = value.find("]");
+//                     std::string neighspe2List = value.substr(start + 1, end - start - 1);
+//                     neighspe2List.erase(std::remove_if(neighspe2List.begin(), neighspe2List.end(), [](char c)
+//                         { return std::isspace(c) || c == '"' || c == '\''; }),
+//                         neighspe2List.end());
+//                     std::istringstream neighspe2Stream(neighspe2List);
+//                     std::string neighspe2Item;
+//                     while (std::getline(neighspe2Stream, neighspe2Item, ','))
+//                     {
+//                         config.neighspe2.push_back(neighspe2Item);
+//                     }
+//                 }
+//                 else if (key == "zeta")
+//                     config.zeta = std::stod(value);
+//                 else if (key == "Menv")
+//                     config.Menv = std::stoi(value);
+//                 else if (key == "Ntrain")
+//                     config.Ntrain = std::stoi(value);
+//                 else if (key == "trainfrac")
+//                     config.trainfrac = std::stof(value);
+//             }
+//         }
+//     }
+// }
 
-
-void Config::populateFromFile(const std::string& filename) 
+void Config::populateFromFile(const std::string &filename)
 {
     err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", std::cout);
     std::ifstream file(filename);
@@ -280,25 +277,44 @@ void Config::populateFromFile(const std::string& filename)
                 value = trim(value);
                 key = trim(key);
 
-                if (key == "average") average = (value == "True");
-                else if (key == "field") field = (value == "True");
-                else if (key == "sparsify") sparsify = (value == "True");
-                else if (key == "ncut") ncut = std::stoi(value);
-                else if (key == "species") species = parseVector(value);
-                else if (key == "rcut1") rcut1 = std::stod(value);
-                else if (key == "rcut2") rcut2 = std::stod(value);
-                else if (key == "nang1") nang1 = std::stoi(value);
-                else if (key == "nang2") nang2 = std::stoi(value);
-                else if (key == "nrad1") nrad1 = std::stoi(value);
-                else if (key == "nrad2") nrad2 = std::stoi(value);
-                else if (key == "sig1") sig1 = std::stod(value);
-                else if (key == "sig2") sig2 = std::stod(value);
-                else if (key == "neighspe1") neighspe1 = parseVector(value);
-                else if (key == "neighspe2") neighspe2 = parseVector(value);
-                else if (key == "zeta") zeta = std::stod(value);
-                else if (key == "Menv") Menv = std::stoi(value);
-                else if (key == "Ntrain") Ntrain = std::stoi(value);
-                else if (key == "trainfrac") trainfrac = std::stof(value);
+                if (key == "average")
+                    average = (value == "True");
+                else if (key == "field")
+                    field = (value == "True");
+                else if (key == "sparsify")
+                    sparsify = (value == "True");
+                else if (key == "ncut")
+                    ncut = std::stoi(value);
+                else if (key == "species")
+                    species = parseVector(value);
+                else if (key == "rcut1")
+                    rcut1 = std::stod(value);
+                else if (key == "rcut2")
+                    rcut2 = std::stod(value);
+                else if (key == "nang1")
+                    nang1 = std::stoi(value);
+                else if (key == "nang2")
+                    nang2 = std::stoi(value);
+                else if (key == "nrad1")
+                    nrad1 = std::stoi(value);
+                else if (key == "nrad2")
+                    nrad2 = std::stoi(value);
+                else if (key == "sig1")
+                    sig1 = std::stod(value);
+                else if (key == "sig2")
+                    sig2 = std::stod(value);
+                else if (key == "neighspe1")
+                    neighspe1 = parseVector(value);
+                else if (key == "neighspe2")
+                    neighspe2 = parseVector(value);
+                else if (key == "zeta")
+                    zeta = std::stod(value);
+                else if (key == "Menv")
+                    Menv = std::stoi(value);
+                else if (key == "Ntrain")
+                    Ntrain = std::stoi(value);
+                else if (key == "trainfrac")
+                    trainfrac = std::stof(value);
             }
         }
     }
@@ -306,13 +322,15 @@ void Config::populateFromFile(const std::string& filename)
     this->nspe2 = static_cast<int>(this->neighspe2.size());
 }
 
-std::vector<std::string> Config::parseVector(const std::string& value) {
+std::vector<std::string> Config::parseVector(const std::string &value)
+{
     std::vector<std::string> result;
 
     // Find the start and end of the list in the string
     size_t start = value.find("[");
     size_t end = value.find("]");
-    if (start == std::string::npos || end == std::string::npos || start >= end) {
+    if (start == std::string::npos || end == std::string::npos || start >= end)
+    {
         return result; // Return empty vector if no valid list is found
     }
 
@@ -320,14 +338,15 @@ std::vector<std::string> Config::parseVector(const std::string& value) {
     std::string listContent = value.substr(start + 1, end - start - 1);
 
     // Remove spaces, quotes, and other unnecessary characters
-    listContent.erase(std::remove_if(listContent.begin(), listContent.end(), [](char c) {
-        return std::isspace(c) || c == '"' || c == '\'';
-        }), listContent.end());
+    listContent.erase(std::remove_if(listContent.begin(), listContent.end(), [](char c)
+                                     { return std::isspace(c) || c == '"' || c == '\''; }),
+                      listContent.end());
 
     // Split the cleaned string into items
     std::istringstream stream(listContent);
     std::string item;
-    while (std::getline(stream, item, ',')) {
+    while (std::getline(stream, item, ','))
+    {
         result.push_back(item);
     }
 

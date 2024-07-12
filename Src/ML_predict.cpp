@@ -12,7 +12,7 @@ Original Code by:
 using namespace std;
 using namespace SALTED_Utils;
 
-vec predict(const WFN& wavy, const string model_folder)
+vec predict(const WFN &wavy, const string model_folder)
 {
     // Read the configuration file
     cout << "Starting prediction... " << flush;
@@ -20,7 +20,9 @@ vec predict(const WFN& wavy, const string model_folder)
     string _f_path("inputs.txt");
     string _path = model_folder;
     join_path(_path, _f_path);
+#if has_RAS
     config.populateFromFile(_path);
+#endif
 
     config.predict_filename = wavy.get_path();
     int nspe1 = static_cast<int>(config.neighspe1.size());
@@ -49,8 +51,10 @@ vec predict(const WFN& wavy, const string model_folder)
     {
         atomic_symbols.push_back(wavy.atoms[i].label);
     }
-    //# Define system excluding atoms that belong to species not listed in SALTED input
+    // # Define system excluding atoms that belong to species not listed in SALTED input
+#if has_RAS
     atomic_symbols = filter_species(atomic_symbols, config.species);
+#endif
     //// Output the result
     // for (const auto& symbol : atomic_symbols) {
     //     std::cout << symbol << " ";
@@ -68,12 +72,11 @@ vec predict(const WFN& wavy, const string model_folder)
 
     unordered_map<string, int> lmax{};
     unordered_map<string, int> nmax{};
+#if has_RAS
     set_lmax_nmax(lmax, nmax, QZVP_JKfit, config.species);
-    
-
 
     // RASCALINE (Generate descriptors)
-#if defined(_WIN32) || defined(__RASCALINE__)
+
     cvec4 v1 = Rascaline_Descriptors(config.predict_filename, config.nrad1, config.nang1, config.sig1, config.rcut1, natoms, config.neighspe1, config.species).calculate_expansion_coeffs();
     cvec4 v2 = Rascaline_Descriptors(config.predict_filename, config.nrad2, config.nang2, config.sig2, config.rcut2, natoms, config.neighspe2, config.species).calculate_expansion_coeffs();
 #else
@@ -81,7 +84,7 @@ vec predict(const WFN& wavy, const string model_folder)
     cvec4 v2, v1;
 #endif
     // END RASCALINE
-    // 
+    //
     // Read Model variables
     unordered_map<string, vec2> Vmat{};
     unordered_map<string, int> Mspe{};
@@ -90,7 +93,7 @@ vec predict(const WFN& wavy, const string model_folder)
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
     H5::H5File features(model_folder + "/GPR_data/FEAT_M-" + to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(model_folder + "/GPR_data/projector_M" + to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
     for (string spe : config.species)
@@ -248,7 +251,7 @@ vec predict(const WFN& wavy, const string model_folder)
             }
         }
     }
-    
+
     unordered_map<string, vector<double>> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
@@ -342,13 +345,16 @@ vec predict(const WFN& wavy, const string model_folder)
     return pred_coefs;
 }
 
-//Wrapper function to generate the ML density prediction
-vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_point& end_SALTED) {
+// Wrapper function to generate the ML density prediction
+vec gen_SALTED_densities(const WFN &wave, options opt, time_point &start, time_point &end_SALTED)
+{
     // Run generation of tsc file
-    if (opt.debug) cout << "Finished ML Density Prediction!" << endl;
+    if (opt.debug)
+        cout << "Finished ML Density Prediction!" << endl;
     vec coefs = predict(wave, opt.SALTED_DIR);
     end_SALTED = get_time();
-    if (opt.debug) {
+    if (opt.debug)
+    {
         long long int dur = get_sec(start, end_SALTED);
         cout << "Finished ML Density Prediction!" << endl;
         if (dur < 1)
@@ -356,11 +362,12 @@ vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_p
         else
             cout << "Time for SALTED prediction: " << fixed << setprecision(0) << dur << " s" << endl;
     }
-    if (opt.debug && (opt.wfn == string("test_cysteine.xyz") || opt.wfn == string("test_sucrose.xyz"))) {
+    if (opt.debug && (opt.wfn == string("test_cysteine.xyz") || opt.wfn == string("test_sucrose.xyz")))
+    {
         vector<unsigned long> shape{};
         bool fortran_order;
         vec ref_coefs{};
-        //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
+        // Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
         if (opt.wfn == string("test_sucrose.xyz"))
             npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
         else
@@ -371,15 +378,17 @@ vec gen_SALTED_densities(const WFN& wave, options opt, time_point& start, time_p
         for (int i = 0; i < coefs.size(); i++)
         {
             diff += abs(coefs[i] - ref_coefs[i]);
-            if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
+            if (abs(coefs[i] - ref_coefs[i]) > 1e-4)
+            {
                 cout << "Difference in coef " << fixed << setprecision(3) << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
             }
             diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
         }
         cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
         cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
-        if (diff > 0.1) {
-			cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
+        if (diff > 0.1)
+        {
+            cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
             exit(1);
         }
     }

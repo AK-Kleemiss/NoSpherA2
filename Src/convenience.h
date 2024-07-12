@@ -45,13 +45,18 @@ class WFN;
 class cell;
 class atom;
 
-inline std::streambuf* coutbuf = std::cout.rdbuf(); // save old buf
-inline void error_check(const bool condition, const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file = std::cout);
-inline void not_implemented(const std::string& file, const int& line, const std::string& function, const std::string& error_mesasge, std::ostream& log_file);
+inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
+inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
+inline void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
+#if defined(_WIN32) || defined(__RASCALINE__)
+#define has_RAS 1
+#else
+#define has_RAS 0
+#endif
 
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;
@@ -66,10 +71,10 @@ typedef std::vector<bool> bvec;
 typedef std::vector<std::string> svec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
-int vec_sum(const bvec& in);
-int vec_sum(const ivec& in);
-double vec_sum(const vec& in);
-cdouble vec_sum(const cvec& in);
+int vec_sum(const bvec &in);
+int vec_sum(const ivec &in);
+double vec_sum(const vec &in);
+cdouble vec_sum(const cvec &in);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -90,22 +95,24 @@ namespace sha
 #define SIG0(x) (ROTR(x, 7) ^ ROTR(x, 18) ^ (x >> 3))
 #define SIG1(x) (ROTR(x, 17) ^ ROTR(x, 19) ^ (x >> 10))
 
-    constexpr uint64_t custom_bswap_64(uint64_t x) {
+    constexpr uint64_t custom_bswap_64(uint64_t x)
+    {
         return ((x & 0xFF00000000000000ull) >> 56) |
-            ((x & 0x00FF000000000000ull) >> 40) |
-            ((x & 0x0000FF0000000000ull) >> 24) |
-            ((x & 0x000000FF00000000ull) >> 8) |
-            ((x & 0x00000000FF000000ull) << 8) |
-            ((x & 0x0000000000FF0000ull) << 24) |
-            ((x & 0x000000000000FF00ull) << 40) |
-            ((x & 0x00000000000000FFull) << 56);
+               ((x & 0x00FF000000000000ull) >> 40) |
+               ((x & 0x0000FF0000000000ull) >> 24) |
+               ((x & 0x000000FF00000000ull) >> 8) |
+               ((x & 0x00000000FF000000ull) << 8) |
+               ((x & 0x0000000000FF0000ull) << 24) |
+               ((x & 0x000000000000FF00ull) << 40) |
+               ((x & 0x00000000000000FFull) << 56);
     }
 
-    constexpr uint32_t custom_bswap_32(uint32_t value) {
+    constexpr uint32_t custom_bswap_32(uint32_t value)
+    {
         return ((value & 0x000000FF) << 24) |
-            ((value & 0x0000FF00) << 8) |
-            ((value & 0x00FF0000) >> 8) |
-            ((value & 0xFF000000) >> 24);
+               ((value & 0x0000FF00) << 8) |
+               ((value & 0x00FF0000) >> 8) |
+               ((value & 0xFF000000) >> 24);
     }
 
     // Initial hash values
@@ -125,20 +132,19 @@ namespace sha
         0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
         0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
-    };
+        0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 
     // SHA-256 processing function
     void sha256_transform(uint32_t state[8], const uint8_t block[64]);
 
     // SHA-256 update function
-    void sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t* data, size_t len, uint64_t& bitlen);
+    void sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen);
 
     // SHA-256 padding and final hash computation
     void sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, uint8_t hash[32]);
 
     // Function to calculate SHA-256 hash
-    std::string sha256(const std::string& input);
+    std::string sha256(const std::string &input);
 }
 
 namespace constants
@@ -224,7 +230,7 @@ namespace constants
     constexpr double f_to_mu = 4208.031548;
     constexpr double barns_to_electrons = 1.43110541E-8;
     constexpr double SI2Debye = 3.33564E-30;               // in C*m
-    constexpr double e_A2Debye = 0.2081943; 							 // in e*Angstrom
+    constexpr double e_A2Debye = 0.2081943;                // in e*Angstrom
     constexpr double a0 = 0.529177210903E-10;              // in m
     constexpr double h = 6.62607015E-34 / 1.602176634E-19; // in eV*s
     constexpr double Ryd_ener = 13.6056923;                // in eV
@@ -367,7 +373,7 @@ std::string go_get_string(std::ifstream &file, std::string search, bool rewind =
 
 const int sht2nbas(const int &type);
 
-const int shell2function(const int& type, const int& prim);
+const int shell2function(const int &type, const int &prim);
 
 const double normgauss(const int &type, const double &exp);
 const double spherical_harmonic(const int &l, const int &m, const double *d);
@@ -410,36 +416,36 @@ std::vector<T> split_string(const std::string &input, const std::string delimite
     return result;
 };
 
-void remove_empty_elements(svec& input, const std::string& empty = " ");
+void remove_empty_elements(svec &input, const std::string &empty = " ");
 std::chrono::high_resolution_clock::time_point get_time();
 long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 
-void write_timing_to_file(std::ostream& file,
-    time_point start,
-    time_point end,
-    time_point end_prototypes,
-    time_point end_becke,
-    time_point end_spherical,
-    time_point end_prune,
-    time_point end_aspherical,
-    time_point before_kpts,
-    time_point after_kpts,
-    time_point end1);
+void write_timing_to_file(std::ostream &file,
+                          time_point start,
+                          time_point end,
+                          time_point end_prototypes,
+                          time_point end_becke,
+                          time_point end_spherical,
+                          time_point end_prune,
+                          time_point end_aspherical,
+                          time_point before_kpts,
+                          time_point after_kpts,
+                          time_point end1);
 
-void write_timing_to_file(std::ostream& file,
-    time_point start,
-    time_point end,
-    time_point end_SALTED,
-    time_point end_prototypes,
-    time_point end_becke,
-    time_point end_spherical,
-    time_point end_prune,
-    time_point end_aspherical,
-    time_point before_kpts,
-    time_point after_kpts,
-    time_point end1);
+void write_timing_to_file(std::ostream &file,
+                          time_point start,
+                          time_point end,
+                          time_point end_SALTED,
+                          time_point end_prototypes,
+                          time_point end_becke,
+                          time_point end_spherical,
+                          time_point end_prune,
+                          time_point end_aspherical,
+                          time_point before_kpts,
+                          time_point after_kpts,
+                          time_point end1);
 
 int CountWords(const char *str);
 
@@ -473,7 +479,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
 bool unsaved_files(std::vector<WFN> &wavy);
 int get_Z_from_label(const char *tmp);
 
-std::string trim(const std::string& s);
+std::string trim(const std::string &s);
 
 //-------------------------Progress_bar--------------------------------------------------
 
@@ -858,83 +864,83 @@ struct options
     };
 
     options(int accuracy,
-        int threads,
-        int pbc,
-        double resolution,
-        double radius,
-        bool becke,
-        bool electron_diffraction,
-        bool ECP,
-        bool set_ECPs,
-        int ECP_mode,
-        bool calc,
-        bool eli,
-        bool esp,
-        bool elf,
-        bool lap,
-        bool rdg,
-        bool hdef,
-        bool def,
-        bool fract,
-        bool hirsh,
-        bool s_rho,
-        bool SALTED,
-        bool SALTED_NO_H,
-        bool SALTED_BECKE,
-        bool Olex2_1_3_switch,
-        bool iam_switch,
-        bool read_k_pts,
-        bool save_k_pts,
-        bool combined_tsc_calc,
-        bool binary_tsc,
-        bool cif_based_combined_tsc_calc,
-        bool density_test_cube,
-        bool no_date,
-        bool gbw2wfn,
-        bool old_tsc,
-        bool thakkar_d_plot,
-        bool spherical_harmonic,
-        bool ML_test,
-        double sfac_scan,
-        double sfac_diffuse,
-        double dmin,
-        int hirsh_number,
-        const ivec& MOs,
-        const ivec2& groups,
-        const vec2& twin_law,
-        const ivec2& combined_tsc_groups,
-        bool all_mos,
-        bool test,
-        const std::string& wfn,
-        const std::string& fchk,
-        const std::string& basis_set,
-        const std::string& hkl,
-        const std::string& cif,
-        const std::string& method,
-        const std::string& xyz_file,
-        const std::string& coef_file,
-        const std::string& fract_name,
-        const svec& combined_tsc_calc_files,
-        const svec& combined_tsc_calc_cifs,
-        const std::string& wavename,
-        const std::string& gaussian_path,
-        const std::string& turbomole_path,
-        const std::string& basis_set_path,
-        const std::string& SALTED_DIR,
-        const svec& arguments,
-        const svec& combine_mo,
-        const svec& Cations,
-        const svec& Anions,
-        const ivec& cmo1,
-        const ivec& cmo2,
-        const ivec& ECP_nrs,
-        const ivec& ECP_elcounts,
-        int ncpus,
-        double mem,
-        unsigned int mult,
-        bool debug,
-        const hkl_list& m_hkl_list,
-        std::ostream& log_file);
+            int threads,
+            int pbc,
+            double resolution,
+            double radius,
+            bool becke,
+            bool electron_diffraction,
+            bool ECP,
+            bool set_ECPs,
+            int ECP_mode,
+            bool calc,
+            bool eli,
+            bool esp,
+            bool elf,
+            bool lap,
+            bool rdg,
+            bool hdef,
+            bool def,
+            bool fract,
+            bool hirsh,
+            bool s_rho,
+            bool SALTED,
+            bool SALTED_NO_H,
+            bool SALTED_BECKE,
+            bool Olex2_1_3_switch,
+            bool iam_switch,
+            bool read_k_pts,
+            bool save_k_pts,
+            bool combined_tsc_calc,
+            bool binary_tsc,
+            bool cif_based_combined_tsc_calc,
+            bool density_test_cube,
+            bool no_date,
+            bool gbw2wfn,
+            bool old_tsc,
+            bool thakkar_d_plot,
+            bool spherical_harmonic,
+            bool ML_test,
+            double sfac_scan,
+            double sfac_diffuse,
+            double dmin,
+            int hirsh_number,
+            const ivec &MOs,
+            const ivec2 &groups,
+            const vec2 &twin_law,
+            const ivec2 &combined_tsc_groups,
+            bool all_mos,
+            bool test,
+            const std::string &wfn,
+            const std::string &fchk,
+            const std::string &basis_set,
+            const std::string &hkl,
+            const std::string &cif,
+            const std::string &method,
+            const std::string &xyz_file,
+            const std::string &coef_file,
+            const std::string &fract_name,
+            const svec &combined_tsc_calc_files,
+            const svec &combined_tsc_calc_cifs,
+            const std::string &wavename,
+            const std::string &gaussian_path,
+            const std::string &turbomole_path,
+            const std::string &basis_set_path,
+            const std::string &SALTED_DIR,
+            const svec &arguments,
+            const svec &combine_mo,
+            const svec &Cations,
+            const svec &Anions,
+            const ivec &cmo1,
+            const ivec &cmo2,
+            const ivec &ECP_nrs,
+            const ivec &ECP_elcounts,
+            int ncpus,
+            double mem,
+            unsigned int mult,
+            bool debug,
+            const hkl_list &m_hkl_list,
+            std::ostream &log_file);
 };
 
 const double gaussian_radial(primitive &p, double &r);
@@ -959,12 +965,12 @@ double hypergeometric(double a, double b, double c, double x);
 
 cdouble hypergeometric(double a, double b, double c, cdouble x);
 
-bool ends_with(const std::string& str, const std::string& suffix);
+bool ends_with(const std::string &str, const std::string &suffix);
 
-bool is_nan(double& in);
-bool is_nan(float& in);
-bool is_nan(long double& in);
-bool is_nan(cdouble& in);
+bool is_nan(double &in);
+bool is_nan(float &in);
+bool is_nan(long double &in);
+bool is_nan(cdouble &in);
 
 #include "wfn_class.h"
 #include "atoms.h"

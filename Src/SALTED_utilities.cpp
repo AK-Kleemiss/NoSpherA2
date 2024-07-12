@@ -2,15 +2,14 @@
 
 using namespace std;
 
-
 vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
 {
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
     {
         int lval = (sizes[i] - 1) / 2;
-        int st = (lval & 1) ? 1 : -1;;
-        ;
+        int st = (lval & 1) ? 1 : -1;
+
         cvec2 transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
         for (int j = 0; j < lval; j++)
         {
@@ -22,9 +21,9 @@ vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
         }
         transformed_matrix[lval][lval] = sqrt(2.0);
         // Divide each element by sqrt(2.0)
-        for (auto& row : transformed_matrix)
+        for (auto &row : transformed_matrix)
         {
-            for (auto& elem : row)
+            for (auto &elem : row)
             {
                 elem /= sqrt(2.0);
             }
@@ -34,11 +33,10 @@ vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
     return matrices;
 }
 
-
-int SALTED_Utils::get_lmax_max(unordered_map<string, int>& lmax)
+int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
 {
     int lmax_max = 0;
-    for (auto& [key, value] : lmax)
+    for (auto &[key, value] : lmax)
     {
         if (value > lmax_max)
         {
@@ -48,12 +46,12 @@ int SALTED_Utils::get_lmax_max(unordered_map<string, int>& lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(unordered_map<string, int>& lmax, unordered_map<string, int>& nmax, array<vector<primitive>, 35> basis_set, vector<string> species)
+void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 35> basis_set, vector<string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
 
-    for (auto& spe : species)
+    for (auto &spe : species)
     {
         int atom_index = get_Z_from_label(spe.c_str());
         // get the last element of the basis set for the given atom
@@ -71,10 +69,8 @@ void SALTED_Utils::set_lmax_nmax(unordered_map<string, int>& lmax, unordered_map
     }
 }
 
-
-
 // Function to filter out atoms that belong to species not available for the model selected
-std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string>& atomic_symbols, const std::vector<std::string>& species)
+std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species)
 {
     std::vector<std::string> filtered_symbols;
     std::set<std::string> excluded_species;
@@ -83,7 +79,7 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     std::set<std::string> species_set(species.begin(), species.end());
 
     // Find all species that are not in the input species set
-    for (const auto& symbol : atomic_symbols)
+    for (const auto &symbol : atomic_symbols)
     {
         if (species_set.find(symbol) == species_set.end())
         {
@@ -92,7 +88,7 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     }
 
     // Filter out excluded species from atomic_symbols
-    for (const auto& symbol : atomic_symbols)
+    for (const auto &symbol : atomic_symbols)
     {
         if (excluded_species.find(symbol) == excluded_species.end())
         {
@@ -103,9 +99,8 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     return filtered_symbols;
 }
 
-
-#if defined(_WIN32) || defined(__RASCALINE__)
-std::string Rascaline_Descriptors::to_json(const HyperParametersDensity& params)
+#if has_RAS
+std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 {
     std::ostringstream oss;
     oss << "{\n"
@@ -144,10 +139,10 @@ string Rascaline_Descriptors::gen_parameters()
     return json_string;
 }
 
-
 Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int nang, double atomic_gaussian_width,
-    double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
-    double center_atom_weight, double spline_accuracy, double cutoff_width) {
+                                             double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
+                                             double center_atom_weight, double spline_accuracy, double cutoff_width)
+{
     this->filepath = filepath;
     this->nrad = nrad;
     this->nang = nang;
@@ -168,15 +163,15 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
     // Construct the parameters for the calculator from the inputs given
     string temp_p = gen_parameters();
-    const char* parameters = temp_p.c_str();
+    const char *parameters = temp_p.c_str();
 
     // size_t nspe1 = neighspe.size();
     std::vector<std::vector<int32_t>> keys_array;
     for (int l = 0; l < this->nang + 1; ++l)
     {
-        for (const std::string& specen : this->species)
+        for (const std::string &specen : this->species)
         {
-            for (const std::string& speneigh : this->neighspe)
+            for (const std::string &speneigh : this->neighspe)
             {
                 // Directly emplace back initializer_lists into keys_array
                 keys_array.emplace_back(std::vector<int32_t>{l, 1, get_Z_from_label(specen.c_str()) + 1, get_Z_from_label(speneigh.c_str()) + 1});
@@ -186,13 +181,13 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 
     // Assuming metatensor::Labels expects a flat sequence of integers for each label
     std::vector<int32_t> flattened_keys;
-    for (const auto& subVector : keys_array)
+    for (const auto &subVector : keys_array)
     {
         flattened_keys.insert(flattened_keys.end(), subVector.begin(), subVector.end());
     }
 
     // Convert keys_array to rascaline::Labels
-    std::vector<std::string> names = { "o3_lambda", "o3_sigma", "center_type", "neighbor_type" };
+    std::vector<std::string> names = {"o3_lambda", "o3_sigma", "center_type", "neighbor_type"};
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
     // create the calculator with its name and parameters
@@ -217,10 +212,10 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buffer)
 {
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    vector<vector<vector<vector<complex<double>>>>> omega(this->nang + 1, vector<vector<vector<complex<double>>>>(this->n_atoms, vector<vector<complex<double>>>(2 * this->nang + 1, vector<complex<double>>(this->nspe * this->nrad, { 0.0, 0.0 }))));
+    vector<vector<vector<vector<complex<double>>>>> omega(this->nang + 1, vector<vector<vector<complex<double>>>>(this->n_atoms, vector<vector<complex<double>>>(2 * this->nang + 1, vector<complex<double>>(this->nspe * this->nrad, {0.0, 0.0}))));
     for (int l = 0; l < nang + 1; ++l)
     {
-        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ (2 * l) + 1 })[0];
+        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];
         metatensor::TensorBlock descriptor_block = descriptor.block_by_id(l);
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
@@ -262,7 +257,7 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buf
 
 cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
 {
-	
+
     metatensor::TensorMap descriptor = get_feats_projs();
     std::vector<uint8_t> descriptor_buffer = descriptor.save_buffer();
     return get_expansion_coeffs(descriptor_buffer);

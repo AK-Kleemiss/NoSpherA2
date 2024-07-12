@@ -71,7 +71,7 @@ string NoSpherA2_message()
     t.append("      Alessandro Genoni,\n");
     t.append("      Lukas Seifert,\n");
     t.append("      and many more in communications or by feedback!\n");
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
     t.append("NoSpherA2 uses Rascaline, Metatensor and the HDF5 library.\n");
     t.append("Please see, respectively:\n");
     t.append("   https://github.com/Luthaf/rascaline\n");
@@ -2855,7 +2855,8 @@ void options::digest_options()
             dmin = stod(arguments[i + 1]);
         else if (temp == "-d")
             basis_set_path = arguments[i + 1];
-        else if (temp == "-dipole_moments") {
+        else if (temp == "-dipole_moments")
+        {
             dipole_moments(*this);
             exit(0);
         }
@@ -3581,18 +3582,18 @@ void write_timing_to_file(std::ostream &file,
         file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
-void write_timing_to_file(std::ostream& file,
-    time_point start,
-    time_point end,
-    time_point end_SALTED,
-    time_point end_prototypes,
-    time_point end_becke,
-    time_point end_spherical,
-    time_point end_prune,
-    time_point end_aspherical,
-    time_point before_kpts,
-    time_point after_kpts,
-    time_point end1)
+void write_timing_to_file(std::ostream &file,
+                          time_point start,
+                          time_point end,
+                          time_point end_SALTED,
+                          time_point end_prototypes,
+                          time_point end_becke,
+                          time_point end_spherical,
+                          time_point end_prune,
+                          time_point end_aspherical,
+                          time_point before_kpts,
+                          time_point after_kpts,
+                          time_point end1)
 {
     // writes the timing of different things to a file
     using namespace std;
@@ -3680,7 +3681,7 @@ void write_timing_to_file(std::ostream& file,
         file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
 }
 
-void remove_empty_elements(svec& input, const std::string& empty)
+void remove_empty_elements(svec &input, const std::string &empty)
 {
     for (int i = (int)input.size() - 1; i >= 0; i--)
         if (input[i] == empty || input[i] == "")

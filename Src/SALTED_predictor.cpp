@@ -2,7 +2,8 @@
 
 using namespace std;
 
-SALTEDPredictor::SALTEDPredictor(const WFN& wavy_in, const options& opt_in) : wavy(wavy_in), opt(opt_in) {
+SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wavy(wavy_in), opt(opt_in)
+{
     string _f_path("inputs.txt");
     string _path = opt_in.SALTED_DIR;
     join_path(_path, _f_path);
@@ -10,26 +11,27 @@ SALTEDPredictor::SALTEDPredictor(const WFN& wavy_in, const options& opt_in) : wa
     this->config.predict_filename = wavy_in.get_path();
 }
 
-
-void SALTEDPredictor::setup_atomic_environment() {
-	SALTED_Utils::set_lmax_nmax(this->lmax, this->nmax, QZVP_JKfit, this->config.species);
+void SALTEDPredictor::setup_atomic_environment()
+{
+    SALTED_Utils::set_lmax_nmax(this->lmax, this->nmax, QZVP_JKfit, this->config.species);
 
     for (int i = 0; i < this->wavy.atoms.size(); i++)
     {
         this->atomic_symbols.push_back(this->wavy.atoms[i].label);
     }
-    //# Define system excluding atoms that belong to species not listed in SALTED input
+    // # Define system excluding atoms that belong to species not listed in SALTED input
     this->atomic_symbols = SALTED_Utils::filter_species(this->atomic_symbols, this->config.species);
 
-    //Print all Atomic symbols
-    if (this->opt.debug){
-		cout << "Atomic symbols: ";
-		for (const auto& symbol : atomic_symbols) {
-			cout << symbol << " ";
-		}
-		cout << endl;
-	}
-
+    // Print all Atomic symbols
+    if (this->opt.debug)
+    {
+        cout << "Atomic symbols: ";
+        for (const auto &symbol : atomic_symbols)
+        {
+            cout << symbol << " ";
+        }
+        cout << endl;
+    }
 
     this->natoms = static_cast<int>(this->atomic_symbols.size());
     for (int i = 0; i < this->atomic_symbols.size(); i++)
@@ -39,7 +41,7 @@ void SALTEDPredictor::setup_atomic_environment() {
     }
 
     // RASCALINE (Generate descriptors)
-#if defined(_WIN32) || defined(__RASCALINE__)
+#if has_RAS
     v1 = Rascaline_Descriptors(this->config.predict_filename, this->config.nrad1, this->config.nang1, this->config.sig1, this->config.rcut1, this->natoms, this->config.neighspe1, this->config.species).calculate_expansion_coeffs();
     v2 = Rascaline_Descriptors(this->config.predict_filename, this->config.nrad2, this->config.nang2, this->config.sig2, this->config.rcut2, this->natoms, this->config.neighspe2, this->config.species).calculate_expansion_coeffs();
 #else
@@ -48,7 +50,8 @@ void SALTEDPredictor::setup_atomic_environment() {
     // END RASCALINE
 }
 
-void SALTEDPredictor::read_model_data(){
+void SALTEDPredictor::read_model_data()
+{
     // Define zeta as a string with one decimal
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << this->config.zeta;
@@ -77,14 +80,13 @@ void SALTEDPredictor::read_model_data(){
     features.close();
     projectors.close();
 
-    
     if (config.sparsify)
     {
         this->vfps = read_fps<int64_t>(this->opt.SALTED_DIR + "/GPR_data/fps" + to_string(this->config.ncut) + "-", SALTED_Utils::get_lmax_max(this->lmax));
     };
 
     int ntrain = static_cast<int>(config.Ntrain * config.trainfrac);
-    
+
     if (config.field)
     {
         cout << "Field" << endl;
@@ -162,7 +164,7 @@ vec SALTEDPredictor::predict()
 
     unordered_map<string, vec2> psi_nm{};
 
-    for (const string& spe : this->config.species)
+    for (const string &spe : this->config.species)
     {
         if (this->atom_idx.find(spe) == this->atom_idx.end())
         {
@@ -216,7 +218,7 @@ vec SALTEDPredictor::predict()
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
-    for (const string& spe : this->config.species)
+    for (const string &spe : this->config.species)
     {
         if (this->atom_idx.find(spe) == this->atom_idx.end())
         {
@@ -306,14 +308,16 @@ vec SALTEDPredictor::predict()
     return pred_coefs;
 }
 
-vec SALTEDPredictor::gen_SALTED_densities(time_point& start, time_point& end_SALTED) {
+vec SALTEDPredictor::gen_SALTED_densities(time_point &start, time_point &end_SALTED)
+{
     // Run generation of tsc file
     this->setup_atomic_environment();
     this->read_model_data();
     vec coefs = this->predict();
 
     end_SALTED = get_time();
-    if (this->opt.debug) {
+    if (this->opt.debug)
+    {
         long long int dur = get_sec(start, end_SALTED);
         cout << "Finished ML Density Prediction!" << endl;
         if (dur < 1)
@@ -323,11 +327,12 @@ vec SALTEDPredictor::gen_SALTED_densities(time_point& start, time_point& end_SAL
 
         cout << "Number of coefficients: " << coefs.size() << endl;
 
-        if (this->opt.wfn == string("test_cysteine.xyz") || this->opt.wfn == string("test_sucrose.xyz")) {
+        if (this->opt.wfn == string("test_cysteine.xyz") || this->opt.wfn == string("test_sucrose.xyz"))
+        {
             vector<unsigned long> shape{};
             bool fortran_order;
             vec ref_coefs{};
-            //Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
+            // Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
             if (this->opt.wfn == string("test_sucrose.xyz"))
                 npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
             else
@@ -338,14 +343,16 @@ vec SALTEDPredictor::gen_SALTED_densities(time_point& start, time_point& end_SAL
             for (int i = 0; i < coefs.size(); i++)
             {
                 diff += abs(coefs[i] - ref_coefs[i]);
-                if (abs(coefs[i] - ref_coefs[i]) > 1e-4) {
+                if (abs(coefs[i] - ref_coefs[i]) > 1e-4)
+                {
                     cout << "Difference in coef " << fixed << setprecision(3) << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
                 }
                 diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
             }
             cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
             cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
-            if (diff > 0.1) {
+            if (diff > 0.1)
+            {
                 cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
                 exit(1);
             }
