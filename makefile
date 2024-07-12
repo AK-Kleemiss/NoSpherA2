@@ -10,8 +10,25 @@ else
   endif
 endif
 
-all:
-	@echo "I think this is $(NAME)"
+all: NoSpherA2
+
+NoSpherA2_Rascaline:
+	@echo "Building NoSpherA2_Rascaline for $(NAME)"
+ifeq ($(NAME),WINDOWS)
+	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
+endif
+ifeq ($(NAME),LINUX)
+	@echo "Start making Linux executable for NoSpherA2_Rascaline"
+	rm -f NoSpherA2_Rascaline
+	cd Linux && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline
+endif
+ifeq ($(NAME),MAC)
+	@echo "Start making Mac executable for NoSpherA2_Rascaline"
+	cd Mac && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline
+endif
+
+NoSpherA2:
+	@echo "Building NoSpherA2 for $(NAME)"
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
 endif
@@ -30,4 +47,4 @@ test:
 tests: 
 	cd tests && make all -k -B
 
-.PHONY: test tests
+.PHONY: test tests NoSpherA2_Rascaline

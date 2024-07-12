@@ -8,7 +8,7 @@ LIBRASCALINE += ../Lib/libmetatensor.a
 LIBHDF5 := ../Lib/libhdf5.a
 LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
-all: clean NoSpherA2 
+all: NoSpherA2 
 
 OBJS := unity.o
 CPP_DEPS := unity.d
@@ -41,7 +41,7 @@ hdf5.o: ../Src/hdf5.cpp
 	g++ ${GCC_OPTS} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-NoSpherA2_rascaline: unity_rasc.o hdf5.o SALTED.o
+NoSpherA2_Rascaline: unity_rasc.o hdf5.o SALTED.o
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2_rascaline" unity_rasc.o hdf5.o SALTED.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
 	${RM} unity_rasc.o hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d
