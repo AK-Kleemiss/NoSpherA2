@@ -64,7 +64,7 @@ string NoSpherA2_message()
     t.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
     t.append("                /_/\n");
     t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
-    t.append("Please give credit and cite corresponding pieces!\n");
+    t.append("Please give credit and cite corresponding pieces!\nThis Software is published with BSD-2 clause library.\n");
     t.append("List of contributors of pieces of code or funcitonality:\n");
     t.append("      Florian Kleemiss,\n");
     t.append("      Emmanuel Hupf,\n");
@@ -72,10 +72,12 @@ string NoSpherA2_message()
     t.append("      Lukas Seifert,\n");
     t.append("      and many more in communications or by feedback!\n");
 #if has_RAS
-    t.append("NoSpherA2 uses Rascaline, Metatensor and the HDF5 library.\n");
+    t.append("NoSpherA2 uses Rascaline, Metatensor, OpenBLAS and the HDF5 library.\n");
+    t.append("The used packages are published under BSD-3 clause License.\n");
     t.append("Please see, respectively:\n");
     t.append("   https://github.com/Luthaf/rascaline\n");
     t.append("   https://github.com/lab-cosmo/metatensor\n");
+    t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
     t.append("   https://github.com/HDFGroup/hdf5\n");
 #endif
     t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
