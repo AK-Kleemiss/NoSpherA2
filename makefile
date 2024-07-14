@@ -20,11 +20,11 @@ endif
 ifeq ($(NAME),LINUX)
 	@echo "Start making Linux executable for NoSpherA2_Rascaline"
 	rm -f NoSpherA2_Rascaline
-	cd Linux && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline
+	cd Linux && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline -j
 endif
 ifeq ($(NAME),MAC)
 	@echo "Start making Mac executable for NoSpherA2_Rascaline"
-	cd Mac && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline
+	cd Mac && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline -j
 endif
 
 NoSpherA2:
