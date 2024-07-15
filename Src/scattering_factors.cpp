@@ -2760,7 +2760,6 @@ static int make_integration_grids_SALTED(
                                    total_grid[2][i],
                                    coefs,
                                    temp.atoms,
-                                   exp_coefs,
                                    asym_atom_list[i]) *
                                total_grid[3][p];
             atom_els[i] += total_grid[4][p];
