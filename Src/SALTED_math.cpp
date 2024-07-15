@@ -1,11 +1,11 @@
 #include "SALTED_math.h"
+#ifdef _WIN32
+#include "DLL_Helper.h"
+#endif
 #if has_RAS
 #include "cblas.h"
 #endif
 #include <cassert>
-#ifdef _WIN32
-#include <windows.h>
-#endif
 
 using namespace std;
 

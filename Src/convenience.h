@@ -268,6 +268,13 @@ namespace constants
     constexpr double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
     constexpr double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
 
+    constexpr size_t sod = sizeof(double);
+    constexpr size_t soi = sizeof(int);
+    constexpr size_t soc = sizeof(char);
+    constexpr size_t sob = sizeof(bool);
+    constexpr size_t socd = sizeof(cdouble);
+    constexpr size_t soli = sizeof(long int);
+
     inline const long long int ft_fun(const int &nr)
     {
         if (nr >= 0 && nr <= 20)

@@ -186,6 +186,9 @@
     <ClCompile Include="..\Src\SALTED_predictor.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\DLL_Helper.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -970,6 +973,9 @@
     </ClInclude>
     <ClInclude Include="..\Src\SALTED_predictor.h">
       <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\DLL_Helper.h">
+      <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

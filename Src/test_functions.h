@@ -735,9 +735,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 void add_ECP_contribution_test(const ivec &asym_atom_list,
                                const WFN &wave,
                                cvec2 &sf,
-                               vec2 &k_pt,
-                               std::ostream &file,
-                               const bool debug)
+                               vec2 &k_pt)
 {
     double k = 1.0;
     // Using a Thakkar core density
@@ -1268,16 +1266,12 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
         asym_atom_list,
         wavy[0],
         sf2,
-        k_pt,
-        log_file,
-        opt.debug);
+        k_pt);
     add_ECP_contribution_test(
         aal_def2,
         wavy[1],
         sf2_def2,
-        k_pt,
-        log_file,
-        opt.debug);
+        k_pt);
     log_file << "done adding ECP contribution" << endl;
     log_file << "Calculating sfacs..." << endl;
     vec thakkar_sfac(k_pt[0].size());
@@ -1564,7 +1558,7 @@ double s_value(double *d)
 
 double one(double *d)
 {
-    return 1;
+    return 1.;
 }
 
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
