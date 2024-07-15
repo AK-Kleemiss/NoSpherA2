@@ -327,13 +327,13 @@ void sfac_scan(options &opt, std::ostream &log_file)
     {
         for (int p = 0; p < phi_size; p++)
         {
-            for (int t = 0; t < theta_size; t++)
+            for (int _t = 0; _t < theta_size; _t++)
             {
-                int ind = t + (p + (ref - 1) * phi_size) * theta_size;
+                int ind = _t + (p + (ref - 1) * phi_size) * theta_size;
                 double k_length = constants::bohr2ang(constants::FOUR_PI * ref / size * opt.d_sfac_scan);
-                k_pt[0][ind] = k_length * sin(t * theta_step) * cos(p * phi_step);
-                k_pt[1][ind] = k_length * sin(t * theta_step) * sin(p * phi_step);
-                k_pt[2][ind] = k_length * cos(t * theta_step);
+                k_pt[0][ind] = k_length * sin(_t * theta_step) * cos(p * phi_step);
+                k_pt[1][ind] = k_length * sin(_t * theta_step) * sin(p * phi_step);
+                k_pt[2][ind] = k_length * cos(_t * theta_step);
                 k_pt[3][ind] = k_length;
             }
         }
@@ -597,8 +597,7 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
     return new_result;
 }
 
-cdouble calc_spherically_averaged_at_k(const WFN &wavy,
-                                       vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
+cdouble calc_spherically_averaged_at_k(vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
                                        const double &k,
                                        const double rel_precision = 1E-4,
                                        const double start_angle = 5.0,
@@ -1394,9 +1393,9 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
                     i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
 
                 if (atom == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef));
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms));
                 else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, exp_coef, atom));
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
             }
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(CubeRho.get_size(0)));
@@ -1556,7 +1555,7 @@ double s_value(double *d)
     return pow(gaussian_radial(p_0, d[3]) * spherical_harmonic(p_0.type, m, d), 2);
 }
 
-double one(double *d)
+double one()
 {
     return 1.;
 }
@@ -1646,71 +1645,71 @@ void test_core_dens()
     dat_out.close();
     exit(0);
 
-    Thakkar T_Rb(37);
-    string base = "def2-ECP";
-    Gaussian_Atom G_Rb(37, base);
-    WFN ECP_way(9);
-    ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
-
-    WFN multi_ecp_wavy(9);
-    multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
-
-    WFN wavy(9);
-    wavy.read_gbw("Rb.gbw", out, false);
-    wavy.delete_unoccupied_MOs();
-    WFN wavy2(9);
-    wavy2.read_gbw("Rb.gbw", cout, false);
-    wavy2.delete_unoccupied_MOs();
-    wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
-    wavy2.pop_back_MO();
-    wavy2.pop_back_MO();
-    wavy2.pop_back_MO();
-    wavy2.pop_back_MO();
-
-    WFN wavy3(9);
-    wavy3.read_gbw("Rb_QZVP.gbw", out, false);
-    wavy3.delete_unoccupied_MOs();
-    WFN wavy4(9);
-    wavy4.read_gbw("Rb_QZVP.gbw", cout, false);
-    wavy4.delete_unoccupied_MOs();
-    wavy4.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
-    wavy4.pop_back_MO();
-    wavy4.pop_back_MO();
-    wavy4.pop_back_MO();
-    wavy4.pop_back_MO();
-
-#pragma omp parallel for
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        double r, sr;
-        r = i * 0.001;
-        sr = r * 0.01;
-        res[0][i] = r;
-        res[1][i] = T_Rb.get_core_form_factor(r, 28);
-        res[2][i] = G_Rb.get_core_form_factor(r, 28);
-        res[3][i] = T_Rb.get_core_density(sr, 28);
-        res[4][i] = G_Rb.get_radial_density(sr);
-        res[5][i] = T_Rb.get_radial_density(sr);
-        res[6][i] = wavy.compute_dens(sr, 0, 0);
-        res[7][i] = wavy2.compute_dens(sr, 0, 0);
-        res[8][i] = sr;
-        res[9][i] = ECP_way.compute_dens(sr, 0, 0);
-        res[10][i] = wavy3.compute_dens(sr, 0, 0);
-        res[11][i] = wavy4.compute_dens(sr, 0, 0);
-    }
-    dat_out << fixed;
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < res.size(); j++)
-        {
-            auto t = res[j][i];
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
+//    Thakkar T_Rb(37);
+//    string base = "def2-ECP";
+//    Gaussian_Atom G_Rb(37, base);
+//    WFN ECP_way(9);
+//    ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
+//
+//    WFN multi_ecp_wavy(9);
+//    multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
+//
+//    WFN wavy(9);
+//    wavy.read_gbw("Rb.gbw", out, false);
+//    wavy.delete_unoccupied_MOs();
+//    WFN wavy2(9);
+//    wavy2.read_gbw("Rb.gbw", cout, false);
+//    wavy2.delete_unoccupied_MOs();
+//    wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
+//    wavy2.pop_back_MO();
+//    wavy2.pop_back_MO();
+//    wavy2.pop_back_MO();
+//    wavy2.pop_back_MO();
+//
+//    WFN wavy3(9);
+//    wavy3.read_gbw("Rb_QZVP.gbw", out, false);
+//    wavy3.delete_unoccupied_MOs();
+//    WFN wavy4(9);
+//    wavy4.read_gbw("Rb_QZVP.gbw", cout, false);
+//    wavy4.delete_unoccupied_MOs();
+//    wavy4.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
+//    wavy4.pop_back_MO();
+//    wavy4.pop_back_MO();
+//    wavy4.pop_back_MO();
+//    wavy4.pop_back_MO();
+//
+//#pragma omp parallel for
+//    for (int i = 0; i < res[0].size(); i++)
+//    {
+//        double r, sr;
+//        r = i * 0.001;
+//        sr = r * 0.01;
+//        res[0][i] = r;
+//        res[1][i] = T_Rb.get_core_form_factor(r, 28);
+//        res[2][i] = G_Rb.get_core_form_factor(r, 28);
+//        res[3][i] = T_Rb.get_core_density(sr, 28);
+//        res[4][i] = G_Rb.get_radial_density(sr);
+//        res[5][i] = T_Rb.get_radial_density(sr);
+//        res[6][i] = wavy.compute_dens(sr, 0, 0);
+//        res[7][i] = wavy2.compute_dens(sr, 0, 0);
+//        res[8][i] = sr;
+//        res[9][i] = ECP_way.compute_dens(sr, 0, 0);
+//        res[10][i] = wavy3.compute_dens(sr, 0, 0);
+//        res[11][i] = wavy4.compute_dens(sr, 0, 0);
+//    }
+//    dat_out << fixed;
+//    for (int i = 0; i < res[0].size(); i++)
+//    {
+//        for (int j = 0; j < res.size(); j++)
+//        {
+//            auto t = res[j][i];
+//            dat_out << t;
+//            dat_out << " ";
+//        }
+//        dat_out << "\n";
+//    }
+//    dat_out << flush;
+//    dat_out.close();
 }
 
 void test_core_dens_corrected(double &precisison, int ncpus = 4)
@@ -1948,9 +1947,9 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
         res[0][i] = sr;
         res[1][i] = T_Au.get_core_form_factor(sr, 60);
         res[2][i] = T_Au.get_form_factor(sr);
-        res[3][i] = calc_spherically_averaged_at_k(ECP_way_Au, d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
-        res[4][i] = calc_spherically_averaged_at_k(wavy_full_Au, d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
-        res[5][i] = calc_spherically_averaged_at_k(wavy_val_Au, d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0, true);
+        res[3][i] = calc_spherically_averaged_at_k(d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
+        res[4][i] = calc_spherically_averaged_at_k(d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
+        res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0, true);
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(upper));
     }

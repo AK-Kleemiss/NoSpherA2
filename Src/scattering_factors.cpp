@@ -2049,8 +2049,7 @@ static int make_hirshfeld_grids_ML(
                 total_grid[1][i],
                 total_grid[2][i],
                 coefs,
-                temp.atoms,
-                exp_coefs);
+                temp.atoms);
         }
         shrink_vector<double>(coefs);
     }
@@ -2424,8 +2423,7 @@ static int make_integration_grids(
             total_grid[1][i],
             total_grid[2][i],
             coefs,
-            temp.atoms,
-            exp_coefs);
+            temp.atoms);
     }
     shrink_vector<double>(coefs);
 

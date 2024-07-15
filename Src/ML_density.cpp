@@ -43,7 +43,7 @@ void ML_density::calc_cube(
 				if (skip)
 					continue;
 
-				CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, wavy.atoms, exp_coef));
+				CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, wavy.atoms));
 			}
 		if (i != 0 && i % step == 0)
 			progress->write((i + CubeRho.get_size(0)) / double(CubeRho.get_size(0) * 3));

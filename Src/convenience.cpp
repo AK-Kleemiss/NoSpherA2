@@ -544,13 +544,10 @@ options::options(int accuracy,
                  bool combined_tsc_calc,
                  bool binary_tsc,
                  bool cif_based_combined_tsc_calc,
-                 bool density_test_cube,
                  bool no_date,
                  bool gbw2wfn,
                  bool old_tsc,
                  bool thakkar_d_plot,
-                 bool spherical_harmonic,
-                 bool ML_test,
                  double sfac_scan,
                  double sfac_diffuse,
                  double dmin,
@@ -585,7 +582,6 @@ options::options(int accuracy,
                  const ivec &cmo2,
                  const ivec &ECP_nrs,
                  const ivec &ECP_elcounts,
-                 int ncpus,
                  double mem,
                  unsigned int mult,
                  bool debug,
@@ -2521,8 +2517,7 @@ const double calc_density_ML(double &x,
                              double &y,
                              double &z,
                              vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs)
+                             std::vector<atom> &atoms)
 {
     double dens = 0, radial = 0;
     int coef_counter = 0;
@@ -2576,7 +2571,6 @@ const double calc_density_ML(double &x,
                              double &z,
                              vec &coefficients,
                              std::vector<atom> &atoms,
-                             const int &exp_coefs,
                              const int &atom_nr)
 {
     double dens = 0, radial = 0;
@@ -2619,7 +2613,6 @@ const double calc_density_ML(double &x,
             }
         }
     }
-    err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
 }
 
@@ -3008,7 +3001,6 @@ void options::digest_options()
         else if (temp == "-perf_benchmark")
         {
             test_timing();
-            exit(0);
         }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
@@ -3088,7 +3080,6 @@ void options::digest_options()
         else if (temp == "-test-core")
         {
             test_core_dens();
-            exit(0);
         }
         else if (temp == "-test")
             cout << "Running in test mode!" << endl, test = true;

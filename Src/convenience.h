@@ -878,13 +878,10 @@ struct options
             bool combined_tsc_calc,
             bool binary_tsc,
             bool cif_based_combined_tsc_calc,
-            bool density_test_cube,
             bool no_date,
             bool gbw2wfn,
             bool old_tsc,
             bool thakkar_d_plot,
-            bool spherical_harmonic,
-            bool ML_test,
             double sfac_scan,
             double sfac_diffuse,
             double dmin,
@@ -919,7 +916,6 @@ struct options
             const ivec &cmo2,
             const ivec &ECP_nrs,
             const ivec &ECP_elcounts,
-            int ncpus,
             double mem,
             unsigned int mult,
             bool debug,
@@ -933,14 +929,12 @@ const double calc_density_ML(double &x,
                              double &y,
                              double &z,
                              vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs);
+                             std::vector<atom> &atoms);
 const double calc_density_ML(double &x,
                              double &y,
                              double &z,
                              vec &coefficients,
                              std::vector<atom> &atoms,
-                             const int &exp_coefs,
                              const int &atom_nr);
 
 int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 35> &b);

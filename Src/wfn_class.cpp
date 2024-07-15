@@ -5151,160 +5151,160 @@ const double WFN::compute_dens_spherical(
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
     return 0.0;
 
-    err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
-    std::fill(phi.begin(), phi.end(), 0.0);
-    double Rho = 0.0;
-    int iat;
-    int l;
-    // ex will carry information about radial function
-    double ex;
-    int mo;
+    //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
+    //std::fill(phi.begin(), phi.end(), 0.0);
+    //double Rho = 0.0;
+    //int iat;
+    //int l;
+    //// ex will carry information about radial function
+    //double ex;
+    //int mo;
 
-    for (iat = 0; iat < ncen; iat++)
-    {
-        d[0][iat] = Pos1 - atoms[iat].x;
-        d[1][iat] = Pos2 - atoms[iat].y;
-        d[2][iat] = Pos3 - atoms[iat].z;
-        d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
-        d[4][iat] = sqrt(d[3][iat]);
-    }
-    /*Here d[0] = x
-                 d[1] = y
-                 d[2] = z
-                 d[3] = r^2
-                 d[4] = r
-                 */
-    for (int j = 0; j < nex; j++)
-    {
-        iat = centers[j] - 1;
-        ex = -exponents[j] * d[3][iat];
-        if (ex < -46.0517)
-        { // corresponds to cutoff of ex ~< 1E-20
-            continue;
-        }
-        ex = exp(ex);
-        // apply radial function:
-        l = types[j];
-        int lam = 0, m = 0;
-        if (l > 1)
-        {
-            if (l <= 4)
-            {
-                ex *= d[4][iat];
-                lam = 1;
-                if (l == 2)
-                    m = 0;
-                else if (l == 3)
-                    m = 1;
-                else if (l == 4)
-                    m = -1;
-            }
-            else if (l <= 9)
-            {
-                ex *= d[3][iat];
-                lam = 2;
-                if (l == 5)
-                    m = 0;
-                else if (l == 6)
-                    m = 1;
-                else if (l == 7)
-                    m = -1;
-                else if (l == 8)
-                    m = 2;
-                else if (l == 9)
-                    m = -2;
-            }
-            else if (l <= 16)
-            {
-                ex *= d[3][iat] * d[4][iat];
-                lam = 3;
-                if (l == 10)
-                    m = 0;
-                else if (l == 11)
-                    m = 1;
-                else if (l == 12)
-                    m = -1;
-                else if (l == 13)
-                    m = 2;
-                else if (l == 14)
-                    m = -2;
-                else if (l == 15)
-                    m = 3;
-                else if (l == 16)
-                    m = -3;
-            }
-            else if (l <= 25)
-            {
-                ex *= d[3][iat] * d[3][iat];
-                lam = 4;
-                if (l == 17)
-                    m = 0;
-                else if (l == 18)
-                    m = 1;
-                else if (l == 19)
-                    m = -1;
-                else if (l == 20)
-                    m = 2;
-                else if (l == 21)
-                    m = -2;
-                else if (l == 22)
-                    m = 3;
-                else if (l == 23)
-                    m = -3;
-                else if (l == 24)
-                    m = 4;
-                else if (l == 25)
-                    m = -4;
-            }
-            else if (l <= 36)
-            {
-                ex *= pow(d[4][iat], 5);
-                lam = 5;
-                if (l == 26)
-                    m = 0;
-                else if (l == 27)
-                    m = 1;
-                else if (l == 28)
-                    m = -1;
-                else if (l == 29)
-                    m = 2;
-                else if (l == 30)
-                    m = -2;
-                else if (l == 31)
-                    m = 3;
-                else if (l == 32)
-                    m = -3;
-                else if (l == 33)
-                    m = 4;
-                else if (l == 34)
-                    m = -4;
-                else if (l == 35)
-                    m = 5;
-                else if (l == 36)
-                    m = -5;
-            }
-        }
-        double d_t[]{d[0][iat], d[1][iat], d[2][iat], d[3][iat], d[4][iat]};
-        double SH = spherical_harmonic(lam, m, d_t);
-        SH *= ex; // multiply radial part with spherical harmonic
-        auto run = phi.data();
-        auto run2 = MOs.data();
-        for (mo = 0; mo < phi.size(); mo++)
-        {
-            *run += (*run2).get_coefficient_f(j) * SH; // build MO values at this point
-            run++, run2++;
-        }
-    }
+    //for (iat = 0; iat < ncen; iat++)
+    //{
+    //    d[0][iat] = Pos1 - atoms[iat].x;
+    //    d[1][iat] = Pos2 - atoms[iat].y;
+    //    d[2][iat] = Pos3 - atoms[iat].z;
+    //    d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
+    //    d[4][iat] = sqrt(d[3][iat]);
+    //}
+    ///*Here d[0] = x
+    //             d[1] = y
+    //             d[2] = z
+    //             d[3] = r^2
+    //             d[4] = r
+    //             */
+    //for (int j = 0; j < nex; j++)
+    //{
+    //    iat = centers[j] - 1;
+    //    ex = -exponents[j] * d[3][iat];
+    //    if (ex < -46.0517)
+    //    { // corresponds to cutoff of ex ~< 1E-20
+    //        continue;
+    //    }
+    //    ex = exp(ex);
+    //    // apply radial function:
+    //    l = types[j];
+    //    int lam = 0, m = 0;
+    //    if (l > 1)
+    //    {
+    //        if (l <= 4)
+    //        {
+    //            ex *= d[4][iat];
+    //            lam = 1;
+    //            if (l == 2)
+    //                m = 0;
+    //            else if (l == 3)
+    //                m = 1;
+    //            else if (l == 4)
+    //                m = -1;
+    //        }
+    //        else if (l <= 9)
+    //        {
+    //            ex *= d[3][iat];
+    //            lam = 2;
+    //            if (l == 5)
+    //                m = 0;
+    //            else if (l == 6)
+    //                m = 1;
+    //            else if (l == 7)
+    //                m = -1;
+    //            else if (l == 8)
+    //                m = 2;
+    //            else if (l == 9)
+    //                m = -2;
+    //        }
+    //        else if (l <= 16)
+    //        {
+    //            ex *= d[3][iat] * d[4][iat];
+    //            lam = 3;
+    //            if (l == 10)
+    //                m = 0;
+    //            else if (l == 11)
+    //                m = 1;
+    //            else if (l == 12)
+    //                m = -1;
+    //            else if (l == 13)
+    //                m = 2;
+    //            else if (l == 14)
+    //                m = -2;
+    //            else if (l == 15)
+    //                m = 3;
+    //            else if (l == 16)
+    //                m = -3;
+    //        }
+    //        else if (l <= 25)
+    //        {
+    //            ex *= d[3][iat] * d[3][iat];
+    //            lam = 4;
+    //            if (l == 17)
+    //                m = 0;
+    //            else if (l == 18)
+    //                m = 1;
+    //            else if (l == 19)
+    //                m = -1;
+    //            else if (l == 20)
+    //                m = 2;
+    //            else if (l == 21)
+    //                m = -2;
+    //            else if (l == 22)
+    //                m = 3;
+    //            else if (l == 23)
+    //                m = -3;
+    //            else if (l == 24)
+    //                m = 4;
+    //            else if (l == 25)
+    //                m = -4;
+    //        }
+    //        else if (l <= 36)
+    //        {
+    //            ex *= pow(d[4][iat], 5);
+    //            lam = 5;
+    //            if (l == 26)
+    //                m = 0;
+    //            else if (l == 27)
+    //                m = 1;
+    //            else if (l == 28)
+    //                m = -1;
+    //            else if (l == 29)
+    //                m = 2;
+    //            else if (l == 30)
+    //                m = -2;
+    //            else if (l == 31)
+    //                m = 3;
+    //            else if (l == 32)
+    //                m = -3;
+    //            else if (l == 33)
+    //                m = 4;
+    //            else if (l == 34)
+    //                m = -4;
+    //            else if (l == 35)
+    //                m = 5;
+    //            else if (l == 36)
+    //                m = -5;
+    //        }
+    //    }
+    //    double d_t[]{d[0][iat], d[1][iat], d[2][iat], d[3][iat], d[4][iat]};
+    //    double SH = spherical_harmonic(lam, m, d_t);
+    //    SH *= ex; // multiply radial part with spherical harmonic
+    //    auto run = phi.data();
+    //    auto run2 = MOs.data();
+    //    for (mo = 0; mo < phi.size(); mo++)
+    //    {
+    //        *run += (*run2).get_coefficient_f(j) * SH; // build MO values at this point
+    //        run++, run2++;
+    //    }
+    //}
 
-    auto run = phi.data();
-    auto run2 = MOs.data();
-    for (mo = 0; mo < phi.size(); mo++)
-    {
-        Rho += (*run2).get_occ() * pow(*run, 2);
-        run++, run2++;
-    }
+    //auto run = phi.data();
+    //auto run2 = MOs.data();
+    //for (mo = 0; mo < phi.size(); mo++)
+    //{
+    //    Rho += (*run2).get_occ() * pow(*run, 2);
+    //    run++, run2++;
+    //}
 
-    return Rho;
+    //return Rho;
 }
 
 void WFN::pop_back_MO()

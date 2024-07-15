@@ -771,11 +771,8 @@ void Calc_Rho_spherical_harmonics(
     progress_bar *progress = new progress_bar{file, 50u, "Calculating Rho"};
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
-    // #pragma omp parallel shared(CubeRho)
+#pragma omp parallel shared(CubeRho) num_threads(cpus)
     {
-#ifdef _OPENMP
-        cout << omp_get_thread_num() << endl;
-#endif
         vec2 d(5);
         for (int i = 0; i < 5; i++)
             d[i].resize(wavy.get_ncen(), 0.0);
@@ -881,7 +878,7 @@ void Calc_S_Rho(
     time_point start = get_time();
     progress_bar* progress = NULL;
     if(!nodate)
-        progress_bar* progress = new progress_bar{ file, 50u, "Calculating Values" };
+        progress = new progress_bar{ file, 50u, "Calculating Values" };
     const int step = (int)max(floor(Cube_S_Rho.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -1704,7 +1701,7 @@ vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom) {
   double mu_x = 0, mu_y = 0, mu_z = 0;
   double scratch = 0;
   const double ax = wavy.get_atom_coordinate(i, 0), ay = wavy.get_atom_coordinate(i, 1), az = wavy.get_atom_coordinate(i, 2), dv = Hirshfeld_atom.get_dv();
-  const int c = wavy.get_atom_charge(i);
+  //const int c = wavy.get_atom_charge(i);
   double charge = 0;
   const double v[9] = { Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
 												 Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),

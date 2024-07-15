@@ -365,7 +365,7 @@ void test_dot()
 
     size_t rows1 = mat1.size();
     size_t cols1 = mat1[0].size();
-    size_t rows2 = mat2.size();
+    //size_t rows2 = mat2.size();
     size_t cols2 = mat2[0].size();
 
     vector<vector<double>> result_old(rows1, vector<double>(cols2, 0.0));
@@ -459,17 +459,18 @@ vector<vector<vector<T>>> transpose(const vector<vector<vector<T>>> &originalVec
         return {}; // Return an empty vector if the original vector is empty or not 3D
     }
 
-    int newDim1 = originalVec[0][0].size(); // New first dimension is the old third dimension
-    int newDim2 = originalVec.size();       // New second dimension is the old first dimension
-    int newDim3 = originalVec[0].size();    // New third dimension is the old second dimension
+    size_t newDim1 = originalVec[0][0].size(); // New first dimension is the old third dimension
+    size_t newDim2 = originalVec.size();       // New second dimension is the old first dimension
+    size_t newDim3 = originalVec[0].size();    // New third dimension is the old second dimension
 
     vector<vector<vector<T>>> transposedVec(newDim1, vector<vector<T>>(newDim2, std::vector<T>(newDim3)));
 
-    for (int i = 0; i < originalVec.size(); ++i)
+#pragma omp parallel for
+    for (int i = 0; i < int(originalVec.size()); ++i)
     {
-        for (int j = 0; j < originalVec[i].size(); ++j)
+        for (size_t j = 0; j < originalVec[i].size(); ++j)
         {
-            for (int k = 0; k < originalVec[i][j].size(); ++k)
+            for (size_t k = 0; k < originalVec[i][j].size(); ++k)
             {
                 transposedVec[k][i][j] = originalVec[i][j][k];
             }
