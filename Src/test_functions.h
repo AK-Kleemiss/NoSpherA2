@@ -265,8 +265,8 @@ void sfac_scan(options &opt, std::ostream &log_file)
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+    std::vector<time_point> time_points;
+    std::vector<std::string> time_descriptions;
 
     cell unit_cell(opt.cif, std::cout, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -301,12 +301,8 @@ void sfac_scan(options &opt, std::ostream &log_file)
                          d1, d2, d3, dens,
                          labels,
                          std::cout,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -794,7 +790,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
     err_checkf(wavy[0].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
 
-    time_point start = get_time(), end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+    std::vector<time_point> time_points;
+    std::vector<std::string> time_descriptions;
 
     cell unit_cell(opt.cif, log_file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -829,12 +826,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1, d2, d3, dens,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -853,12 +846,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_def2, d2_def2, d3_def2, dens_def2,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -877,12 +866,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_all, d2_all, d3_all, dens_all,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -904,12 +889,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_all_val, d2_all_val, d3_all_val, dens_all_val,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -927,12 +908,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_ZORA, d2_ZORA, d3_ZORA, dens_ZORA,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -954,12 +931,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_ZORA_val, d2_ZORA_val, d3_ZORA_val, dens_ZORA_val,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -977,12 +950,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_x2c, d2_x2c, d3_x2c, dens_x2c,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -1004,12 +973,8 @@ void sfac_scan_ECP(options &opt, std::ostream &log_file)
                          d1_x2c_val, d2_x2c_val, d3_x2c_val, dens_x2c_val,
                          labels,
                          log_file,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 
@@ -1930,7 +1895,9 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
         cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
 
-    time_point start = get_time(), end_becke, end_prototypes, end_spherical, end_aspherical, end_prune;
+    std::vector<time_point> time_points;
+    std::vector<std::string> time_descriptions;
+
     ivec atom_type_list({79});
     ivec asym_atom_list({0});
     bvec needs_grid({true});
@@ -1950,12 +1917,8 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          d1_ECP, d2_ECP, d3_ECP, dens_ECP,
                          labels,
                          out,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical);
+                         time_points,
+                         time_descriptions);
     make_hirshfeld_grids(0,
                          3,
                          temp_cell,
@@ -1966,12 +1929,8 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          d1_all, d2_all, d3_all, dens_all,
                          labels,
                          out,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical);
+                         time_points,
+                         time_descriptions);
     make_hirshfeld_grids(0,
                          3,
                          temp_cell,
@@ -1982,12 +1941,8 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          d1_val, d2_val, d3_val, dens_val,
                          labels,
                          out,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical);
+                         time_points,
+                         time_descriptions);
 
     progress_bar *progress = new progress_bar{out, 60u, "Calculating SFACs"};
     const int upper = static_cast<int>(res[0].size());
@@ -2008,7 +1963,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
     delete (progress);
 
     time_point end = get_time();
-    out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
+    out << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
     dat_out << scientific << setprecision(12) << setw(20);
     double t = 0;
     for (int i = 0; i < res[0].size(); i++)

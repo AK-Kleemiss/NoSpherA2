@@ -1400,12 +1400,8 @@ int make_hirshfeld_grids(
     vec2 &dens,
     const svec &labels,
     ostream &file,
-    time_point &start,
-    time_point &end_becke,
-    time_point &end_prototypes,
-    time_point &end_spherical,
-    time_point &end_prune,
-    time_point &end_aspherical,
+    std::vector<time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
@@ -1479,17 +1475,18 @@ int make_hirshfeld_grids(
         file << endl
              << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
     }
-    end_prototypes = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Prototype Grid setup");
     if (debug)
     {
         file << "\n";
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        long long int dur = get_sec(start, end_prototypes);
-
+        long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
+        
         if (dur < 1)
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
+            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
@@ -1520,7 +1517,8 @@ int make_hirshfeld_grids(
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_becke = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Becke Grid setup");
 
     file << "Calculating spherical densities..." << flush;
 
@@ -1566,7 +1564,8 @@ int make_hirshfeld_grids(
     shrink_vector<vec>(radial_density);
     shrink_vector<vec>(radial_dist);
 
-    end_spherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("spherical density");
 
     // Total grid as a sum of all atomic grids.
     // Dimensions: [c] [p]
@@ -1584,7 +1583,8 @@ int make_hirshfeld_grids(
     else
         file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_prune = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Grid Pruning");
 
     file << "Calculating non-spherical densities..." << flush;
     vec2 periodic_grid;
@@ -1778,7 +1778,8 @@ int make_hirshfeld_grids(
     {
         file << "Taking time..." << endl;
     }
-    end_aspherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("aspherical density");
 
     dens.resize(cif2wfn_list.size());
     if (debug)
@@ -1904,12 +1905,8 @@ static int make_hirshfeld_grids_ML(
     const int exp_coefs,
     const svec &labels,
     ostream &file,
-    time_point &start,
-    time_point &end_becke,
-    time_point &end_prototypes,
-    time_point &end_spherical,
-    time_point &end_prune,
-    time_point &end_aspherical,
+    vector<time_point> &time_points,
+    vector<string> &time_descriptions,
     bool debug,
     bool no_date)
 {
@@ -1935,16 +1932,17 @@ static int make_hirshfeld_grids_ML(
         file << endl
              << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
 
-    end_prototypes = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Prototype Grid setup");
     if (debug)
     {
-        long long int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
         //	int diff = end - start;
         if (dur < 1)
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
+            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
@@ -1973,7 +1971,8 @@ static int make_hirshfeld_grids_ML(
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_becke = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Becke Grid setup");
 
     file << "Calculating spherical densities..." << flush;
 
@@ -2010,7 +2009,8 @@ static int make_hirshfeld_grids_ML(
     shrink_vector<vec>(radial_density);
     shrink_vector<vec>(radial_dist);
 
-    end_spherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("spherical density");
 
     ivec new_gridsize(atoms_with_grids, 0);
     ivec reductions(atoms_with_grids, 0);
@@ -2031,7 +2031,8 @@ static int make_hirshfeld_grids_ML(
     else
         file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_prune = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Grid Pruning");
 
     file << "Calculating non-spherical densities..." << flush;
     vec2 periodic_grid;
@@ -2149,7 +2150,8 @@ static int make_hirshfeld_grids_ML(
     file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl
          << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
 
-    end_aspherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("aspherical density");
 
     dens.resize(asym_atom_list.size());
     if (debug)
@@ -2272,12 +2274,8 @@ static int make_integration_grids(
     const int exp_coefs,
     const svec &labels,
     ostream &file,
-    time_point &start,
-    time_point &end_becke,
-    time_point &end_prototypes,
-    time_point &end_spherical,
-    time_point &end_prune,
-    time_point &end_aspherical,
+    std::vector<time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
@@ -2310,16 +2308,18 @@ static int make_integration_grids(
              << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
     }
 
-    end_prototypes = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Prototype Grid setup");
+
     if (debug)
     {
 
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        long long int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
         if (dur < 1)
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
+            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
@@ -2346,8 +2346,8 @@ static int make_integration_grids(
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_becke = get_time();
-    end_spherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Becke Grid setup");
 
     const double _cutoff = cutoff(accuracy);
     ivec new_gridsize(atoms_with_grids, 0);
@@ -2408,7 +2408,8 @@ static int make_integration_grids(
 
     file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_prune = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Grid Pruning");
 
     file << "Calculating non-spherical densities..." << flush;
 
@@ -2499,7 +2500,8 @@ static int make_integration_grids(
 
     file << "Total number of electrons in the wavefunction: " << el_sum_SALTED << endl;
 
-    end_aspherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("aspherical density");
 
     dens.resize(asym_atom_list.size());
     if (debug)
@@ -2592,11 +2594,8 @@ static int make_integration_grids_SALTED(
     const int exp_coefs,
     const svec &labels,
     ostream &file,
-    time_point &start,
-    time_point &end_becke,
-    time_point &end_prototypes,
-    time_point &end_prune,
-    time_point &end_aspherical,
+    std::vector<time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
@@ -2628,16 +2627,17 @@ static int make_integration_grids_SALTED(
              << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
     }
 
-    end_prototypes = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Prototype Grid setup");
     if (debug)
     {
 
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        long long int dur = get_sec(start, end_prototypes);
+        long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
         if (dur < 1)
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(start, end_prototypes) << " ms" << endl;
+            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
             file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
     }
@@ -2667,7 +2667,8 @@ static int make_integration_grids_SALTED(
     else
         file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_becke = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Becke Grid setup");
 
     // Total grid as a sum of all atomic grids.
     // Dimensions: [c] [p]
@@ -2722,7 +2723,8 @@ static int make_integration_grids_SALTED(
 
     file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
 
-    end_prune = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Grid Pruning");
 
     file << "Calculating non-spherical densities..." << flush;
 
@@ -2802,7 +2804,8 @@ static int make_integration_grids_SALTED(
 
     file << "Total number of electrons in the wavefunction: " << el_sum_SALTED << endl;
 
-    end_aspherical = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("aspherical density");
 
     dens.resize(asym_atom_list.size());
     if (debug)
@@ -3540,8 +3543,9 @@ bool calculate_scattering_factors_HF(
         file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    vector<time_point> time_points;
+    vector<string> time_descriptions;
+    time_points.push_back(get_time());
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -3594,16 +3598,13 @@ bool calculate_scattering_factors_HF(
                                       d1, d2, d3, dens,
                                       labels,
                                       file,
-                                      start,
-                                      end_becke,
-                                      end_prototypes,
-                                      end_spherical,
-                                      end_prune,
-                                      end_aspherical,
+                                      time_points,
+                                      time_descriptions,
                                       opt.debug,
                                       opt.no_date);
 
-    time_point before_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("density vectors");
 
     vec2 k_pt;
     make_k_pts(
@@ -3616,18 +3617,23 @@ bool calculate_scattering_factors_HF(
         file,
         opt.debug);
 
-    time_point after_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
 
     cvec2 sf;
+    time_point end1;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
             sf,
             file,
-            start,
+            time_points.front(),
             end1,
             opt.debug,
             opt.no_date);
+
+    time_points.push_back(end1);
+    time_descriptions.push_back("final preparation");
 
     if (wave.get_has_ECPs())
     {
@@ -3656,20 +3662,13 @@ bool calculate_scattering_factors_HF(
         labels,
         hkl);
 
-    time_point end = get_time();
+    time_points.push_back(end1);
+    time_descriptions.push_back("tsc calculation");
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-                             start,
-                             end,
-                             end_prototypes,
-                             end_becke,
-                             end_spherical,
-                             end_prune,
-                             end_aspherical,
-                             before_kpts,
-                             after_kpts,
-                             end1);
+                             time_points,
+                             time_descriptions);
     }
 
     file << "Writing tsc file... " << flush;
@@ -3708,8 +3707,9 @@ bool calculate_scattering_factors_ML(
     file << "Number of protons: " << wave.get_nr_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    time_point start = get_time();
-    time_point end_SALTED, end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    vector<time_point> time_points;
+    vector<string> time_descriptions;
+    time_points.push_back(get_time());
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -3732,9 +3732,14 @@ bool calculate_scattering_factors_ML(
                                       opt.debug);
 
     cif_input.close();
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("startup");
 #if has_RAS
     // Generation of SALTED densitie coefficients
-    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities(start, end_SALTED);
+    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("SALTED prediction");
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
     vec coefs;
@@ -3770,16 +3775,13 @@ bool calculate_scattering_factors_ML(
         exp_coefs,
         labels,
         file,
-        start,
-        end_becke,
-        end_prototypes,
-        end_spherical,
-        end_prune,
-        end_aspherical,
+        time_points,
+        time_descriptions,
         opt.debug,
         opt.no_date);
 
-    time_point before_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("density vectors");
 
     vec2 k_pt;
     make_k_pts(
@@ -3792,18 +3794,23 @@ bool calculate_scattering_factors_ML(
         file,
         opt.debug);
 
-    time_point after_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
 
+    time_point end1;
     cvec2 sf;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
             sf,
             file,
-            start,
+            time_points.front(),
             end1,
             opt.debug,
             opt.no_date);
+
+    time_points.push_back(end1);
+    time_descriptions.push_back("final preparation");
 
     if (wave.get_has_ECPs())
     {
@@ -3832,21 +3839,13 @@ bool calculate_scattering_factors_ML(
         labels,
         hkl);
 
-    time_point end = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("tsc calculation");
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-                             start,
-                             end,
-                             end_SALTED,
-                             end_prototypes,
-                             end_becke,
-                             end_spherical,
-                             end_prune,
-                             end_aspherical,
-                             before_kpts,
-                             after_kpts,
-                             end1);
+                            time_points,
+                            time_descriptions);
     }
 
     file << "Writing tsc file... " << flush;
@@ -3874,9 +3873,10 @@ bool calculate_scattering_factors_ML_No_H(
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
     file << "Number of protons: " << wave.get_nr_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+    vector<time_point> time_points;
+    vector<string> time_descriptions;
 
-    time_point start = get_time();
-    time_point end_SALTED, end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    time_points.push_back(get_time());
 
     cell unit_cell(opt.cif, file, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -3901,7 +3901,9 @@ bool calculate_scattering_factors_ML_No_H(
     cif_input.close();
 
 #if has_RAS
-    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities(start, end_SALTED);
+    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("SALTED prediction");
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
     vec coefs;
@@ -3941,16 +3943,14 @@ bool calculate_scattering_factors_ML_No_H(
             exp_coefs,
             labels,
             file,
-            start,
-            end_becke,
-            end_prototypes,
-            end_prune,
-            end_aspherical,
+            time_points,
+            time_descriptions,
             opt.debug,
             opt.no_date);
     }
     else if (opt.SALTED_BECKE)
     {
+        //An die funktion trau ich mich nicht ran, verwende alte Zeitgebung
         file << "Making SALTED densities and use Becke Integration\n";
         points = make_integration_grids(
             opt.accuracy,
@@ -3964,19 +3964,16 @@ bool calculate_scattering_factors_ML_No_H(
             exp_coefs,
             labels,
             file,
-            start,
-            end_becke,
-            end_prototypes,
-            end_spherical,
-            end_prune,
-            end_aspherical,
+            time_points,
+            time_descriptions,
             opt.debug,
             opt.no_date);
     }
     else
         err_not_impl_f("No implementation of neither SALTED nor SALTED_BECKE", file);
 
-    time_point before_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("density vectors");
 
     vec2 k_pt;
     make_k_pts(
@@ -3989,18 +3986,23 @@ bool calculate_scattering_factors_ML_No_H(
         file,
         opt.debug);
 
-    time_point after_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
 
+    time_point end1;
     cvec2 sf;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
             sf,
             file,
-            start,
+            time_points.front(),
             end1,
             opt.debug,
             opt.no_date);
+
+    time_points.push_back(end1);
+    time_descriptions.push_back("final preparation");
 
     if (wave.get_has_ECPs())
     {
@@ -4029,21 +4031,13 @@ bool calculate_scattering_factors_ML_No_H(
         labels,
         hkl);
 
-    time_point end = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("tsc calculation");
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-                             start,
-                             end,
-                             end_SALTED,
-                             end_prototypes,
-                             end_becke,
-                             end_spherical,
-                             end_prune,
-                             end_aspherical,
-                             before_kpts,
-                             after_kpts,
-                             end1);
+                             time_points,
+                             time_descriptions);
     }
 
     file << "Writing tsc file... " << flush;
@@ -4104,8 +4098,9 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     if (opt.debug)
         file << "Working with: " << wave[nr].get_path() << endl;
 
-    time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical, end1;
+    vector<time_point> time_points;
+    vector<string> time_descriptions;
+    time_points.push_back(get_time());
 
     string cif;
     if (opt.cif_based_combined_tsc_calc)
@@ -4151,17 +4146,14 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
                                             d1, d2, d3, dens,
                                             labels,
                                             file,
-                                            start,
-                                            end_becke,
-                                            end_prototypes,
-                                            end_spherical,
-                                            end_prune,
-                                            end_aspherical,
+                                            time_points,
+                                            time_descriptions,
                                             opt.debug,
                                             opt.no_date);
 
-    time_point before_kpts = get_time();
-
+    time_points.push_back(get_time());
+    time_descriptions.push_back("density vectors");
+       
     vec2 k_pt;
     hkl_list hkl;
     if (opt.m_hkl_list.size() != 0)
@@ -4200,18 +4192,23 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
         k_pt = *kpts;
     }
 
-    time_point after_kpts = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
 
     vector<vector<complex<double>>> sf;
+    time_point end1;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
             sf,
             file,
-            start,
+            time_points.front(),
             end1,
             opt.debug,
             opt.no_date);
+
+    time_points.push_back(end1);
+    time_descriptions.push_back("final preparation");
 
     if (wave[nr].get_has_ECPs())
     {
@@ -4240,20 +4237,14 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
         labels,
         hkl);
 
-    time_point end = get_time();
+    time_points.push_back(get_time());
+    time_descriptions.push_back("tsc calculation");
+
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-                             start,
-                             end,
-                             end_prototypes,
-                             end_becke,
-                             end_spherical,
-                             end_prune,
-                             end_aspherical,
-                             before_kpts,
-                             after_kpts,
-                             end1);
+                             time_points,
+                             time_descriptions);
     }
 
     return blocky;
@@ -4280,8 +4271,11 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    time_point start = get_time();
-    time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+    //time_point start = get_time();
+    //time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+    vector<time_point> time_points;
+    vector<string> time_descriptions;
+    time_points.push_back(get_time());
 
     cell unit_cell(opt.cif, std::cout, opt.debug);
     ifstream cif_input(opt.cif.c_str(), std::ios::in);
@@ -4316,12 +4310,8 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                          d1, d2, d3, dens,
                          labels,
                          std::cout,
-                         start,
-                         end_becke,
-                         end_prototypes,
-                         end_spherical,
-                         end_prune,
-                         end_aspherical,
+                         time_points,
+                         time_descriptions,
                          opt.debug,
                          opt.no_date);
 

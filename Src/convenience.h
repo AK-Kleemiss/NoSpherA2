@@ -422,30 +422,7 @@ long long int get_musec(std::chrono::high_resolution_clock::time_point start, st
 long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 
-void write_timing_to_file(std::ostream &file,
-                          time_point start,
-                          time_point end,
-                          time_point end_prototypes,
-                          time_point end_becke,
-                          time_point end_spherical,
-                          time_point end_prune,
-                          time_point end_aspherical,
-                          time_point before_kpts,
-                          time_point after_kpts,
-                          time_point end1);
-
-void write_timing_to_file(std::ostream &file,
-                          time_point start,
-                          time_point end,
-                          time_point end_SALTED,
-                          time_point end_prototypes,
-                          time_point end_becke,
-                          time_point end_spherical,
-                          time_point end_prune,
-                          time_point end_aspherical,
-                          time_point before_kpts,
-                          time_point after_kpts,
-                          time_point end1);
+void write_timing_to_file(std::ostream &file, std::vector<time_point> time_points, std::vector<std::string> descriptions);
 
 int CountWords(const char *str);
 

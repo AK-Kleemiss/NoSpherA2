@@ -13,7 +13,7 @@ class SALTEDPredictor {
 public:
     SALTEDPredictor(const WFN& wavy, const options &opt);
 
-    vec gen_SALTED_densities(time_point& start, time_point& end_SALTED);
+    vec gen_SALTED_densities();
 private:
     Config config;
     const WFN& wavy;

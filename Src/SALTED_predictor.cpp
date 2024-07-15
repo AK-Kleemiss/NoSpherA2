@@ -308,20 +308,24 @@ vec SALTEDPredictor::predict()
     return pred_coefs;
 }
 
-vec SALTEDPredictor::gen_SALTED_densities(time_point &start, time_point &end_SALTED)
+vec SALTEDPredictor::gen_SALTED_densities()
 {
+    time_point start;
     // Run generation of tsc file
+    if (this->opt.debug) start = get_time();
+
     this->setup_atomic_environment();
     this->read_model_data();
     vec coefs = this->predict();
 
-    end_SALTED = get_time();
+
     if (this->opt.debug)
     {
-        long long int dur = get_sec(start, end_SALTED);
+        time_point end = get_time();
+        long long int dur = get_sec(start, end);
         cout << "Finished ML Density Prediction!" << endl;
         if (dur < 1)
-            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << get_msec(start, end_SALTED) << " ms" << endl;
+            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << get_msec(start, end) << " ms" << endl;
         else
             cout << "Time for SALTED prediction: " << fixed << setprecision(0) << dur << " s" << endl;
 

@@ -3493,194 +3493,46 @@ int CountWords(const char *str)
     return numWords;
 };
 
-void write_timing_to_file(std::ostream &file,
-                          time_point start,
-                          time_point end,
-                          time_point end_prototypes,
-                          time_point end_becke,
-                          time_point end_spherical,
-                          time_point end_prune,
-                          time_point end_aspherical,
-                          time_point before_kpts,
-                          time_point after_kpts,
-                          time_point end1)
-{
-    // writes the timing of different things to a file
-    using namespace std;
-    long long int dur = get_sec(start, end);
 
-    if (dur < 1)
-        file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " ms\n";
-    else if (dur < 60)
-        file << "Total Time: " << fixed << setprecision(0) << dur << " s\n";
-    else if (dur < 3600)
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 60) << " m " << dur % 60 << " s\n";
-    else
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 3600) << " h " << (dur % 3600) / 60 << " m\n";
-    file << endl;
-    file << "Time Breakdown:" << endl;
-    if (get_sec(start, end_prototypes) > 1)
-        if (get_sec(start, end_prototypes) < 100)
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
-        else
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
-    else
-        file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
-    if (get_sec(end_prototypes, end_becke) > 1)
-        if (get_sec(end_prototypes, end_becke) < 100)
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s " << get_msec(end_prototypes, end_becke) % 1000 << " ms" << endl;
-        else
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
-    else
-        file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " ms" << endl;
-    if (get_sec(end_becke, end_spherical) > 1)
-        if (get_sec(end_becke, end_spherical) < 100)
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s " << get_msec(end_becke, end_spherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
-    else
-        file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " ms" << endl;
-    if (get_sec(end_spherical, end_prune) > 1)
-        if (get_sec(end_spherical, end_prune) < 100)
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s " << get_msec(end_spherical, end_prune) % 1000 << " ms" << endl;
-        else
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
-    else
-        file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " ms" << endl;
-    if (get_sec(end_prune, end_aspherical) > 1)
-        if (get_sec(end_prune, end_aspherical) < 100)
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s " << get_msec(end_prune, end_aspherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
-    else
-        file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " ms" << endl;
-    if (get_sec(end_aspherical, before_kpts) > 1)
-        if (get_sec(end_aspherical, before_kpts) < 100)
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s " << get_msec(end_aspherical, before_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
-    else
-        file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " ms" << endl;
-    if (get_sec(before_kpts, after_kpts) > 1)
-        if (get_sec(before_kpts, after_kpts) < 100)
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s " << get_msec(before_kpts, after_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
-    else
-        file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " ms" << endl;
-    if (get_sec(after_kpts, end1) > 1)
-        if (get_sec(after_kpts, end1) < 100)
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s " << get_msec(after_kpts, end1) % 1000 << " ms" << endl;
-        else
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
-    else
-        file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " ms" << endl;
-    if (get_sec(end1, end) > 1)
-        if (get_sec(end1, end) < 100)
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s " << get_msec(end1, end) % 1000 << " ms" << endl;
-        else
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
-    else
-        file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
+void print_duration(std::ostream& file, const std::string& description, const std::chrono::microseconds& duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt) {
+    auto mins = std::chrono::duration_cast<std::chrono::minutes>(duration);
+    auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration) % 60;
+    auto millisecs = std::chrono::duration_cast<std::chrono::milliseconds>(duration) % 1000;
+
+    file << std::setw(35) << std::left << std::setfill(' ') << description << ": " << std::right 
+        << std::setw(2) << std::setfill('0') << mins.count() << ":"
+        << std::setw(2) << std::setfill('0') << secs.count() << ":"
+        << std::setw(3) << std::setfill('0') << millisecs.count();
+    if (total_duration.has_value()) {
+        double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
+        std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
+    };
+    file << std::endl;
 }
 
-void write_timing_to_file(std::ostream &file,
-                          time_point start,
-                          time_point end,
-                          time_point end_SALTED,
-                          time_point end_prototypes,
-                          time_point end_becke,
-                          time_point end_spherical,
-                          time_point end_prune,
-                          time_point end_aspherical,
-                          time_point before_kpts,
-                          time_point after_kpts,
-                          time_point end1)
-{
-    // writes the timing of different things to a file
-    using namespace std;
-    long long int dur = get_sec(start, end);
 
-    if (dur < 1)
-        file << "Total Time: " << fixed << setprecision(0) << get_msec(start, end) << " ms\n";
-    else if (dur < 60)
-        file << "Total Time: " << fixed << setprecision(0) << dur << " s\n";
-    else if (dur < 3600)
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 60) << " m " << dur % 60 << " s\n";
-    else
-        file << "Total Time: " << fixed << setprecision(0) << floor(dur / 3600) << " h " << (dur % 3600) / 60 << " m\n";
-    file << endl;
-    file << "Time Breakdown:" << endl;
-    if (get_sec(start, end_SALTED) > 1)
-        if (get_sec(start, end_prototypes) < 100)
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
-        else
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
-    else
-        file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
-    if (get_sec(start, end_prototypes) > 1)
-        if (get_sec(start, end_prototypes) < 100)
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s " << get_msec(start, end_prototypes) % 1000 << " ms" << endl;
-        else
-            file << " ... for Prototype Grid setup:" << setw(6) << get_sec(start, end_prototypes) << " s" << endl;
-    else
-        file << " ... for Prototype Grid setup:" << setw(6) << get_msec(start, end_prototypes) << " ms" << endl;
-    if (get_sec(end_prototypes, end_becke) > 1)
-        if (get_sec(end_prototypes, end_becke) < 100)
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s " << get_msec(end_prototypes, end_becke) % 1000 << " ms" << endl;
-        else
-            file << " ... for Becke Grid setup:    " << setw(6) << get_sec(end_prototypes, end_becke) << " s" << endl;
-    else
-        file << " ... for Becke Grid setup:    " << setw(6) << get_msec(end_prototypes, end_becke) << " ms" << endl;
-    if (get_sec(end_becke, end_spherical) > 1)
-        if (get_sec(end_becke, end_spherical) < 100)
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s " << get_msec(end_becke, end_spherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for spherical density:   " << setw(6) << get_sec(end_becke, end_spherical) << " s" << endl;
-    else
-        file << " ... for spherical density:   " << setw(6) << get_msec(end_becke, end_spherical) << " ms" << endl;
-    if (get_sec(end_spherical, end_prune) > 1)
-        if (get_sec(end_spherical, end_prune) < 100)
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s " << get_msec(end_spherical, end_prune) % 1000 << " ms" << endl;
-        else
-            file << " ... for Grid Pruning:        " << setw(6) << get_sec(end_spherical, end_prune) << " s" << endl;
-    else
-        file << " ... for Grid Pruning:        " << setw(6) << get_msec(end_spherical, end_prune) << " ms" << endl;
-    if (get_sec(end_prune, end_aspherical) > 1)
-        if (get_sec(end_prune, end_aspherical) < 100)
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s " << get_msec(end_prune, end_aspherical) % 1000 << " ms" << endl;
-        else
-            file << " ... for aspherical density:  " << setw(6) << get_sec(end_prune, end_aspherical) << " s" << endl;
-    else
-        file << " ... for aspherical density:  " << setw(6) << get_msec(end_prune, end_aspherical) << " ms" << endl;
-    if (get_sec(end_aspherical, before_kpts) > 1)
-        if (get_sec(end_aspherical, before_kpts) < 100)
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s " << get_msec(end_aspherical, before_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for density vectors:     " << setw(6) << get_sec(end_aspherical, before_kpts) << " s" << endl;
-    else
-        file << " ... for density vectors:     " << setw(6) << get_msec(end_aspherical, before_kpts) << " ms" << endl;
-    if (get_sec(before_kpts, after_kpts) > 1)
-        if (get_sec(before_kpts, after_kpts) < 100)
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s " << get_msec(before_kpts, after_kpts) % 1000 << " ms" << endl;
-        else
-            file << " ... for k-points preparation:" << setw(6) << get_sec(before_kpts, after_kpts) << " s" << endl;
-    else
-        file << " ... for k-points preparation:" << setw(6) << get_msec(before_kpts, after_kpts) << " ms" << endl;
-    if (get_sec(after_kpts, end1) > 1)
-        if (get_sec(after_kpts, end1) < 100)
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s " << get_msec(after_kpts, end1) % 1000 << " ms" << endl;
-        else
-            file << " ... for final preparation:   " << setw(6) << get_sec(after_kpts, end1) << " s" << endl;
-    else
-        file << " ... for final preparation:   " << setw(6) << get_msec(after_kpts, end1) << " ms" << endl;
-    if (get_sec(end1, end) > 1)
-        if (get_sec(end1, end) < 100)
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s " << get_msec(end1, end) % 1000 << " ms" << endl;
-        else
-            file << " ... for tsc calculation:     " << setw(6) << get_sec(end1, end) << " s" << endl;
-    else
-        file << " ... for tsc calculation:     " << setw(6) << get_msec(end1, end) << " ms" << endl;
+void write_timing_to_file(std::ostream& file,
+                          std::vector<time_point> time_points,
+                          std::vector<std::string> descriptions)
+{
+    using namespace std;
+    //Check if either vector is empty
+    if (time_points.empty() || descriptions.empty())
+	{
+		cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+		return;
+	}
+
+    std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
+    file << "\n\n------------------------------ Time Breakdown! ------------------------------" << endl;
+    file << "                                     mm:ss:ms" << endl;
+    //Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
+    for (int i = 0; i < time_points.size()-1; i++) {
+        std::chrono::microseconds dur = std::chrono::duration_cast<std::chrono::microseconds>(time_points[i + 1] - time_points[i]);
+        print_duration(file, "... for " + descriptions[i], dur, total_time);
+    }
+    print_duration(file, "Total Time", total_time);
+    file << "---------------------------------------------------------------------------" << endl;
 }
 
 void remove_empty_elements(svec &input, const std::string &empty)

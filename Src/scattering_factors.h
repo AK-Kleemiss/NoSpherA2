@@ -234,12 +234,8 @@ int make_hirshfeld_grids(
     vec2 &dens, 
     const svec& labels,
     std::ostream &file, 
-    time_point &start, 
-    time_point &end_becke, 
-    time_point &end_prototypes, 
-    time_point &end_spherical, 
-    time_point &end_prune, 
-    time_point &end_aspherical, 
+    std::vector<time_point>& time_points,
+    std::vector<std::string>& time_descriptions,
     bool debug = false, 
     bool no_date = false
 );
