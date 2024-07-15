@@ -3,6 +3,9 @@
 #include "cblas.h"
 #endif
 #include <cassert>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace std;
 
@@ -114,6 +117,66 @@ vector<double> slice(const vector<double> &vec, size_t start, size_t length)
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
 template <typename T>
+vector<vector<T>> self_dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2)
+{
+    // if either of the matrices is empty, return a empty matrix
+    if (mat1.empty() || mat2.empty())
+    {
+        return {};
+    }
+
+    size_t rows1 = mat1.size();
+    size_t cols1 = mat1[0].size();
+    size_t rows2 = mat2.size();
+    size_t cols2 = mat2[0].size();
+
+    // Check if matrix multiplication is possible
+    if (cols1 != rows2)
+    {
+        throw std::invalid_argument("Matrix dimensions do not match for multiplication");
+    }
+
+    vector<vector<T>> result(rows1, vector<T>(cols2, 0.0));
+    const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
+    size_t total_size = rows1 * cols2;
+#pragma omp parallel
+    {
+        vector<T> local_result(total_size, 0.0);
+        int i, j, k, flatIndex;
+
+#pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
+        for (long long int n = 0; n < totalIterations; ++n)
+        {
+            i = static_cast<int>(n / (cols2 * cols1));
+            j = static_cast<int>((n / cols1) % cols2);
+            k = static_cast<int>(n % cols1);
+            flatIndex = i * cols2 + j;
+            local_result[flatIndex] += mat1[i][k] * mat2[k][j];
+        }
+
+#pragma omp critical
+        {
+            for (i = 0; i < rows1; ++i)
+            {
+                for (j = 0; j < cols2; ++j)
+                {
+                    flatIndex = i * cols2 + j;
+                    result[i][j] += local_result[flatIndex];
+                }
+            }
+        }
+    }
+
+    return result;
+}
+template vector<vector<double>> self_dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2);
+template vector<vector<cdouble>> self_dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2);
+
+typedef void (*ExampleFunctionType)(void);
+
+// Matrix multiplication
+// 2D x 2D MATRIX MULTIPLICATION
+template <typename T>
 vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2)
 {
     // if either of the matrices is empty, return a empty matrix
@@ -134,6 +197,94 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     }
 
 #if has_RAS
+#ifdef _WIN32
+    HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
+    if (hOpenBlas != NULL)
+    {
+        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sgemm");
+        if (eF != NULL)
+        {
+            // If the function is found, use OpenBLAS
+            std::cout << "Using OpenBLAS." << std::endl;
+            vector<T> flatMat1 = flatten(mat1);
+            vector<T> flatMat2 = flatten(mat2);
+
+            vector<T> result_flat(rows1 * cols2, 0.0);
+            if constexpr (std::is_same_v<T, float>)
+            {
+                cblas_sgemm(CblasRowMajor,
+                            CblasNoTrans,
+                            CblasNoTrans,
+                            rows1,
+                            cols2,
+                            cols1,
+                            1.0f,
+                            flatMat1.data(),
+                            cols1,
+                            flatMat2.data(),
+                            cols2,
+                            0.0f,
+                            result_flat.data(),
+                            cols2);
+            }
+            else if constexpr (std::is_same_v<T, double>)
+            {
+                cblas_dgemm(CblasRowMajor,
+                            CblasNoTrans,
+                            CblasNoTrans,
+                            rows1,
+                            cols2,
+                            cols1,
+                            1.0,
+                            flatMat1.data(),
+                            cols1,
+                            flatMat2.data(),
+                            cols2,
+                            0.0,
+                            result_flat.data(),
+                            cols2);
+            }
+            else if constexpr (std::is_same_v<T, cdouble>)
+            {
+                cdouble one = cdouble(1.0, 0.0);
+                cdouble zero = cdouble(0.0, 0.0);
+                cblas_zgemm(CblasRowMajor,
+                            CblasNoTrans,
+                            CblasNoTrans,
+                            rows1,
+                            cols2,
+                            cols1,
+                            &(one),
+                            reinterpret_cast<const cdouble *>(flatMat1.data()),
+                            cols1,
+                            reinterpret_cast<const cdouble *>(flatMat2.data()),
+                            cols2,
+                            &(zero),
+                            reinterpret_cast<cdouble *>(result_flat.data()),
+                            cols2);
+            }
+            else
+            {
+                throw std::invalid_argument("Unsupported data type for matrix multiplication");
+            }
+            Shape2D sizes = {rows1, cols2};
+            return reshape(result_flat, sizes);
+        }
+        else
+        {
+            // Function not found, fallback
+            std::cout << "OpenBLAS function not found, using fallback." << std::endl;
+            return self_dot(mat1, mat2);
+        }
+        FreeLibrary(hOpenBlas);
+    }
+    else
+    {
+        // DLL not found, fallback
+        std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+        return self_dot(mat1, mat2);
+    }
+#else
     vector<T> flatMat1 = flatten(mat1);
     vector<T> flatMat2 = flatten(mat2);
 
@@ -196,42 +347,12 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         throw std::invalid_argument("Unsupported data type for matrix multiplication");
     }
     Shape2D sizes = {rows1, cols2};
-    vector<vector<T>> result = reshape(result_flat, sizes);
+    return reshape(result_flat, sizes);
+#endif
 #else
 
-    vector<vector<T>> result(rows1, vector<T>(cols2, 0.0));
-    const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
-    size_t total_size = rows1 * cols2;
-#pragma omp parallel
-    {
-        vector<T> local_result(total_size, 0.0);
-        int i, j, k, flatIndex;
-
-#pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
-        for (long long int n = 0; n < totalIterations; ++n)
-        {
-            i = static_cast<int>(n / (cols2 * cols1));
-            j = static_cast<int>((n / cols1) % cols2);
-            k = static_cast<int>(n % cols1);
-            flatIndex = i * cols2 + j;
-            local_result[flatIndex] += mat1[i][k] * mat2[k][j];
-        }
-
-#pragma omp critical
-        {
-            for (i = 0; i < rows1; ++i)
-            {
-                for (j = 0; j < cols2; ++j)
-                {
-                    flatIndex = i * cols2 + j;
-                    result[i][j] += local_result[flatIndex];
-                }
-            }
-        }
-    }
+    return self_dot(mat1, mat2);
 #endif
-
-    return result;
 }
 template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2);
 template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2);
