@@ -46,7 +46,7 @@ int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 35> basis_set, vector<string> species)
+void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 86> basis_set, vector<string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
@@ -69,6 +69,7 @@ void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map
     }
 }
 
+
 // Function to filter out atoms that belong to species not available for the model selected
 std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species)
 {
@@ -86,6 +87,18 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
             excluded_species.insert(symbol);
         }
     }
+
+    //Print out the excluded species
+    if (!excluded_species.empty())
+	{
+		std::cout << "Excluded species: ";
+		for (const auto &species : excluded_species)
+		{
+			std::cout << species << " ";
+		}
+		std::cout << std::endl;
+        err_not_impl_f("This Model does not contain all neccecary molecules to predict this structure\n", std::cout);
+	}
 
     // Filter out excluded species from atomic_symbols
     for (const auto &symbol : atomic_symbols)

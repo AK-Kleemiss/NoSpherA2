@@ -13,7 +13,8 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-    SALTED_Utils::set_lmax_nmax(this->lmax, this->nmax, QZVP_JKfit, this->config.species);
+    
+    SALTED_Utils::set_lmax_nmax(this->lmax, this->nmax, *(this->wavy.get_basis_set_ptr()), this->config.species);
 
     for (int i = 0; i < this->wavy.atoms.size(); i++)
     {

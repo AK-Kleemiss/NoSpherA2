@@ -1572,7 +1572,7 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
 
-    const int nr_coefs = load_basis_into_WFN(dummy, TZVP_JKfit);
+    const int nr_coefs = load_basis_into_WFN(dummy, QZVP_JKfit_x2c_univ_combo);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
     calc_cube_ML(data, dummy, nr_coefs);
 

@@ -73,7 +73,7 @@ vec predict(const WFN &wavy, const string model_folder)
     unordered_map<string, int> lmax{};
     unordered_map<string, int> nmax{};
 #if has_RAS
-    set_lmax_nmax(lmax, nmax, QZVP_JKfit, config.species);
+    set_lmax_nmax(lmax, nmax, QZVP_JKfit_x2c_univ_combo, config.species);
 
     // RASCALINE (Generate descriptors)
 

@@ -152,13 +152,14 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_sucrose.cif -wfn test_sucrose.xyz -dmin 0.4 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-SALTED D:\Models\Cysteine_zwit_water_x2c -cif test.cif -wfn test.xyz -dmin 0.4 -v</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_sucrose.cif -wfn test_sucrose.xyz -dmin 0.4 -v -cpus 10</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>
+    </LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

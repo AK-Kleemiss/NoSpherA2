@@ -11,7 +11,7 @@ namespace SALTED_Utils
 {
     std::vector<cvec2> complex_to_real_transformation(std::vector<int> sizes);
     std::vector<std::string> filter_species(const std::vector<std::string> &atomic_symbols, const std::vector<std::string> &species);
-    void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, std::array<std::vector<primitive>, 35> basis_set, std::vector<std::string> species);
+    void set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, std::array<std::vector<primitive>, 86> basis_set, std::vector<std::string> species);
     int get_lmax_max(std::unordered_map<std::string, int> &lmax);
 }
 

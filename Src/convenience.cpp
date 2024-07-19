@@ -2616,8 +2616,9 @@ const double calc_density_ML(double &x,
     return dens;
 }
 
-int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 35> &b)
+int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 86> &b)
 {
+    wavy.set_basis_set_ptr(b);
     int nr_coefs = 0;
     for (int i = 0; i < wavy.atoms.size(); i++)
     {
@@ -2632,6 +2633,7 @@ int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 35> 
     }
     return nr_coefs;
 }
+
 
 double get_decimal_precision_from_CIF_number(string &given_string)
 {
