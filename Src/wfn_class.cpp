@@ -859,6 +859,8 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         {
             length = line.copy(tempchar, 12, 61);
             tempchar[length] = '\0';
+            // if we have a "=" in the line, we have to make it a space
+            if (tempchar[0] == '=') tempchar[0] = ' ';
             temp_ener = stod(tempchar);
         }
         if (temp_ener > last_ener)

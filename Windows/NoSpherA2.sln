@@ -25,6 +25,8 @@ Global
 		D_ML|x86 = D_ML|x86
 		D_OpenShell_gbw|x64 = D_OpenShell_gbw|x64
 		D_OpenShell_gbw|x86 = D_OpenShell_gbw|x86
+		D_polarizability|x64 = D_polarizability|x64
+		D_polarizability|x86 = D_polarizability|x86
 		D_ptb_Disorder|x64 = D_ptb_Disorder|x64
 		D_ptb_Disorder|x86 = D_ptb_Disorder|x86
 		D_pTB|x64 = D_pTB|x64
@@ -123,6 +125,10 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|x64.Build.0 = D_OpenShell_gbw|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|x86.ActiveCfg = D_OpenShell_gbw|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|x86.Build.0 = D_OpenShell_gbw|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_polarizability|x64.ActiveCfg = D_polarizability|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_polarizability|x64.Build.0 = D_polarizability|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_polarizability|x86.ActiveCfg = D_polarizability|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_polarizability|x86.Build.0 = D_polarizability|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ptb_Disorder|x64.ActiveCfg = D_ptb_Disorder|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ptb_Disorder|x64.Build.0 = D_ptb_Disorder|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ptb_Disorder|x86.ActiveCfg = D_ptb_Disorder|x64
@@ -278,6 +284,8 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_OpenShell_gbw|x64.ActiveCfg = D_OpenShell_gbw|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_OpenShell_gbw|x86.ActiveCfg = D_OpenShell_gbw|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_OpenShell_gbw|x86.Build.0 = D_OpenShell_gbw|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_polarizability|x64.ActiveCfg = Debug_SF_Disorder|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_polarizability|x86.ActiveCfg = Debug_SF_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_ptb_Disorder|x64.ActiveCfg = Debug_Co110_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_ptb_Disorder|x86.ActiveCfg = Debug_Co110_SF|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_pTB|x64.ActiveCfg = Debug|x64
@@ -386,6 +394,8 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x86.ActiveCfg = Debug|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x86.Build.0 = Debug|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_polarizability|x64.ActiveCfg = D_polarizability|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_polarizability|x86.ActiveCfg = D_polarizability|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ptb_Disorder|x64.ActiveCfg = D_ptb_Disorder|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ptb_Disorder|x86.ActiveCfg = D_ptb_Disorder|Win32
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_pTB|x64.ActiveCfg = D_pTB|x64

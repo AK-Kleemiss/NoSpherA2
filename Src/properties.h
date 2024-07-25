@@ -90,7 +90,8 @@ void Calc_Rho_no_trans(
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file);
+    std::ostream &file,
+    bool print = true);
 /**
  * Calculates the density based on a wfn with spherical harmonicsand stores the result in the given cube.
  *
@@ -273,6 +274,8 @@ void properties_calculation(options &opt);
 void do_combine_mo(options &opt);
 
 void dipole_moments(options& opt, std::ostream& log2 = std::cout);
+vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int threads, double radius, std::ostream& log2 = std::cout, bool debug = false);
+void polarizabilities(options& opt, std::ostream& log2 = std::cout);
 
 #include "wfn_class.h"
 #include "cell.h"

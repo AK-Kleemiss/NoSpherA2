@@ -744,6 +744,7 @@ struct options
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
     double mem = 0.0;
+    double efield = 0.005;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
     ivec2 groups;
@@ -757,6 +758,7 @@ struct options
     svec combine_mo;
     svec Cations;
     svec Anions;
+    svec pol_wfns;
     ivec cmo1;
     ivec cmo2;
     ivec ECP_nrs;

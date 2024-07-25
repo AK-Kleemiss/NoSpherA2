@@ -116,6 +116,10 @@ int main(int argc, char **argv)
         cout << "Bye Bye!" << endl;
         return 0;
     }
+    if (opt.pol_wfns.size() != 0) {
+        polarizabilities(opt, log_file);
+        exit(0);
+    }
     // Performs MTC and CMTC calcualtions, that is multiple wfns with either one or multiple cifs and 1 common hkl.
     if (opt.cif_based_combined_tsc_calc || opt.combined_tsc_calc)
     {

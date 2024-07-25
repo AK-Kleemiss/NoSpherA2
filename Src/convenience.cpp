@@ -64,7 +64,7 @@ string NoSpherA2_message()
     t.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
     t.append("                /_/\n");
     t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
-    t.append("Please give credit and cite corresponding pieces!\nThis Software is published with BSD-2 clause library.\n");
+    t.append("Please give credit and cite corresponding pieces!\nThis Software is published with BSD-2 clause license.\n");
     t.append("List of contributors of pieces of code or funcitonality:\n");
     t.append("      Florian Kleemiss,\n");
     t.append("      Emmanuel Hupf,\n");
@@ -2857,6 +2857,19 @@ void options::digest_options()
             dipole_moments(*this);
             exit(0);
         }
+        else if (temp == "-polarizabilities")
+        {
+          pol_wfns = { arguments[i + 1],
+            arguments[i + 2],
+            arguments[i + 3],
+            arguments[i + 4],
+            arguments[i + 5],
+            arguments[i + 6],
+            arguments[i + 7]
+          };
+        }
+        else if (temp == "-e_field")
+          efield = stod(arguments[i + 1]);
         else if (temp == "-ECP")
         {
             ECP = true;

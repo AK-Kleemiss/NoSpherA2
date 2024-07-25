@@ -706,7 +706,8 @@ void Calc_Rho_no_trans(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    ostream &file,
+    bool print)
 {
 #ifdef _OPENMP
     if (cpus != -1)
@@ -718,7 +719,9 @@ void Calc_Rho_no_trans(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    progress_bar* progress;
+    if (print)
+        progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeRho.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -745,10 +748,11 @@ void Calc_Rho_no_trans(
 
                 CubeRho.set_value(i, j, k, Rho);
             }
-        if (i != 0 && i % step == 0)
+        if (print && i != 0 && i % step == 0)
             progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
     }
-    delete (progress);
+    if(print)
+        delete (progress);
 
     time_point end = get_time();
     if (get_sec(start, end) < 60)
@@ -1661,8 +1665,6 @@ static void Calc_Hirshfeld_atom_2(
       omp_set_nested(1);
   }
 #endif
-
-  time_point start = get_time();
   Thakkar atom(wavy.get_atom_charge(_atom));
 
 #pragma omp parallel for schedule(dynamic)
@@ -1685,16 +1687,6 @@ static void Calc_Hirshfeld_atom_2(
           CubeHirsh.set_value(i, j, k, (dens_choice / temp_val * CubeRho.get_value(i, j, k)));
       }
   }
-
-  time_point end = get_time();
-  if (get_sec(start, end) < 1)
-    file << "Time to calculate: " << fixed << setprecision(0) << get_msec(start, end) << " ms" << endl;
-  else if (get_sec(start, end) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-  else if (get_sec(start, end) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-  else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
 vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom) {
@@ -1724,8 +1716,7 @@ vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom) {
       }
     }
   }
-  cout << "Charge: " << setprecision(8) << scientific << charge << endl;
-  return { mu_x, mu_y, mu_z };
+  return { mu_x, mu_y, mu_z ,charge};
 }
 
 void dipole_moments(options& opt, ostream& log2)
@@ -1784,7 +1775,7 @@ void dipole_moments(options& opt, ostream& log2)
   log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 
   log2 << "Calcualting Rho...";
-  Calc_Rho_no_trans(Rho, wavy, opt.threads, opt.radius, log2);
+  Calc_Rho_no_trans(Rho, wavy, opt.threads, opt.radius, log2, false);
   log2 << " ...done!\nCalcualting spherical Rho...";
   Calc_Spherical_Dens_no_trans(SPHER, wavy, opt.threads, opt.radius, log2);
   log2 << " ...done!" << endl;
@@ -1800,8 +1791,149 @@ void dipole_moments(options& opt, ostream& log2)
   }
   log2 << " atom   |  dipole moment x,        y,         z" << endl << "======================================" << endl;
   for (int i = 0; i < wavy.get_ncen(); i++) {
-    log2 << setw(3) << i <<" (" << atnr2letter(wavy.get_atom_charge(i))<< ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
+    log2 << setw(3) << i << " (" << atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
   }
+  std::cout << "\n\nProperties calculation done!" << std::endl;
+}
+
+vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int threads, double radius, ostream& log2, bool debug)
+{
+  if (debug)
+    log2 << "Starting calculation of dipole moment" << endl;
+  cube Rho(NbSteps[0], NbSteps[1], NbSteps[2], wavy.get_ncen(), true);
+
+  Rho.give_parent_wfn(wavy);
+  vec stepsizes{ (MinMax[3] - MinMax[0]) / NbSteps[0],
+  (MinMax[4] - MinMax[1]) / NbSteps[1],
+  (MinMax[5] - MinMax[2]) / NbSteps[2] };
+
+  for (int i = 0; i < 3; i++)
+  {
+    Rho.set_origin(i, MinMax[i]);
+    Rho.set_vector(i, i, stepsizes[i]);
+  }
+  if (debug)
+    log2 << "Origins etc are set up" << endl;
+  Rho.set_comment1("Calculated density using NoSpherA2");
+  Rho.set_comment2("from " + wavy.get_path());
+  Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
+  cube Hirsh = Rho;
+  Hirsh.calc_dv();
+  Hirsh.give_parent_wfn(wavy);
+
+  log2 << "Calculating electron density for " << fixed << setprecision(0) << NbSteps[0] * NbSteps[1] * NbSteps[2] << " Gridpoints." << endl;
+  Calc_Rho_no_trans(Rho, wavy, threads, radius, log2, false);
+  vec2 dipole_moments;
+  log2 << "Calcualting Hirshfeld density for atom: " << flush;
+  for (int i = 0; i < wavy.get_ncen(); i++) {
+      Hirsh.set_zero();
+      log2 << i << " " << flush;
+      Calc_Hirshfeld_atom_2(Hirsh, Rho, SPHER, wavy, threads, i, log2);
+      dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh));
+  }
+  log2 << "...done!" << endl;
+  log2 << " atom   |   charge   | dipole moment x,        y,         z" << endl << "======================================" << endl;
+  for (int i = 0; i < wavy.get_ncen(); i++) {
+    log2 << setw(3) << i <<" (" << atnr2letter(wavy.get_atom_charge(i))<< ") |" << scientific << setprecision(6) << setw(12) << dipole_moments[i][3] << "| " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
+  }
+  return dipole_moments;
+}
+
+void polarizabilities(options& opt, ostream& log2)
+{
+  std::vector<WFN> wavy;
+  for (int i = 0; i < 7; i++) {
+    wavy.push_back(WFN(0));
+    wavy[i].read_known_wavefunction_format(opt.pol_wfns[i], log2, opt.debug);
+  }
+
+  //check that all WFN have the same number of atoms
+
+  
+  if (opt.debug)
+    log2 << "Starting calculation of Polarizabilities" << endl;
+
+  if (opt.debug)
+    log2 << opt.resolution << " " << opt.radius << endl;
+  readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution, true);
+  if (opt.debug)
+  {
+    log2 << "Resolution: " << opt.resolution << endl;
+    log2 << "MinMax:" << endl;
+    for (int i = 0; i < 6; i++)
+      log2 << setw(14) << scientific << opt.MinMax[i];
+    log2 << endl;
+    log2 << "Steps:" << endl;
+    for (int i = 0; i < 3; i++)
+      log2 << setw(14) << scientific << opt.NbSteps[i];
+    log2 << endl;
+  }
+  cube SPHER(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
+
+  SPHER.give_parent_wfn(wavy[0]);
+  vec stepsizes{ (opt.MinMax[3] - opt.MinMax[0]) / opt.NbSteps[0],
+  (opt.MinMax[4] - opt.MinMax[1]) / opt.NbSteps[1],
+  (opt.MinMax[5] - opt.MinMax[2]) / opt.NbSteps[2] };
+
+  for (int i = 0; i < 3; i++)
+  {
+    SPHER.set_origin(i, opt.MinMax[i]);
+    SPHER.set_vector(i, i, stepsizes[i]);
+  }
+  if (opt.debug)
+    log2 << "Origins etc are set up" << endl;
+  SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
+  SPHER.set_comment2("from" + wavy[0].get_path());
+  SPHER.path = get_basename_without_ending(wavy[0].get_path()) + "_spher.cube";
+
+  log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
+
+  log2 << "Calcualting spherical Rho...";
+  Calc_Spherical_Dens_no_trans(SPHER, wavy[0], opt.threads, opt.radius, log2);
+  log2 << " ...done!" << endl;
+  vec3 dipoles(7); // 0, +x, -x, +y, -y, +z, -z
+  for (int i = 0; i < 7; i++) {
+    dipoles[i] = dipole_moments(wavy[i], SPHER, opt.MinMax, opt.NbSteps, opt.threads, opt.radius, log2, opt.debug);
+  }
+  vec3 polarizabilities(wavy[0].get_ncen());
+  for (int i = 0; i < wavy[0].get_ncen(); i++) {
+    polarizabilities[i] = { { 0, 0, 0 }, {0,0,0}, {0,0,0} };
+    vec dx = { (dipoles[1][i][0] - dipoles[2][i][0]),
+               (dipoles[3][i][0] - dipoles[4][i][0]),
+               (dipoles[5][i][0] - dipoles[6][i][0]) };
+    vec dy = { (dipoles[1][i][1] - dipoles[2][i][1]),
+               (dipoles[3][i][1] - dipoles[4][i][1]),
+               (dipoles[5][i][1] - dipoles[6][i][1]) };
+    vec dz = { (dipoles[1][i][2] - dipoles[2][i][2]),
+               (dipoles[3][i][2] - dipoles[4][i][2]),
+               (dipoles[5][i][2] - dipoles[6][i][2]) };
+    polarizabilities[i][0][0] = dx[0] / 2 / opt.efield;
+    polarizabilities[i][0][1] = dx[1] / 2 / opt.efield;
+    polarizabilities[i][0][2] = dx[2] / 2 / opt.efield;
+    polarizabilities[i][1][0] = dy[0] / 2 / opt.efield;
+    polarizabilities[i][1][1] = dy[1] / 2 / opt.efield;
+    polarizabilities[i][1][2] = dy[2] / 2 / opt.efield;
+    polarizabilities[i][2][0] = dz[0] / 2 / opt.efield;
+    polarizabilities[i][2][1] = dz[1] / 2 / opt.efield;
+    polarizabilities[i][2][2] = dz[2] / 2 / opt.efield;
+  }
+  // print the results per atom
+  log2 << "Polarizabilities:\n atom   |   charge   |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz" << endl 
+    << "========|============|=======================================================================================================================================" << endl;
+  for (int i = 0; i < wavy[0].get_ncen(); i++) {
+		log2 << setw(3) << i << " (" << atnr2letter(wavy[0].get_atom_charge(i)) << ") |" 
+      << scientific << setprecision(6) << setw(12) << dipoles[0][i][3]-wavy[0].atoms[i].charge << "|"
+      << scientific << setprecision(6) 
+      << setw(14) << polarizabilities[i][0][0] << "," 
+      << setw(14) << polarizabilities[i][0][1] << "," 
+      << setw(14) << polarizabilities[i][0][2] << "," 
+      << setw(14) << polarizabilities[i][1][0] << "," 
+      << setw(14) << polarizabilities[i][1][1] << "," 
+      << setw(14) << polarizabilities[i][1][2] << "," 
+      << setw(14) << polarizabilities[i][2][0] << "," 
+      << setw(14) << polarizabilities[i][2][1] << "," 
+      << setw(14) << polarizabilities[i][2][2] << endl;
+	}
   std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 

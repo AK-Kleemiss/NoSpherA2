@@ -61,6 +61,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">
+    <LocalDebuggerCommandArguments>-resolution 0.02 -radius 2.5 -cpus 8 -polarizabilities zero.wfn xp.wfn xm.wfn yp.wfn ym.wfn zp.wfn zm.wfn</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\polarizabilities</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">
     <LocalDebuggerCommandArguments>-wfn epoxide.gbw -v2 -v -hkl epoxide.hkl -cif epoxide.cif -acc 1</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw\</LocalDebuggerWorkingDirectory>
