@@ -1503,7 +1503,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele
         res[i].resize(10000, 0.0);
 
     string dat = "core_dens_" + ele + ".dat";
-    int el_nr = get_Z_from_label(ele.c_str());
+    int el_nr = get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
@@ -1590,12 +1590,11 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele
     dat_out.close();
 }
 
-void test_core_sfac_corrected(double &precisison, int ncpus = 4)
+void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
 {
     if (ncpus == -1)
         ncpus = 4;
     using namespace std;
-    ofstream out("core_sfac_corrected.log", ios::out);
 #ifdef _OPENMP
     omp_set_num_threads(ncpus);
 #endif
@@ -1603,73 +1602,66 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
     for (int i = 0; i < res.size(); i++)
         res[i].resize(1000, 0.0);
 
-    ofstream dat_out("core_sfac_Au.dat", ios::out);
 
-    Thakkar T_Au(79);
+    string dat = "core_dens_" + ele + ".dat";
+    int el_nr = get_Z_from_label(ele.c_str()) + 1;
+    Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
-    ECP_way_Au.read_gbw("Au_def2TZVP.gbw", out, false, false);
+    ECP_way_Au.read_gbw(ele+"_def2TZVP.gbw", cout, false, false);
+    ECP_way_Au.delete_unoccupied_MOs();
+    ECP_way_Au.set_has_ECPs(true, true, 1);
 
     WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_full_Au.read_gbw(ele+"_jorge.gbw", cout, false);
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_val_Au.read_gbw(ele+"_jorge.gbw", cout, false);
     wavy_val_Au.delete_unoccupied_MOs();
-    cout << "Energies before:" << endl;
+    cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
+    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
+    int deleted = 0;
+    if (val_els_alpha.size() > 0)
+    {
+      // Delete core orbitals
+      int offset = wavy_val_Au.get_MO_op_count(0);
+      for (int i = offset - 1; i >= 0; i--)
+        // only delete if i is not an element of val_els
+        if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
+        {
+          cout << "Deleting from Alpha: " << i << endl;
+          wavy_val_Au.delete_MO(i);
+          MOs_to_delete[i] = true;
+          deleted++;
+        }
+      offset = wavy_val_Au.get_MO_op_count(0);
+      for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
+        if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
+        {
+          cout << "Deleting from Beta: " << i - offset << endl;
+          wavy_val_Au.delete_MO(i);
+          MOs_to_delete[i + deleted] = true;
+        }
+    }
+    cout << "MOs deleted: " << deleted << endl;
+    cout << "MO map:" << endl;
+    for (int i = 0; i < MOs_to_delete.size(); i++)
+      cout << i << " " << MOs_to_delete[i] << endl;
+    cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+    cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
-    wavy_val_Au.delete_MO(30);
-    wavy_val_Au.delete_MO(29);
-    wavy_val_Au.delete_MO(28);
-    wavy_val_Au.delete_MO(27);
-    wavy_val_Au.delete_MO(26);
-    wavy_val_Au.delete_MO(25);
-    wavy_val_Au.delete_MO(24);
-    wavy_val_Au.delete_MO(22);
-    wavy_val_Au.delete_MO(21);
-    wavy_val_Au.delete_MO(20);
-    wavy_val_Au.delete_MO(19);
-    wavy_val_Au.delete_MO(18);
-    wavy_val_Au.delete_MO(17);
-    wavy_val_Au.delete_MO(16);
-    wavy_val_Au.delete_MO(15);
-    wavy_val_Au.delete_MO(14);
-    wavy_val_Au.delete_MO(13);
-    wavy_val_Au.delete_MO(12);
-    wavy_val_Au.delete_MO(11);
-    wavy_val_Au.delete_MO(10);
-    wavy_val_Au.delete_MO(9);
-    wavy_val_Au.delete_MO(8);
-    wavy_val_Au.delete_MO(7);
-    wavy_val_Au.delete_MO(6);
-    wavy_val_Au.delete_MO(5);
-    wavy_val_Au.delete_MO(4);
-    wavy_val_Au.delete_MO(3);
-    wavy_val_Au.delete_MO(2);
-    wavy_val_Au.delete_MO(1);
-    wavy_val_Au.delete_MO(0);
-    // 10 alpha electrons remain
-    for (int i = 0; i < 23; i++)
-        wavy_val_Au.delete_MO(10);
-    // keep the 5s, delete 4f
-    for (int i = 0; i < 7; i++)
-        wavy_val_Au.delete_MO(11);
-
-    cout << "\n\nEnergies after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+      cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     std::vector<time_point> time_points;
     std::vector<std::string> time_descriptions;
 
-    ivec atom_type_list({79});
+    ivec atom_type_list({el_nr});
     ivec asym_atom_list({0});
     bvec needs_grid({true});
     vec2 d1_ECP, d2_ECP, d3_ECP, dens_ECP;
     vec2 d1_all, d2_all, d3_all, dens_all;
     vec2 d1_val, d2_val, d3_val, dens_val;
-    svec labels({"Au"});
+    svec labels({ele});
 
     auto temp_cell = cell();
     make_hirshfeld_grids(0,
@@ -1681,7 +1673,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          needs_grid,
                          d1_ECP, d2_ECP, d3_ECP, dens_ECP,
                          labels,
-                         out,
+                         cout,
                          time_points,
                          time_descriptions);
     make_hirshfeld_grids(0,
@@ -1693,7 +1685,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          needs_grid,
                          d1_all, d2_all, d3_all, dens_all,
                          labels,
-                         out,
+                         cout,
                          time_points,
                          time_descriptions);
     make_hirshfeld_grids(0,
@@ -1705,11 +1697,11 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
                          needs_grid,
                          d1_val, d2_val, d3_val, dens_val,
                          labels,
-                         out,
+                         cout,
                          time_points,
                          time_descriptions);
 
-    progress_bar *progress = new progress_bar{out, 60u, "Calculating SFACs"};
+    progress_bar *progress = new progress_bar{cout, 60u, "Calculating SFACs"};
     const int upper = static_cast<int>(res[0].size());
     const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
 #pragma omp parallel for schedule(dynamic)
@@ -1717,18 +1709,19 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4)
     {
         double sr = i * 0.01;
         res[0][i] = sr;
-        res[1][i] = T_Au.get_core_form_factor(sr, 60);
+        res[1][i] = T_Au.get_core_form_factor(sr, ECP_way_Au.atoms[0].ECP_electrons);
         res[2][i] = T_Au.get_form_factor(sr);
         res[3][i] = calc_spherically_averaged_at_k(d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
         res[4][i] = calc_spherically_averaged_at_k(d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
-        res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0, true);
+        res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0);
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(upper));
     }
     delete (progress);
 
+    ofstream dat_out("core_sfac_" + ele + ".dat", ios::out);
     time_point end = get_time();
-    out << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
+    cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
     dat_out << scientific << setprecision(12) << setw(20);
     double t = 0;
     for (int i = 0; i < res[0].size(); i++)

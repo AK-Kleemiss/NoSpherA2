@@ -2841,7 +2841,9 @@ void options::digest_options()
         else if (temp == "-core_tsc-corrected")
         {
             double prec = stod(arguments[i + 1]);
-            test_core_sfac_corrected(prec, threads);
+            ivec a = split_string<int>(arguments[i + 3], ",");
+            ivec b = split_string<int>(arguments[i + 4], ",");
+            test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
             exit(0);
         }
         else if (temp == "-def" || temp == "-DEF")
