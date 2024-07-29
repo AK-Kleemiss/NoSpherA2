@@ -2833,7 +2833,9 @@ void options::digest_options()
         else if (temp == "-core_dens-corrected")
         {
             double prec = stod(arguments[i + 1]);
-            test_core_dens_corrected(prec, threads);
+            ivec a = split_string<int>(arguments[i + 3], ",");
+            ivec b = split_string<int>(arguments[i + 4], ",");
+            test_core_dens_corrected(prec, threads, arguments[i+2], a, b);
             exit(0);
         }
         else if (temp == "-core_tsc-corrected")
@@ -3013,10 +3015,6 @@ void options::digest_options()
             no_date = true;
         else if (temp == "-pbc")
             pbc = stoi(arguments[i + 1]);
-        else if (temp == "-perf_benchmark")
-        {
-            test_timing();
-        }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
@@ -3074,11 +3072,6 @@ void options::digest_options()
             sfac_scan_ECP(*this, log_file);
             exit(0);
         }
-        else if (temp == "-test-ecp-pot")
-        {
-            test_esp_dens();
-            exit(0);
-        }
         else if (temp == "-sfac_diffuse")
         {
             sfac_diffuse = fromString<double>(arguments[i + 1]);
@@ -3091,10 +3084,6 @@ void options::digest_options()
         {
             spherical_harmonic_test();
             exit(0);
-        }
-        else if (temp == "-test-core")
-        {
-            test_core_dens();
         }
         else if (temp == "-test")
             cout << "Running in test mode!" << endl, test = true;

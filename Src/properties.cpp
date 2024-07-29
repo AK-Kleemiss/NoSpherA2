@@ -719,7 +719,7 @@ void Calc_Rho_no_trans(
 
     time_point start = get_time();
 
-    progress_bar* progress;
+    progress_bar* progress = nullptr;
     if (print)
         progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeRho.get_size(0) / 20.0), 1.0);
@@ -748,10 +748,10 @@ void Calc_Rho_no_trans(
 
                 CubeRho.set_value(i, j, k, Rho);
             }
-        if (print && i != 0 && i % step == 0)
+        if (print && i != 0 && i % step == 0 && progress != nullptr)
             progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
     }
-    if(print)
+    if(progress != nullptr)
         delete (progress);
 
     time_point end = get_time();

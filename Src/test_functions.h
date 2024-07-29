@@ -434,108 +434,6 @@ void sfac_scan(options &opt, std::ostream &log_file)
     }
 }
 
-void test_timing()
-{
-    using namespace std;
-    cout << NoSpherA2_message() << endl;
-    options opt;
-    opt.dmin = 0.5;
-    opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_1\\thpp.wfx");
-    opt.combined_tsc_calc_files.push_back("olex2\\Wfn_job\\Part_2\\thpp.wfx");
-    opt.accuracy = 2;
-    ivec t1 = {0, 1};
-    ivec t2 = {0, 2};
-    opt.groups.pop_back();
-    opt.groups.push_back(t1);
-    opt.groups.push_back(t2);
-    opt.cif = "thpp.cif";
-    opt.combined_tsc_calc = true;
-    opt.binary_tsc = true;
-
-    int max_threads = 48;
-    vector<long long int> time(max_threads);
-
-    for (int ncpus = 1; ncpus < 49; ncpus++)
-    {
-        auto start = std::chrono::high_resolution_clock::now();
-        opt.threads = ncpus;
-#ifdef _OPENMP
-        omp_set_num_threads(ncpus);
-        // print the number of threads used
-        std::cout << "Using " << opt.threads << " threads" << std::endl;
-#pragma omp parallel
-        {
-#pragma omp single
-            cout << omp_get_num_threads() << endl;
-        }
-#else
-        std::cout << "You are running an OmpenMP Benchamrk without parallelization" << std::endl;
-        std::cout << "This will not give you any useful information" << std::endl;
-#endif
-        std::vector<WFN> wavy;
-        err_checkf(opt.hkl != "" || opt.dmin != 99.0, "No hkl specified and no dmin value given", std::cout);
-        if (opt.combined_tsc_calc)
-            err_checkf(opt.cif != "", "No cif specified", std::cout);
-        // First make sure all files exist
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], std::cout);
-            if (opt.cif_based_combined_tsc_calc)
-                err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i], std::cout);
-        }
-        wavy.resize(opt.combined_tsc_calc_files.size());
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            std::cout << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
-            wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], std::cout);
-            std::cout << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
-        }
-
-        svec known_scatterer;
-        vec2 known_kpts;
-        tsc_block<int, cdouble> result;
-        for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
-        {
-            known_scatterer = result.get_scatterers();
-            if (wavy[i].get_origin() != 7)
-            {
-                result.append(calculate_scattering_factors_MTC(
-                                  opt,
-                                  wavy,
-                                  std::cout,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              std::cout);
-            }
-            else
-            {
-                result.append(MTC_thakkar_sfac(
-                                  opt,
-                                  std::cout,
-                                  known_scatterer,
-                                  wavy,
-                                  i),
-                              std::cout);
-            }
-        }
-
-        known_scatterer = result.get_scatterers();
-        std::cout << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-        time[ncpus - 1] = duration.count();
-    }
-
-    // Print out results of timing
-    for (int i = 0; i < max_threads; i++)
-    {
-        std::cout << "Time for " << i + 1 << " threads: " << time[i] << " microseconds" << std::endl;
-    }
-
-    exit(0);
-}
-
 template <typename T>
 std::vector<T> geomspace(T start, T stop, int num)
 {
@@ -593,7 +491,7 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
         angle *= 1.2;
     }
     if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::endl;
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::setw(14) << angle << std::endl;
     return new_result;
 }
 
@@ -1555,11 +1453,6 @@ double s_value(double *d)
     return pow(gaussian_radial(p_0, d[3]) * spherical_harmonic(p_0.type, m, d), 2);
 }
 
-double one()
-{
-    return 1.;
-}
-
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 {
     std::vector<unsigned long> shape{};
@@ -1597,212 +1490,91 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
     }
 }
 
-void test_core_dens()
-{
-    using namespace std;
-    ofstream out("core_dens.log", ios::out);
-    vec2 res(12);
-    for (int i = 0; i < 12; i++)
-        res[i].resize(1000000, 0.0);
-
-    ofstream dat_out("core_dens_Li.dat", ios::out);
-
-    Thakkar T_Li(3);
-
-    WFN ECP_way_LI(9);
-    ECP_way_LI.read_gbw("Li_ECP.gbw", out, true, true);
-
-    WFN wavy3_LI(9);
-    wavy3_LI.read_gbw("Li_QZVP.gbw", out, false);
-    wavy3_LI.delete_unoccupied_MOs();
-    WFN wavy4_LI(9);
-    wavy4_LI.read_gbw("Li_QZVP.gbw", cout, false);
-    wavy4_LI.delete_unoccupied_MOs();
-    wavy4_LI.delete_MO(1); // delete the 2nd MO
-#pragma omp parallel for
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        double sr = i * 0.00001;
-        res[0][i] = sr;
-        res[1][i] = T_Li.get_core_density(sr, 2);
-        res[2][i] = T_Li.get_radial_density(sr);
-        res[3][i] = ECP_way_LI.compute_dens(sr, 0, 0);
-        res[4][i] = wavy3_LI.compute_dens(sr, 0, 0);
-        res[5][i] = wavy4_LI.compute_dens(sr, 0, 0);
-    }
-    dat_out << fixed;
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 6; j++)
-        {
-            auto t = res[j][i];
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
-    exit(0);
-
-//    Thakkar T_Rb(37);
-//    string base = "def2-ECP";
-//    Gaussian_Atom G_Rb(37, base);
-//    WFN ECP_way(9);
-//    ECP_way.read_gbw("Atomic_densities\\atom_atom37.gbw", out, true, true);
-//
-//    WFN multi_ecp_wavy(9);
-//    multi_ecp_wavy.read_gbw("Rb4.gbw", out, true, true);
-//
-//    WFN wavy(9);
-//    wavy.read_gbw("Rb.gbw", out, false);
-//    wavy.delete_unoccupied_MOs();
-//    WFN wavy2(9);
-//    wavy2.read_gbw("Rb.gbw", cout, false);
-//    wavy2.delete_unoccupied_MOs();
-//    wavy2.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
-//    wavy2.pop_back_MO();
-//    wavy2.pop_back_MO();
-//    wavy2.pop_back_MO();
-//    wavy2.pop_back_MO();
-//
-//    WFN wavy3(9);
-//    wavy3.read_gbw("Rb_QZVP.gbw", out, false);
-//    wavy3.delete_unoccupied_MOs();
-//    WFN wavy4(9);
-//    wavy4.read_gbw("Rb_QZVP.gbw", cout, false);
-//    wavy4.delete_unoccupied_MOs();
-//    wavy4.pop_back_MO(); // delete the last 5 MOs: 5s, 3* 4p & 4s
-//    wavy4.pop_back_MO();
-//    wavy4.pop_back_MO();
-//    wavy4.pop_back_MO();
-//    wavy4.pop_back_MO();
-//
-//#pragma omp parallel for
-//    for (int i = 0; i < res[0].size(); i++)
-//    {
-//        double r, sr;
-//        r = i * 0.001;
-//        sr = r * 0.01;
-//        res[0][i] = r;
-//        res[1][i] = T_Rb.get_core_form_factor(r, 28);
-//        res[2][i] = G_Rb.get_core_form_factor(r, 28);
-//        res[3][i] = T_Rb.get_core_density(sr, 28);
-//        res[4][i] = G_Rb.get_radial_density(sr);
-//        res[5][i] = T_Rb.get_radial_density(sr);
-//        res[6][i] = wavy.compute_dens(sr, 0, 0);
-//        res[7][i] = wavy2.compute_dens(sr, 0, 0);
-//        res[8][i] = sr;
-//        res[9][i] = ECP_way.compute_dens(sr, 0, 0);
-//        res[10][i] = wavy3.compute_dens(sr, 0, 0);
-//        res[11][i] = wavy4.compute_dens(sr, 0, 0);
-//    }
-//    dat_out << fixed;
-//    for (int i = 0; i < res[0].size(); i++)
-//    {
-//        for (int j = 0; j < res.size(); j++)
-//        {
-//            auto t = res[j][i];
-//            dat_out << t;
-//            dat_out << " ";
-//        }
-//        dat_out << "\n";
-//    }
-//    dat_out << flush;
-//    dat_out.close();
-}
-
-void test_core_dens_corrected(double &precisison, int ncpus = 4)
+void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
 {
     if (ncpus == -1)
         ncpus = 4;
     using namespace std;
-    ofstream out("core_dens_corrected.log", ios::out);
 #ifdef _OPENMP
     omp_set_num_threads(ncpus);
 #endif
     vec2 res(6);
     for (int i = 0; i < res.size(); i++)
-        res[i].resize(100000, 0.0);
+        res[i].resize(10000, 0.0);
 
-    ofstream dat_out("core_dens_Au.dat", ios::out);
-
-    Thakkar T_Au(79);
+    string dat = "core_dens_" + ele + ".dat";
+    int el_nr = get_Z_from_label(ele.c_str());
+    Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
-    ECP_way_Au.read_gbw("Au_def2TZVP.gbw", out, false, false);
+    string def2 = ele + "_def2TZVP.gbw";
+    ECP_way_Au.read_gbw(def2, cout, false, false);
+    ECP_way_Au.delete_unoccupied_MOs();
+    ECP_way_Au.set_has_ECPs(true, true, 1);
 
+    string jorge = ele + "_jorge.gbw";
     WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_full_Au.read_gbw(jorge, cout, false);
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw("Au_jorge.gbw", out, false);
+    wavy_val_Au.read_gbw(jorge, cout, false);
     wavy_val_Au.delete_unoccupied_MOs();
-    cout << "Energies before:" << endl;
+    cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
+    bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
+    int deleted = 0;
+    if (val_els_alpha.size() > 0)
+    {
+      // Delete core orbitals
+      int offset = wavy_val_Au.get_MO_op_count(0);
+      for (int i = offset - 1; i >= 0; i--)
+        // only delete if i is not an element of val_els
+        if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
+        {
+          cout << "Deleting from Alpha: " << i << endl;
+          wavy_val_Au.delete_MO(i);
+          MOs_to_delete[i] = true;
+          deleted++;
+        }
+      offset = wavy_val_Au.get_MO_op_count(0);
+      for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
+        if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
+        {
+          cout << "Deleting from Beta: " << i - offset << endl;
+          wavy_val_Au.delete_MO(i);
+          MOs_to_delete[i + deleted] = true;
+        }
+    }
+    cout << "MOs deleted: " << deleted << endl;
+    cout << "MO map:" << endl;
+    for (int i = 0; i < MOs_to_delete.size(); i++)
+      cout << i << " " << MOs_to_delete[i] << endl;
+    cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+    cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
-    wavy_val_Au.delete_MO(30);
-    wavy_val_Au.delete_MO(29);
-    wavy_val_Au.delete_MO(28);
-    wavy_val_Au.delete_MO(27);
-    wavy_val_Au.delete_MO(26);
-    wavy_val_Au.delete_MO(25);
-    wavy_val_Au.delete_MO(24);
-    wavy_val_Au.delete_MO(22);
-    wavy_val_Au.delete_MO(21);
-    wavy_val_Au.delete_MO(20);
-    wavy_val_Au.delete_MO(19);
-    wavy_val_Au.delete_MO(18);
-    wavy_val_Au.delete_MO(17);
-    wavy_val_Au.delete_MO(16);
-    wavy_val_Au.delete_MO(15);
-    wavy_val_Au.delete_MO(14);
-    wavy_val_Au.delete_MO(13);
-    wavy_val_Au.delete_MO(12);
-    wavy_val_Au.delete_MO(11);
-    wavy_val_Au.delete_MO(10);
-    wavy_val_Au.delete_MO(9);
-    wavy_val_Au.delete_MO(8);
-    wavy_val_Au.delete_MO(7);
-    wavy_val_Au.delete_MO(6);
-    wavy_val_Au.delete_MO(5);
-    wavy_val_Au.delete_MO(4);
-    wavy_val_Au.delete_MO(3);
-    wavy_val_Au.delete_MO(2);
-    wavy_val_Au.delete_MO(1);
-    wavy_val_Au.delete_MO(0);
-    // 10 alpha electrons remain
-    for (int i = 0; i < 23; i++)
-        wavy_val_Au.delete_MO(10);
-    // keep the 5s, delete 4f
-    for (int i = 0; i < 7; i++)
-        wavy_val_Au.delete_MO(11);
-
-    cout << "\n\nEnergies after:" << endl;
-    for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " " << wavy_val_Au.get_MO_occ(i) << endl;
+      cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{out, 60u, "Calculating densities"};
+    progress_bar *progress = new progress_bar{cout, 60u, "Calculating densities"};
     const int upper = static_cast<int>(res[0].size());
     const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < upper; i++)
     {
-        double sr = i * 0.0001;
+        double sr = i * 0.001;
         res[0][i] = sr;
-        res[1][i] = T_Au.get_core_density(sr, 60);
+        res[1][i] = T_Au.get_core_density(sr, ECP_way_Au.atoms[0].ECP_electrons);
         res[2][i] = T_Au.get_radial_density(sr);
-        res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison);
-        res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison);
-        res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison);
+        res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison, 60);
+        res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison, 60);
+        res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison, 60);
         if (i != 0 && i % step == 0)
             progress->write(i / static_cast<double>(upper));
     }
     delete (progress);
     time_point end = get_time();
-    out << "Time taken: " << get_sec(start, end) << " s " << get_msec(start, end) << " ms" << endl;
+    cout << "Time taken: " << round(get_sec(start, end)/60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
+    ofstream dat_out(dat, ios::out);
     dat_out << scientific << setprecision(12) << setw(20);
     for (int i = 0; i < res[0].size(); i++)
     {
@@ -1991,122 +1763,4 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
         }
     }
     return res / constants::FOUR_PI;
-}
-
-void test_esp_dens()
-{
-    using namespace std;
-    Thakkar T_Li(3);
-    ofstream out("core_pot.log", ios::out);
-    WFN ECP_way(9);
-    ECP_way.read_gbw("Li_QZVP.gbw", out, true, false);
-    ECP_way.delete_unoccupied_MOs();
-
-    WFN ECP_way_core(9);
-    ECP_way_core.read_gbw("Li_QZVP.gbw", out, true, false);
-    ECP_way_core.delete_unoccupied_MOs();
-    ECP_way_core.delete_MO(1);
-    const int points = 100000;
-    const double len = 8;
-    const double dr = len / points;
-
-    vec2 res(10);
-    for (int i = 0; i < 10; i++)
-        res[i].resize(points, 0.0);
-
-    ofstream dat_out("core_pot.dat", ios::out);
-    vec2 d2;
-    d2.resize(ECP_way.get_ncen());
-    for (int i = 0; i < ECP_way.get_ncen(); i++)
-    {
-        d2[i].resize(ECP_way.get_ncen());
-        for (int j = 0; j < ECP_way.get_ncen(); j++)
-        {
-            if (i == j)
-            {
-                d2[i][j] = 0;
-                continue;
-            }
-            d2[i][j] = pow(ECP_way.atoms[i].x - ECP_way.atoms[j].x, 2) + pow(ECP_way.atoms[i].y - ECP_way.atoms[j].y, 2) + pow(ECP_way.atoms[i].z - ECP_way.atoms[j].z, 2);
-        }
-    }
-    /*
-    const double incr = pow(1.005, max(1, 4));
-    const double lincr = log(incr);
-    const double min_dist = 0.0000001;
-    double current = 1;
-    double dist = min_dist;
-    vec2 radial_density(1);
-    vec2 radial_density_core(1);
-    vec2 radial_dist(1);
-    const double cube_dist = 5.0;
-    while (dist < 2.3 * cube_dist)
-    {
-        radial_dist[0].push_back(dist);
-        current = T_Li.get_radial_density(dist);
-        radial_density[0].push_back(current);
-        current = T_Li.get_core_density(dist, 2);
-        radial_density_core[0].push_back(current);
-        dist *= incr;
-    }
-    vec3 dens_grid;
-    double dr = 0.02;
-    const double dr3 = dr * dr * dr;
-    const int grid_size = (2*cube_dist / dr) + 1;
-    dens_grid.resize(grid_size);
-    int points = (int)cube_dist / dr;
-#pragma omp parallel for
-    for (int x = -points; x <= points; x++)
-    {
-        dens_grid[x + points].resize(grid_size);
-        for (int y = -points; y <= points; y++)
-        {
-            dens_grid[x + points][y + points].resize(grid_size, 0.0);
-        }
-    }
-    double NULLY = 0;
-#pragma omp parallel for
-    for (int x = -points; x <= points; x++)
-    {
-        for (int y = -points; y <= points; y++)
-        {
-            for (int z = -points; z <= points; z++) {
-                dens_grid[x+points][y + points][z + points] = linear_interpolate_spherical_density(radial_density[0], radial_dist[0], sqrt(x * x + y * y + z * z)*dr, lincr, 0.0000001);
-            }
-        }
-    }
-    out << "Done with radial densities" << endl;
-    */
-
-    progress_bar *progress = new progress_bar{out, 50u, "Calculating Values", '-', 0.01};
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        double sr = i * dr;
-        double pos[3] = {sr, 0, 0};
-        res[0][i] = sr;
-        res[1][i] = T_Li.get_core_density(sr, 2);
-        res[2][i] = T_Li.get_radial_density(sr);
-        res[3][i] = ECP_way.compute_dens(sr, 0, 0);
-        res[4][i] = ECP_way.computeESP_noCore(pos, d2);
-        // res[5][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
-        // res[6][i] = calc_pot_by_integral(dens_grid, sr, cube_dist, dr);
-        res[7][i] = ECP_way_core.compute_dens(sr, 0, 0);
-        res[8][i] = ECP_way_core.computeESP_noCore(pos, d2);
-        if (i != 0 && i % static_cast<int>(points / 100) == 0)
-            progress->write(i / static_cast<double>(res[0].size()));
-    }
-    dat_out << scientific << setprecision(14);
-    for (int i = 0; i < res[0].size(); i++)
-    {
-        for (int j = 0; j < 9; j++)
-        {
-            auto t = res[j][i];
-            dat_out << t;
-            dat_out << " ";
-        }
-        dat_out << "\n";
-    }
-    dat_out << flush;
-    dat_out.close();
 }
