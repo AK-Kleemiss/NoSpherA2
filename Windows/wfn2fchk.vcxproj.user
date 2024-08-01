@@ -92,8 +92,8 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">
-    <LocalDebuggerCommandArguments>-test-ecp-pot</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF\</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-cpus 4 -cif Rb.cif -core_tsc-corrected 0.001 Rb 14,15,16,17,18 14,15,16,17</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>D:\temp\ECP\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
@@ -158,14 +158,13 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Cysteine_zwit_water_x2c -cif test.cif -wfn test.xyz -dmin 0.4 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-SALTED $(SolutionDir)..\tests\Coeffs_From_ML\Model -cif test_sucrose.cif -wfn test_sucrose.xyz -dmin 0.73 -cpus 8</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">
-    <LocalDebuggerCommandArguments>
-    </LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-SALTED $(SolutionDir)..\tests\Coeffs_From_ML\Model -cif test_sucrose.cif -wfn test_sucrose.xyz -dmin 0.73 -cpus 8</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
