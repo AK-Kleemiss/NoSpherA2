@@ -622,7 +622,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     cout << "Start writing the file" << endl;
     string el = atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
-    out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int << "\n";
+    out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int * constants::FOUR_PI << "\n";
     for (int i = 0; i < upper_r; i++)
         out << setw(24) << scientific << setprecision(15) << i * dr << setw(24) << scientific << setprecision(16) << radial_dens[i] << "\n";
     out.flush();

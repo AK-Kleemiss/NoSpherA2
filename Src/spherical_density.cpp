@@ -501,7 +501,7 @@ static const double gauss_sin_integral(const int& N, const double& exp, const do
 {
     if (N == 1)
     {
-        return k_vector * constants::sqr_pi * std::exp(-k_vector * k_vector / 4. / exp) / 4. / pow(exp, 3. / 2.);
+        return k_vector * std::exp(-k_vector * k_vector / 4. / exp) * pow(constants::PI / exp, 3. / 2.);
     }
     else
         return k_vector / (2. * exp) * gauss_cos_integral(N - 1, exp, k_vector) + (N - 1) / (2. * exp) * gauss_sin_integral(N - 2, exp, k_vector);

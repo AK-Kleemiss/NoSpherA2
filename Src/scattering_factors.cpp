@@ -1829,7 +1829,7 @@ int make_hirshfeld_grids(
                     dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
                     densy = spherical_temp.get_core_density(dist, wave.atoms[cif2wfn_list[i]].ECP_electrons) * total_grid[3][p];
                     if (wave.get_ECP_mode())
-                        densy -= Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
                     diff += densy;
                 }
                 diffs += pow(diff, 2);
@@ -2199,7 +2199,7 @@ static int make_hirshfeld_grids_ML(
                     dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
                     densy = spherical_temp.get_core_density(dist, wave.atoms[asym_atom_list[i]].ECP_electrons) * total_grid[3][p];
                     if (wave.get_ECP_mode())
-                        densy -= Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
                     diff += densy;
                 }
                 diffs += pow(diff, 2);
@@ -3108,7 +3108,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
                 if (wave.atoms[asym_atom_list[i]].ECP_electrons != 0)
                 {
                     Spherical_Gaussian_Density C(wave.atoms[asym_atom_list[i]].charge, mode);
-                    sf[i][s] -= C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
+                    sf[i][s] += C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
                     sf[i][s] += temp[i].get_core_form_factor(k, wave.atoms[asym_atom_list[i]].ECP_electrons);
                 }
             }
