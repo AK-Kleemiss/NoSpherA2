@@ -73,8 +73,7 @@ void SALTEDPredictor::read_model_data()
             }
             if (this->config.zeta == 1)
             {
-                vec2 Vmat_t = transpose<double>(this->Vmat[spe + to_string(lam)]);
-                this->power_env_sparse[spe + to_string(lam)] = dot<double>(Vmat_t, this->power_env_sparse[spe + to_string(lam)]);
+                this->power_env_sparse[spe + to_string(lam)] = dot<double>(this->Vmat[spe + to_string(lam)], this->power_env_sparse[spe + to_string(lam)], true, false);
             }
         }
     }
@@ -171,33 +170,31 @@ vec SALTEDPredictor::predict()
         {
             continue;
         }
-        vec2 power_env_sparse_t = transpose<double>(this->power_env_sparse[spe + "0"]);
         vec2 kernell0_nm;
         if (config.zeta == 1)
         {
-            psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), power_env_sparse_t);
+            psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), this->power_env_sparse[spe + "0"], false, true);
         }
         else
         {
-            kernell0_nm = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), power_env_sparse_t);
+            kernell0_nm = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), this->power_env_sparse[spe + "0"], false, true);
             vec2 kernel_nm = elementWiseExponentiation(kernell0_nm, this->config.zeta);
-            psi_nm[spe + "0"] = dot<double>(kernel_nm, this->Vmat[spe + "0"]);
+            psi_nm[spe + "0"] = dot<double>(kernel_nm, this->Vmat[spe + "0"], false, false);
         }
 
         for (int lam = 1; lam <= lmax[spe]; ++lam)
         {
             int featsize = static_cast<int>(pvec[lam][0][0].size());
-            power_env_sparse_t = transpose<double>(this->power_env_sparse[spe + to_string(lam)]);
             vec3 pVec_Rows = collectRows(pvec[lam], this->atom_idx[spe]);
             vec2 pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{this->natom_dict[spe] * (2 * lam + 1), featsize});
 
             if (this->config.zeta == 1)
             {
-                psi_nm[spe + to_string(lam)] = dot<double>(pvec_lam, power_env_sparse_t);
+                psi_nm[spe + to_string(lam)] = dot<double>(pvec_lam, this->power_env_sparse[spe + to_string(lam)], false, true);
             }
             else
             {
-                vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse_t);
+                vec2 kernel_nm = dot<double>(pvec_lam, this->power_env_sparse[spe + to_string(lam)], false, true);
                 for (size_t i1 = 0; i1 < this->natom_dict[spe]; ++i1)
                 {
                     for (size_t i2 = 0; i2 < this->Mspe[spe]; ++i2)
@@ -211,7 +208,7 @@ vec SALTEDPredictor::predict()
                         }
                     }
                 }
-                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)]);
+                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
         }
     }

@@ -177,7 +177,7 @@ typedef void (*ExampleFunctionType)(void);
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
 template <typename T>
-vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2)
+vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2, bool transp1 = false, bool transp2 = false)
 {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
@@ -195,6 +195,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     {
         throw std::invalid_argument("Matrix dimensions do not match for multiplication");
     }
+    auto trans1 = transp1 ? CblasTrans : CblasNoTrans;
+    auto trans2 = transp2 ? CblasTrans : CblasNoTrans;
 
 #if has_RAS
 #ifdef _WIN32
@@ -213,8 +215,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
             if constexpr (std::is_same_v<T, float>)
             {
                 cblas_sgemm(CblasRowMajor,
-                            CblasNoTrans,
-                            CblasNoTrans,
+                            trans1,
+                            trans2,
                             rows1,
                             cols2,
                             cols1,
@@ -230,8 +232,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
             else if constexpr (std::is_same_v<T, double>)
             {
                 cblas_dgemm(CblasRowMajor,
-                            CblasNoTrans,
-                            CblasNoTrans,
+                            trans1,
+                            trans2,
                             rows1,
                             cols2,
                             cols1,
@@ -249,8 +251,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                 cdouble one = cdouble(1.0, 0.0);
                 cdouble zero = cdouble(0.0, 0.0);
                 cblas_zgemm(CblasRowMajor,
-                            CblasNoTrans,
-                            CblasNoTrans,
+                            trans1,
+                            trans2,
                             rows1,
                             cols2,
                             cols1,
@@ -274,15 +276,95 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         {
             // Function not found, fallback
             std::cout << "OpenBLAS function not found, using fallback." << std::endl;
-            return self_dot(mat1, mat2);
+            if (transp1 && !transp2)
+              return self_dot(transpose(mat1), mat2);
+            else if (transp1 && transp2)
+              return self_dot(transpose(mat1), transpose(mat2));
+            else if (!transp1 && transp2)
+              return self_dot(mat1, transpose(mat2));
+            else 
+              return self_dot(mat1, mat2);
         }
         FreeLibrary(hOpenBlas);
     }
     else
     {
+        if(check_OpenBLAS_DLL()){
+            std::cout << "Sucessfull export of DLL from the Executable, using OpenBLAS!" << std::endl;
+            vector<T> flatMat1 = flatten(mat1);
+            vector<T> flatMat2 = flatten(mat2);
+
+            vector<T> result_flat(rows1* cols2, 0.0);
+            if constexpr (std::is_same_v<T, float>)
+            {
+              cblas_sgemm(CblasRowMajor,
+                trans1,
+                trans2,
+                rows1,
+                cols2,
+                cols1,
+                1.0f,
+                flatMat1.data(),
+                cols1,
+                flatMat2.data(),
+                cols2,
+                0.0f,
+                result_flat.data(),
+                cols2);
+            }
+            else if constexpr (std::is_same_v<T, double>)
+            {
+              cblas_dgemm(CblasRowMajor,
+                trans1,
+                trans2,
+                rows1,
+                cols2,
+                cols1,
+                1.0,
+                flatMat1.data(),
+                cols1,
+                flatMat2.data(),
+                cols2,
+                0.0,
+                result_flat.data(),
+                cols2);
+            }
+            else if constexpr (std::is_same_v<T, cdouble>)
+            {
+              cdouble one = cdouble(1.0, 0.0);
+              cdouble zero = cdouble(0.0, 0.0);
+              cblas_zgemm(CblasRowMajor,
+                trans1,
+                trans2,
+                rows1,
+                cols2,
+                cols1,
+                &(one),
+                reinterpret_cast<const cdouble*>(flatMat1.data()),
+                cols1,
+                reinterpret_cast<const cdouble*>(flatMat2.data()),
+                cols2,
+                &(zero),
+                reinterpret_cast<cdouble*>(result_flat.data()),
+                cols2);
+            }
+            else
+            {
+              throw std::invalid_argument("Unsupported data type for matrix multiplication");
+            }
+            Shape2D sizes = { rows1, cols2 };
+            return reshape(result_flat, sizes);
+				}
         // DLL not found, fallback
         std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
-        return self_dot(mat1, mat2);
+        if (transp1 && !transp2)
+          return self_dot(transpose(mat1), mat2);
+        else if (transp1 && transp2)
+          return self_dot(transpose(mat1), transpose(mat2));
+        else if (!transp1 && transp2)
+          return self_dot(mat1, transpose(mat2));
+        else
+          return self_dot(mat1, mat2);
     }
 #else
     vector<T> flatMat1 = flatten(mat1);
@@ -292,8 +374,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     if constexpr (std::is_same_v<T, float>)
     {
         cblas_sgemm(CblasRowMajor,
-                    CblasNoTrans,
-                    CblasNoTrans,
+                    trans1,
+                    trans2,
                     rows1,
                     cols2,
                     cols1,
@@ -309,8 +391,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     else if constexpr (std::is_same_v<T, double>)
     {
         cblas_dgemm(CblasRowMajor,
-                    CblasNoTrans,
-                    CblasNoTrans,
+                    trans1,
+                    trans2,
                     rows1,
                     cols2,
                     cols1,
@@ -328,8 +410,8 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
         cdouble one = cdouble(1.0, 0.0);
         cdouble zero = cdouble(0.0, 0.0);
         cblas_zgemm(CblasRowMajor,
-                    CblasNoTrans,
-                    CblasNoTrans,
+                    trans1,
+                    trans2,
                     rows1,
                     cols2,
                     cols1,
@@ -351,17 +433,24 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
 #endif
 #else
 
+  if (transp1 && !transp2)
+    return self_dot(transpose(mat1), mat2);
+  else if (transp1 && transp2)
+    return self_dot(transpose(mat1), transpose(mat2));
+  else if (!transp1 && transp2)
+    return self_dot(mat1, transpose(mat2));
+  else
     return self_dot(mat1, mat2);
 #endif
 }
-template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2);
-template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2);
+template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2, bool transp1, bool transp2);
+template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2, bool transp1, bool transp2);
 
 void test_dot()
 {
     vector<vector<double>> mat1 = {{1, 2, 3}, {4, 5, 6}};
     vector<vector<double>> mat2 = {{7, 8}, {9, 10}, {11, 12}};
-    vector<vector<double>> result = dot(mat1, mat2);
+    vector<vector<double>> result = dot(mat1, mat2, false);
 
     size_t rows1 = mat1.size();
     size_t cols1 = mat1[0].size();
@@ -479,9 +568,9 @@ vector<vector<vector<T>>> transpose(const vector<vector<vector<T>>> &originalVec
 
     return transposedVec;
 }
-template vector<vector<vector<double>>> transpose(const vector<vector<vector<double>>> &originalVec);
-template vector<vector<vector<cdouble>>> transpose(const vector<vector<vector<cdouble>>> &originalVec);
-template vector<vector<vector<int>>> transpose(const vector<vector<vector<int>>> &originalVec);
+template vector<vector<vector<double>>> transpose(const vector<vector<vector<double>>>& originalVec);
+template vector<vector<vector<cdouble>>> transpose(const vector<vector<vector<cdouble>>>& originalVec);
+template vector<vector<vector<int>>> transpose(const vector<vector<vector<int>>>& originalVec);
 
 // 2D MATRIX
 template <class T>

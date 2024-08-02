@@ -69,7 +69,7 @@ std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t l
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2);
+std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>

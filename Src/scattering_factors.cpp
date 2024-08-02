@@ -3123,6 +3123,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
 /**
  * Converts the given asymmetric atom list, wavefunction, unit cell, and hkl list
  * to electron scattering factors using the given X-ray scattering factors.
+ * This will be performed in place
  *
  * @param asym_atom_list The list of asymmetric atoms.
  * @param wave The wavefunction.

@@ -109,8 +109,7 @@ vec predict(const WFN &wavy, const string model_folder)
             }
             if (config.zeta == 1)
             {
-                vec2 Vmat_t = transpose<double>(Vmat[spe + to_string(lam)]);
-                power_env_sparse[spe + to_string(lam)] = dot<double>(Vmat_t, power_env_sparse[spe + to_string(lam)]);
+                power_env_sparse[spe + to_string(lam)] = dot(Vmat[spe + to_string(lam)], power_env_sparse[spe + to_string(lam)], true, false);
             }
         }
     }
@@ -207,33 +206,31 @@ vec predict(const WFN &wavy, const string model_folder)
         {
             continue;
         }
-        vec2 power_env_sparse_t = transpose<double>(power_env_sparse[spe + "0"]);
         vec2 kernell0_nm;
         if (config.zeta == 1)
         {
-            psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse_t);
+            psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse[spe + "0"], false, true);
         }
         else
         {
-            kernell0_nm = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse_t);
+            kernell0_nm = dot<double>(collectRows(pvec_l0, atom_idx[spe]), power_env_sparse[spe + "0"], false, true);
             vec2 kernel_nm = elementWiseExponentiation(kernell0_nm, config.zeta);
-            psi_nm[spe + "0"] = dot<double>(kernel_nm, Vmat[spe + "0"]);
+            psi_nm[spe + "0"] = dot<double>(kernel_nm, Vmat[spe + "0"], false, false);
         }
 
         for (int lam = 1; lam <= lmax[spe]; ++lam)
         {
             int featsize = static_cast<int>(pvec[lam][0][0].size());
-            power_env_sparse_t = transpose<double>(power_env_sparse[spe + to_string(lam)]);
             vec3 pVec_Rows = collectRows(pvec[lam], atom_idx[spe]);
             vec2 pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{natom_dict[spe] * (2 * lam + 1), featsize});
 
             if (config.zeta == 1)
             {
-                psi_nm[spe + to_string(lam)] = dot<double>(pvec_lam, power_env_sparse_t);
+                psi_nm[spe + to_string(lam)] = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
             }
             else
             {
-                vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse_t);
+                vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
                 for (size_t i1 = 0; i1 < natom_dict[spe]; ++i1)
                 {
                     for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
@@ -247,7 +244,7 @@ vec predict(const WFN &wavy, const string model_folder)
                         }
                     }
                 }
-                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)]);
+                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
         }
     }

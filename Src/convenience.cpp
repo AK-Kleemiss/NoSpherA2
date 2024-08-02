@@ -4,7 +4,9 @@
 #include "test_functions.h"
 #include "ML_density.h"
 #include "properties.h"
-
+#ifdef _WIN32
+#include <windows.h>
+#endif
 using namespace std;
 
 string help_message()
@@ -3638,30 +3640,17 @@ char asciitolower(char in)
 
 int vec_sum(const bvec &in)
 {
-    int res = 0;
-#pragma omp parallel for reduction(+ : res)
-    for (int i = 0; i < in.size(); i++)
-        if (in[i])
-            res++;
-    return res;
+    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
 }
 
 int vec_sum(const ivec &in)
 {
-    int res = 0;
-#pragma omp parallel for reduction(+ : res)
-    for (int i = 0; i < in.size(); i++)
-        res += in[i];
-    return res;
+    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
 }
 
 double vec_sum(const vec &in)
 {
-    double res = 0.0;
-#pragma omp parallel for reduction(+ : res)
-    for (int i = 0; i < in.size(); i++)
-        res += in[i];
-    return res;
+    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
 }
 
 cdouble vec_sum(const cvec &in)
@@ -3809,3 +3798,70 @@ std::string sha::sha256(const std::string &input)
 
     return ss.str();
 }
+
+#ifdef _WIN32
+// Function to convert a narrow string to a wide string
+std::wstring s2ws(const std::string& s) {
+  int len;
+  int slength = (int)s.length() + 1;
+  len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+  std::wstring r(len, L'\0');
+  MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
+  return r;
+}
+
+bool ExtractDLL(const std::string& dllName) {
+  // Convert the DLL name to a wide string
+  std::wstring wideDllName = s2ws(dllName);
+
+  // Check if the DLL already exists
+  if (GetFileAttributes(wideDllName.c_str()) != INVALID_FILE_ATTRIBUTES) {
+    return true; // DLL already exists
+  }
+
+  // Find the resource
+  HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
+  if (!hRes) return false;
+
+  // Load the resource
+  HGLOBAL hResLoad = LoadResource(NULL, hRes);
+  if (!hResLoad) return false;
+
+  // Lock the resource to get a pointer to the data
+  void* pResData = LockResource(hResLoad);
+  if (!pResData) return false;
+
+  // Get the size of the resource
+  DWORD resSize = SizeofResource(NULL, hRes);
+  if (resSize == 0) return false;
+
+  // Write the resource data to a file
+  std::ofstream outFile(dllName, std::ios::binary);
+  if (!outFile) return false;
+
+  outFile.write(reinterpret_cast<const char*>(pResData), resSize);
+  outFile.close();
+
+  return true;
+}
+
+bool check_OpenBLAS_DLL() {
+  // Get the path of the executable
+  char exePath[MAX_PATH];
+  GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
+  std::string exeDir = get_foldername_from_path(exePath);
+
+  // Define the DLL name
+  std::string dllName = exeDir + "\\libopenblas.dll";
+  if (exists(dllName))
+    return true; // DLL already exists
+  else {
+    // Extract the DLL if it does not exist
+    if (!ExtractDLL(dllName)) {
+      std::cout << "Failed to extract DLL" << endl;
+      return false;
+    }
+  }
+  return true;
+}
+#endif

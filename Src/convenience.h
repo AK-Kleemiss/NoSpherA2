@@ -25,14 +25,18 @@
 #include <sstream>
 #include <typeinfo>
 #include <vector>
+#include <numeric>
+#include <execution>
 
 // Here are the system specific libaries
 #ifdef _WIN32
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
 #include <io.h>
+#include "OpenBLAS.h"
 #else
 #define GetCurrentDir getcwd
+#include <optional>
 #include <unistd.h>
 #include <cfloat>
 #include <sys/wait.h>
@@ -510,44 +514,7 @@ public:
 
     void write(double fraction);
 };
-/*
 
-class cosinus_annaeherung
-{
-public:
-    cosinus_annaeherung();
-    inline double get(double x) const
-    {
-        double xa = abs(x);
-        size_t pos = static_cast<size_t>((xa * mSize) / MPI2); // Stueststelle bestimmen (Wird fuer grosse X ungenau, aber passt fuer x
-        double dx = xa - pos * mStepwidth;
-        pos = pos % mSize; // Modulo, da sinus periodisch ist.
-        double y1 = mBase_values[pos];
-        double y2 = mBase_values[pos + 1];
-        return y1 + dx * (y2 - y1) / mStepwidth;
-    }
-
-    void   resize(size_t size);
-    double calculate_error_at(double x) const;
-private:
-    size_t mSize;
-    double* mBase_values;
-    double mStepwidth;
-};
-struct sinus
-{
-    sinus(cosinus_annaeherung& helper) : helper(helper) {};
-    double get(double x) { return helper.get(x - 1.57079632679489661922l); }
-    cosinus_annaeherung& helper;
-};
-
-struct cosinus
-{
-    cosinus(cosinus_annaeherung& helper) : helper(helper) {};
-    double get(double x) { return helper.get(x); }
-    cosinus_annaeherung& helper;
-};
-*/
 void readxyzMinMax_fromWFN(
     WFN &wavy,
     double *CoordMinMax,
@@ -951,6 +918,10 @@ bool is_nan(double &in);
 bool is_nan(float &in);
 bool is_nan(long double &in);
 bool is_nan(cdouble &in);
+#ifdef _WIN32
+bool ExtractDLL(const std::string& dllName);
+bool check_OpenBLAS_DLL();
+#endif
 
 #include "wfn_class.h"
 #include "atoms.h"

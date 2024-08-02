@@ -977,6 +977,12 @@
     <ClInclude Include="..\Src\DLL_Helper.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\OpenBLAS.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">
@@ -996,6 +1002,13 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll" />
+    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll">
+      <Filter>Ressourcendateien</Filter>
+    </_EmbedManagedResourceFile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\Src\OpenBLAS.rc">
+      <Filter>Ressourcendateien</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
