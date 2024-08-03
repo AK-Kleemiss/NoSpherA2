@@ -191,12 +191,26 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     size_t cols2 = mat2[0].size();
 
     // Check if matrix multiplication is possible
-    if (cols1 != rows2)
+    if (!transp1 && !transp2)
     {
-        throw std::invalid_argument("Matrix dimensions do not match for multiplication");
+        err_checkf(cols1 == rows2, "Incompatibel matrix dimensions!", std::cout);
     }
-    auto trans1 = transp1 ? CblasTrans : CblasNoTrans;
-    auto trans2 = transp2 ? CblasTrans : CblasNoTrans;
+    else if (transp1 && !transp2)
+    {
+        err_checkf(rows1 == rows2, "Incompatibel matrix dimensions!", std::cout);
+    }
+    else if (!transp1 && transp2)
+    {
+        err_checkf(cols1 == cols2, "Incompatibel matrix dimensions!", std::cout);
+    }
+    else if (transp1 && transp2)
+    {
+        err_checkf(rows1 == cols2, "Incompatibel matrix dimensions!", std::cout);
+    }
+    const auto trans1 = transp1 ? CblasTrans : CblasNoTrans;
+    const auto trans2 = transp2 ? CblasTrans : CblasNoTrans;
+    const int LDA = (!transp1) ? rows1 : cols1;
+    const int LDB = (!transp2) ? cols1 : cols2;
 
 #if has_RAS
 #ifdef _WIN32
@@ -222,9 +236,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                             cols1,
                             1.0f,
                             flatMat1.data(),
-                            cols1,
+                            LDA,
                             flatMat2.data(),
-                            cols2,
+                            LDB,
                             0.0f,
                             result_flat.data(),
                             cols2);
@@ -239,9 +253,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                             cols1,
                             1.0,
                             flatMat1.data(),
-                            cols1,
+                            LDA,
                             flatMat2.data(),
-                            cols2,
+                            LDB,
                             0.0,
                             result_flat.data(),
                             cols2);
@@ -258,9 +272,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                             cols1,
                             &(one),
                             reinterpret_cast<const cdouble *>(flatMat1.data()),
-                            cols1,
+                            LDA,
                             reinterpret_cast<const cdouble *>(flatMat2.data()),
-                            cols2,
+                            LDB,
                             &(zero),
                             reinterpret_cast<cdouble *>(result_flat.data()),
                             cols2);
@@ -305,9 +319,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                 cols1,
                 1.0f,
                 flatMat1.data(),
-                cols1,
+                LDA,
                 flatMat2.data(),
-                cols2,
+                LDB,
                 0.0f,
                 result_flat.data(),
                 cols2);
@@ -322,9 +336,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                 cols1,
                 1.0,
                 flatMat1.data(),
-                cols1,
+                LDA,
                 flatMat2.data(),
-                cols2,
+                LDB,
                 0.0,
                 result_flat.data(),
                 cols2);
@@ -341,9 +355,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                 cols1,
                 &(one),
                 reinterpret_cast<const cdouble*>(flatMat1.data()),
-                cols1,
+                LDA,
                 reinterpret_cast<const cdouble*>(flatMat2.data()),
-                cols2,
+                LDB,
                 &(zero),
                 reinterpret_cast<cdouble*>(result_flat.data()),
                 cols2);
@@ -381,9 +395,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                     cols1,
                     1.0f,
                     flatMat1.data(),
-                    cols1,
+                    LDA,
                     flatMat2.data(),
-                    cols2,
+                    LDB,
                     0.0f,
                     result_flat.data(),
                     cols2);
@@ -398,9 +412,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                     cols1,
                     1.0,
                     flatMat1.data(),
-                    cols1,
+                    LDA,
                     flatMat2.data(),
-                    cols2,
+                    LDB,
                     0.0,
                     result_flat.data(),
                     cols2);
@@ -417,9 +431,9 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
                     cols1,
                     &(one),
                     reinterpret_cast<const cdouble *>(flatMat1.data()),
-                    cols1,
+                    LDA,
                     reinterpret_cast<const cdouble *>(flatMat2.data()),
-                    cols2,
+                    LDB,
                     &(zero),
                     reinterpret_cast<cdouble *>(result_flat.data()),
                     cols2);
