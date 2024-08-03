@@ -311,64 +311,64 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
             vector<T> result_flat(rows1* cols2, 0.0);
             if constexpr (std::is_same_v<T, float>)
             {
-              cblas_sgemm(CblasRowMajor,
-                trans1,
-                trans2,
-                rows1,
-                cols2,
-                cols1,
-                1.0f,
-                flatMat1.data(),
-                LDA,
-                flatMat2.data(),
-                LDB,
-                0.0f,
-                result_flat.data(),
-                cols2);
+                cblas_sgemm(CblasRowMajor,
+                  trans1,
+                  trans2,
+                  rows1,
+                  cols2,
+                  cols1,
+                  1.0f,
+                  flatMat1.data(),
+                  LDA,
+                  flatMat2.data(),
+                  LDB,
+                  0.0f,
+                  result_flat.data(),
+                  cols2);
             }
             else if constexpr (std::is_same_v<T, double>)
             {
-              cblas_dgemm(CblasRowMajor,
-                trans1,
-                trans2,
-                rows1,
-                cols2,
-                cols1,
-                1.0,
-                flatMat1.data(),
-                LDA,
-                flatMat2.data(),
-                LDB,
-                0.0,
-                result_flat.data(),
-                cols2);
+                cblas_dgemm(CblasRowMajor,
+                  trans1,
+                  trans2,
+                  rows1,
+                  cols2,
+                  cols1,
+                  1.0,
+                  flatMat1.data(),
+                  LDA,
+                  flatMat2.data(),
+                  LDB,
+                  0.0,
+                  result_flat.data(),
+                  cols2);
             }
             else if constexpr (std::is_same_v<T, cdouble>)
             {
-              cdouble one = cdouble(1.0, 0.0);
-              cdouble zero = cdouble(0.0, 0.0);
-              cblas_zgemm(CblasRowMajor,
-                trans1,
-                trans2,
-                rows1,
-                cols2,
-                cols1,
-                &(one),
-                reinterpret_cast<const cdouble*>(flatMat1.data()),
-                LDA,
-                reinterpret_cast<const cdouble*>(flatMat2.data()),
-                LDB,
-                &(zero),
-                reinterpret_cast<cdouble*>(result_flat.data()),
-                cols2);
+                cdouble one = cdouble(1.0, 0.0);
+                cdouble zero = cdouble(0.0, 0.0);
+                cblas_zgemm(CblasRowMajor,
+                  trans1,
+                  trans2,
+                  rows1,
+                  cols2,
+                  cols1,
+                  &(one),
+                  reinterpret_cast<const cdouble*>(flatMat1.data()),
+                  LDA,
+                  reinterpret_cast<const cdouble*>(flatMat2.data()),
+                  LDB,
+                  &(zero),
+                  reinterpret_cast<cdouble*>(result_flat.data()),
+                  cols2);
             }
             else
             {
-              throw std::invalid_argument("Unsupported data type for matrix multiplication");
+                err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
             }
             Shape2D sizes = { rows1, cols2 };
             return reshape(result_flat, sizes);
-				}
+        }
         // DLL not found, fallback
         std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
         if (transp1 && !transp2)
@@ -440,7 +440,7 @@ vector<vector<T>> dot(const vector<vector<T>> &mat1, const vector<vector<T>> &ma
     }
     else
     {
-        throw std::invalid_argument("Unsupported data type for matrix multiplication");
+        err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
     Shape2D sizes = {rows1, cols2};
     return reshape(result_flat, sizes);
