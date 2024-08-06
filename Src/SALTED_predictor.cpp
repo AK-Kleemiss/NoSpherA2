@@ -139,12 +139,12 @@ vec SALTEDPredictor::predict()
         if (this->config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * config.nrad1), (this->config.nspe2 * config.nrad2), this->v1, this->v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, nfps, this->vfps[lam], p);
+            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, nfps, this->vfps[lam], p);
             featsize = config.ncut;
         }
         else
         {
-            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * config.nrad1), (this->config.nspe2 * config.nrad2), this->v1, this->v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, p);
+            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, wigner3j, llmax, llvec_t, lam, c2r, featsize, p);
         }
         wigner3j.clear();
 
@@ -235,7 +235,7 @@ vec SALTEDPredictor::predict()
             for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
             {
                 int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
-                vector<double> weights_subset(this->weights.begin() + isize, this->weights.begin() + isize + Mcut);
+                vec weights_subset(this->weights.begin() + isize, this->weights.begin() + isize + Mcut);
                 C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe + to_string(l)], weights_subset);
                 isize += Mcut;
             }
@@ -308,8 +308,16 @@ vec SALTEDPredictor::predict()
 
 vec SALTEDPredictor::gen_SALTED_densities()
 {
-    time_point start;
+    if (this->opt.coef_file != "")
+	{
+        vec coefs{};
+		cout << "Reading coefficients from file: " << this->opt.coef_file << endl;
+		read_npy<double>(this->opt.coef_file, coefs);
+		return coefs;
+	}
+
     // Run generation of tsc file
+    time_point start;
     if (this->opt.debug) start = get_time();
 
     this->setup_atomic_environment();

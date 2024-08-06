@@ -2778,11 +2778,11 @@ void options::digest_options()
         {
             charge = stoi(arguments[i + 1]);
         }
-        // else if (temp == "-coef")
-        //{
-        //     coef_file = arguments[i + 1];
-        //     err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
-        // }
+         else if (temp == "-coef")
+        {
+             coef_file = arguments[i + 1];
+             err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+         }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
