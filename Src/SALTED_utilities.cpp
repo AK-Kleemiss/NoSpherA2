@@ -46,7 +46,7 @@ int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 86> basis_set, vector<string> species)
+void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 118> basis_set, vector<string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type

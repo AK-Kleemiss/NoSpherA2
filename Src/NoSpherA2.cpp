@@ -333,7 +333,7 @@ int main(int argc, char **argv)
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-                int nr_coefs = load_basis_into_WFN(wavy[0], QZVP_JKfit_x2c_univ_combo);
+                int nr_coefs = load_basis_into_WFN(wavy[0], def2_qzvppd_rifit);
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation!" << endl;
 

@@ -79,7 +79,7 @@ cube ML_density::data_2_Cube(const string& xyz_File, const string& npy_Coeffs, i
 	WFN wavy(7);
 	wavy.read_xyz(xyz_File, cout);
 
-	int nr_coefs = load_basis_into_WFN(wavy, QZVP_JKfit_x2c_univ_combo);// QZVP_JKfit);//def2_SVP_JKFIT
+	int nr_coefs = load_basis_into_WFN(wavy, def2_qzvppd_rifit);// QZVP_JKfit);//def2_SVP_JKFIT
 	cout << data.size() << " vs. " << nr_coefs << " coefficients" << endl;
 
 

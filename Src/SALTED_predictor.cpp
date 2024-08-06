@@ -338,7 +338,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
             if (this->opt.wfn == string("test_sucrose.xyz"))
                 npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
             else
-                npy::LoadArrayFromNumpy("cysteine_ref_Cysteine.npy", shape, fortran_order, ref_coefs);
+                npy::LoadArrayFromNumpy("cysteine_def2_qzvppd.npy", shape, fortran_order, ref_coefs);
             // Compare coefs with the reference
             vector<double> diff_vec;
             double diff = 0.0;
