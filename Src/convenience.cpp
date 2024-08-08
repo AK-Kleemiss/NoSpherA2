@@ -331,7 +331,6 @@ int get_Z_from_label(const char *tmp)
         return 84;
     else if (strcmp(tmp, "Rn") == 0)
         return 85;
-
     else if (strcmp(tmp, "Fr") == 0)
         return 86;
     else if (strcmp(tmp, "Ra") == 0)
@@ -576,6 +575,7 @@ options::options(int accuracy,
                  const std::string &turbomole_path,
                  const std::string &basis_set_path,
                  const std::string &SALTED_DIR,
+                 const std::string &SALTED_DFBASIS,
                  const svec &arguments,
                  const svec &combine_mo,
                  const svec &Cations,
@@ -595,7 +595,7 @@ options::options(int accuracy,
       set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
       eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
       hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-      s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR),
+      s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
       Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
       read_k_pts(read_k_pts), save_k_pts(save_k_pts),
       combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
@@ -2636,6 +2636,24 @@ int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118>
     return nr_coefs;
 }
 
+int load_basis_into_WFN(WFN &wavy, BasisSet &b)
+{
+    wavy.set_basis_set_ptr(b.get_data());
+    int nr_coefs = 0;
+    for (int i = 0; i < wavy.atoms.size(); i++)
+    {
+        int current_charge = wavy.atoms[i].charge - 1;
+        const std::vector<primitive>& basis = b[current_charge];
+        int size = (int)b[current_charge].size();
+        for (int e = 0; e < size; e++)
+        {
+            wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
+            nr_coefs += 2 * basis[e].type + 1;
+        }
+    }
+    return nr_coefs;
+}
+
 
 double get_decimal_precision_from_CIF_number(string &given_string)
 {
@@ -3055,6 +3073,9 @@ void options::digest_options()
         else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
         {
             SALTED_BECKE = true;
+        }
+        else if (temp == "DFBASIS" || temp == "dfbasis") {
+            SALTED_DFBASIS = arguments[i + 1];
         }
         else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h")
         {

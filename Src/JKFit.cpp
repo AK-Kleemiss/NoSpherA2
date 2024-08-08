@@ -1,6 +1,66 @@
 #pragma once
 #include "JKFit.h"
 
+
+// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 35>& data) {
+	for (int i = 0; i < 35; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 35; i < 118; i++) {
+		_data[i] = {};
+	}
+}
+
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 86>& data) {
+	for (int i = 0; i < 86; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 86; i < 118; i++) {
+		_data[i] = {};
+	}
+}
+
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 118>& data) {
+	_data = data;
+}
+
+
+const std::array<std::vector<primitive>, 118>& BasisSet::get_data(){
+	return _data;
+}
+
+const std::vector<primitive>& BasisSet::operator[](int element) const {
+	//Test if the element is empty
+	err_checkf(_data[element].size() != 0, "Basis set for element " + std::to_string(element) + " is not defined!", std::cout);
+	return _data[element];
+}
+
+
+BasisSetLibrary::BasisSetLibrary() {
+	basisSets["def2_universal_JKfit"] = BasisSet(def2_universal_JKfit);
+	basisSets["def2_SVP_JKfit"] = BasisSet(def2_SVP_JKfit);
+	basisSets["HGBSP3_7"] = BasisSet(HGBSP3_7);
+	basisSets["def2_qzvppd_rifit"] = BasisSet(def2_qzvppd_rifit);
+	basisSets["TZVP_JKfit"] = BasisSet(TZVP_JKfit);
+	basisSets["QZVP_JKfit"] = BasisSet(QZVP_JKfit);
+}
+
+BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_rifit") {
+	//Check if the supplied basis name is contained in part of a given basis set name
+	std::string found_basis = "";
+	for (auto const& [key, val] : basisSets) {
+		if (key.find(basis_name) != std::string::npos) {
+			found_basis = key;
+			break;
+		}
+	}
+	err_checkf(found_basis != "", "Basis set " + basis_name + " not defined in BasisSetLibrary!", std::cout);
+	std::cout << "Using basis set: " << found_basis << std::endl;
+	return basisSets[found_basis];
+}
+
+
 const std::array<std::vector<primitive> , 118> def2_qzvppd_rifit
 {
 	{

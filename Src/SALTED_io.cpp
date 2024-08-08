@@ -217,6 +217,8 @@ void Config::populateFromFile(const std::string &filename)
                     Ntrain = std::stoi(value);
                 else if (key == "trainfrac")
                     trainfrac = std::stof(value);
+                else if (key == "dfbasis")
+                    dfbasis = value;
             }
         }
     }

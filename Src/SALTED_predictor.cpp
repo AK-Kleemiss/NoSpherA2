@@ -10,6 +10,12 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
     this->config.populateFromFile(_path);
     this->config.predict_filename = wavy_in.get_path();
 }
+const string SALTEDPredictor::get_dfbasis_name()
+{
+	return this->config.dfbasis;
+}
+
+
 
 void SALTEDPredictor::setup_atomic_environment()
 {

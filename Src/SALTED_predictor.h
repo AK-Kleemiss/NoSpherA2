@@ -13,6 +13,7 @@ class SALTEDPredictor {
 public:
     SALTEDPredictor(const WFN& wavy, const options &opt);
 
+    const std::string get_dfbasis_name();
     vec gen_SALTED_densities();
 private:
     Config config;

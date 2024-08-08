@@ -43,6 +43,7 @@ struct Config
     int Menv;
     int Ntrain;
     float trainfrac;
+    std::string dfbasis;
 
     // The are initialized to -1 to check if they are set
     // They are set in the populateFromFile function as static_cast<int>(neighspeX.size())

@@ -48,6 +48,7 @@
 class WFN;
 class cell;
 class atom;
+class BasisSet;
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
@@ -731,6 +732,7 @@ struct options
     ivec ECP_nrs;
     ivec ECP_elcounts;
     std::string SALTED_DIR;
+    std::string SALTED_DFBASIS;
     std::string wfn;
     std::string wfn2;
     std::string fchk;
@@ -877,6 +879,7 @@ struct options
             const std::string &turbomole_path,
             const std::string &basis_set_path,
             const std::string &SALTED_DIR,
+            const std::string &SALTED_DFBASIS,
             const svec &arguments,
             const svec &combine_mo,
             const svec &Cations,
@@ -907,6 +910,7 @@ const double calc_density_ML(double &x,
                              const int &atom_nr);
 
 int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b);
+int load_basis_into_WFN(WFN &wavy, BasisSet &b);
 
 double hypergeometric(double a, double b, double c, double x);
 
@@ -925,3 +929,4 @@ bool check_OpenBLAS_DLL();
 
 #include "wfn_class.h"
 #include "atoms.h"
+#include "JKFit.h"
