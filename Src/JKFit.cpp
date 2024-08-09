@@ -43,7 +43,7 @@ BasisSetLibrary::BasisSetLibrary() {
 	basisSets["HGBSP3_7"] = BasisSet(HGBSP3_7);
 	basisSets["def2_qzvppd_rifit"] = BasisSet(def2_qzvppd_rifit);
 	basisSets["TZVP_JKfit"] = BasisSet(TZVP_JKfit);
-	basisSets["QZVP_JKfit"] = BasisSet(QZVP_JKfit);
+	basisSets["cc-pvqz-jkfit"] = BasisSet(QZVP_JKfit);
 }
 
 BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_rifit") {
