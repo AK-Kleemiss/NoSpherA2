@@ -250,7 +250,7 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
             }
             else
             {
-                throw std::invalid_argument("Unsupported data type for matrix multiplication");
+                err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
             }
 
             Shape2D sizes = { m, n };
@@ -310,7 +310,7 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
     }
     else
     {
-        throw std::invalid_argument("Unsupported data type for matrix multiplication");
+        err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
 
     Shape2D sizes = { m, n };

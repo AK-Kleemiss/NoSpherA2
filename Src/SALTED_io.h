@@ -23,6 +23,7 @@ void read_npy(std::string filename, std::vector<Scalar> &data);
 
 struct Config
 {
+public:
     std::string predict_filename;
     bool average;
     bool field;
@@ -50,6 +51,33 @@ struct Config
     int nspe1 = -1;
     int nspe2 = -1;
 
+   
     void populateFromFile(const std::string &filename);
-    std::vector<std::string> parseVector(const std::string &str);
+#if has_RAS
+    void populateFromFile(const H5::H5File file);
+#endif
+
+private:
+    std::vector<std::string> parseVector(const std::string& str);
+#if has_RAS
+    void populate_config(const std::string& dataset_name, const int& data);
+    void populate_config(const std::string& dataset_name, const float& data);
+    void populate_config(const std::string& dataset_name, const std::string& data);
+    void populate_config(const std::string& dataset_name, const std::vector<std::string>& data);
+
+    void handle_int_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
+    void handle_float_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
+    void handle_string_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
+
+    static herr_t op_func(hid_t loc_id, const char* name, const H5L_info_t* info, void* operator_data);
+
+    std::unordered_map<H5T_class_t, std::function<void(const std::string&, H5::DataSet&)>> handlers = {
+        {H5T_INTEGER, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)},
+        {H5T_FLOAT, std::bind(&Config::handle_float_dataset, this, std::placeholders::_1, std::placeholders::_2)},
+        {H5T_STRING, std::bind(&Config::handle_string_dataset, this, std::placeholders::_1, std::placeholders::_2)},
+        {H5T_ENUM, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)}
+    };
+#endif
+    
+
 };
