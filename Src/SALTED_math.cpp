@@ -256,6 +256,14 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
             Shape2D sizes = { m, n };
             return reshape(result_flat, sizes);
         }
+        else 
+        {
+            // DLL found but function not found
+			std::cout << "OpenBLAS DLL found but function not found, using fallback." << std::endl;
+            exit(1);
+        }
+    else
+    {
         // DLL not found, fallback
         std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
         if (transp1 && !transp2)
@@ -330,59 +338,6 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
 template vector<vector<float>> dot(const vector<vector<float>>& mat1, const vector<vector<float>>& mat2, bool transp1, bool transp2);
 template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2, bool transp1, bool transp2);
 template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2, bool transp1, bool transp2);
-
-
-void test_dot()
-{
-    vector<vector<double>> mat1 = {{1, 2, 3}, {4, 5, 6}};
-    vector<vector<double>> mat2 = {{7, 8}, {9, 10}, {11, 12}};
-    vector<vector<double>> result = dot(mat1, mat2, false);
-
-    size_t rows1 = mat1.size();
-    size_t cols1 = mat1[0].size();
-    //size_t rows2 = mat2.size();
-    size_t cols2 = mat2[0].size();
-
-    vector<vector<double>> result_old(rows1, vector<double>(cols2, 0.0));
-    const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
-    size_t total_size = rows1 * cols2;
-#pragma omp parallel
-    {
-        vector<double> local_result(total_size, 0.0);
-        int i, j, k, flatIndex;
-
-#pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
-        for (long long int n = 0; n < totalIterations; ++n)
-        {
-            i = static_cast<int>(n / (cols2 * cols1));
-            j = static_cast<int>((n / cols1) % cols2);
-            k = static_cast<int>(n % cols1);
-            flatIndex = i * cols2 + j;
-            local_result[flatIndex] += mat1[i][k] * mat2[k][j];
-        }
-
-#pragma omp critical
-        {
-            for (i = 0; i < rows1; ++i)
-            {
-                for (j = 0; j < cols2; ++j)
-                {
-                    flatIndex = i * cols2 + j;
-                    result_old[i][j] += local_result[flatIndex];
-                }
-            }
-        }
-    }
-    for (int i = 0; i < rows1; ++i)
-    {
-        for (int j = 0; j < cols2; ++j)
-        {
-            cout << result[i][j] << " " << result_old[i][j] << endl;
-            assert(result[i][j] == result_old[i][j]);
-        }
-    }
-    exit(0);
-}
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>

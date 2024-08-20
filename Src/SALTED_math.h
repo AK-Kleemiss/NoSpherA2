@@ -1,6 +1,4 @@
 #pragma once
-#include <vector>
-
 #include "convenience.h"
 
 struct Shape2D
@@ -68,6 +66,11 @@ std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t l
 
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
+//Own implementation of matrix multiplication
+template <typename T>
+std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2);
+
+//BLAS implementation of matrix multiplication
 template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2);
 
@@ -77,5 +80,3 @@ std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> 
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
-
-void test_dot();
