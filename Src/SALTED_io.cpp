@@ -3,84 +3,70 @@
 using namespace std;
 
 #if has_RAS
-vec2 readHDF5(H5::H5File file, string dataset_name)
-{
-    /*
-     * Try block to detect exceptions raised by any of the calls inside it
-     */
-    try
-    {
-        /*
-         * Turn off the auto-printing when failure occurs so that we can
-         * handle the errors appropriately
-         */
+template <typename T>
+void readHDF5Data(H5::DataSet& dataset, vector<T>& data) {
+    // Select correct datatype depending on T
+    H5::PredType type = H5::PredType::PREDTYPE_CONST;
+    if constexpr(std::is_same_v<T, double>) {
+		type = H5::PredType::NATIVE_DOUBLE;
+	}
+	else if constexpr (std::is_same_v<T, float>) {
+		type = H5::PredType::NATIVE_FLOAT;
+	}
+    else if constexpr (std::is_same_v<T, int>) {
+		type = H5::PredType::NATIVE_INT;
+	}
+    else if constexpr (std::is_same_v<T, int64_t>) {
+        type = H5::PredType::NATIVE_INT64;
+    }
+	else {
+		throw runtime_error("Unsupported datatype");
+	}
+    dataset.read(data.data(), type);
+}
+template void readHDF5Data(H5::DataSet& dataset, vector<double>& data);
+template void readHDF5Data(H5::DataSet& dataset, vector<float>& data);
+template void readHDF5Data(H5::DataSet& dataset, vector<int>& data);
+template void readHDF5Data(H5::DataSet& dataset, vector<int64_t>& data);
+
+template <typename T>
+vector<T> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t> &dims_out) {
+
+    try {
         H5::Exception::dontPrint();
-
-        /*
-         * Open the specified dataset in the file.
-         */
         H5::DataSet dataset = file.openDataSet(dataset_name);
-
-        /*
-         * Get dataspace of the dataset.
-         */
         H5::DataSpace dataspace = dataset.getSpace();
 
-        /*
-         * Get the number of dimensions in the dataspace.
-         */
         const int rank = dataspace.getSimpleExtentNdims();
+        dims_out.resize(rank);
+        dataspace.getSimpleExtentDims(dims_out.data(), NULL);
 
-        /*
-         * Get the dimension size of each dimension in the dataspace and
-         * display them.
-         */
-        vector<hsize_t> dims_out(rank);
-        (void)dataspace.getSimpleExtentDims(dims_out.data(), NULL);
-
-        vector<double> data(dims_out[0] * dims_out[1]);
-        /*
-         * Read data from hyperslab in the file into the hyperslab in
-         * memory and display the data.
-         */
-        dataset.read(data.data(), H5::PredType::NATIVE_DOUBLE);
-
-        // Reorder the results to match the original matrix
-        vec2 retData(dims_out[0], vector<double>(dims_out[1]));
-        for (int i = 0; i < dims_out[0]; i++)
-        {
-            for (int j = 0; j < dims_out[1]; j++)
-            {
-                retData[i][j] = data[i * dims_out[1] + j];
-            }
+        size_t totalSize = 1;
+        for (const auto& dim : dims_out) {
+            totalSize *= dim;
         }
-        /*
-         * Close the dataset and file
-         */
+
+        vector<T> flatData(totalSize);
+        readHDF5Data(dataset, flatData);
         dataset.close();
-
-        // successfully terminated
-        return retData;
-    } // end of try block
-
+        
+        return flatData;
+    }
     // catch failure caused by the H5File operations
     catch (H5::FileIException error)
     {
         error.printErrorStack();
     }
-
     // catch failure caused by the DataSet operations
     catch (H5::DataSetIException error)
     {
         error.printErrorStack();
     }
-
     // catch failure caused by the DataSpace operations
     catch (H5::DataSpaceIException error)
     {
         error.printErrorStack();
     }
-
     // catch failure caused by the DataSpace operations
     catch (H5::DataTypeIException error)
     {
@@ -90,10 +76,15 @@ vec2 readHDF5(H5::H5File file, string dataset_name)
     {
         error.printErrorStack();
     }
-
     return {};
 }
+template vector<double> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
+template vector<float> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
+template vector<int> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
+template vector<int64_t> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
 #endif
+
+
 
 template <typename Scalar>
 void read_npy(string filename, vector<Scalar> &data)
@@ -104,6 +95,7 @@ void read_npy(string filename, vector<Scalar> &data)
 }
 template void read_npy(string filename, vector<double> &data);
 template void read_npy(string filename, vector<float> &data);
+
 
 template <typename T>
 unordered_map<int, vector<T>> read_fps(string filename, int lmax_max)
@@ -228,6 +220,7 @@ void Config::populateFromFile(const std::string &filename)
     }
     this->nspe1 = static_cast<int>(this->neighspe1.size());
     this->nspe2 = static_cast<int>(this->neighspe2.size());
+    this->from_h5 = false;
 }
 std::vector<std::string> Config::parseVector(const std::string& value)
 {
@@ -260,16 +253,17 @@ std::vector<std::string> Config::parseVector(const std::string& value)
     return result;
 }
 
+#if has_RAS
 //Included in h5 file
 void Config::populateFromFile(const H5::H5File file) {
-    err_checkf(file.attrExists("input"), "Dataset 'input' not found in h5-File!", std::cout);
+    err_checkf(!file.attrExists("input"), "Group 'input' not found in h5-File!", std::cout);
     H5::Group input_grp = file.openGroup("input");
 
     std::vector<std::string>* dataset_names = new std::vector<std::string>();
     //Get all datasets in the group
     herr_t status;
     status = H5Literate(input_grp.getId(), H5_INDEX_NAME, H5_ITER_NATIVE, NULL, &Config::op_func, dataset_names);
-    err_checkf((status != 0), "Error reading h5 input file", std::cout);
+    err_checkf((status == 0), "Error reading h5 input file", std::cout);
 
     for (int i = 0; i < dataset_names->size(); i++) {
         string dataset_name = dataset_names->at(i);
@@ -283,11 +277,12 @@ void Config::populateFromFile(const H5::H5File file) {
     }
     this->nspe1 = static_cast<int>(this->neighspe1.size());
     this->nspe2 = static_cast<int>(this->neighspe2.size());
+    this->from_h5 = true;
 }
 
 void Config::populate_config(const std::string& dataset_name, const int& data) {
     if (dataset_name == "predict_filename") this->predict_filename = data;
-    else if (dataset_name == "averages") this->average = data != 0; // Assuming boolean stored as integer
+    else if (dataset_name == "average") this->average = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "field") this->field = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "sparsify") this->sparsify = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "ncut") this->ncut = data;
@@ -366,3 +361,4 @@ herr_t Config::op_func(hid_t loc_id, const char* name, const H5L_info_t* info, v
     data->push_back(name);
     return 0;
 }
+#endif

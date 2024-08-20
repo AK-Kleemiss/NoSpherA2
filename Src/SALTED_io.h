@@ -9,8 +9,16 @@
 #include <H5Dpublic.h>
 #include <H5Opublic.h>
 
-vec2 readHDF5(H5::H5File file, std::string dataset_name);
+//vec2 readHDF5(H5::H5File file, std::string dataset_name);
+
+template <typename T>
+void readHDF5Data(H5::DataSet& dataset, std::vector<T>& data);
+
+template <typename T>
+std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<size_t> &dims_out);
 #endif
+
+
 
 template <class T>
 std::vector<T> readVectorFromFile(const std::string &filename);
@@ -24,6 +32,7 @@ void read_npy(std::string filename, std::vector<Scalar> &data);
 struct Config
 {
 public:
+    bool from_h5;
     std::string predict_filename;
     bool average;
     bool field;

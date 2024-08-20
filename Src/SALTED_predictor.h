@@ -1,4 +1,5 @@
 #pragma once
+#include <filesystem>
 
 #include "convenience.h"
 #include "JKFit.h"
@@ -7,6 +8,8 @@
 #include "SALTED_io.h"
 #include "SALTED_utilities.h"
 #include "SALTED_equicomb.h"
+#include "SALTED_math.h"
+
 
 
 class SALTEDPredictor {
@@ -32,7 +35,12 @@ private:
     std::unordered_map<std::string, vec2> Vmat{}, power_env_sparse{};
     std::unordered_map<std::string, int> Mspe{};
     std::unordered_map<int, std::vector<int64_t>> vfps{};
+    std::unordered_map<int, vec> wigner3j{};
+    std:: unordered_map<std::string, vec> av_coefs{};
     void read_model_data();
+#if has_RAS
+    void read_model_data_h5();
+#endif
 
     vec predict();
 

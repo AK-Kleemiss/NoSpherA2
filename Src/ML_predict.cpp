@@ -96,23 +96,24 @@ vec predict(const WFN &wavy, const string model_folder)
 #if has_RAS
     H5::H5File features(model_folder + "/GPR_data/FEAT_M-" + to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(model_folder + "/GPR_data/projector_M" + to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
-    for (string spe : config.species)
-    {
-        for (int lam = 0; lam < lmax[spe] + 1; lam++)
-        {
-            power_env_sparse[spe + to_string(lam)] = readHDF5(features, "sparse_descriptors/" + spe + "/" + to_string(lam));
-            Vmat[spe + to_string(lam)] = readHDF5(projectors, "projectors/" + spe + "/" + to_string(lam));
+    vector<hsize_t> dims_out;
+    //for (string spe : config.species)
+    //{
+    //    for (int lam = 0; lam < lmax[spe] + 1; lam++)
+    //    {
+    //        power_env_sparse[spe + to_string(lam)] = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out);
+    //        Vmat[spe + to_string(lam)] = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out);
 
-            if (lam == 0)
-            {
-                Mspe[spe] = static_cast<int>(power_env_sparse[spe + to_string(lam)].size());
-            }
-            if (config.zeta == 1)
-            {
-                power_env_sparse[spe + to_string(lam)] = dot(Vmat[spe + to_string(lam)], power_env_sparse[spe + to_string(lam)], true, false);
-            }
-        }
-    }
+    //        if (lam == 0)
+    //        {
+    //            Mspe[spe] = static_cast<int>(power_env_sparse[spe + to_string(lam)].size());
+    //        }
+    //        if (config.zeta == 1)
+    //        {
+    //            power_env_sparse[spe + to_string(lam)] = dot(Vmat[spe + to_string(lam)], power_env_sparse[spe + to_string(lam)], true, false);
+    //        }
+    //    }
+    //}
     features.close();
     projectors.close();
 #endif
