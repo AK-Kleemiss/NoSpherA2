@@ -1805,4 +1805,7 @@ void test_openblas()
 
     ////Fourth compare both transposed
     compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
+
+    std::cout << "All BLAS tests passed!" << std::endl;
+    
 }

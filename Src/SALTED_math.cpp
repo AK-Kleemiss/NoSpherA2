@@ -256,12 +256,12 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
             Shape2D sizes = { m, n };
             return reshape(result_flat, sizes);
         }
-        else 
+        else
         {
             // DLL found but function not found
-			std::cout << "OpenBLAS DLL found but function not found, using fallback." << std::endl;
-            exit(1);
+            err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
         }
+    }
     else
     {
         // DLL not found, fallback
@@ -326,13 +326,13 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
 #endif
 #else
     if (transp1 && !transp2)
-    return self_dot(transpose(mat1), mat2);
+        return self_dot(transpose(mat1), mat2);
     else if (transp1 && transp2)
-    return self_dot(transpose(mat1), transpose(mat2));
+        return self_dot(transpose(mat1), transpose(mat2));
     else if (!transp1 && transp2)
-    return self_dot(mat1, transpose(mat2));
+        return self_dot(mat1, transpose(mat2));
     else
-    return self_dot(mat1, mat2);
+        return self_dot(mat1, mat2);
 #endif
 }
 template vector<vector<float>> dot(const vector<vector<float>>& mat1, const vector<vector<float>>& mat2, bool transp1, bool transp2);

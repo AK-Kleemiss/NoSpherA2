@@ -18,7 +18,7 @@ template <typename T>
 std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<size_t> &dims_out);
 #endif
 
-
+std::string find_first_h5_file(const std::string& directory_path);
 
 template <class T>
 std::vector<T> readVectorFromFile(const std::string &filename);
@@ -33,6 +33,7 @@ struct Config
 {
 public:
     bool from_h5;
+    std::string h5_filename = "";
     std::string predict_filename;
     bool average;
     bool field;

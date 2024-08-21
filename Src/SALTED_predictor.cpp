@@ -2,26 +2,30 @@
 #include <filesystem>
 
 using namespace std;
-
+//std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wavy(wavy_in), opt(opt_in)
 {
     string _path = this->opt.SALTED_DIR;
-    if (filesystem::directory_entry(_path).is_directory())
+    this->config.h5_filename = find_first_h5_file(this->opt.SALTED_DIR);
+    if (this->config.h5_filename == "")
 	{
         string _f_path("inputs.txt");
         join_path(_path, _f_path);
         this->config.populateFromFile(_path);
 	}
-    else if (filesystem::directory_entry(_path).is_regular_file() && _path.find(".h5") != string::npos) {
+	else
+	{
 #if has_RAS
-        H5::H5File config_file(_path, H5F_ACC_RDONLY);
-        this->config.populateFromFile(config_file);
+    join_path(_path, this->config.h5_filename);
+    H5::H5File config_file(_path, H5F_ACC_RDONLY);
+    this->config.populateFromFile(config_file);
 #else
-        err_not_impl_f("HDF5 files are not supported by this build", std::cout);
+    err_not_impl_f("HDF5 files are not supported by this build", std::cout);
 #endif
-    }
+	}
     this->config.predict_filename = this->wavy.get_path();
 }
+
 const string SALTEDPredictor::get_dfbasis_name()
 {
 	return this->config.dfbasis;
@@ -135,7 +139,9 @@ void SALTEDPredictor::read_model_data()
 
 #if has_RAS
 void SALTEDPredictor::read_model_data_h5() {
-    H5::H5File input(this->opt.SALTED_DIR, H5F_ACC_RDONLY);
+    string _H5path = this->opt.SALTED_DIR;
+    join_path(_H5path, this->config.h5_filename);
+    H5::H5File input(_H5path, H5F_ACC_RDONLY);
     vector<hsize_t> dims_out;
     for (string spe : config.species)
     {

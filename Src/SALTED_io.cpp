@@ -1,4 +1,5 @@
 #include "SALTED_io.h"
+#include <filesystem>
 
 using namespace std;
 
@@ -84,6 +85,26 @@ template vector<int> readHDF5(H5::H5File file, string dataset_name, vector<hsize
 template vector<int64_t> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
 #endif
 
+
+std::string find_first_h5_file(const std::string& directory_path) {
+    try {
+        // Iterate through the directory
+        for (const auto& entry : std::filesystem::directory_iterator(directory_path)) {
+            // Check if the entry is a regular file and has a .h5 extension
+            if (entry.is_regular_file() && entry.path().extension() == ".h5") {
+                return entry.path().filename().string();  // Return the filename
+            }
+        }
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Filesystem error: " << e.what() << std::endl;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "General error: " << e.what() << std::endl;
+    }
+
+    return "";  // Return an empty string if no .h5 file is found
+}
 
 
 template <typename Scalar>
