@@ -10,7 +10,6 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-    std::cout << NoSpherA2_message();
     char cwd[1024];
 #ifdef _WIN32
     if (_getcwd(cwd, sizeof(cwd)) != NULL)
@@ -26,17 +25,18 @@ int main(int argc, char **argv)
         return 1;
     }
     ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
-    vector<WFN> wavy;
     options opt(argc, argv, log_file);
     opt.digest_options();
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    vector<WFN> wavy;
+    
     if (opt.threads != -1)
     {
 #ifdef _OPENMP
         omp_set_num_threads(opt.threads);
 #endif
     }
-    log_file << NoSpherA2_message();
+    log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
         log_file << build_date();
@@ -396,7 +396,7 @@ int main(int argc, char **argv)
             wavy[0].write_wfn_CIF(opt.wfn + ".cif");
         return 0;
     }
-    std::cout << NoSpherA2_message();
+    std::cout << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
         std::cout << build_date();
     std::cout << "Did not understand the task to perform!\n"

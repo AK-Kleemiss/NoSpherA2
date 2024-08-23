@@ -77,6 +77,30 @@ jobs:
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
 
+  build_Linux_rascaline:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: make_Linux
+      run: cd Linux && make NoSpherA2_Rascaline
+    - name: tmate session if tests fail build
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: false
+    - name: Archive executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: executable_Linux_rascaline
+        path: |
+          Linux/NoSpherA2_rascaline
+    - name: Run tests
+      run: chmod +x NoSpherA2 && cd tests_r && make all -k MODE=RASCALINE
+    - name: tmate session if tests fail tests
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
+
   combine_all:
     
     runs-on: ubuntu-latest
@@ -87,6 +111,10 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: executable_Linux
+    - name: gather executables Linux_rascaline
+      uses: actions/download-artifact@v4
+      with:
+        name: executable_Linux_rascaline
     - name: gather executables Mac
       uses: actions/download-artifact@v4
       with:
@@ -101,6 +129,7 @@ jobs:
         name: executables
         path: |
           NoSpherA2
+          NoSpherA2_rascaline
           NoSpherA2.exe
           NoSpherA2_Mac
           NoSpherA2_Mac_universal

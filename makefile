@@ -47,4 +47,12 @@ test:
 tests: 
 	cd tests && make all -k -B
 
+test_r: 
+	@echo "Running tests for Rascaline"
+	cd tests && make all -k -B MODE=RASCALINE
+tests_r:
+	@echo "Running tests for Rascaline"
+	cd tests && make all -k -B MODE=RASCALINE
+
+
 .PHONY: test tests NoSpherA2_Rascaline

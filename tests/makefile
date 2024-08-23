@@ -2,11 +2,31 @@ RM := rm
 
 DIFF := diff -q -i -b
 
-all: sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
+
+
+# Define the base path
+BASE_PATH = ../../NoSpherA2
+MODE ?= ""
+ifeq ($(MODE),RASCALINE)
+	BASE_PATH +=_rascaline
+	ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS
+else
+    ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
+endif
+
+# Convert the path to an OS-specific format if necessary
+# For Unix-like systems, this will be a no-op
+# For Windows, you might need to convert '/' to '\'
+ifeq ($(OS),Windows_NT)
+    BASE_PATH := $(shell echo $(BASE_PATH) | sed 's/\//\\/g')
+	BASE_PATH +=.exe
+endif
+
+all: $(ALL_TARGETS)
 
 sucrose_SF:
 	@echo 'Running test: $@'
-	cd sucrose_fchk_SF && ../../NoSpherA2 \
+	cd sucrose_fchk_SF && $(BASE_PATH) \
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
@@ -18,7 +38,7 @@ sucrose_SF:
 
 openBLAS:
 	@echo 'Running test: $@'
-	cd OpenBLAS && ../../NoSpherA2_rascaline \
+	cd OpenBLAS && $(BASE_PATH) \
 		-blastest \
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
@@ -27,7 +47,7 @@ openBLAS:
 
 malbac_SF_ECP:
 	@echo 'Running test: $@'
-	cd ECP_SF && ../../NoSpherA2 \
+	cd ECP_SF && $(BASE_PATH) \
 		-cif malbac.cif \
 		-hkl malbac.hkl \
 		-wfn malbac.gbw \
@@ -40,7 +60,7 @@ malbac_SF_ECP:
 
 sucrose_IAM:
 	@echo 'Running test: $@'
-	cd sucrose_IAM_SF && ../../NoSpherA2 \
+	cd sucrose_IAM_SF && $(BASE_PATH) \
 		-cif sucrose.cif \
 		-hkl sucrose.hkl \
 		-xyz sucrose.xyz -IAM\
@@ -51,7 +71,7 @@ sucrose_IAM:
 	
 sucrose_twin:
 	@echo 'Running test: $@'
-	cd sucrose_fchk_SF && ../../NoSpherA2 \
+	cd sucrose_fchk_SF && $(BASE_PATH) \
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
@@ -64,7 +84,7 @@ sucrose_twin:
 
 sucrose_ptb:
 	@echo 'Running test: $@'
-	cd sucrose_IAM_SF && ../../NoSpherA2 \
+	cd sucrose_IAM_SF && $(BASE_PATH) \
 		-cif sucrose.cif \
 		-dmin 0.8 \
 		-wfn wfn.xtb \
@@ -79,7 +99,7 @@ sucrose_ptb:
 
 disorder_THPP:
 	@echo 'Running test: $@'
-	cd disorder && ../../NoSpherA2 \
+	cd disorder && $(BASE_PATH) \
 		-cif thpp.cif \
 		-hkl thpp.hkl \
 		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 \
@@ -94,7 +114,7 @@ disorder_THPP:
 
 grown_water:
 	@echo 'Running test: $@'
-	cd grown && ../../NoSpherA2 \
+	cd grown && $(BASE_PATH) \
 		-cif water.cif \
 		-hkl water.hkl \
 		-wfn water.wfx \
@@ -106,7 +126,7 @@ grown_water:
 
 fractal:
 	@echo 'Running test: $@'
-	cd sucrose_fchk_SF && ../../NoSpherA2 \
+	cd sucrose_fchk_SF && $(BASE_PATH) \
 		-fractal sucrose_diff.cube \
 		-no_date \
 		&& mv sucrose_diff.cube_fractal_plot $@.log \
@@ -115,7 +135,7 @@ fractal:
 	
 properties:
 	@echo 'Running test: $@'
-	cd sucrose_fchk_SF && ../../NoSpherA2 \
+	cd sucrose_fchk_SF && $(BASE_PATH) \
 		-wfn olex2/Wfn_job/sucrose.wfx \
 		-cif sucrose.cif -lap -eli \
 		-resolution 0.5 -test \
@@ -126,7 +146,7 @@ properties:
 	
 rubredoxin_cmtc:
 	@echo 'Running test: $@'
-	cd rubredoxin_cmtc && ../../NoSpherA2 \
+	cd rubredoxin_cmtc && $(BASE_PATH) \
 		-hkl 1yk4_h.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
 		residues/2.gbw residues/2.cif 0,1 \
@@ -141,7 +161,7 @@ rubredoxin_cmtc:
 
 rubredoxin_cmtc_full:
 	@echo 'Running test: $@'
-	cd rubredoxin_cmtc && ../../NoSpherA2 \
+	cd rubredoxin_cmtc && $(BASE_PATH) \
 		-hkl 1yk4_h_full.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
 		residues/2.gbw residues/2.cif 0,1 \
@@ -154,7 +174,7 @@ rubredoxin_cmtc_full:
 
 Hybrid_mode:
 	@echo 'Running test: $@'
-	cd Hybrid && ../../NoSpherA2 \
+	cd Hybrid && $(BASE_PATH) \
 		-cif ZP2.cif \
 		-dmin 0.9 \
 		-acc 0 \
@@ -168,7 +188,7 @@ Hybrid_mode:
 	
 wfn_reading:
 	@echo 'Running test: $@'
-	cd wfn_reading && ../../NoSpherA2 \
+	cd wfn_reading && $(BASE_PATH) \
 		-hkl test.hkl -acc 0 \
 		-cif test.cif -wfn test.wfn \
 		-no-date \
@@ -178,7 +198,7 @@ wfn_reading:
 
 fchk_conversion:
 	@echo 'Running test: $@'
-	cd NiP3_fchk && ../../NoSpherA2 \
+	cd NiP3_fchk && $(BASE_PATH) \
                 -b def2-TZVP -d ./ \
 		-wfn in.ffn -no-date \
 		&& ${DIFF} in.fchk good.fchk
