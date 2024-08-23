@@ -25,9 +25,9 @@ int main(int argc, char **argv)
         return 1;
     }
     ofstream log_file("NoSpherA2.log", ios::out);
+    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     vector<WFN> wavy;
     
     if (opt.threads != -1)
