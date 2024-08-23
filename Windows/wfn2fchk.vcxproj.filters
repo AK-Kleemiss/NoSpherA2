@@ -168,12 +168,6 @@
     <ClCompile Include="..\Src\SALTED_math.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\ML_predict.cpp">
-      <Filter>Quelldateien\SALTED</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Src\ML_density.cpp">
-      <Filter>Quelldateien\SALTED</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\SALTED_io.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
@@ -952,12 +946,6 @@
     </ClInclude>
     <ClInclude Include="..\Src\rascaline.hpp">
       <Filter>Headerdateien\Rascaline</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\ML_density.h">
-      <Filter>Headerdateien\SALTED</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\ML_predict.h">
-      <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\SALTED_math.h">
       <Filter>Headerdateien\SALTED</Filter>

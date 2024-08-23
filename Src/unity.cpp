@@ -11,5 +11,3 @@
 #include "./fchk.cpp"
 #include "./JKFit.cpp"
 #include "./NoSpherA2.cpp"
-#include "./ML_density.cpp"
-#include "./ML_predict.cpp"
