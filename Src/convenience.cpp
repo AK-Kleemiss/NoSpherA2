@@ -3661,19 +3661,34 @@ char asciitolower(char in)
     return in;
 }
 
-int vec_sum(const bvec &in)
+int vec_sum(const bvec& in)
 {
-    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
+  int sum = 0;
+  for (bool val : in)
+  {
+    sum += val;
+  }
+  return sum;
 }
 
-int vec_sum(const ivec &in)
+int vec_sum(const ivec& in)
 {
-    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
+  int sum = 0;
+  for (int val : in)
+  {
+    sum += val;
+  }
+  return sum;
 }
 
-double vec_sum(const vec &in)
+double vec_sum(const vec& in)
 {
-    return std::reduce(std::execution::par, in.begin(), in.end(), 0);
+  double sum = 0.0;
+  for (double val : in)
+  {
+    sum += val;
+  }
+  return sum;
 }
 
 cdouble vec_sum(const cvec &in)

@@ -72,7 +72,7 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, co
 
 //BLAS implementation of matrix multiplication
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2);
+std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1=false, bool transp2=false);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
@@ -80,3 +80,5 @@ std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> 
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
+
+void _test_openblas();

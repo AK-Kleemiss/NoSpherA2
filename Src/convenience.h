@@ -26,7 +26,7 @@
 #include <typeinfo>
 #include <vector>
 #include <numeric>
-#include <execution>
+#include <cassert>
 
 // Here are the system specific libaries
 #ifdef _WIN32

@@ -5,8 +5,8 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
-#include "SALTED_math.h"
 #if has_RAS
+#include "SALTED_math.h"
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif
@@ -1759,53 +1759,10 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
     return res / constants::FOUR_PI;
 }
 
-template <typename T>
-void compare_matrices(const std::vector<std::vector<T>>& A, const std::vector<std::vector<T>>& B)
-{
-	for (int i = 0; i < A.size(); i++)
-	{
-		for (int j = 0; j < A[0].size(); j++)
-		{
-			assert(A[i][j] == B[i][j]);
-		}
-	}
-}
-
-void test_openblas()
-{
-    //Init Mat A with some values as a 3x3 matrix
-    vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-    //Init Mat B with some values
-    vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-
-    //First test regular dot-product
-    compare_matrices(dot(A, B, false, false), self_dot(A, B));
-
-    ////Second compare first transpose
-    compare_matrices(dot(A, B, true, false), self_dot(transpose(A), B));
-
-    ////Third comparte second transpose
-    compare_matrices(dot(A, B, false, true), self_dot(A, transpose(B)));
-
-    ////Fourth compare both transposed
-    compare_matrices(dot(A, B, true, true), self_dot(transpose(A), transpose(B)));
-
-    //Init Complex matrices
-    cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
-    cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
-
-    //First test regular dot-product
-    compare_matrices(dot(C, D, false, false), self_dot(C, D));
-
-    ////Second compare first transpose
-    compare_matrices(dot(C, D, true, false), self_dot(transpose(C), D));
-
-    ////Third comparte second transpose
-    compare_matrices(dot(C, D, false, true), self_dot(C, transpose(D)));
-
-    ////Fourth compare both transposed
-    compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
-
-    std::cout << "All BLAS tests passed!" << std::endl;
-    
+void test_openblas() {
+#if has_RAS
+	_test_openblas();
+#else
+  err_not_impl_f("Openblas not included in Executable!", std::cout);
+#endif
 }

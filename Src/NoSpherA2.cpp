@@ -331,6 +331,7 @@ int main(int argc, char **argv)
             }
             else
             {
+#if has_RAS
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
                 BasisSetLibrary basis_library;
@@ -358,6 +359,10 @@ int main(int argc, char **argv)
                                    nr_coefs),
                                "Error during ML-SF Calcualtion", log_file);
                 }
+#else
+							log_file << "SALTED is not available in this build!" << endl;
+              exit(-1);
+#endif
             }
         }
         log_file.flush();
