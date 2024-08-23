@@ -96,7 +96,7 @@ jobs:
         path: |
           Linux/NoSpherA2_rascaline
     - name: Run tests
-      run: chmod +x NoSpherA2_rascaline && cd tests_r && make all -k MODE=RASCALINE
+      run: chmod +x NoSpherA2_rascaline && cd tests && make all -k MODE=RASCALINE
     - name: tmate session if tests fail tests
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
