@@ -79,6 +79,7 @@ jobs:
 
   build_Linux_rascaline:
     runs-on: ubuntu-latest
+    needs: build_Linux
 
     steps:
     - uses: actions/checkout@v4
