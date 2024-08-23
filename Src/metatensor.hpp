@@ -66,12 +66,12 @@ namespace details {
 
     private:
         static std::string& get() {
-            #pragma clang diagnostic push
-            #pragma clang diagnostic ignored "-Wexit-time-destructors"
+            //#pragma clang diagnostic push
+            //#pragma clang diagnostic ignored "-Wexit-time-destructors"
             /// we are using a per-thread static value to store the last C++
             /// exception.
             static thread_local std::string STORED_MESSAGE;
-            #pragma clang diagnostic pop
+            //#pragma clang diagnostic pop
 
             return STORED_MESSAGE;
         }

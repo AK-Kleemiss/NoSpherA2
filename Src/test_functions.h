@@ -1761,8 +1761,10 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 
 void test_openblas() {
 #if has_RAS
-	_test_openblas();
+    std::cout << "Running Openblas test" << std::endl;
+    _test_openblas();
+    exit(0);
 #else
-  err_not_impl_f("Openblas not included in Executable!", std::cout);
+    err_not_impl_f("Openblas not included in Executable!", std::cout);
 #endif
 }

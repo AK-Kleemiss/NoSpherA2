@@ -16,6 +16,15 @@ sucrose_SF:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
+openBLAS:
+	@echo 'Running test: $@'
+	cd OpenBLAS && ../../NoSpherA2_rascaline \
+		-blastest \
+		-no-date \
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
 malbac_SF_ECP:
 	@echo 'Running test: $@'
 	cd ECP_SF && ../../NoSpherA2 \

@@ -2771,8 +2771,9 @@ void options::digest_options()
         }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
-        else if (temp == "-blastest")
-            test_openblas();
+        else if (temp == "-blastest") {
+          test_openblas();
+        }
         else if (temp == "-Cation")
         {
             int n = 1;
