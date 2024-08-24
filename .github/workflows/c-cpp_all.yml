@@ -10,7 +10,7 @@ on:
 jobs:
   build_Mac:
     runs-on: macos-latest
-    needs: build_Linux
+    needs: [build_Linux,build_Linux_rascaline]
 
     steps:
     - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   build_windows:
     runs-on: windows-2022
-    needs: build_Linux
+    needs: [build_Linux,build_Linux_rascaline]
 
     steps:
     - uses: actions/checkout@v4
