@@ -252,6 +252,8 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buf
 
     cvec4 expansion_coeffs(2 * this->nang + 1, std::vector<cvec2>(this->nang + 1, cvec2(this->nspe * this->nrad, cvec(this->n_atoms))));
 
+
+    //This is not actually neccecary, but it is done to match the SALTED implementation
     for (int a = 0; a < omega.size(); ++a)
     {
         for (int b = 0; b < omega[0].size(); ++b)

@@ -279,7 +279,7 @@ vec SALTEDPredictor::predict()
             psi_nm[spe + "0"] = dot<double>(kernel_nm, this->Vmat[spe + "0"], false, false);
         }
 
-        for (int lam = 1; lam <= lmax[spe]; ++lam)
+        for (int lam = 1; lam < lmax[spe] + 1; ++lam)
         {
             int featsize = static_cast<int>(pvec[lam][0][0].size());
             vec3 pVec_Rows = collectRows(pvec[lam], this->atom_idx[spe]);
@@ -318,17 +318,26 @@ vec SALTEDPredictor::predict()
     {
         if (this->atom_idx.find(spe) == this->atom_idx.end())
         {
-            for (int l = 0; l <= this->lmax[spe]; ++l)
+            for (int l = 0; l < this->lmax[spe] + 1; ++l)
             {
-                for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
-                {
-                    isize += static_cast<int>(this->Vmat[spe + to_string(l)][0].size());
+                //Check if Vmat[spe + to_string(l)][0] exists
+                if (this->Vmat[spe + to_string(l)].size() == 0) {
+                    cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2." << endl;
+                    cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!" << endl;
+                    l = this->lmax[spe] + 1;
+                    continue;
                 }
+               
+                //for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
+                //{
+                //    isize += static_cast<int>(this->Vmat[spe + to_string(l)][0].size());
+                //}
+                isize += static_cast<int>(this->Vmat[spe + to_string(l)][0].size()) * this->nmax[spe + to_string(l)];
             }
             continue;
         }
         ispe[spe] = 0;
-        for (int l = 0; l <= this->lmax[spe]; ++l)
+        for (int l = 0; l < this->lmax[spe] + 1; ++l)
         {
             for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
             {
@@ -364,14 +373,16 @@ vec SALTEDPredictor::predict()
     for (int iat = 0; iat < this->natoms; ++iat)
     {
         string spe = this->atomic_symbols[iat];
-        for (int l = 0; l <= this->lmax[spe]; ++l)
+        for (int l = 0; l < this->lmax[spe] + 1; ++l)
         {
             for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
             {
-                for (int ind = 0; ind < 2 * l + 1; ++ind)
-                {
-                    pred_coefs[i + ind] = C[spe + to_string(l) + to_string(n)][ispe[spe] * (2 * l + 1) + ind];
-                }
+                //for (int ind = 0; ind < 2 * l + 1; ++ind)
+                //{
+                //    pred_coefs[i + ind] = C[spe + to_string(l) + to_string(n)][ispe[spe] * (2 * l + 1) + ind];
+                //}
+                std::copy_n(C[spe + to_string(l) + to_string(n)].begin() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
+
                 if (this->config.average && l == 0)
                 {
                     Av_coeffs[i] = this->av_coefs[spe][n];
