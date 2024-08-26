@@ -18,6 +18,9 @@ public:
 
     const std::string get_dfbasis_name();
     vec gen_SALTED_densities();
+    const std::string get_h5_filename() const {
+        return config.h5_filename;
+    };
 private:
     Config config;
     const WFN& wavy;

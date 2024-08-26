@@ -10,7 +10,7 @@ on:
 jobs:
   build_Mac:
     runs-on: macos-latest
-    needs: build_Linux
+    needs: [build_Linux,build_Linux_rascaline]
 
     steps:
     - uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   build_windows:
     runs-on: windows-2022
-    needs: build_Linux
+    needs: [build_Linux,build_Linux_rascaline]
 
     steps:
     - uses: actions/checkout@v4
@@ -79,6 +79,7 @@ jobs:
 
   build_Linux_rascaline:
     runs-on: ubuntu-latest
+    needs: build_Linux
 
     steps:
     - uses: actions/checkout@v4
@@ -96,7 +97,7 @@ jobs:
         path: |
           Linux/NoSpherA2_rascaline
     - name: Run tests
-      run: chmod +x NoSpherA2 && cd tests_r && make all -k MODE=RASCALINE
+      run: chmod +x NoSpherA2_rascaline && cd tests && make all -k MODE=RASCALINE
     - name: tmate session if tests fail tests
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -104,7 +105,7 @@ jobs:
   combine_all:
     
     runs-on: ubuntu-latest
-    needs: [build_Linux,build_Mac,build_windows]
+    needs: [build_Linux,build_Mac,build_windows,build_Linux_rascaline]
     
     steps:
     - name: gather executables Linux

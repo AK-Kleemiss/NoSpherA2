@@ -335,7 +335,14 @@ int main(int argc, char **argv)
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
                 BasisSetLibrary basis_library;
-                const string df_basis_name = SALTEDPredictor(wavy[0], opt).get_dfbasis_name();
+                string df_basis_name;
+                string h5file;
+                {
+                    SALTEDPredictor temp_pred(wavy[0], opt);
+                    df_basis_name = temp_pred.get_dfbasis_name();
+                    h5file = temp_pred.get_h5_filename();
+                }
+                log_file << "Using " << h5file << " for the prediction" << endl;
                 int nr_coefs = load_basis_into_WFN(wavy[0], basis_library.get_basis_set(df_basis_name));
                 //int nr_coefs = load_basis_into_WFN(wavy[0], def2_qzvppd_rifit);
                 if (opt.debug)
