@@ -72,6 +72,7 @@ private:
 #if has_RAS
     void populate_config(const std::string& dataset_name, const int& data);
     void populate_config(const std::string& dataset_name, const float& data);
+    void populate_config(const std::string& dataset_name, const double& data);
     void populate_config(const std::string& dataset_name, const std::string& data);
     void populate_config(const std::string& dataset_name, const std::vector<std::string>& data);
 

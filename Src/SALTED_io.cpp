@@ -324,6 +324,15 @@ void Config::populate_config(const std::string& dataset_name, const float& data)
     else if (dataset_name == "trainfrac") this->trainfrac = data;
     else cout << "Unknown dataset name: " << dataset_name << endl;
 }
+void Config::populate_config(const std::string& dataset_name, const double& data) {
+    if (dataset_name == "rcut1") this->rcut1 = data;
+    else if (dataset_name == "rcut2") this->rcut2 = data;
+    else if (dataset_name == "sig1") this->sig1 = data;
+    else if (dataset_name == "sig2") this->sig2 = data;
+    else if (dataset_name == "zeta") this->zeta = data;
+    else if (dataset_name == "trainfrac") this->trainfrac = data;
+    else cout << "Unknown dataset name: " << dataset_name << endl;
+}
 void Config::populate_config(const std::string& dataset_name, const std::string& data) {
     if (dataset_name == "predict_filename") this->predict_filename = data;
     else if (dataset_name == "dfbasis") this->dfbasis = data;
@@ -342,9 +351,17 @@ void Config::handle_int_dataset(const std::string& dataset_name, H5::DataSet& da
     populate_config(dataset_name, data);
 }
 void Config::handle_float_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {
-    float data{};
-    dataSet.read(&data, H5::PredType::NATIVE_FLOAT);
-    populate_config(dataset_name, data);
+    size_t byteSize = dataSet.getFloatType().getSize();
+    if (byteSize == 4) {
+		float data{};
+		dataSet.read(&data, H5::PredType::NATIVE_FLOAT);
+        populate_config(dataset_name, data);
+	}
+	else if (byteSize == 8) {
+		double data{};
+		dataSet.read(&data, H5::PredType::NATIVE_DOUBLE);
+        populate_config(dataset_name, data);
+	}
 }
 void Config::handle_string_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {
     H5::DataSpace dataspace = dataSet.getSpace();

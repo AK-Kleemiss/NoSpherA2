@@ -6,7 +6,9 @@ using namespace std;
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wavy(wavy_in), opt(opt_in)
 {
     string _path = this->opt.SALTED_DIR;
+
     this->config.h5_filename = find_first_h5_file(this->opt.SALTED_DIR);
+    
     if (this->config.h5_filename == "")
 	{
         string _f_path("inputs.txt");
@@ -24,6 +26,8 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
 #endif
 	}
     this->config.predict_filename = this->wavy.get_path();
+
+
 }
 
 const string SALTEDPredictor::get_dfbasis_name()
@@ -301,10 +305,11 @@ vec SALTEDPredictor::predict()
                         }
                     }
                 }
-                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
+                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, this->Vmat[spe + to_string(lam)], false, false);
             }
         }
     }
+
 
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
@@ -317,7 +322,7 @@ vec SALTEDPredictor::predict()
             {
                 for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
                 {
-                    isize += static_cast<int>(this->Vmat[spe + to_string(l)].size());
+                    isize += static_cast<int>(this->Vmat[spe + to_string(l)][0].size());
                 }
             }
             continue;
@@ -328,8 +333,11 @@ vec SALTEDPredictor::predict()
             for (int n = 0; n < this->nmax[spe + to_string(l)]; ++n)
             {
                 int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
+                //Check if isize + Mcut > weights.size()
+                err_chekf(isize + Mcut <= this->weights.size(), "isize + Mcut > weights.size()", std::cout);
                 vec weights_subset(this->weights.begin() + isize, this->weights.begin() + isize + Mcut);
                 C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe + to_string(l)], weights_subset);
+
                 isize += Mcut;
             }
         }
@@ -382,12 +390,12 @@ vec SALTEDPredictor::predict()
         }
     }
 
-    cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
-    // npy::npy_data<double> coeffs;
-    // coeffs.data = pred_coefs;
-    // coeffs.fortran_order = false;
-    // coeffs.shape = { unsigned long(pred_coefs.size()) };
-    // npy::write_npy("coeffs_by_black_magic.npy", coeffs);
+    //cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
+    //npy::npy_data<double> coeffs;
+    //coeffs.data = pred_coefs;
+    //coeffs.fortran_order = false;
+    //coeffs.shape = { unsigned long(pred_coefs.size()) };
+    //npy::write_npy("folder_model.npy", coeffs);
     return pred_coefs;
 }
 
@@ -418,7 +426,8 @@ vec SALTEDPredictor::gen_SALTED_densities()
 #endif
         
     }
-    
+
+
     vec coefs = this->predict();
 
 
@@ -450,7 +459,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
             for (int i = 0; i < coefs.size(); i++)
             {
                 diff += abs(coefs[i] - ref_coefs[i]);
-                if (abs(coefs[i] - ref_coefs[i]) > 1e-4)
+                if (abs(coefs[i] - ref_coefs[i]) > 1e-4 || isnan(coefs[i] - ref_coefs[i]))
                 {
                     cout << "Difference in coef " << fixed << setprecision(3) << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
                 }
@@ -458,7 +467,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
             }
             cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
             cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
-            if (diff > 0.1)
+            if (diff > 0.1 || isnan(diff))
             {
                 cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
                 exit(1);
