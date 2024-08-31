@@ -53,7 +53,7 @@ public:
     double zeta;
     int Menv;
     int Ntrain;
-    float trainfrac;
+    double trainfrac;
     std::string dfbasis;
 
     // The are initialized to -1 to check if they are set

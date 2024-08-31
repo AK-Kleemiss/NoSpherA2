@@ -233,7 +233,7 @@ void Config::populateFromFile(const std::string &filename)
                 else if (key == "Ntrain")
                     this->Ntrain = std::stoi(value);
                 else if (key == "trainfrac")
-                    this->trainfrac = std::stof(value);
+                    this->trainfrac = std::stod(value);
                 else if (key == "dfbasis")
                     this->dfbasis = value;
             }
