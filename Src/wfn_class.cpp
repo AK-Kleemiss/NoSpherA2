@@ -6248,7 +6248,10 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     alpha_els += temp_els;
     if (debug)
         file << "al/be els:" << alpha_els << " " << beta_els << endl;
-    int diff = get_multi() - 1;
+    const int mult = get_multi();
+    int diff = 0;
+    if (mult != 0)
+        diff = get_multi() - 1;
     if (debug)
         file << "diff: " << diff << endl;
     while (alpha_els - beta_els != diff)
