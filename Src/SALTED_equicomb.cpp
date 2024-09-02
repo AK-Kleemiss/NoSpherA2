@@ -9,11 +9,11 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     const ivec2& llvec, int lam,
     const cvec2& c2r, int featsize,
     int nfps, const vector<int64_t>& vfps,
-    vec3& p)
+    vec& p)
 {
     // Initialize p with zeros
-    p.assign(2 * lam + 1, vec2(nfps, vec(natoms, 0.0)));
-
+    p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
+        
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
@@ -76,11 +76,12 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
         {
             for (imu = 0; imu < l21; ++imu)
             {
-                p[imu][n][iat] = ptemp[imu][vfps[n]] / normfact;
+                p[iat * (2 * lam + 1) * nfps + (imu * nfps) + n] = ptemp[imu][vfps[n]] / normfact;
             }
         }
     }
 }
+
 
 void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     cvec4& v1,
@@ -88,10 +89,10 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     vec& w3j, int llmax,
     ivec2& llvec, int lam,
     cvec2& c2r, int featsize,
-    vec3& p)
+    vec& p)
 {
     // Initialize p with zeros
-    p.assign(2 * lam + 1, vec2(featsize, vec(natoms, 0.0)));
+    p.assign(natoms * (2 * lam + 1) * featsize, 0.0);
 
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
@@ -154,7 +155,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
         {
             for (int imu = 0; imu < 2 * lam + 1; ++imu)
             {
-                p[imu][ifeat][iat] = ptemp[imu][ifeat] / normfact;
+                p[iat * (2 * lam + 1) * featsize + (imu * featsize) + ifeat] = ptemp[imu][ifeat] / normfact;
             }
         }
     }

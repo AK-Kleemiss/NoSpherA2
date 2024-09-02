@@ -224,8 +224,9 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 // RASCALINE2
 cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buffer)
 {
+    
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    vector<vector<vector<vector<complex<double>>>>> omega(this->nang + 1, vector<vector<vector<complex<double>>>>(this->n_atoms, vector<vector<complex<double>>>(2 * this->nang + 1, vector<complex<double>>(this->nspe * this->nrad, {0.0, 0.0}))));
+    cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
     for (int l = 0; l < nang + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];

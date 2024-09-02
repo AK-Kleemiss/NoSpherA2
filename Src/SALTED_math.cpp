@@ -116,6 +116,7 @@ vector<double> slice(const vector<double> &vec, size_t start, size_t length)
 
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
+//Slow direct implementation
 template <typename T>
 vector<vector<T>> self_dot(const vector<vector<T>> &mat1, const vector<vector<T>> &mat2)
 {
@@ -174,9 +175,7 @@ template vector<vector<cdouble>> self_dot(const vector<vector<cdouble>> &mat1, c
 
 typedef void (*ExampleFunctionType)(void);
 
-
-//// Matrix multiplication
-//// 2D x 2D MATRIX MULTIPLICATION
+//Fast dot product using OpenBLAS
 template <typename T>
 vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& mat2, bool transp1, bool transp2) {
     // if either of the matrices is empty, return a empty matrix
@@ -194,13 +193,47 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
     err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
 
     // Flatten input matrices
-
     vector<T> flatMat1 = flatten(mat1);
     vector<T> flatMat2 = flatten(mat2);
-    vector<T> result_flat(m * n, 0.0);
+    
+    return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+}
+template vector<vector<float>> dot(const vector<vector<float>>& mat1, const vector<vector<float>>& mat2, bool transp1, bool transp2);
+template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2, bool transp1, bool transp2);
+template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2, bool transp1, bool transp2);
 
+template <typename T>
+vector<vector<T>> dot(const vector<T>& flatMat1, const vector<T>& flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2) {
+    //Check if flatMat1 and flatMat2 have the correct size
+    err_checkf(flatMat1.size() == mat1_d0 * mat1_d1, "flat Matrix 1 has incorrect size", std::cout);
+    err_checkf(flatMat2.size() == mat2_d0 * mat2_d1, "flat Matrix 2 has incorrect size", std::cout);
+
+    // if either of the matrices is empty, return a empty matrix
+	if (flatMat1.empty() || flatMat2.empty())
+	{
+		return {};
+	}
+	size_t m = transp1 ? mat1_d1 : mat1_d0;
+    size_t k1 = transp1 ? mat1_d0 : mat1_d1;
+    size_t k2 = transp2 ? mat2_d1 : mat2_d0;
+    size_t n = transp2 ? mat2_d0 : mat2_d1;
+	// The resulting matrix will have dimensions m x n
+
+	// Check if matrix multiplication is possible
+	err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
+
+	return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+}
+template vector<vector<float>> dot(const vector<float> & flatMat1, const vector<float> & flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
+template vector<vector<double>> dot(const vector<double> & flatMat1, const vector<double> & flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
+template vector<vector<cdouble>> dot(const vector<cdouble> & flatMat1, const vector<cdouble> & flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
+
+template <typename T>
 #if has_RAS
 #ifdef _WIN32
+//Windows specific implementation
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2) {
+    vector<T> result_flat(m * n, 0.0);
     HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
     if (hOpenBlas != NULL)
     {
@@ -265,16 +298,22 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
     {
         // DLL not found, fallback
         std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+        std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
+        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { k2, n });
         if (transp1 && !transp2)
-            return self_dot(transpose(mat1), mat2);
+            return self_dot(transpose(mat1_2D), mat2_2D);
         else if (transp1 && transp2)
-            return self_dot(transpose(mat1), transpose(mat2));
+            return self_dot(transpose(mat1_2D), transpose(mat2_2D));
         else if (!transp1 && transp2)
-            return self_dot(mat1, transpose(mat2));
+            return self_dot(mat1_2D, transpose(mat2_2D));
         else
-            return self_dot(mat1, mat2);
+            return self_dot(mat1_2D, mat2_2D);
     }
+}
 #else
+//Linux specific implementation
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false) {
+    vector<T> result_flat(m * n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
         // Call cblas_dgemm
@@ -322,21 +361,28 @@ vector<vector<T>> dot(const vector<vector<T>>& mat1, const vector<vector<T>>& ma
 
     Shape2D sizes = { m, n };
     return reshape(result_flat, sizes);
+}
 #endif
 #else
+// Fallback implementation
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>&flatMat1, const std::vector<T>&flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false) {
+    std::cout << "Something went wrong, using dot fallback." << std::endl;
+    vector<T> result_flat(m * n, 0.0);
+    std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
+    std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { k2, n });
     if (transp1 && !transp2)
-        return self_dot(transpose(mat1), mat2);
+        return self_dot(transpose(mat1_2D), mat2_2D);
     else if (transp1 && transp2)
-        return self_dot(transpose(mat1), transpose(mat2));
+        return self_dot(transpose(mat1_2D), transpose(mat2_2D));
     else if (!transp1 && transp2)
-        return self_dot(mat1, transpose(mat2));
+        return self_dot(mat1_2D, transpose(mat2_2D));
     else
-        return self_dot(mat1, mat2);
-#endif
+        return self_dot(mat1_2D, mat2_2D);
 }
-template vector<vector<float>> dot(const vector<vector<float>>& mat1, const vector<vector<float>>& mat2, bool transp1, bool transp2);
-template vector<vector<double>> dot(const vector<vector<double>> &mat1, const vector<vector<double>> &mat2, bool transp1, bool transp2);
-template vector<vector<cdouble>> dot(const vector<vector<cdouble>> &mat1, const vector<vector<cdouble>> &mat2, bool transp1, bool transp2);
+#endif
+template vector<vector<float>> dot_BLAS(const std::vector<float>& mat1, const std::vector<float>& mat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2);
+template vector<vector<double>> dot_BLAS(const std::vector<double>& mat1, const std::vector<double>& mat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2);
+template vector<vector<cdouble>> dot_BLAS(const std::vector<cdouble>& mat1, const std::vector<cdouble>& mat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>

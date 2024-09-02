@@ -65,14 +65,23 @@ std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
 std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length);
 
 // Matrix multiplication
+// 
 // 2D x 2D MATRIX MULTIPLICATION
-//Own implementation of matrix multiplication
-template <typename T>
-std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2);
-
 //BLAS implementation of matrix multiplication
 template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1=false, bool transp2=false);
+
+//BLAS dot product from flattend matrices
+template <typename T>
+std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1, const std::vector<T>& flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
+
+//BLAS implementation of matrix multiplication, without prior flattening
+template <typename T>
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false);
+
+//Own implementation of matrix multiplication
+template <typename T>
+std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>

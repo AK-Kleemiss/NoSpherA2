@@ -10,7 +10,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     const ivec2& llvec, int lam,
     const cvec2& c2r, int featsize,
     int nfps, const std::vector<int64_t>& vfps,
-    vec3& p);
+    vec& p);
 
 //Normal implementation
 void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
@@ -19,4 +19,4 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     vec& w3j, int llmax,
     ivec2& llvec, int lam,
     cvec2& c2r, int featsize,
-    vec3& p);
+    vec& p);

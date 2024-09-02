@@ -86,23 +86,24 @@ void SALTEDPredictor::read_model_data()
 
     H5::H5File features(this->opt.SALTED_DIR + "/GPR_data/FEAT_M-" + to_string(this->config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(this->opt.SALTED_DIR + "/GPR_data/projector_M" + to_string(this->config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
-    vector<hsize_t> dims_out;
+    vector<hsize_t> dims_out_descrip;
+    vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
-            vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out);
-            this->power_env_sparse[spe + to_string(lam)] = reshape<double>(temp_power, Shape2D{dims_out[0], dims_out[1]});
-            vec temp_Vmat = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out);
-            this->Vmat[spe + to_string(lam)] = reshape<double>(temp_Vmat, Shape2D{dims_out[0], dims_out[1]});
+            vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
+            this->power_env_sparse[spe + to_string(lam)] = temp_power;
+            vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
+            this->Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{ dims_out_proj[0], dims_out_proj[1] });
 
             if (lam == 0)
             {
-                this->Mspe[spe] = static_cast<int>(this->power_env_sparse[spe + to_string(lam)].size());
+                this->Mspe[spe] = dims_out_descrip[0];
             }
             if (this->config.zeta == 1)
             {
-                this->power_env_sparse[spe + to_string(lam)] = dot<double>(this->Vmat[spe + to_string(lam)], this->power_env_sparse[spe + to_string(lam)], true, false);
+                this->power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
             }
         }
     }
@@ -146,43 +147,45 @@ void SALTEDPredictor::read_model_data_h5() {
     string _H5path = this->opt.SALTED_DIR;
     join_path(_H5path, this->config.h5_filename);
     H5::H5File input(_H5path, H5F_ACC_RDONLY);
-    vector<hsize_t> dims_out;
+    vector<hsize_t> dims_out_descrip;
+    vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
-            vec temp_power = readHDF5<double>(input, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out);
-            this->power_env_sparse[spe + to_string(lam)] = reshape(temp_power, Shape2D{dims_out[0], dims_out[1]});
-            vec temp_proj = readHDF5<double>(input, "projectors/" + spe + "/" + to_string(lam), dims_out);
-            this->Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{dims_out[0], dims_out[1]});
+            vec temp_power = readHDF5<double>(input, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
+            this->power_env_sparse[spe + to_string(lam)] = temp_power;
+            vec temp_proj = readHDF5<double>(input, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
+            this->Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{dims_out_proj[0], dims_out_proj[1]});
 
             if (lam == 0)
             {
-                this->Mspe[spe] = static_cast<int>(this->power_env_sparse[spe + to_string(lam)].size());
+                this->Mspe[spe] = dims_out_descrip[0];
             }
             if (this->config.zeta == 1)
             {
-                this->power_env_sparse[spe + to_string(lam)] = dot<double>(this->Vmat[spe + to_string(lam)], this->power_env_sparse[spe + to_string(lam)], true, false);
+                this->power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power,dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
             }
         }
     }
 
+    vector<hsize_t> dims_out_temp;
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        this->wigner3j[lam] = readHDF5<double>(input, "wigners/lam-" + to_string(lam), dims_out);
+        this->wigner3j[lam] = readHDF5<double>(input, "wigners/lam-" + to_string(lam), dims_out_temp);
     }
-
+    
     if (config.sparsify)
     {
         for (int lam = 0; lam < SALTED_Utils::get_lmax_max(this->lmax) + 1; lam++)
         {
-            this->vfps[lam] = readHDF5<int64_t>(input, "fps/lam-" + to_string(lam), dims_out);
+            this->vfps[lam] = readHDF5<int64_t>(input, "fps/lam-" + to_string(lam), dims_out_temp);
         }
     };
     if (config.average) {
         for (string spe : this->config.species)
         {
-            this->av_coefs[spe] = readHDF5<double>(input, "averages/" + spe, dims_out);
+            this->av_coefs[spe] = readHDF5<double>(input, "averages/" + spe, dims_out_temp);
         }
     }
 
@@ -193,7 +196,7 @@ void SALTEDPredictor::read_model_data_h5() {
     }
     else
     {
-        this->weights = readHDF5<double>(input, "weights", dims_out);
+        this->weights = readHDF5<double>(input, "weights", dims_out_temp);
     }
 }
 #endif
@@ -201,8 +204,7 @@ void SALTEDPredictor::read_model_data_h5() {
 vec SALTEDPredictor::predict()
 {
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    vec2 pvec_l0{};
-    unordered_map<int, vec3> pvec{};
+    unordered_map<int, vec> pvec{};
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
         int llmax = 0;
@@ -231,36 +233,23 @@ vec SALTEDPredictor::predict()
         
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({2 * lam + 1})[0];
 
-        int featsize = this->config.nspe1 * this->config.nspe2 * this->config.nrad1 * this->config.nrad2 * llmax;
-        vec3 p;
+        this->featsize[lam] = this->config.nspe1 * this->config.nspe2 * this->config.nrad1 * this->config.nrad2 * llmax;
+        vec p;
         ivec2 llvec_t = transpose<int>(llvec);
         if (this->config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, this->wigner3j[lam], llmax, llvec_t, lam, c2r, featsize, nfps, this->vfps[lam], p);
-            featsize = config.ncut;
+            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, this->wigner3j[lam], llmax, llvec_t, lam, c2r, this->featsize[lam], nfps, this->vfps[lam], p);
+            this->featsize[lam] = nfps;
         }
         else
         {
-            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, this->wigner3j[lam], llmax, llvec_t, lam, c2r, featsize, p);
+            equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, this->wigner3j[lam], llmax, llvec_t, lam, c2r, this->featsize[lam], p);
         }
-
-        vec3 p_t = reorder3D<double>(p);
-        vec flat_p = flatten<double>(p_t);
-
-        if (lam == 0)
-        {
-            pvec_l0 = reshape<double>(flat_p, Shape2D{this->natoms, featsize});
-        }
-        else
-        {
-            pvec[lam] = reshape<double>(flat_p, Shape3D{this->natoms, 2 * lam + 1, featsize});
-        }
-        flat_p.clear();
+        pvec[lam] = p;
     }
 
     unordered_map<string, vec2> psi_nm{};
-
     for (const string &spe : this->config.species)
     {
         if (this->atom_idx.find(spe) == this->atom_idx.end())
@@ -268,48 +257,53 @@ vec SALTEDPredictor::predict()
             continue;
         }
         vec2 kernell0_nm;
-        if (config.zeta == 1)
-        {
-            psi_nm[spe + "0"] = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), this->power_env_sparse[spe + "0"], false, true);
-        }
-        else
-        {
-            kernell0_nm = dot<double>(collectRows(pvec_l0, this->atom_idx[spe]), this->power_env_sparse[spe + "0"], false, true);
-            vec2 kernel_nm = elementWiseExponentiation(kernell0_nm, this->config.zeta);
-            psi_nm[spe + "0"] = dot<double>(kernel_nm, this->Vmat[spe + "0"], false, false);
-        }
+        for (int lam = 0; lam < lmax[spe] + 1; ++lam) {
+            int lam2_1  = 2 * lam + 1;
+            
+            //This block collects the rows of pvec corresponding to the atoms of species spe
+            vec pvec_lam;
+            pvec_lam.reserve(this->atom_idx[spe].size() * lam2_1 * this->featsize[lam]);  // Preallocate memory for pvec_lam to avoid reallocations
+            int row_size = this->featsize[lam] * lam2_1;  // Size of a block of rows
 
-        for (int lam = 1; lam < lmax[spe] + 1; ++lam)
-        {
-            int featsize = static_cast<int>(pvec[lam][0][0].size());
-            vec3 pVec_Rows = collectRows(pvec[lam], this->atom_idx[spe]);
-            vec2 pvec_lam = reshape<double>(flatten<double>(pVec_Rows), Shape2D{this->natom_dict[spe] * (2 * lam + 1), featsize});
+            for (int idx : this->atom_idx[spe]) {
+                int start_idx = idx * row_size;  // Start index in pvec_flat
+                int end_idx = start_idx + row_size;  // End index in pvec_flat
 
-            if (this->config.zeta == 1)
-            {
-                psi_nm[spe + to_string(lam)] = dot<double>(pvec_lam, this->power_env_sparse[spe + to_string(lam)], false, true);
+                // Copy the block directly into flatVec2
+                pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
+            }
+
+            vec2 kernel_nm = dot<double>(pvec_lam, this->power_env_sparse[spe + to_string(lam)], this->natom_dict[spe] * lam2_1, this->featsize[lam], this->Mspe[spe] * lam2_1, this->featsize[lam], false, true);
+
+            if (config.zeta == 1) {
+                psi_nm[spe + to_string(lam)] = kernel_nm;
+                continue;
+            }
+
+            if (lam == 0) {
+                kernell0_nm = kernel_nm;
+                kernel_nm = elementWiseExponentiation(kernel_nm, this->config.zeta);
             }
             else
             {
-                vec2 kernel_nm = dot<double>(pvec_lam, this->power_env_sparse[spe + to_string(lam)], false, true);
                 for (size_t i1 = 0; i1 < this->natom_dict[spe]; ++i1)
                 {
                     for (size_t i2 = 0; i2 < this->Mspe[spe]; ++i2)
                     {
-                        for (size_t i = 0; i < 2 * lam + 1; ++i)
+                        for (size_t i = 0; i < lam2_1; ++i)
                         {
-                            for (size_t j = 0; j < 2 * lam + 1; ++j)
+                            for (size_t j = 0; j < lam2_1; ++j)
                             {
-                                kernel_nm[i1 * (2 * lam + 1) + i][i2 * (2 * lam + 1) + j] *= pow(kernell0_nm[i1][i2], this->config.zeta - 1);
-                            }
-                        }
-                    }
-                }
-                psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, this->Vmat[spe + to_string(lam)], false, false);
+                                kernel_nm[i1 * lam2_1 + i][i2 * lam2_1 + j] *= pow(kernell0_nm[i1][i2], this->config.zeta - 1);
+							}
+						}
+					}
+				}
             }
+            psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, this->Vmat[spe + to_string(lam)], false, false);
         }
     }
-
+    pvec.clear();
 
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
@@ -461,7 +455,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
             vec ref_coefs{};
             // Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
             if (this->opt.wfn == string("test_sucrose.xyz"))
-                npy::LoadArrayFromNumpy("sucrose_ref_Combined_v1.npy", shape, fortran_order, ref_coefs);
+                npy::LoadArrayFromNumpy("sucrose_ref_Combined_v5.npy", shape, fortran_order, ref_coefs);
             else
                 npy::LoadArrayFromNumpy("cysteine_def2_qzvppd.npy", shape, fortran_order, ref_coefs);
             // Compare coefs with the reference
