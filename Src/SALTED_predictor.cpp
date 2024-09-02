@@ -448,16 +448,12 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
         cout << "Number of coefficients: " << coefs.size() << endl;
 
-        if (this->opt.wfn == string("test_cysteine.xyz") || this->opt.wfn == string("test_sucrose.xyz"))
+        if (this->opt.wfn == string("test_cysteine.xyz"))
         {
             vector<unsigned long> shape{};
             bool fortran_order;
             vec ref_coefs{};
-            // Depending on the value of opt.wfn read either the cysteine or the sucrose reference coefs
-            if (this->opt.wfn == string("test_sucrose.xyz"))
-                npy::LoadArrayFromNumpy("sucrose_ref_Combined_v5.npy", shape, fortran_order, ref_coefs);
-            else
-                npy::LoadArrayFromNumpy("cysteine_def2_qzvppd.npy", shape, fortran_order, ref_coefs);
+            npy::LoadArrayFromNumpy("test_cysteine.npy", shape, fortran_order, ref_coefs);
             // Compare coefs with the reference
             vector<double> diff_vec;
             double diff = 0.0;

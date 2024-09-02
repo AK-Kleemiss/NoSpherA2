@@ -58,6 +58,19 @@ malbac_SF_ECP:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
+SALTED:
+	@echo 'Running test: $@'
+	cd SALTED && $(BASE_PATH) \
+		-SALTED Model \
+		-cif test_cysteine.cif \
+		-wfn test_cysteine.xyz \
+		-dmin 0.73 \
+		-debug \
+		-no-date \
+		&& mv NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
 sucrose_IAM:
 	@echo 'Running test: $@'
 	cd sucrose_IAM_SF && $(BASE_PATH) \
