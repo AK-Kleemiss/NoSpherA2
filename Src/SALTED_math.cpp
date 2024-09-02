@@ -312,7 +312,7 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
 }
 #else
 //Linux specific implementation
-std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false) {
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2) {
     vector<T> result_flat(m * n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
@@ -365,7 +365,7 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
 #endif
 #else
 // Fallback implementation
-std::vector<std::vector<T>> dot_BLAS(const std::vector<T>&flatMat1, const std::vector<T>&flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false) {
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>&flatMat1, const std::vector<T>&flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1, bool transp2) {
     std::cout << "Something went wrong, using dot fallback." << std::endl;
     vector<T> result_flat(m * n, 0.0);
     std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
