@@ -10,7 +10,7 @@ vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
         int lval = (sizes[i] - 1) / 2;
         int st = (lval & 1) ? 1 : -1;
 
-        cvec2 transformed_matrix(sizes[i], vector<complex<double>>(sizes[i], 0.0));
+        cvec2 transformed_matrix(sizes[i], cvec(sizes[i], 0.0));
         for (int j = 0; j < lval; j++)
         {
             transformed_matrix[j][j] = complex<double>(0.0, 1.0);
@@ -251,24 +251,7 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buf
         c2r.clear();
     }
 
-    cvec4 expansion_coeffs(2 * this->nang + 1, std::vector<cvec2>(this->nang + 1, cvec2(this->nspe * this->nrad, cvec(this->n_atoms))));
-
-
-    //This is not actually neccecary, but it is done to match the SALTED implementation
-    for (int a = 0; a < omega.size(); ++a)
-    {
-        for (int b = 0; b < omega[0].size(); ++b)
-        {
-            for (int c = 0; c < omega[0][0].size(); ++c)
-            {
-                for (int d = 0; d < omega[0][0][0].size(); ++d)
-                {
-                    expansion_coeffs[c][a][d][b] = omega[a][b][c][d];
-                }
-            }
-        }
-    }
-    return expansion_coeffs;
+    return omega;
 }
 
 cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()

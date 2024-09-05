@@ -75,6 +75,22 @@ void SALTEDPredictor::setup_atomic_environment()
     }else{
 		v2 = v1;
 	}
+
+    //Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
+#pragma omp parallel for
+    for (int i = 0; i < v2.size(); ++i)
+	{
+		for (int j = 0; j < v2[0].size(); ++j)
+		{
+			for (int k = 0; k < v2[0][0].size(); ++k)
+			{
+				for (int l = 0; l < v2[0][0][0].size(); ++l)
+				{
+					v2[i][j][k][l] = conj(v2[i][j][k][l]);
+				}
+			}
+		}
+	}
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
 #endif
