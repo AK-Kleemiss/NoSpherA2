@@ -49,6 +49,7 @@ tests/reading_SALTED/ORCA/water_monomer_property.txt
 tests/reading_SALTED/visualize water
 tests/reading_SALTED/water_monomer_rho.cube
 tests/reading_SALTED/water_rho.cube
+tests/Coeffs_From_ML/*
 *std.compat.ixx*
 *std.ixx*
 *.ixx.ifc*

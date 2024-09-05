@@ -39,7 +39,7 @@ const string SALTEDPredictor::get_dfbasis_name()
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-    
+
     SALTED_Utils::set_lmax_nmax(this->lmax, this->nmax, *(this->wavy.get_basis_set_ptr()), this->config.species);
 
     for (int i = 0; i < this->wavy.atoms.size(); i++)
@@ -53,7 +53,7 @@ void SALTEDPredictor::setup_atomic_environment()
     if (this->opt.debug)
     {
         cout << "Atomic symbols: ";
-        for (const auto &symbol : atomic_symbols)
+        for (const auto& symbol : atomic_symbols)
         {
             cout << symbol << " ";
         }
@@ -70,7 +70,11 @@ void SALTEDPredictor::setup_atomic_environment()
     // RASCALINE (Generate descriptors)
 #if has_RAS
     v1 = Rascaline_Descriptors(this->config.predict_filename, this->config.nrad1, this->config.nang1, this->config.sig1, this->config.rcut1, this->natoms, this->config.neighspe1, this->config.species).calculate_expansion_coeffs();
-    v2 = Rascaline_Descriptors(this->config.predict_filename, this->config.nrad2, this->config.nang2, this->config.sig2, this->config.rcut2, this->natoms, this->config.neighspe2, this->config.species).calculate_expansion_coeffs();
+    if ((this->config.nrad2 != this->config.nrad1) || (this->config.nang2 != this->config.nang1) || (this->config.sig2 != this->config.sig1) || (this->config.rcut2 != this->config.rcut1) || (this->config.neighspe2 != this->config.neighspe1)) {
+        v2 = Rascaline_Descriptors(this->config.predict_filename, this->config.nrad2, this->config.nang2, this->config.sig2, this->config.rcut2, this->natoms, this->config.neighspe2, this->config.species).calculate_expansion_coeffs();
+    }else{
+		v2 = v1;
+	}
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
 #endif
