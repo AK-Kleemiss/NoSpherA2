@@ -11,17 +11,38 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     int nfps, const vector<int64_t>& vfps,
     vec& p)
 {
+    const int l21 = 2 * lam + 1;
+
     // Initialize p with zeros
-    p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
-        
+    p.assign(natoms * (l21) * nfps, 0.0);
+    
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
+    //Init conj_v2 with the same size as v2
+    cvec4 conj_v2(v2.size(), cvec3(v2[0].size(), cvec2(v2[0][0].size(), cvec(v2[0][0][0].size(), 0.0))));
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize)
+
+#pragma omp parallel private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1,v2, conj_v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize)
+{
+#pragma omp for
+    for (int i = 0; i < v2.size(); ++i)
+    {
+        for (int j = 0; j < v2[0].size(); ++j)
+        {
+            for (int k = 0; k < v2[0][0].size(); ++k)
+            {
+                for (int l = 0; l < v2[0][0][0].size(); ++l)
+                {
+                    conj_v2[i][j][k][l] = conj(v2[i][j][k][l]);
+                }
+            }
+        }
+    }
+
+#pragma omp for 
     for (iat = 0; iat < natoms; ++iat)
     {
-        const int l21 = 2 * lam + 1;
         vec2 ptemp(l21, vec(featsize, 0.0));
         cvec pcmplx(l21, complex<double>(0.0, 0.0));
         vec preal(l21, 0.0);
@@ -50,7 +71,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                pcmplx[imu] += w3j[iwig] * v1[im1][l1][n1][iat] * conj(v2[im2][l2][n2][iat]);
+                                pcmplx[imu] += w3j[iwig] * v1[im1][l1][n1][iat] * conj_v2[im2][l2][n2][iat];
                                 iwig++;
                             }
                         }
@@ -76,10 +97,11 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
         {
             for (imu = 0; imu < l21; ++imu)
             {
-                p[iat * (2 * lam + 1) * nfps + (imu * nfps) + n] = ptemp[imu][vfps[n]] / normfact;
+                p[iat * (l21) * nfps + (imu * nfps) + n] = ptemp[imu][vfps[n]] / normfact;
             }
         }
     }
+}
 }
 
 

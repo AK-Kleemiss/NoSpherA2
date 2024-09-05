@@ -71,6 +71,7 @@ typedef std::vector<int> ivec;
 typedef std::vector<ivec> ivec2;
 typedef std::vector<cdouble> cvec;
 typedef std::vector<cvec> cvec2;
+typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<std::string> svec;
