@@ -2,7 +2,7 @@
 #include "convenience.h"
 #include "Thakkar_coefs.h"
 #include "def2-ECPs_GA.h"
-#include "def2-ECPs_corrections.h"
+#include "ECPs_corrections.h"
 
 Thakkar::Thakkar(const int g_atom_number, const int ECP_m) : Spherical_Atom(g_atom_number, ECP_m)
 {

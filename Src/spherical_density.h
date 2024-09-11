@@ -3,7 +3,7 @@
 #include <vector>
 #include <iostream>
 
-#include "def2-ECPs_corrections.h"
+#include "ECPs_corrections.h"
 
 inline void not_implemented_SA(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
 {
@@ -262,6 +262,14 @@ public:
 		int temp_Z;
 		switch (ECP_m)
 		{
+		case 2:
+            temp_Z = atomic_number - 2;
+            if (temp_Z < 0)
+                err_not_impl_SA();
+            nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
+            z = xtb_corrections::z[temp_Z].data();
+            c = xtb_corrections::c[temp_Z].data();
+            break;
 		case 3:
 			temp_Z = atomic_number - 2;
 			if (temp_Z < 0)
@@ -271,7 +279,6 @@ public:
 			c = ptb_corrections::c[temp_Z].data();
 			break;
 		case 1:
-		case 2:
 			temp_Z = atomic_number - 37;
 			if (temp_Z < 0)
 				err_not_impl_SA();

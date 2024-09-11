@@ -239,7 +239,7 @@
     <ClInclude Include="../Src/Thakkar_coefs.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="../Src/def2-ECPs_corrections.h">
+    <ClInclude Include="..\Src\ECPs_corrections.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="../Src/def2-ECPs_GA.h">
