@@ -255,6 +255,7 @@ vec SALTEDPredictor::predict()
 
         this->featsize[lam] = this->config.nspe1 * this->config.nspe2 * this->config.nrad1 * this->config.nrad2 * llmax;
         vec p;
+        vec p_test;
         ivec2 llvec_t = transpose<int>(llvec);
         if (this->config.sparsify)
         {
@@ -266,8 +267,12 @@ vec SALTEDPredictor::predict()
         {
             equicomb(this->natoms, this->config.nang1, this->config.nang2, (this->config.nspe1 * this->config.nrad1), (this->config.nspe2 * this->config.nrad2), this->v1, this->v2, this->wigner3j[lam], llmax, llvec_t, lam, c2r, this->featsize[lam], p);
         }
+
+
         pvec[lam] = p;
     }
+
+
 
     unordered_map<string, vec2> psi_nm{};
     for (const string &spe : this->config.species)
@@ -359,7 +364,7 @@ vec SALTEDPredictor::predict()
                 //Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= this->weights.size(), "isize + Mcut > weights.size()", std::cout);
                 vec weights_subset(this->weights.begin() + isize, this->weights.begin() + isize + Mcut);
-                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe + to_string(l)], weights_subset);
+                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe + to_string(l)], weights_subset, false);
 
                 isize += Mcut;
             }
@@ -468,7 +473,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
         cout << "Number of coefficients: " << coefs.size() << endl;
 
-        if (this->opt.wfn == string("test_cysteine.xyz"))
+        if (this->opt.wfn == string("test_cysteine2.xyz"))
         {
             vector<unsigned long> shape{};
             bool fortran_order;

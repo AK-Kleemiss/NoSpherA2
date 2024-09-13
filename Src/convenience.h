@@ -903,11 +903,11 @@ const double calc_density_ML(double &x,
                              double &z,
                              vec &coefficients,
                              std::vector<atom> &atoms);
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
+const double calc_density_ML(const double &x,
+                             const double &y,
+                             const double &z,
+                             const vec &coefficients,
+                             const std::vector<atom> &atoms,
                              const int &atom_nr);
 
 int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b);

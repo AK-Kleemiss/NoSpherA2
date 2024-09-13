@@ -303,7 +303,7 @@ void Config::populateFromFile(const H5::H5File file) {
 
 void Config::populate_config(const std::string& dataset_name, const int& data) {
     if (dataset_name == "predict_filename") this->predict_filename = data;
-    else if (dataset_name == "average") this->average = data != 0; // Assuming boolean stored as integer
+    else if (dataset_name == "average" || dataset_name == "averages") this->average = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "field") this->field = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "sparsify") this->sparsify = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "ncut") this->ncut = data;

@@ -65,7 +65,9 @@ std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
 std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length);
 
 // Matrix multiplication
-// 
+
+
+
 // 2D x 2D MATRIX MULTIPLICATION
 //BLAS implementation of matrix multiplication
 template <typename T>
@@ -75,7 +77,7 @@ std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const s
 template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1, const std::vector<T>& flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
 
-//BLAS implementation of matrix multiplication, without prior flattening
+//BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
 std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false);
 
@@ -83,9 +85,30 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
 template <typename T>
 std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2);
 
+
+
+
 // 2D x 1D MATRIX MULTIPLICATION
+// Wrapper for BLAS dot product
 template <typename T>
-std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &vec);
+std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec, bool transp);
+
+//BLAS implementation of matrix multiplication 2D x 1D
+template <typename T>
+std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const size_t m, const size_t n, bool transp);
+
+template <typename T>
+std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec);
+
+
+// 1D x 1D MATRIX MULTIPLICATION
+// Wrapper for BLAS dot product
+template <typename T>
+T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+
+//BLAS implementation of matrix multiplication 1D x 1D
+template <typename T>
+T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);

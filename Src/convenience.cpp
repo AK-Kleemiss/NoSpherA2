@@ -32,7 +32,7 @@ string help_message()
     t.append("   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n");
     t.append("   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n");
     t.append("   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
-    t.append("   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
+    t.append("   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n");
     t.append("                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.");
     t.append("   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
     t.append("   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n");
@@ -2570,11 +2570,11 @@ const double calc_density_ML(double &x,
     return dens;
 }
 
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
+const double calc_density_ML(const double &x,
+                             const double &y,
+                             const double &z,
+                             const vec &coefficients,
+                             const std::vector<atom> &atoms,
                              const int &atom_nr)
 {
     double dens = 0, radial = 0;
@@ -2582,10 +2582,11 @@ const double calc_density_ML(double &x,
     int e = 0, size = 0;
     for (int a = 0; a < atoms.size(); a++)
     {
+        size = (int)atoms[a].basis_set.size();
         if (a == atom_nr)
         {
-            size = (int)atoms[a].basis_set.size();
-            basis_set_entry *bf;
+            
+            const basis_set_entry *bf;
             double d[4]{
                 x - atoms[a].x,
                 y - atoms[a].y,
@@ -2599,6 +2600,7 @@ const double calc_density_ML(double &x,
             {
                 bf = &atoms[a].basis_set[e];
                 primitive p(a, bf->type, bf->exponent, bf->coefficient);
+ 
                 radial = gaussian_radial(p, d[3]);
                 for (int m = -p.type; m <= p.type; m++)
                 {
@@ -2607,10 +2609,10 @@ const double calc_density_ML(double &x,
                 }
                 coef_counter += (2 * p.type + 1);
             }
+            return dens;
         }
         else
         {
-            size = (int)atoms[a].basis_set.size();
             for (e = 0; e < size; e++)
             {
                 coef_counter += (2 * atoms[a].basis_set[e].type + 1);
@@ -3387,7 +3389,7 @@ const double spherical_harmonic(const int &l, const int &m, const double *d)
         }
         break;
     default:
-        err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
+        err_not_impl_f("Higehr than l=6 not done for spherical harmonic!", std::cout);
     }
     return SH;
 }
