@@ -23,9 +23,7 @@ using namespace std;
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
-#if has_RAS
 #include "SALTED_utilities.h"
-#endif
 
 /**
  * @brief Reads k-points from a binary file and stores them in provided vectors.

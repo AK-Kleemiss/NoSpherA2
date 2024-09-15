@@ -5,6 +5,7 @@
 #include "npy.h"
 #include "properties.h"
 #include "JKFit.h"
+#include "SALTED_utilities.h"
 #if has_RAS
 #include "SALTED_math.h"
 #include "rascaline.hpp"
