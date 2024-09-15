@@ -51,7 +51,7 @@ string help_message()
     t.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
     t.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
     t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
-    t.append("      convert tsc:  NoSpherA2.exe -tscb A.tsc\n");
+    t.append("      convert tsc:  NoSpherA2.exe -tscb A.tscb\n");
     t.append("      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n");
     t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
     return t;
@@ -469,6 +469,11 @@ string get_foldername_from_path(const string &input)
 string get_basename_without_ending(const string &input)
 {
     return input.substr(0, input.rfind("."));
+}
+
+string get_ending_from_filename(const string& input)
+{
+	return input.substr(input.rfind(".") + 1);
 }
 
 void write_template_confi()
@@ -3148,7 +3153,12 @@ void options::digest_options()
             string name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             name = "test.cif";
-            blocky.write_tsc_file(name);
+            if (get_ending_from_filename(name) == "tscb")
+                blocky.write_tsc_file(name);
+            else if (get_ending_from_filename(name) == "tsc")
+				blocky.write_tscb_file(name);
+            else
+				err_checkf(false, "Wrong file ending!", cout);
             exit(0);
         }
         else if (temp == "-wfn")
