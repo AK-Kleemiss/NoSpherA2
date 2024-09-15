@@ -2758,6 +2758,7 @@
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />
     <ClInclude Include="../Src/def2-ECPs_GA.h" />
+    <ClInclude Include="..\Src\constants.h" />
     <ClInclude Include="..\Src\ECPs_corrections.h" />
     <ClInclude Include="../Src/npy.h" />
     <ClInclude Include="../Src/properties.h" />

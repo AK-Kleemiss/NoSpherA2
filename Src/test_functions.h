@@ -55,43 +55,43 @@ void thakkar_d_test(options &opt)
             k_value = constants::bohr2ang(constants::FOUR_PI * i);
             result << showpos << setw(6) << setprecision(3) << fixed << i;
             complex<double> temp = H.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(1, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
             temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(6, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
             temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(8, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
             temp = P.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(15, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
             temp = Ca.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(20, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
             temp = Os.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(76, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i, 0).real();
             temp = 0.0;
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(1, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
             temp = C_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(6, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
             temp = O_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(8, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
             temp = P_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(15, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
             temp = Ca_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(20, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
             temp = H_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(1, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
             temp = C_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(6, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
             temp = O_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(8, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
             temp = P_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(15, temp, i).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
             temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(6, temp, i, 1).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 1).real();
             temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(8, temp, i, 1).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 1).real();
             temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(6, temp, i, -1).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, -1).real();
             temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single<int>(7, temp, i, -1).real();
+            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7, temp, i, -1).real();
             result << endl;
         }
         result.flush();
@@ -621,7 +621,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     }
     delete (progress);
     cout << "Start writing the file" << endl;
-    string el = atnr2letter(wavy.get_atom_charge(0));
+    string el = constants::atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
     out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int * constants::FOUR_PI << "\n";
     for (int i = 0; i < upper_r; i++)
@@ -1249,7 +1249,7 @@ void spherical_harmonic_test()
             vec d{std::sin(theta) * std::cos(phi),
                   std::sin(theta) * std::sin(phi),
                   std::cos(theta), 1.0, 1.0};
-            std::cout << spherical_harmonic(lam, m, d.data()) << " ";
+            std::cout << constants::spherical_harmonic(lam, m, d.data()) << " ";
         }
         std::cout << "\n";
     }
@@ -1451,7 +1451,7 @@ double s_value(double *d)
 {
     primitive p_0(0, 0, 3.5, 1.0);
     int m = 0;
-    return pow(gaussian_radial(p_0, d[3]) * spherical_harmonic(p_0.type, m, d), 2);
+    return pow(gaussian_radial(p_0, d[3]) * constants::spherical_harmonic(p_0.type, m, d), 2);
 }
 
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
@@ -1504,7 +1504,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele
         res[i].resize(10000, 0.0);
 
     string dat = "core_dens_" + ele + ".dat";
-    int el_nr = get_Z_from_label(ele.c_str()) + 1;
+    int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
@@ -1605,7 +1605,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
 
 
     string dat = "core_dens_" + ele + ".dat";
-    int el_nr = get_Z_from_label(ele.c_str()) + 1;
+    int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);

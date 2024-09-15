@@ -23,6 +23,9 @@ using namespace std;
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
+#if has_RAS
+#include "SALTED_utilities.h"
+#endif
 
 /**
  * @brief Reads k-points from a binary file and stores them in provided vectors.
@@ -66,6 +69,19 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, ostream &file)
          << "Size of k_points: " << k_pt[0].size() << endl;
     k_points_file.close();
 }
+
+cdouble convert_to_ED_single(
+    const int& neutralcharge,
+    cdouble& sf,
+    const double& k_vector,
+    const int charge)
+{
+    const double h2 = pow(k_vector, 2);
+    std::complex<double> neutral(constants::ED_fact * (neutralcharge - sf.real()) / h2, -constants::ED_fact * sf.imag() / h2);
+    if (charge == 0)
+        return neutral;
+    return neutral + constants::ED_fact * charge / h2;
+};
 
 /**
  * @brief Saves k-points to a binary file.
@@ -532,7 +548,7 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                     }
                     if (is_similar_abs(position[0], wave.atoms[i].x, tolerances[0]) && is_similar_abs(position[1], wave.atoms[i].y, tolerances[1]) && is_similar_abs(position[2], wave.atoms[i].z, tolerances[2]))
                     {
-                        string element = atnr2letter(wave.get_atom_charge(i));
+                        string element = constants::atnr2letter(wave.get_atom_charge(i));
                         err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
                         string label = fields[label_field];
                         string type = fields[type_field];

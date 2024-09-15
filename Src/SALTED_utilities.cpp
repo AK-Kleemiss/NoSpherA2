@@ -1,4 +1,5 @@
 #include "SALTED_utilities.h"
+#include "constants.h"
 
 using namespace std;
 
@@ -53,7 +54,7 @@ void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map
 
     for (auto &spe : species)
     {
-        int atom_index = get_Z_from_label(spe.c_str());
+        int atom_index = constants::get_Z_from_label(spe.c_str());
         // get the last element of the basis set for the given atom
         lmax[spe] = basis_set[atom_index].back().type;
         // initialize nmax with symbol + type
@@ -187,7 +188,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
             for (const std::string &speneigh : this->neighspe)
             {
                 // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{l, 1, get_Z_from_label(specen.c_str()) + 1, get_Z_from_label(speneigh.c_str()) + 1});
+                keys_array.emplace_back(std::vector<int32_t>{l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1});
             }
         }
     }
@@ -262,3 +263,100 @@ cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
     return get_expansion_coeffs(descriptor_buffer);
 }
 #endif
+
+const double calc_density_ML(const double& x,
+    const double& y,
+    const double& z,
+    const vec& coefficients,
+    const std::vector<atom>& atoms,
+    const int& atom_nr)
+{
+    double dens = 0, radial = 0;
+    int coef_counter = 0;
+    int e = 0, size = 0;
+    if (atom_nr == -1) {
+        for (int a = 0; a < atoms.size(); a++)
+        {
+            size = (int)atoms[a].basis_set.size();
+            const basis_set_entry* bf;
+            double d[4]{
+                x - atoms[a].x,
+                y - atoms[a].y,
+                z - atoms[a].z, 0.0 };
+            // store r in last element
+            d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+            if (d[3] < -46.0517)
+            { // corresponds to cutoff of ex ~< 1E-20
+                for (e = 0; e < size; e++)
+                {
+                    bf = &atoms[a].basis_set[e];
+                    coef_counter += (2 * bf->type + 1);
+                }
+                continue;
+            }
+            // normalize distances for spherical harmonic
+            for (e = 0; e < 3; e++)
+                d[e] /= d[3];
+            for (e = 0; e < size; e++)
+            {
+                bf = &atoms[a].basis_set[e];
+                primitive p(a, bf->type, bf->exponent, bf->coefficient);
+                radial = gaussian_radial(p, d[3]);
+                if (radial < 1E-10)
+                {
+                    coef_counter += (2 * p.type + 1);
+                    continue;
+                }
+                for (int m = -p.type; m <= p.type; m++)
+                {
+                    // m+p.type should yield just the running index of coefficents, since we start at -p.type
+                    dens += coefficients[coef_counter + m + p.type] * radial * constants::spherical_harmonic(p.type, m, d);
+                }
+                coef_counter += (2 * p.type + 1);
+            }
+        }
+    }
+    else {
+        for (int a = 0; a < atoms.size(); a++)
+        {
+            size = (int)atoms[a].basis_set.size();
+            if (a == atom_nr)
+            {
+
+                const basis_set_entry* bf;
+                double d[4]{
+                    x - atoms[a].x,
+                    y - atoms[a].y,
+                    z - atoms[a].z, 0.0 };
+                // store r in last element
+                d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                // normalize distances for spherical harmonic
+                for (e = 0; e < 3; e++)
+                    d[e] /= d[3];
+                for (e = 0; e < size; e++)
+                {
+                    bf = &atoms[a].basis_set[e];
+                    primitive p(a, bf->type, bf->exponent, bf->coefficient);
+
+                    radial = gaussian_radial(p, d[3]);
+                    for (int m = -p.type; m <= p.type; m++)
+                    {
+                        // m+p.type should yield just the running index of coefficents, since we start at -p.type
+                        dens += coefficients[coef_counter + m + p.type] * radial * constants::spherical_harmonic(p.type, m, d);
+                    }
+                    coef_counter += (2 * p.type + 1);
+                }
+                return dens;
+            }
+            else
+            {
+                for (e = 0; e < size; e++)
+                {
+                    coef_counter += (2 * atoms[a].basis_set[e].type + 1);
+                }
+            }
+        }
+    }
+    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+    return dens;
+}

@@ -155,19 +155,11 @@ void generate_fractional_hkl(
  * @param charge The charge.
  * @return The converted ED single.
  */
-template <typename NumType>
 cdouble convert_to_ED_single(
-    const int &neutralcharge, 
-    cdouble &sf, 
-    const double &k_vector, 
-    const NumType &charge = 0)
-{
-    const double h2 = pow(k_vector, 2);
-    std::complex<double> neutral(constants::ED_fact * (neutralcharge - sf.real()) / h2, -constants::ED_fact * sf.imag() / h2);
-    if (charge == 0)
-        return neutral;
-    return neutral + constants::ED_fact * charge / h2;
-};
+    const int& neutralcharge,
+    cdouble& sf,
+    const double& k_vector,
+    const int charge = 0);
 
 /**
  * @brief Reads atoms from CIF (Crystallographic Information File).

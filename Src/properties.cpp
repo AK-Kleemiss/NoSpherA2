@@ -3,6 +3,7 @@
 #include "spherical_density.h"
 #include "cell.h"
 #include "cube.h"
+#include "constants.h"
 
 using namespace std;
 
@@ -1792,7 +1793,7 @@ void dipole_moments(options& opt, ostream& log2)
   }
   log2 << " atom   |  dipole moment x,        y,         z" << endl << "======================================" << endl;
   for (int i = 0; i < wavy.get_ncen(); i++) {
-    log2 << setw(3) << i << " (" << atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
+    log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
   }
   std::cout << "\n\nProperties calculation done!" << std::endl;
 }
@@ -1835,7 +1836,7 @@ vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int th
   log2 << "...done!" << endl;
   log2 << " atom   |    charge    | dipole moment x,        y,         z" << endl << "===================================================" << endl;
   for (int i = 0; i < wavy.get_ncen(); i++) {
-    log2 << setw(3) << i <<" (" << atnr2letter(wavy.get_atom_charge(i))<< ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3]-wavy.atoms[i].charge << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
+    log2 << setw(3) << i <<" (" << constants::atnr2letter(wavy.get_atom_charge(i))<< ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3]-wavy.atoms[i].charge << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
   }
   return dipole_moments;
 }
@@ -1922,7 +1923,7 @@ void polarizabilities(options& opt, ostream& log2)
   log2 << "Polarizabilities:\n atom   |    charge    |       xx,            xy,            xz,            yx,            yy,            yz,            zx,            zy,            zz" << endl 
     << "========|==============|=======================================================================================================================================" << endl;
   for (int i = 0; i < wavy[0].get_ncen(); i++) {
-		log2 << setw(3) << i << " (" << atnr2letter(wavy[0].get_atom_charge(i)) << ") |" 
+		log2 << setw(3) << i << " (" << constants::atnr2letter(wavy[0].get_atom_charge(i)) << ") |" 
       << scientific << setprecision(6) << setw(13) << dipoles[0][i][3]-wavy[0].atoms[i].charge << " |"
       << setw(14) << polarizabilities[i][0][0] << "," 
       << setw(14) << polarizabilities[i][0][1] << "," 

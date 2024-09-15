@@ -1,5 +1,6 @@
 #pragma once
 
+#include "constants.h"
 /**
  * @class cell
  * @brief Represents a crystal cell in three-dimensional space.

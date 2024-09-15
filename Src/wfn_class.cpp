@@ -2,32 +2,10 @@
 #include "convenience.h"
 #include "mo_class.h"
 #include "cube.h"
+#include "constants.h"
+#include "fchk.h"
 
 using namespace std;
-
-const int ECP_electrons[] = {0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0,
-                             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                             28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28,
-                             46, 46, 46, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60};
-
-const int ECP_electrons_xTB[] = {0, 0, 0,
-                                 2, 2, 2, 2, 2, 2, 2, 2,
-                                 10, 10, 10, 10, 10, 10, 10, 10,
-                                 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 28, 28, 28, 28, 28, 28, 28,
-                                 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 46, 46, 46, 46, 46, 46, 46,
-                                 54, 54, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 68, 68, 68, 68, 68, 68, 68, 68, 78, 78, 78, 78, 78, 78, 78};
-
-const int ECP_electrons_pTB[] = {0, 0, 0,
-                                 0, 0, 2, 2, 2, 2, 2, 2,
-                                 2, 2, 10, 10, 10, 10, 10, 10,
-                                 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 28, 28, 28, 28, 28, 28,
-                                 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 46, 46, 46, 46, 46, 46,
-                                 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78};
-
-bool debug_wfn = false;
-bool debug_wfn_deep = false;
 
 void WFN::fill_pre()
 {
@@ -545,11 +523,6 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
-    if (debug)
-    {
-        debug_wfn = true;
-        debug_wfn_deep = true;
-    }
     err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
     ifstream rf(fileName.c_str());
     if (rf.good())
@@ -672,7 +645,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "We have a problem adding center assignements!\n";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
         file << "finished with centers, moving to types...\n";
     //------------------------------------ Read Types ---------------------------------------------------------
     vector<unsigned int> dum_type;
@@ -719,7 +692,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "We have a problem adding type assignements!\n";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
         file << "finished with types, reading exponents now...\n";
     //----------------------------- Read exponents -------------------------------
     vec dum_exp;
@@ -801,7 +774,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "We have a problem adding exponents!\n";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
     {
         file << "finished with exponents, reading MOs now...\n";
         file << "line: " << line << endl;
@@ -820,7 +793,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         temp_val[i].resize(e_nex);
     //-------------------------------- Read MOs --------------------------------------
     // bool orca_switch = false;
-    // int temp_orca = check_order(debug_wfn),
+    // int temp_orca = check_order(debug),
     int temp_nr = 0;
     int oper = 0;
     double temp_occ = -1.0, temp_ener = 0.0, last_ener = -DBL_MAX;
@@ -830,7 +803,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
     {
         if (monum == e_nmo)
         {
-            // if (debug_wfn) file << "read all MOs I expected, finishing read...." << endl;
+            // if (debug) file << "read all MOs I expected, finishing read...." << endl;
             break;
         }
         stringstream stream2(line);
@@ -982,7 +955,7 @@ bool WFN::read_xyz(const string &filename, ostream &file, const bool debug)
         dum_x[i] = constants::ang2bohr(stod(temp[1]));
         dum_y[i] = constants::ang2bohr(stod(temp[2]));
         dum_z[i] = constants::ang2bohr(stod(temp[3]));
-        dum_ch[i] = get_Z_from_label(dum_label[i].c_str()) + 1;
+        dum_ch[i] = constants::get_Z_from_label(dum_label[i].c_str()) + 1;
         if (debug)
         {
             file << "label:" << dum_label[i]
@@ -1068,7 +1041,7 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     }
     err_checkf(pos[0].size() == temp_ncen, "Mismatch in atom position size", file);
     for (int i = 0; i < temp_ncen; i++)
-        push_back_atom(atnr2letter(nrs[i]) + to_string(i + 1), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
+        push_back_atom(constants::atnr2letter(nrs[i]) + to_string(i + 1), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
     err_checkf(ncen == temp_ncen, "Mismatch in atom position size", file);
     for (int i = 0; i < 3; i++)
         pos[i].resize(0);
@@ -1995,7 +1968,7 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
                 rf.read((char *)&(geo_ints[i]), 4);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
-            string temp = atnr2letter(geo_ints[0]);
+            string temp = constants::atnr2letter(geo_ints[0]);
             err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
             err_checkf(push_back_atom(temp,
                                       geo_vals[0],
@@ -2679,8 +2652,6 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
 {
     if (debug)
     {
-        debug_wfn = true;
-        debug_wfn_deep = true;
         if (exists(fileName))
         {
             cout << "File already existed!";
@@ -2688,7 +2659,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         }
         else
         {
-            if (debug_wfn)
+            if (debug)
                 cout << "File didn't exist before, writing comment to it now." << endl;
         }
     }
@@ -2701,10 +2672,10 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         return false;
     }
     rf << comment << endl;
-    if (debug_wfn)
+    if (debug)
         cout << "comment written, now for the header..\n";
     rf << hdr(occupied);
-    if (debug_wfn)
+    if (debug)
     {
         cout << "header written, now for the centers..\n";
         cout << "this is the header: \n"
@@ -2731,9 +2702,9 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         rf << ".0";
         rf << '\n';
     }
-    if (debug_wfn)
+    if (debug)
         cout << "centers written, now for the center_assignement..\n";
-    if (debug_wfn)
+    if (debug)
         cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
     int run = 0;
     int exnum = 0;
@@ -2746,7 +2717,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
             if (exnum > nex)
             {
                 cout << "run is too big in center writing";
-                if (debug_wfn)
+                if (debug)
                     cout << "in 20er-lines...\n";
                 return false;
             }
@@ -2755,7 +2726,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         run++;
         rf << '\n';
     }
-    if (debug_wfn)
+    if (debug)
         cout << "this should be the last line... \n";
     if (exnum < nex)
     {
@@ -2766,7 +2737,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
             if (exnum > nex)
             {
                 cout << "run is too big in center writing";
-                if (debug_wfn)
+                if (debug)
                     cout << " in last line... trying to access # " << exnum << "\n";
                 return false;
             }
@@ -2779,7 +2750,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         cout << "Problem during writing of Centre assignments... stopping...\n";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
         cout << "center assignements written, now for the types..\n";
     run = 0;
     exnum = 0;
@@ -2814,7 +2785,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
             final_j = j;
             exnum++;
         }
-        if (debug_wfn)
+        if (debug)
             cout << "final_j: " << final_j << endl;
         rf << '\n';
     }
@@ -2823,7 +2794,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         cout << "Problem during writing of Type assignments... stopping...";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
         cout << "types assignements written, now for the exponents..\n";
     run = 0;
     exnum = 0;
@@ -2871,7 +2842,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         cout << "Problem during writing of Exponents... stopping...";
         return false;
     }
-    if (debug_wfn)
+    if (debug)
         cout << "exponents assignements written, now for the MOs.." << endl
              << "For informational purposes: ncen "
              << ncen << " nmo " << nmo << " nex " << nex << endl;
@@ -2904,7 +2875,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
         }
         if (run < nex)
         {
-            if (debug_wfn_deep)
+            if (debug)
                 cout << "Still some left to write... going in % for loop...." << endl;
             for (int j = 0; j < nex % 5; j++)
             {
@@ -2927,7 +2898,7 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
     if (run != nex)
     {
         cout << "Problem during writing of MOs... stopping...";
-        if (debug_wfn_deep)
+        if (debug)
             cout << "run: " << run << endl;
         return false;
     }
@@ -3897,9 +3868,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (ECP_electrons[atoms[i].charge] != 0)
+            if (constants::ECP_electrons[atoms[i].charge] != 0)
             {
-                atoms[i].ECP_electrons = ECP_electrons[atoms[i].charge];
+                atoms[i].ECP_electrons = constants::ECP_electrons[atoms[i].charge];
             }
         }
     }
@@ -3908,9 +3879,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (ECP_electrons_xTB[atoms[i].charge] != 0)
+            if (constants::ECP_electrons_xTB[atoms[i].charge] != 0)
             {
-                atoms[i].ECP_electrons = ECP_electrons_xTB[atoms[i].charge];
+                atoms[i].ECP_electrons = constants::ECP_electrons_xTB[atoms[i].charge];
             }
         }
     }
@@ -3919,9 +3890,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (ECP_electrons_pTB[atoms[i].charge] != 0)
+            if (constants::ECP_electrons_pTB[atoms[i].charge] != 0)
             {
-                atoms[i].ECP_electrons = ECP_electrons_pTB[atoms[i].charge];
+                atoms[i].ECP_electrons = constants::ECP_electrons_pTB[atoms[i].charge];
             }
         }
     }
@@ -4207,7 +4178,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     ncen = (int)atnbrs.size();
     atoms.resize(ncen);
     for (int i = 0; i < ncen; i++)
-        atoms[i].label = atnr2letter(atnbrs[i]);
+        atoms[i].label = constants::atnr2letter(atnbrs[i]);
     vec charges;
     if (!read_fchk_double_block(fchk, "Nuclear charges", charges))
     {
@@ -4689,9 +4660,10 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
             for (int l = 0; l < nr_prims_shell[i]; l++)
             {
                 exponents[k] = exp[iexp + l];
-                primconnorm[k] = contraction[iexp + l] * normgauss(types[k], exponents[k]);
+				double ng = constants::normgauss(types[k], exponents[k]);
+                primconnorm[k] = contraction[iexp + l] * ng;
                 if (debug)
-                    log << setw(22) << setprecision(16) << normgauss(types[k], exponents[k]) << endl;
+                    log << setw(22) << setprecision(16) << ng << endl;
 #pragma omp parallel for
                 for (int mo = 0; mo < nmo; mo++)
                 {
@@ -4866,7 +4838,7 @@ const double WFN::compute_dens_cartesian(
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
-        type2vector(types[j], l);
+        constants::type2vector(types[j], l);
         ex = -exponents[j] * d[3][iat];
         if (ex < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
@@ -4945,7 +4917,7 @@ const double WFN::compute_spin_dens_cartesian(
     for (j = 0; j < nex; j++)
     {
         iat = centers[j] - 1;
-        type2vector(types[j], l);
+        constants::type2vector(types[j], l);
         ex = -exponents[j] * d[3][iat];
         if (ex < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
@@ -5350,7 +5322,7 @@ const void WFN::computeValues(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -5472,7 +5444,7 @@ const void WFN::computeELIELF(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -5577,7 +5549,7 @@ const void WFN::computeELI(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -5678,7 +5650,7 @@ const void WFN::computeELF(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -5781,7 +5753,7 @@ const void WFN::computeLapELIELF(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -5895,7 +5867,7 @@ const void WFN::computeLapELI(
     {
         iat = get_center(j) - 1;
 
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         d[0] = PosGrid[0] - atoms[iat].x;
         d[1] = PosGrid[1] - atoms[iat].y;
         d[2] = PosGrid[2] - atoms[iat].z;
@@ -6013,7 +5985,7 @@ const double WFN::computeMO(
     {
         iat = get_center(j) - 1;
         // if (iat != atom) continue;
-        type2vector(get_type(j), l);
+        constants::type2vector(get_type(j), l);
         temp = -get_exponent(j) * d[3][iat];
         if (temp < -46.0517) // corresponds to cutoff of ex ~< 1E-20
             continue;
@@ -6234,7 +6206,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     for (int i = 0; i < ncen; i++)
     {
         elcount += get_atom_charge(i);
-        elcount -= ECP_electrons_pTB[get_atom_charge(i)];
+        elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
     }
     if (debug)
         file << "elcount after: " << elcount << endl;
@@ -6244,6 +6216,9 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
         alpha_els++;
         beta_els++;
         temp_els -= 2;
+		err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", file);
+		err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons!", file);
+		err_checkf(temp_els < -elcount, "Error setting alpha and beta electrons!", file);
     }
     alpha_els += temp_els;
     if (debug)
@@ -6258,6 +6233,7 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     {
         alpha_els++;
         beta_els--;
+		err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", file);
     }
     for (int i = beta_els; i < alpha_els; i++)
     {
@@ -6323,7 +6299,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         ss << "  {\n";
         ss << "    'atom_site_label': '" << atoms[i].label << "'\n";
         ss << "    'Z': " << atom_types[i] << "\n";
-        ss << "    'atom_type': " << atnr2letter(atom_types[i]) << "\n";
+        ss << "    'atom_type': " << constants::atnr2letter(atom_types[i]) << "\n";
         ss << "    'nr_shells': " << get_atom_shell_count(atoms_with_type[i]) << "\n";
         ss << "    'shell_sizes': [";
         for (int j = 0; j < get_atom_shell_count(atoms_with_type[i]); j++)
@@ -6514,12 +6490,12 @@ const double WFN::computeESP(const double *PosGrid, const vec2 &d2) const
     for (int iprim = 0; iprim < nprim; iprim++)
     {
         iat = get_center(iprim) - 1;
-        type2vector(get_type(iprim), l_i);
+        constants::type2vector(get_type(iprim), l_i);
         iex = get_exponent(iprim);
         for (int jprim = iprim; jprim < nprim; jprim++)
         {
             jat = get_center(jprim) - 1;
-            type2vector(get_type(jprim), l_j);
+            constants::type2vector(get_type(jprim), l_j);
             ex_sum = get_exponent(iprim) + get_exponent(jprim);
             jex = get_exponent(jprim);
 
@@ -6670,12 +6646,12 @@ const double WFN::computeESP_noCore(const double *PosGrid, const vec2 &d2) const
     for (int iprim = 0; iprim < nprim; iprim++)
     {
         iat = get_center(iprim) - 1;
-        type2vector(get_type(iprim), l_i);
+        constants::type2vector(get_type(iprim), l_i);
         iex = get_exponent(iprim);
         for (int jprim = iprim; jprim < nprim; jprim++)
         {
             jat = get_center(jprim) - 1;
-            type2vector(get_type(jprim), l_j);
+            constants::type2vector(get_type(jprim), l_j);
             ex_sum = get_exponent(iprim) + get_exponent(jprim);
             jex = get_exponent(jprim);
 
