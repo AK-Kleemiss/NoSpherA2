@@ -1605,8 +1605,8 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
         res[i].resize(1000, 0.0);
 
 
-    string dat = "core_dens_" + ele + ".dat";
-    int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
+    string dat = "core_sfac_" + ele + ".dat";
+    const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
