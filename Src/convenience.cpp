@@ -2570,6 +2570,132 @@ const double calc_density_ML(double &x,
     return dens;
 }
 
+double get_bessel_ratio(const double nu, const double x)
+{
+    const double RECUR_BIG = DBL_MAX;
+    const double RECUR_SMALL = DBL_MIN;
+    const int maxiter = 10000;
+    int n = 1;
+    double Anm2 = 1.0;
+    double Bnm2 = 0.0;
+    double Anm1 = 0.0;
+    double Bnm1 = 1.0;
+    double a1 = x / (2.0 * (nu + 1.0));
+    double An = Anm1 + a1 * Anm2;
+    double Bn = Bnm1 + a1 * Bnm2;
+    double an;
+    double fn = An / Bn;
+    double dn = a1;
+    double s = 1.0;
+
+    while (n < maxiter) {
+        double old_fn;
+        double del;
+        n++;
+        Anm2 = Anm1;
+        Bnm2 = Bnm1;
+        Anm1 = An;
+        Bnm1 = Bn;
+        an = -x * x / (4.0 * (nu + n - 1.0) * (nu + n));
+        An = Anm1 + an * Anm2;
+        Bn = Bnm1 + an * Bnm2;
+
+        if (fabs(An) > RECUR_BIG || fabs(Bn) > RECUR_BIG) {
+            An /= RECUR_BIG;
+            Bn /= RECUR_BIG;
+            Anm1 /= RECUR_BIG;
+            Bnm1 /= RECUR_BIG;
+            Anm2 /= RECUR_BIG;
+        }
+        else if (fabs(An) < RECUR_SMALL || fabs(Bn) < RECUR_SMALL) {
+            An /= RECUR_SMALL;
+            Bn /= RECUR_SMALL;
+            Anm1 /= RECUR_SMALL;
+            Bnm1 /= RECUR_SMALL;
+            Anm2 /= RECUR_SMALL;
+            Bnm2 /= RECUR_SMALL;
+        }
+
+        old_fn = fn;
+        fn = An / Bn;
+        del = old_fn / fn;
+
+        dn = 1.0 / (2.0 * (nu + n) / x - dn);
+        if (dn < 0.0) s = -s;
+
+        if (fabs(del - 1.0) < 2.0 * DBL_EPSILON) break;
+    }
+
+    return fn;
+}
+
+double bessel_first_kind(const int l, const double x) {
+    if (l < 0 || x < 0.0) {
+        err_not_impl_f("This is not implemented, pelase dont do this to me!", std::cout);
+    }
+    else if (x == 0.0) {
+        return (l > 0 ? 0.0 : 1.0);
+    }
+    else if (l == 0) {
+        return sin(x) / x;
+    }
+    else if (l == 1) {
+        return (sin(x) / x - cos(x)) / x;
+    }
+    else if (l == 2) {
+        const double f = (3.0 / (x * x) - 1.0);
+        return (f * sin(x) - 3.0 * cos(x) / x) / x;
+    }
+    else if (l == 3) {
+        double x2 = x * x;
+        const double f1 = (x2 - 15.0);
+        const double f2 = (6. * x2 - 15.);
+        return (-f2 * sin(x) + f1 * cos(x) * x) / pow(x, 4);
+    }
+    else if (l == 4) {
+        double x2 = x * x;
+        const double f1 = (10. * x2 - 105.0);
+        const double f2 = (x2 * x2 - 45. * x2 + 105.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / pow(x, 5);
+    }
+    else if (l == 5) {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = (-x4 + 105.0 * x2 - 945.);
+        const double f2 = (15. * x4 - 420. * x2 + 945.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / (x4 * x2);
+    }
+    else if (l == 6) {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = 21. * (x4 - 60.0 * x2 + 495.);
+        const double f2 = (-x4 * x2 + 210. * x4 - 4725 * x2 + 10395.);
+        return (f2 * sin(x) - f1 * cos(x) * x) / pow(x, 7);
+    }
+    else {
+        double ratio = get_bessel_ratio(l + 0.5, x);
+        const double smallest = DBL_MIN / DBL_EPSILON;
+        double jellp1 = smallest * ratio;
+        double jell = smallest;
+        double jellm1;
+        int ell;
+        for (ell = l; ell > 0; ell--) {
+            jellm1 = -jellp1 + (2 * ell + 1) / x * jell;
+            jellp1 = jell;
+            jell = jellm1;
+        }
+
+        if (fabs(jell) > fabs(jellp1)) {
+            double pre = smallest / jell;
+            return bessel_first_kind(0, x) * pre;
+        }
+        else {
+            double pre = smallest / jellp1;
+            return bessel_first_kind(1, x) * pre;
+        }
+    }
+}
+
 const double calc_density_ML(const double &x,
                              const double &y,
                              const double &z,

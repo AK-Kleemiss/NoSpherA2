@@ -2068,8 +2068,8 @@ static int make_hirshfeld_grids_ML(
     // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
     // dimension 1: atoms of asym_atom_list
 
-    vec2 atom_els(4);
-    for (int n = 0; n < 4; n++)
+    vec2 atom_els(5);
+    for (int n = 0; n < 5; n++)
     {
         atom_els[n].resize(asym_atom_list.size(), 0.0);
     }
@@ -2111,61 +2111,58 @@ static int make_hirshfeld_grids_ML(
         }
     }
 
-    //double r_max = 7.0;
-    //double step = 0.00001;
-    //double el_sum = 0.0;
 
-    //int  e = 0, size = 0;
-    //double radial = 0, d = 0;
+    double el_sum = 0.0;
 
-    //const int nr_pts = (int)total_grid[0].size();
-    //const basis_set_entry* bf;
-    //double n = 0;
-    //
+    int  e = 0, size = 0;
+    double radial = 0, d = 0;
 
-    //int coef_counter = 0;
-    //for (int i = 0; i < asym_atom_list.size(); i++) {
-    //    
-    //    size = (int)wave.atoms[i].basis_set.size();
+    const int nr_pts = (int)total_grid[0].size();
+    const basis_set_entry* bf;
+    double n = 0;
+    
 
-    //    double temp_dens = 0;
-    //    for (e = 0; e < size; e++)
-    //    {
-    //        bf = &wave.atoms[i].basis_set[e];
-    //        primitive p(i, bf->type, bf->exponent, bf->coefficient);
-    //        if (p.type > 0) {
-    //            break;
-    //        }
-    //        radial = constants::PI/ (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;//gaussian_radial(p, d[3]) * p.coefficient;
+    int coef_counter = 0;
+    for (int i = 0; i < asym_atom_list.size(); i++) {
+        
+        size = (int)wave.atoms[i].basis_set.size();
 
-    //        n = coefs_temp[coef_counter + e] * radial;
+        double temp_dens = 0;
+        for (e = 0; e < size; e++)
+        {
+            bf = &wave.atoms[i].basis_set[e];
+            primitive p(i, bf->type, bf->exponent, bf->coefficient);
+            if (p.type > 0) {
+                break;
+            }
+            radial = constants::PI/ (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;//gaussian_radial(p, d[3]) * p.coefficient;
 
-    //        temp_dens += n;// *spherical_harmonic(p.type, m, d);
-    //        file << setprecision(2) << "Radial: " << radial 
-    //            << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0) 
-    //            << " | Coef Counter: " << coef_counter + e 
-    //            << " | Size: " << size << setprecision(2) 
-    //            << " | Exponent: " << bf->exponent 
-    //            << " | Coefficient: " << bf->coefficient 
-    //            << " | Norm Const: " << p.norm_const 
-    //            << " | Temp Dens: " << temp_dens
-    //            << " | New Dens: " << n << endl;
-    //    }
+            n = coefs_temp[coef_counter + e] * radial;
+
+            temp_dens += n;// *spherical_harmonic(p.type, m, d);
+            file << setprecision(2) << "Radial: " << radial 
+                << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0) 
+                << " | Coef Counter: " << coef_counter + e 
+                << " | Size: " << size << setprecision(2) 
+                << " | Exponent: " << bf->exponent 
+                << " | Coefficient: " << bf->coefficient 
+                << " | Norm Const: " << p.norm_const 
+                << " | Temp Dens: " << temp_dens
+                << " | New Dens: " << n << endl;
+        }
 
 
-    //    atom_els[3][i] += temp_dens;
-    //    for (e = 0; e < size; e++)
-    //    {
-    //        bf = &wave.atoms[i].basis_set[e];
-    //        coef_counter += (2 * bf->type + 1);
-    //    }
-    //    file << "---------------------------------" << endl;
-    //    //atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
-    //    el_sum += atom_els[3][i];
-    //    
-    //}
+        atom_els[3][i] += temp_dens;
+        for (e = 0; e < size; e++)
+        {
+            bf = &wave.atoms[i].basis_set[e];
+            coef_counter += (2 * bf->type + 1);
+        }
+        file << "---------------------------------" << endl;
+        //atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
+        el_sum += atom_els[3][i];
+    }
 
-    //file << setprecision(4) << "DOOFE Elektronen: " << el_sum << endl;
 
     if (debug)
     {
@@ -2194,17 +2191,18 @@ static int make_hirshfeld_grids_ML(
         file << setw(10) << labels[i]
             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
-            //<< fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[3][counter];
+            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter]
+            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[3][counter];
         if (debug)
             file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[0][counter]
             << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
-            << fixed << setw(10) << setprecision(3) << atom_els[2][counter];
-                 //<< fixed << setw(10) << setprecision(3) << atom_els[3][counter];
+            << fixed << setw(10) << setprecision(3) << atom_els[2][counter]
+            << fixed << setw(10) << setprecision(3) << atom_els[3][counter];
         counter++;
         file << endl;
     }
 
+    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
     file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl
          << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
 

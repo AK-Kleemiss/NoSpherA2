@@ -27,6 +27,7 @@
 #include <vector>
 #include <numeric>
 #include <cassert>
+#include <float.h>
 
 // Here are the system specific libaries
 #ifdef _WIN32
