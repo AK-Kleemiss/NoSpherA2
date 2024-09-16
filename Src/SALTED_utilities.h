@@ -73,3 +73,10 @@ private:
     cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer);
 };
 #endif
+
+const double calc_density_ML(const double& x,
+    const double& y,
+    const double& z,
+    const vec& coefficients,
+    const std::vector<atom>& atoms,
+    const int& atom_nr = -1);

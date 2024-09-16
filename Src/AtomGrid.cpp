@@ -1,6 +1,7 @@
 #include "convenience.h"
 #include "AtomGrid.h"
 #include "sphere_lebedev_rule.h"
+#include "constants.h"
 
 #ifdef _WIN32
 #define NOMIMAX

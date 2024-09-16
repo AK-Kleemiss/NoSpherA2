@@ -1,5 +1,6 @@
 #include "cube.h"
 #include "convenience.h"
+#include "constants.h"
 
 using namespace std;
 
@@ -156,7 +157,7 @@ bool cube::read_file(bool full, bool header, bool expert)
                 iss = std::istringstream(line);
                 double dum;
                 iss >> atnr >> dum >> atp[0] >> atp[1] >> atp[2];
-                parent_wavefunction->push_back_atom(atnr2letter(atnr), atp[0], atp[1], atp[2], atnr);
+                parent_wavefunction->push_back_atom(constants::atnr2letter(atnr), atp[0], atp[1], atp[2], atnr);
             }
     }
     if (full)

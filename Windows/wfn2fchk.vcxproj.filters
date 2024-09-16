@@ -971,6 +971,9 @@
     <ClInclude Include="..\Src\OpenBLAS.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\constants.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">
