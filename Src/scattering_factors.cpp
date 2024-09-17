@@ -3704,7 +3704,7 @@ bool calculate_scattering_factors_HF(
             opt.no_date);
 
     time_points.push_back(end1);
-    time_descriptions.push_back("final preparation");
+    time_descriptions.push_back("final preparations");
 
     if (wave.get_has_ECPs())
     {
@@ -3733,7 +3733,7 @@ bool calculate_scattering_factors_HF(
         labels,
         hkl);
 
-    time_points.push_back(end1);
+    time_points.push_back(get_time());
     time_descriptions.push_back("tsc calculation");
     if (!opt.no_date)
     {
