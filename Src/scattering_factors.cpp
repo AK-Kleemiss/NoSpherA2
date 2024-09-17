@@ -2980,6 +2980,46 @@ void make_k_pts(const bool &read_k_pts,
         read_k_points(k_pt, hkl, file);
     }
 }
+/*
+// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
+double fourier_bessel_integral(
+    primitive &p,
+    double H
+)
+{
+    int l = p.type;
+    double b = p.exp;
+    double N = p.norm_const;
+    return N * pow(H, l - 1) / (pow(2, l + 2) * pow(b, l + 1.5)) * constants::sqr_pi * exp(-H * H / (4 * b));
+}
+
+cdouble sfac_bessel(
+	primitive& p,
+    int m,
+	vec& k_point
+)
+{
+    double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
+    double H = 2 * constants::PI * leng;
+    double radial = fourier_bessel_integral(p, H);
+    //normalize the spherical harmonics k_point
+    for(int i=0; i<3; i++)
+        k_point[i] /= leng;
+
+    double angular = constants::spherical_harmonic(p.type, m, k_point.data());
+	return constants::FOUR_PI * pow(constants::c_i,p.type) * radial * angular;
+}
+*/
+
+void calc_SF_SALTED(const vec2 &k_pt,
+                    const vec &coefs,
+                    cvec2 &sf,
+                    ostream& file,
+                    time_point& start,
+                    time_point& end1)
+{
+    const long long int smax = static_cast<long long int>(k_pt[0].size());
+}
 
 /**
  * Calculates the scattering factors for a given set of parameters.

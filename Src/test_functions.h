@@ -1,6 +1,7 @@
 #pragma once
 #include "spherical_density.h"
 #include "scattering_factors.h"
+#include "AtomGrid.h"
 #include "convenience.h"
 #include "npy.h"
 #include "properties.h"
@@ -1320,6 +1321,113 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
         std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
         CubeRho.write_file(fn, false);
     }
+};
+
+// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
+double fourier_bessel_integral(
+    primitive& p,
+    double H
+)
+{
+    int l = p.type;
+    double b = p.exp;
+    double N = p.norm_const;
+    return N * pow(H, l - 1) / (pow(2, l + 2) * pow(b, l + 1.5)) * constants::sqr_pi * exp(-H * H / (4 * b));
+}
+
+cdouble sfac_bessel(
+    primitive& p,
+    int m,
+    vec& k_point
+)
+{
+    vec local_k = k_point;
+    double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
+    double H = 2 * constants::PI * leng;
+    double radial = fourier_bessel_integral(p, H);
+    //normalize the spherical harmonics k_point
+    for (int i = 0; i < 3; i++)
+        local_k[i] /= leng;
+
+    double angular = constants::spherical_harmonic(p.type, m, local_k.data());
+    return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * angular;
+}
+
+void test_analytical_fourier() {
+    WFN wavy(0);
+    wavy.push_back_MO(0, 1.0, -13);
+    wavy.push_back_atom("H", 0, 0, 0, 1);
+    double vals[] = { 0.6 };
+    wavy.add_primitive(1, 2, 0.5, vals);
+    wavy.add_exp(0, 1, 0.5);
+    vec2 kpts;
+    for (int i = 1; i < 100; i++) {
+        kpts.push_back({ 0.1 * i, 0, 0 });
+        kpts.push_back({ 0, 0.1 * i, 0 });
+        kpts.push_back({ 0,0,0.1 * i });
+        kpts.push_back({ -0.1 * i, 0, 0 });
+        kpts.push_back({ 0, -0.1 * i, 0 });
+        kpts.push_back({ 0, 0, -0.1 * i });
+    }
+    cvec2 sf_A, sf_N;
+    sf_A.resize(1);
+    sf_N.resize(1);
+    sf_A[0].resize(kpts.size(), 0.0);
+    sf_N[0].resize(kpts.size(), 0.0);
+    vec2 grid;
+    grid.resize(5); //x, y, z, dens, atomic_weight
+    /*
+    AtomGrid(const double radial_precision,
+        const int min_num_angular_points,
+        const int max_num_angular_points,
+        const int proton_charge,
+        const double alpha_max,
+        const int max_l_quantum_number,
+        const double alpha_min[],
+        std::ostream& file);*/
+    double alpha_min[] = { 0.5 };
+    AtomGrid griddy(1E-10,
+        120,
+        350,
+        1,
+        0.5,
+        1,
+        alpha_min,
+        std::cout);
+
+    double pos[] = { 0 };
+    for (int i = 0; i < grid.size(); i++) {
+        grid[i].resize(griddy.get_num_grid_points(), 0.0);
+    }
+    griddy.get_atomic_grid(0, pos,pos, pos, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data());
+
+    for (int i = 0; i < grid[0].size(); i++) {
+        grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
+    }
+
+    primitive p(1,1,0.5,0.6);
+    for (int i = 0; i < kpts.size(); i++) {
+		sf_A[0][i] = sfac_bessel(p,1,kpts[i]);
+        for (int p = 0; p < grid[0].size(); p++) {
+            double work = 2* constants::PI * (kpts[i][0] * grid[0][p] + kpts[i][1] * grid[1][p] + kpts[i][2] * grid[2][p]);
+            sf_N[0][i] += std::polar(grid[3][p]* grid[4][p],work);
+        }
+	}
+    using namespace std;
+	ofstream result("sfacs.dat", ios::out);
+	for (int i = 0; i < kpts.size(); i++) {
+		result << setw(8) << setprecision(1) << fixed << kpts[i][0];
+        result << setw(8) << setprecision(1) << fixed << kpts[i][1];
+        result << setw(8) << setprecision(1) << fixed << kpts[i][2];
+		result << setw(16) << setprecision(8) << scientific << sf_A[0][i].real();
+		result << setw(16) << setprecision(8) << scientific << sf_A[0][i].imag();
+		result << setw(16) << setprecision(8) << scientific << sf_N[0][i].real();
+		result << setw(16) << setprecision(8) << scientific << sf_N[0][i].imag();
+		result << "\n";
+	}
+	result.flush();
+	result.close();
+        
 };
 
 void calc_rho_cube(WFN &dummy)

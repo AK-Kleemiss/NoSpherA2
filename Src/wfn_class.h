@@ -53,8 +53,8 @@ private:
     bool push_back_center(const int &cent);
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
-    void push_back_MO_coef(const int &nr, const double &value);
     void assign_MO_coefs(const int &nr, vec &values);
+    void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;

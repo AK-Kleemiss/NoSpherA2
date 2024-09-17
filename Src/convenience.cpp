@@ -2790,6 +2790,10 @@ void options::digest_options()
 				err_checkf(false, "Wrong file ending!", cout);
             exit(0);
         }
+        else if (temp == "-test_analytical") {
+            test_analytical_fourier();
+            exit(0);
+        }
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
