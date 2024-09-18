@@ -1323,6 +1323,96 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
     }
 };
 
+
+const static double dlm_function(const unsigned int l, const int m, const double theta,
+    const double phi) {
+    register double result = (double)NAN;
+    register double x = cos(theta);
+    register double s = -sin(theta);
+    register double p;
+    register int m_ = abs(m);
+    // the formula for a real spherical harmonic is:
+    // for positive m:
+    // (-1)^m cos(m * phi)
+    // for negative m:
+    // (-1)^m sin(-m * phi)
+    // multiplied by the appropriate function dependent on l and |m|
+    // (see switch/case below)
+    if (m < 0) {
+        p = sin(m_ * phi);
+    }
+    else {
+        p = cos(m_ * phi);
+    };
+    if ((m_) % 2 == 1) p = -p; // (-1)^m
+    switch (l) {
+    case 0: switch (m_) {
+    case 0: result = 1.; break;
+    }; break;
+    case 1: switch (m_) {
+    case 0: result = x; break;
+    case 1: result = p * s; break;
+    }; break;
+    case 2: switch (m_) {
+    case 0: result = 0.5 * (3. * x * x - 1.); break;
+    case 1: result = p * 3. * x * s; break;
+    case 2: result = p * 3. * s * s; break;
+    }; break;
+    case 3: switch (m_) {
+    case 0: result = 0.5 * x * (5. * x * x - 3.); break;
+    case 1: result = p * 1.5 * (5. * x * x - 1.) * s; break;
+    case 2: result = p * 15. * x * s * s; break;
+    case 3: result = p * 15. * s * s * s; break;
+    }; break;
+    case 4: switch (m_) {
+    case 0: result = 0.125 * (35. * x * x * x * x - 30. * x * x + 3.); break;
+    case 1: result = p * 2.5 * (7. * x * x * x - 3. * x) * s; break;
+    case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
+    case 3: result = p * 105. * x * s * s * s; break;
+    case 4: result = p * 105. * s * s * s * s; break;
+    }; break;
+    case 5: switch (m_) {
+    case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;
+    case 1: result = p * 1.875 * (21. * x * x * x * x - 14. * x * x + 1.) * s; break;
+    case 2: result = p * 52.5 * x * (3. * x * x - 1.) * s * s; break;
+    case 3: result = p * 52.5 * (9. * x * x - 1.) * s * s * s; break;
+    case 4: result = p * 945. * x * s * s * s * s; break;
+    case 5: result = p * 945. * s * s * s * s * s; break;
+    }; break;
+    case 6: switch (m_) {
+    case 0: result = 0.0625 * (231. * x * x * x * x * x * x - 315. * x * x * x * x + 105. * x * x - 5.); break;
+    case 1: result = p * 2.625 * x * (33. * x * x * x * x - 30. * x * x + 5.) * s; break;
+    case 2: result = p * 13.125 * (33. * x * x * x * x - 18. * x * x + 1.) * s * s; break;
+    case 3: result = p * 157.5 * x * (11. * x * x - 3.) * s * s * s; break;
+    case 4: result = p * 472.5 * (11. * x * x - 1.) * s * s * s * s; break;
+    case 5: result = p * 10395. * x * s * s * s * s * s; break;
+    case 6: result = p * 10395. * s * s * s * s * s * s; break;
+    }; break;
+    case 7: switch (m_) {
+    case 0: result = 0.0625 * x * (429. * x * x * x * x * x * x - 693. * x * x * x * x + 315. * x * x - 35.); break;
+    case 1: result = p * 0.4375 * (429. * x * x * x * x * x * x - 495. * x * x * x * x + 135. * x * x - 5.) * s; break;
+    case 2: result = p * 7.875 * x * (143. * x * x * x * x - 110. * x * x + 15.) * s * s; break;
+    case 3: result = p * 39.375 * (143. * x * x * x * x - 66. * x * x + 3.) * s * s * s; break;
+    case 4: result = p * 1732.5 * x * (13. * x * x - 3.) * s * s * s * s; break;
+    case 5: result = p * 5197.5 * (13. * x * x - 1.) * s * s * s * s * s; break;
+    case 6: result = p * 135135. * x * s * s * s * s * s * s; break;
+    case 7: result = p * 135135. * s * s * s * s * s * s * s; break;
+    }; break;
+    case 8: switch (m_) {
+    case 0: result = 0.0078125 * (6435. * x * x * x * x * x * x * x * x - 12012. * x * x * x * x * x * x + 6930. * x * x * x * x - 1260. * x * x + 35.); break;
+    case 1: result = p * 0.5625 * x * (715. * x * x * x * x * x * x - 1001. * x * x * x * x + 385. * x * x - 35.) * s; break;
+    case 2: result = p * 19.6875 * (143. * x * x * x * x * x * x - 143. * x * x * x * x + 33. * x * x - 1.) * s * s; break;
+    case 3: result = p * 433.125 * x * (39. * x * x * x * x - 26. * x * x + 3.) * s * s * s; break;
+    case 4: result = p * 1299.375 * (65. * x * x * x * x - 26. * x * x + 1.) * s * s * s * s; break;
+    case 5: result = p * 67567.5 * x * (5. * x * x - 1.) * s * s * s * s * s; break;
+    case 6: result = p * 67567.5 * (15. * x * x - 1.) * s * s * s * s * s * s; break;
+    case 7: result = p * 2027025. * x * s * s * s * s * s * s * s; break;
+    case 8: result = p * 2027025. * s * s * s * s * s * s * s * s; break;
+    }; break;
+    };
+    return result;
+}
+
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 double fourier_bessel_integral(
     primitive& p,
@@ -1331,8 +1421,13 @@ double fourier_bessel_integral(
 {
     int l = p.type;
     double b = p.exp;
-    double N = p.norm_const;
-    return N * pow(H, l - 1) / (pow(2, l + 2) * pow(b, l + 1.5)) * constants::sqr_pi * exp(-H * H / (4 * b));
+    //double N = pow(
+    //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
+    //    0.25);
+    double N = 1;//pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
+    //double N = p.norm_const;
+    //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
+    return N*N * (pow(H, l*2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
 }
 
 cdouble sfac_bessel(
@@ -1349,25 +1444,32 @@ cdouble sfac_bessel(
     for (int i = 0; i < 3; i++)
         local_k[i] /= leng;
 
-    double angular = constants::spherical_harmonic(p.type, m, local_k.data());
-    return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * angular;
+    if (p.type == 0)
+    {
+        return  constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient;
+    }
+    else if (p.type == 1) {
+        //double angular = constants::spherical_harmonic(p.type, m, local_k.data());
+        return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient;
+    }
 }
+
 
 void test_analytical_fourier() {
     WFN wavy(0);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
-    double vals[] = { 0.6 };
-    wavy.add_primitive(1, 2, 0.5, vals);
-    wavy.add_exp(0, 1, 0.5);
+    const double c_exp = 1;
+    double vals[] = { 0.8 };
+    wavy.add_primitive(1, 2, c_exp, vals);
     vec2 kpts;
     for (int i = 1; i < 100; i++) {
-        kpts.push_back({ 0.1 * i, 0, 0 });
-        kpts.push_back({ 0, 0.1 * i, 0 });
-        kpts.push_back({ 0,0,0.1 * i });
-        kpts.push_back({ -0.1 * i, 0, 0 });
-        kpts.push_back({ 0, -0.1 * i, 0 });
-        kpts.push_back({ 0, 0, -0.1 * i });
+        kpts.push_back({ 0.01 * i, 0, 0 });
+        kpts.push_back({ 0, 0.01 * i, 0 });
+        kpts.push_back({ 0,0,0.01 * i });
+        kpts.push_back({ -0.01 * i, 0, 0 });
+        kpts.push_back({ 0, -0.01 * i, 0 });
+        kpts.push_back({ 0, 0, -0.01 * i });
     }
     cvec2 sf_A, sf_N;
     sf_A.resize(1);
@@ -1376,21 +1478,13 @@ void test_analytical_fourier() {
     sf_N[0].resize(kpts.size(), 0.0);
     vec2 grid;
     grid.resize(5); //x, y, z, dens, atomic_weight
-    /*
-    AtomGrid(const double radial_precision,
-        const int min_num_angular_points,
-        const int max_num_angular_points,
-        const int proton_charge,
-        const double alpha_max,
-        const int max_l_quantum_number,
-        const double alpha_min[],
-        std::ostream& file);*/
+    
     double alpha_min[] = { 0.5 };
-    AtomGrid griddy(1E-10,
-        120,
-        350,
+    AtomGrid griddy(1E-40,
+        1120,
+        1350,
         1,
-        0.5,
+        3.6,
         1,
         alpha_min,
         std::cout);
@@ -1405,24 +1499,27 @@ void test_analytical_fourier() {
         grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
     }
 
-    primitive p(1,1,0.5,0.6);
+    primitive p(1, 1, c_exp, vals[0]);
+#pragma omp parallel for
     for (int i = 0; i < kpts.size(); i++) {
-		sf_A[0][i] = sfac_bessel(p,1,kpts[i]);
+		sf_A[0][i] = sfac_bessel(p, 0, kpts[i]);
         for (int p = 0; p < grid[0].size(); p++) {
-            double work = 2* constants::PI * (kpts[i][0] * grid[0][p] + kpts[i][1] * grid[1][p] + kpts[i][2] * grid[2][p]);
+            double work = 2 * constants::PI * (kpts[i][0] * grid[0][p] + kpts[i][1] * grid[1][p] + kpts[i][2] * grid[2][p]);
             sf_N[0][i] += std::polar(grid[3][p]* grid[4][p],work);
         }
 	}
     using namespace std;
 	ofstream result("sfacs.dat", ios::out);
 	for (int i = 0; i < kpts.size(); i++) {
-		result << setw(8) << setprecision(1) << fixed << kpts[i][0];
-        result << setw(8) << setprecision(1) << fixed << kpts[i][1];
-        result << setw(8) << setprecision(1) << fixed << kpts[i][2];
+		result << setw(8) << setprecision(2) << fixed << kpts[i][0];
+        result << setw(8) << setprecision(2) << fixed << kpts[i][1];
+        result << setw(8) << setprecision(2) << fixed << kpts[i][2];
 		result << setw(16) << setprecision(8) << scientific << sf_A[0][i].real();
 		result << setw(16) << setprecision(8) << scientific << sf_A[0][i].imag();
 		result << setw(16) << setprecision(8) << scientific << sf_N[0][i].real();
 		result << setw(16) << setprecision(8) << scientific << sf_N[0][i].imag();
+        result << setw(16) << setprecision(8) << scientific << abs(sf_A[0][i] - sf_N[0][i]);
+        result << setw(35) << setprecision(8) << scientific << sf_A[0][i] / sf_N[0][i];
 		result << "\n";
 	}
 	result.flush();
