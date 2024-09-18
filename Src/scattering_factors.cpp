@@ -3129,6 +3129,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
 {
     double k = 1.0;
     hkl_list_it it = hkl.begin();
+    err_checkf(mode >= 0, "Invalid mode for ECP contribution!", file);
     if (mode == 0)
     { // Using a gaussian tight core function
         if (debug)
@@ -3189,7 +3190,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
     }
     else
     {
-        err_not_impl_f("No higher ECP mode than 1 implemented!", file);
+        err_not_impl_f("No higher ECP mode than 3 implemented!", file);
     }
 }
 
