@@ -1418,8 +1418,9 @@ const static double dlm_function(const unsigned int l, const int m, const double
     return result;
 }
 
+
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
-double fourier_bessel_integral(
+cdouble fourier_bessel_integral(
     primitive& p,
     double H
 )
@@ -1432,7 +1433,16 @@ double fourier_bessel_integral(
     double N = 1;//pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
     //double N = p.norm_const;
     //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
-    return N*N * (pow(H, l*2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+    if (l == 0)
+    {
+        return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+    }
+    else if (l == 1)
+    {
+        double f1 = pow(2, 3 / 2) * sqrt(b);
+        cdouble S_0 = -(cerf((constants::c_i * H) / f1)*constants::sqr_pi*constants::c_i*exp(-(H*H)/(8*b))) / (f1);
+        return N * N * (1 / (6 * b * H * H) * S_0 - 1 / (16 * b * b * H) + (H + H * H * S_0) / (64 * b * b * b));
+    }
 }
 
 cdouble sfac_bessel(
@@ -1444,7 +1454,7 @@ cdouble sfac_bessel(
     vec local_k = k_point;
     double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
     double H = 2 * constants::PI * leng;
-    double radial = fourier_bessel_integral(p, H);
+    cdouble radial = fourier_bessel_integral(p, H);
     //normalize the spherical harmonics k_point
     for (int i = 0; i < 3; i++)
         local_k[i] /= leng;
@@ -1454,8 +1464,8 @@ cdouble sfac_bessel(
         return  constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient;
     }
     else if (p.type == 1) {
-        //double angular = constants::spherical_harmonic(p.type, m, local_k.data());
-        return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient;
+        double angular = constants::spherical_harmonic(p.type, m, local_k.data());
+        return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient * angular;
     }
 }
 
