@@ -7,6 +7,7 @@
 #include "properties.h"
 #include "JKFit.h"
 #include "SALTED_utilities.h"
+#include "cerf.h"
 #if has_RAS
 #include "SALTED_math.h"
 #include "rascaline.hpp"
@@ -99,6 +100,10 @@ void thakkar_d_test(options &opt)
         result.flush();
         result.close();
     }
+}
+
+void test_cerf() {
+    cdouble a = cerf(cdouble(1.0, 1.0));
 }
 
 void test_density_cubes(options &opt, std::ostream &log_file)
@@ -1326,11 +1331,11 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
 
 const static double dlm_function(const unsigned int l, const int m, const double theta,
     const double phi) {
-    register double result = (double)NAN;
-    register double x = cos(theta);
-    register double s = -sin(theta);
-    register double p;
-    register int m_ = abs(m);
+    double result = (double)NAN;
+    double x = cos(theta);
+    double s = -sin(theta);
+    double p;
+    int m_ = abs(m);
     // the formula for a real spherical harmonic is:
     // for positive m:
     // (-1)^m cos(m * phi)

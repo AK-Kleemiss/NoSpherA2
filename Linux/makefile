@@ -23,12 +23,12 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 
 unity.o: ../Src/unity.cpp
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GCC_OPTS} -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 unity_rasc.o: ../Src/unity.cpp
 	@echo 'Building file: $< with rascaline support'
-	g++ ${GCC_OPTS} -D__RASCALINE__ -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GCC_OPTS} -D__RASCALINE__ -I../Lib/ -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 SALTED.o: ../Src/SALTED.cpp
@@ -41,10 +41,15 @@ hdf5.o: ../Src/hdf5.cpp
 	g++ ${GCC_OPTS} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-NoSpherA2_Rascaline: unity_rasc.o hdf5.o SALTED.o
+cerf.o: ../Src/cerf.cpp
+	@echo 'Building file: $<'
+	g++ ${GCC_OPTS} -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@echo 'Finished building: $<'
+
+NoSpherA2_Rascaline: unity_rasc.o hdf5.o SALTED.o cerf.o
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_rascaline" unity_rasc.o hdf5.o SALTED.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
-	${RM} unity_rasc.o hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d
+	g++ -o "NoSpherA2_rascaline" unity_rasc.o hdf5.o SALTED.o cerf.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
+	${RM} unity_rasc.o hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d cerf.o cerf.d
 	cp NoSpherA2_rascaline ../
 	@echo 'Done building rascaline version of NoSpherA2'
 

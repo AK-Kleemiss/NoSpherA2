@@ -2637,7 +2637,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\Lib;..\Lib\OpenBlas\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\Lib\cerf;..\Lib\OpenBlas\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2704,6 +2704,11 @@
     <ClCompile Include="../Src/wfn_class.cpp" />
     <ClCompile Include="../Src/properties.cpp" />
     <ClCompile Include="../Src/spherical_density.cpp" />
+    <ClCompile Include="..\Lib\cerf\erfcx.cpp" />
+    <ClCompile Include="..\Lib\cerf\err_fcts.cpp" />
+    <ClCompile Include="..\Lib\cerf\im_w_of_x.cpp" />
+    <ClCompile Include="..\Lib\cerf\width.cpp" />
+    <ClCompile Include="..\Lib\cerf\w_of_z.cpp" />
     <ClCompile Include="..\Lib\H5AbstractDs.cpp" />
     <ClCompile Include="..\Lib\H5ArrayType.cpp" />
     <ClCompile Include="..\Lib\H5AtomType.cpp" />
@@ -2758,6 +2763,8 @@
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />
     <ClInclude Include="../Src/def2-ECPs_GA.h" />
+    <ClInclude Include="..\Lib\cerf\cerf.h" />
+    <ClInclude Include="..\Lib\cerf\defs.h" />
     <ClInclude Include="..\Src\constants.h" />
     <ClInclude Include="..\Src\ECPs_corrections.h" />
     <ClInclude Include="../Src/npy.h" />
