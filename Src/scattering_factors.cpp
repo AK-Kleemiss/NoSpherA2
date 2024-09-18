@@ -3167,6 +3167,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
 {
     double k = 1.0;
     hkl_list_it it = hkl.begin();
+    err_checkf(mode >= 0, "Invalid mode for ECP contribution!", file);
     if (mode == 0)
     { // Using a gaussian tight core function
         if (debug)
@@ -3227,7 +3228,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
     }
     else
     {
-        err_not_impl_f("No higher ECP mode than 1 implemented!", file);
+        err_not_impl_f("No higher ECP mode than 3 implemented!", file);
     }
 }
 
@@ -3742,7 +3743,7 @@ bool calculate_scattering_factors_HF(
             opt.no_date);
 
     time_points.push_back(end1);
-    time_descriptions.push_back("final preparation");
+    time_descriptions.push_back("final preparations");
 
     if (wave.get_has_ECPs())
     {
@@ -3771,7 +3772,7 @@ bool calculate_scattering_factors_HF(
         labels,
         hkl);
 
-    time_points.push_back(end1);
+    time_points.push_back(get_time());
     time_descriptions.push_back("tsc calculation");
     if (!opt.no_date)
     {
