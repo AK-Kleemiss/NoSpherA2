@@ -55,4 +55,4 @@ tests_r:
 	cd tests && make all -k -B MODE=RASCALINE
 
 
-.PHONY: test tests NoSpherA2_Rascaline
+.PHONY: test tests NoSpherA2_Rascaline NoSpherA2 all
