@@ -11,4 +11,4 @@
 #include "./fchk.cpp"
 #include "./JKFit.cpp"
 #include "./NoSpherA2.cpp"
-#include "./SALTED_utilities.h"
+#include "./SALTED_utilities.cpp"
