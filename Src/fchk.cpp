@@ -2,7 +2,6 @@
 #include "convenience.h"
 #include "basis_set.h"
 #include "constants.h"
-using namespace std;
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -699,11 +698,11 @@ double read_fchk_double(const std::string& in)
 {
     return std::stod(in.substr(49, in.length() - 49));
 };
-bool read_fchk_integer_block(ifstream& in, const char* heading, ivec& result, bool rewind)
+bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& result, bool rewind)
 {
     if (result.size() != 0)
         result.clear();
-    string line = go_get_string(in, heading, rewind);
+    std::string line = go_get_string(in, heading, rewind);
     int limit = read_fchk_integer(line);
     int run = 0;
     int temp;
@@ -720,11 +719,11 @@ bool read_fchk_integer_block(ifstream& in, const char* heading, ivec& result, bo
     }
     return true;
 };
-bool read_fchk_double_block(ifstream& in, const char* heading, vec& result, bool rewind)
+bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result, bool rewind)
 {
     if (result.size() != 0)
         result.clear();
-    string line = go_get_string(in, heading, rewind);
+    std::string line = go_get_string(in, heading, rewind);
     int limit = read_fchk_integer(line);
     int run = 0;
     double temp;
@@ -743,17 +742,18 @@ bool read_fchk_double_block(ifstream& in, const char* heading, vec& result, bool
 };
 int read_fchk_integer(std::ifstream& in, const char* search, bool rewind)
 {
-    string temp = go_get_string(in, search, rewind);
-    return stoi(temp.substr(49, temp.length() - 49));
+    std::string temp = go_get_string(in, search, rewind);
+    return std::stoi(temp.substr(49, temp.length() - 49));
 };
 double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
 {
-    string temp = go_get_string(in, search, rewind);
-    return stod(temp.substr(49, temp.length() - 49));
+    std::string temp = go_get_string(in, search, rewind);
+    return std::stod(temp.substr(49, temp.length() - 49));
 };
 
-bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+bool free_fchk(std::ofstream &file, const std::string &fchk_name, const std::string &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
 {
+    using namespace std;
     int elcount = 0;
     elcount -= wave.get_charge();
     for (int i = 0; i < wave.get_ncen(); i++)

@@ -1,10 +1,9 @@
 #include "SALTED_utilities.h"
 #include "constants.h"
 
-using namespace std;
-
-vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
+std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
+    using namespace std;
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
     {
@@ -34,7 +33,7 @@ vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
     return matrices;
 }
 
-int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
+int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int> &lmax)
 {
     int lmax_max = 0;
     for (auto &[key, value] : lmax)
@@ -47,7 +46,7 @@ int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 118> basis_set, vector<string> species)
+void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, std::array<std::vector<primitive>, 118> basis_set, std::vector<std::string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
@@ -60,12 +59,12 @@ void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map
         // initialize nmax with symbol + type
         for (int i = 0; i < basis_set[atom_index].back().type + 1; i++)
         {
-            nmax[spe + to_string(i)] = 0;
+            nmax[spe + std::to_string(i)] = 0;
         }
         // count the number of primitives for the given atom and type
         for (int i = 0; i < basis_set[atom_index].size(); i++)
         {
-            nmax[spe + to_string(basis_set[atom_index][i].type)] += 1;
+            nmax[spe + std::to_string(basis_set[atom_index][i].type)] += 1;
         }
     }
 }
@@ -137,7 +136,7 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
     return oss.str();
 }
 
-string Rascaline_Descriptors::gen_parameters()
+std::string Rascaline_Descriptors::gen_parameters()
 {
     std::ostringstream oss;
     HyperParametersDensity hyper_parameters_density = {
@@ -149,7 +148,7 @@ string Rascaline_Descriptors::gen_parameters()
         {"Gto", this->spline_accuracy},       // radial_basis
         {"ShiftedCosine", this->cutoff_width} // cutoff_function
     };
-    string json_string = to_json(hyper_parameters_density);
+    std::string json_string = to_json(hyper_parameters_density);
     return json_string;
 }
 
@@ -176,7 +175,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
     rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
     // Construct the parameters for the calculator from the inputs given
-    string temp_p = gen_parameters();
+    std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
 
     // size_t nspe1 = neighspe.size();
@@ -223,7 +222,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 }
 
 // RASCALINE2
-cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buffer)
+cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
 {
     
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);

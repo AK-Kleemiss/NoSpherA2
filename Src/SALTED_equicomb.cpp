@@ -5,8 +5,6 @@
 #include "cblas.h"
 #endif
 
-using namespace std;
-
 //BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
 
 void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
@@ -15,7 +13,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     const vec& w3j, int llmax,
     const ivec2& llvec, int lam,
     const cvec2& c2r, int featsize,
-    int nfps, const vector<int64_t>& vfps,
+    int nfps, const std::vector<int64_t>& vfps,
     vec& p)
 {
     const int l21 = 2 * lam + 1;
@@ -26,12 +24,13 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
+    const cdouble null(0.0, 0.0);
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null)
     for (iat = 0; iat < natoms; ++iat)
     {
         vec2 ptemp(l21, vec(featsize, 0.0));
-        cvec pcmplx(l21, complex<double>(0.0, 0.0));
+        cvec pcmplx(l21, null);
         vec preal(l21, 0.0);
         inner = 0.0;
 
@@ -46,7 +45,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                     l1 = llvec[0][il];
                     l2 = llvec[1][il];
 
-                    fill(pcmplx.begin(), pcmplx.end(), complex<double>(0.0, 0.0));
+                    fill(pcmplx.begin(), pcmplx.end(), null);
 
                     for (imu = 0; imu < l21; ++imu)
                     {
@@ -105,13 +104,14 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
+    const cdouble null(0.0, 0.0);
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, p, featsize)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, p, featsize, null)
     for (iat = 0; iat < natoms; ++iat)
     {
         const int l21 = 2 * lam + 1;
         vec2 ptemp(l21, vec(featsize, 0.0));
-        cvec pcmplx(l21, complex<double>(0.0, 0.0));
+        cvec pcmplx(l21, null);
         vec preal(l21, 0.0);
         inner = 0.0;
 
@@ -126,7 +126,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                     l1 = llvec[0][il];
                     l2 = llvec[1][il];
 
-                    fill(pcmplx.begin(), pcmplx.end(), complex<double>(0.0, 0.0));
+                    fill(pcmplx.begin(), pcmplx.end(), null);
 
                     for (imu = 0; imu < l21; ++imu)
                     {

@@ -103,7 +103,7 @@ void thakkar_d_test(options &opt)
 }
 
 void test_cerf() {
-    cdouble a = cerf(cdouble(1.0, 1.0));
+    cerf(cdouble(1.0, 1.0));
 }
 
 void test_density_cubes(options &opt, std::ostream &log_file)
@@ -1415,6 +1415,7 @@ cdouble fourier_bessel_integral(
     double H
 )
 {
+    using namespace std::complex_literals;
     int l = p.type;
     double b = p.exp;
     //double N = pow(
@@ -1430,7 +1431,7 @@ cdouble fourier_bessel_integral(
     else if (l == 1)
     {
         double f1 = pow(2, 3 / 2) * sqrt(b);
-        cdouble S_0 = -(cerf((1i * H) / f1)*constants::sqr_pi*1i*exp(-(H*H)/(8*b))) / (f1);
+        cdouble S_0 = -(cerf((1.0i * H) / f1)*constants::sqr_pi*1.0i*exp(-(H*H)/(8*b))) / (f1);
         return N * N * (1 / (6 * b * H * H) * S_0 - 1 / (16 * b * b * H) + (H + H * H * S_0) / (64 * b * b * b));
     }
 }
@@ -1441,6 +1442,7 @@ cdouble sfac_bessel(
     vec& k_point
 )
 {
+    using namespace std::complex_literals;
     vec local_k = k_point;
     double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
     double H = 2 * constants::PI * leng;
@@ -1451,11 +1453,11 @@ cdouble sfac_bessel(
 
     if (p.type == 0)
     {
-        return  constants::FOUR_PI * pow(1i, p.type) * radial * p.coefficient * p.coefficient;
+        return  constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient;
     }
     else if (p.type == 1) {
         double angular = constants::spherical_harmonic(p.type, m, local_k.data());
-        return constants::FOUR_PI * pow(1i, p.type) * radial * p.coefficient * p.coefficient * angular;
+        return constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * angular;
     }
 }
 

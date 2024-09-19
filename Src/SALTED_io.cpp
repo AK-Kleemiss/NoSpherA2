@@ -1,11 +1,9 @@
 #include "SALTED_io.h"
 #include <filesystem>
 
-using namespace std;
-
 #if has_RAS
 template <typename T>
-void readHDF5Data(H5::DataSet& dataset, vector<T>& data) {
+void readHDF5Data(H5::DataSet& dataset, std::vector<T>& data) {
     // Select correct datatype depending on T
     H5::PredType type = H5::PredType::PREDTYPE_CONST;
     if constexpr(std::is_same_v<T, double>) {
@@ -21,17 +19,17 @@ void readHDF5Data(H5::DataSet& dataset, vector<T>& data) {
         type = H5::PredType::NATIVE_INT64;
     }
 	else {
-		throw runtime_error("Unsupported datatype");
+		throw std::runtime_error("Unsupported datatype");
 	}
     dataset.read(data.data(), type);
 }
-template void readHDF5Data(H5::DataSet& dataset, vector<double>& data);
-template void readHDF5Data(H5::DataSet& dataset, vector<float>& data);
-template void readHDF5Data(H5::DataSet& dataset, vector<int>& data);
-template void readHDF5Data(H5::DataSet& dataset, vector<int64_t>& data);
+template void readHDF5Data(H5::DataSet& dataset, std::vector<double>& data);
+template void readHDF5Data(H5::DataSet& dataset, std::vector<float>& data);
+template void readHDF5Data(H5::DataSet& dataset, std::vector<int>& data);
+template void readHDF5Data(H5::DataSet& dataset, std::vector<int64_t>& data);
 
 template <typename T>
-vector<T> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t> &dims_out) {
+std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out) {
 
     try {
         H5::Exception::dontPrint();
@@ -47,7 +45,7 @@ vector<T> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t> &dims_o
             totalSize *= dim;
         }
 
-        vector<T> flatData(totalSize);
+        std::vector<T> flatData(totalSize);
         readHDF5Data(dataset, flatData);
         dataset.close();
         
@@ -79,10 +77,10 @@ vector<T> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t> &dims_o
     }
     return {};
 }
-template vector<double> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
-template vector<float> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
-template vector<int> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
-template vector<int64_t> readHDF5(H5::H5File file, string dataset_name, vector<hsize_t>& dims_out);
+template std::vector<double> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<float> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int64_t> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
 #endif
 
 
@@ -108,34 +106,34 @@ std::string find_first_h5_file(const std::string& directory_path) {
 
 
 template <typename Scalar>
-void read_npy(string filename, vector<Scalar> &data)
+void read_npy(std::string filename, std::vector<Scalar> &data)
 {
-    vector<unsigned long> shape{};
+    std::vector<unsigned long> shape{};
     bool fortran_order;
     npy::LoadArrayFromNumpy(filename, shape, fortran_order, data);
 }
-template void read_npy(string filename, vector<double> &data);
-template void read_npy(string filename, vector<float> &data);
+template void read_npy(std::string filename, std::vector<double> &data);
+template void read_npy(std::string filename, std::vector<float> &data);
 
 
 template <typename T>
-unordered_map<int, vector<T>> read_fps(string filename, int lmax_max)
+std::unordered_map<int, std::vector<T>> read_fps(std::string filename, int lmax_max)
 {
-    unordered_map<int, vector<T>> vfps{};
-    vector<T> data{};
+    std::unordered_map<int, std::vector<T>> vfps{};
+    std::vector<T> data{};
     for (int lam = 0; lam < lmax_max + 1; lam++)
     {
         data.clear();
-        read_npy(filename + to_string(lam) + ".npy", data);
+        read_npy(filename + std::to_string(lam) + ".npy", data);
         vfps[lam] = data;
     }
     return vfps;
 }
-template unordered_map<int, vector<double>> read_fps(string filename, int lmax_max);
-template unordered_map<int, vector<int64_t>> read_fps(string filename, int lmax_max);
+template std::unordered_map<int, std::vector<double>> read_fps(std::string filename, int lmax_max);
+template std::unordered_map<int, std::vector<int64_t>> read_fps(std::string filename, int lmax_max);
 
 template <class T>
-vector<T> readVectorFromFile(const string &filename)
+std::vector<T> readVectorFromFile(const std::string &filename)
 {
     std::vector<T> result;
     std::ifstream file(filename);
@@ -165,15 +163,15 @@ vector<T> readVectorFromFile(const string &filename)
         {
             // Handle the case where the line cannot be converted to double
             // For now, we'll just skip the line
-            string message = "Could not convert line to double: " + line + ": " + e.what();
+            std::string message = "Could not convert line to double: " + line + ": " + e.what();
             continue;
         }
     }
 
     return result;
 }
-template vector<double> readVectorFromFile(const string &filename);
-template vector<int> readVectorFromFile(const string &filename);
+template std::vector<double> readVectorFromFile(const std::string &filename);
+template std::vector<int> readVectorFromFile(const std::string &filename);
 
 
 // ----------------- Functions to populate the Config struct -----------------
@@ -287,7 +285,7 @@ void Config::populateFromFile(const H5::H5File file) {
     err_checkf((status == 0), "Error reading h5 input file", std::cout);
 
     for (int i = 0; i < dataset_names->size(); i++) {
-        string dataset_name = dataset_names->at(i);
+        std::string dataset_name = dataset_names->at(i);
         H5::DataSet dataSet = input_grp.openDataSet(dataset_name);
         //read type of dataset
         H5T_class_t type_class = dataSet.getTypeClass();
@@ -313,7 +311,7 @@ void Config::populate_config(const std::string& dataset_name, const int& data) {
     else if (dataset_name == "nrad2") this->nrad2 = data;
     else if (dataset_name == "Menv") this->Menv = data;
     else if (dataset_name == "Ntrain") this->Ntrain = data;
-    else cout << "Unknown dataset name: " << dataset_name << endl;
+    else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const float& data) {
     if (dataset_name == "rcut1") this->rcut1 = data;
@@ -322,7 +320,7 @@ void Config::populate_config(const std::string& dataset_name, const float& data)
     else if (dataset_name == "sig2") this->sig2 = data;
     else if (dataset_name == "zeta") this->zeta = data;
     else if (dataset_name == "trainfrac") this->trainfrac = data;
-    else cout << "Unknown dataset name: " << dataset_name << endl;
+    else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const double& data) {
     if (dataset_name == "rcut1") this->rcut1 = data;
@@ -331,18 +329,18 @@ void Config::populate_config(const std::string& dataset_name, const double& data
     else if (dataset_name == "sig2") this->sig2 = data;
     else if (dataset_name == "zeta") this->zeta = data;
     else if (dataset_name == "trainfrac") this->trainfrac = data;
-    else cout << "Unknown dataset name: " << dataset_name << endl;
+    else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const std::string& data) {
     if (dataset_name == "predict_filename") this->predict_filename = data;
     else if (dataset_name == "dfbasis") this->dfbasis = data;
-    else cout << "Unknown dataset name: " << dataset_name << endl;
+    else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const std::vector<std::string>& data) {
     if (dataset_name == "species") this->species = data;
     else if (dataset_name == "neighspe1") this->neighspe1 = data;
     else if (dataset_name == "neighspe2") this->neighspe2 = data;
-    else cout << "Unknown dataset name: " << dataset_name << endl;
+    else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 
 void Config::handle_int_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {

@@ -12,7 +12,6 @@
 #include "spherical_density.h"
 #include "AtomGrid.h"
 #include "npy.h"
-using namespace std;
 
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
@@ -38,15 +37,15 @@ using namespace std;
  *
  * @throws runtime_error If the file does not exist or cannot be read.
  */
-void read_k_points(vec2 &k_pt, hkl_list &hkl, ostream &file)
+void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
 {
     err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
-    file << "Reading: kpts.dat" << flush;
-    ifstream k_points_file("kpts.dat", ios::binary);
+    file << "Reading: kpts.dat" << std::flush;
+    std::ifstream k_points_file("kpts.dat", std::ios::binary);
     err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
     int nr[1]{0};
     k_points_file.read((char *)&nr, sizeof(nr));
-    file << " expecting " << nr[0] << " k points... " << flush;
+    file << " expecting " << nr[0] << " k points... " << std::flush;
     double temp[1]{0.0};
     int hkl_temp[1]{0};
     k_pt.resize(3);
@@ -63,8 +62,8 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, ostream &file)
         hkl.emplace(hkl_);
     }
     err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
-    file << " done!" << endl
-         << "Size of k_points: " << k_pt[0].size() << endl;
+    file << " done!" << std::endl
+         << "Size of k_points: " << k_pt[0].size() << std::endl;
     k_points_file.close();
 }
 
@@ -93,7 +92,7 @@ cdouble convert_to_ED_single(
  */
 void save_k_points(vec2 &k_pt, hkl_list &hkl)
 {
-    ofstream k_points_file("kpts.dat", ios::out | ios::binary | ios::trunc);
+    std::ofstream k_points_file("kpts.dat", std::ios::out | std::ios::binary | std::ios::trunc);
     int nr[1] = {(int)k_pt[0].size()};
     k_points_file.write((char *)&nr, sizeof(nr));
     double temp[1]{0.0};
@@ -124,20 +123,20 @@ void save_k_points(vec2 &k_pt, hkl_list &hkl)
  * @param file The output stream to write debug information to.
  * @param debug Flag indicating whether debug information should be printed.
  */
-void read_hkl(const string &hkl_filename,
+void read_hkl(const std::string &hkl_filename,
               hkl_list &hkl,
               const vec2 &twin_law,
               cell &unit_cell,
-              ostream &file,
+    std::ostream &file,
               bool debug = false)
 {
-    file << "Reading: " << setw(44) << hkl_filename << flush;
+    file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
     ivec hkl_(3);
     err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
-    ifstream hkl_input(hkl_filename.c_str(), ios::in);
+    std::ifstream hkl_input(hkl_filename.c_str(), std::ios::in);
     hkl_input.seekg(0, hkl_input.beg);
-    regex r{R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])"};
-    string line, temp;
+    std::regex r{R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])"};
+    std::string line, temp;
     while (!hkl_input.eof())
     {
         getline(hkl_input, line);
@@ -145,7 +144,7 @@ void read_hkl(const string &hkl_filename,
             break;
         if (line.size() < 2)
             continue;
-        cmatch result;
+        std::cmatch result;
         if (regex_search(line.c_str(), result, r))
             continue;
         // if (debug) file << "hkl: ";
@@ -163,14 +162,14 @@ void read_hkl(const string &hkl_filename,
     if (found != hkl.end())
     {
         if (debug)
-            file << "popping back 0 0 0" << endl;
+            file << "popping back 0 0 0" << std::endl;
         hkl.erase(ivec{0, 0, 0});
     }
     hkl_input.close();
-    file << " done!\nNr of reflections read from file: " << hkl.size() << endl;
+    file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
 
     if (debug)
-        file << "Number of reflections before twin: " << hkl.size() << endl;
+        file << "Number of reflections before twin: " << hkl.size() << std::endl;
     if (twin_law.size() > 0)
     {
         for (const ivec &hkl__ : hkl)
@@ -181,29 +180,29 @@ void read_hkl(const string &hkl_filename,
                     static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
     }
     if (debug)
-        file << "Number of reflections after twin: " << hkl.size() << endl;
+        file << "Number of reflections after twin: " << hkl.size() << std::endl;
 
-    vector<vector<ivec>> sym(3);
+    std::vector<std::vector<ivec>> sym(3);
     for (int i = 0; i < 3; i++)
         sym[i].resize(3);
     sym = unit_cell.get_sym();
 
     if (debug)
     {
-        file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+        file << "Read " << sym[0][0].size() << " symmetry elements!" << std::endl;
         for (int i = 0; i < sym[0][0].size(); i++)
         {
             for (int x = 0; x < 3; x++)
             {
                 for (int y = 0; y < 3; y++)
-                    file << setw(3) << sym[y][x][i];
-                file << endl;
+                    file << std::setw(3) << sym[y][x][i];
+                file << std::endl;
             }
-            file << endl;
+            file << std::endl;
         }
     }
     else
-        file << "Number of symmetry operations: " << sym[0][0].size() << endl;
+        file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
 
     ivec tempv(3);
     hkl_list hkl_enlarged = hkl;
@@ -239,7 +238,7 @@ void read_hkl(const string &hkl_filename,
         }
     }
     hkl = hkl_enlarged;
-    file << "Nr of reflections to be used: " << hkl.size() << endl;
+    file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 }
 
 /**
@@ -256,9 +255,10 @@ void generate_hkl(const double &dmin,
                   hkl_list &hkl,
                   const vec2 &twin_law,
                   cell &unit_cell,
-                  ostream &file,
+    std::ostream &file,
                   bool debug)
 {
+    using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
     ivec hkl_(3);
     string line, temp;
@@ -368,10 +368,11 @@ void generate_fractional_hkl(const double &dmin,
                              hkl_list_d &hkl,
                              const vec2 &twin_law,
                              cell &unit_cell,
-                             ostream &file,
+    std::ostream &file,
                              double stepsize,
                              bool debug)
 {
+    using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
     vec hkl_(3);
     string line, temp;
@@ -432,7 +433,7 @@ void generate_fractional_hkl(const double &dmin,
  * @param file The output stream for the file.
  * @param debug A boolean indicating whether to enable debug mode.
  */
-svec read_atoms_from_CIF(ifstream &cif_input,
+svec read_atoms_from_CIF(std::ifstream &cif_input,
                          const ivec &input_groups,
                          const cell &unit_cell,
                          const WFN &wave,
@@ -441,9 +442,10 @@ svec read_atoms_from_CIF(ifstream &cif_input,
                          ivec &asym_atom_to_type_list,
                          ivec &asym_atom_list,
                          bvec &needs_grid,
-                         ostream &file,
+    std::ostream &file,
                          const bool debug)
 {
+    using namespace std;
     bool atoms_read = false;
     int count_fields = 0;
     int group_field = 0;
@@ -719,15 +721,16 @@ svec read_atoms_from_CIF(ifstream &cif_input,
     return labels2;
 }
 
-vector<AtomGrid> make_Prototype_atoms(
+std::vector<AtomGrid> make_Prototype_atoms(
     const ivec &atom_type_list,
     const ivec &cif2wfn_list,
     const bool &debug,
-    ostream &file,
+    std::ostream &file,
     const int &accuracy,
     const WFN &wave,
     int basis_mode)
 {
+    using namespace std;
     vec alpha_max(wave.get_ncen());
     vec2 alpha_min(wave.get_ncen());
     ivec max_l(wave.get_ncen());
@@ -1032,11 +1035,12 @@ ivec make_atomic_grids(
     const int &pbc,
     const ivec &atom_type_list,
     const ivec &cif2wfn_list,
-    const vector<AtomGrid> &Prototype_grids,
+    const std::vector<AtomGrid> &Prototype_grids,
     vec3 &grid,
-    ostream &file,
+    std::ostream &file,
     bool debug)
 {
+    using namespace std;
     ivec num_points(cif2wfn_list.size(), 0);
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
@@ -1096,12 +1100,13 @@ double make_sphericals(
     vec2 &dens,
     vec2 &dist,
     const ivec &atom_type_list,
-    ostream &file,
+    std::ostream &file,
     bool debug = false,
     double incr_start = 1.005,
     double min_dist = 0.0000001,
     int accuracy = 2)
 {
+    using namespace std;
     const double incr = pow(incr_start, max(1, accuracy - 1));
     const double lincr = log(incr);
     vector<Thakkar> sphericals;
@@ -1221,12 +1226,13 @@ void calc_spherical_values(
     const ivec &atom_type_list,
     const ivec &num_points,
     const ivec &cif2wfn_list,
-    ostream &file,
+    std::ostream &file,
     const double lincr,
     const int pbc,
     const cell &unit_cell,
     bool debug = false)
 {
+    using namespace std;
     int type_list_number = -1;
     if (debug)
     {
@@ -1413,12 +1419,13 @@ int make_hirshfeld_grids(
     vec2 &d3,
     vec2 &dens,
     const svec &labels,
-    ostream &file,
+    std::ostream &file,
     std::vector<time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
+    using namespace std;
 #ifdef FLO_CUDA
     return cu_make_hirshfeld_grids(pbc,
                                    accuracy,
@@ -1918,12 +1925,13 @@ static int make_hirshfeld_grids_ML(
     vec2 &dens,
     const int exp_coefs,
     const svec &labels,
-    ostream &file,
-    vector<time_point> &time_points,
-    vector<string> &time_descriptions,
+    std::ostream &file,
+    std::vector<time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
+    using namespace std;
     int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
     // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4=total spherical density, 5=molecular becke weight],
@@ -2343,12 +2351,13 @@ static int make_integration_grids(
     vec2 &dens,
     const int exp_coefs,
     const svec &labels,
-    ostream &file,
+    std::ostream &file,
     std::vector<time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
+    using namespace std;
     int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p]
     // a = atom [0,ncen],
@@ -2662,12 +2671,13 @@ static int make_integration_grids_SALTED(
     vec2 &dens,
     const int exp_coefs,
     const svec &labels,
-    ostream &file,
+    std::ostream &file,
     std::vector<time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
 {
+    using namespace std;
     int atoms_with_grids = vec_sum(needs_grid);
     // GRID COORDINATES for [a][c][p]
     // a = atom [0,ncen],
@@ -2941,9 +2951,10 @@ void make_k_pts(const bool &read_k_pts,
                 const cell &unit_cell,
                 hkl_list &hkl,
                 vec2 &k_pt,
-                ostream &file,
+    std::ostream &file,
                 bool debug = false)
 {
+    using namespace std;
     const int size = (int)hkl.size();
     if (!read_k_pts)
     {
@@ -3014,7 +3025,7 @@ cdouble sfac_bessel(
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
                     cvec2 &sf,
-                    ostream& file,
+    std::ostream& file,
                     time_point& start,
                     time_point& end1)
 {
@@ -3044,7 +3055,7 @@ void calc_SF(const int &points,
              vec2 &d3,
              vec2 &dens,
              cvec2 &sf,
-             ostream &file,
+    std::ostream &file,
              time_point &start,
              time_point &end1,
              bool debug,
@@ -3058,11 +3069,12 @@ void calc_SF(const int &points,
 #pragma omp parallel for
     for (int i = 0; i < imax; i++)
         sf[i].resize(smax, constants::cnull);
-
+    using namespace std;
     if (debug)
-        file << "Initialized FFs" << endl
+        file << "Initialized FFs" << std::endl
              << "asym atom list size: " << imax << " total grid size: " << points << endl;
     end1 = get_time();
+    
     if (!no_date)
     {
         long long int dur = get_sec(start, end1);
@@ -3161,10 +3173,11 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
                                  cvec2 &sf,
                                  const cell &cell,
                                  hkl_list &hkl,
-                                 ostream &file,
+                                 std::ostream &file,
                                  const int &mode,
                                  const bool debug)
 {
+    using namespace std;
     double k = 1.0;
     hkl_list_it it = hkl.begin();
     err_checkf(mode >= 0, "Invalid mode for ECP contribution!", file);
@@ -3274,9 +3287,10 @@ void convert_to_ED(const ivec &asym_atom_list,
  */
 bool thakkar_sfac(
     const options &opt,
-    ostream &file,
+    std::ostream &file,
     const WFN &wave)
 {
+    using namespace std;
     if (opt.hkl != "")
     {
         err_checkf(exists(opt.hkl), "HKL file does not exists!", file);
@@ -3514,11 +3528,12 @@ bool thakkar_sfac(
  */
 tsc_block<int, cdouble> MTC_thakkar_sfac(
     options &opt,
-    ostream &file,
+    std::ostream &file,
     svec &known_atoms,
-    vector<WFN> &wave,
+    std::vector<WFN> &wave,
     const int &nr)
 {
+    using namespace std;
     err_checkf(exists(opt.hkl) || !(opt.dmin == 99.0), "HKL file does not exists!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
     file << "Number of protons: " << wave[nr].get_nr_electrons() << endl;
@@ -3636,8 +3651,9 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
 bool calculate_scattering_factors_HF(
     const options &opt,
     const WFN &wave,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef FLO_CUDA
     if (opt.pbc != 0)
     {
@@ -3809,9 +3825,10 @@ bool calculate_scattering_factors_HF(
 bool calculate_scattering_factors_ML(
     const options &opt,
     const WFN &wave,
-    ostream &file,
+    std::ostream &file,
     const int exp_coefs)
 {
+    using namespace std;
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
     file << "Number of protons: " << wave.get_nr_electrons() << endl;
@@ -3976,9 +3993,10 @@ bool calculate_scattering_factors_ML(
 bool calculate_scattering_factors_ML_No_H(
     const options &opt,
     const WFN &wave,
-    ostream &file,
+    std::ostream &file,
     const int exp_coefs)
 {
+    using namespace std;
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
     file << "Number of protons: " << wave.get_nr_electrons() << endl;
@@ -4178,12 +4196,13 @@ bool calculate_scattering_factors_ML_No_H(
  */
 tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     options &opt,
-    const vector<WFN> &wave,
-    ostream &file,
+    const std::vector<WFN> &wave,
+    std::ostream &file,
     svec &known_atoms,
     const int &nr,
     vec2 *kpts)
 {
+    using namespace std;
 #ifdef FLO_CUDA
 
 #endif

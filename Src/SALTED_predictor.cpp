@@ -1,17 +1,16 @@
 #include "SALTED_predictor.h"
 #include <filesystem>
 
-using namespace std;
 //std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wavy(wavy_in), opt(opt_in)
 {
-    string _path = this->opt.SALTED_DIR;
+    std::string _path = this->opt.SALTED_DIR;
 
     this->config.h5_filename = find_first_h5_file(this->opt.SALTED_DIR);
     
     if (this->config.h5_filename == "")
 	{
-        string _f_path("inputs.txt");
+        std::string _f_path("inputs.txt");
         join_path(_path, _f_path);
         this->config.populateFromFile(_path);
 	}
@@ -30,7 +29,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
 
 }
 
-const string SALTEDPredictor::get_dfbasis_name()
+const std::string SALTEDPredictor::get_dfbasis_name()
 {
 	return this->config.dfbasis;
 }
@@ -52,12 +51,12 @@ void SALTEDPredictor::setup_atomic_environment()
     // Print all Atomic symbols
     if (this->opt.debug)
     {
-        cout << "Atomic symbols: ";
+        std::cout << "Atomic symbols: ";
         for (const auto& symbol : atomic_symbols)
         {
-            cout << symbol << " ";
+            std::cout << symbol << " ";
         }
-        cout << endl;
+        std::cout << std::endl;
     }
 
     this->natoms = static_cast<int>(this->atomic_symbols.size());
@@ -99,23 +98,24 @@ void SALTEDPredictor::setup_atomic_environment()
 
 void SALTEDPredictor::read_model_data()
 {
+    using namespace std;
     // Define zeta as a string with one decimal
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << this->config.zeta;
     std::string zeta_str = stream.str();
 
-    H5::H5File features(this->opt.SALTED_DIR + "/GPR_data/FEAT_M-" + to_string(this->config.Menv) + ".h5", H5F_ACC_RDONLY);
-    H5::H5File projectors(this->opt.SALTED_DIR + "/GPR_data/projector_M" + to_string(this->config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
-    vector<hsize_t> dims_out_descrip;
-    vector<hsize_t> dims_out_proj;
+    H5::H5File features(this->opt.SALTED_DIR + "/GPR_data/FEAT_M-" + std::to_string(this->config.Menv) + ".h5", H5F_ACC_RDONLY);
+    H5::H5File projectors(this->opt.SALTED_DIR + "/GPR_data/projector_M" + std::to_string(this->config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
+    std::vector<hsize_t> dims_out_descrip;
+    std::vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
             vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
-            this->power_env_sparse[spe + to_string(lam)] = temp_power;
+            this->power_env_sparse[spe + std::to_string(lam)] = temp_power;
             vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            this->Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{ dims_out_proj[0], dims_out_proj[1] });
+            this->Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{ dims_out_proj[0], dims_out_proj[1] });
 
             if (lam == 0)
             {
@@ -123,7 +123,7 @@ void SALTEDPredictor::read_model_data()
             }
             if (this->config.zeta == 1)
             {
-                this->power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
+                this->power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
             }
         }
     }
@@ -164,6 +164,7 @@ void SALTEDPredictor::read_model_data()
 
 #if has_RAS
 void SALTEDPredictor::read_model_data_h5() {
+    using namespace std;
     string _H5path = this->opt.SALTED_DIR;
     join_path(_H5path, this->config.h5_filename);
     H5::H5File input(_H5path, H5F_ACC_RDONLY);
@@ -223,6 +224,7 @@ void SALTEDPredictor::read_model_data_h5() {
 
 vec SALTEDPredictor::predict()
 {
+    using namespace std;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     unordered_map<int, vec> pvec{};
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
@@ -431,6 +433,7 @@ vec SALTEDPredictor::predict()
 
 vec SALTEDPredictor::gen_SALTED_densities()
 {
+    using namespace std;
     if (this->opt.coef_file != "")
 	{
         vec coefs{};

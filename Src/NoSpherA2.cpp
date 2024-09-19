@@ -6,10 +6,11 @@
 #include "cube.h"
 #include "scattering_factors.h"
 #include "properties.h"
-using namespace std;
+
 
 int main(int argc, char **argv)
 {
+    using namespace std;
     char cwd[1024];
 #ifdef _WIN32
     if (_getcwd(cwd, sizeof(cwd)) != NULL)

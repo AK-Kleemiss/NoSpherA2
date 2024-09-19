@@ -6,9 +6,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-using namespace std;
 
-string help_message()
+std::string help_message()
 {
     std::string t = "\n----------------------------------------------------------------------------\n";
     t.append("          These commands and arguments are known by NoSpherA2:\n");
@@ -56,9 +55,9 @@ string help_message()
     t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
     return t;
 }
-string NoSpherA2_message(bool no_date)
+std::string NoSpherA2_message(bool no_date)
 {
-    string t = "    _   __     _____       __              ___   ___\n";
+    std::string t = "    _   __     _____       __              ___   ___\n";
     t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
     t.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
     t.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
@@ -89,9 +88,9 @@ string NoSpherA2_message(bool no_date)
     return t;
 }
 
-string build_date()
+std::string build_date()
 {
-    return ("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
+    return ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 }
 
 bool is_similar_rel(const double &first, const double &second, const double &tolerance)
@@ -126,10 +125,10 @@ void cls()
     //    cout << string( 100, '\n' );
 #ifdef _WIN32
     if (system("CLS"))
-        cout << "this should not happen...!" << endl;
+        std::cout << "this should not happen...!" << std::endl;
 #else
     if (system("clear"))
-        cout << "this should not happen...!" << endl;
+        std::cout << "this should not happen...!" << std::endl;
 #endif
 };
 
@@ -158,10 +157,10 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(string &from, string &to)
+void copy_file(std::string &from, std::string &to)
 {
-    ifstream source(from.c_str(), ios::binary);
-    ofstream dest(to.c_str(), ios::binary);
+    std::ifstream source(from.c_str(), std::ios::binary);
+    std::ofstream dest(to.c_str(), std::ios::binary);
 
     dest << source.rdbuf();
 
@@ -171,20 +170,20 @@ void copy_file(string &from, string &to)
 
 //---------------------------Configuration files ---------------------------------------------------
 
-string get_home_path(void)
+std::string get_home_path(void)
 {
 #ifdef _WIN32
-    string temp1 = getenv("HOMEDRIVE");
-    string temp2 = getenv("HOMEPATH");
+    std::string temp1 = getenv("HOMEDRIVE");
+    std::string temp2 = getenv("HOMEPATH");
     temp1.append(temp2);
     return temp1;
 #else
-    string home = getenv("HOME");
+    std::string home = getenv("HOME");
     return home;
 #endif
 }
 
-void join_path(string &s1, string &s2)
+void join_path(std::string &s1, std::string &s2)
 {
 #ifdef _WIN32
     s1.append("\\");
@@ -195,7 +194,7 @@ void join_path(string &s1, string &s2)
     s1.append(s2);
 }
 
-string get_filename_from_path(const string &input)
+std::string get_filename_from_path(const std::string &input)
 {
 #ifdef _WIN32
     return input.substr(input.rfind("\\") + 1);
@@ -204,7 +203,7 @@ string get_filename_from_path(const string &input)
 #endif
 }
 
-string get_foldername_from_path(const string &input)
+std::string get_foldername_from_path(const std::string &input)
 {
 #ifdef _WIN32
     return input.substr(0, input.rfind("\\") + 1);
@@ -213,18 +212,19 @@ string get_foldername_from_path(const string &input)
 #endif
 }
 
-string get_basename_without_ending(const string &input)
+std::string get_basename_without_ending(const std::string &input)
 {
     return input.substr(0, input.rfind("."));
 }
 
-string get_ending_from_filename(const string& input)
+std::string get_ending_from_filename(const std::string& input)
 {
 	return input.substr(input.rfind(".") + 1);
 }
 
 void write_template_confi()
 {
+    using namespace std;
     string line;
     string programs = get_home_path();
     string filename = ".cuQCT.conf";
@@ -374,8 +374,9 @@ options::options(int accuracy,
     groups.resize(1);
 };
 
-int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
+int program_confi(std::string &gaussian_path, std::string &turbomole_path, std::string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
+    using namespace std;
     counter++;
     if (counter == 3)
     {
@@ -478,7 +479,7 @@ bool check_bohr(WFN &wave, bool debug)
             d[2] = atom1[2] - atom2[2];
             double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
             if (debug)
-                cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << endl;
+                std::cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << std::endl;
             if (length < min_length)
                 min_length = length;
         }
@@ -486,14 +487,14 @@ bool check_bohr(WFN &wave, bool debug)
     if (debug)
     {
         if (min_length < 2)
-            cout << "Decided it's written in Angstrom" << endl;
+            std::cout << "Decided it's written in Angstrom" << std::endl;
         else
-            cout << "Decided it's written in Bohr" << endl;
+            std::cout << "Decided it's written in Bohr" << std::endl;
     }
     return (!(min_length < 2));
 };
 
-int filetype_identifier(string &file, bool debug)
+int filetype_identifier(std::string &file, bool debug)
 {
     /*
     List of filetypes and correpsonding values:
@@ -505,36 +506,37 @@ int filetype_identifier(string &file, bool debug)
     -g/o *.grd      6: XDGraph grid file
     -o *.(F)fc(C)hk 5: fchk
     */
+    using namespace std;
     if (debug)
     {
-        cout << "Testing WFN:  " << file.find(".wfn") << endl
-             << "Testing out:  " << file.find(".out") << endl
-             << "Testing FFN:  " << file.find(".ffn") << endl
-             << "Testing CUB:  " << file.find(".cub") << endl
-             << "Testing CUBE: " << file.find(".cube") << endl
-             << "Testing Grid: " << file.find(".grd") << endl
-             << "Testing fchk: " << file.find(".fchk") << endl
-             << "Testing FChk: " << file.find(".FChk") << endl
-             << "Testing Fchk: " << file.find(".Fchk") << endl;
-        cout << "string::npos: " << string::npos << endl;
+        std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
+             << "Testing out:  " << file.find(".out") << std::endl
+             << "Testing FFN:  " << file.find(".ffn") << std::endl
+             << "Testing CUB:  " << file.find(".cub") << std::endl
+             << "Testing CUBE: " << file.find(".cube") << std::endl
+             << "Testing Grid: " << file.find(".grd") << std::endl
+             << "Testing fchk: " << file.find(".fchk") << std::endl
+             << "Testing FChk: " << file.find(".FChk") << std::endl
+             << "Testing Fchk: " << file.find(".Fchk") << std::endl;
+        std::cout << "string::npos: " << std::string::npos << std::endl;
     }
     int temp_type = 0;
     size_t found, temp;
     temp = 0;
     if (debug)
-        cout << "Temp before any checks: " << temp << endl;
+        std::cout << "Temp before any checks: " << temp << std::endl;
     svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
-    if (file.find(".wfn") != string::npos)
+    if (file.find(".wfn") != std::string::npos)
     {
         if (debug)
-            cout << "Checking for"
-                 << ".wfn" << endl;
+            std::cout << "Checking for"
+                 << ".wfn" << std::endl;
         temp_type = 2;
         found = file.rfind(".wfn");
         if (debug)
-            cout << "Found: " << found << endl;
+            std::cout << "Found: " << found << std::endl;
         for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
+            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != std::string::npos)
                 temp = file.rfind(types[i]);
         if (debug)
             cout << "Temp: " << temp << endl;
@@ -643,15 +645,15 @@ int filetype_identifier(string &file, bool debug)
     return -1;
 }
 
-string go_get_string(ifstream &file, string search, bool rewind)
+std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
     if (rewind)
     {
         file.clear();
         file.seekg(0, file.beg);
     }
-    string line;
-    while (line.find(search) == string::npos && !file.eof() && getline(file, line))
+    std::string line;
+    while (line.find(search) == std::string::npos && !file.eof() && getline(file, line))
         continue;
     if (file.eof())
         return "";
@@ -659,7 +661,7 @@ string go_get_string(ifstream &file, string search, bool rewind)
         return line;
 }
 
-string shrink_string(string &input)
+std::string shrink_string(std::string &input)
 {
     while (input.find(" ") != -1)
     {
@@ -716,7 +718,7 @@ string shrink_string(string &input)
     return input;
 };
 
-string shrink_string_to_atom(string &input, const int &atom_number)
+std::string shrink_string_to_atom(std::string &input, const int &atom_number)
 {
     while (input.find(" ") != -1)
     {
@@ -770,7 +772,7 @@ string shrink_string_to_atom(string &input, const int &atom_number)
     {
         input.erase(input.find(")"), 1);
     }
-    string temp = constants::atnr2letter(atom_number);
+    std::string temp = constants::atnr2letter(atom_number);
     err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
     if (input.find(temp) != 1)
         return temp;
@@ -1057,11 +1059,12 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 };
 */
 
-void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
     //  selection[1][i] for iths selection of cube
+    using namespace std;
     cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
     if (nr_of_cubes > 1)
         cout << "s in total." << endl;
@@ -1168,7 +1171,7 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
     } while (true);
 };
 
-bool unsaved_files(vector<WFN> &wavy)
+bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
         for (int c = 0; c < wavy[w].cub.size(); c++)
@@ -1261,14 +1264,15 @@ void readxyzMinMax_fromWFN(
 }
 
 void readxyzMinMax_fromCIF(
-    string cif,
+    std::string cif,
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
     double Resolution,
-    ofstream &file,
+    std::ofstream &file,
     bool debug)
 {
+    using namespace std;
     if (debug)
         file << "starting to read cif!" << endl;
     if (!exists(cif))
@@ -1699,8 +1703,9 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
+    using namespace std;
     vec2 Uij, Cijk, Dijkl;
     ifstream asym_cif_input(cif.c_str(), std::ios::in);
     asym_cif_input.clear();
@@ -2293,7 +2298,7 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
 }
 
 
-double get_decimal_precision_from_CIF_number(string &given_string)
+double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
     int len = (int)given_string.length();
     int open_bracket = -1;
@@ -2321,8 +2326,8 @@ double get_decimal_precision_from_CIF_number(string &given_string)
     if (open_bracket != -1 && close_bracket != -1)
     {
         size_of_precision = close_bracket - open_bracket - 1;
-        string temp = given_string.substr(open_bracket + 1, size_of_precision);
-        precision = stoi(temp);
+        std::string temp = given_string.substr(open_bracket + 1, size_of_precision);
+        precision = std::stoi(temp);
     }
     int digits = 0;
     if (open_bracket != -1 && close_bracket != -1)
@@ -2348,6 +2353,7 @@ double get_decimal_precision_from_CIF_number(string &given_string)
 
 void options::digest_options()
 {
+    using namespace std;
     // Lets print what was the command line, for debugging
     if (debug)
     {
@@ -2820,15 +2826,15 @@ void options::look_for_debug(int &argc, char **argv)
     // This loop figures out command line options
     for (int i = 0; i < argc; i++)
     {
-        string temp = argv[i];
+        std::string temp = argv[i];
         arguments.push_back(temp);
         if (temp.find("-") > 0)
             continue;
         else if (temp == "-v" || temp == "-v2" || temp == "-debug")
-            cout << "Turning on verbose mode!" << endl, debug = true;
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
-            cout << NoSpherA2_message() << help_message() << build_date() << endl;
+            std::cout << NoSpherA2_message() << help_message() << build_date() << std::endl;
             exit(0);
         }
     }
@@ -3341,7 +3347,7 @@ bool check_OpenBLAS_DLL() {
   else {
     // Extract the DLL if it does not exist
     if (!ExtractDLL(dllName)) {
-      std::cout << "Failed to extract DLL" << endl;
+      std::cout << "Failed to extract DLL" << std::endl;
       return false;
     }
   }
