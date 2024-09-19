@@ -1329,26 +1329,17 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
 };
 
 
-const static double dlm_function(const unsigned int l, const int m, const double theta, const double phi) {
+const double dlm_function(const unsigned int& l, const int& m, const double& theta, const double& phi) {
     double result = (double)NAN;
-    double x = cos(theta);
-    double s = -sin(theta);
-    double p;
-    int m_ = abs(m);
+    const double x = cos(theta);
+    const double s = -sin(theta);
+    const int m_ = abs(m);
     // the formula for a real spherical harmonic is:
     // for positive m:
     // (-1)^m cos(m * phi)
     // for negative m:
     // (-1)^m sin(-m * phi)
-    // multiplied by the appropriate function dependent on l and |m|
-    // (see switch/case below)
-    if (m < 0) {
-        p = sin(m_ * phi);
-    }
-    else {
-        p = cos(m_ * phi);
-    };
-    if ((m_) % 2 == 1) p = -p; // (-1)^m
+    const double p((m_) % 2 == 1 ? (m < 0 ? -sin(m_ * phi) : -cos(m_ * phi)) : (m < 0 ? sin(m_ * phi) : cos(m_ * phi)));
     switch (l) {
     case 0: switch (m_) {
     case 0: result = 1.; break;
