@@ -1329,8 +1329,7 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
 };
 
 
-const static double dlm_function(const unsigned int l, const int m, const double theta,
-    const double phi) {
+const static double dlm_function(const unsigned int l, const int m, const double theta, const double phi) {
     double result = (double)NAN;
     double x = cos(theta);
     double s = -sin(theta);
