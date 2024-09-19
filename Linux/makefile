@@ -10,7 +10,8 @@ LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
 all: NoSpherA2 
 
-OBJS := unity.o cerf.o
+OBJS := cerf.o wfn_class.o atoms.o properties.o spherical_density.o AtomGrid.o basis_set.o convenience.o sphere_lebedev_rule.o scattering_factors.o cube.o fchk.o JKFit.o NoSpherA2.o SALTED_utilities.o
+OBJS_RASC := cerf.o_RASC wfn_class.o_RASC atoms.o_RASC properties.o_RASC spherical_density.o_RASC AtomGrid.o_RASC basis_set.o_RASC convenience.o_RASC sphere_lebedev_rule.o_RASC scattering_factors.o_RASC cube.o_RASC fchk.o_RASC JKFit.o_RASC NoSpherA2.o_RASC SALTED_utilities.o_RASC
 CPP_DEPS := unity.d
 GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 
@@ -21,13 +22,15 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
 
-unity.o: ../Src/unity.cpp
+# Pattern rule to compile all .cpp files
+%.o: ../Src/%.cpp
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-unity_rasc.o: ../Src/unity.cpp
-	@echo 'Building file: $< with rascaline support'
+# Pattern rule to compile all .cpp files
+%.o_RASC: ../Src/%.cpp
+	@echo 'Building file: $<'
 	g++ ${GCC_OPTS} -D__RASCALINE__ -I../Lib/ -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
@@ -41,15 +44,10 @@ hdf5.o: ../Src/hdf5.cpp
 	g++ ${GCC_OPTS} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-cerf.o: ../Src/cerf.cpp
-	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-NoSpherA2_Rascaline: unity_rasc.o hdf5.o SALTED.o cerf.o
+NoSpherA2_Rascaline: ${OBJS_RASC} hdf5.o SALTED.o cerf.o
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_rascaline" unity_rasc.o hdf5.o SALTED.o cerf.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
-	${RM} unity_rasc.o hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d cerf.o cerf.d
+	g++ -o "NoSpherA2_rascaline" ${OBJS_RASC} hdf5.o SALTED.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
+	${RM} ${OBJS_RASC} hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d cerf.o cerf.d
 	cp NoSpherA2_rascaline ../
 	@echo 'Done building rascaline version of NoSpherA2'
 
