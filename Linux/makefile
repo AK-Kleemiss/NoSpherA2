@@ -10,7 +10,7 @@ LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
 all: NoSpherA2 
 
-OBJS := unity.o
+OBJS := unity.o cerf.o
 CPP_DEPS := unity.d
 GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 

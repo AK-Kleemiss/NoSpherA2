@@ -5,16 +5,14 @@
 #include "constants.h"
 #include "fchk.h"
 
-using namespace std;
-
 void WFN::fill_pre()
 {
     for (int j = 0; j < 9; j++)
         for (int l = 0; l < 5; l++)
             for (int m = 0; m < 5; m++)
             {
-                int imax = min(j, l);
-                int imin = max(0, j - m);
+                int imax = std::min(j, l);
+                int imin = std::max(0, j - m);
                 for (int i = imin; i <= imax; i++)
                     pre[j][l][m][i] = constants::ft[j] * constants::ft[l] / constants::ft[l - i] / constants::ft[i] * constants::ft[m] / constants::ft[m - j + i] / constants::ft[j - i];
             }
@@ -71,7 +69,7 @@ WFN::WFN(int given_origin)
     fill_Afac_pre();
 };
 
-bool WFN::push_back_atom(const string &label, const double &x, const double &y, const double &z, const int &_charge)
+bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge)
 {
     ncen++;
     if (_charge >= 1)
@@ -155,27 +153,27 @@ bool WFN::erase_center(const int &g_nr)
     return true;
 };
 
-const string WFN::get_centers(const bool &bohr) const
+const std::string WFN::get_centers(const bool &bohr) const
 {
-    string temp;
+    std::string temp;
     for (int i = 0; i < ncen; i++)
     {
         temp.append(atoms[i].label);
         temp.append(" ");
         if (bohr)
-            temp.append(to_string(atoms[i].x));
+            temp.append(std::to_string(atoms[i].x));
         else
-            temp.append(to_string(constants::bohr2ang(atoms[i].x)));
+            temp.append(std::to_string(constants::bohr2ang(atoms[i].x)));
         temp.append(" ");
         if (bohr)
-            temp.append(to_string(atoms[i].y));
+            temp.append(std::to_string(atoms[i].y));
         else
-            temp.append(to_string(constants::bohr2ang(atoms[i].y)));
+            temp.append(std::to_string(constants::bohr2ang(atoms[i].y)));
         temp.append(" ");
         if (bohr)
-            temp.append(to_string(atoms[i].z));
+            temp.append(std::to_string(atoms[i].z));
         else
-            temp.append(to_string(constants::bohr2ang(atoms[i].z)));
+            temp.append(std::to_string(constants::bohr2ang(atoms[i].z)));
         temp.append("\n");
     }
     return temp;
@@ -185,9 +183,9 @@ const void WFN::list_centers() const
 {
     for (int i = 0; i < ncen; i++)
     {
-        cout << atoms[i].nr << " " << atoms[i].label << " "
+        std::cout << atoms[i].nr << " " << atoms[i].label << " "
              << atoms[i].x << " " << atoms[i].y << " "
-             << atoms[i].z << " " << atoms[i].charge << endl;
+             << atoms[i].z << " " << atoms[i].charge << std::endl;
     }
 };
 
@@ -275,12 +273,12 @@ void WFN::change_type(const int &nr)
     bool end = false;
     while (!end)
     {
-        cout << "Please enter the new type you want to assign: ";
+        std::cout << "Please enter the new type you want to assign: ";
         int new_type = 0;
-        cin >> new_type;
+        std::cin >> new_type;
         if (new_type > ncen || new_type < 0)
         {
-            cout << "Sorry, wrong input, try again!\n";
+            std::cout << "Sorry, wrong input, try again!\n";
             continue;
         }
         types[nr - 1] = new_type;
@@ -295,12 +293,12 @@ void WFN::change_exponent(const int &nr)
     bool end = false;
     while (!end)
     {
-        cout << "Please enter the new exponent you want to assign: ";
+        std::cout << "Please enter the new exponent you want to assign: ";
         int new_exp = 0;
-        cin >> new_exp;
+        std::cin >> new_exp;
         if (new_exp > ncen || new_exp < 0)
         {
-            cout << "Sorry, wrong input, try again!\n";
+            std::cout << "Sorry, wrong input, try again!\n";
             continue;
         }
         exponents[nr - 1] = new_exp;
@@ -314,12 +312,12 @@ void WFN::change_center(const int &nr)
     bool end = false;
     while (!end)
     {
-        cout << "Please enter the new center you want to assign: ";
+        std::cout << "Please enter the new center you want to assign: ";
         int new_center = 0;
-        cin >> new_center;
+        std::cin >> new_center;
         if (new_center > ncen || new_center < 0)
         {
-            cout << "Sorry, wrong input, try again!\n";
+            std::cout << "Sorry, wrong input, try again!\n";
             continue;
         }
         centers[nr - 1] = new_center;
@@ -338,7 +336,7 @@ const void WFN::list_primitives() const
 {
     for (int i = 0; i < nex; i++)
     {
-        cout << i << " center: " << centers[i] << " type: " << types[i] << " exponent: " << exponents[i] << endl;
+        std::cout << i << " center: " << centers[i] << " type: " << types[i] << " exponent: " << exponents[i] << std::endl;
     }
 };
 
@@ -393,22 +391,22 @@ const int WFN::get_MO_primitive_count(const int &nr_mo) const
     return MOs[nr_mo].get_primitive_count();
 };
 
-const string WFN::hdr(const bool &occupied) const
+const std::string WFN::hdr(const bool &occupied) const
 {
-    string temp = "GAUSSIAN            ";
+    std::string temp = "GAUSSIAN            ";
     if (!occupied)
     {
         if (nmo > 100)
-            temp.append(to_string(nmo));
+            temp.append(std::to_string(nmo));
         else if (nmo < 100 && nmo > 10)
         {
             temp.append(" ");
-            temp.append(to_string(nmo));
+            temp.append(std::to_string(nmo));
         }
         else if (nmo < 10 && nmo > 0)
         {
             temp.append("  ");
-            temp.append(to_string(nmo));
+            temp.append(std::to_string(nmo));
         }
         else if (nmo < 0)
             return "PROBLEM";
@@ -417,47 +415,47 @@ const string WFN::hdr(const bool &occupied) const
     {
         const int occupied_mos = get_nmo(true);
         if (occupied_mos > 100)
-            temp.append(to_string(occupied_mos));
+            temp.append(std::to_string(occupied_mos));
         else if (occupied_mos < 100 && occupied_mos > 10)
         {
             temp.append(" ");
-            temp.append(to_string(occupied_mos));
+            temp.append(std::to_string(occupied_mos));
         }
         else if (occupied_mos < 10 && occupied_mos > 0)
         {
             temp.append("  ");
-            temp.append(to_string(occupied_mos));
+            temp.append(std::to_string(occupied_mos));
         }
         else if (occupied_mos < 0)
             return "PROBLEM";
     }
     temp.append(" MOL ORBITALS    ");
     if (nex > 100)
-        temp.append(to_string(nex));
+        temp.append(std::to_string(nex));
     else if (nex < 100 && nex > 10)
     {
         temp.append(" ");
-        temp.append(to_string(nex));
+        temp.append(std::to_string(nex));
     }
     else if (nex < 10 && nex > 0)
     {
         temp.append("  ");
-        temp.append(to_string(nex));
+        temp.append(std::to_string(nex));
     }
     else if (nex < 0)
         return "PROBLEM";
     temp.append(" PRIMITIVES      ");
     if (ncen > 100)
-        temp.append(to_string(ncen));
+        temp.append(std::to_string(ncen));
     else if (ncen < 100 && ncen > 10)
     {
         temp.append(" ");
-        temp.append(to_string(ncen));
+        temp.append(std::to_string(ncen));
     }
     else if (ncen < 10 && ncen > 0)
     {
         temp.append("  ");
-        temp.append(to_string(ncen));
+        temp.append(std::to_string(ncen));
     }
     else if (ncen < 0)
         return "PROBLEM";
@@ -465,56 +463,31 @@ const string WFN::hdr(const bool &occupied) const
     return temp;
 };
 
-void WFN::read_known_wavefunction_format(const string &fileName, ostream &file, const bool debug)
+void WFN::read_known_wavefunction_format(const std::string &fileName, std::ostream &file, const bool debug)
 {
-    if (fileName.find(".wfn") != string::npos)
+    if (fileName.find(".wfn") != std::string::npos)
         origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
-    else if (fileName.find(".ffn") != string::npos)
+    else if (fileName.find(".ffn") != std::string::npos)
         origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
-    else if (fileName.find(".wfx") != string::npos)
-    {
-        if (debug)
-            file << "Reading wfx file" << endl;
+    else if (fileName.find(".wfx") != std::string::npos)
         origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
-    }
-    else if (fileName.find(".fch") != string::npos)
-    {
-        if (debug)
-            file << "Reading fchk file" << endl;
+    else if (fileName.find(".fch") != std::string::npos)
         origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
-        if (debug)
-            err_checkf(write_wfn("test.wfn", debug, false), "Problem writing test.wfn", file);
-    }
-    else if (fileName.find(".xyz") != string::npos)
-    {
-        if (debug)
-            file << "Reading xyz file" << endl;
+    else if (fileName.find(".xyz") != std::string::npos)
         origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
-    }
-    else if (fileName.find(".molden") != string::npos)
-    {
-        if (debug)
-            file << "Reading molden file" << endl;
+    else if (fileName.find(".molden") != std::string::npos)
         origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
-    }
-    else if (fileName.find(".gbw") != string::npos)
-    {
-        if (debug)
-            file << "Reading gbw file" << endl;
+    else if (fileName.find(".gbw") != std::string::npos)
         origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
-    }
-    else if (fileName.find(".xtb") != string::npos)
-    {
-        if (debug)
-            file << "Reading xtb file" << endl;
+    else if (fileName.find(".xtb") != std::string::npos)
         origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
-    }
     else
         err_checkf(false, "Unknown filetype!", file);
 };
 
-bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
+bool WFN::read_wfn(const std::string &fileName, const bool &debug, std::ostream &file)
 {
+    using namespace std;
     if (ncen > 0)
     {
         // file << "There is already a wavefunction loaded, do you want to continue and possibly overwrite the existing wavefunction?" << endl;
@@ -523,6 +496,7 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
+    origin = 2;
     err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
     ifstream rf(fileName.c_str());
     if (rf.good())
@@ -913,8 +887,9 @@ bool WFN::read_wfn(const string &fileName, const bool &debug, ostream &file)
     return true;
 };
 
-bool WFN::read_xyz(const string &filename, ostream &file, const bool debug)
+bool WFN::read_xyz(const std::string &filename, std::ostream &file, const bool debug)
 {
+    using namespace std;
     err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", file);
     origin = 7;
     ifstream rf(filename.c_str());
@@ -975,8 +950,10 @@ bool WFN::read_xyz(const string &filename, ostream &file, const bool debug)
     return true;
 };
 
-bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
+bool WFN::read_wfx(const std::string &fileName, const bool &debug, std::ostream &file)
 {
+    origin = 6;
+    using namespace std;
     err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
     ifstream rf(fileName.c_str());
     path = fileName;
@@ -1233,8 +1210,9 @@ bool WFN::read_wfx(const string &fileName, const bool &debug, ostream &file)
     return true;
 };
 
-bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
+bool WFN::read_molden(const std::string &filename, std::ostream &file, const bool debug)
 {
+    using namespace std;
     err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
     if (debug)
         file << "File is valid, continuing...\n"
@@ -1930,8 +1908,9 @@ bool WFN::read_molden(const string &filename, ostream &file, const bool debug)
     return true;
 };
 
-bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, const bool _has_ECPs)
+bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
 {
+    using namespace std;
     // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
     err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
     if (debug)
@@ -2437,7 +2416,7 @@ bool WFN::read_gbw(const string &filename, ostream &file, const bool debug, cons
     return true;
 };
 
-const vec WFN::get_norm_const(ostream &file, bool debug) const
+const vec WFN::get_norm_const(std::ostream &file, bool debug) const
 {
     err_checkf(get_nr_basis_set_loaded() != 0, "No basis set loaded!", file);
     err_checkf(get_nr_basis_set_loaded() == get_ncen(), "Not all atoms have a basis set loaded!", file);
@@ -2479,7 +2458,7 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 basis_coefficients[a].push_back(temp);
                 break;
             case -1:
-                cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
+                std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << std::endl;
                 break;
             }
         }
@@ -2491,14 +2470,14 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
             int type_temp = get_shell_type(a, s);
             if (type_temp == -1)
             {
-                cout << "ERROR in type assignement!!" << endl;
+                std::cout << "ERROR in type assignement!!" << std::endl;
             }
             if (debug)
             {
-                cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl;
-                cout << "start: " << get_shell_start(a, s) << flush;
-                cout << " stop: " << get_shell_end(a, s) << flush << endl;
-                cout << "factor: ";
+                std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << std::endl
+                 << "start: " << get_shell_start(a, s) << std::flush
+                 << " stop: " << get_shell_end(a, s) << std::flush << std::endl
+                 << "factor: ";
             }
             switch (type_temp)
             {
@@ -2517,13 +2496,13 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 err_checkf(factor != 0, "Factor of 0 is unphysical!", file);
                 factor = pow(factor, -0.5);
                 if (debug)
-                    cout << factor << endl;
+                    std::cout << factor << std::endl;
                 for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                 {
                     if (debug)
                     {
-                        cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << endl;
-                        cout << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
+                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     norm_const.push_back(basis_coefficients[a][i]);
@@ -2545,13 +2524,13 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 err_checkf(factor != 0, "Factor of 0 is unphysical!", file);
                 factor = pow(factor, -0.5);
                 if (debug)
-                    cout << factor << endl;
+                    std::cout << factor << std::endl;
                 for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                 {
                     if (debug)
                     {
-                        cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << endl;
-                        cout << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
+                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int k = 0; k < 3; k++)
@@ -2574,13 +2553,13 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 err_checkf(factor != 0, "Factor of 0 is unphysical!", file);
                 factor = (pow(factor, -0.5)) / sqrt(3);
                 if (debug)
-                    cout << factor << endl;
+                    std::cout << factor << std::endl;
                 for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                 {
                     if (debug)
                     {
-                        cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << endl;
-                        cout << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
+                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int k = 0; k < 3; k++)
@@ -2605,13 +2584,13 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 err_checkf(factor != 0, "Factor of 0 is unphysical!", file);
                 factor = pow(factor, -0.5) / sqrt(15);
                 if (debug)
-                    cout << factor << endl;
+                    std::cout << factor << std::endl;
                 for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                 {
                     if (debug)
                     {
-                        cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << endl;
-                        cout << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i) << std::endl
+                         << "Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << std::endl;
                     }
                     basis_coefficients[a][i] *= factor;
                     for (int l = 0; l < 3; l++)
@@ -2623,7 +2602,7 @@ const vec WFN::get_norm_const(ostream &file, bool debug) const
                 break;
             }
             if (debug)
-                cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
+                std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << std::endl;
         }
     }
     return norm_const;
@@ -2648,8 +2627,9 @@ const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int
     }
 };
 
-bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupied)
+bool WFN::write_wfn(const std::string &fileName, const bool &debug, const bool occupied)
 {
+    using namespace std;
     if (debug)
     {
         if (exists(fileName))
@@ -2910,14 +2890,14 @@ bool WFN::write_wfn(const string &fileName, const bool &debug, const bool occupi
 
 void WFN::print_primitive(const int &nr) const
 {
-    cout << "center assignement: " << centers[nr] << " type: " << types[nr]
-         << " exponent: " << exponents[nr] << endl
+    std::cout << "center assignement: " << centers[nr] << " type: " << types[nr]
+         << " exponent: " << exponents[nr] << std::endl
          << "MO coefficients:";
     for (int i = 0; i < nmo; i++)
     {
-        cout << MOs[nr].get_coefficient(i) << "   ";
+        std::cout << MOs[nr].get_coefficient(i) << "   ";
         if (i % 5 == 0)
-            cout << endl;
+            std::cout << std::endl;
     }
 };
 
@@ -2995,7 +2975,7 @@ bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim,
 
 bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0, "Wrong input!", cout);
+    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
     atoms[nr_atom].basis_set[nr_prim].coefficient = value;
     set_modified();
     return true;
@@ -3142,10 +3122,9 @@ const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr
         return -1;
 };
 
-const string WFN::get_atom_label(const unsigned int &nr) const
+const std::string WFN::get_atom_label(const unsigned int &nr) const
 {
-    string error_return;
-    error_return = '?';
+    std::string error_return{ '?' };
     if (nr < static_cast<unsigned int>(ncen))
         return atoms[nr].label;
     else
@@ -3167,7 +3146,7 @@ const bool WFN::get_atom_basis_set_loaded(const int &nr) const
         return atoms[nr].get_basis_set_loaded();
     else
     {
-        cout << "invalid atom choice in atom_basis_set_loaded!" << endl;
+        std::cout << "invalid atom choice in atom_basis_set_loaded!" << std::endl;
         return false;
     }
 };
@@ -3178,7 +3157,7 @@ const int WFN::get_atom_charge(const int &nr) const
         return atoms[nr].charge;
     else
     {
-        cout << "invalid atom choice in atom_basis_set_loaded!" << endl;
+        std::cout << "invalid atom choice in atom_basis_set_loaded!" << std::endl;
         return -1;
     }
 };
@@ -3199,7 +3178,7 @@ const double WFN::get_DM(const int &nr) const
         return DensityMatrix[nr];
     else
     {
-        cout << "Requested nr out of range! Size: " << DensityMatrix.size() << " nr: " << nr << endl;
+        std::cout << "Requested nr out of range! Size: " << DensityMatrix.size() << " nr: " << nr << std::endl;
         return -1;
     }
 };
@@ -3213,7 +3192,7 @@ bool WFN::set_DM(const int &nr, const double &value)
     }
     else
     {
-        cout << "invalid arguments for set_DM! Input was: " << nr << ";" << value << endl;
+        std::cout << "invalid arguments for set_DM! Input was: " << nr << ";" << value << std::endl;
         return false;
     }
 };
@@ -3234,7 +3213,7 @@ const double WFN::get_SDM(const int &nr) const
         return SpinDensityMatrix[nr];
     else
     {
-        cout << "Requested nr out of range! Size: " << SpinDensityMatrix.size() << " nr: " << nr << endl;
+        std::cout << "Requested nr out of range! Size: " << SpinDensityMatrix.size() << " nr: " << nr << std::endl;
         return -1;
     }
 };
@@ -3248,7 +3227,7 @@ bool WFN::set_SDM(const int &nr, const double &value)
     }
     else
     {
-        cout << "invalid arguments for set_SDM! Input was: " << nr << ";" << value << endl;
+        std::cout << "invalid arguments for set_SDM! Input was: " << nr << ";" << value << std::endl;
         return false;
     }
 };
@@ -3259,8 +3238,8 @@ int WFN::check_order(const bool &debug) const
     {
         if (!get_atom_basis_set_loaded(i))
         {
-            cout << "Sorry, consistency check only works if basis set is loaded for all atoms!" << endl
-                 << "Failing atom: " << i << " " << get_atom_label(i) << endl;
+            std::cout << "Sorry, consistency check only works if basis set is loaded for all atoms!" << std::endl
+                 << "Failing atom: " << i << " " << get_atom_label(i) << std::endl;
             return -1;
         }
     }
@@ -3284,7 +3263,7 @@ int WFN::check_order(const bool &debug) const
                         order = -1;
                         if (debug)
                         {
-                            cout << "This should not happen, the order of your file is not ok for S-types! Checked #:" << primcounter << endl;
+                            std::cout << "This should not happen, the order of your file is not ok for S-types! Checked #:" << primcounter << std::endl;
                             return -1;
                         }
                     }
@@ -3303,7 +3282,7 @@ int WFN::check_order(const bool &debug) const
                             {
                                 if (debug)
                                 {
-                                    cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
+                                    std::cout << "The found order does not match all type entries! primcounter: " << primcounter << std::endl;
                                 }
                                 return -1;
                             }
@@ -3319,7 +3298,7 @@ int WFN::check_order(const bool &debug) const
                             {
                                 if (debug)
                                 {
-                                    cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
+                                    std::cout << "The found order does not match all type entries! primcounter: " << primcounter << std::endl;
                                 }
                                 return -1;
                             }
@@ -3334,7 +3313,7 @@ int WFN::check_order(const bool &debug) const
                             {
                                 if (debug)
                                 {
-                                    cout << "The found order does not match all type entries! primcounter: " << primcounter << endl;
+                                    std::cout << "The found order does not match all type entries! primcounter: " << primcounter << std::endl;
                                 }
                                 return -1;
                             }
@@ -3348,7 +3327,7 @@ int WFN::check_order(const bool &debug) const
                     {
                         if (debug && a == 0)
                         {
-                            cout << "Seems to be either tonto or gaussian file..." << endl;
+                            std::cout << "Seems to be either tonto or gaussian file..." << std::endl;
                         }
                         if (types[primcounter + 1] == 3)
                         {
@@ -3356,7 +3335,7 @@ int WFN::check_order(const bool &debug) const
                             order_found = true;
                             if (debug)
                             {
-                                cout << "This wfn file is in tonto order!" << endl;
+                                std::cout << "This wfn file is in tonto order!" << std::endl;
                             }
                         }
                         else if (types[primcounter + 1] == 2 && get_atom_shell_primitives(a, s) > 1)
@@ -3365,7 +3344,7 @@ int WFN::check_order(const bool &debug) const
                             order_found = true;
                             if (debug)
                             {
-                                cout << "This wfn file is in gaussian order!" << endl;
+                                std::cout << "This wfn file is in gaussian order!" << std::endl;
                             }
                         }
                         else
@@ -3374,8 +3353,8 @@ int WFN::check_order(const bool &debug) const
                             order_found = true;
                             if (debug)
                             {
-                                cout << "Either some error or this shell only has 1 p-primitive and "
-                                     << "i didn't find any order yet... assuming gaussian" << endl;
+                                std::cout << "Either some error or this shell only has 1 p-primitive and "
+                                     << "i didn't find any order yet... assuming gaussian" << std::endl;
                             }
                         }
                     }
@@ -3383,21 +3362,21 @@ int WFN::check_order(const bool &debug) const
                     {
                         if (debug && a == 0)
                         {
-                            cout << "Seems as if this file was ORCA ordered..." << endl;
+                            std::cout << "Seems as if this file was ORCA ordered..." << std::endl;
                         }
                         order = 3;
                         if (types[primcounter + 1] == 2)
                         {
                             if (debug)
                             {
-                                cout << "Yep, that's right! making it permanent now!" << endl;
+                                std::cout << "Yep, that's right! making it permanent now!" << std::endl;
                             }
                             order_found = true;
                         }
                     }
                     else
                     {
-                        cout << "I can't recognize this order of the .wfn file..." << endl;
+                        std::cout << "I can't recognize this order of the .wfn file..." << std::endl;
                         return -1;
                     }
                     s--;
@@ -3418,16 +3397,16 @@ int WFN::check_order(const bool &debug) const
                                 order = -1;
                                 if (debug)
                                 {
-                                    cout << "The checked types are 6 from #" << primcounter << " and are:" << endl;
-                                    cout << types[get_shell_start_in_primitives(a, s) + 0 * get_atom_shell_primitives(a, s) + i] << " "
+                                    std::cout << "The checked types are 6 from #" << primcounter << " and are:" << std::endl
+                                         << types[get_shell_start_in_primitives(a, s) + 0 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 1 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 2 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << endl;
+                                         << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << std::endl;
                                     return -1;
                                 }
-                                cout << "Something seems to be wrong in the order of your D-Types..." << endl;
+                                std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
                             else
                                 primcounter += 6;
@@ -3444,16 +3423,16 @@ int WFN::check_order(const bool &debug) const
                                 order = -1;
                                 if (debug)
                                 {
-                                    cout << "The checked types are 6 from #" << primcounter << " and are:" << endl;
-                                    cout << types[get_shell_start_in_primitives(a, s) + 0 + 6 * i] << " "
+                                    std::cout << "The checked types are 6 from #" << primcounter << " and are:" << std::endl
+                                         << types[get_shell_start_in_primitives(a, s) + 0 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 1 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 2 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 3 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 4 + 6 * i] << " "
-                                         << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << endl;
+                                         << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << std::endl;
                                     return -1;
                                 }
-                                cout << "Something seems to be wrong in the order of your D-Types..." << endl;
+                                std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
                             else
                                 primcounter += 6;
@@ -3464,7 +3443,7 @@ int WFN::check_order(const bool &debug) const
                 }
                 else
                 {
-                    cout << "That's highly suspicious, no order for P-type but D-type functions? Let me stop before i do something stupid!" << endl;
+                    std::cout << "That's highly suspicious, no order for P-type but D-type functions? Let me stop before i do something stupid!" << std::endl;
                     return -1;
                 }
             }
@@ -3479,12 +3458,12 @@ int WFN::check_order(const bool &debug) const
                             f_order = 4;
                             if (debug)
                             {
-                                cout << "The checked types are 10 from #" << primcounter << " and are:" << endl;
-                                cout << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
+                                std::cout << "The checked types are 10 from #" << primcounter << " and are:\n"
+                                     << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
                                      << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
                                      << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
-                                     << types[primcounter + 9] << endl;
-                                cout << "Appears to be already okay..." << endl;
+                                     << types[primcounter + 9] << std::endl
+                                     << "Appears to be already okay..." << std::endl;
                             }
                         }
                         else if (types[primcounter] != 11 || types[primcounter + 1] != 12 || types[primcounter + 2] != 13 || types[primcounter + 3] != 14 || types[primcounter + 4] != 15 || types[primcounter + 5] != 17 || types[primcounter + 6] != 16 || types[primcounter + 7] != 18 || types[primcounter + 8] != 19 || types[primcounter + 9] != 20)
@@ -3492,12 +3471,12 @@ int WFN::check_order(const bool &debug) const
                             order = -1;
                             if (debug)
                             {
-                                cout << "The checked types are 10 from #" << primcounter << " and are:" << endl;
-                                cout << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
-                                     << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
-                                     << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
-                                     << types[primcounter + 9] << endl;
-                                cout << "Something seems to be wrong in the order of your F-Types..." << endl;
+                                std::cout << "The checked types are 10 from #" << primcounter << " and are:\n"
+                                    << types[primcounter] << " " << types[primcounter + 1] << " " << types[primcounter + 2] << " "
+                                    << types[primcounter + 3] << " " << types[primcounter + 4] << " " << types[primcounter + 5] << " "
+                                    << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
+                                    << types[primcounter + 9] << "\n"
+                                    << "Something seems to be wrong in the order of your F-Types..." << std::endl;
                                 return -1;
                             }
                         }
@@ -3515,7 +3494,7 @@ int WFN::check_order(const bool &debug) const
                 }
                 break;
             default:
-                cout << "ERROR in type assignement!!" << endl;
+                std::cout << "ERROR in type assignement!!" << std::endl;
                 return -1;
                 break;
             }
@@ -3616,7 +3595,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 if (!set_MO_coef(m, primcounter + i, temp_MO_coefficients[i][m]))
                                 {
-                                    cout << "Error while assigning new MO coefficient!" << endl;
+                                    std::cout << "Error while assigning new MO coefficient!" << std::endl;
                                     return false;
                                 }
                         }
@@ -3655,7 +3634,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                             for (int m = 0; m < nmo; m++)
                                 if (!set_MO_coef(m, primcounter + i, temp_MO_coefficients[i][m]))
                                 {
-                                    cout << "Error while assigning new MO coefficient!" << endl;
+                                    std::cout << "Error while assigning new MO coefficient!" << std::endl;
                                     return false;
                                 }
                         }
@@ -3668,7 +3647,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
     case 2:
         if (debug)
         {
-            cout << "Nothing to be done here, i like tonto type..." << endl;
+            std::cout << "Nothing to be done here, i like tonto type..." << std::endl;
         }
         break;
     case 3:
@@ -3711,7 +3690,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
                         for (int m = 0; m < nmo; m++)
                             if (!set_MO_coef(m, primcounter + 2, temp_MO_coefficients[m]))
                             {
-                                cout << "Error while assigning new MO coefficient!" << endl;
+                                std::cout << "Error while assigning new MO coefficient!" << std::endl;
                                 return false;
                             }
                         primcounter += 3;
@@ -3729,7 +3708,7 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
         }
         break;
     default:
-        cout << "order type: " << f_order << " " << order << " not supported!" << endl;
+        std::cout << "order type: " << f_order << " " << order << " not supported!" << std::endl;
         return false;
         break;
     }
@@ -3842,17 +3821,17 @@ bool WFN::sort_wfn(const int &g_order, const bool &debug)
     case 4:
         if (debug)
         {
-            cout << "This is fine, i like them well ordered!" << endl;
+            std::cout << "This is fine, i like them well ordered!" << std::endl;
         }
         break;
     case 0:
         if (debug)
         {
-            cout << "There seems to be no f-functions!" << endl;
+            std::cout << "There seems to be no f-functions!" << std::endl;
         }
         break;
     default:
-        cout << "f-order type: " << f_order << " not supported!" << endl;
+        std::cout << "f-order type: " << f_order << " not supported!" << std::endl;
         return false;
         break;
     }
@@ -3907,10 +3886,10 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
     {
         for (int j = 0; j < nr.size(); j++)
         {
-            cout << "checking " << atoms[i].charge << " against " << nr[j] << endl;
+            std::cout << "checking " << atoms[i].charge << " against " << nr[j] << std::endl;
             if (atoms[i].charge == nr[j])
             {
-                cout << "Adding " << elcount[j] << " electron to atom " << i << "with charge " << atoms[i].charge << endl;
+                std::cout << "Adding " << elcount[j] << " electron to atom " << i << "with charge " << atoms[i].charge << std::endl;
                 atoms[i].ECP_electrons = elcount[j];
                 break;
             }
@@ -3958,7 +3937,7 @@ int WFN::calculate_charge()
         int nr = atoms[a].charge;
         if (nr == 0)
         {
-            cout << "ERROR: Atomtype misunderstanding!" << endl;
+            std::cout << "ERROR: Atomtype misunderstanding!" << std::endl;
             return -1000;
         }
         atomic_charges += nr;
@@ -3970,7 +3949,7 @@ int WFN::calculate_charge()
     return atomic_charges - (int)mo_charges;
 };
 
-int WFN::calculate_charge(ostream &file)
+int WFN::calculate_charge(std::ostream &file)
 {
     int atomic_charges = 0;
     double mo_charges = 0;
@@ -3979,7 +3958,7 @@ int WFN::calculate_charge(ostream &file)
         int nr = atoms[a].charge;
         if (nr == 0)
         {
-            file << "ERROR: Atomtype misunderstanding!" << endl;
+            file << "ERROR: Atomtype misunderstanding!" << std::endl;
             return -1000;
         }
         atomic_charges += nr;
@@ -3991,21 +3970,21 @@ int WFN::calculate_charge(ostream &file)
     return atomic_charges - (int)mo_charges;
 };
 
-bool WFN::guess_multiplicity(ostream &file)
+bool WFN::guess_multiplicity(std::ostream &file)
 {
     if (get_nr_electrons() % 2 == 0)
     {
-        file << "With " << get_nr_electrons() << " electrons your system appears to have multiplicity 1." << endl;
+        file << "With " << get_nr_electrons() << " electrons your system appears to have multiplicity 1." << std::endl;
         assign_multi(1);
     }
     else if (get_nr_electrons() % 2 == 1)
     {
-        file << "With " << get_nr_electrons() % 2 << " electron this seems to be open shell, assuming multiplicity 2." << endl;
+        file << "With " << get_nr_electrons() % 2 << " electron this seems to be open shell, assuming multiplicity 2." << std::endl;
         assign_multi(2);
     }
     else
     {
-        file << "This is awkward... i dind't think of this case yet, contact Florian to implement it!" << endl;
+        file << "This is awkward... i dind't think of this case yet, contact Florian to implement it!" << std::endl;
         return false;
     }
     return true;
@@ -4040,9 +4019,9 @@ bool WFN::change_exponent(int nr, double value){
 };
 */
 
-bool WFN::push_back_cube(const string &filepath, const bool &full, const bool &expert)
+bool WFN::push_back_cube(const std::string &filepath, const bool &full, const bool &expert)
 {
-    cub.push_back(cube(filepath, full, *this, cout, expert));
+    cub.push_back(cube(filepath, full, *this, std::cout, expert));
     return true;
 };
 
@@ -4060,12 +4039,12 @@ const unsigned int WFN::get_atom_integer_mass(const unsigned int &atomnr) const
 {
     if (get_atom_charge(atomnr) > 86)
     {
-        cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << endl;
+        std::cout << "Sorry, only implemented until Rn yet, ask Florian for increases!" << std::endl;
         return 0;
     }
     if (get_atom_charge(atomnr) <= 0)
     {
-        cout << "sorry, something seems wrong with the atoms you requested!" << endl;
+        std::cout << "sorry, something seems wrong with the atoms you requested!" << std::endl;
         return 0;
     }
     return constants::integer_masses[get_atom_charge(atomnr) - 1];
@@ -4075,12 +4054,12 @@ const double WFN::get_atom_real_mass(const int &atomnr) const
 {
     if (get_atom_charge(atomnr) > 86)
     {
-        cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << endl;
+        std::cout << "Sorry, only implemented until Xe yet, ask Florian for increases!" << std::endl;
         return 0;
     }
     if (get_atom_charge(atomnr) <= 0)
     {
-        cout << "sorry, something seems wrong with the atoms you requested!" << endl;
+        std::cout << "sorry, something seems wrong with the atoms you requested!" << std::endl;
         return 0;
     }
     return constants::real_masses[get_atom_charge(atomnr) - 1];
@@ -4088,7 +4067,7 @@ const double WFN::get_atom_real_mass(const int &atomnr) const
 
 atom WFN::get_atom(const int &nr) const
 {
-    err_checkf(nr <= ncen && nr > 0, "Error, selected atom index higehr than wavefunction!", cout);
+    err_checkf(nr <= ncen && nr > 0, "Error, selected atom index higehr than wavefunction!", std::cout);
     return atoms[nr];
 }
 
@@ -4114,23 +4093,23 @@ void WFN::delete_unoccupied_MOs()
     }
 };
 
-bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
+bool WFN::read_fchk(const std::string &filename, std::ostream &log, const bool debug)
 {
     vec2 mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
     if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h))
-        log << "Error during geenration of matrix" << endl;
+        log << "Error during geenration of matrix" << std::endl;
     int r_u_ro_switch = 0;
-    ifstream fchk(filename, ios::in);
+    std::ifstream fchk(filename, std::ios::in);
     if (!fchk.is_open())
     {
-        log << "ERROR while opening .fchk file!" << endl;
+        log << "ERROR while opening .fchk file!" << std::endl;
         return false;
     }
-    string line;
+    std::string line;
     getline(fchk, line);
-    string title = line;
+    std::string title = line;
     getline(fchk, line);
-    string calculation_level = line;
+    std::string calculation_level = line;
     if (line[10] == 'R')
     {
         if (line[11] == 'O')
@@ -4152,7 +4131,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     err_checkf(el == ael + bel, "Error in number of electrons!", log);
     if (ael != bel && r_u_ro_switch == 0)
         r_u_ro_switch = 1; // If U was not correctly recognized
-    if (calculation_level.find("CASSCF") != string::npos && ael != bel)
+    if (calculation_level.find("CASSCF") != std::string::npos && ael != bel)
         r_u_ro_switch = 2; // CASSCF requires open shell treatment
     int nbas = read_fchk_integer(fchk, "Number of basis functions");
     line = go_get_string(fchk, "Number of independent functions");
@@ -4162,7 +4141,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     else
         indbas = read_fchk_integer(line);
     if (debug)
-        cout << "Number of independent functions: " << indbas << endl;
+        std::cout << "Number of independent functions: " << indbas << std::endl;
     line = go_get_string(fchk, "Virial Ratio");
     if (line != "")
         virial_ratio = read_fchk_double(line);
@@ -4172,7 +4151,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     ivec atnbrs;
     if (!read_fchk_integer_block(fchk, "Atomic numbers", atnbrs))
     {
-        log << "Error reading atnbrs" << endl;
+        log << "Error reading atnbrs" << std::endl;
         return false;
     }
     ncen = (int)atnbrs.size();
@@ -4182,7 +4161,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     vec charges;
     if (!read_fchk_double_block(fchk, "Nuclear charges", charges))
     {
-        log << "Error reading charges" << endl;
+        log << "Error reading charges" << std::endl;
         return false;
     }
     for (int i = 0; i < charges.size(); i++)
@@ -4190,12 +4169,12 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     vec coords;
     if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords))
     {
-        log << "Error reading coordinates" << endl;
+        log << "Error reading coordinates" << std::endl;
         return false;
     }
     if (coords.size() != ncen * 3)
     {
-        log << "Inconsistant number of atoms and coordinates" << endl;
+        log << "Inconsistant number of atoms and coordinates" << std::endl;
         return false;
     }
     for (int i = 0; i < ncen; i++)
@@ -4207,7 +4186,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     ivec shell_types;
     if (!read_fchk_integer_block(fchk, "Shell types", shell_types, false))
     {
-        log << "Error reading shell types" << endl;
+        log << "Error reading shell types" << std::endl;
         return false;
     }
     bool is_spherical = false;
@@ -4215,30 +4194,30 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         if (shell_types[i] < -1)
             is_spherical = true;
     if (debug)
-        log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << endl
-            << "Loading basis set information..." << endl;
+        log << "This fchk contains spherical harmonics, which will be transformed into cartesian functions!" << std::endl
+            << "Loading basis set information..." << std::endl;
     ivec nr_prims_shell;
     if (!read_fchk_integer_block(fchk, "Number of primitives per shell", nr_prims_shell))
     {
-        log << "Error reading primitives per shell" << endl;
+        log << "Error reading primitives per shell" << std::endl;
         return false;
     }
     ivec shell2atom;
     if (!read_fchk_integer_block(fchk, "Shell to atom map", shell2atom))
     {
-        log << "Error reading shell2atom" << endl;
+        log << "Error reading shell2atom" << std::endl;
         return false;
     }
     vec exp;
     if (!read_fchk_double_block(fchk, "Primitive exponents", exp))
     {
-        log << "Error reading Primitive exponents" << endl;
+        log << "Error reading Primitive exponents" << std::endl;
         return false;
     }
     vec contraction;
     if (!read_fchk_double_block(fchk, "Contraction coefficients", contraction))
     {
-        log << "Error reading Contraction coefficients" << endl;
+        log << "Error reading Contraction coefficients" << std::endl;
         return false;
     }
     vec acoef, bcoef;
@@ -4247,12 +4226,12 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     { // Restricted or Restricted-Open-Shell
         if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene))
         {
-            log << "Error during reading of Alpha Energies" << endl;
+            log << "Error during reading of Alpha Energies" << std::endl;
             return false;
         }
         if (!read_fchk_double_block(fchk, "MO coefficients", acoef))
         {
-            log << "Error during reading of Alpha MOs" << endl;
+            log << "Error during reading of Alpha MOs" << std::endl;
             return false;
         }
         MOocc.resize(aMOene.size());
@@ -4281,22 +4260,22 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     { // Unrestricted
         if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene))
         {
-            log << "Error during reading of Alpha Energies" << endl;
+            log << "Error during reading of Alpha Energies" << std::endl;
             return false;
         }
         if (!read_fchk_double_block(fchk, "Beta Orbital Energies", bMOene))
         {
-            log << "Error during reading of Beta Energies" << endl;
+            log << "Error during reading of Beta Energies" << std::endl;
             return false;
         }
         if (!read_fchk_double_block(fchk, "Alpha MO coefficients", acoef))
         {
-            log << "Error during reading of Alpha MOs" << endl;
+            log << "Error during reading of Alpha MOs" << std::endl;
             return false;
         }
         if (!read_fchk_double_block(fchk, "Beta MO coefficients", bcoef))
         {
-            log << "Error during reading of Beta MOs" << endl;
+            log << "Error during reading of Beta MOs" << std::endl;
             return false;
         }
         MOocc.resize(aMOene.size() + bMOene.size());
@@ -4318,7 +4297,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         }
     }
     if (debug)
-        log << "Finished reading the file! Transferring to WFN object!" << endl;
+        log << "Finished reading the file! Transferring to WFN object!" << std::endl;
     ivec shelltypesspherical;
     int nbas5D(0);
     nmo = nbas;
@@ -4328,9 +4307,9 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         shelltypesspherical.resize(shell_types.size());
         if (debug)
         {
-            log << "shelltype:" << endl;
+            log << "shelltype:" << std::endl;
             for (int i = 0; i < nshell; i++)
-                log << setw(3) << shell_types[i] << endl;
+                log << std::setw(3) << shell_types[i] << std::endl;
         }
         shelltypesspherical = shell_types;
         for (int i = 0; i < nshell; i++)
@@ -4343,10 +4322,10 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     }
     if (debug)
     {
-        log << "sizes" << endl;
-        log << setw(3) << nshell << endl;
-        log << setw(3) << nbas5D << endl;
-        log << setw(3) << nbas << endl;
+        log << "sizes" << std::endl;
+        log << std::setw(3) << nshell << std::endl;
+        log << std::setw(3) << nbas5D << std::endl;
+        log << std::setw(3) << nbas << std::endl;
     }
     ivec shelltypescartesian(size_t(shell_types.size()), 0);
     shelltypescartesian = shell_types;
@@ -4356,27 +4335,27 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         nprims += sht2nbas(shell_types[i]) * nr_prims_shell[i];
     if (debug)
     {
-        log << "nprim" << endl;
-        log << setw(3) << nprims << endl;
+        log << "nprim" << std::endl;
+        log << std::setw(3) << nprims << std::endl;
         log << "amocoeff of MO:1";
         for (int i = 0; i < 4; i++)
         {
             if (i % 2 == 0)
-                log << endl;
-            log << setprecision(8) << setw(16) << scientific << acoef[i];
+                log << std::endl;
+            log << std::setprecision(8) << std::setw(16) << std::scientific << acoef[i];
         }
-        log << endl
-            << "First of MOs 1-4:" << endl;
+        log << std::endl
+            << "First of MOs 1-4:" << std::endl;
         int temp = 0;
         for (int i = 0; i < 4; i++)
         {
             if (i % 2 == 0)
-                log << endl;
+                log << std::endl;
             if (is_spherical)
                 temp = i * nbas5D;
             else
                 temp = i * nbas;
-            log << setprecision(8) << setw(16) << scientific << acoef[temp];
+            log << std::setprecision(8) << std::setw(16) << std::scientific << acoef[temp];
         }
     }
     // vector<primitive> basis;
@@ -4428,7 +4407,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                 CObasa_spherical[mo][b] = acoef[nbas5D * b + mo];
         if (debug)
         {
-            log << endl
+            log << std::endl
                 << "CObasa5d";
             int run = 0;
             for (int i = 0; i < 2; i++)
@@ -4436,13 +4415,13 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                 for (int j = 0; j < nbas5D; j++)
                 {
                     if (run % 2 == 0)
-                        log << endl;
-                    log << setprecision(8) << setw(16) << scientific << CObasa_spherical[i][j];
+                        log << std::endl;
+                    log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[i][j];
                     run++;
                 }
-                log << endl;
+                log << std::endl;
             }
-            log << endl;
+            log << std::endl;
         }
         if (r_u_ro_switch == 1)
         {
@@ -4464,13 +4443,13 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
             int shell_size6D = sht2nbas(temp_typ6D);
             if (debug)
             {
-                log << setw(3) << ipos_spher;
-                log << setw(3) << ipos_cart;
-                log << setw(3) << temp_typ5D;
-                log << setw(3) << temp_typ6D;
-                log << setw(3) << shell_size5D;
-                log << setw(3) << shell_size6D;
-                log << endl;
+                log << std::setw(3) << ipos_spher
+                    << std::setw(3) << ipos_cart
+                    << std::setw(3) << temp_typ5D
+                    << std::setw(3) << temp_typ6D
+                    << std::setw(3) << shell_size5D
+                    << std::setw(3) << shell_size6D
+                    << std::endl;
             }
             if (temp_typ5D >= -1)
             { // S and P shells are fine!
@@ -4484,19 +4463,19 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                     for (int i = 0; i < nbas5D; i++)
                     {
                         if (run % 2 == 0)
-                            log << endl;
-                        log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher][i];
+                            log << std::endl;
+                        log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[ipos_spher][i];
                         run++;
                     }
-                    log << endl;
+                    log << std::endl;
                     for (int i = 0; i < nbas; i++)
                     {
                         if (run % 2 == 0)
-                            log << endl;
-                        log << setprecision(8) << setw(16) << scientific << CObasa[ipos_cart][i];
+                            log << std::endl;
+                        log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[ipos_cart][i];
                         run++;
                     }
-                    log << endl;
+                    log << std::endl;
                 }
                 // if (debug) {
                 //	int run = 0;
@@ -4522,11 +4501,11 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                         for (int i = 0; i < nbas5D; i++)
                         {
                             if (run % 2 == 0)
-                                log << endl;
-                            log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher + j][i];
+                                log << std::endl;
+                            log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[ipos_spher + j][i];
                             run++;
                         }
-                    log << endl;
+                    log << std::endl;
                 }
                 if (debug)
                 {
@@ -4536,13 +4515,13 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                         for (int i = 0; i < nbas5D; i++)
                         {
                             if (run % 2 == 0)
-                                log << endl;
-                            log << setprecision(8) << setw(16) << scientific << CObasa[ipos_cart + j][i];
+                                log << std::endl;
+                            log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[ipos_cart + j][i];
                             run++;
                         }
-                        log << endl;
+                        log << std::endl;
                     }
-                    log << endl;
+                    log << std::endl;
                 }
             }
             else if (temp_typ5D == -3) // 7F -> 10F
@@ -4600,7 +4579,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
         }
         if (debug)
         {
-            log << endl
+            log << std::endl
                 << "CObasa";
             int run = 0;
             for (int i = 0; i < 10; i++)
@@ -4609,13 +4588,13 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
                 for (int j = 0; j < nbas; j++)
                 {
                     if (run % 2 == 0)
-                        log << endl;
-                    log << setprecision(8) << setw(16) << scientific << CObasa[i][j];
+                        log << std::endl;
+                    log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[i][j];
                     run++;
                 }
-                log << endl;
+                log << std::endl;
             }
-            log << endl;
+            log << std::endl;
         }
     }
     else
@@ -4632,16 +4611,16 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
     }
     if (debug)
     {
-        log << endl;
+        log << std::endl;
         int run = 0;
         for (int i = 0; i < contraction.size(); i++)
         {
             if (run % 2 == 0)
-                log << endl;
-            log << setprecision(8) << setw(16) << scientific << contraction[i];
+                log << std::endl;
+            log << std::setprecision(8) << std::setw(16) << std::scientific << contraction[i];
             run++;
         }
-        log << flush;
+        log << std::flush;
     }
     int k = 0, iexp = 0, ibasis = 0;
     // double tnormgau;
@@ -4663,7 +4642,7 @@ bool WFN::read_fchk(const string &filename, ostream &log, const bool debug)
 				double ng = constants::normgauss(types[k], exponents[k]);
                 primconnorm[k] = contraction[iexp + l] * ng;
                 if (debug)
-                    log << setw(22) << setprecision(16) << ng << endl;
+                    log << std::setw(22) << std::setprecision(16) << ng << std::endl;
 #pragma omp parallel for
                 for (int mo = 0; mo < nmo; mo++)
                 {
@@ -4968,7 +4947,7 @@ const double WFN::compute_MO_spherical(
     const double &Pos3,
     const int &MO) const
 {
-    err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
+    err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
     //int iat;
@@ -5122,7 +5101,7 @@ const double WFN::compute_dens_spherical(
     vec2 &d,
     vec &phi) const
 {
-    err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", cout);
+    err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
 
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
@@ -6064,7 +6043,7 @@ const double WFN::fj(int &j, int &l, int &m, double &aa, double &bb) const
     double temp = 0.0;
     double temp2 = 0.0;
     int a = 0, b = 0;
-    for (int i = max(0, j - m); i <= min(j, l); i++)
+    for (int i = std::max(0, j - m); i <= std::min(j, l); i++)
     {
         // pre = factorial[l] / factorial[l - i] / factorial[i] * factorial[m] / factorial[m - j + i] / factorial[j - i];
         temp2 = static_cast<double>(pre[j][l][m][i]);
@@ -6091,17 +6070,18 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
         return temp;
 }
 
-bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
+bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool debug)
 {
+    origin = 10;
     if (debug)
-        file << "Reading pTB file: " << filename << endl;
-    ifstream inFile(filename, ios::binary | ios::in);
+        file << "Reading pTB file: " << filename << std::endl;
+    std::ifstream inFile(filename, std::ios::binary | std::ios::in);
     if (!inFile)
     {
-        cerr << "File could not be opened!\n";
+        std::cerr << "File could not be opened!\n";
         return false;
     }
-    inFile.seekg(0, ios::beg);
+    inFile.seekg(0, std::ios::beg);
     int one = 0, two = 0, three = 0, four = 0;
     double dummy = 0.0;
     inFile.read(reinterpret_cast<char *>(&one), sizeof(one));
@@ -6202,14 +6182,14 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     int elcount = 0;
     elcount -= get_charge();
     if (debug)
-        file << "elcount: " << elcount << endl;
+        file << "elcount: " << elcount << std::endl;
     for (int i = 0; i < ncen; i++)
     {
         elcount += get_atom_charge(i);
         elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
     }
     if (debug)
-        file << "elcount after: " << elcount << endl;
+        file << "elcount after: " << elcount << std::endl;
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
@@ -6222,13 +6202,13 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     }
     alpha_els += temp_els;
     if (debug)
-        file << "al/be els:" << alpha_els << " " << beta_els << endl;
+        file << "al/be els:" << alpha_els << " " << beta_els << std::endl;
     const int mult = get_multi();
     int diff = 0;
     if (mult != 0)
         diff = get_multi() - 1;
     if (debug)
-        file << "diff: " << diff << endl;
+        file << "diff: " << diff << std::endl;
     while (alpha_els - beta_els != diff)
     {
         alpha_els++;
@@ -6241,13 +6221,13 @@ bool WFN::read_ptb(const string &filename, ostream &file, const bool debug)
     }
     if (debug)
     {
-        file << "al/be els after:" << alpha_els << " " << beta_els << endl;
+        file << "al/be els after:" << alpha_els << " " << beta_els << std::endl;
         file << "occs: ";
         for (int i = 0; i < nmomax; i++)
         {
             file << occ[i] << " ";
         }
-        file << endl;
+        file << std::endl;
     }
 
     for (int i = 0; i < nmomax; i++)
@@ -6292,7 +6272,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         _nr = 1;
     else
         _nr = nr;
-    stringstream ss;
+    std::stringstream ss;
     ss << _nr << " '" << basis_set_name << "' [\n";
     for (int i = 0; i < atom_types.size(); i++)
     {
@@ -6342,7 +6322,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
 
 const std::string WFN::get_CIF_table(const int nr) const
 {
-    stringstream ss;
+    std::stringstream ss;
     int _nr;
     if (nr == 0)
         _nr = 1;
@@ -6433,7 +6413,7 @@ const std::string WFN::get_CIF_table(const int nr) const
 void WFN::write_wfn_CIF(const std::string &fileName) const
 {
     err_checkf(basis_set_name != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
-    ofstream file(fileName);
+    std::ofstream file(fileName);
     file << "loop_\n_basis.id\n_basis.name\n_basis.dict\n";
     file << get_basis_set_CIF();
     file << "\n\nloop_\n_wavefunction.id\n_wavefunction.type\n_wavefunction.radial_type\n_wavefunction.angular_type\n_wavefunction.dict\n";

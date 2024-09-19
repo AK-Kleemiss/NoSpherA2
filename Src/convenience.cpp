@@ -14,7 +14,7 @@ std::string help_message()
     t.append("----------------------------------------------------------------------------\n\n");
     t.append(":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n");
     t.append("   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n");
-    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; fch* (UNTESTED!)\n");
+    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n");
     t.append("   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n");
     t.append("   -b              <FILENAME>               Read this basis set\n");
     t.append("   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n");
