@@ -36,6 +36,7 @@ bool basis_set_entry::operator==(const basis_set_entry& other) const {
 
 atom::atom() {
 	label = '?';
+	ID = "0000000000000";
 	nr = 0;
 	x = 0.0;
 	y = 0.0;
@@ -47,34 +48,28 @@ atom::atom() {
 	frac_coords = { 0,0,0 };
 };
 
-atom::atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch) {
-	nr = n;
-	label = l;
-	x = c1;
-	y = c2;
-	z = c3;
-	charge = ch;
-	ECP_electrons = 0;
-	basis_set_id = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
-};
+atom::atom(const std::string& l, 
+	const std::string& id, 
+	const int& n, 
+	const double& c1, 
+	const double& c2, 
+	const double& c3, 
+	const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }) 
+{};
 
-atom::atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els) {
-	nr = n;
-	label = l;
-	x = c1;
-	y = c2;
-	z = c3;
-	charge = ch;
-	ECP_electrons = ECP_els;
-	basis_set_id = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
-};
+atom::atom(const std::string& l, 
+	const std::string& id, 
+	const int& n, 
+	const double& c1, 
+	const double& c2, 
+	const double& c3, 
+	const int& ch, 
+	const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 })
+{};
 
 atom atom::operator= (const atom& rhs) {
 	label = rhs.label;
+	ID = rhs.ID;
 	nr = rhs.nr;
 	x = rhs.x;
 	y = rhs.y;
@@ -176,6 +171,18 @@ void atom::assign_ADPs(vec& second, vec& third, vec& fourth) {
 		ADPs[1] = third;
 		ADPs[2] = fourth;
 	}
+};
+
+void atom::assign_ID(const std::string& id) {
+	ID = id;
+};
+
+void atom::set_ID(const std::string& id) {
+	ID = id;
+};
+
+std::string atom::get_ID() const {
+	return ID;
 };
 
 bool atom::operator==(const atom& other) const {

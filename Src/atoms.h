@@ -18,12 +18,13 @@ struct basis_set_entry{
 class atom {
 public:
 	std::string label;
+    std::string ID;
 	int nr, charge, ECP_electrons;
 	double x, y, z;
 	vec frac_coords;
 	atom();
-	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
-	atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
+	atom(const std::string &l, const std::string& id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
+	atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
 	atom operator=(const atom &rhs);
 	void print_values() const;
 	bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
@@ -33,6 +34,9 @@ public:
 	void assign_ADPs(vec &second, vec &third, vec &fourth);
 	void assign_ADPs(vec& second);
 	void assign_ADPs(double& Uiso);
+    void assign_ID(const std::string& id);
+    void set_ID(const std::string& id);
+    std::string get_ID() const;
 	std::vector<basis_set_entry> basis_set;
 	int basis_set_id;
 	std::vector<unsigned int> shellcount;

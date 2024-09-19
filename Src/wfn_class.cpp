@@ -69,11 +69,11 @@ WFN::WFN(int given_origin)
     fill_Afac_pre();
 };
 
-bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge)
+bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
 {
     ncen++;
     if (_charge >= 1)
-        atoms.push_back(atom(label, ncen, x, y, z, _charge));
+        atoms.push_back(atom(label, ID, ncen, x, y, z, _charge));
     else
     {
         atoms.push_back(atom());
@@ -6171,10 +6171,9 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
     }
 
     // making it into the wavefunction data
-
     for (int i = 0; i < ncent; i++)
     {
-        err_checkf(push_back_atom(atom(atyp[i], i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
+        err_checkf(push_back_atom(atom(atyp[i], "0000000000000", i, x[i], y[i], z[i], _charge[i])), "Error adding atom to WFN!", file);
     }
     err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 
