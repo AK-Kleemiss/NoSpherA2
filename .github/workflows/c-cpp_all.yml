@@ -59,7 +59,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make_Linux
-      run: cd Linux && make
+      run: cd Linux && make -j
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -84,7 +84,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make_Linux
-      run: cd Linux && make NoSpherA2_Rascaline
+      run: cd Linux && make NoSpherA2_Rascaline -j
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
