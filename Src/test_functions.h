@@ -1430,7 +1430,7 @@ cdouble fourier_bessel_integral(
     else if (l == 1)
     {
         double f1 = pow(2, 3 / 2) * sqrt(b);
-        cdouble S_0 = -(cerf((constants::c_i * H) / f1)*constants::sqr_pi*constants::c_i*exp(-(H*H)/(8*b))) / (f1);
+        cdouble S_0 = -(cerf((1i * H) / f1)*constants::sqr_pi*1i*exp(-(H*H)/(8*b))) / (f1);
         return N * N * (1 / (6 * b * H * H) * S_0 - 1 / (16 * b * b * H) + (H + H * H * S_0) / (64 * b * b * b));
     }
 }
@@ -1451,11 +1451,11 @@ cdouble sfac_bessel(
 
     if (p.type == 0)
     {
-        return  constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient;
+        return  constants::FOUR_PI * pow(1i, p.type) * radial * p.coefficient * p.coefficient;
     }
     else if (p.type == 1) {
         double angular = constants::spherical_harmonic(p.type, m, local_k.data());
-        return constants::FOUR_PI * pow(constants::c_i, p.type) * radial * p.coefficient * p.coefficient * angular;
+        return constants::FOUR_PI * pow(1i, p.type) * radial * p.coefficient * p.coefficient * angular;
     }
 }
 

@@ -3007,7 +3007,7 @@ cdouble sfac_bessel(
         k_point[i] /= leng;
 
     double angular = constants::spherical_harmonic(p.type, m, k_point.data());
-	return constants::FOUR_PI * pow(constants::c_i,p.type) * radial * angular;
+	return constants::FOUR_PI * pow(1i,p.type) * radial * angular;
 }
 */
 
