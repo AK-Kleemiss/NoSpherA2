@@ -1409,30 +1409,74 @@ const double dlm_function(const unsigned int& l, const int& m, const double& the
 }
 
 
+cdouble S_l_recursion(int l, double H, double b);
+cdouble C_l_recursion(int l, double H, double b);
+//For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
+cdouble S_0(double H, double b) {
+	using namespace std::complex_literals;
+    double two_32 = pow(2, 1.5);
+	return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8 * b))) / (two_32 * sqrt(b));
+}
+double C_0(double H, double b) {
+	return  (constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, 1.5) * sqrt(b));
+}
+//Following 1/(4b) * ((n-1)C_(n-2) - H*S_(n-1)) = C_n
+cdouble C_l_recursion(int l, double H, double b) {
+    using namespace std::complex_literals;
+    if (l == 0) {
+        return C_0(H, b);
+    }
+    else if (l == 1) {
+        return (1 / (4 * b)) * (cdouble(1.0, 0.0) + S_0(H, b));
+    }
+    else {
+		return (1 / (4 * b)) * (cdouble((l - 1),0.0) * C_l_recursion(l - 2, H, b) - H * S_l_recursion(l-1, H,b));
+    }
+}
+//\int_{ 0 }^ {\infty} r^ n\sin(Hr) \cdot e^ { -2br ^ 2 } dr & = \frac{ 1 }{4b}\left((n - 1)S_{ n - 2 } + HC_{ n - 1 }\right) = S_n
+cdouble S_l_recursion(int l, double H, double b) {
+    using namespace std::complex_literals;
+    if (l == 0) {
+        return S_0(H, b);
+    }
+    else if (l == 1) {
+        return (1 / (4 * b)) * H * C_0(H, b);
+    }
+    else {
+        return (1 / (4 * b)) * (cdouble(l - 1, 0) * S_l_recursion(l - 2, H, b) + H * C_l_recursion(l - 1, H, b));
+    }
+}
+
+
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 cdouble fourier_bessel_integral(
     primitive& p,
-    double H
+    const double H
 )
 {
     using namespace std::complex_literals;
-    int l = p.type;
-    double b = p.exp;
+    const int l = p.type;
+    const double b = p.exp;
+    double N;
     //double N = pow(
     //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
     //    0.25);
-    double N = 1;//pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
+    //pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
     //double N = p.norm_const;
     //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
     if (l == 0)
     {
-        return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+        N = 1;
+        //cdouble test_a = (pow(2, 3.5) * pow(b, 1.5));
+        //cdouble test_b = (4 * b * pow(2, 3/2) * sqrt(b));  WARUM IST test_a != test_b ???????????
+        
+        //return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+        return  ((N * N) / (4 * b)) * C_l_recursion(0, H, b);
     }
     else if (l == 1)
     {
-        double f1 = pow(2, 3 / 2) * sqrt(b);
-        cdouble S_0 = -(cerf((1.0i * H) / f1)*constants::sqr_pi*1.0i*exp(-(H*H)/(8*b))) / (f1);
-        return N * N * (1 / (6 * b * H * H) * S_0 - 1 / (16 * b * b * H) + (H + H * H * S_0) / (64 * b * b * b));
+        N = p.norm_const;
+        return ((N * N) / (H * H)) * (S_l_recursion(2, H, b) - H * C_l_recursion(3, H, b));
     }
 }
 
@@ -1456,7 +1500,8 @@ cdouble sfac_bessel(
         return  constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient;
     }
     else if (p.type == 1) {
-        double angular = constants::spherical_harmonic(p.type, m, local_k.data());
+		double angular = dlm_function(p.type, m, acos(local_k[2]), atan2(local_k[1], local_k[0]));
+        //double angular = constants::spherical_harmonic(p.type, m, local_k.data());
         return constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * angular;
     }
 }
@@ -1468,7 +1513,8 @@ void test_analytical_fourier() {
     wavy.push_back_atom("H", 0, 0, 0, 1);
     const double c_exp = 1;
     double vals[] = { 0.8 };
-    wavy.add_primitive(1, 2, c_exp, vals);
+    int type = 1;
+    wavy.add_primitive(1, type + 1, c_exp, vals);
     vec2 kpts;
     for (int i = 1; i < 100; i++) {
         kpts.push_back({ 0.01 * i, 0, 0 });
@@ -1506,7 +1552,7 @@ void test_analytical_fourier() {
         grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
     }
 
-    primitive p(1, 1, c_exp, vals[0]);
+    primitive p(1, type, c_exp, vals[0]);
 #pragma omp parallel for
     for (int i = 0; i < kpts.size(); i++) {
 		sf_A[0][i] = sfac_bessel(p, 0, kpts[i]);
