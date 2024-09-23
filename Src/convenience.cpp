@@ -2787,11 +2787,11 @@ void options::digest_options()
         {
             string name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
-            name = "test.cif";
+            string cif_name = "test.cif";
             if (get_ending_from_filename(name) == "tscb")
-                blocky.write_tsc_file(name);
+                blocky.write_tsc_file(cif_name, get_basename_without_ending(name) + ".tsc");
             else if (get_ending_from_filename(name) == "tsc")
-				blocky.write_tscb_file(name);
+				blocky.write_tscb_file(cif_name, get_basename_without_ending(name) + ".tscb");
             else
 				err_checkf(false, "Wrong file ending!", cout);
             exit(0);
@@ -2799,6 +2799,9 @@ void options::digest_options()
         else if (temp == "-test_analytical") {
             test_analytical_fourier();
             exit(0);
+        }
+        else if (temp == "-test_cerf") {
+            test_cerf();
         }
         else if (temp == "-wfn")
         {
