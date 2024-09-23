@@ -1409,47 +1409,78 @@ const double dlm_function(const unsigned int& l, const int& m, const double& the
 }
 
 
-cdouble S_n_recursion(int n, double H, double b);
-cdouble C_n_recursion(int n, double H, double b);
+//cdouble S_n_recursion(int n, double H, double b);
+//cdouble C_n_recursion(int n, double H, double b);
 //For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
-cdouble S_0(double H, double b) {
-	using namespace std::complex_literals;
-    double two_32 = pow(2.0, 1.5);
-	return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8. * b))) / (two_32 * sqrt(b));
-}
-double C_0(double H, double b) {
-	return  (constants::sqr_pi * exp(-H * H / (8. * b))) / (pow(2., 1.5) * sqrt(b));
-}
-//Following 1/(4b) * ((n-1)C_(n-2) - H*S_(n-1)) = C_n
-cdouble C_n_recursion(int n, double H, double b) {
-    using namespace std::complex_literals;
-    if (n == 0) {
-        return C_0(H, b);
-    }
-    else if (n == 1) {
-        return (1. / (4. * b)) * (1. + S_0(H, b));
-    }
-    else {
-        return (1. / (4. * b)) * ((n - 1.) * C_n_recursion(n - 2, H, b) - H * S_n_recursion(n - 1, H, b));
-    }
-}
-//\int_{ 0 }^ {\infty} r^ n\sin(Hr) \cdot e^ { -2br ^ 2 } dr & = \frac{ 1 }{4b}\left((n - 1)S_{ n - 2 } + HC_{ n - 1 }\right) = S_n
-cdouble S_n_recursion(int n, double H, double b) {
-    using namespace std::complex_literals;
-    if (n == 0) {
-        return S_0(H, b);
-    }
-    else if (n == 1) {
-        return (1. / (4. * b)) * H * C_0(H, b);
-    }
-    else {
-        return (1. / (4. * b)) * ((n - 1.) * S_n_recursion(n - 2, H, b) + H * C_n_recursion(n - 1, H, b));
-    }
-}
+
+//cdouble S_0(double H, double b) {
+//	using namespace std::complex_literals;
+//    double two_32 = pow(2.0, 1.5);
+//	return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8. * b))) / (two_32 * sqrt(b));
+//}
+//double C_0(double H, double b) {
+//	return  (constants::sqr_pi * exp(-H * H / (8. * b))) / (pow(2., 1.5) * sqrt(b));
+//}
+////Following 1/(4b) * ((n-1)C_(n-2) - H*S_(n-1)) = C_n
+//cdouble C_n_recursion(int n, double H, double b) {
+//    using namespace std::complex_literals;
+//    if (n == 0) {
+//        return C_0(H, b);
+//    }
+//    else if (n == 1) {
+//        return (1. / (4. * b)) * (1. + S_0(H, b));
+//    }
+//    else {
+//        return (1. / (4. * b)) * ((n - 1.) * C_n_recursion(n - 2, H, b) - H * S_n_recursion(n - 1, H, b));
+//    }
+//}
+////\int_{ 0 }^ {\infty} r^ n\sin(Hr) \cdot e^ { -2br ^ 2 } dr & = \frac{ 1 }{4b}\left((n - 1)S_{ n - 2 } + HC_{ n - 1 }\right) = S_n
+//cdouble S_n_recursion(int n, double H, double b) {
+//    using namespace std::complex_literals;
+//    if (n == 0) {
+//        return S_0(H, b);
+//    }
+//    else if (n == 1) {
+//        return (1. / (4. * b)) * H * C_0(H, b);
+//    }
+//    else {
+//        return (1. / (4. * b)) * ((n - 1.) * S_n_recursion(n - 2, H, b) + H * C_n_recursion(n - 1, H, b));
+//    }
+//}
+//// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
+//cdouble fourier_bessel_integral(
+//    primitive& p,
+//    const double H
+//)
+//{
+//    using namespace std::complex_literals;
+//    const int l = p.type;
+//    const double b = p.exp;
+//    double N;
+//    //double N = pow(
+//    //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
+//    //    0.25);
+//    //pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
+//    //double N = p.norm_const;
+//    //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
+//    if (l == 0)
+//    {
+//        N = 1.;
+//        //return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+//        return  ((N * N) / (4 * b)) * C_n_recursion(0, H, b);
+//    }
+//    else if (l == 1)
+//    {
+//        N = 1.; //p.norm_const;
+//        return ((N * N) / (H * H)) * (S_n_recursion(2, H, b) - H * C_n_recursion(3, H, b));
+//    }
+//}
+
+//For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r) * r^2 dr    |   Densities!!
 
 
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
-cdouble fourier_bessel_integral(
+double fourier_bessel_integral(
     primitive& p,
     const double H
 )
@@ -1457,24 +1488,12 @@ cdouble fourier_bessel_integral(
     using namespace std::complex_literals;
     const int l = p.type;
     const double b = p.exp;
-    double N;
-    //double N = pow(
-    //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
-    //    0.25);
-    //pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
     //double N = p.norm_const;
-    //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
-    if (l == 0)
-    {
-        N = 1.;
-        //return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
-        return  ((N * N) / (4 * b)) * C_n_recursion(0, H, b);
-    }
-    else if (l == 1)
-    {
-        N = 1.; p.norm_const;
-        return ((N * N) / (H*H)) * (S_n_recursion(2, H, b) - H * C_n_recursion(3, H, b));
-    }
+    double N = pow(
+        pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
+        0.25);
+
+    return N * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
 }
 
 //Returns the spherical coordinates of a given cartesian vector
@@ -1493,90 +1512,115 @@ vec cartesian_to_spherical(double x, double y, double z) {
     return { r, theta, phi };
 }
 
+//https://en.wikipedia.org/wiki/Associated_Legendre_polynomials
 double legendre_polynomial(int l, int m, double x) {
     if (l == 0) {
         return 1.;
     }
-    if (l == 1) {
+    else if (l == 1) {
         if (m == 0) {
             return x;
         }
         else if (m == 1) {
-			return -sqrt(1 - x * x);
+			return sqrt(1 - x * x);
 		}
         else if (m == -1) {
-            return 0.5*sqrt(1 - x * x);
+            return -0.5 * sqrt(1. - x * x);
+        }
+    }
+    else if (l == 2) {
+        if (m == 0) {
+            return 0.5 * (3 * x * x - 1.);
+        }
+        else if (m == 1) {
+            return -3. * x * sqrt(1. - x * x);
+        }
+        else if (m == 2) {
+            return 3. * (1. - x * x);
+        }
+        else if (m == -1) {
+            return 0.5 * x * sqrt(1. - x * x);
+		}
+        else if (m == -2) {
+            return 0.125 * (1. - x * x);
+        }
+    }
+    else if (l == 3) {
+        if (m == 0) {
+            return 0.5 * x * (5. * x * x - 3.);
+        }
+        else if (m == 1) {
+            return 1.5 * (1 - 5 * x * x) * sqrt((1 - x * x));
+        }
+        else if (m == 2) {
+            return 15. * x * (1 - x * x);
+        }
+        else if (m == 3) {
+            return -15. * sqrt(1 - x * x) * (1 - x * x);
+        }
+        else if (m == -1) {
+            return -0.125 * (1 - 5 * x * x) * sqrt((1 - x * x));
+        }
+        else if (m == -2) {
+            return 0.125 * x * (1 - x * x);
+        }
+        else if (m == -3) {
+            return (15. / 720.) * sqrt(1 - x * x) * (1 - x * x);
         }
     }
 }
 
-double factorial(int n) {
-	if (n == 0) {
-		return 1;
-	}
-	else {
-		return n * factorial(n - 1);
-	}
-}
-
-cdouble complex_spherical(double theta, double phi, int l, int m) {
-    using namespace std::complex_literals;
-    double N = sqrt(((2. * l + 1.) / (4. * constants::PI)) * (factorial(l - m) / factorial(l + m)));
-    return pow(-1., m) * legendre_polynomial(l, m, cos(theta)) * exp(1.i * (1. * m) * phi) * N;
-}
-
-//Das conj ist nicht wirklich belegt und sollte nochmal überdacht werden
-//Aus https://www.physics.uoguelph.ca/chapter-4-spherical-harmonics
+//Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
+//I omitted the abs(m) in the factorial as most other sources do not include it
 double real_spherical(int l, int m, double theta, double phi) {
-    using namespace std::complex_literals;
-    double result = 1.; pow(-1., m);
     double N;
-    if (l == 0) {
-        N = sqrt(1 / constants::FOUR_PI);
+    m == 0 ? N = sqrt((2 * l + 1) / constants::FOUR_PI) : N = sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)]));
+    if (m >= 0) {
+        return N * legendre_polynomial(l, m, cos(theta)) * cos(m * phi);
     }
-    else if (l == 1) {
-        N = 1 / ( constants::PI);
+    else {
+        return N * legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
     }
-    cdouble test = result * (complex_spherical(theta, phi, l, m) + conj(complex_spherical(theta, phi, l, m)));
-	if (m == 0) {
-		result *= sqrt((1/constants::TWO_PI)) * legendre_polynomial(l,m,cos(theta))*cos(m*phi);
-	}
-	else if (m > 0) {
-        result *= (complex_spherical(theta, phi, l, m) + conj(complex_spherical(theta, phi, l, m))).real();
-	}
-	else if (m < 0) {
-        result *= ((complex_spherical(theta, phi, l, m) - conj(complex_spherical(theta, phi, l, m))) / (2.i)).real();
-	}
-	return result;
 }
 
 cdouble sfac_bessel(
     primitive& p,
-    int m,
-    vec& k_point
+    vec& k_point,
+    const vec& coefs
 )
 {
     using namespace std::complex_literals;
     vec local_k = k_point;
     double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
     double H = 2 * constants::PI * leng;
-    cdouble radial = fourier_bessel_integral(p, H);
     //normalize the spherical harmonics k_point
     for (int i = 0; i < 3; i++)
         local_k[i] /= leng;
 
     vec spherical = cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
-    cdouble angular = real_spherical(p.type, m, spherical[1], spherical[2]);
-    if (p.type == 0)
-    {
-        //constants::FOUR_PI^2 weil in angular^2 ein Faktor 1/4pi drin ist
-        return  constants::FOUR_PI * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
+
+
+    // IMPLEMENTATION FOR DENSITY AS INPUT
+    double radial = fourier_bessel_integral(p, H) * p.coefficient;
+    cdouble result(0.0, 0.0);
+    for (int m = -p.type; m <= p.type; m++) {
+        cdouble angular = real_spherical(p.type, m, spherical[1], spherical[2]);
+        result += constants::FOUR_PI * pow(1.0i, p.type) * radial * angular * coefs[m + p.type];
     }
-    else if (p.type == 1) {
-		//double angular = dlm_function(p.type, m+1, spherical[1], spherical[2]);
-        //double angular = constants::spherical_harmonic(p.type, m+1, local_k.data());
-        return pow(0.75*constants::PI, 2) * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
-    }
+    return result;
+
+    //// IMPLEMENTATION FOR WAVE FUNCTIONS AS INPUT
+    //  cdouble radial = fourier_bessel_integral(p, H);
+    //  if (p.type == 0)
+    //  {
+    //      //constants::FOUR_PI^2 weil in angular^2 ein Faktor 1/4pi drin ist
+    //      return  constants::FOUR_PI * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
+    //  }
+    //  else if (p.type == 1) {
+          ////double angular = dlm_function(p.type, m+1, spherical[1], spherical[2]);
+    //      double angular2 = constants::spherical_harmonic(p.type, m, local_k.data());
+    //      return pow(0.75*constants::PI, 2) * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
+    //  }
 }
 
 //Only valid for one atom positioned at 0,0,0
@@ -1628,21 +1672,24 @@ double compute_MO_spherical_new(double x, double y, double z, double expon, doub
     double ex = 0;
     double temp = 0;
     int type_local = type;
+    double N = 1;
     //convert "type" to l
     if (type == 1) {
         type_local = 0;
+        N =1/ sqrt(1 / (constants::FOUR_PI));
     }
     else if (type > 1 && type < 5) {
         type_local = 1;
+        N = 1/ sqrt(3 / (constants::FOUR_PI));
     }
-    double N = 1;
+    
     // r, theta, phi
     vec spher = cartesian_to_spherical(x, y, z);
-    double R = exp(-expon * spher[0] * spher[0]) * N * pow(spher[0], type_local);
-    double Y = real_spherical(type_local, m, spher[1],spher[2]);
-    result = coef * R * Y / 0.690988;
-    //double test = compute_MO_spherical_orig(x, y, z, expon, coef, type);
-    //std::cout << "New: " << result << " Old: " << test << " diff: " << result - test << " fact: " << result / test << std::endl;
+    double R = exp(-expon * spher[0] * spher[0]) * pow(spher[0], type_local);
+    double Y = real_spherical(type_local, m, spher[1],spher[2]) * N;
+    result = coef * R * Y;
+    double test = compute_MO_spherical_orig(x, y, z, expon, coef, type);
+    std::cout << "New: " << result << " Old: " << test << " diff: " << result - test << " fact: " << result / test << std::endl;
     return result;
 }
 
@@ -1704,24 +1751,25 @@ void test_analytical_fourier() {
     WFN wavy(0);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
-    const double c_exp = 1.0;
+    const double c_exp = 2.0;
     double vals[] = { 1.0 };
-    int type = 1;
-    wavy.add_primitive(1, type + 1, c_exp, vals);
-
-    /*double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
-    readxyzMinMax_fromWFN(wavy, MinMax, steps, 3., 0.025, true);
-    cube CubeMO(steps[0], steps[1], steps[2], 1, true);
-    CubeMO.give_parent_wfn(wavy);
-    for (int i = 0; i < 3; i++)
-    {
-        CubeMO.set_origin(i, MinMax[i]);
-        CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
-    CubeMO.path = "MO.cube";
-    CubeMO.write_file(true);*/
+    vec coefs = { 0.0, 0.0, 0.0 , 0.0 , 1.0};
+    int type = 2;
+    //wavy.add_primitive(1, type + 1, c_exp, vals);
+    wavy.atoms[0].push_back_basis_set(c_exp, vals[0],  type, 0);
+    //double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    //int steps[3]{ 0, 0, 0 };
+    //readxyzMinMax_fromWFN(wavy, MinMax, steps, 3., 0.025, true);
+    //cube CubeMO(steps[0], steps[1], steps[2], 1, true);
+    //CubeMO.give_parent_wfn(wavy);
+    //for (int i = 0; i < 3; i++)
+    //{
+    //    CubeMO.set_origin(i, MinMax[i]);
+    //    CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    //}
+    //Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
+    //CubeMO.path = "MO.cube";
+    //CubeMO.write_file(true);
 
     vec2 kpts;
     for (int i = 1; i < 100; i++) {
@@ -1757,16 +1805,14 @@ void test_analytical_fourier() {
     griddy.get_atomic_grid(0, pos,pos, pos, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data());
 
     for (int i = 0; i < grid[0].size(); i++) {
-        grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
+        //grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
+        grid[3][i] = calc_density_ML(grid[0][i], grid[1][i], grid[2][i], coefs, wavy.atoms);
     }
 
     primitive p(1, type, c_exp, vals[0]);
 #pragma omp parallel for
     for (int i = 0; i < kpts.size(); i++) {
-        {
-            for (int m = -p.type; m <= p.type; m++)
-                sf_A[0][i] += sfac_bessel(p, m, kpts[i]) * cdouble(0,1.); //i ist nur zum testen
-        }
+        sf_A[0][i] = sfac_bessel(p, kpts[i], coefs);
         for (int p = 0; p < grid[0].size(); p++) {
             double work = 2 * constants::PI * (kpts[i][0] * grid[0][p] + kpts[i][1] * grid[1][p] + kpts[i][2] * grid[2][p]);
             sf_N[0][i] += std::polar(grid[3][p] * grid[4][p],work);
@@ -1782,9 +1828,9 @@ void test_analytical_fourier() {
             local_k[i] /= leng;
 
         //double angular = dlm_function(p.type, m, acos(k_point[2]), atan2(k_point[1], k_point[0]));
-        double angular_m1 = constants::spherical_harmonic(p.type, -1, local_k.data());
-        double angular_1 = constants::spherical_harmonic(p.type, 1, local_k.data());
-        double angular_0 = constants::spherical_harmonic(p.type, 0, local_k.data());
+        //double angular_m1 = constants::spherical_harmonic(p.type, -1, local_k.data());
+        //double angular_1 = constants::spherical_harmonic(p.type, 1, local_k.data());
+        //double angular_0 = constants::spherical_harmonic(p.type, 0, local_k.data());
 		result << setw(8) << setprecision(2) << fixed << kpts[i][0];
         result << setw(8) << setprecision(2) << fixed << kpts[i][1];
         result << setw(8) << setprecision(2) << fixed << kpts[i][2];
@@ -1794,10 +1840,9 @@ void test_analytical_fourier() {
 		result << setw(16) << setprecision(8) << scientific << sf_N[0][i].imag();
         result << setw(16) << setprecision(8) << scientific << abs(sf_A[0][i] - sf_N[0][i]);
         result << setw(35) << setprecision(8) << scientific << sf_A[0][i] / sf_N[0][i];
-        result << setw(16) << setprecision(8) << scientific << abs(angular_m1 * angular_m1);
-        result << setw(16) << setprecision(8) << scientific << abs(angular_0 * angular_0);
-        result << setw(16) << setprecision(8) << scientific << abs(angular_1 * angular_1);
-        result << setw(16) << setprecision(8) << scientific << cerf(1.* i * cdouble(0.,1.));
+        //result << setw(16) << setprecision(8) << scientific << abs(angular_m1 * angular_m1);
+        //result << setw(16) << setprecision(8) << scientific << abs(angular_0 * angular_0);
+        //result << setw(16) << setprecision(8) << scientific << abs(angular_1 * angular_1);
 		result << "\n";
 	}
 	result.flush();
