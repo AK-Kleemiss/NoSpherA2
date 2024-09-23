@@ -103,7 +103,23 @@ void thakkar_d_test(options &opt)
 }
 
 void test_cerf() {
+    using namespace std;
     cerf(cdouble(1.0, 1.0));
+    ofstream name("test.dat", ios::out);
+    for (int i = 0; i < 1000; i++) {
+        name << setprecision(8) << scientific << setw(16) << i * 0.01;
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 0.0)).real();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 0.0)).imag();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 1.0)).real();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 1.0)).imag();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(0.0, i * 0.01)).real();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(0.0, i * 0.01)).imag();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(1.0, i * 0.01)).real();
+        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(1.0, i * 0.01)).imag();
+        name << endl;
+    }
+    name.close();
+    exit(0);
 }
 
 void test_density_cubes(options &opt, std::ostream &log_file)
@@ -1410,7 +1426,6 @@ const double dlm_function(const unsigned int& l, const int& m, const double& the
 
 
 cdouble S_n_recursion(int n, double H, double b);
-cdouble C_n_recursion(int n, double H, double b);
 //For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
 cdouble S_0(double H, double b) {
 	using namespace std::complex_literals;

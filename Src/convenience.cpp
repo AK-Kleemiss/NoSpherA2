@@ -2800,6 +2800,9 @@ void options::digest_options()
             test_analytical_fourier();
             exit(0);
         }
+        else if (temp == "-test_cerf") {
+            test_cerf();
+        }
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
