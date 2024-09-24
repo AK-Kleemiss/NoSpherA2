@@ -6178,8 +6178,7 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
     err_checkf(ncen == ncent, "Error adding atoms to WFN!", file);
 
     // Since pTB writes all occupations to be 2 regardless of the actual occupation, we need to fix this
-    int elcount = 0;
-    elcount -= get_charge();
+    int elcount = -get_charge();
     if (debug)
         file << "elcount: " << elcount << std::endl;
     for (int i = 0; i < ncen; i++)
@@ -6195,9 +6194,11 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         alpha_els++;
         beta_els++;
         temp_els -= 2;
-		err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", file);
-		err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons!", file);
-		err_checkf(temp_els < -elcount, "Error setting alpha and beta electrons!", file);
+        if (debug)
+            file << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", file);
+        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!", file);
+        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!", file);
     }
     alpha_els += temp_els;
     if (debug)
