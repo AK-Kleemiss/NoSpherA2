@@ -1941,9 +1941,9 @@ void test_analytical_fourier() {
     grid.resize(5); //x, y, z, dens, atomic_weight
 
     double alpha_min[] = { 0.5 };
-    AtomGrid griddy(1E-40,
-        1120,
-        1350,
+    AtomGrid griddy(1E-20,
+        320,
+        500,
         1,
         3.6,
         1,
