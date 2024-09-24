@@ -2742,6 +2742,7 @@
     <ClCompile Include="..\Lib\H5StrType.cpp" />
     <ClCompile Include="..\Lib\H5VarLenType.cpp" />
     <ClCompile Include="..\Src\atoms.cpp" />
+    <ClCompile Include="..\Src\constants.cpp" />
     <ClCompile Include="..\Src\DLL_Helper.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
