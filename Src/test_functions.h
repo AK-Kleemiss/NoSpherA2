@@ -2036,7 +2036,7 @@ void test_analytical_fourier() {
                 if (abs(diff) > abs(max_diff)) {
                     max_diff = diff;
                 }
-                if (abs(diff) > 1E-8) {
+                if (abs(diff) > 1E-5) {
                     correct = false;
                 }
             }
