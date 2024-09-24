@@ -2979,10 +2979,11 @@ void make_k_pts(const bool &read_k_pts,
             }
         }
 
-        file << endl
-             << "Number of k-points to evaluate: ";
-        file << k_pt[0].size();
-        file << " for " << gridsize << " gridpoints." << endl;
+        file << "\nNumber of k-points to evaluate: " << k_pt[0].size();
+        if (gridsize!=0)
+            file << " for " << gridsize << " gridpoints." << endl;
+        else
+            file << endl;
         if (save_k_pts)
             save_k_points(k_pt, hkl);
     }
@@ -2991,45 +2992,77 @@ void make_k_pts(const bool &read_k_pts,
         read_k_points(k_pt, hkl, file);
     }
 }
-/*
+
+
+
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 double fourier_bessel_integral(
-    primitive &p,
-    double H
+    const primitive& p,
+    const double H
 )
 {
-    int l = p.type;
-    double b = p.exp;
+    using namespace std::complex_literals;
+    const int l = p.type;
+    const double b = p.exp;
     double N = p.norm_const;
-    return N * pow(H, l - 1) / (pow(2, l + 2) * pow(b, l + 1.5)) * constants::sqr_pi * exp(-H * H / (4 * b));
+
+    return N * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
 }
+
 
 cdouble sfac_bessel(
-	primitive& p,
-    int m,
-	vec& k_point
+    const primitive& p,
+    const vec& k_point,
+    const vec& coefs
 )
 {
-    double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
-    double H = 2 * constants::PI * leng;
-    double radial = fourier_bessel_integral(p, H);
+    using namespace std::complex_literals;
+    vec local_k = k_point;
+    double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
+    double H = leng;
     //normalize the spherical harmonics k_point
-    for(int i=0; i<3; i++)
-        k_point[i] /= leng;
+    for (int i = 0; i < 3; i++)
+        local_k[i] /= leng;
 
-    double angular = constants::spherical_harmonic(p.type, m, k_point.data());
-	return constants::FOUR_PI * pow(1i,p.type) * radial * angular;
+    vec spherical = constants::cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
+
+    double radial = fourier_bessel_integral(p, H) * p.coefficient;
+    cdouble result(0.0, 0.0);
+    for (int m = -p.type; m <= p.type; m++) {
+        cdouble angular = constants::real_spherical(p.type, m, spherical[1], spherical[2]);
+        result += constants::FOUR_PI * pow(1.0i, p.type) * radial * angular * coefs[m + p.type];
+    }
+    return result;
 }
-*/
 
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
-                    cvec2 &sf,
-    std::ostream& file,
-                    time_point& start,
-                    time_point& end1)
+                    const std::vector<atom> &atom_list,
+                    cvec2 &sf)
 {
-    const long long int smax = static_cast<long long int>(k_pt[0].size());
+    sf.resize(atom_list.size());
+#pragma omp parallel
+    {
+#pragma omp for
+        for (int i = 0; i < sf.size(); i++) {
+            sf[i].resize(k_pt[0].size(), constants::cnull);
+        }
+        primitive basis;
+#pragma omp for
+        for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++) {
+            int coef_count = 0;
+            vec k_pt_local = { k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt] };
+            for (int iat = 0; iat < atom_list.size(); iat++) {
+                const int lim = atom_list[iat].basis_set.size();
+                for (int i_basis = 0; i_basis < lim; i_basis++) {
+                    basis = atom_list[iat].basis_set[i_basis].p;
+                    vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);
+                    sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
+                    coef_count += 2 * basis.type + 1;
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -3861,16 +3894,7 @@ bool calculate_scattering_factors_ML(
     cif_input.close();
 
     time_points.push_back(get_time());
-    time_descriptions.push_back("startup");
-#if has_RAS
-    // Generation of SALTED densitie coefficients
-    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
-    time_points.push_back(get_time());
-    time_descriptions.push_back("SALTED prediction");
-#else
-    err_not_impl_f("RASCALINE is not supported by this build", std::cout);
-    vec coefs;
-#endif
+    time_descriptions.push_back("CIF reading");
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
@@ -3889,32 +3913,27 @@ bool calculate_scattering_factors_ML(
 
     if (opt.debug)
         file << "made it post CIF, now make grids!" << endl;
-    vec2 d1, d2, d3, dens;
-
-    int points = make_hirshfeld_grids_ML(
-        opt.accuracy,
-        wave,
-        coefs,
-        atom_type_list,
-        asym_atom_list,
-        needs_grid,
-        d1, d2, d3, dens,
-        exp_coefs,
-        labels,
-        file,
-        time_points,
-        time_descriptions,
-        opt.debug,
-        opt.no_date);
 
     time_points.push_back(get_time());
-    time_descriptions.push_back("density vectors");
+    time_descriptions.push_back("Generating hkl");
+
+#if has_RAS
+    // Generation of SALTED densitie coefficients
+    file << "Generating densities... " << flush;
+    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
+    file << "                          ... done!\n" << flush;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("SALTED prediction");
+#else
+    err_not_impl_f("RASCALINE is not supported by this build", std::cout);
+    vec coefs;
+#endif
 
     vec2 k_pt;
     make_k_pts(
         opt.read_k_pts,
         opt.save_k_pts,
-        points,
+        0,
         unit_cell,
         hkl,
         k_pt,
@@ -3924,20 +3943,18 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    time_point end1;
     cvec2 sf;
-    calc_SF(points,
-            k_pt,
-            d1, d2, d3, dens,
-            sf,
-            file,
-            time_points.front(),
-            end1,
-            opt.debug,
-            opt.no_date);
 
-    time_points.push_back(end1);
-    time_descriptions.push_back("final preparation");
+    calc_SF_SALTED(
+        k_pt,
+        coefs,
+        wave.atoms,
+        sf
+        );
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Fourier transform");
+
 
     if (wave.get_has_ECPs())
     {
@@ -3967,7 +3984,7 @@ bool calculate_scattering_factors_ML(
         hkl);
 
     time_points.push_back(get_time());
-    time_descriptions.push_back("tsc calculation");
+    time_descriptions.push_back("last corrections");
     if (!opt.no_date)
     {
         write_timing_to_file(file,

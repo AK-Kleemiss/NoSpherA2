@@ -414,6 +414,12 @@ struct primitive
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
+    bool operator==(const primitive& other) const {
+        return center == other.center &&
+			type == other.type &&
+			exp == other.exp &&
+			coefficient == other.coefficient;
+    };
 };
 
 struct ECP_primitive : primitive

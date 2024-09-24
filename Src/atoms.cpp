@@ -18,22 +18,6 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 	p = primitive(0, type, exponent, coefficient);
 };
 
-basis_set_entry basis_set_entry::operator=(const basis_set_entry& rhs) {
-	coefficient = rhs.coefficient;
-	exponent = rhs.exponent;
-	type = rhs.type;
-	shell = rhs.shell;
-	p = rhs.p;
-	return *this;
-};
-
-bool basis_set_entry::operator==(const basis_set_entry& other) const {
-	return coefficient == other.coefficient &&
-		exponent == other.exponent &&
-		type == other.type &&
-		shell == other.shell;
-}
-
 atom::atom() {
 	label = '?';
 	ID = "0000000000000";
@@ -109,12 +93,12 @@ bool atom::push_back_basis_set(const double& exponent, const double& coefficient
 		shellcount.push_back(1);
 	else
 		shellcount[shell]++;
-	if (type >= 0 && type < 6 && shell >= 0) {
+	if (type >= 0 && type < 7 && shell >= 0) {
 		basis_set.push_back(basis_set_entry(coefficient, exponent, type, shell));
 		return true;
 	}
 	else {
-		if (type >= 6) err_checkf(false, "h and higher types are not yet supported!", std::cout);
+		if (type >= 7) err_checkf(false, "h and higher types are not yet supported!", std::cout);
 		std::cout << "This is not a valid basis set entry!" << std::endl;
 		std::cout << "Exponent: " << exponent << " coefficient: " << coefficient << " type: " << type << " shell: " << shell << std::endl;
 		return false;

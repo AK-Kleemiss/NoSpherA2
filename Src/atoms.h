@@ -8,10 +8,18 @@ struct basis_set_entry{
 	double exponent;
 	unsigned int type; //1=S; 2=P; 3=D; 4=F; 5=G
 	unsigned int shell;
-	basis_set_entry operator=(const basis_set_entry &rhs);
+	// Default assignment operator
+	basis_set_entry& operator=(const basis_set_entry& rhs) = default;
 	basis_set_entry();
 	basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
-	bool operator==(const basis_set_entry& other) const;
+	// Equality operator
+	bool operator==(const basis_set_entry& other) const {
+		return coefficient == other.coefficient &&
+			exponent == other.exponent &&
+			type == other.type &&
+			shell == other.shell &&
+			p == other.p;
+	}
 	primitive p;
 };
 

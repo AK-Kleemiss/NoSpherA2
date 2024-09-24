@@ -1,12 +1,13 @@
 #pragma once
 
-namespace constants
-{
 #include <limits>
 #include <complex>
 #include <cmath>
 #include <map>
+#include <vector>
 
+namespace constants
+{
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
         return curr == prev
@@ -123,7 +124,8 @@ namespace constants
     constexpr double c_693_2048p = sqrt(693.0 / (2048.0 * PI));
     constexpr double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
     constexpr double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
-
+    constexpr double c_3003_2048p = sqrt(3003.0 / (2048.0 * PI));
+    
     constexpr size_t sod = sizeof(double);
     constexpr size_t soi = sizeof(int);
     constexpr size_t soc = sizeof(char);
@@ -243,26 +245,7 @@ namespace constants
                                      46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 46, 60, 60, 60, 60, 60, 60, 60, 60, 60, 78, 78, 78, 78, 78, 78 };
 
     constexpr const char* Labels[] = { "DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr" };
-    constexpr const char* atnr2letter(const int& nr)
-    {
-        if (nr == 0)
-        {
-            // Exception for Q peaks in residual maps
-            return "Q";
-        }
-        if (nr > 103 || nr < 0)
-        {
-            if (nr == 119)
-            {
-                // Exception for Q in ECPs from ORCA
-                return "Q";
-            }
-            std::cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-103!" << std::endl;
-            return ("PROBLEM");
-        }
-        else
-            return Labels[nr];
-    };
+    const char* atnr2letter(const int& nr);
 
     constexpr int get_Z_from_label(const char* tmp)
     {
@@ -456,231 +439,11 @@ namespace constants
         vector[2] = constants::type_vector[temp * 3 + 2];
     };
 
-    constexpr double normgauss(const int& type, const double& exp)
-    {
-        int t[3]{ 0,0,0 };
-        if (type > 0)
-        {
-            constants::type2vector(type, t);
-            err_checkf(t[0] != -1, "Problem with type2vector!", std::cout);
-            err_checkf(t[1] != -1, "Problem with type2vector!", std::cout);
-            err_checkf(t[2] != -1, "Problem with type2vector!", std::cout);
-        }
-        else
-            t[0] = t[1] = t[2] = 0;
-        long long int temp = constants::ft[t[0]] * constants::ft[t[1]] * constants::ft[t[2]];
-        int t1 = 2 * t[0], t2 = 2 * t[1], t3 = 2 * t[2];
-        long long int temp2 = constants::ft[t1] * constants::ft[t2] * constants::ft[t3];
-        double temp1 = 2 * exp / constants::PI;
-        temp1 = temp1 * temp1 * temp1;
-        temp1 = constants::sqrt(constants::sqrt(temp1));
-        const int exponent = t[0] + t[1] + t[2];
-        double temp_e = 1.0;
-        for (int i = 0; i < exponent; i++)
-            temp_e *= 8 * exp;
-        return temp1 * constants::sqrt(temp_e * temp / temp2);
-    };
+    const double normgauss(const int& type, const double& exp);
 
-    constexpr double spherical_harmonic(const int& l, const int& m, const double* d)
-    {
-        /*Here d[0] = x
-                     d[1] = y
-                     d[2] = z
-                     d[3] = r^2 IGNORED
-                     d[4] = r   IGNORED
-                     */
-                     // Will need extension for up to l=8
-                     // calc spherical harmonic
-        double SH = 0, x = d[0], y = d[1], z = d[2];
-        switch (l)
-        {
-        case 0: // S
-            SH = constants::c_1_4p;
-            break;
-        case 1:
-            switch (m)
-            {
-            case 0: // P 0 Z
-                SH = constants::c_3_4p * z;
-                break;
-            case 1: // P 1 X
-                SH = constants::c_3_4p * x;
-                break;
-            case -1: // P -1 Y
-                SH = constants::c_3_4p * y;
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        case 2:
-            switch (m)
-            {
-            case 0: // D 0 Z2
-                SH = constants::c_5_16p * (3 * z*z - 1.0);
-                break;
-            case 1: // D 1 XZ
-                SH = constants::c_15_4p * x * z;
-                break;
-            case -1: // D -1 YZ
-                SH = constants::c_15_4p * y * z;
-                break;
-            case 2: // D 2 X2-Y2
-                SH = constants::c_15_16p * (x*x - y*y);
-                break;
-            case -2: // D -2 XY
-                SH = constants::c_15_4p * y * x;
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        case 3:
-            switch (m)
-            {
-            case 0: // F 0 Z3
-                SH = constants::c_7_16p * (5 * z*z*z - 3 * z);
-                break;
-            case 1: // F 1 XZZ
-                SH = constants::c_21_32p * x * (5 * z*z - 1.0);
-                break;
-            case -1: // F -1 YZZ
-                SH = constants::c_21_32p * y * (5 * z*z - 1.0);
-                break;
-            case 2: // F 2 Z(X2-Y2)
-                SH = constants::c_105_16p * ((x*x - y*y) * z);
-                break;
-            case -2: // F -2 XYZ
-                SH = constants::c_105_4p * x * y * z;
-                break;
-            case 3: // F 3 X(X^2-3Y^2)
-                SH = constants::c_35_32p * x * (x*x - 3 * y*y);
-                break;
-            case -3: // F -3 Y(3X^2-Y^2)
-                SH = constants::c_35_32p * y * (3 * x*x - y*y);
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        case 4:
-            switch (m)
-            {
-            case 0: // G 0 Z^4
-                SH = constants::c_9_256p * (35 * z*z*z*z - 30 * z*z + 3.0);
-                break;
-            case 1: // G 1 X(7Z^3-3ZR^2)
-                SH = constants::c_45_32p * x * (7 * z*z*z - 3 * z);
-                break;
-            case -1: // G -1 Y(7Z^2-3ZR^2)
-                SH = constants::c_45_32p * y * (7 * z*z*z - 3 * z);
-                break;
-            case 2: // G 2
-                SH = constants::c_45_64p * (x*x - y*y) * (7 * z*z - 1.0);
-                break;
-            case -2: // G -2
-                SH = constants::c_45_16p * x * y * (7 * z*z - 1.0);
-                break;
-            case 3: // G 3 XZ(X^2-3Y^2)
-                SH = constants::c_315_32p * x * (x*x - 3 * y*y) * z;
-                break;
-            case -3: // G -3 XZ(3X^2-Y^2)
-                SH = constants::c_315_32p * y * (3 * x*x - y*y) * z;
-                break;
-            case 4: // G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-                SH = constants::c_315_256p * ((x*x * (x*x - 3 * y*y)) -
-                    (y*y * (3 * x*x - y*y)));
-                break;
-            case -4: // G -4 XY(X^2-Y^2)
-                SH = constants::c_315_16p * x * y * (x*x - y*y);
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        case 5:
-            switch (m)
-            {
-            case 0: // H Z^5
-                SH = constants::c_11_256p * (63 * z*z*z*z*z - 70 * z*z*z + 15 * z);
-                break;
-            case 1:
-                SH = constants::c_165_256p * x * (21 * z*z*z*z - 14 * z*z + 1.0);
-                break;
-            case -1:
-                SH = constants::c_165_256p * y * (21 * z*z*z*z - 14 * z*z + 1.0);
-                break;
-            case 2:
-                SH = constants::c_1155_64p * (x*x - y*y) * (3 * z*z*z - z);
-                break;
-            case -2:
-                SH = constants::c_1155_64p * 2 * x * y * (3 * z*z*z - z);
-                break;
-            case 3:
-                SH = constants::c_385_512p * x * (x*x - 3 * y*y) * (9 * z*z - 1.0);
-                break;
-            case -3:
-                SH = constants::c_385_512p * y * (3 * x*x - y*y) * (9 * z*z - 1.0);
-                break;
-            case 4:
-                SH = constants::c_3465_256p * (x*x*x*x - 6 * x * x * y * y + y*y*y*y) * z;
-                break;
-            case -4:
-                SH = -constants::c_3465_256p * (4 * x * y*y*y - 4 * x*x*x * y) * z;
-                break;
-            case 5:
-                SH = constants::c_693_2048p * (2 * x*x*x*x*x - 20 * x*x*x * y*y + 10 * x * y*y*y*y);
-                break;
-            case -5:
-                SH = constants::c_693_2048p * (2 * y*y*y*y*y - 20 * x*x * y*y*y + 10 * y * x*x*x*x);
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        case 6:
-            switch (m)
-            {
-            case 0: // I Z^6
-                SH = constants::c_13_1024p * (231 * z*z*z*z*z*z - 315 * z*z*z*z + 105 * z*z - 5);
-                break;
-            case 1:
-                SH = constants::c_273_256p * x * (21 * z*z*z*z - 14 * z*z + 1.0);
-                break;
-            case -1:
-                SH = constants::c_165_256p * 2 * y * (21 * z*z*z*z - 14 * z*z + 1.0);
-                break;
-            case 2:
-                SH = constants::c_1155_64p * (x*x - y*y) * (3 * z*z*z - z);
-                break;
-            case -2:
-                SH = constants::c_1155_64p * 2 * x * y * (3 * z*z*z - z);
-                break;
-            case 3:
-                SH = constants::c_385_512p * x * (x*x - 3 * y*y) * (9 * z*z - 1.0);
-                break;
-            case -3:
-                SH = constants::c_385_512p * y * (3 * x*x - y*y) * (9 * z*z - 1.0);
-                break;
-            case 4:
-                SH = constants::c_3465_256p * (x*x*x*x - 6 * x * x * y * y + y*y*y*y) * z;
-                break;
-            case -4:
-                SH = -constants::c_3465_256p * (4 * x * y*y*y - 4 * x*x*x * y) * z;
-                break;
-            case 5:
-                SH = constants::c_693_2048p * (2 * x*x*x*x*x - 20 * x*x*x * y*y + 10 * x * y*y*y*y);
-                break;
-            case -5:
-                SH = constants::c_693_2048p * (2 * y*y*y*y*y - 20 * x*x * y*y*y + 10 * y * x*x*x*x);
-                break;
-            default:
-                err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-            }
-            break;
-        default:
-            err_not_impl_f("Higehr than l=6 not done for spherical harmonic!", std::cout);
-        }
-        return SH;
-    }
+    const double spherical_harmonic(const int& l, const int& m, const double* d);
+    
+    double associated_legendre_polynomial(int l, int m, double x);
+    std::vector<double> cartesian_to_spherical(double x, double y, double z);
+    double real_spherical(int l, int m, double theta, double phi);
 }

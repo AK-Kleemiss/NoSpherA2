@@ -279,6 +279,17 @@ void calc_SF(const int &points,
     time_point &end1, 
     bool debug = false);
 
+double fourier_bessel_integral(
+    const primitive& p,
+    const double H
+);
+
+cdouble sfac_bessel(
+    const primitive& p,
+    const vec& k_point,
+    const vec& coefs
+);
+
 /**
  * @brief Calculates the diffuse scattering factors.
  * @param opt The options for scattering factors calculations.
