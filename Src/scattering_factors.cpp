@@ -1856,7 +1856,7 @@ int make_hirshfeld_grids(
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
-                avg += diff;
+                avg += abs(diff);
                 run++;
             }
         }
@@ -3053,7 +3053,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
             int coef_count = 0;
             vec k_pt_local = { k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt] };
             for (int iat = 0; iat < atom_list.size(); iat++) {
-                const int lim = atom_list[iat].basis_set.size();
+                const int lim = (int) atom_list[iat].basis_set.size();
                 for (int i_basis = 0; i_basis < lim; i_basis++) {
                     basis = atom_list[iat].basis_set[i_basis].p;
                     vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);
