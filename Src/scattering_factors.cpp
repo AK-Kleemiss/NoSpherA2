@@ -2998,10 +2998,9 @@ void make_k_pts(const bool &read_k_pts,
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 double fourier_bessel_integral(
     const primitive& p,
-    const double H
+    const double& H
 )
 {
-    using namespace std::complex_literals;
     const int l = p.type;
     const double b = p.exp;
     double N = p.norm_const;
@@ -3017,16 +3016,11 @@ cdouble sfac_bessel(
 )
 {
     using namespace std::complex_literals;
-    vec local_k = k_point;
-    double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
-    double H = leng;
-    //normalize the spherical harmonics k_point
-    for (int i = 0; i < 3; i++)
-        local_k[i] /= leng;
+    double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
+                                                      //normalize the spherical harmonics k_point
+    const vec spherical = constants::cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
-    vec spherical = constants::cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
-
-    double radial = fourier_bessel_integral(p, H) * p.coefficient;
+    const double radial = fourier_bessel_integral(p, leng) * p.coefficient;
     cdouble result(0.0, 0.0);
     for (int m = -p.type; m <= p.type; m++) {
         cdouble angular = constants::real_spherical(p.type, m, spherical[1], spherical[2]);

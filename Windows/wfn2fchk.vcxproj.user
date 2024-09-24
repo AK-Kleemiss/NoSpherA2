@@ -165,7 +165,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
     <LocalDebuggerCommandArguments>-test_analytical</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Reading_SALTED</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>

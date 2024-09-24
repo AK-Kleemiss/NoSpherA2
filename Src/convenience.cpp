@@ -2738,12 +2738,6 @@ void options::digest_options()
             sfac_scan(*this, log_file);
             exit(0);
         }
-        else if (temp == "-test-ecp")
-        {
-            d_sfac_scan = fromString<double>(arguments[i + 1]);
-            sfac_scan_ECP(*this, log_file);
-            exit(0);
-        }
         else if (temp == "-sfac_diffuse")
         {
             sfac_diffuse = fromString<double>(arguments[i + 1]);
