@@ -1538,11 +1538,12 @@ double legendre_polynomial(int l, int m, double x) {
             return x;
         }
         else if (m == 1) {
-			return sqrt(1 - x * x);
-		}
+            return sqrt(1 - x * x);
+        }
         else if (m == -1) {
             return -0.5 * sqrt(1. - x * x);
         }
+        else err_checkf(false, "This is impossible!", std::cout);
     }
     else if (l == 2) {
         if (m == 0) {
@@ -1556,10 +1557,11 @@ double legendre_polynomial(int l, int m, double x) {
         }
         else if (m == -1) {
             return 0.5 * x * sqrt(1. - x * x);
-		}
+        }
         else if (m == -2) {
             return 0.125 * (1. - x * x);
         }
+        else err_checkf(false, "This is impossible!", std::cout);
     }
     else if (l == 3) {
         if (m == 0) {
@@ -1583,20 +1585,22 @@ double legendre_polynomial(int l, int m, double x) {
         else if (m == -3) {
             return (15. / 720.) * sqrt(1 - x * x) * (1 - x * x);
         }
+        else err_checkf(false, "This is impossible!", std::cout);
     }
+    else err_not_impl_f("This Legendre Polynomial doesn't yet exist in the code!", std::cout);
 }
 
 //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
 //I omitted the abs(m) in the factorial as most other sources do not include it
 double real_spherical(int l, int m, double theta, double phi) {
-    double N;
-    m == 0 ? N = sqrt((2 * l + 1) / constants::FOUR_PI) : N = sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)]));
-    if (m >= 0) {
-        return N * legendre_polynomial(l, m, cos(theta)) * cos(m * phi);
+    if (m > 0) {
+        return sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)])) * legendre_polynomial(l, m, cos(theta)) * cos(m * phi);
     }
-    else {
-        return N * legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
+    else if (m < 0) {
+        return sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)])) * legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
     }
+    else
+        return sqrt((2 * l + 1) / constants::FOUR_PI) * legendre_polynomial(l, m, cos(theta));
 }
 
 cdouble sfac_bessel(
