@@ -139,7 +139,7 @@ grown_water:
 
 fourier_transform:
 	@echo 'Running test: $@'
-	$(BASE_PATH) -test_analytical
+	cd SALTED && $(BASE_PATH) -test_analytical -no-date
 	@echo 'Finished running: $@'
 
 fractal:
