@@ -127,6 +127,14 @@ void generate_hkl(
     std::ostream &file, 
     bool debug = false);
 
+void generate_hkl(
+    const ivec2& hkl_min_max,
+    hkl_list& hkl,
+    const vec2& twin_law,
+    cell& unit_cell,
+    std::ostream& file,
+    bool debug = false);
+
 /**
  * @brief Generates the fractional hkl (Miller indices) list.
  * @param dmin The minimum d-spacing.

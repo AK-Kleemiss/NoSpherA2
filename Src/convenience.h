@@ -481,6 +481,7 @@ struct options
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
     ivec2 groups;
+    ivec2 hkl_min_max{ {-100,100},{-100,100},{-100,100} };
     vec2 twin_law;
     ivec2 combined_tsc_groups;
     svec combined_tsc_calc_files;

@@ -18,8 +18,6 @@ private:
     double upper;
     std::string crystal_system;
     std::vector<ivec2> sym;
-    const double PI = 3.14159265358979323846;
-    const double bohr2angs = 0.529177249;
 
 public:
     cell()
@@ -75,8 +73,8 @@ public:
     double get_sg() const { return sg; };
     double get_rcm(int i, int j) const { return rcm[i][j]; };
     double get_cm(int i, int j) const { return cm[i][j]; };
-    double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };
-    double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / constants::TWO_PI; };
+    double get_rcm_angs(int i, int j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
+    double get_cm_angs(int i, int j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
     double get_sym(int i, int j, int k) const { return sym[i][j][k]; };
     std::vector<ivec2> get_sym() const { return sym; };
     double get_a() const { return a; };

@@ -255,7 +255,7 @@ void generate_hkl(const double &dmin,
                   hkl_list &hkl,
                   const vec2 &twin_law,
                   cell &unit_cell,
-    std::ostream &file,
+                  std::ostream &file,
                   bool debug)
 {
     using namespace std;
@@ -340,6 +340,109 @@ void generate_hkl(const double &dmin,
     }
 
     for (const ivec &hkl__ : hkl_enlarged)
+    {
+        tempv = hkl__;
+        tempv[0] *= -1;
+        tempv[1] *= -1;
+        tempv[2] *= -1;
+        if (hkl.find(tempv) != hkl.end() && hkl.find(hkl__) == hkl.end())
+        {
+            hkl.emplace(hkl__);
+        }
+    }
+    file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
+}
+
+void generate_hkl(const ivec2& hkl_min_max,
+    hkl_list& hkl,
+    const vec2& twin_law,
+    cell& unit_cell,
+    std::ostream& file,
+    bool debug)
+{
+    using namespace std;
+    ivec hkl_(3);
+    string line, temp;
+    int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])), 
+        k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])), 
+        l_max = std::max(abs(hkl_min_max[2][1]), abs(hkl_min_max[2][0]));
+    file << "Generating hkl between ["
+        << setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
+        << setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["
+        << setw(2) << -l_max << "," << setw(2) << l_max << "] " << flush;
+    for (int h = -h_max; h <= h_max; h++)
+    {
+        for (int k = -k_max; k <= k_max; k++)
+        {
+            // only need 0 to extreme, since we have no DISP signal
+            for (int l = 0; l <= l_max; l++)
+            {
+                hkl_ = { h, k, l };
+                hkl.emplace(hkl_);
+            }
+        }
+    }
+    file << "... done!\nNr of reflections generated: " << setw(21) << hkl.size() << endl;
+
+    if (debug)
+        file << "Number of reflections before twin: " << hkl.size() << endl;
+    if (twin_law.size() > 0)
+    {
+        for (const ivec& hkl__ : hkl)
+            for (int i = 0; i < twin_law.size(); i++)
+                hkl.emplace(ivec{
+                    int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
+                    int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
+                    int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+    }
+    if (debug)
+        file << "Number of reflections after twin: " << hkl.size() << endl;
+
+    vector<vector<ivec>> sym(3);
+    for (int i = 0; i < 3; i++)
+        sym[i].resize(3);
+    sym = unit_cell.get_sym();
+
+    if (debug)
+    {
+        file << "Read " << sym[0][0].size() << " symmetry elements!" << endl;
+        for (int i = 0; i < sym[0][0].size(); i++)
+        {
+            for (int x = 0; x < 3; x++)
+            {
+                for (int y = 0; y < 3; y++)
+                    file << setw(3) << sym[y][x][i];
+                file << endl;
+            }
+            file << endl;
+        }
+    }
+    else
+        file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
+
+    ivec tempv(3);
+    hkl_list hkl_enlarged = hkl;
+    for (int s = 0; s < sym[0][0].size(); s++)
+    {
+        if (sym[0][0][s] == 1 && sym[1][1][s] == 1 && sym[2][2][s] == 1 &&
+            sym[0][1][s] == 0 && sym[0][2][s] == 0 && sym[1][2][s] == 0 &&
+            sym[1][0][s] == 0 && sym[2][0][s] == 0 && sym[2][1][s] == 0)
+        {
+            continue;
+        }
+        for (const ivec& hkl__ : hkl)
+        {
+            tempv = { 0, 0, 0 };
+            for (int h = 0; h < 3; h++)
+            {
+                for (int j = 0; j < 3; j++)
+                    tempv[j] += hkl__[h] * sym[j][h][s];
+            }
+            hkl_enlarged.emplace(tempv);
+        }
+    }
+
+    for (const ivec& hkl__ : hkl_enlarged)
     {
         tempv = hkl__;
         tempv[0] *= -1;
@@ -3360,7 +3463,10 @@ bool thakkar_sfac(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -3614,7 +3720,10 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;
     }
 
@@ -3734,7 +3843,10 @@ bool calculate_scattering_factors_HF(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -3902,7 +4014,10 @@ bool calculate_scattering_factors_ML(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -4060,7 +4175,10 @@ bool calculate_scattering_factors_ML_No_H(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -4308,7 +4426,10 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;
     }
     if (kpts == NULL || kpts->size() == 0)

@@ -2528,17 +2528,6 @@ void options::digest_options()
             dipole_moments(*this);
             exit(0);
         }
-        else if (temp == "-polarizabilities")
-        {
-          pol_wfns = { arguments[i + 1],
-            arguments[i + 2],
-            arguments[i + 3],
-            arguments[i + 4],
-            arguments[i + 5],
-            arguments[i + 6],
-            arguments[i + 7]
-          };
-        }
         else if (temp == "-e_field")
           efield = stod(arguments[i + 1]);
         else if (temp == "-ECP")
@@ -2606,6 +2595,15 @@ void options::digest_options()
         {
             hkl = arguments[i + 1];
             err_checkf(exists(hkl), "hkl doesn't exist", cout);
+        }
+        else if (temp == "-hkl_min_max") {
+            int h_min(stoi(arguments[i + 1]));
+            int h_max(stoi(arguments[i + 2]));
+            int k_min(stoi(arguments[i + 3]));
+            int k_max(stoi(arguments[i + 4]));
+            int l_min(stoi(arguments[i + 5]));
+            int l_max(stoi(arguments[i + 6]));
+            hkl_min_max = { {h_min, h_max},{k_min, k_max},{l_min,l_max} };
         }
         else if (temp == "-IAM")
             iam_switch = true;
@@ -2684,6 +2682,17 @@ void options::digest_options()
             no_date = true;
         else if (temp == "-pbc")
             pbc = stoi(arguments[i + 1]);
+        else if (temp == "-polarizabilities")
+        {
+            pol_wfns = { arguments[i + 1],
+              arguments[i + 2],
+              arguments[i + 3],
+              arguments[i + 4],
+              arguments[i + 5],
+              arguments[i + 6],
+              arguments[i + 7]
+            };
+        }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
