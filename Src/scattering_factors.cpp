@@ -3120,14 +3120,13 @@ cdouble sfac_bessel(
 {
     using namespace std::complex_literals;
     double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
-                                                      //normalize the spherical harmonics k_point
+                                                           //normalize the spherical harmonics k_point
     const vec spherical = constants::cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
-    const double radial = fourier_bessel_integral(p, leng) * p.coefficient;
+    const cdouble radial = constants::FOUR_PI * constants::i_pows[p.type] * fourier_bessel_integral(p, leng) * p.coefficient;
     cdouble result(0.0, 0.0);
     for (int m = -p.type; m <= p.type; m++) {
-        cdouble angular = constants::real_spherical(p.type, m, spherical[1], spherical[2]);
-        result += constants::FOUR_PI * pow(1.0i, p.type) * radial * angular * coefs[m + p.type];
+        result +=  radial * constants::real_spherical(p.type, m, spherical[1], spherical[2]) * coefs[m + p.type];
     }
     return result;
 }

@@ -7,7 +7,7 @@
 #endif
 
 template <typename T>
-std::vector<std::vector<T>> reshape(std::vector<T> flatVec, Shape2D sizes)
+std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes)
 {
     std::vector<std::vector<T>> reshapedVec(sizes.rows, std::vector<T>(sizes.cols));
     for (int i = 0; i < sizes.rows; ++i)
@@ -19,13 +19,13 @@ std::vector<std::vector<T>> reshape(std::vector<T> flatVec, Shape2D sizes)
     }
     return reshapedVec;
 }
-template vec2 reshape(vec flatVec, Shape2D sizes);
-template cvec2 reshape(cvec flatVec, Shape2D sizes);
-template ivec2 reshape(ivec flatVec, Shape2D sizes);
+template vec2 reshape(const vec& flatVec, Shape2D sizes);
+template cvec2 reshape(const cvec& flatVec, Shape2D sizes);
+template ivec2 reshape(const ivec& flatVec, Shape2D sizes);
 
 // To_3D
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reshape(std::vector<T> flatVec, Shape3D sizes)
+std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes)
 {
     std::vector<std::vector<std::vector<T>>> reshapedVec(sizes.depth, std::vector<std::vector<T>>(sizes.rows, std::vector<T>(sizes.cols)));
     for (int i = 0; i < sizes.depth; ++i)
@@ -40,9 +40,9 @@ std::vector<std::vector<std::vector<T>>> reshape(std::vector<T> flatVec, Shape3D
     }
     return reshapedVec;
 }
-template vec3 reshape(vec flatVec, Shape3D sizes);
-template cvec3 reshape(cvec flatVec, Shape3D sizes);
-template std::vector<ivec2> reshape(ivec flatVec, Shape3D sizes);
+template vec3 reshape(const vec& flatVec, Shape3D sizes);
+template cvec3 reshape(const cvec& flatVec, Shape3D sizes);
+template std::vector<ivec2> reshape(const ivec& flatVec, Shape3D sizes);
 
 
 // Flatten Vectors 2D
@@ -98,10 +98,7 @@ template ivec flatten(const std::vector<ivec2> &vec3D);
 // SLICE Operation
 std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length)
 {
-    if (start + length > vec.size())
-    {
-        throw std::out_of_range("Slice range is out of bounds.");
-    }
+    err_checkf(start + length < vec.size(), "Slice range is out of bounds.", std::cout);
 
     std::vector<double> result;
     for (size_t i = start; i < start + length; ++i)
@@ -130,10 +127,7 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
     size_t cols2 = mat2[0].size();
 
     // Check if matrix multiplication is possible
-    if (cols1 != rows2)
-    {
-        throw std::invalid_argument("Matrix dimensions do not match for multiplication");
-    }
+    err_checkf (cols1 == rows2, "Matrix dimensions do not match for multiplication", std::cout);
 
     std::vector<std::vector<T>> result(rows1, std::vector<T>(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
@@ -298,9 +292,12 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
     else
     {
         // DLL not found, fallback
-        std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+        if (!myGlobalBool) {
+            std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+            myGlobalBool = true;
+        }
         std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
-        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { k2, n });
+        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
         if (transp1 && !transp2)
             return self_dot(transpose(mat1_2D), mat2_2D);
         else if (transp1 && transp2)
@@ -370,7 +367,7 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
     std::cout << "Something went wrong, using dot fallback." << std::endl;
     std::vector<T> result_flat(m * n, 0.0);
     std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
-    std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { k2, n });
+    std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
     if (transp1 && !transp2)
         return self_dot(transpose(mat1_2D), mat2_2D);
     else if (transp1 && transp2)
@@ -435,10 +432,7 @@ std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>&
 	int vec_size = static_cast<int>(vec.size());
 
 	// Check if matrix multiplication is possible
-	if (mat_cols != vec_size)
-	{
-		throw std::invalid_argument("Matrix dimensions do not match for multiplication");
-	}
+	err_checkf(mat_cols == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
     
     return dot_BLAS(flatten(mat), vec, mat_rows, mat_cols, transp);
 }
@@ -595,10 +589,7 @@ T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate)
 
 	size_t size = vec1.size();
 	// Check if vector dimensions match
-	if (size != vec2.size())
-	{
-		throw std::invalid_argument("Vector dimensions do not match for multiplication");
-	}
+	err_checkf (size == vec2.size(), "Vector dimensions do not match for multiplication", std::cout);
 
     return dot_BLAS(vec1, vec2, conjugate);
 }
@@ -822,15 +813,8 @@ vec2 collectRows(const vec2 &matrix, const ivec& indices)
     vec2 result;
     for (int index : indices)
     {
-        if (index < matrix.size())
-        {
-            result.push_back(matrix[index]);
-        }
-        else
-        {
-            // Handle the case where index is out of bounds
-            throw std::out_of_range("Index out of range");
-        }
+        err_checkf(index < matrix.size(), "Index out of range", std::cout);
+        result.push_back(matrix[index]);
     }
     return result;
 }
@@ -846,15 +830,8 @@ vec3 collectRows(const vec3 &cube, const ivec &indices)
     vec3 result;
     for (int index : indices)
     {
-        if (index < cube.size())
-        {
-            result.push_back(cube[index]);
-        }
-        else
-        {
-            // Handle the case where index is out of bounds
-            throw std::out_of_range("Index out of range");
-        }
+        err_checkf(index < cube.size(), "Index out of range", std::cout);
+        result.push_back(cube[index]);
     }
     return result;
 }

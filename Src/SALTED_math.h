@@ -29,10 +29,10 @@ struct Shape3D
 
 // To_2D
 template <typename T>
-std::vector<std::vector<T>> reshape(std::vector<T> flatVec, Shape2D sizes);
+std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes);
 // To_3D
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reshape(std::vector<T> flatVec, Shape3D sizes);
+std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes);
 
 // TRANSPOSES
 // 3D MATRIX

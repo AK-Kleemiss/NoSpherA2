@@ -45,6 +45,9 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                     l1 = llvec[0][il];
                     l2 = llvec[1][il];
 
+                    cvec2* v1_ptr = (cvec2*)&v1[l1][iat];
+                    cvec2* v2_ptr = (cvec2*)&v2[l2][iat];
+
                     fill(pcmplx.begin(), pcmplx.end(), null);
 
                     for (imu = 0; imu < l21; ++imu)
@@ -57,7 +60,7 @@ void equicomb(int natoms, int nang1, int nang2, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                pcmplx[imu] += w3j[iwig] * v1[l1][iat][im1][n1] * v2[l2][iat][im2][n2];
+                                pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1][n1] * (*v2_ptr)[im2][n2];
                                 iwig++;
                             }
                         }

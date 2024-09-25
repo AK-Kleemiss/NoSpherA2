@@ -45,6 +45,8 @@
 #include <cstring>
 #endif
 
+extern bool myGlobalBool;
+
 // Pre-definition of classes included later
 class WFN;
 class cell;

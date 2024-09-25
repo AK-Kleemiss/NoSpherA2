@@ -7,6 +7,7 @@
 #include "scattering_factors.h"
 #include "properties.h"
 
+bool myGlobalBool = false;
 
 int main(int argc, char **argv)
 {
