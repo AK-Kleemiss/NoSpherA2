@@ -27,7 +27,7 @@ int main(int argc, char **argv)
         return 1;
     }
     ofstream log_file("NoSpherA2.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
     vector<WFN> wavy;
@@ -345,7 +345,7 @@ int main(int argc, char **argv)
                     h5file = temp_pred.get_h5_filename();
                 }
                 log_file << "Using " << h5file << " for the prediction" << endl;
-                int nr_coefs = load_basis_into_WFN(wavy[0], basis_library.get_basis_set(df_basis_name));
+                load_basis_into_WFN(wavy[0], basis_library.get_basis_set(df_basis_name));
                 //int nr_coefs = load_basis_into_WFN(wavy[0], def2_qzvppd_rifit);
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation!" << endl;
@@ -354,8 +354,7 @@ int main(int argc, char **argv)
                     err_checkf(calculate_scattering_factors_ML_No_H(
                                    opt,
                                    wavy[0],
-                                   log_file,
-                                   nr_coefs),
+                                   log_file),
                                "Error during ML-SF Calcualtion", log_file);
                 else
                 {
@@ -364,8 +363,7 @@ int main(int argc, char **argv)
                     err_checkf(calculate_scattering_factors_ML(
                                    opt,
                                    wavy[0],
-                                   log_file,
-                                   nr_coefs),
+                                   log_file),
                                "Error during ML-SF Calcualtion", log_file);
                 }
 #else
@@ -375,7 +373,7 @@ int main(int argc, char **argv)
             }
         }
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn + ".cif");
@@ -387,7 +385,7 @@ int main(int argc, char **argv)
     {
         properties_calculation(opt);
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
     }
@@ -399,7 +397,7 @@ int main(int argc, char **argv)
         wavy[0].read_known_wavefunction_format(opt.wfn, log_file);
         wavy[0].write_wfn("converted.wfn", false, false);
         log_file.flush();
-        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn + ".cif");

@@ -17,7 +17,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     vec& p)
 {
     const int l21 = 2 * lam + 1;
-    const int llmax = llvec[0].size();
+    const int llmax = (int) llvec[0].size();
 
     // Initialize p with zeros
     p.assign(natoms * l21 * nfps, 0.0);

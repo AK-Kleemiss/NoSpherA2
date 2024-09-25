@@ -76,8 +76,7 @@ bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::o
 bool calculate_scattering_factors_ML(
     const options &opt, 
     const WFN &wave, 
-    std::ostream &file, 
-    const int exp_coefs);
+    std::ostream &file);
 
 /**
  * @brief Calculates the scattering factors for RI (Resolution of Identity) method without Hirshfeld weights.
@@ -90,8 +89,7 @@ bool calculate_scattering_factors_ML(
 bool calculate_scattering_factors_ML_No_H(
     const options &opt, 
     const WFN &wave, 
-    std::ostream &file, 
-    const int exp_coefs);
+    std::ostream &file);
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.

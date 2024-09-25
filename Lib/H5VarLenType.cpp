@@ -140,6 +140,7 @@ VarLenType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence the compiler warning
     }
     VarLenType *encoded_vltype = new VarLenType;
     encoded_vltype->p_setId(encoded_vltype_id);

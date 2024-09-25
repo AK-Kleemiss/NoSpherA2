@@ -396,5 +396,6 @@ herr_t Config::op_func(hid_t loc_id, const char* name, const H5L_info_t* info, v
     std::vector<std::string>* data = (std::vector<std::string> *) operator_data;
     data->push_back(name);
     return 0;
+    (void)info;
 }
 #endif

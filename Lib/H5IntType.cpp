@@ -141,6 +141,7 @@ IntType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence the compiler warning
     }
     IntType *encoded_inttype = new IntType;
     encoded_inttype->p_setId(encoded_inttype_id);

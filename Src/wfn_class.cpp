@@ -4949,6 +4949,10 @@ const double WFN::compute_MO_spherical(
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
+    (void)Pos1;
+    (void)Pos2;
+    (void)Pos3;
+    (void)MO;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
     //int iat;
     //int l = 0;
@@ -5103,7 +5107,11 @@ const double WFN::compute_dens_spherical(
 {
     err_not_impl_f("This one is not tested an will most likely not work, therefore aborting!", std::cout);
     return 0.0;
-
+    (void)Pos1;
+    (void)Pos2;
+    (void)Pos3;
+    (void)d;
+    (void)phi;
     //err_checkf(d_f_switch, "Only works for spheriacl wavefunctions!", std::cout);
     //std::fill(phi.begin(), phi.end(), 0.0);
     //double Rho = 0.0;

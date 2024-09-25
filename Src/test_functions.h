@@ -694,7 +694,7 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1)
+void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
 {
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
@@ -763,8 +763,6 @@ void calc_cube_ML(vec data, WFN &dummy, const int &exp_coef, const int atom = -1
 
 //Only valid for one atom positioned at 0,0,0
 double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type) {
-    double result = 0.0;
-    int iat = 0;
     int l[3]{ 0, 0, 0 };
     double ex = 0;
     double temp = 0;
@@ -805,10 +803,7 @@ double compute_MO_spherical_orig(double x, double y, double z, double expon, dou
 //Only valid for one atom positioned at 0,0,0
 double compute_MO_spherical_new(double x, double y, double z, double expon, double coef, int type, int m = 1) {
     double result = 0.0;
-    int iat = 0;
     int l[3]{ 0, 0, 0 };
-    double ex = 0;
-    double temp = 0;
     int type_local = type;
     double N = 1;
     //convert "type" to l
@@ -1033,10 +1028,10 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 
     const int nr_coefs = load_basis_into_WFN(dummy, def2_qzvppd_rifit);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    calc_cube_ML(data, dummy, nr_coefs);
+    calc_cube_ML(data, dummy);
 
     for (int i = 0; i < dummy.get_ncen(); i++)
-        calc_cube_ML(data, dummy, nr_coefs, i);
+        calc_cube_ML(data, dummy, i);
 }
 
 void test_xtb_molden(options &opt, std::ostream &log_file)
@@ -1444,9 +1439,9 @@ void test_analytical_fourier() {
                     k_pt_local[d] = kpts[i][d] * 2 * constants::PI;
                 }
                 sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
-                for (int p = 0; p < grid[0].size(); p++) {
-                    double work = 2 * constants::PI * (kpts[i][0] * grid[0][p] + kpts[i][1] * grid[1][p] + kpts[i][2] * grid[2][p]);
-                    sf_N[0][i] += std::polar(grid[3][p] * grid[4][p], work);
+                for (int _p = 0; _p < grid[0].size(); _p++) {
+                    double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
+                    sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
                 diff = abs(sf_A[0][i] - sf_N[0][i]);
                 if (abs(diff) > abs(max_diff)) {

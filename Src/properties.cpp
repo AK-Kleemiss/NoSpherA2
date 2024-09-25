@@ -1301,7 +1301,7 @@ void properties_calculation(options &opt)
 {
     using namespace std;
     ofstream log2("NoSpherA2_cube.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
+    auto _coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
     log2 << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
@@ -1546,7 +1546,7 @@ void properties_calculation(options &opt)
         log2 << "  done!" << endl;
     }
     // return output to cout
-    std::cout.rdbuf(coutbuf);
+    std::cout.rdbuf(_coutbuf);
     log2.close();
     std::cout<< "Properties calculation done!" << std::endl;
 }
@@ -1672,6 +1672,7 @@ static void Calc_Hirshfeld_atom_2(
   int _atom,
   std::ostream& file)
 {
+    (void)file;
     using namespace std;
 #ifdef _OPENMP
   if (cpus != -1)

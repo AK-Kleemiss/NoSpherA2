@@ -146,15 +146,15 @@ void SALTEDPredictor::read_model_data()
             vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
             power_env_sparse[spe + std::to_string(lam)] = temp_power;
             vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{ dims_out_proj[0], dims_out_proj[1] });
+            Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{ (int)dims_out_proj[0], (int)dims_out_proj[1] });
 
             if (lam == 0)
             {
-                Mspe[spe] = dims_out_descrip[0];
+                Mspe[spe] = (int)dims_out_descrip[0];
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
+                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
             }
         }
     }
@@ -208,15 +208,15 @@ void SALTEDPredictor::read_model_data_h5() {
             vec temp_power = readHDF5<double>(input, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
             power_env_sparse[spe + to_string(lam)] = temp_power;
             vec temp_proj = readHDF5<double>(input, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{dims_out_proj[0], dims_out_proj[1]});
+            Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{(int)dims_out_proj[0], (int)dims_out_proj[1]});
 
             if (lam == 0)
             {
-                Mspe[spe] = dims_out_descrip[0];
+                Mspe[spe] = (int)dims_out_descrip[0];
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power,dims_out_proj[0], dims_out_proj[1], dims_out_descrip[0], dims_out_descrip[1], true, false));
+                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
             }
         }
     }

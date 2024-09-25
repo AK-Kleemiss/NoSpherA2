@@ -53,6 +53,14 @@ protected:
 						   double *Orb)
 	{
 		err_not_impl_SA();
+		(void)nr_ex;
+		(void)nr_coef;
+		(void)dist;
+		(void)offset;
+		(void)n_vector;
+		(void)lower_m;
+		(void)upper_m;
+		(void)Orb;
 	};
 	virtual double calc_type(
 		int &nr_ex,
@@ -66,6 +74,15 @@ protected:
 		const int &min)
 	{
 		err_not_impl_SA();
+        (void)nr_ex;
+        (void)nr_coef;
+        (void)k_vector;
+        (void)offset;
+        (void)n_vector;
+        (void)lower_m;
+        (void)upper_m;
+        (void)max;
+        (void)min;
 		return -1;
 	};
 
@@ -85,16 +102,20 @@ public:
 	virtual const double get_radial_density(double &dist)
 	{
 		err_not_impl_SA();
+        (void)dist;
 		return -1;
 	};
 	virtual const double get_form_factor(const double &k_vector)
 	{
 		err_not_impl_SA();
+        (void)k_vector;
 		return -1;
 	};
 	virtual const double get_core_form_factor(const double &k_vector, const int &core_els)
 	{
 		err_not_impl_SA();
+        (void)k_vector;
+        (void)core_els;
 		return -1;
 	};
 	virtual const double get_custom_form_factor(
@@ -109,6 +130,15 @@ public:
 		const int &min_f)
 	{
 		err_not_impl_SA();
+        (void)k_vector;
+        (void)max_s;
+        (void)max_p;
+        (void)max_d;
+        (void)max_f;
+        (void)min_s;
+        (void)min_p;
+        (void)min_d;
+        (void)min_f;
 		return -1;
 	};
 	const int get_atomic_number() const { return atomic_number; };

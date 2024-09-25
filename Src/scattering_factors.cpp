@@ -2026,7 +2026,6 @@ static int make_hirshfeld_grids_ML(
     vec2 &d2,
     vec2 &d3,
     vec2 &dens,
-    const int exp_coefs,
     const svec &labels,
     std::ostream &file,
     std::vector<time_point> &time_points,
@@ -2139,7 +2138,6 @@ static int make_hirshfeld_grids_ML(
 
     ivec new_gridsize(atoms_with_grids, 0);
     ivec reductions(atoms_with_grids, 0);
-    int final_size = 0;
     // Total grid as a sum of all atomic grids.
     // Dimensions: [c] [p]
     // p = the number of gridpoint
@@ -2238,14 +2236,10 @@ static int make_hirshfeld_grids_ML(
 
 
     double el_sum = 0.0;
-
     int  e = 0, size = 0;
-    double radial = 0, d = 0;
-
-    const int nr_pts = (int)total_grid[0].size();
+    double radial = 0;
     const basis_set_entry* bf;
     double n = 0;
-    
 
     int coef_counter = 0;
     for (int i = 0; i < asym_atom_list.size(); i++) {
@@ -2442,7 +2436,6 @@ static int make_hirshfeld_grids_ML(
  */
 static int make_integration_grids(
     const int &accuracy,
-    cell &unit_cell,
     const WFN &wave,
     vec coefs,
     const ivec &atom_type_list,
@@ -2452,7 +2445,6 @@ static int make_integration_grids(
     vec2 &d2,
     vec2 &d3,
     vec2 &dens,
-    const int exp_coefs,
     const svec &labels,
     std::ostream &file,
     std::vector<time_point> &time_points,
@@ -2762,7 +2754,6 @@ static int make_integration_grids(
  */
 static int make_integration_grids_SALTED(
     const int &accuracy,
-    cell &unit_cell,
     const WFN &wave,
     vec coefs,
     const ivec &atom_type_list,
@@ -2772,7 +2763,6 @@ static int make_integration_grids_SALTED(
     vec2 &d2,
     vec2 &d3,
     vec2 &dens,
-    const int exp_coefs,
     const svec &labels,
     std::ostream &file,
     std::vector<time_point> &time_points,
@@ -3963,8 +3953,7 @@ bool calculate_scattering_factors_HF(
 bool calculate_scattering_factors_ML(
     const options &opt,
     const WFN &wave,
-    std::ostream &file,
-    const int exp_coefs)
+    std::ostream &file)
 {
     using namespace std;
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
@@ -4118,8 +4107,7 @@ bool calculate_scattering_factors_ML(
 bool calculate_scattering_factors_ML_No_H(
     const options &opt,
     const WFN &wave,
-    std::ostream &file,
-    const int exp_coefs)
+    std::ostream &file)
 {
     using namespace std;
     err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
@@ -4189,14 +4177,12 @@ bool calculate_scattering_factors_ML_No_H(
         file << "Making pure SALTED densities\n";
         points = make_integration_grids_SALTED(
             opt.accuracy,
-            unit_cell,
             wave,
             coefs,
             atom_type_list,
             asym_atom_list,
             needs_grid,
             d1, d2, d3, dens,
-            exp_coefs,
             labels,
             file,
             time_points,
@@ -4210,14 +4196,12 @@ bool calculate_scattering_factors_ML_No_H(
         file << "Making SALTED densities and use Becke Integration\n";
         points = make_integration_grids(
             opt.accuracy,
-            unit_cell,
             wave,
             coefs,
             atom_type_list,
             asym_atom_list,
             needs_grid,
             d1, d2, d3, dens,
-            exp_coefs,
             labels,
             file,
             time_points,

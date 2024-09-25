@@ -159,6 +159,7 @@ EnumType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence compiler warning
     }
     EnumType *encoded_enumtype = new EnumType;
     encoded_enumtype->p_setId(encoded_enumtype_id);
