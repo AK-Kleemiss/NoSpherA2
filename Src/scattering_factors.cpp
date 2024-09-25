@@ -1856,7 +1856,7 @@ int make_hirshfeld_grids(
                 diffs += pow(diff, 2);
                 upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
                 lower += abs(total_grid[5][p] + densy);
-                avg += diff;
+                avg += abs(diff);
                 run++;
             }
         }
@@ -2998,10 +2998,9 @@ void make_k_pts(const bool &read_k_pts,
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 double fourier_bessel_integral(
     const primitive& p,
-    const double H
+    const double& H
 )
 {
-    using namespace std::complex_literals;
     const int l = p.type;
     const double b = p.exp;
     double N = p.norm_const;
@@ -3017,16 +3016,11 @@ cdouble sfac_bessel(
 )
 {
     using namespace std::complex_literals;
-    vec local_k = k_point;
-    double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
-    double H = leng;
-    //normalize the spherical harmonics k_point
-    for (int i = 0; i < 3; i++)
-        local_k[i] /= leng;
+    double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
+                                                      //normalize the spherical harmonics k_point
+    const vec spherical = constants::cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
-    vec spherical = constants::cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
-
-    double radial = fourier_bessel_integral(p, H) * p.coefficient;
+    const double radial = fourier_bessel_integral(p, leng) * p.coefficient;
     cdouble result(0.0, 0.0);
     for (int m = -p.type; m <= p.type; m++) {
         cdouble angular = constants::real_spherical(p.type, m, spherical[1], spherical[2]);
@@ -3053,7 +3047,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
             int coef_count = 0;
             vec k_pt_local = { k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt] };
             for (int iat = 0; iat < atom_list.size(); iat++) {
-                const int lim = atom_list[iat].basis_set.size();
+                const int lim = (int) atom_list[iat].basis_set.size();
                 for (int i_basis = 0; i_basis < lim; i_basis++) {
                     basis = atom_list[iat].basis_set[i_basis].p;
                     vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);

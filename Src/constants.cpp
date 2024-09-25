@@ -257,22 +257,21 @@ namespace constants {
         return SH;
     }
 
-    double associated_legendre_polynomial(int l, int m, double x) {
-        double result = 0.0;
+    double associated_legendre_polynomial(const int &l, const int &m, const double &x) {
         switch (l) {
         case 0:
-            result = 1.0;
+            return 1.0;
             break;
         case 1:
             switch (m) {
             case 0:
-                result = x;
+                return x;
                 break;
             case 1:
-                result = sqrt(1 - x * x);
+                return sqrt(1 - x * x);
                 break;
             case -1:
-                result = -0.5 * sqrt(1 - x * x);
+                return -0.5 * sqrt(1 - x * x);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -281,19 +280,19 @@ namespace constants {
         case 2:
             switch (m) {
             case 0:
-                result = 0.5 * (3 * x * x - 1);
+                return 0.5 * (3 * x * x - 1);
                 break;
             case 1:
-                result = 3.0 * x * sqrt(1 - x * x);
+                return 3.0 * x * sqrt(1 - x * x);
                 break;
             case 2:
-                result = -3.0 * (x * x - 1);
+                return -3.0 * (x * x - 1);
                 break;
             case -1:
-                result = -0.5 * x * sqrt(1 - x * x);
+                return -0.5 * x * sqrt(1 - x * x);
                 break;
             case -2:
-                result = -0.125 * (1 - x * x);
+                return -0.125 * (1 - x * x);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -302,25 +301,25 @@ namespace constants {
         case 3:
             switch (m) {
             case 0:
-                result = 0.5 * x * (5 * x * x - 3);
+                return 0.5 * x * (5 * x * x - 3);
                 break;
             case 1:
-                result = 1.5 * (5 * x * x - 1) * sqrt(1 - x * x);
+                return 1.5 * (5 * x * x - 1) * sqrt(1 - x * x);
                 break;
             case 2:
-                result = -15.0 * x * (x * x - 1);
+                return -15.0 * x * (x * x - 1);
                 break;
             case 3:
-                result = 15.0 * pow(1 - x * x, 1.5);
+                return 15.0 * pow(1 - x * x, 1.5);
                 break;
             case -1:
-                result = -0.125 * (5 * x * x - 1) * sqrt(1 - x * x);
+                return -0.125 * (5 * x * x - 1) * sqrt(1 - x * x);
                 break;
             case -2:
-                result = 0.125 * x * (x * x - 1);
+                return 0.125 * x * (x * x - 1);
                 break;
             case -3:
-                result = -(1.0 / 48.0) * pow(1 - x * x, 1.5);
+                return -(1.0 / 48.0) * pow(1 - x * x, 1.5);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -329,31 +328,31 @@ namespace constants {
         case 4:
             switch (m) {
             case 0:
-                result = 4.375 * x * x * x * x - 3.75 * x * x + 0.375;
+                return 4.375 * x * x * x * x - 3.75 * x * x + 0.375;
                 break;
             case 1:
-                result = 2.5 * sqrt(1 - x * x) * (7 * x * x * x - 3 * x);
+                return 2.5 * sqrt(1 - x * x) * (7 * x * x * x - 3 * x);
                 break;
             case 2:
-                result = -7.5 * (x * x - 1) * (7 * x * x - 1);
+                return -7.5 * (x * x - 1) * (7 * x * x - 1);
                 break;
             case 3:
-                result = 105.0 * x * pow(1 - x * x, 1.5);
+                return 105.0 * x * pow(1 - x * x, 1.5);
                 break;
             case 4:
-                result = 105.0 * pow(x * x - 1, 2.0);
+                return 105.0 * pow(x * x - 1, 2.0);
                 break;
             case -1:
-                result = -0.125 * sqrt(1 - x * x) * (7 * x * x * x - 3 * x);
+                return -0.125 * sqrt(1 - x * x) * (7 * x * x * x - 3 * x);
                 break;
             case -2:
-                result = (1.0 / 48.0) * (x * x - 1) * (7 * x * x - 1);
+                return (1.0 / 48.0) * (x * x - 1) * (7 * x * x - 1);
                 break;
             case -3:
-                result = -(1.0 / 48.0) * pow(1 - x, 1.5) * x * pow(x + 1, 1.5);
+                return -(1.0 / 48.0) * pow(1 - x, 1.5) * x * pow(x + 1, 1.5);
                 break;
             case -4:
-                result = -(1.0 / 384.0) * pow(x * x - 1, 2.0);
+                return -(1.0 / 384.0) * pow(x * x - 1, 2.0);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -362,37 +361,37 @@ namespace constants {
         case 5:
             switch (m) {
             case 0:
-                result = 7.875 * x * x * x * x * x - 8.75 * x * x * x + 1.875 * x;
+                return 7.875 * x * x * x * x * x - 8.75 * x * x * x + 1.875 * x;
                 break;
             case 1:
-                result = (15.0 / 8.0) * sqrt(1 - x * x) * (21 * x * x * x * x - 14 * x * x + 1);
+                return (15.0 / 8.0) * sqrt(1 - x * x) * (21 * x * x * x * x - 14 * x * x + 1);
                 break;
             case 2:
-                result = -(105.0 / 2.0) * (x * x - 1) * (3 * x * x * x - x);
+                return -(105.0 / 2.0) * (x * x - 1) * (3 * x * x * x - x);
                 break;
             case 3:
-                result = (105.0 / 2.0) * pow(1 - x * x, 1.5) * (9 * x * x - 1);
+                return (105.0 / 2.0) * pow(1 - x * x, 1.5) * (9 * x * x - 1);
                 break;
             case 4:
-                result = 945.0 * x * pow(x * x - 1, 2);
+                return 945.0 * x * pow(x * x - 1, 2);
                 break;
             case 5:
-                result = 945.0 * pow(1 - x * x, 2.5);
+                return 945.0 * pow(1 - x * x, 2.5);
                 break;
             case -1:
-                result = -sqrt(1 - x * x) * (1.3125 * x * x * x * x - 0.875 * x * x + 0.0625);
+                return -sqrt(1 - x * x) * (1.3125 * x * x * x * x - 0.875 * x * x + 0.0625);
                 break;
             case -2:
-                result = (1.0 / 16.0) * (x * x - 1) * (3 * x * x * x - x);
+                return (1.0 / 16.0) * (x * x - 1) * (3 * x * x * x - x);
                 break;
             case -3:
-                result = -(1.0 / 384.0) * pow(1 - x * x, 1.5) * (9 * x * x - 1);
+                return -(1.0 / 384.0) * pow(1 - x * x, 1.5) * (9 * x * x - 1);
                 break;
             case -4:
-                result = -(1.0 / 384.0) * x * pow(x * x - 1, 2.0);
+                return -(1.0 / 384.0) * x * pow(x * x - 1, 2.0);
                 break;
             case -5:
-                result = -(1.0 / 3840.0) * pow(1 - x * x, 2.5);
+                return -(1.0 / 3840.0) * pow(1 - x * x, 2.5);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -401,43 +400,43 @@ namespace constants {
         case 6:  //THIS IS WILDLY UNTESTED BECAUSE I DONT TRUST constants::spherical_harmonic!!!! (WORKS FOR m=0)
             switch (m) {
             case 0:
-                result = 14.4375 * x * x * x * x * x * x - 19.6875 * x * x * x * x + 6.5625 * x * x - 0.3125;
+                return 14.4375 * x * x * x * x * x * x - 19.6875 * x * x * x * x + 6.5625 * x * x - 0.3125;
                 break;
             case 1:
-                result = -2.625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
+                return -2.625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
                 break;
             case 2:
-                result = -13.125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
+                return -13.125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
                 break;
             case 3:
-                result = -157.5 * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
+                return -157.5 * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
                 break;
             case 4:
-                result = 472.5 * pow(x * x - 1, 2.0) * (11 * x * x - 1);
+                return 472.5 * pow(x * x - 1, 2.0) * (11 * x * x - 1);
                 break;
             case 5:
-                result = -10395.0 * x * pow(1 - x * x, 2.5);
+                return -10395.0 * x * pow(1 - x * x, 2.5);
                 break;
             case 6:
-                result = -10395.0 * pow(x * x - 1, 3.0);
+                return -10395.0 * pow(x * x - 1, 3.0);
                 break;
             case -1:
-                result = 0.0625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
+                return 0.0625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
                 break;
             case -2:
-                result = -0.0078125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
+                return -0.0078125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
                 break;
             case -3:
-                result = -(1.0 / 384.0) * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
+                return -(1.0 / 384.0) * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
                 break;
             case -4:
-                result = (1.0 / 3840.0) * pow(x * x - 1, 2.0) * (11 * x * x - 1);
+                return (1.0 / 3840.0) * pow(x * x - 1, 2.0) * (11 * x * x - 1);
                 break;
             case -5:
-                result = (1.0 / 3840.0) * x * pow(1 - x * x, 2.5);
+                return (1.0 / 3840.0) * x * pow(1 - x * x, 2.5);
                 break;
             case -6:
-                result = -(1.0 / 46080.0) * pow(x * x - 1, 3.0);
+                return -(1.0 / 46080.0) * pow(x * x - 1, 3.0);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
@@ -445,31 +444,27 @@ namespace constants {
             break;
         default:
             err_not_impl_f("associated_legendre_polynomial l > 6 ", std::cout);
+            return -1000.;
         }
-        return result;
+        return -1000.;
     };
 
     //Returns the spherical coordinates of a given cartesian vector
     //the output is a vector with the (radius, theta and phi)
-    vec cartesian_to_spherical(double x, double y, double z) {
-        using namespace std;
-        double theta, phi;
+    vec cartesian_to_spherical(const double& x, const double& y, const double& z) {
         double r = sqrt(x * x + y * y + z * z);
         if (r == 0) {
-            theta = 0;
-            phi = 0;
+            return { r, 0., 0. };
         }
         else {
-            theta = acos(z / r);
-            phi = atan2(y, x);
+            return { r, acos(z / r), atan2(y, x) };
         }
-        return { r, theta, phi };
     }
 
 
     //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
     //I omitted the abs(m) in the factorial as most other sources do not include it
-    double real_spherical(int l, int m, double theta, double phi) {
+    double real_spherical(const int& l, const int& m, const double& theta, const double& phi) {
         double N;
         m == 0 ? N = sqrt((2 * l + 1) / constants::FOUR_PI) : N = sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)]));
         if (m >= 0) {

@@ -443,7 +443,7 @@ namespace constants
 
     const double spherical_harmonic(const int& l, const int& m, const double* d);
     
-    double associated_legendre_polynomial(int l, int m, double x);
-    std::vector<double> cartesian_to_spherical(double x, double y, double z);
-    double real_spherical(int l, int m, double theta, double phi);
+    double associated_legendre_polynomial(const int &l, const int &m, const double &x);
+    std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
+    double real_spherical(const int& l, const int& m, const double& theta, const double& phi);
 }

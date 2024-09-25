@@ -281,7 +281,7 @@ void calc_SF(const int &points,
 
 double fourier_bessel_integral(
     const primitive& p,
-    const double H
+    const double& H
 );
 
 cdouble sfac_bessel(

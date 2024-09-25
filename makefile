@@ -35,11 +35,11 @@ endif
 ifeq ($(NAME),LINUX)
 	@echo "Start making Linux executable"
 	rm -f NoSpherA2
-	cd Linux && rm -f NoSpherA2 && make all
+	cd Linux && rm -f NoSpherA2 && make all -j
 endif
 ifeq ($(NAME),MAC)
 	@echo "Start making Mac executable"
-	cd Mac && rm -f NoSpherA2 && make all
+	cd Mac && rm -f NoSpherA2 && make all -j
 endif
 
 test: 
