@@ -2197,6 +2197,7 @@ double get_bessel_ratio(const double nu, const double x)
 double bessel_first_kind(const int l, const double x) {
     if (l < 0 || x < 0.0) {
         err_not_impl_f("This is not implemented, pelase dont do this to me!", std::cout);
+        return -1000;
     }
     else if (x == 0.0) {
         return (l > 0 ? 0.0 : 1.0);

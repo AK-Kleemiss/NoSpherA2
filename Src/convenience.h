@@ -28,6 +28,8 @@
 #include <numeric>
 #include <cassert>
 #include <float.h>
+#include <algorithm>
+#include <execution>
 
 // Here are the system specific libaries
 #ifdef _WIN32
@@ -54,8 +56,8 @@ class atom;
 class BasisSet;
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
-inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
-inline void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
+void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
+void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)

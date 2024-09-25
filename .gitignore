@@ -65,3 +65,4 @@ Linux/NoSpherA2_rascaline
 NoSpherA2_rascaline
 /Windows/*/*/libopenblas.dll
 *.exp
+*.o_RASC

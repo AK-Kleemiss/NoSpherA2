@@ -1,7 +1,7 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -lgomp -static-libgcc -static-libstdc++
+LIBS := -lgomp -static-libgcc -static-libstdc++ -ltbb
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
