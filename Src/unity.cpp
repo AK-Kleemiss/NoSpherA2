@@ -5,6 +5,7 @@
 #include "./AtomGrid.cpp"
 #include "./basis_set.cpp"
 #include "./convenience.cpp"
+#include "./constants.cpp"
 #include "./sphere_lebedev_rule.cpp"
 #include "./scattering_factors.cpp"
 #include "./cube.cpp"

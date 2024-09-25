@@ -204,6 +204,9 @@
     <ClCompile Include="..\Lib\cerf\width.cpp">
       <Filter>Quelldateien\cerf</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\constants.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
