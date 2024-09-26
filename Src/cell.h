@@ -71,17 +71,17 @@ public:
     double get_sa() const { return sa; };
     double get_sb() const { return sb; };
     double get_sg() const { return sg; };
-    double get_rcm(int i, int j) const { return rcm[i][j]; };
-    double get_cm(int i, int j) const { return cm[i][j]; };
-    double get_rcm_angs(int i, int j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
-    double get_cm_angs(int i, int j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
-    double get_sym(int i, int j, int k) const { return sym[i][j][k]; };
+    double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
+    double get_cm(const int& i, const int& j) const { return cm[i][j]; };
+    double get_rcm_angs(const int& i, const int& j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
+    double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
+    double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
     std::vector<ivec2> get_sym() const { return sym; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };
     double get_V() const { return V; };
-    double get_angle(int i) const
+    double get_angle(const int& i) const
     {
         switch (i)
         {

@@ -3044,7 +3044,7 @@ void make_k_pts(const bool &read_k_pts,
                 const cell &unit_cell,
                 hkl_list &hkl,
                 vec2 &k_pt,
-    std::ostream &file,
+                std::ostream &file,
                 bool debug = false)
 {
     using namespace std;
@@ -3058,16 +3058,18 @@ void make_k_pts(const bool &read_k_pts,
 
         if (debug)
             file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+        //Create local copy of hkl list for faster access
+        const ivec2 hkl_vector(hkl.begin(), hkl.end());
 
 #pragma omp parallel for
         for (int ref = 0; ref < size; ref++)
         {
-            hkl_list_it hkl_ = next(hkl.begin(), ref);
+            const ivec hkl_ = hkl_vector[ref];
             for (int x = 0; x < 3; x++)
             {
                 for (int j = 0; j < 3; j++)
                 {
-                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * (*(hkl_))[j];
+                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
                 }
             }
         }
@@ -3096,9 +3098,7 @@ double fourier_bessel_integral(
 {
     const int l = p.type;
     const double b = p.exp;
-    double N = p.norm_const;
-
-    return N * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
+    return p.norm_const * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
 
@@ -3109,14 +3109,14 @@ cdouble sfac_bessel(
 )
 {
     using namespace std::complex_literals;
-    double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
+    const double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
                                                            //normalize the spherical harmonics k_point
-    const vec spherical = constants::cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
+    const std::pair<double,double> spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
-    const cdouble radial = constants::FOUR_PI * constants::i_pows[p.type] * fourier_bessel_integral(p, leng) * p.coefficient;
+    const cdouble radial = constants::FOUR_PI_i_pows[p.type] * fourier_bessel_integral(p, leng) * p.coefficient;
     cdouble result(0.0, 0.0);
     for (int m = -p.type; m <= p.type; m++) {
-        result +=  radial * constants::real_spherical(p.type, m, spherical[1], spherical[2]) * coefs[m + p.type];
+        result +=  radial * constants::real_spherical(p.type, m, spherical.first, spherical.second) * coefs[m + p.type];
     }
     return result;
 }

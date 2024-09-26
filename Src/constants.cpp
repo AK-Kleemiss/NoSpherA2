@@ -461,17 +461,74 @@ namespace constants {
         }
     }
 
+    //Returns the spherical coordinates of a given cartesian vector
+    //the output is a vector with the (radius, theta and phi)
+    std::pair<double,double> norm_cartesian_to_spherical(const double& x, const double& y, const double& z) {
+        return { acos(z), atan2(y, x) };
+    }
+
+    const vec2 spherical_norms{
+        {sqrt(1 / constants::FOUR_PI)}, // l=0
+        {sqrt(3 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[0])),
+         sqrt(3 / constants::FOUR_PI),
+         sqrt(3 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[2]))}, // l=1 m=-1, m=0, m=1
+        {sqrt(5 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[0])),
+         sqrt(5 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[1])),
+         sqrt(5 / constants::FOUR_PI) ,
+         sqrt(5 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[3])),
+         sqrt(5 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[4]))}, // l=2 m=-2, m=-1, m=0, m=1, m=2
+        {sqrt(7 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[0])),
+         sqrt(7 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[1])),
+         sqrt(7 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[2])),
+         sqrt(7 / constants::FOUR_PI),
+         sqrt(7 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[4])),
+         sqrt(7 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[5])),
+         sqrt(7 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[6]))}, // l=3 m=-3, m=-2, m=-1, m=0, m=1, m=2, m=3
+        {sqrt(9 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[0])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[1])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[2])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[3])),
+         sqrt(9 / constants::FOUR_PI),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[5])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[6])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[7])),
+         sqrt(9 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[8]))}, // l=4 m=-4, m=-3, m=-2, m=-1, m=0, m=1, m=2, m=3, m=4
+        {sqrt(11 / constants::TWO_PI * double(constants::ft[10]) / double(constants::ft[0])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[9]) / double(constants::ft[1])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[2])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[3])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[4])),
+         sqrt(11 / constants::FOUR_PI),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[6])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[7])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[8])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[9])),
+         sqrt(11 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[10]))}, // l=5 m=-5, m=-4, m=-3, m=-2, m=-1, m=0, m=1, m=2, m=3, m=4, m=5
+        {sqrt(13 / constants::TWO_PI * double(constants::ft[12]) / double(constants::ft[0])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[11]) / double(constants::ft[1])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[10]) / double(constants::ft[2])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[9]) / double(constants::ft[3])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[4])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[5])),
+         sqrt(13 / constants::FOUR_PI),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[7])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[8])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[9])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[10])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[11])),
+         sqrt(13 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[12]))} // l=6 m=-6, m=-5, m=-4, m=-3, m=-2, m=-1, m=0, m=1, m=2, m=3, m=4, m=5, m=6
+    };
 
     //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
     //I omitted the abs(m) in the factorial as most other sources do not include it
     double real_spherical(const int& l, const int& m, const double& theta, const double& phi) {
-        double N;
-        m == 0 ? N = sqrt((2 * l + 1) / constants::FOUR_PI) : N = sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)]));
+        //double N;
+        //m == 0 ? N = sqrt((2 * l + 1) / constants::FOUR_PI) : N = sqrt(((2 * l + 1) / constants::TWO_PI) * double(constants::ft[l - (m)]) / double(constants::ft[l + (m)]));
         if (m >= 0) {
-            return N * associated_legendre_polynomial(l, m, cos(theta)) * cos(m * phi);
+            return spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * cos(m * phi);
         }
         else {
-            return N * associated_legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
+            return spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
         }
     }
 }

@@ -125,6 +125,8 @@ namespace constants
     constexpr double c_1155_64p = sqrt(1155.0 / (64.0 * PI));
     constexpr double c_3465_256p = sqrt(3465.0 / (256.0 * PI));
     constexpr double c_3003_2048p = sqrt(3003.0 / (2048.0 * PI));
+
+    constexpr int pow_2[] = { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576 };
     
     constexpr size_t sod = sizeof(double);
     constexpr size_t soi = sizeof(int);
@@ -257,6 +259,20 @@ namespace constants
         std::complex<double>(0.0, 1.0), 
         std::complex<double>(-1.0, 0.0), 
         std::complex<double>(0.0, -1.0) };
+
+    constexpr std::complex<double> FOUR_PI_i_pows[] = {
+        std::complex<double>(FOUR_PI, 0.0),
+        std::complex<double>(0.0, FOUR_PI),
+        std::complex<double>(-FOUR_PI, 0.0),
+        std::complex<double>(0.0, -FOUR_PI),
+        std::complex<double>(FOUR_PI, 0.0),
+        std::complex<double>(0.0, FOUR_PI),
+        std::complex<double>(-FOUR_PI, 0.0),
+        std::complex<double>(0.0, -FOUR_PI),
+        std::complex<double>(FOUR_PI, 0.0),
+        std::complex<double>(0.0, FOUR_PI),
+        std::complex<double>(-FOUR_PI, 0.0),
+        std::complex<double>(0.0, -FOUR_PI) };
 
     constexpr const char* Labels[] = { "DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr" };
     const char* atnr2letter(const int& nr);
@@ -459,5 +475,6 @@ namespace constants
     
     double associated_legendre_polynomial(const int &l, const int &m, const double &x);
     std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
+    std::pair<double, double> norm_cartesian_to_spherical(const double& x, const double& y, const double& z);
     double real_spherical(const int& l, const int& m, const double& theta, const double& phi);
 }
