@@ -164,6 +164,7 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
 void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
+void join_path(std::string& s1, std::initializer_list<std::string> s2);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);

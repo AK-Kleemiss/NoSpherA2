@@ -170,12 +170,16 @@ void SALTEDPredictor::read_model_data()
 
     if (config.sparsify)
     {
-        vfps = read_fps<int64_t>(opt.SALTED_DIR + "/GPR_data/fps" + to_string(config.ncut) + "-", SALTED_Utils::get_lmax_max(lmax));
+        std::string path = opt.SALTED_DIR;
+        join_path(path, { "GPR_data", "fps" + to_string(config.ncut) + "-" });
+        vfps = read_fps<int64_t>(path, SALTED_Utils::get_lmax_max(lmax));
     };
     if (config.average) {
         for (string spe : config.species)
         {
-            read_npy(opt.SALTED_DIR + "/averages/averages_" + spe + ".npy", av_coefs[spe]);
+            string path = opt.SALTED_DIR;
+            join_path(path, { "averages", "averages_" + spe + ".npy" });
+            read_npy(path, av_coefs[spe]);
         }
     }
 
@@ -189,7 +193,9 @@ void SALTEDPredictor::read_model_data()
     }
     else
     {
-        read_npy(opt.SALTED_DIR + "/GPR_data/weights_N" + to_string(ntrain) + "_reg-6.npy", weights);
+        string path = opt.SALTED_DIR;
+        join_path(path, { "GPR_data", "weights_N" + to_string(ntrain) + "_reg-6.npy"});
+        read_npy(path, weights);
     }
 }
 

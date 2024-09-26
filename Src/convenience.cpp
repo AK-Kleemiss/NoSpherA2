@@ -194,6 +194,28 @@ void join_path(std::string &s1, std::string &s2)
     s1.append(s2);
 }
 
+void join_path(std::string& s1, std::initializer_list<std::string> s2)
+{
+    std::string separator;
+#ifdef _WIN32
+    separator = "\\";
+#else
+    separator = "/";
+#endif
+    // Ensure that the initial path has a trailing separator if needed
+    if (!s1.empty() && s1.back() != '/' && s1.back() != '\\') {
+        s1.append(separator);
+}
+    // Iterate over each segment in the initializer list
+    for (auto it = s2.begin(); it != s2.end(); ++it) {
+        s1.append(*it);
+        // Append the separator if it's not the last segment
+        if (std::next(it) != s2.end() && it->back() != '/' && it->back() != '\\') {
+            s1.append(separator);
+        }
+    }
+}
+
 std::string get_filename_from_path(const std::string &input)
 {
 #ifdef _WIN32
