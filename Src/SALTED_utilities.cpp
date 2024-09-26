@@ -140,13 +140,13 @@ std::string Rascaline_Descriptors::gen_parameters()
 {
     std::ostringstream oss;
     HyperParametersDensity hyper_parameters_density = {
-        rcut,                           // cutoff
-        nrad,                           // max_radial
-        nang,                           // max_angular
-        atomic_gaussian_width,          // atomic_gaussian_width
-        center_atom_weight,             // center_atom_weight
-        {"Gto", spline_accuracy},       // radial_basis
-        {"ShiftedCosine", cutoff_width} // cutoff_function
+        this->rcut,                           // cutoff
+        this->nrad,                           // max_radial
+        this->nang,                           // max_angular
+        this->atomic_gaussian_width,          // atomic_gaussian_width
+        this->center_atom_weight,             // center_atom_weight
+        {"Gto", this->spline_accuracy},       // radial_basis
+        {"ShiftedCosine", this->cutoff_width} // cutoff_function
     };
     std::string json_string = to_json(hyper_parameters_density);
     return json_string;
@@ -156,35 +156,36 @@ Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int
                                              double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
                                              double center_atom_weight, double spline_accuracy, double cutoff_width)
 {
-    filepath = filepath;
-    nrad = nrad;
-    nang = nang;
-    atomic_gaussian_width = atomic_gaussian_width;
-    rcut = rcut;
-    n_atoms = n_atoms;
-    neighspe = neighspe;
-    species = species;
-    center_atom_weight = center_atom_weight;
-    spline_accuracy = spline_accuracy;
-    cutoff_width = cutoff_width;
-    nspe = (int)neighspe.size();
+    //Mindestens an dieser Stelle ist this-> nötig, sonst gibt es einen Fehler
+    this->filepath = filepath;
+    this->nrad = nrad;
+    this->nang = nang;
+    this->atomic_gaussian_width = atomic_gaussian_width;
+    this->rcut = rcut;
+    this->n_atoms = n_atoms;
+    this->neighspe = neighspe;
+    this->species = species;
+    this->center_atom_weight = center_atom_weight;
+    this->spline_accuracy = spline_accuracy;
+    this->cutoff_width = cutoff_width;
+    this->nspe = (int)neighspe.size();
 }
 
 // RASCALINE1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    rascaline::BasicSystems system = rascaline::BasicSystems(filepath);
+    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
 
     // size_t nspe1 = neighspe.size();
     std::vector<std::vector<int32_t>> keys_array;
-    for (int l = 0; l < nang + 1; ++l)
+    for (int l = 0; l < this->nang + 1; ++l)
     {
-        for (const std::string &specen : species)
+        for (const std::string &specen : this->species)
         {
-            for (const std::string &speneigh : neighspe)
+            for (const std::string &speneigh : this->neighspe)
             {
                 // Directly emplace back initializer_lists into keys_array
                 keys_array.emplace_back(std::vector<int32_t>{l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1});
@@ -226,7 +227,7 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
 {
     
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    cvec4 omega(nang + 1, std::vector<cvec2>(n_atoms, cvec2(2 * nang + 1, cvec(nspe * nrad, {0.0, 0.0}))));
+    cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
     for (int l = 0; l < nang + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];
@@ -234,11 +235,11 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
         metatensor::NDArray<double> descriptor_values = descriptor_block.values();
 
         // Perform the matrix multiplication and assignment
-        for (int a = 0; a < n_atoms; ++a)
+        for (int a = 0; a < this->n_atoms; ++a)
         {
             for (int c = 0; c < 2 * l + 1; ++c)
             {
-                for (int d = 0; d < nspe * nrad; ++d)
+                for (int d = 0; d < this->nspe * this->nrad; ++d)
                 {
                     omega[l][a][c][d] = 0.0;
                     for (int r = 0; r < 2 * l + 1; ++r)
