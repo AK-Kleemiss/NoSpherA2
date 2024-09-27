@@ -266,6 +266,7 @@ vec SALTEDPredictor::predict()
     unordered_map<int, vec> pvec{};
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
+        std::cout << "Calculating descriptors for l = " << lam << std::endl;
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
         for (int l1 = 0; l1 < config.nang1 + 1; l1++)

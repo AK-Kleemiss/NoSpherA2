@@ -360,3 +360,49 @@ const double calc_density_ML(const double& x,
     // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
 }
+
+
+/**
+ * Calculates the atomic density for a given list of atoms and coefficients.
+ *
+ * @param atoms The list of atoms.
+ * @param coefs The coefficients used in the calculation.
+ * @return The atomic density for each atom.
+ */
+vec calc_atomic_density(const std::vector<atom> atoms, const vec coefs) {
+    int  e = 0, size;
+    double radial;
+    const basis_set_entry* bf;
+
+    vec atom_elecs(atoms.size(), 0.0);
+
+    int coef_counter = 0;
+    for (int i = 0; i < atoms.size(); i++) {
+
+        size = (int)atoms[i].basis_set.size();
+
+        double temp_dens = 0;
+        for (e = 0; e < size; e++)
+        {
+            bf = &atoms[i].basis_set[e];
+            primitive p(i, bf->type, bf->exponent, bf->coefficient);
+            if (p.type > 0) {
+                break;
+            }
+            radial = constants::PI / (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;
+
+            temp_dens += coefs[coef_counter + e] * radial;
+        }
+
+
+        atom_elecs[i] += temp_dens;
+
+        for (e = 0; e < size; e++)
+        {
+            bf = &atoms[i].basis_set[e];
+            coef_counter += (2 * bf->type + 1);
+        }
+    }
+    return atom_elecs;
+
+}

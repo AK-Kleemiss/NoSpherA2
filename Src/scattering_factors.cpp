@@ -3073,12 +3073,8 @@ void make_k_pts(const bool &read_k_pts,
                 }
             }
         }
-
-        file << "\nNumber of k-points to evaluate: " << k_pt[0].size();
         if (gridsize!=0)
-            file << " for " << gridsize << " gridpoints." << endl;
-        else
-            file << endl;
+            file << "\nNumber of k-points to evaluate: " << k_pt[0].size() << " for " << gridsize << " gridpoints." << endl;
         if (save_k_pts)
             save_k_points(k_pt, hkl);
     }
@@ -3127,6 +3123,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
+    ProgressBar pb(k_pt[0].size());
 #pragma omp parallel
     {
 #pragma omp for
@@ -3147,6 +3144,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     coef_count += 2 * basis.type + 1;
                 }
             }
+            pb.update();
         }
     }
 }
@@ -4016,9 +4014,9 @@ bool calculate_scattering_factors_ML(
 
 #if has_RAS
     // Generation of SALTED densitie coefficients
-    file << "Generating densities... " << flush;
+    file << "\nGenerating densities... " << endl;
     vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
-    file << "                          ... done!\n" << flush;
+    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n" << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
 #else
@@ -4026,6 +4024,7 @@ bool calculate_scattering_factors_ML(
     vec coefs;
 #endif
 
+    file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
     make_k_pts(
         opt.read_k_pts,
@@ -4036,19 +4035,41 @@ bool calculate_scattering_factors_ML(
         k_pt,
         file,
         opt.debug);
+    file << "                          ... done!\n" << flush;
+    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    cvec2 sf;
 
+    vec atom_elecs = calc_atomic_density(wave.atoms, coefs);
+     file  << "Table of Charges in electrons\n" << "       Atom      ML" << endl;
+
+    int counter = 0;
+    for (int i = 0; i < asym_atom_list.size(); i++)
+    {
+        int a = asym_atom_list[i];
+        file << setw(10) << labels[i]
+            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_elecs[i];
+        if (opt.debug)
+            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+        file << endl;
+    }
+
+    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+
+
+
+    file << "\nGenerating scattering factors..." << endl;
+    cvec2 sf;
     calc_SF_SALTED(
         k_pt,
         coefs,
         wave.atoms,
         sf
         );
-
+    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n" << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 

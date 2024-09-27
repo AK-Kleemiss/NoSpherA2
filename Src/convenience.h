@@ -292,6 +292,80 @@ public:
     void write(double fraction);
 };
 
+//My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
+class ProgressBar {
+public:
+    ~ProgressBar() {
+        progress_ = 100.0f;
+        write_progress();
+        std::cout << std::endl;
+    }
+
+    ProgressBar(int worksize, size_t bar_width = 60, std::string fill = "#", std::string remainder = " ", std::string status_text = "")
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f) {
+        linestart = std::cout.tellp();
+    }
+
+
+    void set_progress() {
+        std::unique_lock lock{ mutex_ };  // CTAD (C++17)
+        progress_ = (float)workdone * 100.0f / static_cast<float>(worksize_);
+    }
+
+    void update(std::ostream& os = std::cout) {
+        workdone = workdone + 1;
+        set_progress();
+        write_progress(os);
+    }
+
+    void write_progress(std::ostream& os = std::cout) {
+        std::unique_lock lock{ mutex_ };
+
+        // No need to write once progress is 100%
+        if (progress_ > 100.0f) return;
+
+        // Move cursor to the first position on the same line and flush
+        //Check if os is cout, else reset the pointer to the beginning of the line
+        os.seekp(linestart); //os << "\r" << std::flush;
+
+
+        
+
+        // Start bar
+        os << "[";
+
+        const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
+        for (size_t i = 0; i < bar_width_; ++i) {
+            if (i <= completed)
+                os << fill_;
+            else
+                os << remainder_;
+        }
+
+        // End bar
+        os << "]";
+
+        // Write progress percentage
+        os << " " << std::min(static_cast<size_t>(progress_), size_t(100)) << "%";
+
+        // Write status text
+        os << " " << status_text_ << std::flush;
+    }
+
+
+private:
+    const int worksize_;
+    size_t bar_width_;
+    std::string fill_;
+    std::string remainder_;
+    std::string status_text_;
+    std::atomic<int> workdone;
+    std::mutex mutex_;
+    float progress_;
+    std::streampos linestart;
+};
+
+
 void readxyzMinMax_fromWFN(
     WFN &wavy,
     double *CoordMinMax,
