@@ -30,6 +30,7 @@
 #include <float.h>
 #include <algorithm>
 #include <execution>
+#include <mutex>
 
 // Here are the system specific libaries
 #ifdef _WIN32
