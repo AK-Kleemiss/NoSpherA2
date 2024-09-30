@@ -300,16 +300,20 @@ public:
         progress_ = 100.0f;
         write_progress();
         std::cout << std::endl;
+        omp_destroy_lock(&lock);
     }
 
     ProgressBar(const int& worksize, const size_t& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(worksize/100) {
         linestart = std::cout.tellp();
+        omp_init_lock(&lock);
     }
 
     void set_progress() {
-        //std::unique_lock lock{ mutex_ };  // CTAD (C++17)
+        omp_set_lock(&lock);
         progress_ = (float)workdone * workpart_;
+        omp_destroy_lock(&lock);
+
     }
 
     void update(std::ostream& os = std::cout) {
@@ -322,6 +326,7 @@ public:
 
     void write_progress(std::ostream& os = std::cout) {
         //std::unique_lock lock{ mutex_ };
+        omp_set_lock(&lock);
 
         // No need to write once progress is 100%
         if (progress_ > 100.0f) return;
@@ -349,6 +354,7 @@ public:
 
         // Write status text
         os << " " << status_text_ << std::flush;
+        omp_unset_lock(&lock);
     }
 
 
@@ -359,6 +365,7 @@ private:
     std::string remainder_;
     std::string status_text_;
     std::atomic<int> workdone;
+    omp_lock_t lock;
     //std::mutex mutex_;
     float progress_;
     std::streampos linestart;

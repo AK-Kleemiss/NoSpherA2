@@ -3144,10 +3144,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     coef_count += 2 * basis.type + 1;
                 }
             }
-#pragma omp critical
-            {
-                pb.update();
-            }
+            pb.update();
         }
     }
 }
@@ -4048,7 +4045,6 @@ bool calculate_scattering_factors_ML(
     vec atom_elecs = calc_atomic_density(wave.atoms, coefs);
      file  << "Table of Charges in electrons\n" << "       Atom      ML" << endl;
 
-    int counter = 0;
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
@@ -4061,8 +4057,8 @@ bool calculate_scattering_factors_ML(
 
     auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
     file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-
-
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Calculation of Charges");
 
     file << "\nGenerating scattering factors..." << endl;
     cvec2 sf;

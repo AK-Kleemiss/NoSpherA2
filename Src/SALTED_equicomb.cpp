@@ -94,10 +94,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
             }
             offset++;
         }
-#pragma omp critical
-        {
-            pb.update(std::cout);
-        }
+        pb.update(std::cout);
     }
 }
 
