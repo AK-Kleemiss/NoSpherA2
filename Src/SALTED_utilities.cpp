@@ -138,7 +138,6 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 
 std::string Rascaline_Descriptors::gen_parameters()
 {
-    std::ostringstream oss;
     HyperParametersDensity hyper_parameters_density = {
         this->rcut,                           // cutoff
         this->nrad,                           // max_radial
@@ -152,23 +151,14 @@ std::string Rascaline_Descriptors::gen_parameters()
     return json_string;
 }
 
+//How about this?
 Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int nang, double atomic_gaussian_width,
                                              double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
-                                             double center_atom_weight, double spline_accuracy, double cutoff_width)
+    double center_atom_weight, double spline_accuracy, double cutoff_width) : nrad(nrad), nang(nang), atomic_gaussian_width(atomic_gaussian_width),
+    rcut(rcut), n_atoms(n_atoms), neighspe(neighspe), species(species), center_atom_weight(center_atom_weight),
+    spline_accuracy(spline_accuracy), cutoff_width(cutoff_width)
 {
-    //Mindestens an dieser Stelle ist this-> nötig, sonst gibt es einen Fehler
-    this->filepath = filepath;
-    this->nrad = nrad;
-    this->nang = nang;
-    this->atomic_gaussian_width = atomic_gaussian_width;
-    this->rcut = rcut;
-    this->n_atoms = n_atoms;
-    this->neighspe = neighspe;
-    this->species = species;
-    this->center_atom_weight = center_atom_weight;
-    this->spline_accuracy = spline_accuracy;
-    this->cutoff_width = cutoff_width;
-    this->nspe = (int)neighspe.size();
+    nspe = (int)neighspe.size();
 }
 
 // RASCALINE1

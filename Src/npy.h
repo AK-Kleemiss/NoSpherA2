@@ -388,10 +388,10 @@ namespace npy {
 
     size_t length = magic_string_length + 2 + 2 + header_dict.length() + 1;
 
-    version_t version{ 1, 0 };
+    version_t version{ (char)1, (char)0 };
     if (length >= 255 * 255) {
       length = magic_string_length + 2 + 4 + header_dict.length() + 1;
-      version = { 2, 0 };
+      version = { (char)2, (char)0 };
     }
     size_t padding_len = 16 - length % 16;
     std::string padding(padding_len, ' ');
@@ -400,7 +400,7 @@ namespace npy {
     write_magic(out, version);
 
     // write header length
-    if (version == version_t{ 1, 0 }) {
+    if (version == version_t{ (char)1, (char)0 }) {
       auto header_len = static_cast<uint16_t>(header_dict.length() + padding.length() + 1);
 
       std::array<uint8_t, 2> header_len_le16{ static_cast<uint8_t>((header_len >> 0) & 0xff),
@@ -424,7 +424,7 @@ namespace npy {
     version_t version = read_magic(istream);
 
     uint32_t header_length = 0;
-    if (version == version_t{ 1, 0 }) {
+    if (version == version_t{ (char)1, (char)0 }) {
       std::array<uint8_t, 2> header_len_le16{};
       istream.read(reinterpret_cast<char*>(header_len_le16.data()), 2);
       header_length = (header_len_le16[0] << 0) | (header_len_le16[1] << 8);
@@ -433,7 +433,7 @@ namespace npy {
         // TODO(llohse): display warning
       }
     }
-    else if (version == version_t{ 2, 0 }) {
+    else if (version == version_t{ (char)2, (char)0 }) {
       std::array<uint8_t, 4> header_len_le32{};
       istream.read(reinterpret_cast<char*>(header_len_le32.data()), 4);
 
