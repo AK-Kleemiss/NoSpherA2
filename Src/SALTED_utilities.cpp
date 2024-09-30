@@ -152,13 +152,22 @@ std::string Rascaline_Descriptors::gen_parameters()
 }
 
 //How about this?
-Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int nang, double atomic_gaussian_width,
-                                             double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
-    double center_atom_weight, double spline_accuracy, double cutoff_width) : nrad(nrad), nang(nang), atomic_gaussian_width(atomic_gaussian_width),
-    rcut(rcut), n_atoms(n_atoms), neighspe(neighspe), species(species), center_atom_weight(center_atom_weight),
-    spline_accuracy(spline_accuracy), cutoff_width(cutoff_width)
+Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
+                                             const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
+                                             const double& center_atom_weight, const double& spline_accuracy, const double& cutoff_width)
 {
-    nspe = (int)neighspe.size();
+    this->filepath = filepath;
+    this->nrad = nrad;
+    this->nang = nang;
+    this->atomic_gaussian_width = atomic_gaussian_width;
+    this->rcut = rcut;
+    this->n_atoms = n_atoms;
+    this->neighspe = neighspe;
+    this->species = species;
+    this->center_atom_weight = center_atom_weight;
+    this->spline_accuracy = spline_accuracy;
+    this->cutoff_width = cutoff_width;
+    this->nspe = (int)neighspe.size();
 }
 
 // RASCALINE1
@@ -359,7 +368,7 @@ const double calc_density_ML(const double& x,
  * @param coefs The coefficients used in the calculation.
  * @return The atomic density for each atom.
  */
-vec calc_atomic_density(const std::vector<atom> atoms, const vec coefs) {
+vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
     int  e = 0, size;
     double radial;
     const basis_set_entry* bf;

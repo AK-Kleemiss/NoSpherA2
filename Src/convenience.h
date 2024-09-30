@@ -30,7 +30,7 @@
 #include <float.h>
 #include <algorithm>
 #include <execution>
-#include <mutex>
+//#include <mutex>
 
 // Here are the system specific libaries
 #ifdef _WIN32
@@ -302,25 +302,26 @@ public:
         std::cout << std::endl;
     }
 
-    ProgressBar(int worksize, size_t bar_width = 60, std::string fill = "#", std::string remainder = " ", std::string status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f) {
+    ProgressBar(const int& worksize, const size_t& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(worksize/100) {
         linestart = std::cout.tellp();
     }
 
-
     void set_progress() {
-        std::unique_lock lock{ mutex_ };  // CTAD (C++17)
-        progress_ = (float)workdone * 100.0f / static_cast<float>(worksize_);
+        //std::unique_lock lock{ mutex_ };  // CTAD (C++17)
+        progress_ = (float)workdone * workpart_;
     }
 
     void update(std::ostream& os = std::cout) {
         workdone = workdone + 1;
-        set_progress();
-        write_progress(os);
+        if (workdone % percent_ == 0) {
+            set_progress();
+            write_progress(os);
+        }
     }
 
     void write_progress(std::ostream& os = std::cout) {
-        std::unique_lock lock{ mutex_ };
+        //std::unique_lock lock{ mutex_ };
 
         // No need to write once progress is 100%
         if (progress_ > 100.0f) return;
@@ -328,9 +329,6 @@ public:
         // Move cursor to the first position on the same line and flush
         //Check if os is cout, else reset the pointer to the beginning of the line
         os.seekp(linestart); //os << "\r" << std::flush;
-
-
-        
 
         // Start bar
         os << "[";
@@ -355,13 +353,13 @@ public:
 
 
 private:
-    const int worksize_;
+    const int worksize_; const float workpart_; const int percent_;
     size_t bar_width_;
     std::string fill_;
     std::string remainder_;
     std::string status_text_;
     std::atomic<int> workdone;
-    std::mutex mutex_;
+    //std::mutex mutex_;
     float progress_;
     std::streampos linestart;
 };

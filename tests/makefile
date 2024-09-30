@@ -136,7 +136,7 @@ grown_water:
 
 fourier_transform:
 	@echo 'Running test: $@'
-	cd SALTED && $(BASE_PATH) -test_analytical -no-date
+	cd SALTED && $(BASE_PATH) -test_analytical -no-date && mv NoSpherA2.log $@.log
 	@echo 'Finished running: $@'
 
 fractal:

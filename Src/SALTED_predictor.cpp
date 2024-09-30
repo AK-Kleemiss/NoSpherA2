@@ -273,7 +273,7 @@ vec SALTEDPredictor::predict()
         {
             for (int l2 = 0; l2 < config.nang2 + 1; l2++)
             {
-                // keep only even combination to enforce inversion symmetryc
+                // keep only even combination to enforce inversion symmetry
                 if ((lam + l1 + l2) % 2 == 0)
                 {
                     if (abs(l2 - lam) <= l1 && l1 <= (l2 + lam))

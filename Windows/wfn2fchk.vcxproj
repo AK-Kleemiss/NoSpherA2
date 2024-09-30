@@ -1885,7 +1885,7 @@
       <EnableEnhancedInstructionSet>
       </EnableEnhancedInstructionSet>
       <SupportJustMyCode>false</SupportJustMyCode>
-      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>

@@ -3144,7 +3144,10 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     coef_count += 2 * basis.type + 1;
                 }
             }
-            pb.update();
+#pragma omp critical
+            {
+                pb.update();
+            }
         }
     }
 }
