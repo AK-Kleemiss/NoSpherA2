@@ -3123,8 +3123,10 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
+    omp_lock_t l;
+    omp_init_lock(&l);
     ProgressBar pb(k_pt[0].size());
-#pragma omp parallel
+#pragma omp parallel shared(pb, l, sf)
     {
 #pragma omp for
         for (int i = 0; i < sf.size(); i++) {
@@ -3144,9 +3146,12 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     coef_count += 2 * basis.type + 1;
                 }
             }
+            omp_set_lock(&l);
             pb.update();
+            omp_unset_lock(&l);
         }
     }
+    omp_destroy_lock(&l);
 }
 
 /**

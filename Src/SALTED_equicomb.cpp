@@ -27,9 +27,10 @@ void equicomb(int natoms, int nrad1, int nrad2,
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;
     const cdouble null(0.0, 0.0);
-
+    omp_lock_t l;
+    omp_init_lock(&l);
     ProgressBar pb(natoms);
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(pb, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null, f_vec, std::cout)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(pb, l, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null, f_vec, std::cout)
     for (iat = 0; iat < natoms; ++iat)
     {
         vec2 ptemp(l21, f_vec);
@@ -94,8 +95,11 @@ void equicomb(int natoms, int nrad1, int nrad2,
             }
             offset++;
         }
+        omp_set_lock(&l);
         pb.update(std::cout);
+        omp_unset_lock(&l);
     }
+    omp_destroy_lock(&l);
 }
 
 
