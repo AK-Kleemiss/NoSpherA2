@@ -358,7 +358,8 @@ void generate_hkl(const ivec2& hkl_min_max,
     const vec2& twin_law,
     cell& unit_cell,
     std::ostream& file,
-    bool debug)
+    bool debug,
+    bool ED)
 {
     using namespace std;
     ivec hkl_(3);
@@ -366,6 +367,8 @@ void generate_hkl(const ivec2& hkl_min_max,
     int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])), 
         k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])), 
         l_max = std::max(abs(hkl_min_max[2][1]), abs(hkl_min_max[2][0]));
+    if (ED)
+        h_max *= 2, k_max *= 2, l_max *= 2;
     file << "Generating hkl between ["
         << setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
         << setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["
@@ -3455,7 +3458,7 @@ bool thakkar_sfac(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
@@ -3712,7 +3715,7 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;
@@ -3835,7 +3838,7 @@ bool calculate_scattering_factors_HF(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
@@ -4005,7 +4008,7 @@ bool calculate_scattering_factors_ML(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
@@ -4187,7 +4190,7 @@ bool calculate_scattering_factors_ML_No_H(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
@@ -4434,7 +4437,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
         else
             if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug);
+                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
             else
                 read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;

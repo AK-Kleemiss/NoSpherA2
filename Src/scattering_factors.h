@@ -131,7 +131,8 @@ void generate_hkl(
     const vec2& twin_law,
     cell& unit_cell,
     std::ostream& file,
-    bool debug = false);
+    bool debug = false,
+    bool ED = false);
 
 /**
  * @brief Generates the fractional hkl (Miller indices) list.
