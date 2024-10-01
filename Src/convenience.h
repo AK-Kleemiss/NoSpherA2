@@ -303,7 +303,7 @@ public:
     }
 
     ProgressBar(const int& worksize, const size_t& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(worksize/100) {
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize/100,1)) {
         linestart = std::cout.tellp();
     }
 
@@ -602,7 +602,7 @@ struct options
     bool fract = false;
     bool hirsh = false;
     bool s_rho = false;
-    bool SALTED = false, SALTED_NO_H = false, SALTED_BECKE = false;
+    bool SALTED = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
     bool read_k_pts = false;
@@ -661,51 +661,49 @@ struct options
         look_for_debug(argc, argv);
     };
 
-    options(int accuracy,
-            int threads,
-            int pbc,
-            double resolution,
-            double radius,
-            bool becke,
-            bool electron_diffraction,
-            bool ECP,
-            bool set_ECPs,
-            int ECP_mode,
-            bool calc,
-            bool eli,
-            bool esp,
-            bool elf,
-            bool lap,
-            bool rdg,
-            bool hdef,
-            bool def,
-            bool fract,
-            bool hirsh,
-            bool s_rho,
-            bool SALTED,
-            bool SALTED_NO_H,
-            bool SALTED_BECKE,
-            bool Olex2_1_3_switch,
-            bool iam_switch,
-            bool read_k_pts,
-            bool save_k_pts,
-            bool combined_tsc_calc,
-            bool binary_tsc,
-            bool cif_based_combined_tsc_calc,
-            bool no_date,
-            bool gbw2wfn,
-            bool old_tsc,
-            bool thakkar_d_plot,
-            double sfac_scan,
-            double sfac_diffuse,
-            double dmin,
-            int hirsh_number,
+    options(const int accuracy,
+            const int threads,
+            const int pbc,
+            const double resolution,
+            const double radius,
+            const bool becke,
+            const bool electron_diffraction,
+            const bool ECP,
+            const bool set_ECPs,
+            const int ECP_mode,
+            const bool calc,
+            const bool eli,
+            const bool esp,
+            const bool elf,
+            const bool lap,
+            const bool rdg,
+            const bool hdef,
+            const bool def,
+            const bool fract,
+            const bool hirsh,
+            const bool s_rho,
+            const bool SALTED,
+            const bool Olex2_1_3_switch,
+            const bool iam_switch,
+            const bool read_k_pts,
+            const bool save_k_pts,
+            const bool combined_tsc_calc,
+            const bool binary_tsc,
+            const bool cif_based_combined_tsc_calc,
+            const bool no_date,
+            const bool gbw2wfn,
+            const bool old_tsc,
+            const bool thakkar_d_plot,
+            const double sfac_scan,
+            const double sfac_diffuse,
+            const double dmin,
+            const int hirsh_number,
             const ivec &MOs,
             const ivec2 &groups,
             const vec2 &twin_law,
             const ivec2 &combined_tsc_groups,
-            bool all_mos,
-            bool test,
+            const bool all_mos,
+            const bool test,
             const std::string &wfn,
             const std::string &fchk,
             const std::string &basis_set,
@@ -731,9 +729,9 @@ struct options
             const ivec &cmo2,
             const ivec &ECP_nrs,
             const ivec &ECP_elcounts,
-            double mem,
-            unsigned int mult,
-            bool debug,
+            const double mem,
+            const unsigned int mult,
+            const bool debug,
             const hkl_list &m_hkl_list,
             std::ostream &log_file);
 };
@@ -755,7 +753,7 @@ bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 #ifdef _WIN32
 bool ExtractDLL(const std::string& dllName);
-bool check_OpenBLAS_DLL();
+bool check_OpenBLAS_DLL(const bool& debug=false);
 #endif
 
 #include "wfn_class.h"

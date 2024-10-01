@@ -311,7 +311,7 @@ int main(int argc, char **argv)
         // This one will calcualte a single tsc/tscb file form a single wfn
         if (opt.cif != "" || opt.hkl != "")
         {
-            if (!opt.SALTED && !opt.SALTED_BECKE && !opt.SALTED_NO_H)
+            if (!opt.SALTED)
             {
                 // Calculate tsc file from given files
                 if (opt.debug)
@@ -336,6 +336,9 @@ int main(int argc, char **argv)
 #if has_RAS
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+#ifdef _WIN32
+                check_OpenBLAS_DLL(opt.debug);
+#endif
                 BasisSetLibrary basis_library;
                 string df_basis_name;
                 string h5file;
@@ -350,22 +353,13 @@ int main(int argc, char **argv)
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation!" << endl;
 
-                if (opt.SALTED_BECKE || opt.SALTED_NO_H)
-                    err_checkf(calculate_scattering_factors_ML_No_H(
-                                   opt,
-                                   wavy[0],
-                                   log_file),
-                               "Error during ML-SF Calcualtion", log_file);
-                else
-                {
-                    if (opt.debug)
-                        log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                    err_checkf(calculate_scattering_factors_ML(
-                                   opt,
-                                   wavy[0],
-                                   log_file),
-                               "Error during ML-SF Calcualtion", log_file);
-                }
+                if (opt.debug)
+                    log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+                err_checkf(calculate_scattering_factors_ML(
+                    opt,
+                    wavy[0],
+                    log_file),
+                    "Error during ML-SF Calcualtion", log_file);
 #else
 							log_file << "SALTED is not available in this build!" << endl;
               exit(-1);

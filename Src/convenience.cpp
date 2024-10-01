@@ -290,51 +290,49 @@ void write_template_confi()
     return;
 };
 
-options::options(int accuracy,
-                 int threads,
-                 int pbc,
-                 double resolution,
-                 double radius,
-                 bool becke,
-                 bool electron_diffraction,
-                 bool ECP,
-                 bool set_ECPs,
-                 int ECP_mode,
-                 bool calc,
-                 bool eli,
-                 bool esp,
-                 bool elf,
-                 bool lap,
-                 bool rdg,
-                 bool hdef,
-                 bool def,
-                 bool fract,
-                 bool hirsh,
-                 bool s_rho,
-                 bool SALTED,
-                 bool SALTED_NO_H,
-                 bool SALTED_BECKE,
-                 bool Olex2_1_3_switch,
-                 bool iam_switch,
-                 bool read_k_pts,
-                 bool save_k_pts,
-                 bool combined_tsc_calc,
-                 bool binary_tsc,
-                 bool cif_based_combined_tsc_calc,
-                 bool no_date,
-                 bool gbw2wfn,
-                 bool old_tsc,
-                 bool thakkar_d_plot,
-                 double sfac_scan,
-                 double sfac_diffuse,
-                 double dmin,
-                 int hirsh_number,
+options::options(const int accuracy,
+                 const int threads,
+                 const int pbc,
+                 const double resolution,
+                 const double radius,
+                 const bool becke,
+                 const bool electron_diffraction,
+                 const bool ECP,
+                 const bool set_ECPs,
+                 const int ECP_mode,
+                 const bool calc,
+                 const bool eli,
+                 const bool esp,
+                 const bool elf,
+                 const bool lap,
+                 const bool rdg,
+                 const bool hdef,
+                 const bool def,
+                 const bool fract,
+                 const bool hirsh,
+                 const bool s_rho,
+                 const bool SALTED,
+                 const bool Olex2_1_3_switch,
+                 const bool iam_switch,
+                 const bool read_k_pts,
+                 const bool save_k_pts,
+                 const bool combined_tsc_calc,
+                 const bool binary_tsc,
+                 const bool cif_based_combined_tsc_calc,
+                 const bool no_date,
+                 const bool gbw2wfn,
+                 const bool old_tsc,
+                 const bool thakkar_d_plot,
+                 const double sfac_scan,
+                 const double sfac_diffuse,
+                 const double dmin,
+                 const int hirsh_number,
                  const ivec &MOs,
                  const ivec2 &_groups,
                  const vec2 &twin_law,
                  const ivec2 &combined_tsc_groups,
-                 bool all_mos,
-                 bool test,
+                 const bool all_mos,
+                 const bool test,
                  const std::string &wfn,
                  const std::string &fchk,
                  const std::string &basis_set,
@@ -360,9 +358,9 @@ options::options(int accuracy,
                  const ivec &cmo2,
                  const ivec &ECP_nrs,
                  const ivec &ECP_elcounts,
-                 double mem,
-                 unsigned int mult,
-                 bool debug,
+                 const double mem,
+                 const unsigned int mult,
+                 const bool debug,
                  const hkl_list &m_hkl_list,
                  std::ostream &log_file)
     : accuracy(accuracy), threads(threads), pbc(pbc),
@@ -371,7 +369,7 @@ options::options(int accuracy,
       set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
       eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
       hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-      s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
+      s_rho(s_rho), SALTED(SALTED), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
       Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
       read_k_pts(read_k_pts), save_k_pts(save_k_pts),
       combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
@@ -2470,6 +2468,7 @@ void options::digest_options()
         {
              coef_file = arguments[i + 1];
              err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+             SALTED = true;
          }
         else if (temp == "-cif")
         {
@@ -2749,16 +2748,8 @@ void options::digest_options()
             SALTED = true;
             SALTED_DIR = arguments[i + 1];
         }
-        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
-        {
-            SALTED_BECKE = true;
-        }
-        else if (temp == "DFBASIS" || temp == "dfbasis") {
+        else if (temp == "-DFBASIS" || temp == "-dfbasis") {
             SALTED_DFBASIS = arguments[i + 1];
-        }
-        else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h")
-        {
-            SALTED_NO_H = true;
         }
         else if (temp == "-skpts")
             save_k_pts = true;
@@ -3363,23 +3354,35 @@ bool ExtractDLL(const std::string& dllName) {
   return true;
 }
 
-bool check_OpenBLAS_DLL() {
-  // Get the path of the executable
-  char exePath[MAX_PATH];
-  GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
-  std::string exeDir = get_foldername_from_path(exePath);
+bool check_OpenBLAS_DLL(const bool& debug) {
+    if(debug)
+        std::cout << "Checking for OpenBLAS DLL" << std::endl;
+   // Get the path of the executable
+   char exePath[MAX_PATH];
+   GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
+   if(debug)
+       std::cout << "Executable path: " << exePath << std::endl;
+   std::string exeDir = get_foldername_from_path(exePath);
+   if (debug)
+       std::cout << "Executable directory: " << exeDir << std::endl;
 
-  // Define the DLL name
-  std::string dllName = exeDir + "\\libopenblas.dll";
-  if (exists(dllName))
-    return true; // DLL already exists
-  else {
-    // Extract the DLL if it does not exist
-    if (!ExtractDLL(dllName)) {
-      std::cout << "Failed to extract DLL" << std::endl;
-      return false;
-    }
-  }
-  return true;
+   // Define the DLL name
+   std::string dllName = exeDir + "\\libopenblas.dll";
+   if (debug)
+       std::cout << "DLL name: " << dllName << std::endl;
+   if (exists(dllName))
+     return true; // DLL already exists
+   else {
+       if(debug)
+           std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+     // Extract the DLL if it does not exist
+     if (!ExtractDLL(dllName)) {
+       std::cout << "Failed to extract DLL" << std::endl;
+       return false;
+     }
+     if(debug)
+         std::cout << "DLL extracted successfully!" << std::endl;
+   }
+   return true;
 }
 #endif
