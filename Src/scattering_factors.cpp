@@ -3385,12 +3385,11 @@ void convert_to_ED(const ivec &asym_atom_list,
                    const hkl_list &hkl)
 {
     double h2;
-    hkl_list_it it;
-#pragma omp parallel for private(h2, it)
+    const ivec2 hkl_vector(hkl.begin(), hkl.end());
+#pragma omp parallel for private(h2) shared(hkl_vector)
     for (int s = 0; s < hkl.size(); s++)
     {
-        it = next(hkl.begin(), s);
-        h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
+        h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
         for (int i = 0; i < asym_atom_list.size(); i++)
             sf[i][s] = cdouble(constants::ED_fact * (wave.get_atom_charge(asym_atom_list[i]) - sf[i][s].real()) / h2, -constants::ED_fact * sf[i][s].imag() / h2);
     }
