@@ -68,9 +68,9 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
 }
 
 cdouble convert_to_ED_single(
-    const int& neutralcharge,
-    cdouble& sf,
-    const double& k_vector,
+    const int &neutralcharge,
+    cdouble &sf,
+    const double &k_vector,
     const int charge)
 {
     const double h2 = pow(k_vector, 2);
@@ -127,7 +127,7 @@ void read_hkl(const std::string &hkl_filename,
               hkl_list &hkl,
               const vec2 &twin_law,
               cell &unit_cell,
-    std::ostream &file,
+              std::ostream &file,
               bool debug = false)
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
@@ -353,26 +353,26 @@ void generate_hkl(const double &dmin,
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
-void generate_hkl(const ivec2& hkl_min_max,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
-    bool debug,
-    bool ED)
+void generate_hkl(const ivec2 &hkl_min_max,
+                  hkl_list &hkl,
+                  const vec2 &twin_law,
+                  cell &unit_cell,
+                  std::ostream &file,
+                  bool debug,
+                  bool ED)
 {
     using namespace std;
     ivec hkl_(3);
     string line, temp;
-    int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])), 
-        k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])), 
+    int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])),
+        k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])),
         l_max = std::max(abs(hkl_min_max[2][1]), abs(hkl_min_max[2][0]));
     if (ED)
         h_max *= 2, k_max *= 2, l_max *= 2;
     file << "Generating hkl between ["
-        << setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
-        << setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["
-        << setw(2) << -l_max << "," << setw(2) << l_max << "] " << flush;
+         << setw(2) << -h_max << "," << setw(2) << h_max << "] ; ["
+         << setw(2) << -k_max << "," << setw(2) << k_max << "] ; ["
+         << setw(2) << -l_max << "," << setw(2) << l_max << "] " << flush;
     for (int h = -h_max; h <= h_max; h++)
     {
         for (int k = -k_max; k <= k_max; k++)
@@ -380,7 +380,7 @@ void generate_hkl(const ivec2& hkl_min_max,
             // only need 0 to extreme, since we have no DISP signal
             for (int l = 0; l <= l_max; l++)
             {
-                hkl_ = { h, k, l };
+                hkl_ = {h, k, l};
                 hkl.emplace(hkl_);
             }
         }
@@ -391,12 +391,12 @@ void generate_hkl(const ivec2& hkl_min_max,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const ivec& hkl__ : hkl)
+        for (const ivec &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(ivec{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
-                    int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2]) });
+                    int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
     }
     if (debug)
         file << "Number of reflections after twin: " << hkl.size() << endl;
@@ -433,9 +433,9 @@ void generate_hkl(const ivec2& hkl_min_max,
         {
             continue;
         }
-        for (const ivec& hkl__ : hkl)
+        for (const ivec &hkl__ : hkl)
         {
-            tempv = { 0, 0, 0 };
+            tempv = {0, 0, 0};
             for (int h = 0; h < 3; h++)
             {
                 for (int j = 0; j < 3; j++)
@@ -445,7 +445,7 @@ void generate_hkl(const ivec2& hkl_min_max,
         }
     }
 
-    for (const ivec& hkl__ : hkl_enlarged)
+    for (const ivec &hkl__ : hkl_enlarged)
     {
         tempv = hkl__;
         tempv[0] *= -1;
@@ -474,7 +474,7 @@ void generate_fractional_hkl(const double &dmin,
                              hkl_list_d &hkl,
                              const vec2 &twin_law,
                              cell &unit_cell,
-    std::ostream &file,
+                             std::ostream &file,
                              double stepsize,
                              bool debug)
 {
@@ -548,7 +548,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                          ivec &asym_atom_to_type_list,
                          ivec &asym_atom_list,
                          bvec &needs_grid,
-    std::ostream &file,
+                         std::ostream &file,
                          const bool debug)
 {
     using namespace std;
@@ -1611,7 +1611,7 @@ int make_hirshfeld_grids(
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
         long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
-        
+
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
@@ -2237,16 +2237,16 @@ static int make_hirshfeld_grids_ML(
         }
     }
 
-
     double el_sum = 0.0;
-    int  e = 0, size = 0;
+    int e = 0, size = 0;
     double radial = 0;
-    const basis_set_entry* bf;
+    const basis_set_entry *bf;
     double n = 0;
 
     int coef_counter = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++) {
-        
+    for (int i = 0; i < asym_atom_list.size(); i++)
+    {
+
         size = (int)wave.atoms[i].basis_set.size();
 
         double temp_dens = 0;
@@ -2254,25 +2254,25 @@ static int make_hirshfeld_grids_ML(
         {
             bf = &wave.atoms[i].basis_set[e];
             primitive p(i, bf->type, bf->exponent, bf->coefficient);
-            if (p.type > 0) {
+            if (p.type > 0)
+            {
                 break;
             }
-            radial = constants::PI/ (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;//gaussian_radial(p, d[3]) * p.coefficient;
+            radial = constants::PI / (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const; // gaussian_radial(p, d[3]) * p.coefficient;
 
             n = coefs_temp[coef_counter + e] * radial;
 
-            temp_dens += n;// *spherical_harmonic(p.type, m, d);
-            file << setprecision(2) << "Radial: " << radial 
-                << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0) 
-                << " | Coef Counter: " << coef_counter + e 
-                << " | Size: " << size << setprecision(2) 
-                << " | Exponent: " << bf->exponent 
-                << " | Coefficient: " << bf->coefficient 
-                << " | Norm Const: " << p.norm_const 
-                << " | Temp Dens: " << temp_dens
-                << " | New Dens: " << n << endl;
+            temp_dens += n; // *spherical_harmonic(p.type, m, d);
+            file << setprecision(2) << "Radial: " << radial
+                 << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0)
+                 << " | Coef Counter: " << coef_counter + e
+                 << " | Size: " << size << setprecision(2)
+                 << " | Exponent: " << bf->exponent
+                 << " | Coefficient: " << bf->coefficient
+                 << " | Norm Const: " << p.norm_const
+                 << " | Temp Dens: " << temp_dens
+                 << " | New Dens: " << n << endl;
         }
-
 
         atom_els[3][i] += temp_dens;
         for (e = 0; e < size; e++)
@@ -2281,10 +2281,9 @@ static int make_hirshfeld_grids_ML(
             coef_counter += (2 * bf->type + 1);
         }
         file << "---------------------------------" << endl;
-        //atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
+        // atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
         el_sum += atom_els[3][i];
     }
-
 
     if (debug)
     {
@@ -2311,15 +2310,15 @@ static int make_hirshfeld_grids_ML(
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[3][counter];
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter]
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[3][counter];
         if (debug)
             file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[0][counter]
-            << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
-            << fixed << setw(10) << setprecision(3) << atom_els[2][counter]
-            << fixed << setw(10) << setprecision(3) << atom_els[3][counter];
+                 << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
+                 << fixed << setw(10) << setprecision(3) << atom_els[2][counter]
+                 << fixed << setw(10) << setprecision(3) << atom_els[3][counter];
         counter++;
         file << endl;
     }
@@ -2440,7 +2439,7 @@ void make_k_pts(const bool &read_k_pts,
 
         if (debug)
             file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-        //Create local copy of hkl list for faster access
+        // Create local copy of hkl list for faster access
         const ivec2 hkl_vector(hkl.begin(), hkl.end());
 
 #pragma omp parallel for
@@ -2455,7 +2454,7 @@ void make_k_pts(const bool &read_k_pts,
                 }
             }
         }
-        if (gridsize!=0)
+        if (gridsize != 0)
             file << "\nNumber of k-points to evaluate: " << k_pt[0].size() << " for " << gridsize << " gridpoints." << endl;
         if (save_k_pts)
             save_k_points(k_pt, hkl);
@@ -2466,35 +2465,31 @@ void make_k_pts(const bool &read_k_pts,
     }
 }
 
-
-
 // This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
 double fourier_bessel_integral(
-    const primitive& p,
-    const double& H
-)
+    const primitive &p,
+    const double &H)
 {
     const int l = p.type;
     const double b = p.exp;
     return p.norm_const * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
-
 cdouble sfac_bessel(
-    const primitive& p,
-    const vec& k_point,
-    const vec& coefs
-)
+    const primitive &p,
+    const vec &k_point,
+    const vec &coefs)
 {
     using namespace std::complex_literals;
     const double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
-                                                           //normalize the spherical harmonics k_point
-    const std::pair<double,double> spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
+    // normalize the spherical harmonics k_point
+    const std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
     const cdouble radial = constants::FOUR_PI_i_pows[p.type] * fourier_bessel_integral(p, leng) * p.coefficient;
     cdouble result(0.0, 0.0);
-    for (int m = -p.type; m <= p.type; m++) {
-        result +=  radial * constants::real_spherical(p.type, m, spherical.first, spherical.second) * coefs[m + p.type];
+    for (int m = -p.type; m <= p.type; m++)
+    {
+        result += radial * constants::real_spherical(p.type, m, spherical.first, spherical.second) * coefs[m + p.type];
     }
     return result;
 }
@@ -2505,35 +2500,47 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
+#ifdef _OPENMP
     omp_lock_t l;
     omp_init_lock(&l);
+#endif
     ProgressBar pb(k_pt[0].size());
 #pragma omp parallel shared(pb, l, sf)
     {
 #pragma omp for
-        for (int i = 0; i < sf.size(); i++) {
+        for (int i = 0; i < sf.size(); i++)
+        {
             sf[i].resize(k_pt[0].size(), constants::cnull);
         }
         primitive basis;
 #pragma omp for
-        for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++) {
+        for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
+        {
             int coef_count = 0;
-            vec k_pt_local = { k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt] };
-            for (int iat = 0; iat < atom_list.size(); iat++) {
-                const int lim = (int) atom_list[iat].basis_set.size();
-                for (int i_basis = 0; i_basis < lim; i_basis++) {
+            vec k_pt_local = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt]};
+            for (int iat = 0; iat < atom_list.size(); iat++)
+            {
+                const int lim = (int)atom_list[iat].basis_set.size();
+                for (int i_basis = 0; i_basis < lim; i_basis++)
+                {
                     basis = atom_list[iat].basis_set[i_basis].p;
                     vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
                     coef_count += 2 * basis.type + 1;
                 }
             }
+#ifdef _OPENMP
             omp_set_lock(&l);
+#endif
             pb.update();
+#ifdef _OPENMP
             omp_unset_lock(&l);
+#endif
         }
     }
+#ifdef _OPENMP
     omp_destroy_lock(&l);
+#endif
 }
 
 /**
@@ -2559,7 +2566,7 @@ void calc_SF(const int &points,
              vec2 &d3,
              vec2 &dens,
              cvec2 &sf,
-    std::ostream &file,
+             std::ostream &file,
              time_point &start,
              time_point &end1,
              bool debug,
@@ -2578,7 +2585,7 @@ void calc_SF(const int &points,
         file << "Initialized FFs" << std::endl
              << "asym atom list size: " << imax << " total grid size: " << points << endl;
     end1 = get_time();
-    
+
     if (!no_date)
     {
         long long int dur = get_sec(start, end1);
@@ -2835,11 +2842,10 @@ bool thakkar_sfac(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
-            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-            else
-                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -3092,11 +3098,10 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
-            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-            else
-                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;
     }
 
@@ -3215,11 +3220,10 @@ bool calculate_scattering_factors_HF(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
-            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-            else
-                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -3385,11 +3389,10 @@ bool calculate_scattering_factors_ML(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
-            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-            else
-                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
     }
 
     if (opt.debug)
@@ -3402,7 +3405,8 @@ bool calculate_scattering_factors_ML(
     // Generation of SALTED densitie coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n" << flush;
+    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
+         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
 #else
@@ -3421,21 +3425,22 @@ bool calculate_scattering_factors_ML(
         k_pt,
         file,
         opt.debug);
-    file << "                          ... done!\n" << flush;
+    file << "                          ... done!\n"
+         << flush;
     file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-
     vec atom_elecs = calc_atomic_density(wave.atoms, coefs);
-     file  << "Table of Charges in electrons\n" << "       Atom      ML" << endl;
+    file << "Table of Charges in electrons\n"
+         << "       Atom      ML" << endl;
 
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
             file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
@@ -3452,12 +3457,11 @@ bool calculate_scattering_factors_ML(
         k_pt,
         coefs,
         wave.atoms,
-        sf
-        );
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n" << flush;
+        sf);
+    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
+         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
-
 
     if (wave.get_has_ECPs())
     {
@@ -3491,8 +3495,8 @@ bool calculate_scattering_factors_ML(
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-                            time_points,
-                            time_descriptions);
+                             time_points,
+                             time_descriptions);
     }
 
     file << "Writing tsc file... " << flush;
@@ -3609,7 +3613,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
 
     time_points.push_back(get_time());
     time_descriptions.push_back("density vectors");
-       
+
     vec2 k_pt;
     hkl_list hkl;
     if (opt.m_hkl_list.size() != 0)
@@ -3623,11 +3627,10 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
-            if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-                generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-            else
-                read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
         opt.m_hkl_list = hkl;
     }
     if (kpts == NULL || kpts->size() == 0)
@@ -3730,8 +3733,8 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    //time_point start = get_time();
-    //time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
+    // time_point start = get_time();
+    // time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
     vector<time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());

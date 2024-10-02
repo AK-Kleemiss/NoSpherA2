@@ -27,6 +27,21 @@ ifeq ($(NAME),MAC)
 	cd Mac && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline -j
 endif
 
+NoSpherA2_Rascaline_Debug:
+	@echo "Building NoSpherA2_Rascaline_Debug for $(NAME)"
+ifeq ($(NAME),WINDOWS)
+	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
+endif
+ifeq ($(NAME),LINUX)
+	@echo "Start making Linux executable for NoSpherA2_Rascaline_Debug"
+	rm -f NoSpherA2_rascaline_debug
+	cd Linux && rm -f NoSpherA2_Rascaline_Debug && make NoSpherA2_Rascaline_Debug -j
+endif
+ifeq ($(NAME),MAC)
+	@echo "Start making Mac executable for NoSpherA2_Rascaline_Debug"
+	cd Mac && rm -f NoSpherA2_Rascaline_Debug && make NoSpherA2_Rascaline_debug -j
+endif
+
 NoSpherA2:
 	@echo "Building NoSpherA2 for $(NAME)"
 ifeq ($(NAME),WINDOWS)
