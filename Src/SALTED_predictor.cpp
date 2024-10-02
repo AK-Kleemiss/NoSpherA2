@@ -10,18 +10,26 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
     
     if (config.h5_filename == "")
 	{
+        if (opt.debug)
+        {
+            std::cout << "No HDF5 file found in the SALTED directory. Using inputs.txt instead." << std::endl;
+        }
         std::string _f_path("inputs.txt");
         join_path(_path, _f_path);
         config.populateFromFile(_path);
 	}
 	else
 	{
+        if(opt.debug)
+        {
+            std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
+        }
 #if has_RAS
-    join_path(_path, config.h5_filename);
-    H5::H5File config_file(_path, H5F_ACC_RDONLY);
-    config.populateFromFile(config_file);
+        join_path(_path, config.h5_filename);
+        H5::H5File config_file(_path, H5F_ACC_RDONLY);
+        config.populateFromFile(config_file);
 #else
-    err_not_impl_f("HDF5 files are not supported by this build", std::cout);
+        err_not_impl_f("HDF5 files are not supported by this build", std::cout);
 #endif
 	}
     config.predict_filename = wavy.get_path();

@@ -349,9 +349,6 @@ int main(int argc, char **argv)
                 }
                 log_file << "Using " << h5file << " for the prediction" << endl;
                 load_basis_into_WFN(wavy[0], basis_library.get_basis_set(df_basis_name));
-                //int nr_coefs = load_basis_into_WFN(wavy[0], def2_qzvppd_rifit);
-                if (opt.debug)
-                    log_file << "Entering scattering ML Factor Calculation!" << endl;
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
