@@ -50,10 +50,10 @@ bool thakkar_sfac(const options &opt, std::ostream &file, const WFN &wave);
  * @return True if the calculation is successful, false otherwise.
  */
 itsc_block MTC_thakkar_sfac(
-    options &opt, 
-    std::ostream &file, 
-    svec &known_atoms, 
-    std::vector<WFN> &wave, 
+    options &opt,
+    std::ostream &file,
+    svec &known_atoms,
+    std::vector<WFN> &wave,
     const int &nr);
 
 /**
@@ -74,8 +74,8 @@ bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::o
  * @return True if the calculation is successful, false otherwise.
  */
 bool calculate_scattering_factors_ML(
-    const options &opt, 
-    const WFN &wave, 
+    const options &opt,
+    const WFN &wave,
     std::ostream &file);
 
 /**
@@ -89,11 +89,11 @@ bool calculate_scattering_factors_ML(
  * @return The calculated scattering factors.
  */
 itsc_block calculate_scattering_factors_MTC(
-    options &opt, 
-    const std::vector<WFN> &wave, 
-    std::ostream &file, 
-    svec &known_atoms, 
-    const int &nr, 
+    options &opt,
+    const std::vector<WFN> &wave,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
     vec2 *kpts = NULL);
 
 /**
@@ -106,19 +106,19 @@ itsc_block calculate_scattering_factors_MTC(
  * @param debug Flag indicating whether to enable debug mode.
  */
 void generate_hkl(
-    const double &dmin, 
-    hkl_list &hkl, 
-    const vec2 &twin_law, 
-    cell &unit_cell, 
-    std::ostream &file, 
+    const double &dmin,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
     bool debug = false);
 
 void generate_hkl(
-    const ivec2& hkl_min_max,
-    hkl_list& hkl,
-    const vec2& twin_law,
-    cell& unit_cell,
-    std::ostream& file,
+    const ivec2 &hkl_min_max,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
     bool debug = false,
     bool ED = false);
 
@@ -133,12 +133,12 @@ void generate_hkl(
  * @param debug Flag indicating whether to enable debug mode.
  */
 void generate_fractional_hkl(
-    const double &dmin, 
-    hkl_list_d &hkl, 
-    const vec2 &twin_law, 
-    cell &unit_cell, 
-    std::ostream &file, 
-    double stepsize, 
+    const double &dmin,
+    hkl_list_d &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
+    double stepsize,
     bool debug);
 
 /**
@@ -151,9 +151,9 @@ void generate_fractional_hkl(
  * @return The converted ED single.
  */
 cdouble convert_to_ED_single(
-    const int& neutralcharge,
-    cdouble& sf,
-    const double& k_vector,
+    const int &neutralcharge,
+    cdouble &sf,
+    const double &k_vector,
     const int charge = 0);
 
 /**
@@ -171,16 +171,16 @@ cdouble convert_to_ED_single(
  * @param debug Flag indicating whether to enable debug mode.
  */
 svec read_atoms_from_CIF(
-    std::ifstream &cif_input, 
-    const ivec &input_groups, 
-    const cell &unit_cell, 
-    const WFN &wave, 
-    const svec &known_atoms, 
-    ivec &atom_type_list, 
-    ivec &asym_atom_to_type_list, 
-    ivec &asym_atom_list, 
-    bvec &needs_grid, 
-    std::ostream &file, 
+    std::ifstream &cif_input,
+    const ivec &input_groups,
+    const cell &unit_cell,
+    const WFN &wave,
+    const svec &known_atoms,
+    ivec &atom_type_list,
+    ivec &asym_atom_to_type_list,
+    ivec &asym_atom_list,
+    bvec &needs_grid,
+    std::ostream &file,
     const bool debug = false);
 
 /**
@@ -208,24 +208,23 @@ svec read_atoms_from_CIF(
  * @return The number of Hirshfeld grids generated.
  */
 int make_hirshfeld_grids(
-    const int &pbc, 
-    const int &accuracy, 
-    cell &unit_cell, 
-    const WFN &wave, 
-    const ivec &atom_type_list, 
-    const ivec &cif2wfn_list, 
-    bvec &needs_grid, 
-    vec2 &d1, 
-    vec2 &d2, 
-    vec2 &d3, 
-    vec2 &dens, 
-    const svec& labels,
-    std::ostream &file, 
-    std::vector<time_point>& time_points,
-    std::vector<std::string>& time_descriptions,
-    bool debug = false, 
-    bool no_date = false
-);
+    const int &pbc,
+    const int &accuracy,
+    cell &unit_cell,
+    const WFN &wave,
+    const ivec &atom_type_list,
+    const ivec &cif2wfn_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
+    const svec &labels,
+    std::ostream &file,
+    std::vector<time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
+    bool debug = false,
+    bool no_date = false);
 
 /**
  * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
@@ -239,13 +238,13 @@ int make_hirshfeld_grids(
  * @param debug Flag indicating whether to enable debug mode.
  */
 static void add_ECP_contribution(
-    const ivec &asym_atom_list, 
-    const WFN &wave, 
+    const ivec &asym_atom_list,
+    const WFN &wave,
     cvec2 &sf,
-    const cell &cell, 
-    hkl_list &hkl, 
-    std::ostream &file, 
-    const int &mode = 0, 
+    const cell &cell,
+    hkl_list &hkl,
+    std::ostream &file,
+    const int &mode = 0,
     const bool debug = false);
 
 /**
@@ -262,28 +261,26 @@ static void add_ECP_contribution(
  * @param end1 The end time point.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void calc_SF(const int &points, 
-    vec2 &k_pt, 
-    vec2 &d1, 
-    vec2 &d2, 
-    vec2 &d3, 
-    vec2 &dens, 
-    cvec2&sf,
-    std::ostream &file, 
-    time_point &start, 
-    time_point &end1, 
-    bool debug = false);
+void calc_SF(const int &points,
+             vec2 &k_pt,
+             vec2 &d1,
+             vec2 &d2,
+             vec2 &d3,
+             vec2 &dens,
+             cvec2 &sf,
+             std::ostream &file,
+             time_point &start,
+             time_point &end1,
+             bool debug = false);
 
 double fourier_bessel_integral(
-    const primitive& p,
-    const double& H
-);
+    const primitive &p,
+    const double &H);
 
 cdouble sfac_bessel(
-    const primitive& p,
-    const vec& k_point,
-    const vec& coefs
-);
+    const primitive &p,
+    const double *k_point,
+    const vec &coefs);
 
 /**
  * @brief Calculates the diffuse scattering factors.

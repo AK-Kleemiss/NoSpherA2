@@ -120,18 +120,6 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
         return true;
 };
 
-void cls()
-{
-    //    cout << string( 100, '\n' );
-#ifdef _WIN32
-    if (system("CLS"))
-        std::cout << "this should not happen...!" << std::endl;
-#else
-    if (system("clear"))
-        std::cout << "this should not happen...!" << std::endl;
-#endif
-};
-
 /*
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
     resize(100);
@@ -194,7 +182,7 @@ void join_path(std::string &s1, std::string &s2)
     s1.append(s2);
 }
 
-void join_path(std::string& s1, std::initializer_list<std::string> s2)
+void join_path(std::string &s1, std::initializer_list<std::string> s2)
 {
     std::string separator;
 #ifdef _WIN32
@@ -203,14 +191,17 @@ void join_path(std::string& s1, std::initializer_list<std::string> s2)
     separator = "/";
 #endif
     // Ensure that the initial path has a trailing separator if needed
-    if (!s1.empty() && s1.back() != '/' && s1.back() != '\\') {
+    if (!s1.empty() && s1.back() != '/' && s1.back() != '\\')
+    {
         s1.append(separator);
-}
+    }
     // Iterate over each segment in the initializer list
-    for (auto it = s2.begin(); it != s2.end(); ++it) {
+    for (auto it = s2.begin(); it != s2.end(); ++it)
+    {
         s1.append(*it);
         // Append the separator if it's not the last segment
-        if (std::next(it) != s2.end() && it->back() != '/' && it->back() != '\\') {
+        if (std::next(it) != s2.end() && it->back() != '/' && it->back() != '\\')
+        {
             s1.append(separator);
         }
     }
@@ -239,9 +230,9 @@ std::string get_basename_without_ending(const std::string &input)
     return input.substr(0, input.rfind("."));
 }
 
-std::string get_ending_from_filename(const std::string& input)
+std::string get_ending_from_filename(const std::string &input)
 {
-	return input.substr(input.rfind(".") + 1);
+    return input.substr(input.rfind(".") + 1);
 }
 
 void write_template_confi()
@@ -530,14 +521,14 @@ int filetype_identifier(std::string &file, bool debug)
     if (debug)
     {
         std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
-             << "Testing out:  " << file.find(".out") << std::endl
-             << "Testing FFN:  " << file.find(".ffn") << std::endl
-             << "Testing CUB:  " << file.find(".cub") << std::endl
-             << "Testing CUBE: " << file.find(".cube") << std::endl
-             << "Testing Grid: " << file.find(".grd") << std::endl
-             << "Testing fchk: " << file.find(".fchk") << std::endl
-             << "Testing FChk: " << file.find(".FChk") << std::endl
-             << "Testing Fchk: " << file.find(".Fchk") << std::endl;
+                  << "Testing out:  " << file.find(".out") << std::endl
+                  << "Testing FFN:  " << file.find(".ffn") << std::endl
+                  << "Testing CUB:  " << file.find(".cub") << std::endl
+                  << "Testing CUBE: " << file.find(".cube") << std::endl
+                  << "Testing Grid: " << file.find(".grd") << std::endl
+                  << "Testing fchk: " << file.find(".fchk") << std::endl
+                  << "Testing FChk: " << file.find(".FChk") << std::endl
+                  << "Testing Fchk: " << file.find(".Fchk") << std::endl;
         std::cout << "string::npos: " << std::string::npos << std::endl;
     }
     int temp_type = 0;
@@ -550,7 +541,7 @@ int filetype_identifier(std::string &file, bool debug)
     {
         if (debug)
             std::cout << "Checking for"
-                 << ".wfn" << std::endl;
+                      << ".wfn" << std::endl;
         temp_type = 2;
         found = file.rfind(".wfn");
         if (debug)
@@ -2173,7 +2164,8 @@ double get_bessel_ratio(const double nu, const double x)
     double dn = a1;
     double s = 1.0;
 
-    while (n < maxiter) {
+    while (n < maxiter)
+    {
         double old_fn;
         double del;
         n++;
@@ -2185,14 +2177,16 @@ double get_bessel_ratio(const double nu, const double x)
         An = Anm1 + an * Anm2;
         Bn = Bnm1 + an * Bnm2;
 
-        if (fabs(An) > RECUR_BIG || fabs(Bn) > RECUR_BIG) {
+        if (fabs(An) > RECUR_BIG || fabs(Bn) > RECUR_BIG)
+        {
             An /= RECUR_BIG;
             Bn /= RECUR_BIG;
             Anm1 /= RECUR_BIG;
             Bnm1 /= RECUR_BIG;
             Anm2 /= RECUR_BIG;
         }
-        else if (fabs(An) < RECUR_SMALL || fabs(Bn) < RECUR_SMALL) {
+        else if (fabs(An) < RECUR_SMALL || fabs(Bn) < RECUR_SMALL)
+        {
             An /= RECUR_SMALL;
             Bn /= RECUR_SMALL;
             Anm1 /= RECUR_SMALL;
@@ -2206,76 +2200,92 @@ double get_bessel_ratio(const double nu, const double x)
         del = old_fn / fn;
 
         dn = 1.0 / (2.0 * (nu + n) / x - dn);
-        if (dn < 0.0) s = -s;
+        if (dn < 0.0)
+            s = -s;
 
-        if (fabs(del - 1.0) < 2.0 * DBL_EPSILON) break;
+        if (fabs(del - 1.0) < 2.0 * DBL_EPSILON)
+            break;
     }
 
     return fn;
 }
 
-double bessel_first_kind(const int l, const double x) {
-    if (l < 0 || x < 0.0) {
+double bessel_first_kind(const int l, const double x)
+{
+    if (l < 0 || x < 0.0)
+    {
         err_not_impl_f("This is not implemented, pelase dont do this to me!", std::cout);
         return -1000;
     }
-    else if (x == 0.0) {
+    else if (x == 0.0)
+    {
         return (l > 0 ? 0.0 : 1.0);
     }
-    else if (l == 0) {
+    else if (l == 0)
+    {
         return sin(x) / x;
     }
-    else if (l == 1) {
+    else if (l == 1)
+    {
         return (sin(x) / x - cos(x)) / x;
     }
-    else if (l == 2) {
+    else if (l == 2)
+    {
         const double f = (3.0 / (x * x) - 1.0);
         return (f * sin(x) - 3.0 * cos(x) / x) / x;
     }
-    else if (l == 3) {
+    else if (l == 3)
+    {
         double x2 = x * x;
         const double f1 = (x2 - 15.0);
         const double f2 = (6. * x2 - 15.);
         return (-f2 * sin(x) + f1 * cos(x) * x) / pow(x, 4);
     }
-    else if (l == 4) {
+    else if (l == 4)
+    {
         double x2 = x * x;
         const double f1 = (10. * x2 - 105.0);
         const double f2 = (x2 * x2 - 45. * x2 + 105.);
         return (f2 * sin(x) + f1 * cos(x) * x) / pow(x, 5);
     }
-    else if (l == 5) {
+    else if (l == 5)
+    {
         double x2 = x * x;
         double x4 = x2 * x2;
         const double f1 = (-x4 + 105.0 * x2 - 945.);
         const double f2 = (15. * x4 - 420. * x2 + 945.);
         return (f2 * sin(x) + f1 * cos(x) * x) / (x4 * x2);
     }
-    else if (l == 6) {
+    else if (l == 6)
+    {
         double x2 = x * x;
         double x4 = x2 * x2;
         const double f1 = 21. * (x4 - 60.0 * x2 + 495.);
         const double f2 = (-x4 * x2 + 210. * x4 - 4725 * x2 + 10395.);
         return (f2 * sin(x) - f1 * cos(x) * x) / pow(x, 7);
     }
-    else {
+    else
+    {
         double ratio = get_bessel_ratio(l + 0.5, x);
         const double smallest = DBL_MIN / DBL_EPSILON;
         double jellp1 = smallest * ratio;
         double jell = smallest;
         double jellm1;
         int ell;
-        for (ell = l; ell > 0; ell--) {
+        for (ell = l; ell > 0; ell--)
+        {
             jellm1 = -jellp1 + (2 * ell + 1) / x * jell;
             jellp1 = jell;
             jell = jellm1;
         }
 
-        if (fabs(jell) > fabs(jellp1)) {
+        if (fabs(jell) > fabs(jellp1))
+        {
             double pre = smallest / jell;
             return bessel_first_kind(0, x) * pre;
         }
-        else {
+        else
+        {
             double pre = smallest / jellp1;
             return bessel_first_kind(1, x) * pre;
         }
@@ -2307,7 +2317,7 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
     for (int i = 0; i < wavy.atoms.size(); i++)
     {
         int current_charge = wavy.atoms[i].charge - 1;
-        const std::vector<primitive>& basis = b[current_charge];
+        const std::vector<primitive> &basis = b[current_charge];
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
@@ -2317,7 +2327,6 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
     }
     return nr_coefs;
 }
-
 
 double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
@@ -2436,8 +2445,9 @@ void options::digest_options()
         }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
-        else if (temp == "-blastest") {
-          test_openblas();
+        else if (temp == "-blastest")
+        {
+            test_openblas();
         }
         else if (temp == "-Cation")
         {
@@ -2464,12 +2474,12 @@ void options::digest_options()
         {
             charge = stoi(arguments[i + 1]);
         }
-         else if (temp == "-coef")
+        else if (temp == "-coef")
         {
-             coef_file = arguments[i + 1];
-             err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
-             SALTED = true;
-         }
+            coef_file = arguments[i + 1];
+            err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+            SALTED = true;
+        }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
@@ -2524,7 +2534,7 @@ void options::digest_options()
             double prec = stod(arguments[i + 1]);
             ivec a = split_string<int>(arguments[i + 3], ",");
             ivec b = split_string<int>(arguments[i + 4], ",");
-            test_core_dens_corrected(prec, threads, arguments[i+2], a, b);
+            test_core_dens_corrected(prec, threads, arguments[i + 2], a, b);
             exit(0);
         }
         else if (temp == "-core_tsc-corrected")
@@ -2550,25 +2560,28 @@ void options::digest_options()
             dipole_moments(*this);
             exit(0);
         }
-        //Visualize the specified orbital using spherical harmonics.
-		//Call as -draw_orbits lambda,m,resolution,radius
-        //Where resolution and radius are optional
-        else if (temp == "-draw_orbits") {
+        // Visualize the specified orbital using spherical harmonics.
+        // Call as -draw_orbits lambda,m,resolution,radius
+        // Where resolution and radius are optional
+        else if (temp == "-draw_orbits")
+        {
             vec opts = split_string<double>(arguments[i + 1], ",");
             double resolution = 0.025;
-			double radius = 3.5;
-            if (opts.size() >= 3) {
-				resolution = opts[2];
+            double radius = 3.5;
+            if (opts.size() >= 3)
+            {
+                resolution = opts[2];
             }
-            if (opts.size() == 4) {
+            if (opts.size() == 4)
+            {
                 radius = opts[3];
             }
-    
+
             draw_orbital(opts[0], opts[1], resolution, radius);
             exit(0);
         }
         else if (temp == "-e_field")
-          efield = stod(arguments[i + 1]);
+            efield = stod(arguments[i + 1]);
         else if (temp == "-ECP")
         {
             ECP = true;
@@ -2635,14 +2648,15 @@ void options::digest_options()
             hkl = arguments[i + 1];
             err_checkf(exists(hkl), "hkl doesn't exist", cout);
         }
-        else if (temp == "-hkl_min_max") {
+        else if (temp == "-hkl_min_max")
+        {
             int h_min(stoi(arguments[i + 1]));
             int h_max(stoi(arguments[i + 2]));
             int k_min(stoi(arguments[i + 3]));
             int k_max(stoi(arguments[i + 4]));
             int l_min(stoi(arguments[i + 5]));
             int l_max(stoi(arguments[i + 6]));
-            hkl_min_max = { {h_min, h_max},{k_min, k_max},{l_min,l_max} };
+            hkl_min_max = {{h_min, h_max}, {k_min, k_max}, {l_min, l_max}};
         }
         else if (temp == "-IAM")
             iam_switch = true;
@@ -2723,14 +2737,13 @@ void options::digest_options()
             pbc = stoi(arguments[i + 1]);
         else if (temp == "-polarizabilities")
         {
-            pol_wfns = { arguments[i + 1],
-              arguments[i + 2],
-              arguments[i + 3],
-              arguments[i + 4],
-              arguments[i + 5],
-              arguments[i + 6],
-              arguments[i + 7]
-            };
+            pol_wfns = {arguments[i + 1],
+                        arguments[i + 2],
+                        arguments[i + 3],
+                        arguments[i + 4],
+                        arguments[i + 5],
+                        arguments[i + 6],
+                        arguments[i + 7]};
         }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
@@ -2765,7 +2778,8 @@ void options::digest_options()
             SALTED = true;
             SALTED_DIR = arguments[i + 1];
         }
-        else if (temp == "-DFBASIS" || temp == "-dfbasis") {
+        else if (temp == "-DFBASIS" || temp == "-dfbasis")
+        {
             SALTED_DFBASIS = arguments[i + 1];
         }
         else if (temp == "-skpts")
@@ -2825,17 +2839,15 @@ void options::digest_options()
             if (get_ending_from_filename(name) == "tscb")
                 blocky.write_tsc_file(cif_name, get_basename_without_ending(name) + ".tsc");
             else if (get_ending_from_filename(name) == "tsc")
-				blocky.write_tscb_file(cif_name, get_basename_without_ending(name) + ".tscb");
+                blocky.write_tscb_file(cif_name, get_basename_without_ending(name) + ".tscb");
             else
-				err_checkf(false, "Wrong file ending!", cout);
+                err_checkf(false, "Wrong file ending!", cout);
             exit(0);
         }
-        else if (temp == "-test_analytical") {
+        else if (temp == "-test_analytical")
+        {
             test_analytical_fourier();
             exit(0);
-        }
-        else if (temp == "-test_cerf") {
-            test_cerf();
         }
         else if (temp == "-wfn")
         {
@@ -3003,41 +3015,42 @@ int CountWords(const char *str)
     return numWords;
 };
 
-
-void print_duration(std::ostream& file, const std::string& description, const std::chrono::microseconds& duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt) {
+void print_duration(std::ostream &file, const std::string &description, const std::chrono::microseconds &duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
+{
     auto mins = std::chrono::duration_cast<std::chrono::minutes>(duration);
     auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration) % 60;
     auto millisecs = std::chrono::duration_cast<std::chrono::milliseconds>(duration) % 1000;
 
-    file << std::setw(35) << std::left << std::setfill(' ') << description << ": " << std::right 
-        << std::setw(2) << std::setfill('0') << mins.count() << ":"
-        << std::setw(2) << std::setfill('0') << secs.count() << ":"
-        << std::setw(3) << std::setfill('0') << millisecs.count();
-    if (total_duration.has_value()) {
+    file << std::setw(35) << std::left << std::setfill(' ') << description << ": " << std::right
+         << std::setw(2) << std::setfill('0') << mins.count() << ":"
+         << std::setw(2) << std::setfill('0') << secs.count() << ":"
+         << std::setw(3) << std::setfill('0') << millisecs.count();
+    if (total_duration.has_value())
+    {
         double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
         std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
 }
 
-
-void write_timing_to_file(std::ostream& file,
+void write_timing_to_file(std::ostream &file,
                           std::vector<time_point> time_points,
                           std::vector<std::string> descriptions)
 {
     using namespace std;
-    //Check if either vector is empty
+    // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
-	{
-		cout << "Error: Empty vector passed to write_timing_to_file" << endl;
-		return;
-	}
+    {
+        cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        return;
+    }
 
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
     file << "\n\n------------------------------ Time Breakdown! ------------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
-    //Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
-    for (int i = 0; i < time_points.size()-1; i++) {
+    // Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
+    for (int i = 0; i < time_points.size() - 1; i++)
+    {
         std::chrono::microseconds dur = std::chrono::duration_cast<std::chrono::microseconds>(time_points[i + 1] - time_points[i]);
         print_duration(file, "... for " + descriptions[i], dur, total_time);
     }
@@ -3149,34 +3162,34 @@ char asciitolower(char in)
     return in;
 }
 
-int vec_sum(const bvec& in)
+int vec_sum(const bvec &in)
 {
-  int sum = 0;
-  for (bool val : in)
-  {
-    sum += val;
-  }
-  return sum;
+    int sum = 0;
+    for (bool val : in)
+    {
+        sum += val;
+    }
+    return sum;
 }
 
-int vec_sum(const ivec& in)
+int vec_sum(const ivec &in)
 {
-  int sum = 0;
-  for (int val : in)
-  {
-    sum += val;
-  }
-  return sum;
+    int sum = 0;
+    for (int val : in)
+    {
+        sum += val;
+    }
+    return sum;
 }
 
-double vec_sum(const vec& in)
+double vec_sum(const vec &in)
 {
-  double sum = 0.0;
-  for (double val : in)
-  {
-    sum += val;
-  }
-  return sum;
+    double sum = 0.0;
+    for (double val : in)
+    {
+        sum += val;
+    }
+    return sum;
 }
 
 cdouble vec_sum(const cvec &in)
@@ -3327,79 +3340,90 @@ std::string sha::sha256(const std::string &input)
 
 #ifdef _WIN32
 // Function to convert a narrow string to a wide string
-std::wstring s2ws(const std::string& s) {
-  int len;
-  int slength = (int)s.length() + 1;
-  len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
-  std::wstring r(len, L'\0');
-  MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
-  return r;
+std::wstring s2ws(const std::string &s)
+{
+    int len;
+    int slength = (int)s.length() + 1;
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+    std::wstring r(len, L'\0');
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
+    return r;
 }
 
-bool ExtractDLL(const std::string& dllName) {
-  // Convert the DLL name to a wide string
-  std::wstring wideDllName = s2ws(dllName);
+bool ExtractDLL(const std::string &dllName)
+{
+    // Convert the DLL name to a wide string
+    std::wstring wideDllName = s2ws(dllName);
 
-  // Check if the DLL already exists
-  if (GetFileAttributes(wideDllName.c_str()) != INVALID_FILE_ATTRIBUTES) {
-    return true; // DLL already exists
-  }
+    // Check if the DLL already exists
+    if (GetFileAttributes(wideDllName.c_str()) != INVALID_FILE_ATTRIBUTES)
+    {
+        return true; // DLL already exists
+    }
 
-  // Find the resource
-  HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
-  if (!hRes) return false;
+    // Find the resource
+    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
+    if (!hRes)
+        return false;
 
-  // Load the resource
-  HGLOBAL hResLoad = LoadResource(NULL, hRes);
-  if (!hResLoad) return false;
+    // Load the resource
+    HGLOBAL hResLoad = LoadResource(NULL, hRes);
+    if (!hResLoad)
+        return false;
 
-  // Lock the resource to get a pointer to the data
-  void* pResData = LockResource(hResLoad);
-  if (!pResData) return false;
+    // Lock the resource to get a pointer to the data
+    void *pResData = LockResource(hResLoad);
+    if (!pResData)
+        return false;
 
-  // Get the size of the resource
-  DWORD resSize = SizeofResource(NULL, hRes);
-  if (resSize == 0) return false;
+    // Get the size of the resource
+    DWORD resSize = SizeofResource(NULL, hRes);
+    if (resSize == 0)
+        return false;
 
-  // Write the resource data to a file
-  std::ofstream outFile(dllName, std::ios::binary);
-  if (!outFile) return false;
+    // Write the resource data to a file
+    std::ofstream outFile(dllName, std::ios::binary);
+    if (!outFile)
+        return false;
 
-  outFile.write(reinterpret_cast<const char*>(pResData), resSize);
-  outFile.close();
+    outFile.write(reinterpret_cast<const char *>(pResData), resSize);
+    outFile.close();
 
-  return true;
+    return true;
 }
 
-bool check_OpenBLAS_DLL(const bool& debug) {
-    if(debug)
+bool check_OpenBLAS_DLL(const bool &debug)
+{
+    if (debug)
         std::cout << "Checking for OpenBLAS DLL" << std::endl;
-   // Get the path of the executable
-   char exePath[MAX_PATH];
-   GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
-   if(debug)
-       std::cout << "Executable path: " << exePath << std::endl;
-   std::string exeDir = get_foldername_from_path(exePath);
-   if (debug)
-       std::cout << "Executable directory: " << exeDir << std::endl;
+    // Get the path of the executable
+    char exePath[MAX_PATH];
+    GetModuleFileNameA(NULL, exePath, MAX_PATH); // get path to NoSpherA2 executable
+    if (debug)
+        std::cout << "Executable path: " << exePath << std::endl;
+    std::string exeDir = get_foldername_from_path(exePath);
+    if (debug)
+        std::cout << "Executable directory: " << exeDir << std::endl;
 
-   // Define the DLL name
-   std::string dllName = exeDir + "\\libopenblas.dll";
-   if (debug)
-       std::cout << "DLL name: " << dllName << std::endl;
-   if (exists(dllName))
-     return true; // DLL already exists
-   else {
-       if(debug)
-           std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
-     // Extract the DLL if it does not exist
-     if (!ExtractDLL(dllName)) {
-       std::cout << "Failed to extract DLL" << std::endl;
-       return false;
-     }
-     if(debug)
-         std::cout << "DLL extracted successfully!" << std::endl;
-   }
-   return true;
+    // Define the DLL name
+    std::string dllName = exeDir + "\\libopenblas.dll";
+    if (debug)
+        std::cout << "DLL name: " << dllName << std::endl;
+    if (exists(dllName))
+        return true; // DLL already exists
+    else
+    {
+        if (debug)
+            std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+        // Extract the DLL if it does not exist
+        if (!ExtractDLL(dllName))
+        {
+            std::cout << "Failed to extract DLL" << std::endl;
+            return false;
+        }
+        if (debug)
+            std::cout << "DLL extracted successfully!" << std::endl;
+    }
+    return true;
 }
 #endif

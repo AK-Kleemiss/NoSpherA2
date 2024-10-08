@@ -62,7 +62,6 @@ SALTED:
 		-cif test_cysteine.cif \
 		-wfn test_cysteine.xyz \
 		-dmin 0.73 \
-		-debug \
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good

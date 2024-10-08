@@ -70,4 +70,4 @@ tests_r:
 	cd tests && make all -k -B MODE=RASCALINE
 
 
-.PHONY: test tests NoSpherA2_Rascaline NoSpherA2 all
+.PHONY: test tests NoSpherA2_Rascaline NoSpherA2 all NoSpherA2_Rascaline_Debug test_r tests_r

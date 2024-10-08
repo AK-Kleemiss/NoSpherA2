@@ -17,19 +17,17 @@
                 "-wfn",
                 "test_cysteine.xyz",
                 "-dmin",
-                "0.5",
-                "-v"
+                "0.5"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/tests/SALTED",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",
-            //Add breakpoint in line 3177 of convenience.cpp
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
+                    "text": "python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
                     "ignoreFailures": true
                 },
                 {
@@ -37,11 +35,6 @@
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
                 },
-                {
-                    "description": "Set breakpoint",
-                    "text": "break ../Src/convenience.cpp:3177",
-                    "ignoreFailures": true
-                }
             ]
         },
         {

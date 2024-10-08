@@ -238,6 +238,9 @@ void read_hkl(const std::string &hkl_filename,
         }
     }
     hkl = hkl_enlarged;
+    // Remove 0 0 0 if it exists
+    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
+        hkl.erase(ivec{0, 0, 0});
     file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 }
 
@@ -350,6 +353,9 @@ void generate_hkl(const double &dmin,
             hkl.emplace(hkl__);
         }
     }
+    // Remove 0 0 0 if it exists
+    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
+        hkl.erase(ivec{0, 0, 0});
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -456,6 +462,9 @@ void generate_hkl(const ivec2 &hkl_min_max,
             hkl.emplace(hkl__);
         }
     }
+    // Remove 0 0 0 if it exists
+    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
+        hkl.erase(ivec{0, 0, 0});
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -2477,7 +2486,7 @@ double fourier_bessel_integral(
 
 cdouble sfac_bessel(
     const primitive &p,
-    const vec &k_point,
+    const double *k_point,
     const vec &coefs)
 {
     const double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
@@ -2516,7 +2525,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
             int coef_count = 0;
-            vec k_pt_local = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt]};
+            double k_pt_local[3] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt]};
             for (int iat = 0; iat < atom_list.size(); iat++)
             {
                 const int lim = (int)atom_list[iat].basis_set.size();

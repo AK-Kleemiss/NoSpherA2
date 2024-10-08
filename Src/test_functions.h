@@ -7,7 +7,6 @@
 #include "properties.h"
 #include "JKFit.h"
 #include "SALTED_utilities.h"
-#include "cerf.h"
 #if has_RAS
 #include "SALTED_math.h"
 #include "rascaline.hpp"
@@ -100,26 +99,6 @@ void thakkar_d_test(options &opt)
         result.flush();
         result.close();
     }
-}
-
-void test_cerf() {
-    using namespace std;
-    cerf(cdouble(1.0, 1.0));
-    ofstream name("test.dat", ios::out);
-    for (int i = 0; i < 1000; i++) {
-        name << setprecision(8) << scientific << setw(16) << i * 0.01;
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 0.0)).real();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 0.0)).imag();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 1.0)).real();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(i * 0.01, 1.0)).imag();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(0.0, i * 0.01)).real();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(0.0, i * 0.01)).imag();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(1.0, i * 0.01)).real();
-        name << setprecision(8) << scientific << setw(16) << cerf(cdouble(1.0, i * 0.01)).imag();
-        name << endl;
-    }
-    name.close();
-    exit(0);
 }
 
 void test_density_cubes(options &opt, std::ostream &log_file)
@@ -760,10 +739,10 @@ void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
     }
 };
 
-
-//Only valid for one atom positioned at 0,0,0
-double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type) {
-    int l[3]{ 0, 0, 0 };
+// Only valid for one atom positioned at 0,0,0
+double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type)
+{
+    int l[3]{0, 0, 0};
     double ex = 0;
     double temp = 0;
 
@@ -772,9 +751,7 @@ double compute_MO_spherical_orig(double x, double y, double z, double expon, dou
         x,
         y,
         z,
-        x * x + y * y + z * z
-    };
-
+        x * x + y * y + z * z};
 
     // if (iat != atom) continue;
     constants::type2vector(type, l);
@@ -800,26 +777,29 @@ double compute_MO_spherical_orig(double x, double y, double z, double expon, dou
     return coef * ex; // build MO values at this point
 }
 
-//Only valid for one atom positioned at 0,0,0
-double compute_MO_spherical_new(double x, double y, double z, double expon, double coef, int type, int m = 1) {
+// Only valid for one atom positioned at 0,0,0
+double compute_MO_spherical_new(double x, double y, double z, double expon, double coef, int type, int m = 1)
+{
     double result = 0.0;
-    int l[3]{ 0, 0, 0 };
+    int l[3]{0, 0, 0};
     int type_local = type;
     double N = 1;
-    //convert "type" to l
-    if (type == 1) {
+    // convert "type" to l
+    if (type == 1)
+    {
         type_local = 0;
-        N =1/ sqrt(1 / (constants::FOUR_PI));
+        N = 1 / sqrt(1 / (constants::FOUR_PI));
     }
-    else if (type > 1) {
+    else if (type > 1)
+    {
         type_local = 1;
-        N = 1/ sqrt(3 / (constants::FOUR_PI));
+        N = 1 / sqrt(3 / (constants::FOUR_PI));
     }
-    
+
     // r, theta, phi
     vec spher = constants::cartesian_to_spherical(x, y, z);
     double R = exp(-expon * spher[0] * spher[0]) * pow(spher[0], type_local);
-    double Y = constants::real_spherical(type_local, m, spher[1],spher[2]) * N;
+    double Y = constants::real_spherical(type_local, m, spher[1], spher[2]) * N;
     result = coef * R * Y;
 
     double test = compute_MO_spherical_orig(x, y, z, expon, coef, type);
@@ -827,12 +807,11 @@ double compute_MO_spherical_new(double x, double y, double z, double expon, doub
     return result;
 }
 
-
 void Calc_MO_spherical_harmonics(
-    cube& CubeMO,
-    WFN& wavy,
+    cube &CubeMO,
+    WFN &wavy,
     int cpus,
-    std::ostream& file,
+    std::ostream &file,
     bool nodate)
 {
     using namespace std;
@@ -846,9 +825,9 @@ void Calc_MO_spherical_harmonics(
 
     time_point start = get_time();
 
-    progress_bar* progress = NULL;
+    progress_bar *progress = NULL;
     if (!nodate)
-        progress = new progress_bar{ file, 50u, "Calculating Values" };
+        progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeMO.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -861,14 +840,15 @@ void Calc_MO_spherical_harmonics(
                 double PosGrid[3]{
                     i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
                     i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
-                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2) };
+                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)};
 
-                CubeMO.set_value(i, j, k, compute_MO_spherical_new(PosGrid[0], PosGrid[1], PosGrid[2], wavy.get_exponent(0), wavy.get_MO_coef(0,0), wavy.get_type(0)));
+                CubeMO.set_value(i, j, k, compute_MO_spherical_new(PosGrid[0], PosGrid[1], PosGrid[2], wavy.get_exponent(0), wavy.get_MO_coef(0, 0), wavy.get_type(0)));
             }
         if (i != 0 && i % step == 0 && !nodate)
             progress->write((i) / static_cast<double>(CubeMO.get_size(0)));
     }
-    if (!nodate) {
+    if (!nodate)
+    {
         delete (progress);
 
         time_point end = get_time();
@@ -880,7 +860,6 @@ void Calc_MO_spherical_harmonics(
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
     }
 };
-
 
 void calc_rho_cube(WFN &dummy)
 {
@@ -1052,7 +1031,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
     }
 }
 
-void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
+void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele = "Au", ivec val_els_alpha = {}, ivec val_els_beta = {})
 {
     if (ncpus == -1)
         ncpus = 4;
@@ -1086,34 +1065,34 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele
     int deleted = 0;
     if (val_els_alpha.size() > 0)
     {
-      // Delete core orbitals
-      int offset = wavy_val_Au.get_MO_op_count(0);
-      for (int i = offset - 1; i >= 0; i--)
-        // only delete if i is not an element of val_els
-        if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-        {
-          cout << "Deleting from Alpha: " << i << endl;
-          wavy_val_Au.delete_MO(i);
-          MOs_to_delete[i] = true;
-          deleted++;
-        }
-      offset = wavy_val_Au.get_MO_op_count(0);
-      for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-        if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-        {
-          cout << "Deleting from Beta: " << i - offset << endl;
-          wavy_val_Au.delete_MO(i);
-          MOs_to_delete[i + deleted] = true;
-        }
+        // Delete core orbitals
+        int offset = wavy_val_Au.get_MO_op_count(0);
+        for (int i = offset - 1; i >= 0; i--)
+            // only delete if i is not an element of val_els
+            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
+            {
+                cout << "Deleting from Alpha: " << i << endl;
+                wavy_val_Au.delete_MO(i);
+                MOs_to_delete[i] = true;
+                deleted++;
+            }
+        offset = wavy_val_Au.get_MO_op_count(0);
+        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
+            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
+            {
+                cout << "Deleting from Beta: " << i - offset << endl;
+                wavy_val_Au.delete_MO(i);
+                MOs_to_delete[i + deleted] = true;
+            }
     }
     cout << "MOs deleted: " << deleted << endl;
     cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-      cout << i << " " << MOs_to_delete[i] << endl;
+        cout << i << " " << MOs_to_delete[i] << endl;
     cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
     cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-      cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
+        cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     time_point start = get_time();
 
@@ -1135,7 +1114,7 @@ void test_core_dens_corrected(double& precisison, int ncpus = 4, std::string ele
     }
     delete (progress);
     time_point end = get_time();
-    cout << "Time taken: " << round(get_sec(start, end)/60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
+    cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
     ofstream dat_out(dat, ios::out);
     dat_out << scientific << setprecision(12) << setw(20);
     for (int i = 0; i < res[0].size(); i++)
@@ -1164,55 +1143,54 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     for (int i = 0; i < res.size(); i++)
         res[i].resize(1000, 0.0);
 
-
     string dat = "core_sfac_" + ele + ".dat";
     const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
     WFN ECP_way_Au(9);
-    ECP_way_Au.read_gbw(ele+"_def2TZVP.gbw", cout, false, false);
+    ECP_way_Au.read_gbw(ele + "_def2TZVP.gbw", cout, false, false);
     ECP_way_Au.delete_unoccupied_MOs();
     ECP_way_Au.set_has_ECPs(true, true, 1);
 
     WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw(ele+"_jorge.gbw", cout, false);
+    wavy_full_Au.read_gbw(ele + "_jorge.gbw", cout, false);
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw(ele+"_jorge.gbw", cout, false);
+    wavy_val_Au.read_gbw(ele + "_jorge.gbw", cout, false);
     wavy_val_Au.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
     {
-      // Delete core orbitals
-      int offset = wavy_val_Au.get_MO_op_count(0);
-      for (int i = offset - 1; i >= 0; i--)
-        // only delete if i is not an element of val_els
-        if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
-        {
-          cout << "Deleting from Alpha: " << i << endl;
-          wavy_val_Au.delete_MO(i);
-          MOs_to_delete[i] = true;
-          deleted++;
-        }
-      offset = wavy_val_Au.get_MO_op_count(0);
-      for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
-        if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
-        {
-          cout << "Deleting from Beta: " << i - offset << endl;
-          wavy_val_Au.delete_MO(i);
-          MOs_to_delete[i + deleted] = true;
-        }
+        // Delete core orbitals
+        int offset = wavy_val_Au.get_MO_op_count(0);
+        for (int i = offset - 1; i >= 0; i--)
+            // only delete if i is not an element of val_els
+            if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
+            {
+                cout << "Deleting from Alpha: " << i << endl;
+                wavy_val_Au.delete_MO(i);
+                MOs_to_delete[i] = true;
+                deleted++;
+            }
+        offset = wavy_val_Au.get_MO_op_count(0);
+        for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
+            if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
+            {
+                cout << "Deleting from Beta: " << i - offset << endl;
+                wavy_val_Au.delete_MO(i);
+                MOs_to_delete[i + deleted] = true;
+            }
     }
     cout << "MOs deleted: " << deleted << endl;
     cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-      cout << i << " " << MOs_to_delete[i] << endl;
+        cout << i << " " << MOs_to_delete[i] << endl;
     cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
     cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-      cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
+        cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     std::vector<time_point> time_points;
     std::vector<std::string> time_descriptions;
@@ -1320,7 +1298,8 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
     return res / constants::FOUR_PI;
 }
 
-void test_openblas() {
+void test_openblas()
+{
 #if has_RAS
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
@@ -1330,143 +1309,161 @@ void test_openblas() {
 #endif
 }
 
-void test_analytical_fourier() {
-    //Generate grid and k_pts
+void test_analytical_fourier()
+{
+    // Generate grid and k_pts
     vec2 kpts;
-    for (int i = 1; i < 100; i++) {
-        kpts.push_back({ 0.01 * i, 0, 0 });     //X
-        kpts.push_back({ 0, 0.01 * i, 0 });     //Y
-        kpts.push_back({ 0,0,0.01 * i });       //Z
-        kpts.push_back({ 0.01 * i, 0.01 * i , 0 });     //XY
-        kpts.push_back({ 0.01 * i, 0, 0.01 * i });    //XZ
-        kpts.push_back({ 0, 0.01 * i, 0.01 * i });    //YZ
-        kpts.push_back({ 0.01 * i * 2, 0.01 * i, 0.01 * i }); //XYZ
-        kpts.push_back({ -0.01 * i, 0, 0 });
-        kpts.push_back({ 0, -0.01 * i, 0 });
-        kpts.push_back({ 0, 0, -0.01 * i });
-        kpts.push_back({ -0.01 * i, -0.01 * i , 0 });
-        kpts.push_back({ -0.01 * i, 0, -0.01 * i });
-        kpts.push_back({ 0, -0.01 * i, -0.01 * i });
-        kpts.push_back({ -0.01 * i * 2, -0.01 * i, -0.01 * i });
+    for (int i = 1; i < 100; i++)
+    {
+        kpts.push_back({0.01 * i, 0, 0});                   // X
+        kpts.push_back({0, 0.01 * i, 0});                   // Y
+        kpts.push_back({0, 0, 0.01 * i});                   // Z
+        kpts.push_back({0.01 * i, 0.01 * i, 0});            // XY
+        kpts.push_back({0.01 * i, 0, 0.01 * i});            // XZ
+        kpts.push_back({0, 0.01 * i, 0.01 * i});            // YZ
+        kpts.push_back({0.01 * i * 2, 0.01 * i, 0.01 * i}); // XYZ
+        kpts.push_back({-0.01 * i, 0, 0});
+        kpts.push_back({0, -0.01 * i, 0});
+        kpts.push_back({0, 0, -0.01 * i});
+        kpts.push_back({-0.01 * i, -0.01 * i, 0});
+        kpts.push_back({-0.01 * i, 0, -0.01 * i});
+        kpts.push_back({0, -0.01 * i, -0.01 * i});
+        kpts.push_back({-0.01 * i * 2, -0.01 * i, -0.01 * i});
     }
     vec2 grid;
-    grid.resize(5); //x, y, z, dens, atomic_weight
+    grid.resize(5); // x, y, z, dens, atomic_weight
 
-    double alpha_min[] = { 0.5 };
+    double alpha_min[] = {0.5};
     AtomGrid griddy(1E-25,
-        350,
-        770,
-        1,
-        4.5,
-        1,
-        alpha_min,
-        std::cout);
+                    350,
+                    770,
+                    1,
+                    4.5,
+                    1,
+                    alpha_min,
+                    std::cout);
 
-    double pos[] = { 0 };
-    for (int i = 0; i < grid.size(); i++) {
+    double pos[] = {0};
+    for (int i = 0; i < grid.size(); i++)
+    {
         grid[i].resize(griddy.get_num_grid_points(), 0.0);
     }
     griddy.get_atomic_grid(0, pos, pos, pos, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data());
 
-    //Initialize the vectors sf_A and sf_N
+    // Initialize the vectors sf_A and sf_N
     cvec2 sf_A, sf_N;
     sf_A.resize(1);
     sf_N.resize(1);
     sf_A[0].resize(kpts.size(), 0.0);
     sf_N[0].resize(kpts.size(), 0.0);
 
-    //Conditions for the Wavefunction
+    // Conditions for the Wavefunction
     const double c_exp = 2.0;
-    double vals[] = { 1.0 };
+    double vals[] = {1.0};
 
-    //double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    //int steps[3]{ 0, 0, 0 };
-    //readxyzMinMax_fromWFN(wavy, MinMax, steps, 3., 0.025, true);
-    //cube CubeMO(steps[0], steps[1], steps[2], 1, true);
-    //CubeMO.give_parent_wfn(wavy);
-    //for (int i = 0; i < 3; i++)
+    // double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    // int steps[3]{ 0, 0, 0 };
+    // readxyzMinMax_fromWFN(wavy, MinMax, steps, 3., 0.025, true);
+    // cube CubeMO(steps[0], steps[1], steps[2], 1, true);
+    // CubeMO.give_parent_wfn(wavy);
+    // for (int i = 0; i < 3; i++)
     //{
-    //    CubeMO.set_origin(i, MinMax[i]);
-    //    CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    //}
-    //Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
-    //CubeMO.path = "MO.cube";
-    //CubeMO.write_file(true);
-
+    //     CubeMO.set_origin(i, MinMax[i]);
+    //     CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    // }
+    // Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
+    // CubeMO.path = "MO.cube";
+    // CubeMO.write_file(true);
 
     bool correct = true;
-    
+
     cdouble max_diff, diff;
-    for (int type = 0; type < 6; type++) {
+    for (int type = 0; type < 6; type++)
+    {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
 
-        //Initialize the Wavefunction
+        // Initialize the Wavefunction
         WFN wavy(0);
         wavy.push_back_MO(0, 1.0, -13);
         wavy.push_back_atom("H", 0, 0, 0, 1);
         wavy.atoms[0].push_back_basis_set(c_exp, vals[0], type, 0);
         primitive p(1, type, c_exp, vals[0]);
 
-        for (int l = 0; l < type * 2 + 1; l++) {
-            for (int i = 0; i < coefs.size(); i++) {
+        for (int l = 0; l < type * 2 + 1; l++)
+        {
+            for (int i = 0; i < coefs.size(); i++)
+            {
                 coefs[i] = 0.0;
             }
             max_diff = 0.0;
             coefs[l] = 1.0;
-            //print content of coefs
+            // print content of coefs
             std::cout << "Coefs: ";
-            for (int i = 0; i < coefs.size(); i++) {
+            for (int i = 0; i < coefs.size(); i++)
+            {
                 std::cout << coefs[i] << " ";
             }
             std::cout << "    |  m: " << l - type << std::endl;
 
-            for (int i = 0; i < grid[0].size(); i++) {
-                //grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
+            for (int i = 0; i < grid[0].size(); i++)
+            {
+                // grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
                 grid[3][i] = calc_density_ML(grid[0][i], grid[1][i], grid[2][i], coefs, wavy.atoms);
             }
 
-            //Empty the vectors sf:A nad sf_N
-            for (int i = 0; i < kpts.size(); i++) {
+            // Empty the vectors sf:A nad sf_N
+            for (int i = 0; i < kpts.size(); i++)
+            {
                 sf_A[0][i] = 0.0;
                 sf_N[0][i] = 0.0;
             }
 
-
 #pragma omp parallel for
-            for (int i = 0; i < kpts.size(); i++) {
-                vec k_pt_local(3);
-                for (int d = 0; d < 3; d++) {
+            for (int i = 0; i < kpts.size(); i++)
+            {
+                double k_pt_local[3];
+                for (int d = 0; d < 3; d++)
+                {
                     k_pt_local[d] = kpts[i][d] * 2 * constants::PI;
                 }
                 sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
-                for (int _p = 0; _p < grid[0].size(); _p++) {
+                for (int _p = 0; _p < grid[0].size(); _p++)
+                {
                     double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
                     sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
                 diff = abs(sf_A[0][i] - sf_N[0][i]);
-                if (abs(diff) > abs(max_diff)) {
+                if (abs(diff) > abs(max_diff))
+                {
                     max_diff = diff;
                 }
-                if (abs(diff) > 2.1E-4) {
+                if (abs(diff) > 2.1E-4)
+                {
                     correct = false;
                 }
             }
-            if (!correct) {
+            if (!correct)
+            {
                 std::cout << "Error at m: " << l - type << "   Max diff: " << std::setprecision(6) << max_diff << std::endl;
                 break;
             }
-            else {
+            else
+            {
                 std::cout << "m: " << l - type << " passed!" << " Max diff: " << std::setprecision(6) << max_diff << std::endl;
             }
         }
-        if (!correct) break;
-        std::cout << "l = " << type << " passed!\n" << std::endl;
+        if (!correct)
+            break;
+        std::cout << "l = " << type << " passed!\n"
+                  << std::endl;
     }
-    if (!correct) {
+    if (!correct)
+    {
         using namespace std;
         ofstream result("sfacs.dat", ios::out);
-        for (int i = 0; i < kpts.size(); i++) {
+        for (int i = 0; i < kpts.size(); i++)
+        {
             result << setw(8) << setprecision(2) << fixed << kpts[i][0];
             result << setw(8) << setprecision(2) << fixed << kpts[i][1];
             result << setw(8) << setprecision(2) << fixed << kpts[i][2];
@@ -1481,24 +1478,27 @@ void test_analytical_fourier() {
         result.flush();
         result.close();
     }
-    else {
+    else
+    {
         std::cout << "All tests passed!" << std::endl;
     }
 };
 
-void draw_orbital(const int lambda, const int m, const double resulution = 0.025, const double radius = 3.5) {
-    if (m > lambda || m < -lambda) {
-		std::cout << "m must be between -l and l" << std::endl;
-		return;
-	}
+void draw_orbital(const int lambda, const int m, const double resulution = 0.025, const double radius = 3.5)
+{
+    if (m > lambda || m < -lambda)
+    {
+        std::cout << "m must be between -l and l" << std::endl;
+        return;
+    }
 
-    //Initialize the Wavefunction
+    // Initialize the Wavefunction
     WFN wavy(0);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
     wavy.atoms[0].push_back_basis_set(1.0, 1.0, lambda, 0);
-    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-    int steps[3]{ 0, 0, 0 };
+    double MinMax[6]{0, 0, 0, 0, 0, 0};
+    int steps[3]{0, 0, 0};
     readxyzMinMax_fromWFN(wavy, MinMax, steps, radius, resulution, true);
     cube CubeMO(steps[0], steps[1], steps[2], 1, true);
     CubeMO.give_parent_wfn(wavy);
@@ -1523,13 +1523,13 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
                 double PosGrid[3]{
                     i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
                     i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
-                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2) };
+                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2)};
 
                 const double leng = sqrt(PosGrid[0] * PosGrid[0] + PosGrid[1] * PosGrid[1] + PosGrid[2] * PosGrid[2]);
 
                 const std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(PosGrid[0] / leng, PosGrid[1] / leng, PosGrid[2] / leng);
-                const double radial = std::exp(-leng * leng) * std::pow(leng, lambda);  //Radial part of the wavefunction with b==1
-                const double result = radial * constants::real_spherical(lambda, m, spherical.first, spherical.second); //Coefficients are 1
+                const double radial = std::exp(-leng * leng) * std::pow(leng, lambda);                                  // Radial part of the wavefunction with b==1
+                const double result = radial * constants::real_spherical(lambda, m, spherical.first, spherical.second); // Coefficients are 1
                 CubeMO.set_value(i, j, k, result);
             }
         }
@@ -1545,182 +1545,180 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     omp_destroy_lock(&l);
 #endif
     CubeMO.path = "Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube";
-	CubeMO.write_file();
+    CubeMO.write_file();
 }
 
+// const double dlm_function(const unsigned int& l, const int& m, const double& theta, const double& phi) {
+//     double result = (double)NAN;
+//     const double x = cos(theta);
+//     const double s = -sin(theta);
+//     const int m_ = abs(m);
+//     // the formula for a real spherical harmonic is:
+//     // for positive m:
+//     // (-1)^m cos(m * phi)
+//     // for negative m:
+//     // (-1)^m sin(-m * phi)
+//     const double p((m_) % 2 == 1 ? (m < 0 ? -sin(m_ * phi) : -cos(m_ * phi)) : (m < 0 ? sin(m_ * phi) : cos(m_ * phi)));
+//     switch (l) {
+//     case 0: switch (m_) {
+//     case 0: result = 1.; break;
+//     }; break;
+//     case 1: switch (m_) {
+//     case 0: result = x; break;
+//     case 1: result = p * s; break;
+//     }; break;
+//     case 2: switch (m_) {
+//     case 0: result = 0.5 * (3. * x * x - 1.); break;
+//     case 1: result = p * 3. * x * s; break;
+//     case 2: result = p * 3. * s * s; break;
+//     }; break;
+//     case 3: switch (m_) {
+//     case 0: result = 0.5 * x * (5. * x * x - 3.); break;
+//     case 1: result = p * 1.5 * (5. * x * x - 1.) * s; break;
+//     case 2: result = p * 15. * x * s * s; break;
+//     case 3: result = p * 15. * s * s * s; break;
+//     }; break;
+//     case 4: switch (m_) {
+//     case 0: result = 0.125 * (35. * x * x * x * x - 30. * x * x + 3.); break;
+//     case 1: result = p * 2.5 * (7. * x * x * x - 3. * x) * s; break;
+//     case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
+//     case 3: result = p * 105. * x * s * s * s; break;
+//     case 4: result = p * 105. * s * s * s * s; break;
+//     }; break;
+//     case 5: switch (m_) {
+//     case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;
+//     case 1: result = p * 1.875 * (21. * x * x * x * x - 14. * x * x + 1.) * s; break;
+//     case 2: result = p * 52.5 * x * (3. * x * x - 1.) * s * s; break;
+//     case 3: result = p * 52.5 * (9. * x * x - 1.) * s * s * s; break;
+//     case 4: result = p * 945. * x * s * s * s * s; break;
+//     case 5: result = p * 945. * s * s * s * s * s; break;
+//     }; break;
+//     case 6: switch (m_) {
+//     case 0: result = 0.0625 * (231. * x * x * x * x * x * x - 315. * x * x * x * x + 105. * x * x - 5.); break;
+//     case 1: result = p * 2.625 * x * (33. * x * x * x * x - 30. * x * x + 5.) * s; break;
+//     case 2: result = p * 13.125 * (33. * x * x * x * x - 18. * x * x + 1.) * s * s; break;
+//     case 3: result = p * 157.5 * x * (11. * x * x - 3.) * s * s * s; break;
+//     case 4: result = p * 472.5 * (11. * x * x - 1.) * s * s * s * s; break;
+//     case 5: result = p * 10395. * x * s * s * s * s * s; break;
+//     case 6: result = p * 10395. * s * s * s * s * s * s; break;
+//     }; break;
+//     case 7: switch (m_) {
+//     case 0: result = 0.0625 * x * (429. * x * x * x * x * x * x - 693. * x * x * x * x + 315. * x * x - 35.); break;
+//     case 1: result = p * 0.4375 * (429. * x * x * x * x * x * x - 495. * x * x * x * x + 135. * x * x - 5.) * s; break;
+//     case 2: result = p * 7.875 * x * (143. * x * x * x * x - 110. * x * x + 15.) * s * s; break;
+//     case 3: result = p * 39.375 * (143. * x * x * x * x - 66. * x * x + 3.) * s * s * s; break;
+//     case 4: result = p * 1732.5 * x * (13. * x * x - 3.) * s * s * s * s; break;
+//     case 5: result = p * 5197.5 * (13. * x * x - 1.) * s * s * s * s * s; break;
+//     case 6: result = p * 135135. * x * s * s * s * s * s * s; break;
+//     case 7: result = p * 135135. * s * s * s * s * s * s * s; break;
+//     }; break;
+//     case 8: switch (m_) {
+//     case 0: result = 0.0078125 * (6435. * x * x * x * x * x * x * x * x - 12012. * x * x * x * x * x * x + 6930. * x * x * x * x - 1260. * x * x + 35.); break;
+//     case 1: result = p * 0.5625 * x * (715. * x * x * x * x * x * x - 1001. * x * x * x * x + 385. * x * x - 35.) * s; break;
+//     case 2: result = p * 19.6875 * (143. * x * x * x * x * x * x - 143. * x * x * x * x + 33. * x * x - 1.) * s * s; break;
+//     case 3: result = p * 433.125 * x * (39. * x * x * x * x - 26. * x * x + 3.) * s * s * s; break;
+//     case 4: result = p * 1299.375 * (65. * x * x * x * x - 26. * x * x + 1.) * s * s * s * s; break;
+//     case 5: result = p * 67567.5 * x * (5. * x * x - 1.) * s * s * s * s * s; break;
+//     case 6: result = p * 67567.5 * (15. * x * x - 1.) * s * s * s * s * s * s; break;
+//     case 7: result = p * 2027025. * x * s * s * s * s * s * s * s; break;
+//     case 8: result = p * 2027025. * s * s * s * s * s * s * s * s; break;
+//     }; break;
+//     };
+//     return result;
+// }
 
-
-//const double dlm_function(const unsigned int& l, const int& m, const double& theta, const double& phi) {
-//    double result = (double)NAN;
-//    const double x = cos(theta);
-//    const double s = -sin(theta);
-//    const int m_ = abs(m);
-//    // the formula for a real spherical harmonic is:
-//    // for positive m:
-//    // (-1)^m cos(m * phi)
-//    // for negative m:
-//    // (-1)^m sin(-m * phi)
-//    const double p((m_) % 2 == 1 ? (m < 0 ? -sin(m_ * phi) : -cos(m_ * phi)) : (m < 0 ? sin(m_ * phi) : cos(m_ * phi)));
-//    switch (l) {
-//    case 0: switch (m_) {
-//    case 0: result = 1.; break;
-//    }; break;
-//    case 1: switch (m_) {
-//    case 0: result = x; break;
-//    case 1: result = p * s; break;
-//    }; break;
-//    case 2: switch (m_) {
-//    case 0: result = 0.5 * (3. * x * x - 1.); break;
-//    case 1: result = p * 3. * x * s; break;
-//    case 2: result = p * 3. * s * s; break;
-//    }; break;
-//    case 3: switch (m_) {
-//    case 0: result = 0.5 * x * (5. * x * x - 3.); break;
-//    case 1: result = p * 1.5 * (5. * x * x - 1.) * s; break;
-//    case 2: result = p * 15. * x * s * s; break;
-//    case 3: result = p * 15. * s * s * s; break;
-//    }; break;
-//    case 4: switch (m_) {
-//    case 0: result = 0.125 * (35. * x * x * x * x - 30. * x * x + 3.); break;
-//    case 1: result = p * 2.5 * (7. * x * x * x - 3. * x) * s; break;
-//    case 2: result = p * 7.5 * (7. * x * x - 1.) * s * s; break;
-//    case 3: result = p * 105. * x * s * s * s; break;
-//    case 4: result = p * 105. * s * s * s * s; break;
-//    }; break;
-//    case 5: switch (m_) {
-//    case 0: result = 0.125 * x * (63. * x * x * x * x - 70. * x * x + 15.); break;
-//    case 1: result = p * 1.875 * (21. * x * x * x * x - 14. * x * x + 1.) * s; break;
-//    case 2: result = p * 52.5 * x * (3. * x * x - 1.) * s * s; break;
-//    case 3: result = p * 52.5 * (9. * x * x - 1.) * s * s * s; break;
-//    case 4: result = p * 945. * x * s * s * s * s; break;
-//    case 5: result = p * 945. * s * s * s * s * s; break;
-//    }; break;
-//    case 6: switch (m_) {
-//    case 0: result = 0.0625 * (231. * x * x * x * x * x * x - 315. * x * x * x * x + 105. * x * x - 5.); break;
-//    case 1: result = p * 2.625 * x * (33. * x * x * x * x - 30. * x * x + 5.) * s; break;
-//    case 2: result = p * 13.125 * (33. * x * x * x * x - 18. * x * x + 1.) * s * s; break;
-//    case 3: result = p * 157.5 * x * (11. * x * x - 3.) * s * s * s; break;
-//    case 4: result = p * 472.5 * (11. * x * x - 1.) * s * s * s * s; break;
-//    case 5: result = p * 10395. * x * s * s * s * s * s; break;
-//    case 6: result = p * 10395. * s * s * s * s * s * s; break;
-//    }; break;
-//    case 7: switch (m_) {
-//    case 0: result = 0.0625 * x * (429. * x * x * x * x * x * x - 693. * x * x * x * x + 315. * x * x - 35.); break;
-//    case 1: result = p * 0.4375 * (429. * x * x * x * x * x * x - 495. * x * x * x * x + 135. * x * x - 5.) * s; break;
-//    case 2: result = p * 7.875 * x * (143. * x * x * x * x - 110. * x * x + 15.) * s * s; break;
-//    case 3: result = p * 39.375 * (143. * x * x * x * x - 66. * x * x + 3.) * s * s * s; break;
-//    case 4: result = p * 1732.5 * x * (13. * x * x - 3.) * s * s * s * s; break;
-//    case 5: result = p * 5197.5 * (13. * x * x - 1.) * s * s * s * s * s; break;
-//    case 6: result = p * 135135. * x * s * s * s * s * s * s; break;
-//    case 7: result = p * 135135. * s * s * s * s * s * s * s; break;
-//    }; break;
-//    case 8: switch (m_) {
-//    case 0: result = 0.0078125 * (6435. * x * x * x * x * x * x * x * x - 12012. * x * x * x * x * x * x + 6930. * x * x * x * x - 1260. * x * x + 35.); break;
-//    case 1: result = p * 0.5625 * x * (715. * x * x * x * x * x * x - 1001. * x * x * x * x + 385. * x * x - 35.) * s; break;
-//    case 2: result = p * 19.6875 * (143. * x * x * x * x * x * x - 143. * x * x * x * x + 33. * x * x - 1.) * s * s; break;
-//    case 3: result = p * 433.125 * x * (39. * x * x * x * x - 26. * x * x + 3.) * s * s * s; break;
-//    case 4: result = p * 1299.375 * (65. * x * x * x * x - 26. * x * x + 1.) * s * s * s * s; break;
-//    case 5: result = p * 67567.5 * x * (5. * x * x - 1.) * s * s * s * s * s; break;
-//    case 6: result = p * 67567.5 * (15. * x * x - 1.) * s * s * s * s * s * s; break;
-//    case 7: result = p * 2027025. * x * s * s * s * s * s * s * s; break;
-//    case 8: result = p * 2027025. * s * s * s * s * s * s * s * s; break;
-//    }; break;
-//    };
-//    return result;
-//}
-
-//TESTING THE FOURIER BESSEL TRANSFORM for WAVE FUNCTIONS
-//cdouble S_n_recursion(int n, double H, double b);
-//cdouble C_n_recursion(int n, double H, double b);
-//For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
-//cdouble S_0(double H, double b) {
+// TESTING THE FOURIER BESSEL TRANSFORM for WAVE FUNCTIONS
+// cdouble S_n_recursion(int n, double H, double b);
+// cdouble C_n_recursion(int n, double H, double b);
+// For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
+// cdouble S_0(double H, double b) {
 //	using namespace std::complex_literals;
-//    double two_32 = pow(2.0, 1.5);
+//     double two_32 = pow(2.0, 1.5);
 //	return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8. * b))) / (two_32 * sqrt(b));
-//}
-//double C_0(double H, double b) {
+// }
+// double C_0(double H, double b) {
 //	return  (constants::sqr_pi * exp(-H * H / (8. * b))) / (pow(2., 1.5) * sqrt(b));
-//}
+// }
 ////Following 1/(4b) * ((n-1)C_(n-2) - H*S_(n-1)) = C_n
-//cdouble C_n_recursion(int n, double H, double b) {
-//    using namespace std::complex_literals;
-//    if (n == 0) {
-//        return C_0(H, b);
-//    }
-//    else if (n == 1) {
-//        return (1. / (4. * b)) * (1. + S_0(H, b));
-//    }
-//    else {
-//        return (1. / (4. * b)) * ((n - 1.) * C_n_recursion(n - 2, H, b) - H * S_n_recursion(n - 1, H, b));
-//    }
-//}
+// cdouble C_n_recursion(int n, double H, double b) {
+//     using namespace std::complex_literals;
+//     if (n == 0) {
+//         return C_0(H, b);
+//     }
+//     else if (n == 1) {
+//         return (1. / (4. * b)) * (1. + S_0(H, b));
+//     }
+//     else {
+//         return (1. / (4. * b)) * ((n - 1.) * C_n_recursion(n - 2, H, b) - H * S_n_recursion(n - 1, H, b));
+//     }
+// }
 ////\int_{ 0 }^ {\infty} r^ n\sin(Hr) \cdot e^ { -2br ^ 2 } dr & = \frac{ 1 }{4b}\left((n - 1)S_{ n - 2 } + HC_{ n - 1 }\right) = S_n
-//cdouble S_n_recursion(int n, double H, double b) {
-//    using namespace std::complex_literals;
-//    if (n == 0) {
-//        return S_0(H, b);
-//    }
-//    else if (n == 1) {
-//        return (1. / (4. * b)) * H * C_0(H, b);
-//    }
-//    else {
-//        return (1. / (4. * b)) * ((n - 1.) * S_n_recursion(n - 2, H, b) + H * C_n_recursion(n - 1, H, b));
-//    }
-//}
+// cdouble S_n_recursion(int n, double H, double b) {
+//     using namespace std::complex_literals;
+//     if (n == 0) {
+//         return S_0(H, b);
+//     }
+//     else if (n == 1) {
+//         return (1. / (4. * b)) * H * C_0(H, b);
+//     }
+//     else {
+//         return (1. / (4. * b)) * ((n - 1.) * S_n_recursion(n - 2, H, b) + H * C_n_recursion(n - 1, H, b));
+//     }
+// }
 //// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
-//cdouble fourier_bessel_integral(
-//    primitive& p,
-//    const double H
+// cdouble fourier_bessel_integral(
+//     primitive& p,
+//     const double H
 //)
 //{
-//    using namespace std::complex_literals;
-//    const int l = p.type;
-//    const double b = p.exp;
-//    double N;
-//    //double N = pow(
-//    //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
-//    //    0.25);
-//    //pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
-//    //double N = p.norm_const;
-//    //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
-//    if (l == 0)
-//    {
-//        N = 1.;
-//        //return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
-//        return  ((N * N) / (4 * b)) * C_n_recursion(0, H, b);
-//    }
-//    else if (l == 1)
-//    {
-//        N = 1.; //p.norm_const;
-//        return ((N * N) / (H * H)) * (S_n_recursion(2, H, b) - H * C_n_recursion(3, H, b));
-//    }
-//}
-//cdouble sfac_bessel(
-//    const primitive& p,
-//    const vec& k_point,
-//    const vec& coefs
+//     using namespace std::complex_literals;
+//     const int l = p.type;
+//     const double b = p.exp;
+//     double N;
+//     //double N = pow(
+//     //    pow(2, 7 + 4 * l) * pow(b, 3 + 2 * l) / constants::PI / pow(doublefactorial(2 * l + 1), 2),
+//     //    0.25);
+//     //pow(8 * pow(b, 3) / pow(constants::PI, 3), 0.25);
+//     //double N = p.norm_const;
+//     //return N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (4 * b))) / (pow(2, l + 2) * pow(b, l + 1.5));
+//     if (l == 0)
+//     {
+//         N = 1.;
+//         //return N * N * (pow(H, l * 2) * constants::sqr_pi * exp(-H * H / (8 * b))) / (pow(2, l + 3.5) * pow(b, l + 1.5));
+//         return  ((N * N) / (4 * b)) * C_n_recursion(0, H, b);
+//     }
+//     else if (l == 1)
+//     {
+//         N = 1.; //p.norm_const;
+//         return ((N * N) / (H * H)) * (S_n_recursion(2, H, b) - H * C_n_recursion(3, H, b));
+//     }
+// }
+// cdouble sfac_bessel(
+//     const primitive& p,
+//     const vec& k_point,
+//     const vec& coefs
 //)
 //{
-//    using namespace std::complex_literals;
-//    vec local_k = k_point;
-//    double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
-//    double H = 2 * constants::PI * leng;
-//    //normalize the spherical harmonics k_point
-//    for (int i = 0; i < 3; i++)
-//        local_k[i] /= leng;
+//     using namespace std::complex_literals;
+//     vec local_k = k_point;
+//     double leng = sqrt(local_k[0] * local_k[0] + local_k[1] * local_k[1] + local_k[2] * local_k[2]);
+//     double H = 2 * constants::PI * leng;
+//     //normalize the spherical harmonics k_point
+//     for (int i = 0; i < 3; i++)
+//         local_k[i] /= leng;
 //
-//    vec spherical = cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
-//     for (int m = -p.type; m <= p.type; m++) {
-//           cdouble angular = real_spherical(p.type, m, spherical[1], spherical[2]);
-//           result += constants::FOUR_PI * pow(1.0i, p.type) * radial * angular * coefs[m + p.type];
-//  cdouble radial = fourier_bessel_integral(p, H);
-//  if (p.type == 0)
-//  {
-//      //constants::FOUR_PI^2 weil in angular^2 ein Faktor 1/4pi drin ist
-//      return  constants::FOUR_PI * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
-//  }
-//  else if (p.type == 1) {
-        ////double angular = dlm_function(p.type, m+1, spherical[1], spherical[2]);
+//     vec spherical = cartesian_to_spherical(local_k[0], local_k[1], local_k[2]);
+//      for (int m = -p.type; m <= p.type; m++) {
+//            cdouble angular = real_spherical(p.type, m, spherical[1], spherical[2]);
+//            result += constants::FOUR_PI * pow(1.0i, p.type) * radial * angular * coefs[m + p.type];
+//   cdouble radial = fourier_bessel_integral(p, H);
+//   if (p.type == 0)
+//   {
+//       //constants::FOUR_PI^2 weil in angular^2 ein Faktor 1/4pi drin ist
+//       return  constants::FOUR_PI * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
+//   }
+//   else if (p.type == 1) {
+////double angular = dlm_function(p.type, m+1, spherical[1], spherical[2]);
 //      double angular2 = constants::spherical_harmonic(p.type, m, local_k.data());
 //      return pow(0.75*constants::PI, 2) * constants::FOUR_PI * pow(1.0i, p.type) * radial * p.coefficient * p.coefficient * abs(angular * angular);
 //  }

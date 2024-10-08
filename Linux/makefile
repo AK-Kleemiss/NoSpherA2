@@ -1,7 +1,7 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -lgomp -static-libgcc -static-libstdc++ -ltbb
+LIBS := -lgomp -static-libgcc -static-libstdc++
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
@@ -10,9 +10,9 @@ LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
 all: NoSpherA2 
 
-OBJS := cerf.o wfn_class.o atoms.o properties.o spherical_density.o AtomGrid.o basis_set.o convenience.o sphere_lebedev_rule.o scattering_factors.o cube.o fchk.o JKFit.o NoSpherA2.o SALTED_utilities.o constants.o
-OBJS_RASC := cerf.o_RASC wfn_class.o_RASC atoms.o_RASC properties.o_RASC spherical_density.o_RASC AtomGrid.o_RASC basis_set.o_RASC convenience.o_RASC sphere_lebedev_rule.o_RASC scattering_factors.o_RASC cube.o_RASC fchk.o_RASC JKFit.o_RASC NoSpherA2.o_RASC SALTED_utilities.o_RASC constants.o_RASC
-OBJS_RASC_d := cerf.o_RASC_d wfn_class.o_RASC_d atoms.o_RASC_d properties.o_RASC_d spherical_density.o_RASC_d AtomGrid.o_RASC_d basis_set.o_RASC_d convenience.o_RASC_d sphere_lebedev_rule.o_RASC_d scattering_factors.o_RASC_d cube.o_RASC_d fchk.o_RASC_d JKFit.o_RASC_d NoSpherA2.o_RASC_d SALTED_utilities.o_RASC_d constants.o_RASC_d SALTED_math.o_RASC_d SALTED_equicomb.o_RASC_d SALTED_io.o_RASC_d SALTED_predictor.o_RASC_d hdf5.o_RASC_d
+OBJS := wfn_class.o atoms.o properties.o spherical_density.o AtomGrid.o basis_set.o convenience.o sphere_lebedev_rule.o scattering_factors.o cube.o fchk.o JKFit.o NoSpherA2.o SALTED_utilities.o constants.o
+OBJS_RASC := wfn_class.o_RASC atoms.o_RASC properties.o_RASC spherical_density.o_RASC AtomGrid.o_RASC basis_set.o_RASC convenience.o_RASC sphere_lebedev_rule.o_RASC scattering_factors.o_RASC cube.o_RASC fchk.o_RASC JKFit.o_RASC NoSpherA2.o_RASC SALTED_utilities.o_RASC constants.o_RASC
+OBJS_RASC_d := wfn_class.o_RASC_d atoms.o_RASC_d properties.o_RASC_d spherical_density.o_RASC_d AtomGrid.o_RASC_d basis_set.o_RASC_d convenience.o_RASC_d sphere_lebedev_rule.o_RASC_d scattering_factors.o_RASC_d cube.o_RASC_d fchk.o_RASC_d JKFit.o_RASC_d NoSpherA2.o_RASC_d SALTED_utilities.o_RASC_d constants.o_RASC_d SALTED_math.o_RASC_d SALTED_equicomb.o_RASC_d SALTED_io.o_RASC_d SALTED_predictor.o_RASC_d hdf5.o_RASC_d
 CPP_DEPS := unity.d
 GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 GCC_OPTS_DEBUG := -std=c++17 -Og -g -c -fmessage-length=0 -static -MMD -MP
@@ -27,19 +27,19 @@ NoSpherA2: ${OBJS} ${USER_OBJS}
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
 %.o_RASC: ../Src/%.cpp
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} -D__RASCALINE__ -I../Lib/ -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GCC_OPTS} -D__RASCALINE__ -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
 %.o_RASC_d: ../Src/%.cpp
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS_DEBUG} -D__RASCALINE__ -I../Lib/ -I../Lib/OpenBlas/include_Linux -I../Lib/cerf -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	g++ ${GCC_OPTS_DEBUG} -D__RASCALINE__ -I../Lib/ -I../Lib/OpenBlas/include_Linux -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 SALTED.o: ../Src/SALTED.cpp
@@ -52,10 +52,10 @@ hdf5.o: ../Src/hdf5.cpp
 	g++ ${GCC_OPTS} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-NoSpherA2_Rascaline: ${OBJS_RASC} hdf5.o SALTED.o cerf.o
+NoSpherA2_Rascaline: ${OBJS_RASC} hdf5.o SALTED.o
 	@echo 'Building target: $@'
 	g++ -o "NoSpherA2_rascaline" ${OBJS_RASC} hdf5.o SALTED.o ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
-	${RM} ${OBJS_RASC} hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d cerf.o cerf.d
+	${RM} ${OBJS_RASC} hdf5.o unity_rasc.d hdf5.d SALTED.o SALTED.d
 	cp NoSpherA2_rascaline ../
 	@echo 'Done building rascaline version of NoSpherA2'
 

@@ -29,8 +29,7 @@
 #include <cassert>
 #include <float.h>
 #include <algorithm>
-#include <execution>
-//#include <mutex>
+#include <atomic>
 
 // Here are the system specific libaries
 #ifdef _WIN32
@@ -162,10 +161,9 @@ namespace sha
 bool is_similar_rel(const double &first, const double &second, const double &tolerance);
 bool is_similar(const double &first, const double &second, const double &tolerance);
 bool is_similar_abs(const double &first, const double &second, const double &tolerance);
-void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
-void join_path(std::string& s1, std::initializer_list<std::string> s2);
+void join_path(std::string &s1, std::initializer_list<std::string> s2);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
@@ -293,51 +291,63 @@ public:
     void write(double fraction);
 };
 
-//My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
-class ProgressBar {
+// My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
+class ProgressBar
+{
 public:
-    ~ProgressBar() {
+    ~ProgressBar()
+    {
         progress_ = 100.0f;
         write_progress();
         std::cout << std::endl;
     }
 
-    ProgressBar(const int& worksize, const size_t& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize/100,1)) {
+    ProgressBar(const int &worksize, const size_t &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
+    {
         linestart = std::cout.tellp();
     }
 
-    void set_progress() {
+    void set_progress()
+    {
         progress_ = (float)workdone * workpart_;
-
     }
 
-    void update(std::ostream& os = std::cout) {
+    void update(std::ostream &os = std::cout)
+    {
         workdone = workdone + 1;
-        if (workdone % percent_ == 0) {
+        if (workdone % percent_ == 0)
+        {
             set_progress();
             write_progress(os);
         }
     }
 
-    void write_progress(std::ostream& os = std::cout) {
-        //std::unique_lock lock{ mutex_ };
+    void write_progress(std::ostream &os = std::cout)
+    {
+        // std::unique_lock lock{ mutex_ };
 
         // No need to write once progress is 100%
-        if (progress_ > 100.0f) return;
+        if (progress_ > 100.0f)
+            return;
 
         // Move cursor to the first position on the same line
-        //Check if os is a file stream
-        if (dynamic_cast<std::filebuf*>(std::cout.rdbuf())) {
-            os.seekp(linestart); //Is a file stream
+        // Check if os is a file stream
+        if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+        {
+            os.seekp(linestart); // Is a file stream
         }
-        else { os << "\r" << std::flush; } //Is not a file stream
+        else
+        {
+            os << "\r" << std::flush;
+        } // Is not a file stream
 
         // Start bar
         os << "[";
 
         const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
-        for (size_t i = 0; i < bar_width_; ++i) {
+        for (size_t i = 0; i < bar_width_; ++i)
+        {
             if (i <= completed)
                 os << fill_;
             else
@@ -354,9 +364,10 @@ public:
         os << " " << status_text_ << std::flush;
     }
 
-
 private:
-    const int worksize_; const float workpart_; const int percent_;
+    const int worksize_;
+    const float workpart_;
+    const int percent_;
     size_t bar_width_;
     std::string fill_;
     std::string remainder_;
@@ -365,7 +376,6 @@ private:
     float progress_;
     std::streampos linestart;
 };
-
 
 void readxyzMinMax_fromWFN(
     WFN &wavy,
@@ -494,11 +504,12 @@ struct primitive
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
-    bool operator==(const primitive& other) const {
+    bool operator==(const primitive &other) const
+    {
         return center == other.center &&
-			type == other.type &&
-			exp == other.exp &&
-			coefficient == other.coefficient;
+               type == other.type &&
+               exp == other.exp &&
+               coefficient == other.coefficient;
     };
 };
 
@@ -561,7 +572,7 @@ struct options
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
     ivec2 groups;
-    ivec2 hkl_min_max{ {-100,100},{-100,100},{-100,100} };
+    ivec2 hkl_min_max{{-100, 100}, {-100, 100}, {-100, 100}};
     vec2 twin_law;
     ivec2 combined_tsc_groups;
     svec combined_tsc_calc_files;
@@ -755,8 +766,8 @@ bool is_nan(float &in);
 bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 #ifdef _WIN32
-bool ExtractDLL(const std::string& dllName);
-bool check_OpenBLAS_DLL(const bool& debug=false);
+bool ExtractDLL(const std::string &dllName);
+bool check_OpenBLAS_DLL(const bool &debug = false);
 #endif
 
 #include "wfn_class.h"

@@ -66,3 +66,4 @@ NoSpherA2_rascaline
 /Windows/*/*/libopenblas.dll
 *.exp
 *.o_RASC
+*.o_RASC_d
