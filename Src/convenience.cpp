@@ -2550,6 +2550,23 @@ void options::digest_options()
             dipole_moments(*this);
             exit(0);
         }
+        //Visualize the specified orbital using spherical harmonics.
+		//Call as -draw_orbits lambda,m,resolution,radius
+        //Where resolution and radius are optional
+        else if (temp == "-draw_orbits") {
+            vec opts = split_string<double>(arguments[i + 1], ",");
+            double resolution = 0.025;
+			double radius = 3.5;
+            if (opts.size() >= 3) {
+				resolution = opts[2];
+            }
+            if (opts.size() == 4) {
+                radius = opts[3];
+            }
+    
+            draw_orbital(opts[0], opts[1], resolution, radius);
+            exit(0);
+        }
         else if (temp == "-e_field")
           efield = stod(arguments[i + 1]);
         else if (temp == "-ECP")

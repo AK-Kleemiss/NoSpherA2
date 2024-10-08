@@ -326,9 +326,12 @@ public:
         // No need to write once progress is 100%
         if (progress_ > 100.0f) return;
 
-        // Move cursor to the first position on the same line and flush
-        //Check if os is cout, else reset the pointer to the beginning of the line
-        os.seekp(linestart); //os << "\r" << std::flush;
+        // Move cursor to the first position on the same line
+        //Check if os is a file stream
+        if (dynamic_cast<std::filebuf*>(std::cout.rdbuf())) {
+            os.seekp(linestart); //Is a file stream
+        }
+        else { os << "\r" << std::flush; } //Is not a file stream
 
         // Start bar
         os << "[";

@@ -2480,7 +2480,6 @@ cdouble sfac_bessel(
     const vec &k_point,
     const vec &coefs)
 {
-    using namespace std::complex_literals;
     const double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
     // normalize the spherical harmonics k_point
     const std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);

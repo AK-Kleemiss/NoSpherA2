@@ -811,7 +811,7 @@ double compute_MO_spherical_new(double x, double y, double z, double expon, doub
         type_local = 0;
         N =1/ sqrt(1 / (constants::FOUR_PI));
     }
-    else if (type > 1 && type < 5) {
+    else if (type > 1) {
         type_local = 1;
         N = 1/ sqrt(3 / (constants::FOUR_PI));
     }
@@ -821,6 +821,7 @@ double compute_MO_spherical_new(double x, double y, double z, double expon, doub
     double R = exp(-expon * spher[0] * spher[0]) * pow(spher[0], type_local);
     double Y = constants::real_spherical(type_local, m, spher[1],spher[2]) * N;
     result = coef * R * Y;
+
     double test = compute_MO_spherical_orig(x, y, z, expon, coef, type);
     std::cout << "New: " << result << " Old: " << test << " diff: " << result - test << " fact: " << result / test << std::endl;
     return result;
@@ -1484,6 +1485,68 @@ void test_analytical_fourier() {
         std::cout << "All tests passed!" << std::endl;
     }
 };
+
+void draw_orbital(const int lambda, const int m, const double resulution = 0.025, const double radius = 3.5) {
+    if (m > lambda || m < -lambda) {
+		std::cout << "m must be between -l and l" << std::endl;
+		return;
+	}
+
+    //Initialize the Wavefunction
+    WFN wavy(0);
+    wavy.push_back_MO(0, 1.0, -13);
+    wavy.push_back_atom("H", 0, 0, 0, 1);
+    wavy.atoms[0].push_back_basis_set(1.0, 1.0, lambda, 0);
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    readxyzMinMax_fromWFN(wavy, MinMax, steps, radius, resulution, true);
+    cube CubeMO(steps[0], steps[1], steps[2], 1, true);
+    CubeMO.give_parent_wfn(wavy);
+    for (int i = 0; i < 3; i++)
+    {
+        CubeMO.set_origin(i, MinMax[i]);
+        CubeMO.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+#ifdef _OPENMP
+    omp_lock_t l;
+    omp_init_lock(&l);
+#endif
+    ProgressBar pb(CubeMO.get_size(0));
+
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < CubeMO.get_size(0); i++)
+    {
+        for (int j = 0; j < CubeMO.get_size(1); j++)
+        {
+            for (int k = 0; k < CubeMO.get_size(2); k++)
+            {
+                double PosGrid[3]{
+                    i * CubeMO.get_vector(0, 0) + j * CubeMO.get_vector(0, 1) + k * CubeMO.get_vector(0, 2) + CubeMO.get_origin(0),
+                    i * CubeMO.get_vector(1, 0) + j * CubeMO.get_vector(1, 1) + k * CubeMO.get_vector(1, 2) + CubeMO.get_origin(1),
+                    i * CubeMO.get_vector(2, 0) + j * CubeMO.get_vector(2, 1) + k * CubeMO.get_vector(2, 2) + CubeMO.get_origin(2) };
+
+                const double leng = sqrt(PosGrid[0] * PosGrid[0] + PosGrid[1] * PosGrid[1] + PosGrid[2] * PosGrid[2]);
+
+                const std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(PosGrid[0] / leng, PosGrid[1] / leng, PosGrid[2] / leng);
+                const double radial = std::exp(-leng * leng) * std::pow(leng, lambda);  //Radial part of the wavefunction with b==1
+                const double result = radial * constants::real_spherical(lambda, m, spherical.first, spherical.second); //Coefficients are 1
+                CubeMO.set_value(i, j, k, result);
+            }
+        }
+#ifdef _OPENMP
+        omp_set_lock(&l);
+#endif
+        pb.update(std::cout);
+#ifdef _OPENMP
+        omp_unset_lock(&l);
+#endif
+    }
+#ifdef _OPENMP
+    omp_destroy_lock(&l);
+#endif
+    CubeMO.path = "Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube";
+	CubeMO.write_file();
+}
 
 
 
