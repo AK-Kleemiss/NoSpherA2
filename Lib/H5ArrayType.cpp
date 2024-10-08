@@ -156,6 +156,7 @@ ArrayType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence compiler warning
     }
     ArrayType *encoded_arrtype = new ArrayType;
     encoded_arrtype->p_setId(encoded_arrtype_id);

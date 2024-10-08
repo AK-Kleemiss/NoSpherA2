@@ -27,6 +27,10 @@
 #include <vector>
 #include <numeric>
 #include <cassert>
+#include <float.h>
+#include <algorithm>
+#include <execution>
+//#include <mutex>
 
 // Here are the system specific libaries
 #ifdef _WIN32
@@ -44,6 +48,8 @@
 #include <cstring>
 #endif
 
+extern bool myGlobalBool;
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
@@ -51,8 +57,8 @@ class atom;
 class BasisSet;
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
-inline void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
-inline void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
+void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
+void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
@@ -159,6 +165,7 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
 void cls();
 std::string get_home_path(void);
 void join_path(std::string &s1, std::string &s2);
+void join_path(std::string& s1, std::initializer_list<std::string> s2);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
@@ -285,6 +292,80 @@ public:
 
     void write(double fraction);
 };
+
+//My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
+class ProgressBar {
+public:
+    ~ProgressBar() {
+        progress_ = 100.0f;
+        write_progress();
+        std::cout << std::endl;
+    }
+
+    ProgressBar(const int& worksize, const size_t& bar_width = 60, const std::string& fill = "#", const std::string& remainder = " ", const std::string& status_text = "")
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize/100,1)) {
+        linestart = std::cout.tellp();
+    }
+
+    void set_progress() {
+        progress_ = (float)workdone * workpart_;
+
+    }
+
+    void update(std::ostream& os = std::cout) {
+        workdone = workdone + 1;
+        if (workdone % percent_ == 0) {
+            set_progress();
+            write_progress(os);
+        }
+    }
+
+    void write_progress(std::ostream& os = std::cout) {
+        //std::unique_lock lock{ mutex_ };
+
+        // No need to write once progress is 100%
+        if (progress_ > 100.0f) return;
+
+        // Move cursor to the first position on the same line
+        //Check if os is a file stream
+        if (dynamic_cast<std::filebuf*>(std::cout.rdbuf())) {
+            os.seekp(linestart); //Is a file stream
+        }
+        else { os << "\r" << std::flush; } //Is not a file stream
+
+        // Start bar
+        os << "[";
+
+        const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
+        for (size_t i = 0; i < bar_width_; ++i) {
+            if (i <= completed)
+                os << fill_;
+            else
+                os << remainder_;
+        }
+
+        // End bar
+        os << "]";
+
+        // Write progress percentage
+        os << " " << std::min(static_cast<size_t>(progress_), size_t(100)) << "%";
+
+        // Write status text
+        os << " " << status_text_ << std::flush;
+    }
+
+
+private:
+    const int worksize_; const float workpart_; const int percent_;
+    size_t bar_width_;
+    std::string fill_;
+    std::string remainder_;
+    std::string status_text_;
+    std::atomic<int> workdone;
+    float progress_;
+    std::streampos linestart;
+};
+
 
 void readxyzMinMax_fromWFN(
     WFN &wavy,
@@ -413,6 +494,12 @@ struct primitive
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
+    bool operator==(const primitive& other) const {
+        return center == other.center &&
+			type == other.type &&
+			exp == other.exp &&
+			coefficient == other.coefficient;
+    };
 };
 
 struct ECP_primitive : primitive
@@ -474,6 +561,7 @@ struct options
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
     ivec2 groups;
+    ivec2 hkl_min_max{ {-100,100},{-100,100},{-100,100} };
     vec2 twin_law;
     ivec2 combined_tsc_groups;
     svec combined_tsc_calc_files;
@@ -517,7 +605,7 @@ struct options
     bool fract = false;
     bool hirsh = false;
     bool s_rho = false;
-    bool SALTED = false, SALTED_NO_H = false, SALTED_BECKE = false;
+    bool SALTED = false;
     bool Olex2_1_3_switch = false;
     bool iam_switch = false;
     bool read_k_pts = false;
@@ -576,51 +664,49 @@ struct options
         look_for_debug(argc, argv);
     };
 
-    options(int accuracy,
-            int threads,
-            int pbc,
-            double resolution,
-            double radius,
-            bool becke,
-            bool electron_diffraction,
-            bool ECP,
-            bool set_ECPs,
-            int ECP_mode,
-            bool calc,
-            bool eli,
-            bool esp,
-            bool elf,
-            bool lap,
-            bool rdg,
-            bool hdef,
-            bool def,
-            bool fract,
-            bool hirsh,
-            bool s_rho,
-            bool SALTED,
-            bool SALTED_NO_H,
-            bool SALTED_BECKE,
-            bool Olex2_1_3_switch,
-            bool iam_switch,
-            bool read_k_pts,
-            bool save_k_pts,
-            bool combined_tsc_calc,
-            bool binary_tsc,
-            bool cif_based_combined_tsc_calc,
-            bool no_date,
-            bool gbw2wfn,
-            bool old_tsc,
-            bool thakkar_d_plot,
-            double sfac_scan,
-            double sfac_diffuse,
-            double dmin,
-            int hirsh_number,
+    options(const int accuracy,
+            const int threads,
+            const int pbc,
+            const double resolution,
+            const double radius,
+            const bool becke,
+            const bool electron_diffraction,
+            const bool ECP,
+            const bool set_ECPs,
+            const int ECP_mode,
+            const bool calc,
+            const bool eli,
+            const bool esp,
+            const bool elf,
+            const bool lap,
+            const bool rdg,
+            const bool hdef,
+            const bool def,
+            const bool fract,
+            const bool hirsh,
+            const bool s_rho,
+            const bool SALTED,
+            const bool Olex2_1_3_switch,
+            const bool iam_switch,
+            const bool read_k_pts,
+            const bool save_k_pts,
+            const bool combined_tsc_calc,
+            const bool binary_tsc,
+            const bool cif_based_combined_tsc_calc,
+            const bool no_date,
+            const bool gbw2wfn,
+            const bool old_tsc,
+            const bool thakkar_d_plot,
+            const double sfac_scan,
+            const double sfac_diffuse,
+            const double dmin,
+            const int hirsh_number,
             const ivec &MOs,
             const ivec2 &groups,
             const vec2 &twin_law,
             const ivec2 &combined_tsc_groups,
-            bool all_mos,
-            bool test,
+            const bool all_mos,
+            const bool test,
             const std::string &wfn,
             const std::string &fchk,
             const std::string &basis_set,
@@ -646,9 +732,9 @@ struct options
             const ivec &cmo2,
             const ivec &ECP_nrs,
             const ivec &ECP_elcounts,
-            double mem,
-            unsigned int mult,
-            bool debug,
+            const double mem,
+            const unsigned int mult,
+            const bool debug,
             const hkl_list &m_hkl_list,
             std::ostream &log_file);
 };
@@ -670,7 +756,7 @@ bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 #ifdef _WIN32
 bool ExtractDLL(const std::string& dllName);
-bool check_OpenBLAS_DLL();
+bool check_OpenBLAS_DLL(const bool& debug=false);
 #endif
 
 #include "wfn_class.h"

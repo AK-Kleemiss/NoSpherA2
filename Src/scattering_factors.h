@@ -76,22 +76,8 @@ bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::o
 bool calculate_scattering_factors_ML(
     const options &opt, 
     const WFN &wave, 
-    std::ostream &file, 
-    const int exp_coefs);
+    std::ostream &file);
 
-/**
- * @brief Calculates the scattering factors for RI (Resolution of Identity) method without Hirshfeld weights.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @param exp_coefs The number of expansion coefficients.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_ML_No_H(
-    const options &opt, 
-    const WFN &wave, 
-    std::ostream &file, 
-    const int exp_coefs);
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.
@@ -126,6 +112,15 @@ void generate_hkl(
     cell &unit_cell, 
     std::ostream &file, 
     bool debug = false);
+
+void generate_hkl(
+    const ivec2& hkl_min_max,
+    hkl_list& hkl,
+    const vec2& twin_law,
+    cell& unit_cell,
+    std::ostream& file,
+    bool debug = false,
+    bool ED = false);
 
 /**
  * @brief Generates the fractional hkl (Miller indices) list.
@@ -278,6 +273,17 @@ void calc_SF(const int &points,
     time_point &start, 
     time_point &end1, 
     bool debug = false);
+
+double fourier_bessel_integral(
+    const primitive& p,
+    const double& H
+);
+
+cdouble sfac_bessel(
+    const primitive& p,
+    const vec& k_point,
+    const vec& coefs
+);
 
 /**
  * @brief Calculates the diffuse scattering factors.

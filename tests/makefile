@@ -1,24 +1,21 @@
 RM := rm
-
 DIFF := diff -q -i -b
-
-
 
 # Define the base path
 BASE_PATH = ../../NoSpherA2
 MODE ?= ""
 ifeq ($(MODE),RASCALINE)
 	BASE_PATH = ../../NoSpherA2_rascaline
-	ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED
+	ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED fourier_transform
 else
-    ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
+  ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
 endif
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
 # For Windows, you might need to convert '/' to '\'
 ifeq ($(OS),Windows_NT)
-    BASE_PATH := $(shell echo $(BASE_PATH) | sed 's/\//\\/g')
+  BASE_PATH := $(shell echo $(BASE_PATH) | sed 's/\//\\/g')
 	BASE_PATH +=.exe
 endif
 
@@ -135,6 +132,11 @@ grown_water:
 		-no-date \
 		&& mv NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
+	@echo 'Finished running: $@'
+
+fourier_transform:
+	@echo 'Running test: $@'
+	cd SALTED && $(BASE_PATH) -test_analytical -no-date && mv NoSpherA2.log $@.log
 	@echo 'Finished running: $@'
 
 fractal:

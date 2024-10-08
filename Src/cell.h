@@ -18,8 +18,6 @@ private:
     double upper;
     std::string crystal_system;
     std::vector<ivec2> sym;
-    const double PI = 3.14159265358979323846;
-    const double bohr2angs = 0.529177249;
 
 public:
     cell()
@@ -73,17 +71,17 @@ public:
     double get_sa() const { return sa; };
     double get_sb() const { return sb; };
     double get_sg() const { return sg; };
-    double get_rcm(int i, int j) const { return rcm[i][j]; };
-    double get_cm(int i, int j) const { return cm[i][j]; };
-    double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };
-    double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / constants::TWO_PI; };
-    double get_sym(int i, int j, int k) const { return sym[i][j][k]; };
+    double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
+    double get_cm(const int& i, const int& j) const { return cm[i][j]; };
+    double get_rcm_angs(const int& i, const int& j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
+    double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
+    double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
     std::vector<ivec2> get_sym() const { return sym; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };
     double get_V() const { return V; };
-    double get_angle(int i) const
+    double get_angle(const int& i) const
     {
         switch (i)
         {
@@ -172,8 +170,18 @@ public:
     {
         // d will be in Angstrom
         // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
-        double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
-        return sqrt(upper / lower);
+        double h = hkl[0];
+        double k = hkl[1];
+        double l = hkl[2];
+        double lower2 =
+            h * h * b * b * c * c * sa * sa +
+            k * k * a * a * c * c * sb * sb +
+            l * l * a * a * b * b * sg * sg +
+            2 * k * l * a * a * b * c * (cb * cg - ca) +
+            2 * h * l * a * b * b * c * (cg * ca - cb) +
+            2 * h * k * a * b * c * c * (ca * cb - cg);
+        //double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
+        return sqrt(V*V / lower2);
     }
 
     /**

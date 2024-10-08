@@ -20,9 +20,9 @@ namespace SALTED_Utils
 class Rascaline_Descriptors
 {
 public:
-    Rascaline_Descriptors(std::string filepath, int nrad, int nang, double atomic_gaussian_width,
-                          double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
-                          double center_atom_weight = 1.0, double spline_accuracy = 1e-6, double cutoff_width = 0.1);
+    Rascaline_Descriptors(const std::string& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
+                          const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
+                          const double& center_atom_weight = 1.0, const double& spline_accuracy = 1e-6, const double& cutoff_width = 0.1);
     std::string filepath;
     int nrad;
     int nang;
@@ -80,3 +80,5 @@ const double calc_density_ML(const double& x,
     const vec& coefficients,
     const std::vector<atom>& atoms,
     const int& atom_nr = -1);
+
+vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs);

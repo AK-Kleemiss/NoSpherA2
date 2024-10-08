@@ -8,22 +8,31 @@ struct basis_set_entry{
 	double exponent;
 	unsigned int type; //1=S; 2=P; 3=D; 4=F; 5=G
 	unsigned int shell;
-	basis_set_entry operator=(const basis_set_entry &rhs);
+	// Default assignment operator
+	basis_set_entry& operator=(const basis_set_entry& rhs) = default;
 	basis_set_entry();
 	basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
-	bool operator==(const basis_set_entry& other) const;
+	// Equality operator
+	bool operator==(const basis_set_entry& other) const {
+		return coefficient == other.coefficient &&
+			exponent == other.exponent &&
+			type == other.type &&
+			shell == other.shell &&
+			p == other.p;
+	}
 	primitive p;
 };
 
 class atom {
 public:
 	std::string label;
+    std::string ID;
 	int nr, charge, ECP_electrons;
 	double x, y, z;
 	vec frac_coords;
 	atom();
-	atom(const std::string &l, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
-	atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
+	atom(const std::string &l, const std::string& id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
+	atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
 	atom operator=(const atom &rhs);
 	void print_values() const;
 	bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
@@ -33,6 +42,9 @@ public:
 	void assign_ADPs(vec &second, vec &third, vec &fourth);
 	void assign_ADPs(vec& second);
 	void assign_ADPs(double& Uiso);
+    void assign_ID(const std::string& id);
+    void set_ID(const std::string& id);
+    std::string get_ID() const;
 	std::vector<basis_set_entry> basis_set;
 	int basis_set_id;
 	std::vector<unsigned int> shellcount;

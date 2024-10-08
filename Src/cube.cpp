@@ -2,8 +2,6 @@
 #include "convenience.h"
 #include "constants.h"
 
-using namespace std;
-
 cube::cube()
 {
     size.resize(3, 0);
@@ -45,7 +43,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(const string &filepath, bool read, WFN &wave, ostream &file, bool expert)
+cube::cube(const std::string &filepath, bool read, WFN &wave, std::ostream &file, bool expert)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
@@ -58,6 +56,7 @@ cube::cube(const string &filepath, bool read, WFN &wave, ostream &file, bool exp
 
 cube::cube(int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
 {
+    using namespace std;
     na = g_na;
     parent_wavefunction = new WFN(6);
     cout << "Assigned Nr of Atoms" << endl;
@@ -123,6 +122,7 @@ cube::cube(const cube &given)
 
 bool cube::read_file(bool full, bool header, bool expert)
 {
+    using namespace std;
     ifstream file(path.c_str());
     string line;
     if (header)
@@ -241,6 +241,7 @@ bool cube::read_file(bool full, bool header, bool expert)
 
 bool cube::write_file(bool force, bool absolute)
 {
+    using namespace std;
     if (exists(path))
     {
         if (force)
@@ -319,8 +320,9 @@ bool cube::write_file(bool force, bool absolute)
     return (true);
 };
 
-bool cube::write_file(string &given_path, bool debug)
+bool cube::write_file(std::string &given_path, bool debug)
 {
+    using namespace std;
     stringstream stream;
     string temp;
     ofstream of(given_path.c_str(), ios::out);
@@ -379,8 +381,9 @@ bool cube::write_file(string &given_path, bool debug)
     return (true);
 };
 
-bool cube::write_xdgraph(string &given_path, bool debug)
+bool cube::write_xdgraph(std::string &given_path, bool debug)
 {
+    using namespace std;
     stringstream stream;
     string temp;
     ofstream of(given_path.c_str(), ios::out);
@@ -514,17 +517,20 @@ bool cube::fractal_dimension(const double stepsize)
         else
             df[i] = log(bins[i]) / epsilon;
     }
-    string output(path + "_fractal_plot");
-    ofstream of(output.c_str(), ios::out);
-    of << setw(8) << scientific << setprecision(8) << steps
-       << setw(16) << scientific << setprecision(8) << map_min
-       << setw(16) << scientific << setprecision(8) << map_max
-       << setw(16) << scientific << setprecision(8) << e[0] * pow(0.529177249, 3)
-       << setw(16) << scientific << setprecision(8) << e[1] * pow(0.529177249, 3) << "\n";
-    for (int i = 0; i < steps; i++)
-        of << setw(16) << scientific << setprecision(8) << iso[i] << setw(16) << scientific << setprecision(8) << df[i] << "\n";
-    of.flush();
-    of.close();
+    {
+        using namespace std;
+        string output(path + "_fractal_plot");
+        ofstream of(output.c_str(), ios::out);
+        of << setw(8) << scientific << setprecision(8) << steps
+            << setw(16) << scientific << setprecision(8) << map_min
+            << setw(16) << scientific << setprecision(8) << map_max
+            << setw(16) << scientific << setprecision(8) << e[0] * pow(0.529177249, 3)
+            << setw(16) << scientific << setprecision(8) << e[1] * pow(0.529177249, 3) << "\n";
+        for (int i = 0; i < steps; i++)
+            of << setw(16) << scientific << setprecision(8) << iso[i] << setw(16) << scientific << setprecision(8) << df[i] << "\n";
+        of.flush();
+        of.close();
+    }
     return true;
 }
 
@@ -603,7 +609,7 @@ void cube::operator=(cube &right)
 
 cube cube::operator+(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, cout, false);
+    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
     res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "+" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -616,6 +622,7 @@ cube cube::operator+(cube &right) const
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
     else
     {
+        using namespace std;
         int reads2 = 0;
         int reads1 = 0;
         int rest2 = 0;
@@ -695,7 +702,7 @@ cube cube::operator+(cube &right) const
 
 cube cube::operator-(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, cout, false);
+    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
     res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "-" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -708,6 +715,7 @@ cube cube::operator-(cube &right) const
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
     else
     {
+        using namespace std;
         int reads2 = 0;
         int reads1 = 0;
         int rest2 = 0;
@@ -788,7 +796,7 @@ cube cube::operator-(cube &right) const
 
 cube cube::operator*(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, cout, false);
+    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
     res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "*" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -800,6 +808,7 @@ cube cube::operator*(cube &right) const
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
     else
     {
+        using namespace std;
         int reads2 = 0;
         int reads1 = 0;
         int rest2 = 0;
@@ -880,7 +889,7 @@ cube cube::operator*(cube &right) const
 
 cube cube::operator/(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, cout, false);
+    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
     res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "_" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -892,6 +901,7 @@ cube cube::operator/(cube &right) const
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
     else
     {
+        using namespace std;
         int reads2 = 0;
         int reads1 = 0;
         int rest2 = 0;
@@ -1178,8 +1188,9 @@ bool cube::set_origin(unsigned int i, double value)
     return (true);
 };
 
-string cube::super_cube()
+std::string cube::super_cube()
 {
+    using namespace std;
     int m[3]{0, 0, 0};
     cout << "How many times in X-direction? ";
     cin >> m[0];

@@ -1,10 +1,9 @@
 #include "SALTED_utilities.h"
 #include "constants.h"
 
-using namespace std;
-
-vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
+std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
+    using namespace std;
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
     {
@@ -34,7 +33,7 @@ vector<cvec2> SALTED_Utils::complex_to_real_transformation(vector<int> sizes)
     return matrices;
 }
 
-int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
+int SALTED_Utils::get_lmax_max(std::unordered_map<std::string, int> &lmax)
 {
     int lmax_max = 0;
     for (auto &[key, value] : lmax)
@@ -47,7 +46,7 @@ int SALTED_Utils::get_lmax_max(unordered_map<string, int> &lmax)
     return lmax_max;
 }
 
-void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map<string, int> &nmax, array<vector<primitive>, 118> basis_set, vector<string> species)
+void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std::unordered_map<std::string, int> &nmax, std::array<std::vector<primitive>, 118> basis_set, std::vector<std::string> species)
 {
     // lmax = {"C": 5, "H":2,...} with the numbers beeing the maximum angular momentum (type) for the given atom
     // nmax = {C0: 10, C1: 7, ...} with the numbers beeing the maximum number of primitives for the given atom and type
@@ -60,12 +59,12 @@ void SALTED_Utils::set_lmax_nmax(unordered_map<string, int> &lmax, unordered_map
         // initialize nmax with symbol + type
         for (int i = 0; i < basis_set[atom_index].back().type + 1; i++)
         {
-            nmax[spe + to_string(i)] = 0;
+            nmax[spe + std::to_string(i)] = 0;
         }
         // count the number of primitives for the given atom and type
         for (int i = 0; i < basis_set[atom_index].size(); i++)
         {
-            nmax[spe + to_string(basis_set[atom_index][i].type)] += 1;
+            nmax[spe + std::to_string(basis_set[atom_index][i].type)] += 1;
         }
     }
 }
@@ -93,9 +92,9 @@ std::vector<std::string> SALTED_Utils::filter_species(const std::vector<std::str
     if (!excluded_species.empty())
 	{
 		std::cout << "Excluded species: ";
-		for (const auto &species : excluded_species)
+		for (const auto &_species : excluded_species)
 		{
-			std::cout << species << " ";
+			std::cout << _species << " ";
 		}
 		std::cout << std::endl;
         err_not_impl_f("This Model does not contain all neccecary molecules to predict this structure\n", std::cout);
@@ -137,9 +136,8 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
     return oss.str();
 }
 
-string Rascaline_Descriptors::gen_parameters()
+std::string Rascaline_Descriptors::gen_parameters()
 {
-    std::ostringstream oss;
     HyperParametersDensity hyper_parameters_density = {
         this->rcut,                           // cutoff
         this->nrad,                           // max_radial
@@ -149,13 +147,14 @@ string Rascaline_Descriptors::gen_parameters()
         {"Gto", this->spline_accuracy},       // radial_basis
         {"ShiftedCosine", this->cutoff_width} // cutoff_function
     };
-    string json_string = to_json(hyper_parameters_density);
+    std::string json_string = to_json(hyper_parameters_density);
     return json_string;
 }
 
-Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int nang, double atomic_gaussian_width,
-                                             double rcut, int n_atoms, std::vector<std::string> neighspe, std::vector<std::string> species,
-                                             double center_atom_weight, double spline_accuracy, double cutoff_width)
+//How about this?
+Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
+                                             const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
+                                             const double& center_atom_weight, const double& spline_accuracy, const double& cutoff_width)
 {
     this->filepath = filepath;
     this->nrad = nrad;
@@ -168,7 +167,7 @@ Rascaline_Descriptors::Rascaline_Descriptors(std::string filepath, int nrad, int
     this->center_atom_weight = center_atom_weight;
     this->spline_accuracy = spline_accuracy;
     this->cutoff_width = cutoff_width;
-    this->nspe = neighspe.size();
+    this->nspe = (int)neighspe.size();
 }
 
 // RASCALINE1
@@ -176,7 +175,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
     rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
     // Construct the parameters for the calculator from the inputs given
-    string temp_p = gen_parameters();
+    std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
 
     // size_t nspe1 = neighspe.size();
@@ -223,11 +222,12 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 }
 
 // RASCALINE2
-cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buffer)
+cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
 {
     
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
+    //cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
+    cvec4 omega(this->n_atoms, std::vector<cvec2>(this->nspe * this->nrad, cvec2(this->nang + 1, cvec(2 * this->nang + 1, { 0.0, 0.0 }))));
     for (int l = 0; l < nang + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];
@@ -241,12 +241,14 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(vector<uint8_t> descriptor_buf
             {
                 for (int d = 0; d < this->nspe * this->nrad; ++d)
                 {
-                    omega[l][a][c][d] = 0.0;
+                    //omega[l][a][c][d] = 0.0;
+                    omega[a][d][l][c] = 0.0;
                     for (int r = 0; r < 2 * l + 1; ++r)
                     {
-                        omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        //omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        omega[a][d][l][c] += conj(c2r[r][c]) * descriptor_values(a, r, d);
                     }
-                }
+                }                    /*cvec* v2_ptr = (cvec*)&v2[iat][l2][n2];*/
             }
         }
         c2r.clear();
@@ -359,4 +361,50 @@ const double calc_density_ML(const double& x,
     }
     // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
+}
+
+
+/**
+ * Calculates the atomic density for a given list of atoms and coefficients.
+ *
+ * @param atoms The list of atoms.
+ * @param coefs The coefficients used in the calculation.
+ * @return The atomic density for each atom.
+ */
+vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
+    int  e = 0, size;
+    double radial;
+    const basis_set_entry* bf;
+
+    vec atom_elecs(atoms.size(), 0.0);
+
+    int coef_counter = 0;
+    for (int i = 0; i < atoms.size(); i++) {
+
+        size = (int)atoms[i].basis_set.size();
+
+        double temp_dens = 0;
+        for (e = 0; e < size; e++)
+        {
+            bf = &atoms[i].basis_set[e];
+            primitive p(i, bf->type, bf->exponent, bf->coefficient);
+            if (p.type > 0) {
+                break;
+            }
+            radial = constants::PI / (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;
+
+            temp_dens += coefs[coef_counter + e] * radial;
+        }
+
+
+        atom_elecs[i] += temp_dens;
+
+        for (e = 0; e < size; e++)
+        {
+            bf = &atoms[i].basis_set[e];
+            coef_counter += (2 * bf->type + 1);
+        }
+    }
+    return atom_elecs;
+
 }

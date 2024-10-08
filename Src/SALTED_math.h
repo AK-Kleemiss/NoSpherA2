@@ -3,9 +3,8 @@
 
 struct Shape2D
 {
-    size_t rows;
-    size_t cols;
-    Shape2D(size_t rows, size_t cols) : rows(rows), cols(cols) {}
+    int rows;
+    int cols;
     Shape2D() : rows(0), cols(0) {}
     Shape2D(int rows, int cols) : rows(rows), cols(cols) {
       err_checkf(rows >= 0, "cannot have negative size!", std::cout);
@@ -15,10 +14,9 @@ struct Shape2D
 
 struct Shape3D
 {
-    size_t depth;
-    size_t rows;
-    size_t cols;
-    Shape3D(size_t depth, size_t rows, size_t cols) : depth(depth), rows(rows), cols(cols) {}
+    int depth;
+    int rows;
+    int cols;
     Shape3D() : depth(0), rows(0), cols(0) {}
     Shape3D(int depth, int rows, int cols) : depth(depth), rows(rows), cols(cols) { 
       err_checkf(depth >= 0, "cannot have negative size!", std::cout);
@@ -29,10 +27,10 @@ struct Shape3D
 
 // To_2D
 template <typename T>
-std::vector<std::vector<T>> reshape(std::vector<T> flatVec, Shape2D sizes);
+std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes);
 // To_3D
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reshape(std::vector<T> flatVec, Shape3D sizes);
+std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes);
 
 // TRANSPOSES
 // 3D MATRIX
@@ -75,11 +73,11 @@ std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const s
 
 //BLAS dot product from flattend matrices
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1, const std::vector<T>& flatMat2, size_t mat1_d0, size_t mat1_d1, size_t mat2_d0, size_t mat2_d1, bool transp1, bool transp2);
+std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1, const std::vector<T>& flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
-std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const size_t m, const size_t k1, const size_t k2, const size_t n, bool transp1 = false, bool transp2 = false);
+std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
 
 //Own implementation of matrix multiplication
 template <typename T>
@@ -95,7 +93,7 @@ std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>&
 
 //BLAS implementation of matrix multiplication 2D x 1D
 template <typename T>
-std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const size_t m, const size_t n, bool transp);
+std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n, bool transp);
 
 template <typename T>
 std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec);

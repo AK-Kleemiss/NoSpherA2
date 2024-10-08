@@ -140,6 +140,7 @@ CompType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence compiler warning
     }
     CompType *encoded_cmptype = new CompType;
     encoded_cmptype->p_setId(encoded_cmptype_id);

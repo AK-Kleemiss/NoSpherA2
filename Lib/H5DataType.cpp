@@ -278,6 +278,7 @@ DataType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence the compiler warning
     }
     DataType *encoded_dtype = new DataType;
     encoded_dtype->p_setId(encoded_dtype_id);

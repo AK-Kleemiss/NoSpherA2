@@ -526,7 +526,8 @@ static double calc_Gaussian_int(const int& occ, const double& coef, const double
 static double calc_Gaussian_int_at_k0(const int& occ, const double& coef, const double& exp, const int& radial_exp, const double& k_vector)
 {
     const int N = radial_exp;
-    return -pow(2.0, -N - 2.5) * pow(exp, -N - 1.5) * tgamma(N + 1.5);
+    return -pow(2.0, -N - 2.5) * pow(exp, -N - 1.5) * tgamma(N + 1.5) * coef * occ;
+    (void)k_vector;
 }
 
 Gaussian_Atom::Gaussian_Atom(int g_atom_number, std::string& basis) : Spherical_Atom(g_atom_number, 2)
@@ -673,8 +674,16 @@ const double Gaussian_Atom::get_custom_form_factor(
     const int& min_d,
     const int& min_f)
 {
-
     err_not_impl_SA();
+    (void)k_vector;
+    (void)max_s;
+    (void)max_p;
+    (void)max_d;
+    (void)max_f;
+    (void)min_s;
+    (void)min_p;
+    (void)min_d;
+    (void)min_f;
     return -1;
 };
 const double Gaussian_Atom::get_custom_form_factor(
@@ -724,6 +733,7 @@ const double Gaussian_Atom::get_core_form_factor(const double& k_vector, const i
 {
     int max_s = 0, max_p = 1, max_d = 1, max_f = 1, max_h = 1, max_g = 1;
     return get_custom_form_factor(k_vector, max_s, max_p, max_d, max_f, max_g, max_h, 0, 0, 0, 0, 0, 0);
+    (void)core_els;
 };
 
 void Gaussian_Atom::calc_orbs(

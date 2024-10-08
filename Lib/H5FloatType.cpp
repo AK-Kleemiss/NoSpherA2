@@ -142,6 +142,7 @@ FloatType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence the compiler warning
     }
     FloatType *encoded_flttype = new FloatType;
     encoded_flttype->p_setId(encoded_flttype_id);

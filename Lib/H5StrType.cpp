@@ -196,6 +196,7 @@ StrType::decode() const
     }
     catch (DataTypeIException &err) {
         throw;
+        (void)err; // silence the compiler warning
     }
     StrType *encoded_strtype = new StrType;
     encoded_strtype->p_setId(encoded_strtype_id);

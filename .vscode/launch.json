@@ -5,13 +5,53 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/NoSpherA2_Rascaline_Debug",
+            "args": [
+                "-SALTED",
+                "Model",
+                "-cif",
+                "test_cysteine.cif",
+                "-wfn",
+                "test_cysteine.xyz",
+                "-dmin",
+                "0.5",
+                "-v"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/tests/SALTED",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            //Add breakpoint in line 3177 of convenience.cpp
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set breakpoint",
+                    "text": "break ../Src/convenience.cpp:3177",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
-        }
+        },
         {
             "name": "Python: Optimizer",
             "type": "python",

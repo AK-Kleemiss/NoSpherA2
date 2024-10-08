@@ -53,8 +53,8 @@ private:
     bool push_back_center(const int &cent);
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
-    void push_back_MO_coef(const int &nr, const double &value);
     void assign_MO_coefs(const int &nr, vec &values);
+    void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;
@@ -202,7 +202,7 @@ public:
     const int get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
     const int get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
     const int get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
-    bool push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &charge);
+    bool push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &charge, const std::string& ID = "0000000000000");
     bool push_back_atom(const atom &given);
     // atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
     bool push_back_atom_basis_set(const int &nr, const double &exponent, const double &coefficient, const int &type, const int &shell)

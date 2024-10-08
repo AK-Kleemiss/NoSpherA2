@@ -5,15 +5,14 @@
 #include "cube.h"
 #include "constants.h"
 
-using namespace std;
-
 void Calc_Spherical_Dens(
     cube &CubeSpher,
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -107,8 +106,9 @@ void Calc_Spherical_Dens_no_trans(
   WFN& wavy,
   int cpus,
   double radius,
-  ostream& file)
+  std::ostream& file)
 {
+    using namespace std;
 #ifdef _OPENMP
   if (cpus != -1)
   {
@@ -181,8 +181,9 @@ void Calc_Static_Def(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -276,8 +277,9 @@ void Calc_Static_Def(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -361,8 +363,9 @@ void Calc_Hirshfeld(
     int cpus,
     double radius,
     int ignore_atom,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -460,8 +463,9 @@ void Calc_Hirshfeld(
     int cpus,
     double radius,
     int ignore_atom,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -545,8 +549,9 @@ void Calc_Hirshfeld_atom(
     int cpus,
     double radius,
     int ignore_atom,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -627,8 +632,9 @@ void Calc_Rho(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -707,9 +713,10 @@ void Calc_Rho_no_trans(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file,
+    std::ostream &file,
     bool print)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -768,9 +775,9 @@ void Calc_Rho_spherical_harmonics(
     cube &CubeRho,
     WFN &wavy,
     int cpus,
-    ostream &file)
+    std::ostream &file)
 {
-
+    using namespace std;
     time_point start = get_time();
 
     progress_bar *progress = new progress_bar{file, 50u, "Calculating Rho"};
@@ -817,9 +824,10 @@ void Calc_MO_spherical_harmonics(
     WFN &wavy,
     int cpus,
     int MO,
-    ostream &file,
+    std::ostream &file,
     bool nodate)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -869,9 +877,10 @@ void Calc_S_Rho(
     cube& Cube_S_Rho,
     WFN& wavy,
     int cpus,
-    ostream& file,
+    std::ostream& file,
     bool& nodate)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -930,9 +939,10 @@ void Calc_Prop(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file,
+    std::ostream &file,
     bool test)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -1104,8 +1114,9 @@ void Calc_ESP(
     int cpus,
     double radius,
     bool no_date,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
 #ifdef _OPENMP
     if (cpus != -1)
     {
@@ -1208,8 +1219,9 @@ void Calc_MO(
     WFN &wavy,
     int cpus,
     double radius,
-    ostream &file)
+    std::ostream &file)
 {
+    using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
 #ifdef _OPENMP
     if (cpus != -1)
@@ -1287,8 +1299,9 @@ void Calc_MO(
 
 void properties_calculation(options &opt)
 {
+    using namespace std;
     ofstream log2("NoSpherA2_cube.log", ios::out);
-    auto coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
+    auto _coutbuf = std::cout.rdbuf(log2.rdbuf()); // save and redirect
     log2 << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
@@ -1533,7 +1546,7 @@ void properties_calculation(options &opt)
         log2 << "  done!" << endl;
     }
     // return output to cout
-    std::cout.rdbuf(coutbuf);
+    std::cout.rdbuf(_coutbuf);
     log2.close();
     std::cout<< "Properties calculation done!" << std::endl;
 }
@@ -1657,8 +1670,10 @@ static void Calc_Hirshfeld_atom_2(
   WFN& wavy,
   int cpus,
   int _atom,
-  ostream& file)
+  std::ostream& file)
 {
+    (void)file;
+    using namespace std;
 #ifdef _OPENMP
   if (cpus != -1)
   {
@@ -1720,8 +1735,9 @@ vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom) {
   return { mu_x, mu_y, mu_z ,charge};
 }
 
-void dipole_moments(options& opt, ostream& log2)
+void dipole_moments(options& opt, std::ostream& log2)
 {
+  using namespace std;
   log2 << NoSpherA2_message(opt.no_date);
   if (!opt.no_date)
     log2 << build_date();
@@ -1798,8 +1814,9 @@ void dipole_moments(options& opt, ostream& log2)
   std::cout << "\n\nProperties calculation done!" << std::endl;
 }
 
-vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int threads, double radius, ostream& log2, bool debug)
+vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int threads, double radius, std::ostream& log2, bool debug)
 {
+    using namespace std;
   if (debug)
     log2 << "Starting calculation of dipole moment" << endl;
   cube Rho(NbSteps[0], NbSteps[1], NbSteps[2], wavy.get_ncen(), true);
@@ -1841,8 +1858,9 @@ vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int th
   return dipole_moments;
 }
 
-void polarizabilities(options& opt, ostream& log2)
+void polarizabilities(options& opt, std::ostream& log2)
 {
+    using namespace std;
   std::vector<WFN> wavy;
   for (int i = 0; i < 7; i++) {
     wavy.push_back(WFN(0));

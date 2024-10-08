@@ -6,16 +6,15 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-using namespace std;
 
-string help_message()
+std::string help_message()
 {
     std::string t = "\n----------------------------------------------------------------------------\n";
     t.append("          These commands and arguments are known by NoSpherA2:\n");
     t.append("----------------------------------------------------------------------------\n\n");
     t.append(":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n");
     t.append("   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n");
-    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; fch* (UNTESTED!)\n");
+    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n");
     t.append("   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n");
     t.append("   -b              <FILENAME>               Read this basis set\n");
     t.append("   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n");
@@ -56,9 +55,9 @@ string help_message()
     t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
     return t;
 }
-string NoSpherA2_message(bool no_date)
+std::string NoSpherA2_message(bool no_date)
 {
-    string t = "    _   __     _____       __              ___   ___\n";
+    std::string t = "    _   __     _____       __              ___   ___\n";
     t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
     t.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
     t.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
@@ -89,9 +88,9 @@ string NoSpherA2_message(bool no_date)
     return t;
 }
 
-string build_date()
+std::string build_date()
 {
-    return ("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
+    return ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 }
 
 bool is_similar_rel(const double &first, const double &second, const double &tolerance)
@@ -126,10 +125,10 @@ void cls()
     //    cout << string( 100, '\n' );
 #ifdef _WIN32
     if (system("CLS"))
-        cout << "this should not happen...!" << endl;
+        std::cout << "this should not happen...!" << std::endl;
 #else
     if (system("clear"))
-        cout << "this should not happen...!" << endl;
+        std::cout << "this should not happen...!" << std::endl;
 #endif
 };
 
@@ -158,10 +157,10 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(string &from, string &to)
+void copy_file(std::string &from, std::string &to)
 {
-    ifstream source(from.c_str(), ios::binary);
-    ofstream dest(to.c_str(), ios::binary);
+    std::ifstream source(from.c_str(), std::ios::binary);
+    std::ofstream dest(to.c_str(), std::ios::binary);
 
     dest << source.rdbuf();
 
@@ -171,20 +170,20 @@ void copy_file(string &from, string &to)
 
 //---------------------------Configuration files ---------------------------------------------------
 
-string get_home_path(void)
+std::string get_home_path(void)
 {
 #ifdef _WIN32
-    string temp1 = getenv("HOMEDRIVE");
-    string temp2 = getenv("HOMEPATH");
+    std::string temp1 = getenv("HOMEDRIVE");
+    std::string temp2 = getenv("HOMEPATH");
     temp1.append(temp2);
     return temp1;
 #else
-    string home = getenv("HOME");
+    std::string home = getenv("HOME");
     return home;
 #endif
 }
 
-void join_path(string &s1, string &s2)
+void join_path(std::string &s1, std::string &s2)
 {
 #ifdef _WIN32
     s1.append("\\");
@@ -195,7 +194,29 @@ void join_path(string &s1, string &s2)
     s1.append(s2);
 }
 
-string get_filename_from_path(const string &input)
+void join_path(std::string& s1, std::initializer_list<std::string> s2)
+{
+    std::string separator;
+#ifdef _WIN32
+    separator = "\\";
+#else
+    separator = "/";
+#endif
+    // Ensure that the initial path has a trailing separator if needed
+    if (!s1.empty() && s1.back() != '/' && s1.back() != '\\') {
+        s1.append(separator);
+}
+    // Iterate over each segment in the initializer list
+    for (auto it = s2.begin(); it != s2.end(); ++it) {
+        s1.append(*it);
+        // Append the separator if it's not the last segment
+        if (std::next(it) != s2.end() && it->back() != '/' && it->back() != '\\') {
+            s1.append(separator);
+        }
+    }
+}
+
+std::string get_filename_from_path(const std::string &input)
 {
 #ifdef _WIN32
     return input.substr(input.rfind("\\") + 1);
@@ -204,7 +225,7 @@ string get_filename_from_path(const string &input)
 #endif
 }
 
-string get_foldername_from_path(const string &input)
+std::string get_foldername_from_path(const std::string &input)
 {
 #ifdef _WIN32
     return input.substr(0, input.rfind("\\") + 1);
@@ -213,18 +234,19 @@ string get_foldername_from_path(const string &input)
 #endif
 }
 
-string get_basename_without_ending(const string &input)
+std::string get_basename_without_ending(const std::string &input)
 {
     return input.substr(0, input.rfind("."));
 }
 
-string get_ending_from_filename(const string& input)
+std::string get_ending_from_filename(const std::string& input)
 {
 	return input.substr(input.rfind(".") + 1);
 }
 
 void write_template_confi()
 {
+    using namespace std;
     string line;
     string programs = get_home_path();
     string filename = ".cuQCT.conf";
@@ -268,51 +290,49 @@ void write_template_confi()
     return;
 };
 
-options::options(int accuracy,
-                 int threads,
-                 int pbc,
-                 double resolution,
-                 double radius,
-                 bool becke,
-                 bool electron_diffraction,
-                 bool ECP,
-                 bool set_ECPs,
-                 int ECP_mode,
-                 bool calc,
-                 bool eli,
-                 bool esp,
-                 bool elf,
-                 bool lap,
-                 bool rdg,
-                 bool hdef,
-                 bool def,
-                 bool fract,
-                 bool hirsh,
-                 bool s_rho,
-                 bool SALTED,
-                 bool SALTED_NO_H,
-                 bool SALTED_BECKE,
-                 bool Olex2_1_3_switch,
-                 bool iam_switch,
-                 bool read_k_pts,
-                 bool save_k_pts,
-                 bool combined_tsc_calc,
-                 bool binary_tsc,
-                 bool cif_based_combined_tsc_calc,
-                 bool no_date,
-                 bool gbw2wfn,
-                 bool old_tsc,
-                 bool thakkar_d_plot,
-                 double sfac_scan,
-                 double sfac_diffuse,
-                 double dmin,
-                 int hirsh_number,
+options::options(const int accuracy,
+                 const int threads,
+                 const int pbc,
+                 const double resolution,
+                 const double radius,
+                 const bool becke,
+                 const bool electron_diffraction,
+                 const bool ECP,
+                 const bool set_ECPs,
+                 const int ECP_mode,
+                 const bool calc,
+                 const bool eli,
+                 const bool esp,
+                 const bool elf,
+                 const bool lap,
+                 const bool rdg,
+                 const bool hdef,
+                 const bool def,
+                 const bool fract,
+                 const bool hirsh,
+                 const bool s_rho,
+                 const bool SALTED,
+                 const bool Olex2_1_3_switch,
+                 const bool iam_switch,
+                 const bool read_k_pts,
+                 const bool save_k_pts,
+                 const bool combined_tsc_calc,
+                 const bool binary_tsc,
+                 const bool cif_based_combined_tsc_calc,
+                 const bool no_date,
+                 const bool gbw2wfn,
+                 const bool old_tsc,
+                 const bool thakkar_d_plot,
+                 const double sfac_scan,
+                 const double sfac_diffuse,
+                 const double dmin,
+                 const int hirsh_number,
                  const ivec &MOs,
                  const ivec2 &_groups,
                  const vec2 &twin_law,
                  const ivec2 &combined_tsc_groups,
-                 bool all_mos,
-                 bool test,
+                 const bool all_mos,
+                 const bool test,
                  const std::string &wfn,
                  const std::string &fchk,
                  const std::string &basis_set,
@@ -338,9 +358,9 @@ options::options(int accuracy,
                  const ivec &cmo2,
                  const ivec &ECP_nrs,
                  const ivec &ECP_elcounts,
-                 double mem,
-                 unsigned int mult,
-                 bool debug,
+                 const double mem,
+                 const unsigned int mult,
+                 const bool debug,
                  const hkl_list &m_hkl_list,
                  std::ostream &log_file)
     : accuracy(accuracy), threads(threads), pbc(pbc),
@@ -349,7 +369,7 @@ options::options(int accuracy,
       set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
       eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
       hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-      s_rho(s_rho), SALTED(SALTED), SALTED_NO_H(SALTED_NO_H), SALTED_BECKE(SALTED_BECKE), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
+      s_rho(s_rho), SALTED(SALTED), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
       Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
       read_k_pts(read_k_pts), save_k_pts(save_k_pts),
       combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
@@ -374,8 +394,9 @@ options::options(int accuracy,
     groups.resize(1);
 };
 
-int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
+int program_confi(std::string &gaussian_path, std::string &turbomole_path, std::string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
 {
+    using namespace std;
     counter++;
     if (counter == 3)
     {
@@ -478,7 +499,7 @@ bool check_bohr(WFN &wave, bool debug)
             d[2] = atom1[2] - atom2[2];
             double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
             if (debug)
-                cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << endl;
+                std::cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << std::endl;
             if (length < min_length)
                 min_length = length;
         }
@@ -486,14 +507,14 @@ bool check_bohr(WFN &wave, bool debug)
     if (debug)
     {
         if (min_length < 2)
-            cout << "Decided it's written in Angstrom" << endl;
+            std::cout << "Decided it's written in Angstrom" << std::endl;
         else
-            cout << "Decided it's written in Bohr" << endl;
+            std::cout << "Decided it's written in Bohr" << std::endl;
     }
     return (!(min_length < 2));
 };
 
-int filetype_identifier(string &file, bool debug)
+int filetype_identifier(std::string &file, bool debug)
 {
     /*
     List of filetypes and correpsonding values:
@@ -505,36 +526,37 @@ int filetype_identifier(string &file, bool debug)
     -g/o *.grd      6: XDGraph grid file
     -o *.(F)fc(C)hk 5: fchk
     */
+    using namespace std;
     if (debug)
     {
-        cout << "Testing WFN:  " << file.find(".wfn") << endl
-             << "Testing out:  " << file.find(".out") << endl
-             << "Testing FFN:  " << file.find(".ffn") << endl
-             << "Testing CUB:  " << file.find(".cub") << endl
-             << "Testing CUBE: " << file.find(".cube") << endl
-             << "Testing Grid: " << file.find(".grd") << endl
-             << "Testing fchk: " << file.find(".fchk") << endl
-             << "Testing FChk: " << file.find(".FChk") << endl
-             << "Testing Fchk: " << file.find(".Fchk") << endl;
-        cout << "string::npos: " << string::npos << endl;
+        std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
+             << "Testing out:  " << file.find(".out") << std::endl
+             << "Testing FFN:  " << file.find(".ffn") << std::endl
+             << "Testing CUB:  " << file.find(".cub") << std::endl
+             << "Testing CUBE: " << file.find(".cube") << std::endl
+             << "Testing Grid: " << file.find(".grd") << std::endl
+             << "Testing fchk: " << file.find(".fchk") << std::endl
+             << "Testing FChk: " << file.find(".FChk") << std::endl
+             << "Testing Fchk: " << file.find(".Fchk") << std::endl;
+        std::cout << "string::npos: " << std::string::npos << std::endl;
     }
     int temp_type = 0;
     size_t found, temp;
     temp = 0;
     if (debug)
-        cout << "Temp before any checks: " << temp << endl;
+        std::cout << "Temp before any checks: " << temp << std::endl;
     svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
-    if (file.find(".wfn") != string::npos)
+    if (file.find(".wfn") != std::string::npos)
     {
         if (debug)
-            cout << "Checking for"
-                 << ".wfn" << endl;
+            std::cout << "Checking for"
+                 << ".wfn" << std::endl;
         temp_type = 2;
         found = file.rfind(".wfn");
         if (debug)
-            cout << "Found: " << found << endl;
+            std::cout << "Found: " << found << std::endl;
         for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
+            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != std::string::npos)
                 temp = file.rfind(types[i]);
         if (debug)
             cout << "Temp: " << temp << endl;
@@ -643,15 +665,15 @@ int filetype_identifier(string &file, bool debug)
     return -1;
 }
 
-string go_get_string(ifstream &file, string search, bool rewind)
+std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
     if (rewind)
     {
         file.clear();
         file.seekg(0, file.beg);
     }
-    string line;
-    while (line.find(search) == string::npos && !file.eof() && getline(file, line))
+    std::string line;
+    while (line.find(search) == std::string::npos && !file.eof() && getline(file, line))
         continue;
     if (file.eof())
         return "";
@@ -659,7 +681,7 @@ string go_get_string(ifstream &file, string search, bool rewind)
         return line;
 }
 
-string shrink_string(string &input)
+std::string shrink_string(std::string &input)
 {
     while (input.find(" ") != -1)
     {
@@ -716,7 +738,7 @@ string shrink_string(string &input)
     return input;
 };
 
-string shrink_string_to_atom(string &input, const int &atom_number)
+std::string shrink_string_to_atom(std::string &input, const int &atom_number)
 {
     while (input.find(" ") != -1)
     {
@@ -770,7 +792,7 @@ string shrink_string_to_atom(string &input, const int &atom_number)
     {
         input.erase(input.find(")"), 1);
     }
-    string temp = constants::atnr2letter(atom_number);
+    std::string temp = constants::atnr2letter(atom_number);
     err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
     if (input.find(temp) != 1)
         return temp;
@@ -1057,11 +1079,12 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 };
 */
 
-void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
     //  selection[1][i] for iths selection of cube
+    using namespace std;
     cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
     if (nr_of_cubes > 1)
         cout << "s in total." << endl;
@@ -1168,7 +1191,7 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
     } while (true);
 };
 
-bool unsaved_files(vector<WFN> &wavy)
+bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
         for (int c = 0; c < wavy[w].cub.size(); c++)
@@ -1261,14 +1284,15 @@ void readxyzMinMax_fromWFN(
 }
 
 void readxyzMinMax_fromCIF(
-    string cif,
+    std::string cif,
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
     double Resolution,
-    ofstream &file,
+    std::ofstream &file,
     bool debug)
 {
+    using namespace std;
     if (debug)
         file << "starting to read cif!" << endl;
     if (!exists(cif))
@@ -1699,8 +1723,9 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
+    using namespace std;
     vec2 Uij, Cijk, Dijkl;
     ifstream asym_cif_input(cif.c_str(), std::ios::in);
     asym_cif_input.clear();
@@ -2130,6 +2155,133 @@ const double gaussian_radial(primitive &p, double &r)
     return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
 }
 
+double get_bessel_ratio(const double nu, const double x)
+{
+    const double RECUR_BIG = DBL_MAX;
+    const double RECUR_SMALL = DBL_MIN;
+    const int maxiter = 10000;
+    int n = 1;
+    double Anm2 = 1.0;
+    double Bnm2 = 0.0;
+    double Anm1 = 0.0;
+    double Bnm1 = 1.0;
+    double a1 = x / (2.0 * (nu + 1.0));
+    double An = Anm1 + a1 * Anm2;
+    double Bn = Bnm1 + a1 * Bnm2;
+    double an;
+    double fn = An / Bn;
+    double dn = a1;
+    double s = 1.0;
+
+    while (n < maxiter) {
+        double old_fn;
+        double del;
+        n++;
+        Anm2 = Anm1;
+        Bnm2 = Bnm1;
+        Anm1 = An;
+        Bnm1 = Bn;
+        an = -x * x / (4.0 * (nu + n - 1.0) * (nu + n));
+        An = Anm1 + an * Anm2;
+        Bn = Bnm1 + an * Bnm2;
+
+        if (fabs(An) > RECUR_BIG || fabs(Bn) > RECUR_BIG) {
+            An /= RECUR_BIG;
+            Bn /= RECUR_BIG;
+            Anm1 /= RECUR_BIG;
+            Bnm1 /= RECUR_BIG;
+            Anm2 /= RECUR_BIG;
+        }
+        else if (fabs(An) < RECUR_SMALL || fabs(Bn) < RECUR_SMALL) {
+            An /= RECUR_SMALL;
+            Bn /= RECUR_SMALL;
+            Anm1 /= RECUR_SMALL;
+            Bnm1 /= RECUR_SMALL;
+            Anm2 /= RECUR_SMALL;
+            Bnm2 /= RECUR_SMALL;
+        }
+
+        old_fn = fn;
+        fn = An / Bn;
+        del = old_fn / fn;
+
+        dn = 1.0 / (2.0 * (nu + n) / x - dn);
+        if (dn < 0.0) s = -s;
+
+        if (fabs(del - 1.0) < 2.0 * DBL_EPSILON) break;
+    }
+
+    return fn;
+}
+
+double bessel_first_kind(const int l, const double x) {
+    if (l < 0 || x < 0.0) {
+        err_not_impl_f("This is not implemented, pelase dont do this to me!", std::cout);
+        return -1000;
+    }
+    else if (x == 0.0) {
+        return (l > 0 ? 0.0 : 1.0);
+    }
+    else if (l == 0) {
+        return sin(x) / x;
+    }
+    else if (l == 1) {
+        return (sin(x) / x - cos(x)) / x;
+    }
+    else if (l == 2) {
+        const double f = (3.0 / (x * x) - 1.0);
+        return (f * sin(x) - 3.0 * cos(x) / x) / x;
+    }
+    else if (l == 3) {
+        double x2 = x * x;
+        const double f1 = (x2 - 15.0);
+        const double f2 = (6. * x2 - 15.);
+        return (-f2 * sin(x) + f1 * cos(x) * x) / pow(x, 4);
+    }
+    else if (l == 4) {
+        double x2 = x * x;
+        const double f1 = (10. * x2 - 105.0);
+        const double f2 = (x2 * x2 - 45. * x2 + 105.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / pow(x, 5);
+    }
+    else if (l == 5) {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = (-x4 + 105.0 * x2 - 945.);
+        const double f2 = (15. * x4 - 420. * x2 + 945.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / (x4 * x2);
+    }
+    else if (l == 6) {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = 21. * (x4 - 60.0 * x2 + 495.);
+        const double f2 = (-x4 * x2 + 210. * x4 - 4725 * x2 + 10395.);
+        return (f2 * sin(x) - f1 * cos(x) * x) / pow(x, 7);
+    }
+    else {
+        double ratio = get_bessel_ratio(l + 0.5, x);
+        const double smallest = DBL_MIN / DBL_EPSILON;
+        double jellp1 = smallest * ratio;
+        double jell = smallest;
+        double jellm1;
+        int ell;
+        for (ell = l; ell > 0; ell--) {
+            jellm1 = -jellp1 + (2 * ell + 1) / x * jell;
+            jellp1 = jell;
+            jell = jellm1;
+        }
+
+        if (fabs(jell) > fabs(jellp1)) {
+            double pre = smallest / jell;
+            return bessel_first_kind(0, x) * pre;
+        }
+        else {
+            double pre = smallest / jellp1;
+            return bessel_first_kind(1, x) * pre;
+        }
+    }
+}
+
 int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b)
 {
     wavy.set_basis_set_ptr(b);
@@ -2167,7 +2319,7 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
 }
 
 
-double get_decimal_precision_from_CIF_number(string &given_string)
+double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
     int len = (int)given_string.length();
     int open_bracket = -1;
@@ -2195,8 +2347,8 @@ double get_decimal_precision_from_CIF_number(string &given_string)
     if (open_bracket != -1 && close_bracket != -1)
     {
         size_of_precision = close_bracket - open_bracket - 1;
-        string temp = given_string.substr(open_bracket + 1, size_of_precision);
-        precision = stoi(temp);
+        std::string temp = given_string.substr(open_bracket + 1, size_of_precision);
+        precision = std::stoi(temp);
     }
     int digits = 0;
     if (open_bracket != -1 && close_bracket != -1)
@@ -2222,6 +2374,7 @@ double get_decimal_precision_from_CIF_number(string &given_string)
 
 void options::digest_options()
 {
+    using namespace std;
     // Lets print what was the command line, for debugging
     if (debug)
     {
@@ -2315,6 +2468,7 @@ void options::digest_options()
         {
              coef_file = arguments[i + 1];
              err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+             SALTED = true;
          }
         else if (temp == "-cif")
         {
@@ -2396,16 +2550,22 @@ void options::digest_options()
             dipole_moments(*this);
             exit(0);
         }
-        else if (temp == "-polarizabilities")
-        {
-          pol_wfns = { arguments[i + 1],
-            arguments[i + 2],
-            arguments[i + 3],
-            arguments[i + 4],
-            arguments[i + 5],
-            arguments[i + 6],
-            arguments[i + 7]
-          };
+        //Visualize the specified orbital using spherical harmonics.
+		//Call as -draw_orbits lambda,m,resolution,radius
+        //Where resolution and radius are optional
+        else if (temp == "-draw_orbits") {
+            vec opts = split_string<double>(arguments[i + 1], ",");
+            double resolution = 0.025;
+			double radius = 3.5;
+            if (opts.size() >= 3) {
+				resolution = opts[2];
+            }
+            if (opts.size() == 4) {
+                radius = opts[3];
+            }
+    
+            draw_orbital(opts[0], opts[1], resolution, radius);
+            exit(0);
         }
         else if (temp == "-e_field")
           efield = stod(arguments[i + 1]);
@@ -2474,6 +2634,15 @@ void options::digest_options()
         {
             hkl = arguments[i + 1];
             err_checkf(exists(hkl), "hkl doesn't exist", cout);
+        }
+        else if (temp == "-hkl_min_max") {
+            int h_min(stoi(arguments[i + 1]));
+            int h_max(stoi(arguments[i + 2]));
+            int k_min(stoi(arguments[i + 3]));
+            int k_max(stoi(arguments[i + 4]));
+            int l_min(stoi(arguments[i + 5]));
+            int l_max(stoi(arguments[i + 6]));
+            hkl_min_max = { {h_min, h_max},{k_min, k_max},{l_min,l_max} };
         }
         else if (temp == "-IAM")
             iam_switch = true;
@@ -2552,6 +2721,17 @@ void options::digest_options()
             no_date = true;
         else if (temp == "-pbc")
             pbc = stoi(arguments[i + 1]);
+        else if (temp == "-polarizabilities")
+        {
+            pol_wfns = { arguments[i + 1],
+              arguments[i + 2],
+              arguments[i + 3],
+              arguments[i + 4],
+              arguments[i + 5],
+              arguments[i + 6],
+              arguments[i + 7]
+            };
+        }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
@@ -2585,16 +2765,8 @@ void options::digest_options()
             SALTED = true;
             SALTED_DIR = arguments[i + 1];
         }
-        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
-        {
-            SALTED_BECKE = true;
-        }
-        else if (temp == "DFBASIS" || temp == "dfbasis") {
+        else if (temp == "-DFBASIS" || temp == "-dfbasis") {
             SALTED_DFBASIS = arguments[i + 1];
-        }
-        else if (temp == "-SALTED_NO_H" || temp == "-salted_no_h")
-        {
-            SALTED_NO_H = true;
         }
         else if (temp == "-skpts")
             save_k_pts = true;
@@ -2604,12 +2776,6 @@ void options::digest_options()
             cif = arguments[i + 2];
             wfn = arguments[i + 3];
             sfac_scan(*this, log_file);
-            exit(0);
-        }
-        else if (temp == "-test-ecp")
-        {
-            d_sfac_scan = fromString<double>(arguments[i + 1]);
-            sfac_scan_ECP(*this, log_file);
             exit(0);
         }
         else if (temp == "-sfac_diffuse")
@@ -2655,14 +2821,21 @@ void options::digest_options()
         {
             string name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
-            name = "test.cif";
+            string cif_name = "test.cif";
             if (get_ending_from_filename(name) == "tscb")
-                blocky.write_tsc_file(name);
+                blocky.write_tsc_file(cif_name, get_basename_without_ending(name) + ".tsc");
             else if (get_ending_from_filename(name) == "tsc")
-				blocky.write_tscb_file(name);
+				blocky.write_tscb_file(cif_name, get_basename_without_ending(name) + ".tscb");
             else
 				err_checkf(false, "Wrong file ending!", cout);
             exit(0);
+        }
+        else if (temp == "-test_analytical") {
+            test_analytical_fourier();
+            exit(0);
+        }
+        else if (temp == "-test_cerf") {
+            test_cerf();
         }
         else if (temp == "-wfn")
         {
@@ -2690,15 +2863,15 @@ void options::look_for_debug(int &argc, char **argv)
     // This loop figures out command line options
     for (int i = 0; i < argc; i++)
     {
-        string temp = argv[i];
+        std::string temp = argv[i];
         arguments.push_back(temp);
         if (temp.find("-") > 0)
             continue;
         else if (temp == "-v" || temp == "-v2" || temp == "-debug")
-            cout << "Turning on verbose mode!" << endl, debug = true;
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
-            cout << NoSpherA2_message() << help_message() << build_date() << endl;
+            std::cout << NoSpherA2_message() << help_message() << build_date() << std::endl;
             exit(0);
         }
     }
@@ -3198,23 +3371,35 @@ bool ExtractDLL(const std::string& dllName) {
   return true;
 }
 
-bool check_OpenBLAS_DLL() {
-  // Get the path of the executable
-  char exePath[MAX_PATH];
-  GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
-  std::string exeDir = get_foldername_from_path(exePath);
+bool check_OpenBLAS_DLL(const bool& debug) {
+    if(debug)
+        std::cout << "Checking for OpenBLAS DLL" << std::endl;
+   // Get the path of the executable
+   char exePath[MAX_PATH];
+   GetModuleFileNameA(NULL, exePath, MAX_PATH); //get path to NoSpherA2 executable
+   if(debug)
+       std::cout << "Executable path: " << exePath << std::endl;
+   std::string exeDir = get_foldername_from_path(exePath);
+   if (debug)
+       std::cout << "Executable directory: " << exeDir << std::endl;
 
-  // Define the DLL name
-  std::string dllName = exeDir + "\\libopenblas.dll";
-  if (exists(dllName))
-    return true; // DLL already exists
-  else {
-    // Extract the DLL if it does not exist
-    if (!ExtractDLL(dllName)) {
-      std::cout << "Failed to extract DLL" << endl;
-      return false;
-    }
-  }
-  return true;
+   // Define the DLL name
+   std::string dllName = exeDir + "\\libopenblas.dll";
+   if (debug)
+       std::cout << "DLL name: " << dllName << std::endl;
+   if (exists(dllName))
+     return true; // DLL already exists
+   else {
+       if(debug)
+           std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+     // Extract the DLL if it does not exist
+     if (!ExtractDLL(dllName)) {
+       std::cout << "Failed to extract DLL" << std::endl;
+       return false;
+     }
+     if(debug)
+         std::cout << "DLL extracted successfully!" << std::endl;
+   }
+   return true;
 }
 #endif

@@ -31,6 +31,12 @@
     <Filter Include="Quelldateien\SALTED">
       <UniqueIdentifier>{411a5573-0e6b-43bd-8cf5-f94a2d53f41a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Quelldateien\cerf">
+      <UniqueIdentifier>{753cf8dc-21d0-496f-b928-4a07a44ad109}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\cerf">
+      <UniqueIdentifier>{2b45ffe2-bcc4-4afc-8212-d8a266865b83}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -181,6 +187,24 @@
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\DLL_Helper.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\cerf\erfcx.cpp">
+      <Filter>Quelldateien\cerf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\cerf\err_fcts.cpp">
+      <Filter>Quelldateien\cerf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\cerf\im_w_of_x.cpp">
+      <Filter>Quelldateien\cerf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\cerf\w_of_z.cpp">
+      <Filter>Quelldateien\cerf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lib\cerf\width.cpp">
+      <Filter>Quelldateien\cerf</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\constants.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -973,6 +997,12 @@
     </ClInclude>
     <ClInclude Include="..\Src\constants.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lib\cerf\cerf.h">
+      <Filter>Headerdateien\cerf</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lib\cerf\defs.h">
+      <Filter>Headerdateien\cerf</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

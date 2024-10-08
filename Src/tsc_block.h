@@ -399,7 +399,7 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
-  void write_tscb_file(std::string name = "experimental.tscb")
+  void write_tscb_file(std::string cif_name = "test.cif", std::string name = "experimental.tscb")
   {
     std::ofstream tsc_file(name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 
