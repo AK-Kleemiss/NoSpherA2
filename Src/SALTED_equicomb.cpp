@@ -5,7 +5,6 @@
 #endif
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
-
 void equicomb(int natoms, int nrad1, int nrad2,
               const cvec4 &v1,
               const cvec4 &v2,
@@ -15,6 +14,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
               const int &nfps, const std::vector<int64_t> &vfps,
               vec &p)
 {
+
     const int l21 = 2 * lam + 1;
     const int llmax = (int)llvec[0].size();
 
@@ -50,8 +50,11 @@ void equicomb(int natoms, int nrad1, int nrad2,
                     l1 = llvec[0][il];
                     l2 = llvec[1][il];
 
-                    cvec2 *v1_ptr = (cvec2 *)&v1[l1][iat];
-                    cvec2 *v2_ptr = (cvec2 *)&v2[l2][iat];
+                    //cvec2 *v1_ptr = (cvec2 *)&v1[l1][iat];
+                    //cvec2 *v2_ptr = (cvec2 *)&v2[l2][iat];
+
+                    cvec *v1_ptr = (cvec *)&v1[iat][n1][l1];
+                    cvec *v2_ptr = (cvec *)&v2[iat][n2][l2];
 
                     fill(pcmplx.begin(), pcmplx.end(), null);
 
@@ -65,7 +68,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1][n1] * (*v2_ptr)[im2][n2];
+                                //pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1][n1] * (*v2_ptr)[im2][n2];
+                                pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1] * (*v2_ptr)[im2];
                                 iwig++;
                             }
                         }

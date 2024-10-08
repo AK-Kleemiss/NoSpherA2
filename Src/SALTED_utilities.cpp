@@ -226,7 +226,8 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
 {
     
     metatensor::TensorMap descriptor = metatensor::TensorMap::load_buffer(descriptor_buffer);
-    cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
+    //cvec4 omega(this->nang + 1, std::vector<cvec2>(this->n_atoms, cvec2(2 * this->nang + 1, cvec(this->nspe * this->nrad, {0.0, 0.0}))));
+    cvec4 omega(this->n_atoms, std::vector<cvec2>(this->nspe * this->nrad, cvec2(this->nang + 1, cvec(2 * this->nang + 1, { 0.0, 0.0 }))));
     for (int l = 0; l < nang + 1; ++l)
     {
         cvec2 c2r = SALTED_Utils::complex_to_real_transformation({(2 * l) + 1})[0];
@@ -240,12 +241,14 @@ cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descripto
             {
                 for (int d = 0; d < this->nspe * this->nrad; ++d)
                 {
-                    omega[l][a][c][d] = 0.0;
+                    //omega[l][a][c][d] = 0.0;
+                    omega[a][d][l][c] = 0.0;
                     for (int r = 0; r < 2 * l + 1; ++r)
                     {
-                        omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        //omega[l][a][c][d] += conj(c2r[r][c]) * descriptor_values(a, r, d);
+                        omega[a][d][l][c] += conj(c2r[r][c]) * descriptor_values(a, r, d);
                     }
-                }
+                }                    /*cvec* v2_ptr = (cvec*)&v2[iat][l2][n2];*/
             }
         }
         c2r.clear();
