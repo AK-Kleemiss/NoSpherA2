@@ -16,7 +16,7 @@ Reading:                               sucrose.cif... done!
 Generating hkl indices up to d=:              0.80... done!
 Nr of reflections generated:                  4223
 Number of symmetry operations:                   2
-Nr of reflections to be used:                 8045
+Nr of reflections to be used:                 8044
 There are:
   45 atoms read from the wavefunction, of which 
   45 are identified as asymmetric unit atoms!
@@ -79,6 +79,6 @@ Table of Charges in electrons
 Total number of electrons in the wavefunction: 181.632
  and Hirshfeld electrons (asym unit): 182.467
 
-Number of k-points to evaluate: 8045 for 4398 gridpoints.
+Number of k-points to evaluate: 8044 for 4398 gridpoints.
 Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] Calculating scattering factors ===================== [100%] 
 Writing tsc file...  ... done!
