@@ -3031,6 +3031,8 @@ void print_duration(std::ostream &file, const std::string &description, const st
         std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
+    //Disable setfill 0 again
+    file << std::setfill(' ');
 }
 
 void write_timing_to_file(std::ostream &file,
