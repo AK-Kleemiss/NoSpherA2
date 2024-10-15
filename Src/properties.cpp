@@ -1326,7 +1326,10 @@ void properties_calculation(options &opt)
         cell_matrix[i].resize(3);
     if (opt.debug)
         log2 << opt.cif << " " << opt.resolution << " " << opt.radius << endl;
-    readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution, log2, opt.debug);
+    if (opt.cif != "")
+        readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution, log2, opt.debug);
+    else
+        readxyzMinMax_fromWFN(wavy, opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
     if (opt.debug)
     {
         log2 << "Resolution: " << opt.resolution << endl;
