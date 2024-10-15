@@ -82,7 +82,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
         t.append("   https://github.com/HDFGroup/hdf5\n");
 #endif
-        t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
+        t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     }
     return t;
@@ -1219,12 +1219,11 @@ void readxyzMinMax_fromWFN(
     PosAtoms.resize(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
         PosAtoms[i].resize(3);
-    bool bohrang = !check_bohr(wavy, false);
-    if (no_bohr)
-        bohrang = true;
+    bool bohrang = true;
+    if (!no_bohr)
+        bohrang = !check_bohr(wavy, false);
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-
         PosAtoms[j][0] = wavy.atoms[j].x;
         PosAtoms[j][1] = wavy.atoms[j].y;
         PosAtoms[j][2] = wavy.atoms[j].z;
@@ -1242,7 +1241,6 @@ void readxyzMinMax_fromWFN(
             CoordMinMax[2] = PosAtoms[j][2];
             CoordMinMax[5] = PosAtoms[j][2];
         }
-
         else
         {
             if (CoordMinMax[0] > PosAtoms[j][0])
@@ -1261,7 +1259,7 @@ void readxyzMinMax_fromWFN(
                 CoordMinMax[5] = PosAtoms[j][2];
         }
     }
-    double temp_rad = constants::ang2bohr(Radius);
+    const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
     CoordMinMax[3] += temp_rad;
     CoordMinMax[1] -= temp_rad;
