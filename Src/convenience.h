@@ -44,9 +44,9 @@ cdouble vec_sum(const cvec &in);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
-std::string help_message();
+extern std::string help_message;
 std::string NoSpherA2_message(bool no_date = false);
-std::string build_date();
+extern std::string build_date;
 
 namespace sha
 {

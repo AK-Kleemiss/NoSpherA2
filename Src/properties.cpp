@@ -1248,7 +1248,7 @@ void properties_calculation(options &opt)
     log2 << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
-        log2 << build_date();
+        log2 << build_date;
     }
     log2.flush();
 
@@ -1721,7 +1721,7 @@ void dipole_moments(options& opt, std::ostream& log2)
   using namespace std;
   log2 << NoSpherA2_message(opt.no_date);
   if (!opt.no_date)
-    log2 << build_date();
+    log2 << build_date;
   err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
   WFN wavy(0);
   wavy.read_known_wavefunction_format(opt.wfn, log2, opt.debug);

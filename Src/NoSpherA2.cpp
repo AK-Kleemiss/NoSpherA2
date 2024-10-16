@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
-        log_file << build_date();
+        log_file << build_date;
     }
     log_file.flush();
     // Perform fractal dimensional analysis and quit
@@ -396,9 +396,9 @@ int main(int argc, char **argv)
     }
     std::cout << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
-        std::cout << build_date();
+        std::cout << build_date;
     std::cout << "Did not understand the task to perform!\n"
-              << help_message() << endl;
+              << help_message << endl;
     log_file.flush();
     return 0;
 }
