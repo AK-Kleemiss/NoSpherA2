@@ -7,5 +7,7 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
+Calcualting:
+Laplacian, ELI, 
 Calculating for 6336 Gridpoints.
 Writing cubes to Disk... done!

@@ -1,4 +1,5 @@
 #include "wfn_class.h"
+#include "properties.h"
 #include "convenience.h"
 #include "spherical_density.h"
 #include "cell.h"
@@ -10,7 +11,8 @@ void Calc_Spherical_Dens(
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -30,11 +32,18 @@ void Calc_Spherical_Dens(
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
 
+    const int low_i = wrap ? -CubeSpher.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeSpher.get_size(0) : CubeSpher.get_size(0);
+    const int low_j = wrap ? -CubeSpher.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeSpher.get_size(1) : CubeSpher.get_size(1);
+    const int low_k = wrap ? -CubeSpher.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeSpher.get_size(2) : CubeSpher.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeSpher.get_size(0); i < 2 * CubeSpher.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeSpher.get_size(1); j < 2 * CubeSpher.get_size(1); j++)
-            for (int k = -CubeSpher.get_size(2); k < 2 * CubeSpher.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
@@ -101,87 +110,14 @@ void Calc_Spherical_Dens(
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
 };
 
-void Calc_Spherical_Dens_no_trans(
-  cube& CubeSpher,
-  WFN& wavy,
-  int cpus,
-  double radius,
-  std::ostream& file)
-{
-    using namespace std;
-#ifdef _OPENMP
-  if (cpus != -1)
-  {
-    if (cpus > 1)
-      omp_set_nested(1);
-  }
-#endif
-
-  time_point start = get_time();
-
-  progress_bar* progress = new progress_bar{ file, 50u, "Calculating Spherical Density" };
-  const int step = (int)max(floor(CubeSpher.get_size(0) / 20.0), 1.0);
-
-  vector<Thakkar> atoms;
-  for (int a = 0; a < wavy.get_ncen(); a++)
-    atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
-
-#pragma omp parallel for schedule(dynamic)
-  for (int i = 0; i < CubeSpher.get_size(0); i++)
-  {
-    for (int j = 0; j < CubeSpher.get_size(1); j++)
-      for (int k = 0; k < CubeSpher.get_size(2); k++)
-      {
-
-        const double PosGrid[3]{ i * CubeSpher.get_vector(0, 0) + j * CubeSpher.get_vector(0, 1) + k * CubeSpher.get_vector(0, 2) + CubeSpher.get_origin(0),
-                                i * CubeSpher.get_vector(1, 0) + j * CubeSpher.get_vector(1, 1) + k * CubeSpher.get_vector(1, 2) + CubeSpher.get_origin(1),
-                                i * CubeSpher.get_vector(2, 0) + j * CubeSpher.get_vector(2, 1) + k * CubeSpher.get_vector(2, 2) + CubeSpher.get_origin(2) };
-
-        bool skip = true;
-        for (int a = 0; a < wavy.get_ncen(); a++)
-        {
-          if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
-            skip = false;
-        }
-        if (skip)
-          continue;
-
-        double dens_all = 0.0;
-        double dist;
-        for (int a = 0; a < wavy.get_ncen(); a++)
-        {
-          dist = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
-          dens_all += atoms[a].get_radial_density(dist);
-          ;
-        }
-
-        CubeSpher.set_value(i, j, k, dens_all);
-      }
-    if (i != 0 && i % step == 0
-#ifdef _OPENMP
-      && omp_get_thread_num() == 0
-#endif
-      )
-      progress->write((i + CubeSpher.get_size(0)) / static_cast<double>(3 * CubeSpher.get_size(0)));
-  }
-  delete (progress);
-
-  time_point end = get_time();
-  if (get_sec(start, end) < 60)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-  else if (get_sec(start, end) < 3600)
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-  else
-    file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-};
-
 void Calc_Static_Def(
     cube &CubeDEF,
     cube &CubeRho,
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -201,11 +137,18 @@ void Calc_Static_Def(
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
 
+    const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeDEF.get_size(0) : CubeDEF.get_size(0);
+    const int low_j = wrap ? -CubeDEF.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeDEF.get_size(1) : CubeDEF.get_size(1);
+    const int low_k = wrap ? -CubeDEF.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeDEF.get_size(2) : CubeDEF.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeDEF.get_size(0); i < 2 * CubeDEF.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeDEF.get_size(1); j < 2 * CubeDEF.get_size(1); j++)
-            for (int k = -CubeDEF.get_size(2); k < 2 * CubeDEF.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
@@ -277,7 +220,8 @@ void Calc_Static_Def(
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -293,11 +237,18 @@ void Calc_Static_Def(
     progress_bar *progress = new progress_bar{file, 50u, "Calculating Deformation Density"};
     const int step = (int)max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
 
+    const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeDEF.get_size(0) : CubeDEF.get_size(0);
+    const int low_j = wrap ? -CubeDEF.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeDEF.get_size(1) : CubeDEF.get_size(1);
+    const int low_k = wrap ? -CubeDEF.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeDEF.get_size(2) : CubeDEF.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeDEF.get_size(0); i < 2 * CubeDEF.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeDEF.get_size(1); j < 2 * CubeDEF.get_size(1); j++)
-            for (int k = -CubeDEF.get_size(2); k < 2 * CubeDEF.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeDEF.get_vector(0, 0) + j * CubeDEF.get_vector(0, 1) + k * CubeDEF.get_vector(0, 2) + CubeDEF.get_origin(0),
@@ -363,7 +314,8 @@ void Calc_Hirshfeld(
     int cpus,
     double radius,
     int ignore_atom,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -383,11 +335,18 @@ void Calc_Hirshfeld(
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
 
+    const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeHDEF.get_size(0) : CubeHDEF.get_size(0);
+    const int low_j = wrap ? -CubeHDEF.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeHDEF.get_size(1) : CubeHDEF.get_size(1);
+    const int low_k = wrap ? -CubeHDEF.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeHDEF.get_size(2) : CubeHDEF.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeHDEF.get_size(0); i < 2 * CubeHDEF.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeHDEF.get_size(1); j < 2 * CubeHDEF.get_size(1); j++)
-            for (int k = -CubeHDEF.get_size(2); k < 2 * CubeHDEF.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0),
@@ -463,7 +422,8 @@ void Calc_Hirshfeld(
     int cpus,
     double radius,
     int ignore_atom,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -481,11 +441,18 @@ void Calc_Hirshfeld(
 
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
+    const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeHDEF.get_size(0) : CubeHDEF.get_size(0);
+    const int low_j = wrap ? -CubeHDEF.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeHDEF.get_size(1) : CubeHDEF.get_size(1);
+    const int low_k = wrap ? -CubeHDEF.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeHDEF.get_size(2) : CubeHDEF.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeHDEF.get_size(0); i < 2 * CubeHDEF.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeHDEF.get_size(1); j < 2 * CubeHDEF.get_size(1); j++)
-            for (int k = -CubeHDEF.get_size(2); k < 2 * CubeHDEF.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeHDEF.get_vector(0, 0) + j * CubeHDEF.get_vector(0, 1) + k * CubeHDEF.get_vector(0, 2) + CubeHDEF.get_origin(0),
@@ -549,7 +516,8 @@ void Calc_Hirshfeld_atom(
     int cpus,
     double radius,
     int ignore_atom,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -567,11 +535,18 @@ void Calc_Hirshfeld_atom(
 
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
+    const int low_i = wrap ? -CubeHirsh.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeHirsh.get_size(0) : CubeHirsh.get_size(0);
+    const int low_j = wrap ? -CubeHirsh.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeHirsh.get_size(1) : CubeHirsh.get_size(1);
+    const int low_k = wrap ? -CubeHirsh.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeHirsh.get_size(2) : CubeHirsh.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeHirsh.get_size(0); i < 2 * CubeHirsh.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeHirsh.get_size(1); j < 2 * CubeHirsh.get_size(1); j++)
-            for (int k = -CubeHirsh.get_size(2); k < 2 * CubeHirsh.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{i * CubeHirsh.get_vector(0, 0) + j * CubeHirsh.get_vector(0, 1) + k * CubeHirsh.get_vector(0, 2) + CubeHirsh.get_origin(0),
@@ -632,7 +607,8 @@ void Calc_Rho(
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -648,11 +624,18 @@ void Calc_Rho(
     progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
+    const int low_i = wrap ? -CubeRho.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
+    const int low_j = wrap ? -CubeRho.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
+    const int low_k = wrap ? -CubeRho.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeRho.get_size(0); i < 2 * CubeRho.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeRho.get_size(1); j < 2 * CubeRho.get_size(1); j++)
-            for (int k = -CubeRho.get_size(2); k < 2 * CubeRho.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 double PosGrid[3]{
@@ -698,69 +681,6 @@ void Calc_Rho(
             progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
     }
     delete (progress);
-
-    time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-};
-
-void Calc_Rho_no_trans(
-    cube &CubeRho,
-    WFN &wavy,
-    int cpus,
-    double radius,
-    std::ostream &file,
-    bool print)
-{
-    using namespace std;
-#ifdef _OPENMP
-    if (cpus != -1)
-    {
-        if (cpus > 1)
-            omp_set_nested(1);
-    }
-#endif
-
-    time_point start = get_time();
-
-    progress_bar* progress = nullptr;
-    if (print)
-        progress = new progress_bar{file, 50u, "Calculating Values"};
-    const int step = (int)max(floor(CubeRho.get_size(0) / 20.0), 1.0);
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                double PosGrid[3]{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)},
-                    Rho = 0;
-
-                bool skip = true;
-                for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
-                        skip = false;
-                if (skip)
-                    continue;
-
-                Rho = wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2]);
-
-                CubeRho.set_value(i, j, k, Rho);
-            }
-        if (print && i != 0 && i % step == 0 && progress != nullptr)
-            progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
-    }
-    if(progress != nullptr)
-        delete (progress);
 
     time_point end = get_time();
     if (get_sec(start, end) < 60)
@@ -940,7 +860,8 @@ void Calc_Prop(
     int cpus,
     double radius,
     std::ostream &file,
-    bool test)
+    bool test,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -958,11 +879,18 @@ void Calc_Prop(
         progress = new progress_bar{file, 50u, "Calculating Values"};
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
+    const int low_i = wrap ? -CubeRho.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeRho.get_size(0) : CubeRho.get_size(0);
+    const int low_j = wrap ? -CubeRho.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeRho.get_size(1) : CubeRho.get_size(1);
+    const int low_k = wrap ? -CubeRho.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeRho.get_size(2) : CubeRho.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeRho.get_size(0); i < 2 * CubeRho.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeRho.get_size(1); j < 2 * CubeRho.get_size(1); j++)
-            for (int k = -CubeRho.get_size(2); k < 2 * CubeRho.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 double PosGrid[3]{
@@ -1114,7 +1042,8 @@ void Calc_ESP(
     int cpus,
     double radius,
     bool no_date,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
 #ifdef _OPENMP
@@ -1147,14 +1076,20 @@ void Calc_ESP(
         progress = new progress_bar{file, 50u, "Calculating ESP"};
     const int step = (int)max(floor(CubeESP.get_size(0) * 3 / 20.0), 1.0);
 
-#pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeESP.get_size(0); i < 2 * CubeESP.get_size(0); i++)
-    {
-        double temp;
-        int temp_i, temp_j, temp_k;
+    const int low_i = wrap ? -CubeESP.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeESP.get_size(0) : CubeESP.get_size(0);
+    const int low_j = wrap ? -CubeESP.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeESP.get_size(1) : CubeESP.get_size(1);
+    const int low_k = wrap ? -CubeESP.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeESP.get_size(2) : CubeESP.get_size(2);
+    double temp;
+    int temp_i, temp_j, temp_k;
 
-        for (int j = -CubeESP.get_size(1); j < 2 * CubeESP.get_size(1); j++)
-            for (int k = -CubeESP.get_size(2); k < 2 * CubeESP.get_size(2); k++)
+#pragma omp parallel for schedule(dynamic) private(temp, temp_i, temp_j, temp_k)
+    for (int i = low_i; i < high_i; i++)
+    {
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
                 const double PosGrid[3]{
                     i * CubeESP.get_vector(0, 0) + j * CubeESP.get_vector(0, 1) + k * CubeESP.get_vector(0, 2) + CubeESP.get_origin(0),
@@ -1219,7 +1154,8 @@ void Calc_MO(
     WFN &wavy,
     int cpus,
     double radius,
-    std::ostream &file)
+    std::ostream &file,
+    bool wrap)
 {
     using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
@@ -1235,11 +1171,18 @@ void Calc_MO(
     progress_bar *progress = new progress_bar{file, 50u, "Calculating MO"};
     const int step = (int)max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
 
+    const int low_i = wrap ? -CubeMO.get_size(0) : 0;
+    const int high_i = wrap ? 2 * CubeMO.get_size(0) : CubeMO.get_size(0);
+    const int low_j = wrap ? -CubeMO.get_size(1) : 0;
+    const int high_j = wrap ? 2 * CubeMO.get_size(1) : CubeMO.get_size(1);
+    const int low_k = wrap ? -CubeMO.get_size(2) : 0;
+    const int high_k = wrap ? 2 * CubeMO.get_size(2) : CubeMO.get_size(2);
+
 #pragma omp parallel for schedule(dynamic)
-    for (int i = -CubeMO.get_size(0); i < 2 * CubeMO.get_size(0); i++)
+    for (int i = low_i; i < high_i; i++)
     {
-        for (int j = -CubeMO.get_size(1); j < 2 * CubeMO.get_size(1); j++)
-            for (int k = -CubeMO.get_size(2); k < 2 * CubeMO.get_size(2); k++)
+        for (int j = low_j; j < high_j; j++)
+            for (int k = low_k; k < high_k; k++)
             {
 
                 const double PosGrid[3]{
@@ -1305,7 +1248,7 @@ void properties_calculation(options &opt)
     log2 << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
-        log2 << build_date();
+        log2 << build_date;
     }
     log2.flush();
 
@@ -1324,17 +1267,25 @@ void properties_calculation(options &opt)
     cell_matrix.resize(3);
     for (int i = 0; i < 3; i++)
         cell_matrix[i].resize(3);
-    if (opt.debug)
-        log2 << opt.cif << " " << opt.resolution << " " << opt.radius << endl;
-    readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution, log2, opt.debug);
+    if (opt.debug) {
+        log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.resolution << "|" << constants::ang2bohr(opt.resolution) << "|" << opt.radius << "|" << constants::ang2bohr(opt.radius) << endl;
+        for (int a=0; a<wavy.get_ncen(); a++)
+            log2 << "Atom " << a << " at " << wavy.atoms[a].x << " " << wavy.atoms[a].y << " " << wavy.atoms[a].z << endl;
+    }
+    if (opt.cif != "")
+        readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution, log2, opt.debug);
+    else {
+        readxyzMinMax_fromWFN(wavy, opt.MinMax, opt.NbSteps, opt.radius, opt.resolution, true);
+        for (int i = 0; i < 3; i++)
+            cell_matrix[i][i] = constants::ang2bohr(opt.resolution);
+    }
     if (opt.debug)
     {
-        log2 << "Resolution: " << opt.resolution << endl;
-        log2 << "MinMax:" << endl;
+        log2 << "MinMax: ";
         for (int i = 0; i < 6; i++)
             log2 << setw(14) << scientific << opt.MinMax[i];
         log2 << endl;
-        log2 << "Steps:" << endl;
+        log2 << "Steps: ";
         for (int i = 0; i < 3; i++)
             log2 << setw(14) << scientific << opt.NbSteps[i];
         log2 << endl;
@@ -1399,7 +1350,7 @@ void properties_calculation(options &opt)
         }
     }
     if (opt.debug)
-        log2 << "Origins etc are set up" << endl;
+        log2 << "Origins etc. are set up" << endl;
     Rho.set_comment1("Calculated density using NoSpherA2");
     RDG.set_comment1("Calculated reduced density gradient using NoSpherA2");
     Elf.set_comment1("Calculated electron localization function using NoSpherA2");
@@ -1437,6 +1388,34 @@ void properties_calculation(options &opt)
         log2 << "Status: " << opt.hdef << opt.def << opt.hirsh << opt.lap << opt.eli << opt.elf << opt.rdg << opt.esp << endl;
         log2 << "Everything is set up; starting calculation..." << endl;
     }
+    else {
+        log2 << "Calcualting:" << endl;
+        if (opt.hdef || opt.def || opt.hirsh)
+            log2 << "Rho, ";
+        if (opt.hdef || opt.hirsh)
+            log2 << "Spherical Rho, ";
+        if (opt.def)
+            log2 << "Static deformation density, ";
+        if (opt.hdef)
+            log2 << "Hirshfeld deformation density, ";
+        if (opt.hirsh)
+            log2 << "Hirshfeld density, ";
+        if (opt.lap)
+            log2 << "Laplacian, ";
+        if (opt.eli)
+            log2 << "ELI, ";
+        if (opt.elf)
+            log2 << "ELF, ";
+        if (opt.rdg)
+            log2 << "RDG, ";
+        if (opt.esp)
+            log2 << "ESP, ";
+        if (opt.MOs.size() != 0)
+            log2 << "MOs, ";
+        if (opt.s_rho)
+            log2 << "Spin density, ";
+        log2 << endl;
+    }
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 
@@ -1446,14 +1425,16 @@ void properties_calculation(options &opt)
             log2 << "Calcualting MO: " << opt.MOs[i] << endl;
             MO.set_zero();
             MO.path = get_basename_without_ending(wavy.get_path()) + "_MO_" + to_string(opt.MOs[i]) + ".cube";
-            Calc_MO(MO, opt.MOs[i], wavy, opt.threads, opt.radius, log2);
+            Calc_MO(MO, opt.MOs[i], wavy, opt.threads, opt.radius, log2, opt.cif!= "");
             MO.write_file(true);
         }
+
+    wavy.delete_unoccupied_MOs();
 
     if (opt.hdef || opt.def || opt.hirsh)
     {
         log2 << "Calcualting Rho...";
-        Calc_Rho(Rho, wavy, opt.threads, opt.radius, log2);
+        Calc_Rho(Rho, wavy, opt.threads, opt.radius, log2, opt.cif != "");
         log2 << " ...done!" << endl;
         cube temp(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy.get_ncen(), opt.hdef || opt.hirsh);
         for (int i = 0; i < 3; i++)
@@ -1465,7 +1446,7 @@ void properties_calculation(options &opt)
         if (opt.hdef || opt.hirsh)
         {
             log2 << "Calcualting spherical Rho...";
-            Calc_Spherical_Dens(temp, wavy, opt.threads, opt.radius, log2);
+            Calc_Spherical_Dens(temp, wavy, opt.threads, opt.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
 
@@ -1473,9 +1454,9 @@ void properties_calculation(options &opt)
         {
             log2 << "Calculating static deformation density...";
             if (opt.hdef)
-                Calc_Static_Def(DEF, Rho, temp, wavy, opt.threads, opt.radius, log2);
+                Calc_Static_Def(DEF, Rho, temp, wavy, opt.threads, opt.radius, log2, opt.cif != "");
             else
-                Calc_Static_Def(DEF, Rho, wavy, opt.threads, opt.radius, log2);
+                Calc_Static_Def(DEF, Rho, wavy, opt.threads, opt.radius, log2, opt.cif != "");
             log2 << " ...done!" << endl;
         }
 
@@ -1485,7 +1466,7 @@ void properties_calculation(options &opt)
             {
                 log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
                 HDEF.path = get_basename_without_ending(wavy.get_path()) + "_HDEF_" + to_string(a) + ".cube";
-                Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.threads, opt.radius, a, log2);
+                Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.threads, opt.radius, a, log2, opt.cif != "");
                 HDEF.write_file(true);
                 HDEF.set_zero();
             }
@@ -1494,13 +1475,13 @@ void properties_calculation(options &opt)
         if (opt.hirsh)
         {
             log2 << "Calcualting Hirshfeld density for atom: " << opt.hirsh_number << endl;
-            Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy, opt.threads, opt.radius, opt.hirsh_number, log2);
+            Calc_Hirshfeld_atom(Hirsh, Rho, temp, wavy, opt.threads, opt.radius, opt.hirsh_number, log2, opt.cif != "");
             log2 << "..done!" << endl;
         }
     }
 
     if (opt.lap || opt.eli || opt.elf || opt.rdg || opt.esp)
-        Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy, opt.threads, opt.radius, log2, opt.no_date);
+        Calc_Prop(Rho, RDG, Elf, Eli, Lap, ESP, wavy, opt.threads, opt.radius, log2, opt.no_date, opt.cif != "");
 
     if (opt.s_rho)
         Calc_S_Rho(S_Rho, wavy, opt.threads, log2, opt.no_date);
@@ -1740,7 +1721,7 @@ void dipole_moments(options& opt, std::ostream& log2)
   using namespace std;
   log2 << NoSpherA2_message(opt.no_date);
   if (!opt.no_date)
-    log2 << build_date();
+    log2 << build_date;
   err_checkf(opt.wfn != "", "Error, no wfn file specified!", log2);
   WFN wavy(0);
   wavy.read_known_wavefunction_format(opt.wfn, log2, opt.debug);
@@ -1793,9 +1774,9 @@ void dipole_moments(options& opt, std::ostream& log2)
   log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 
   log2 << "Calcualting Rho...";
-  Calc_Rho_no_trans(Rho, wavy, opt.threads, opt.radius, log2, false);
+  Calc_Rho(Rho, wavy, opt.threads, opt.radius, log2, false);
   log2 << " ...done!\nCalcualting spherical Rho...";
-  Calc_Spherical_Dens_no_trans(SPHER, wavy, opt.threads, opt.radius, log2);
+  Calc_Spherical_Dens(SPHER, wavy, opt.threads, opt.radius, log2);
   log2 << " ...done!" << endl;
   vec2 dipole_moments;
   for (int i = 0; i < wavy.get_ncen(); i++) {
@@ -1841,7 +1822,7 @@ vec2 dipole_moments(WFN& wavy, cube& SPHER, double* MinMax, int* NbSteps, int th
   Hirsh.give_parent_wfn(wavy);
 
   log2 << "Calculating electron density for " << fixed << setprecision(0) << NbSteps[0] * NbSteps[1] * NbSteps[2] << " Gridpoints." << endl;
-  Calc_Rho_no_trans(Rho, wavy, threads, radius, log2, false);
+  Calc_Rho(Rho, wavy, threads, radius, log2, false);
   vec2 dipole_moments;
   log2 << "Calcualting Hirshfeld density for atom: " << flush;
   for (int i = 0; i < wavy.get_ncen(); i++) {
@@ -1909,7 +1890,7 @@ void polarizabilities(options& opt, std::ostream& log2)
   log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 
   log2 << "Calcualting spherical Rho...";
-  Calc_Spherical_Dens_no_trans(SPHER, wavy[0], opt.threads, opt.radius, log2);
+  Calc_Spherical_Dens(SPHER, wavy[0], opt.threads, opt.radius, log2, false);
   log2 << " ...done!" << endl;
   vec3 dipoles(7); // 0, +x, -x, +y, -y, +z, -z
   for (int i = 0; i < 7; i++) {

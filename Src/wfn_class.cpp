@@ -1929,7 +1929,7 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
         rf.read((char *)&geo_start, sizeof(geo_start));
         err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
         if (debug)
-            file << "I read the pointer of geometry succesfully" << endl;
+            file << "I read the pointer of geometry successfully" << endl;
         rf.seekg(geo_start, ios::beg);
         int at = 0;
         rf.read((char *)&at, constants::soi);
@@ -1957,14 +1957,14 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
                        "Error pushing back atom", file);
         }
         if (debug)
-            file << "I read the geometry of " << at << " atoms succesfully" << endl;
+            file << "I read the geometry of " << at << " atoms successfully" << endl;
 
         rf.seekg(16, ios::beg);
         long int basis_start = 0;
         rf.read((char *)&basis_start, constants::soli);
         err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
         if (debug)
-            file << "I read the pointer of basis set succesfully" << endl;
+            file << "I read the pointer of basis set successfully" << endl;
         rf.seekg(basis_start, ios::beg);
         int atoms2 = 0, temp = 0;
         rf.read((char *)&temp, constants::soi);
@@ -2058,7 +2058,7 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
         vec2 g_pure_2_cart;
         err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", file);
         if (debug)
-            file << "I read the basis of " << atoms2 << " atoms succesfully" << endl;
+            file << "I read the basis of " << atoms2 << " atoms successfully" << endl;
 
         rf.seekg(24, ios::beg);
         long int MOs_start = 0;
@@ -2066,7 +2066,7 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
         err_checkf(rf.good(), "Error reading MO_start", file);
         err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
         if (debug)
-            file << "I read the pointer of MOs succesfully" << endl;
+            file << "I read the pointer of MOs successfully" << endl;
         rf.seekg(MOs_start, ios::beg);
         int operators = 0, dimension = 0;
         rf.read((char *)&operators, constants::soi);
@@ -2091,24 +2091,24 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
             rf.read((char *)coefficients[i].data(), constants::sod * coef_nr);
             err_checkf(rf.good(), "Error reading coefficients", file);
             if (debug)
-                file << "I read the coefficients succesfully" << endl;
+                file << "I read the coefficients successfully" << endl;
             rf.read((char *)occupations[i].data(), constants::sod * dimension);
             err_checkf(rf.good(), "Error reading occupations", file);
             if (debug)
-                file << "I read the occupations succesfully" << endl;
+                file << "I read the occupations successfully" << endl;
             rf.read((char *)energies[i].data(), constants::sod * dimension);
             err_checkf(rf.good(), "Error reading energies", file);
             if (debug)
-                file << "I read the energies succesfully" << endl;
+                file << "I read the energies successfully" << endl;
             rf.read((char *)irreps[i].data(), constants::soi * dimension);
             err_checkf(rf.good(), "Error reading irreps", file);
             if (debug)
-                file << "I read the irreps succesfully" << endl;
+                file << "I read the irreps successfully" << endl;
             rf.read((char *)cores[i].data(), constants::soi * dimension);
             err_checkf(rf.good(), "Error reading cores", file);
             if (debug)
             {
-                file << "I read the cores succesfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
+                file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
             }
             for (int j = 0; j < dimension; j++)
             {
@@ -2337,7 +2337,7 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
         }
         if (debug)
         {
-            file << "\nI read " << MO_run << "/" << dimension << " MOs of " << operators << " operators succesfully" << endl;
+            file << "\nI read " << MO_run << "/" << dimension << " MOs of " << operators << " operators successfully" << endl;
             file << "There are " << nex << " primitives after conversion" << endl;
         }
         if (_has_ECPs)
@@ -2350,7 +2350,7 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
             rf.read((char *)&ECP_start, sizeof(ECP_start));
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
-                file << "I read the pointer of ECP succesfully" << endl;
+                file << "I read the pointer of ECP successfully" << endl;
             rf.seekg(ECP_start, ios::beg);
             long int i1 = 0;
             int i2 = 0;

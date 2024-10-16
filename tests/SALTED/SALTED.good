@@ -1,0 +1,59 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                            test_cysteine.xyz done!
+Number of atoms in Wavefunction file: 14 Number of MOs: 0
+Using  for the prediction
+Using basis set: cc-pvqz-jkfit
+Number of protons: 64
+Reading:                         test_cysteine.cif... done!
+Generating hkl indices up to d=:              0.73... done!
+Nr of reflections generated:                  4079
+Number of symmetry operations:                   4
+Nr of reflections to be used:                 7832
+
+Generating densities... 
+Calculating descriptors for l = 0
+[############################################################] 100% 
+Calculating descriptors for l = 1
+[############################################################] 100% 
+Calculating descriptors for l = 2
+[############################################################] 100% 
+Calculating descriptors for l = 3
+[############################################################] 100% 
+Calculating descriptors for l = 4
+[############################################################] 100% 
+Calculating descriptors for l = 5
+[############################################################] 100% 
+													... done!
+
+Generating k-points...                            ... done!
+Number of k - points to evaluate : 7832
+Table of Charges in electrons
+       Atom      ML
+         S    -0.108
+         O    -0.763
+        O1    -0.731
+         N    -0.436
+        C1     0.015
+        C2     0.858
+        C3     0.106
+        H1    -0.001
+       H3a     0.040
+       H3b     0.021
+         H    -0.113
+        Ha     0.291
+        Hb     0.259
+        Hc     0.268
+Total number of analytical Electrons: 64.2941
+
+Generating scattering factors...
+[############################################################] 100% 
+													... done!
+Writing tsc file...  ... done!

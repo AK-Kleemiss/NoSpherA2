@@ -2738,6 +2738,7 @@
     <ClCompile Include="..\Src\atoms.cpp" />
     <ClCompile Include="..\Src\constants.cpp" />
     <ClCompile Include="..\Src\DLL_Helper.cpp" />
+    <ClCompile Include="..\Src\ECPs_corrections.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
@@ -3001,6 +3002,7 @@
     <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\metatensor.hpp" />
     <ClInclude Include="..\Src\OpenBLAS.h" />
+    <ClInclude Include="..\Src\pch.h" />
     <ClInclude Include="..\Src\rascaline.h" />
     <ClInclude Include="..\Src\rascaline.hpp" />
     <ClInclude Include="..\Src\SALTED_equicomb.h" />

@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
-        log_file << build_date();
+        log_file << build_date;
     }
     log_file.flush();
     // Perform fractal dimensional analysis and quit
@@ -87,8 +87,8 @@ int main(int argc, char **argv)
         Rho2.set_comment2("from " + wav2.get_path());
         Rho1.path = get_basename_without_ending(wav.get_path()) + "_rho.cube";
         Rho2.path = get_basename_without_ending(wav2.get_path()) + "_rho.cube";
-        Calc_Rho_no_trans(Rho1, wav, opt.threads, opt.radius, log_file);
-        Calc_Rho_no_trans(Rho2, wav2, opt.threads, opt.radius, log_file);
+        Calc_Rho(Rho1, wav, opt.threads, opt.radius, log_file, false);
+        Calc_Rho(Rho2, wav2, opt.threads, opt.radius, log_file, false);
         cube Rho_diff(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wav.get_ncen(), true);
 #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < Rho1.get_size(0); i++)
@@ -396,9 +396,9 @@ int main(int argc, char **argv)
     }
     std::cout << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
-        std::cout << build_date();
+        std::cout << build_date;
     std::cout << "Did not understand the task to perform!\n"
-              << help_message() << endl;
+              << help_message << endl;
     log_file.flush();
     return 0;
 }

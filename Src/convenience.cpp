@@ -7,54 +7,55 @@
 #include <windows.h>
 #endif
 
-std::string help_message()
-{
-    std::string t = "\n----------------------------------------------------------------------------\n";
-    t.append("          These commands and arguments are known by NoSpherA2:\n");
-    t.append("----------------------------------------------------------------------------\n\n");
-    t.append(":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n");
-    t.append("   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n");
-    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n");
-    t.append("   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n");
-    t.append("   -b              <FILENAME>               Read this basis set\n");
-    t.append("   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n");
-    t.append("   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n");
-    t.append("   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n");
-    t.append("                                            [1]: def2-ECP\n");
-    t.append("   --help/-help/--h                         print this help\n");
-    t.append("   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
-    t.append("   -v2                                      Even more stuff\n");
-    t.append("   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
-    t.append("   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n");
-    t.append("   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n");
-    t.append("   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n");
-    t.append("   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n");
-    t.append("   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n");
-    t.append("   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
-    t.append("   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n");
-    t.append("                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.");
-    t.append("   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
-    t.append("   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n");
-    t.append("   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
-    t.append("                                            If there is more than a single twin law to be used, use the twin command multiple times.\n");
-    t.append("   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n");
-    t.append("   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n");
-    t.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
-    t.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
-    t.append("                                            without spaces.\n   Typical use Examples:\n");
-    t.append("   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n");
-    t.append("   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n");
-    t.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
-    t.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
-    t.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
-    t.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
-    t.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
-    t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
-    t.append("      convert tsc:  NoSpherA2.exe -tscb A.tscb\n");
-    t.append("      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n");
-    t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
-    return t;
-}
+std::string help_message =
+(
+    "\n----------------------------------------------------------------------------\n"
+    "          These commands and arguments are known by NoSpherA2:\n"
+    "----------------------------------------------------------------------------\n\n"
+    ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
+    "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
+    "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n"
+    "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n"
+    "   -b              <FILENAME>               Read this basis set\n"
+    "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
+    "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+    "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
+    "                                            [1]: def2-ECP\n"
+    "                                            [2]: xTB\n"
+    "                                            [3]: pTB\n"
+    "   --help/-help/--h                         print this help\n"
+    "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
+    "   -v2                                      Even more stuff\n"
+    "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
+    "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
+    "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
+    "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
+    "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
+    "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
+    "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
+    "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
+    "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
+    "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
+    "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
+    "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
+    "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+    "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
+    "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
+    "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
+    "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
+    "                                            without spaces.\n   Typical use Examples:\n"
+    "   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
+    "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+    "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
+    "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
+    "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n"
+    "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
+    "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n"
+    "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
+    "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
+    "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
+    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n"
+    );
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -82,16 +83,13 @@ std::string NoSpherA2_message(bool no_date)
         t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
         t.append("   https://github.com/HDFGroup/hdf5\n");
 #endif
-        t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
+        t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     }
     return t;
 }
 
-std::string build_date()
-{
-    return ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
-}
+std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
 bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
@@ -1219,12 +1217,11 @@ void readxyzMinMax_fromWFN(
     PosAtoms.resize(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
         PosAtoms[i].resize(3);
-    bool bohrang = !check_bohr(wavy, false);
-    if (no_bohr)
-        bohrang = true;
+    bool bohrang = true;
+    if (!no_bohr)
+        bohrang = !check_bohr(wavy, false);
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-
         PosAtoms[j][0] = wavy.atoms[j].x;
         PosAtoms[j][1] = wavy.atoms[j].y;
         PosAtoms[j][2] = wavy.atoms[j].z;
@@ -1242,7 +1239,6 @@ void readxyzMinMax_fromWFN(
             CoordMinMax[2] = PosAtoms[j][2];
             CoordMinMax[5] = PosAtoms[j][2];
         }
-
         else
         {
             if (CoordMinMax[0] > PosAtoms[j][0])
@@ -1261,7 +1257,7 @@ void readxyzMinMax_fromWFN(
                 CoordMinMax[5] = PosAtoms[j][2];
         }
     }
-    double temp_rad = constants::ang2bohr(Radius);
+    const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
     CoordMinMax[3] += temp_rad;
     CoordMinMax[1] -= temp_rad;
@@ -2883,7 +2879,7 @@ void options::look_for_debug(int &argc, char **argv)
             std::cout << "Turning on verbose mode!" << std::endl, debug = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
-            std::cout << NoSpherA2_message() << help_message() << build_date() << std::endl;
+            std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
             exit(0);
         }
     }
