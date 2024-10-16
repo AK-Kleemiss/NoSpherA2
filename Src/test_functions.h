@@ -359,7 +359,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     const double *k2_local = k_pt[1].data();
     const double *k3_local = k_pt[2].data();
     double work, rho;
-    progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
+    ProgressBar * progress = new ProgressBar(smax, 50, "=", " ", "Calculating Scattering factors");
     for (int i = 0; i < imax; i++)
     {
         pmax = (int)dens[i].size();
@@ -377,8 +377,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
                 sf_local[s] += complex<double>(rho * cos(work), rho * sin(work));
             }
-            if (s != 0 && s % step == 0)
-                progress->write(s / static_cast<double>(smax));
+            progress->update();
         }
     }
     delete (progress);
@@ -607,7 +606,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     // Calcualte density on angular grid at each point of radial grid, average and integrate
     long double tot_int = 0;
     vec radial_dens(upper_r, 0.0);
-    progress_bar *progress = new progress_bar{cout, 60u, "Calculating densities"};
+    ProgressBar * progress = new ProgressBar(upper_r, 65, "=", " ", "Calculating Densities");
     const long long int step = max(static_cast<long long int>(floor(upper_r / 20)), 1LL);
 
 #pragma omp parallel for reduction(+ : tot_int) num_threads(opt.threads) schedule(dynamic)
@@ -618,8 +617,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         radial_dens[_r] = v;
         if (_r >= 1)
             tot_int += v * r * r * (r - (_r - 1) * dr);
-        if (_r != 0 && _r % step == 0)
-            progress->write(_r / static_cast<double>(upper_r));
+        progress->update();
     }
     delete (progress);
     cout << "Start writing the file" << endl;
@@ -692,8 +690,7 @@ void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{std::cout, 50u, "Calculating Values"};
-    const int step = (int)std::max(floor(CubeRho.get_size(0) / 20.0), 1.0);
+    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
     if (atom != -1)
         std::cout << "Calculation for atom " << atom << std::endl;
 
@@ -714,8 +711,7 @@ void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
                 else
                     CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
             }
-        if (i != 0 && i % step == 0)
-            progress->write(i / static_cast<double>(CubeRho.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -825,10 +821,9 @@ void Calc_MO_spherical_harmonics(
 
     time_point start = get_time();
 
-    progress_bar *progress = NULL;
+    ProgressBar *progress = NULL;
     if (!nodate)
-        progress = new progress_bar{file, 50u, "Calculating Values"};
-    const int step = (int)max(floor(CubeMO.get_size(0) / 20.0), 1.0);
+        progress = new ProgressBar(CubeMO.get_size(0), 60, "=", " ", "Calculating MOs");
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < CubeMO.get_size(0); i++)
@@ -844,8 +839,8 @@ void Calc_MO_spherical_harmonics(
 
                 CubeMO.set_value(i, j, k, compute_MO_spherical_new(PosGrid[0], PosGrid[1], PosGrid[2], wavy.get_exponent(0), wavy.get_MO_coef(0, 0), wavy.get_type(0)));
             }
-        if (i != 0 && i % step == 0 && !nodate)
-            progress->write((i) / static_cast<double>(CubeMO.get_size(0)));
+        if (!nodate)
+            progress->update();
     }
     if (!nodate)
     {
@@ -885,8 +880,7 @@ void calc_rho_cube(WFN &dummy)
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
     ;
     cout << "Lets go into the loop! There is " << total_size << " points" << endl;
-    progress_bar *progress = new progress_bar{std::cout, 50u, "Calculating Values"};
-    const int step = (int)std::max(floor(total_size / 20.0), 1.0);
+    ProgressBar* progress = new ProgressBar(total_size, 50, "=", " ", "Calculating Rho");
 
     vec v1{
         CubeRho.get_vector(0, 0),
@@ -925,8 +919,7 @@ void calc_rho_cube(WFN &dummy)
                 i * v1[2] + j * v2[2] + k * v3[2] + orig[2]};
 
             CubeRho.set_value(i, j, k, dummy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
-            if (index != 0 && index % step == 0)
-                progress->write(index / static_cast<double>(total_size));
+            progress->update();
         }
     }
     delete (progress);
@@ -955,8 +948,7 @@ double numerical_3d_integral(std::function<double(double *)> f, double stepsize 
     long long int total_calcs = upper * (long long int)(constants::PI / da * r_max / dr);
     std::cout << "Integrating over " << total_calcs << " points" << std::endl;
 
-    progress_bar *progress = new progress_bar{std::cout, 50u, "Integrating"};
-    const long long int step = (long long int)std::max(floor(upper / 20.0), 1.0);
+    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Integrating");
 
 #pragma omp parallel for reduction(+ : tot_int) schedule(dynamic)
     for (int phic = 0; phic <= upper; phic++)
@@ -979,8 +971,7 @@ double numerical_3d_integral(std::function<double(double *)> f, double stepsize 
                 tot_int += f(d) * r * r * ang_mom;
             }
         }
-        if (phic != 0 && phic % step == 0)
-            progress->write(static_cast<double>(phic) / static_cast<double>(upper));
+        progress->update();
     }
 
     std::cout << "\ntotal integral : " << std::fixed << std::setprecision(4) << tot_int << std::endl;
@@ -1096,9 +1087,9 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{cout, 60u, "Calculating densities"};
     const int upper = static_cast<int>(res[0].size());
-    const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
+    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Calculating Densities");
+    
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < upper; i++)
     {
@@ -1109,8 +1100,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
         res[3][i] = calc_spherically_averaged_at_r(ECP_way_Au, sr, precisison, 60);
         res[4][i] = calc_spherically_averaged_at_r(wavy_full_Au, sr, precisison, 60);
         res[5][i] = calc_spherically_averaged_at_r(wavy_val_Au, sr, precisison, 60);
-        if (i != 0 && i % step == 0)
-            progress->write(i / static_cast<double>(upper));
+        progress->update();
     }
     delete (progress);
     time_point end = get_time();
@@ -1241,9 +1231,9 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          time_points,
                          time_descriptions);
 
-    progress_bar *progress = new progress_bar{cout, 60u, "Calculating SFACs"};
     const int upper = static_cast<int>(res[0].size());
-    const long long int step = max(static_cast<long long int>(floor(upper / 20)), 1LL);
+    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Calculating SFACs");
+    
 #pragma omp parallel for schedule(dynamic)
     for (int i = 1; i < upper; i++)
     {
@@ -1254,8 +1244,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
         res[3][i] = calc_spherically_averaged_at_k(d1_ECP, d2_ECP, d3_ECP, dens_ECP, sr, precisison, 150.0);
         res[4][i] = calc_spherically_averaged_at_k(d1_all, d2_all, d3_all, dens_all, sr, precisison, 150.0);
         res[5][i] = calc_spherically_averaged_at_k(d1_val, d2_val, d3_val, dens_val, sr, precisison, 150.0);
-        if (i != 0 && i % step == 0)
-            progress->write(i / static_cast<double>(upper));
+        progress->update();
     }
     delete (progress);
 

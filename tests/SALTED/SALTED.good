@@ -19,18 +19,18 @@ Number of symmetry operations:                   4
 Nr of reflections to be used:                 7832
 
 Generating densities... 
-Calculating descriptors for l = 0
-[############################################################] 100% 
-Calculating descriptors for l = 1
-[############################################################] 100% 
-Calculating descriptors for l = 2
-[############################################################] 100% 
-Calculating descriptors for l = 3
-[############################################################] 100% 
-Calculating descriptors for l = 4
-[############################################################] 100% 
-Calculating descriptors for l = 5
-[############################################################] 100% 
+[              Calculating descriptors for l = 0               ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 1               ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 2               ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 3               ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 4               ]
+[#############################################################] 100% 
+[              Calculating descriptors for l = 5               ]
+[#############################################################] 100% 
 													... done!
 
 Generating k-points...                            ... done!
@@ -52,8 +52,7 @@ Table of Charges in electrons
         Hb     0.259
         Hc     0.268
 Total number of analytical Electrons: 64.2941
-
-Generating scattering factors...
-[############################################################] 100% 
+[               Generating scattering factors...               ]
+[#############################################################] 100% 
 													... done!
 Writing tsc file...  ... done!

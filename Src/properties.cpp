@@ -25,7 +25,7 @@ void Calc_Spherical_Dens(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Spherical Density"};
+    ProgressBar* progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
     const int step = (int)max(floor(3 * CubeSpher.get_size(0) / 20.0), 1.0);
 
     vector<Thakkar> atoms;
@@ -92,12 +92,7 @@ void Calc_Spherical_Dens(
 
                 CubeSpher.set_value(temp_i, temp_j, temp_k, CubeSpher.get_value(temp_i, temp_j, temp_k) + dens_all);
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeSpher.get_size(0)) / static_cast<double>(3 * CubeSpher.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -130,7 +125,7 @@ void Calc_Static_Def(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Deformation Density"};
+    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
     const int step = (int)max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
 
     vector<Thakkar> atoms;
@@ -195,12 +190,7 @@ void Calc_Static_Def(
                 dens_all -= CubeRho.get_value(temp_i, temp_j, temp_k);
                 CubeDEF.set_value(temp_i, temp_j, temp_k, CubeDEF.get_value(temp_i, temp_j, temp_k) - dens_all);
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeDEF.get_size(0)) / static_cast<double>(3 * CubeDEF.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -234,7 +224,7 @@ void Calc_Static_Def(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Deformation Density"};
+    ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
     const int step = (int)max(floor(3 * CubeDEF.get_size(0) / 20.0), 1.0);
 
     const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
@@ -289,12 +279,7 @@ void Calc_Static_Def(
                 double temp = rho - spher;
                 CubeDEF.set_value(temp_i, temp_j, temp_k, CubeDEF.get_value(temp_i, temp_j, temp_k) + temp);
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeDEF.get_size(0)) / static_cast<double>(3 * CubeDEF.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -328,7 +313,7 @@ void Calc_Hirshfeld(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    ProgressBar * progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
 
     vector<Thakkar> atoms;
@@ -396,12 +381,7 @@ void Calc_Hirshfeld(
                 dens_all = dens_choice / dens_all * CubeRho.get_value(temp_i, temp_j, temp_k);
                 CubeHDEF.set_value(temp_i, temp_j, temp_k, CubeHDEF.get_value(temp_i, temp_j, temp_k) + dens_all - dens_choice);
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeHDEF.get_size(0)) / static_cast<double>(3 * CubeHDEF.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -436,7 +416,7 @@ void Calc_Hirshfeld(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    ProgressBar * progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(3 * CubeHDEF.get_size(0) / 20.0), 1.0);
 
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
@@ -490,12 +470,7 @@ void Calc_Hirshfeld(
                     temp_k = k - CubeHDEF.get_size(2);
                 CubeHDEF.set_value(temp_i, temp_j, temp_k, CubeHDEF.get_value(temp_i, temp_j, temp_k) + (dens_choice / CubeSpherical.get_value(temp_i, temp_j, temp_k) * CubeRho.get_value(temp_i, temp_j, temp_k)) - dens_choice);
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeHDEF.get_size(0)) / static_cast<double>(3 * CubeHDEF.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -530,7 +505,7 @@ void Calc_Hirshfeld_atom(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    ProgressBar * progress = new ProgressBar(CubeHirsh.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(3 * CubeHirsh.get_size(0) / 20.0), 1.0);
 
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
@@ -584,12 +559,7 @@ void Calc_Hirshfeld_atom(
                     temp_k = k - CubeHirsh.get_size(2);
                 CubeHirsh.set_value(temp_i, temp_j, temp_k, CubeHirsh.get_value(temp_i, temp_j, temp_k) + (dens_choice / CubeSpherical.get_value(temp_i, temp_j, temp_k) * CubeRho.get_value(temp_i, temp_j, temp_k)));
             }
-        if (i != 0 && i % step == 0
-#ifdef _OPENMP
-            && omp_get_thread_num() == 0
-#endif
-        )
-            progress->write((i + CubeHirsh.get_size(0)) / static_cast<double>(3 * CubeHirsh.get_size(0)));
+        progress->update();
     }
     delete (progress);
 
@@ -621,7 +591,7 @@ void Calc_Rho(
 
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Values"};
+    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
@@ -677,8 +647,7 @@ void Calc_Rho(
 
                 CubeRho.set_value(temp_i, temp_j, temp_k, CubeRho.get_value(temp_i, temp_j, temp_k) + Rho);
             }
-        if (i != 0 && i % step == 0)
-            progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
+        progress->update();
     }
     delete (progress);
 
@@ -700,7 +669,7 @@ void Calc_Rho_spherical_harmonics(
     using namespace std;
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating Rho"};
+    ProgressBar * progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
 #pragma omp parallel shared(CubeRho) num_threads(cpus)
@@ -724,8 +693,7 @@ void Calc_Rho_spherical_harmonics(
 
                     CubeRho.set_value(i, j, k, wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
                 }
-            if (i != 0 && i % step == 0)
-                progress->write((i) / static_cast<double>(CubeRho.get_size(0)));
+            progress->update();
         }
     }
     delete (progress);
@@ -758,10 +726,9 @@ void Calc_MO_spherical_harmonics(
 
     time_point start = get_time();
 
-    progress_bar* progress = NULL;
+    ProgressBar* progress = NULL;
     if (!nodate)
-        progress = new progress_bar{file, 50u, "Calculating Values"};
-    const int step = (int)max(floor(CubeMO.get_size(0) / 20.0), 1.0);
+        progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
 
 #pragma omp parallel for schedule(dynamic)
     for (int i = 0; i < CubeMO.get_size(0); i++)
@@ -777,8 +744,8 @@ void Calc_MO_spherical_harmonics(
 
                 CubeMO.set_value(i, j, k, wavy.compute_MO_spherical(PosGrid[0], PosGrid[1], PosGrid[2], MO));
             }
-        if (i != 0 && i % step == 0&& !nodate)
-            progress->write((i) / static_cast<double>(CubeMO.get_size(0)));
+        if (!nodate)
+            progress->update();
     }
     if (!nodate) {
         delete (progress);
@@ -810,9 +777,9 @@ void Calc_S_Rho(
 #endif
 
     time_point start = get_time();
-    progress_bar* progress = NULL;
+    ProgressBar* progress = NULL;
     if(!nodate)
-        progress = new progress_bar{ file, 50u, "Calculating Values" };
+        progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(Cube_S_Rho.get_size(0) / 20.0), 1.0);
 
 #pragma omp parallel for schedule(dynamic)
@@ -833,8 +800,8 @@ void Calc_S_Rho(
 
                 Cube_S_Rho.set_value(i, j, k, wavy.compute_spin_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
             }
-        if (i != 0 && i % step == 0 && !nodate)
-            progress->write((i) / static_cast<double>(Cube_S_Rho.get_size(0)));
+        if (!nodate)
+            progress->update();
     }
     if (!nodate) {
         delete (progress);
@@ -874,9 +841,9 @@ void Calc_Prop(
 
     time_point start = get_time();
 
-    progress_bar *progress = NULL;
+    ProgressBar *progress = NULL;
     if (!test)
-        progress = new progress_bar{file, 50u, "Calculating Values"};
+        progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
     const int step = (int)max(floor(CubeRho.get_size(0) * 3 / 20.0), 1.0);
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
@@ -1018,10 +985,7 @@ void Calc_Prop(
                 }
             }
         if (!test)
-        {
-            if (i != 0 && i % step == 0)
-                progress->write((i + CubeRho.get_size(0)) / static_cast<double>(CubeRho.get_size(0) * 3));
-        }
+            progress->update();
     }
     if (!test)
     {
@@ -1071,9 +1035,9 @@ void Calc_ESP(
         }
     }
 
-    progress_bar *progress = NULL;
+    ProgressBar *progress = NULL;
     if (!no_date)
-        progress = new progress_bar{file, 50u, "Calculating ESP"};
+        progress = new ProgressBar(CubeESP.get_size(0), 50, "=", " ", "Calculating ESP");
     const int step = (int)max(floor(CubeESP.get_size(0) * 3 / 20.0), 1.0);
 
     const int low_i = wrap ? -CubeESP.get_size(0) : 0;
@@ -1129,10 +1093,7 @@ void Calc_ESP(
                 // CubeESP.set_value(i, j, k, computeESP(PosGrid, d2, wavy));
             }
         if (!no_date)
-        {
-            if (i != 0 && i % step == 0)
-                progress->write((i + CubeESP.get_size(0)) / static_cast<double>(CubeESP.get_size(0) * 3));
-        }
+            progress->update();
     }
     if (!no_date)
     {
@@ -1168,7 +1129,7 @@ void Calc_MO(
 #endif
     time_point start = get_time();
 
-    progress_bar *progress = new progress_bar{file, 50u, "Calculating MO"};
+    ProgressBar *progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
     const int step = (int)max(floor(CubeMO.get_size(0) * 3 / 20.0), 1.0);
 
     const int low_i = wrap ? -CubeMO.get_size(0) : 0;
@@ -1226,8 +1187,7 @@ void Calc_MO(
 
                 CubeMO.set_value(temp_i, temp_j, temp_k, CubeMO.get_value(temp_i, temp_j, temp_k) + MO);
             }
-        if (i != 0 && i % step == 0)
-            progress->write((i + CubeMO.get_size(0)) / static_cast<double>(CubeMO.get_size(0) * 3));
+        progress->update();
     }
     delete (progress);
 

@@ -233,52 +233,6 @@ std::string get_ending_from_filename(const std::string &input)
     return input.substr(input.rfind(".") + 1);
 }
 
-void write_template_confi()
-{
-    using namespace std;
-    string line;
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    if (exists(programs))
-    {
-        cout << "File already exists! Aborting!" << endl;
-        return;
-    }
-    ofstream conf(programs.c_str());
-#ifdef _WIN32
-    conf << "gaussian=\"D:\\g09\\g09\\\"" << endl;
-    conf << "turbomole=\"D:\\turbomole\\dscf7.1\\\"" << endl;
-    conf << "basis=\"D:\\tonto\\basis_sets\\\"" << endl;
-#else
-    conf << "gaussian=\"/usr/local/g09/g09\"" << endl;
-    conf << "turbomole=\"/usr/local/bin/dscf7.1\"" << endl;
-    conf << "basis=\"/basis_sets/\"" << endl;
-#endif
-    conf << "cpu=4" << endl;
-    conf << "mem=4.0" << endl;
-    conf << "rho=1" << endl;
-    conf << "rdg=1" << endl;
-    conf << "eli=0" << endl;
-    conf << "elf=0" << endl;
-    conf << "lap=0" << endl;
-    conf << "esp=0" << endl;
-    conf << "efv=0" << endl;
-    conf << "def=0" << endl;
-    conf << "hir=0" << endl;
-    conf.flush();
-    conf.close();
-#ifdef _WIN32
-    //	const wchar_t* fileLPCWSTR = programs.c_str();
-    //	wstring stemp = wstring(programs.begin(), programs.end());
-    //	int attr = GetFileAttributes(stemp.c_str());
-    //	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-    //		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
-    //	}
-#endif
-    return;
-};
-
 options::options(const int accuracy,
                  const int threads,
                  const int pbc,
@@ -381,92 +335,6 @@ options::options(const int accuracy,
       debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
 {
     groups.resize(1);
-};
-
-int program_confi(std::string &gaussian_path, std::string &turbomole_path, std::string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
-{
-    using namespace std;
-    counter++;
-    if (counter == 3)
-    {
-        cout << "Too many iterations of tries to read config file, better abort..." << endl;
-        return -1;
-    }
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    ifstream conf(programs.c_str());
-    if (debug)
-        cout << programs << endl;
-    string line;
-    if (conf.good())
-    {
-        if (debug)
-            cout << "File is valid, continuing..." << endl;
-    }
-    else
-    {
-        if (expert)
-        {
-            cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", writing a template for you!" << endl;
-            write_template_confi();
-            if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1)
-                return -1;
-            cout << "Wrote a template for you, read default values!" << endl;
-            return 0;
-        }
-        else
-        {
-            write_template_confi();
-            program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug);
-            return 0;
-        }
-    }
-    conf.seekg(0);
-    getline(conf, line);
-    size_t length;
-    char *tempchar = new char[200];
-    int run = 0;
-    while (!conf.eof())
-    {
-        switch (run)
-        {
-        case 0:
-            length = line.copy(tempchar, line.size() - 11, 10);
-            tempchar[length] = '\0';
-            gaussian_path = tempchar;
-            break;
-        case 1:
-            length = line.copy(tempchar, line.size() - 12, 11);
-            tempchar[length] = '\0';
-            turbomole_path = tempchar;
-            break;
-        case 2:
-            length = line.copy(tempchar, line.size() - 8, 7);
-            tempchar[length] = '\0';
-            basis = tempchar;
-            break;
-        case 3:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            ncpus = stoi(tempchar);
-            break;
-        case 4:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            mem = stod(tempchar);
-            break;
-        default:
-            if (debug)
-                cout << "found everything i was looking for, if you miss something check the switch" << endl;
-            break;
-        }
-        if (debug)
-            cout << run << ". line: " << tempchar << endl;
-        run++;
-        getline(conf, line);
-    }
-    return 1;
 };
 
 bool check_bohr(WFN &wave, bool debug)
@@ -1188,22 +1056,6 @@ bool unsaved_files(std::vector<WFN> &wavy)
                 return true;
     return false;
 };
-
-void progress_bar::write(double fraction)
-{
-    // clamp fraction to valid range [0,1]
-    if (fraction < 0)
-        fraction = 0;
-    else if (fraction > 1)
-        fraction = 1;
-
-    auto width = bar_width - message.size();
-    auto offset = bar_width - static_cast<unsigned>(width * round(fraction / precision) * precision);
-
-    os << '\r' << message;
-    os.write(full_bar.data() + offset, width);
-    os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction / precision) * precision) << "%] " << std::flush;
-}
 
 void readxyzMinMax_fromWFN(
     WFN &wavy,
@@ -3044,7 +2896,7 @@ void write_timing_to_file(std::ostream &file,
     }
 
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
-    file << "\n\n------------------------------ Time Breakdown! ------------------------------" << endl;
+    file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
     // Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
     for (int i = 0; i < time_points.size() - 1; i++)
