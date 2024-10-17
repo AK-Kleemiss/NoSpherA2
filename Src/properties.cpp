@@ -1226,7 +1226,7 @@ void properties_calculation(options &opt)
     vec2 cell_matrix;
     cell_matrix.resize(3);
     for (int i = 0; i < 3; i++)
-        cell_matrix[i].resize(3);
+        cell_matrix[i].resize(3, 0.0);
     if (opt.debug) {
         log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.resolution << "|" << constants::ang2bohr(opt.resolution) << "|" << opt.radius << "|" << constants::ang2bohr(opt.radius) << endl;
         for (int a=0; a<wavy.get_ncen(); a++)
@@ -1349,7 +1349,7 @@ void properties_calculation(options &opt)
         log2 << "Everything is set up; starting calculation..." << endl;
     }
     else {
-        log2 << "Calcualting:" << endl;
+        log2 << "\nCalculating:" << endl;
         if (opt.hdef || opt.def || opt.hirsh)
             log2 << "Rho, ";
         if (opt.hdef || opt.hirsh)

@@ -265,20 +265,20 @@ void generate_hkl(const double &dmin,
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
     ivec hkl_(3);
     string line, temp;
-    const int extreme = 201;
-    double dmin_l = 0.9 * dmin;
-    for (int h = -extreme; h < extreme; h++)
+    const ivec extreme = { 
+        int(unit_cell.get_a() / (dmin - 0.01)), 
+        int(unit_cell.get_b() / (dmin - 0.01)), 
+        int(unit_cell.get_c() / (dmin - 0.01)) };
+    if (debug)
+        file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
+    for (int h = -extreme[0]; h < extreme[0]; h++)
     {
-        for (int k = -extreme; k < extreme; k++)
+        for (int k = -extreme[1]; k < extreme[2]; k++)
         {
-            // only need 0 to extreme, since we have no DISP signal
-            for (int l = 0; l < extreme; l++)
+            for (int l = -extreme[2]; l < extreme[2]; l++)
             {
                 hkl_ = {h, k, l};
-                if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
-                    hkl.emplace(hkl_);
-                else
-                    break;
+                hkl.emplace(hkl_);
             }
         }
     }

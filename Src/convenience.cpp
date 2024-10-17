@@ -1132,122 +1132,30 @@ void readxyzMinMax_fromCIF(
     bool debug)
 {
     using namespace std;
-    if (debug)
-        file << "starting to read cif!" << endl;
-    if (!exists(cif))
-    {
-        file << "CIF does not exists!" << endl;
-        return;
-    }
-    ifstream cif_input(cif.c_str(), ios::in);
-    bvec found;
-    string line;
-    found.resize(7);
-    for (int k = 0; k < 7; k++)
-        found[k] = false;
-    double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
-    double alpha = 0.0, beta = 0.0, gamma = 0.0;
-    svec cell_keywords;
-    cell_keywords.push_back("_cell_length_a");
-    cell_keywords.push_back("_cell_length_b");
-    cell_keywords.push_back("_cell_length_c");
-    cell_keywords.push_back("_cell_angle_alpha");
-    cell_keywords.push_back("_cell_angle_beta");
-    cell_keywords.push_back("_cell_angle_gamma");
-    cell_keywords.push_back("_cell_volume");
-    if (debug)
-        file << "Starting while !.eof()" << endl;
-    while (!cif_input.eof())
-    {
-        if (debug)
-            file << "While line! " << setw(80) << line
-                 << setw(10) << a << found[0]
-                 << setw(10) << b << found[1]
-                 << setw(10) << c << found[2]
-                 << setw(10) << alpha << found[3]
-                 << setw(10) << beta << found[4]
-                 << setw(10) << gamma << found[5]
-                 << setw(10) << v << found[6] << endl;
-        getline(cif_input, line);
-        for (int k = 0; k < cell_keywords.size(); k++)
-        {
-            if (line.find(cell_keywords[k]) != string::npos)
-            {
-                switch (k)
-                {
-                case 0:
-                    a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 1:
-                    b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 2:
-                    c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 3:
-                    alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 4:
-                    beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 5:
-                    gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 6:
-                    v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                default:
-                    file << "This is weird... should never get here... aborting!" << endl;
-                    return;
-                }
-                found[k] = true;
-            }
-        }
-        if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
-            break;
-    }
-    double ca = cos(constants::PI_180 * alpha);
-    double cb = cos(constants::PI_180 * beta);
-    double cg = cos(constants::PI_180 * gamma);
-    double sa = sin(constants::PI_180 * alpha);
-    double sb = sin(constants::PI_180 * beta);
-    double sg = sin(constants::PI_180 * gamma);
-    double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
-    double V = a * b * c * Vp;
+    cell cell(cif);
 
-    if (debug)
-        file << "Making cm" << endl
-             << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
-
-    cm[0][0] = a / 0.529177249;
-    cm[1][0] = 0.0;
-    cm[2][0] = 0.0;
-
-    cm[0][1] = b * cg / 0.529177249;
-    cm[1][1] = b * sg / 0.529177249;
-    cm[2][1] = 0.0;
-
-    cm[0][2] = c * cb / 0.529177249;
-    cm[1][2] = (c * (ca - cb * cg) / sg) / 0.529177249;
-    cm[2][2] = V / (a * b * sg) / 0.529177249;
+    cm[0][0] = constants::ang2bohr(cell.get_a());
+    cm[0][1] = constants::ang2bohr(cell.get_b() * cell.get_cg());
+    cm[0][2] = constants::ang2bohr(cell.get_c() * cell.get_cb());
+    cm[1][1] = constants::ang2bohr(cell.get_b() * cell.get_sg());
+    cm[1][2] = constants::ang2bohr(cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg());
+    cm[2][2] = constants::ang2bohr(cell.get_V() / (cell.get_a() * cell.get_b() * cell.get_sg()));
 
     CoordMinMax[0] = 0.0;
     CoordMinMax[1] = 0.0;
     CoordMinMax[2] = 0.0;
 
-    CoordMinMax[3] = (a + b * cg + c * cb) / 0.529177249;
-    CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
-    CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
+    CoordMinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
+    CoordMinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
+    CoordMinMax[5] = cm[2][2];
 
-    NbSteps[0] = (int)ceil(a / Resolution);
-    NbSteps[1] = (int)ceil(b / Resolution);
-    NbSteps[2] = (int)ceil(c / Resolution);
+    NbSteps[0] = (int)ceil(cell.get_a() / Resolution);
+    NbSteps[1] = (int)ceil(cell.get_b() / Resolution);
+    NbSteps[2] = (int)ceil(cell.get_c() / Resolution);
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
             cm[i][j] /= NbSteps[j];
-
-    cif_input.close();
 }
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
