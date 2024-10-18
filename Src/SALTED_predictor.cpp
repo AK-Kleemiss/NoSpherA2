@@ -7,7 +7,6 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
     std::string _path = opt.SALTED_DIR;
 
     config.h5_filename = find_first_h5_file(opt.SALTED_DIR);
-    config.predict_filename = wavy.get_path();
 
     if (config.h5_filename == "")
     {
@@ -33,15 +32,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
         err_not_impl_f("HDF5 files are not supported by this build", std::cout);
 #endif
     }
-    config.neighspe1 = { "H", "O" , "C", "N", "S" };
-    config.neighspe2 = { "H", "O" , "C", "N", "S" };
-    config.species = { "H", "O" , "C", "N", "S" };
-    config.nspe1 = 5;
-    config.nspe2 = 5;
-    config.nang1 = 6;
-    config.nang2 = 6;
-    config.nrad1 = 5;
-    config.nrad2 = 5;
+    config.predict_filename = wavy.get_path();
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name()
@@ -128,6 +119,20 @@ void SALTEDPredictor::setup_atomic_environment()
 
     // Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
     calculateConjugate(v2);
+// #pragma omp parallel for
+//     for (int i = 0; i < v2.size(); ++i)
+//	{
+//		for (int j = 0; j < v2[0].size(); ++j)
+//		{
+//			for (int k = 0; k < v2[0][0].size(); ++k)
+//			{
+//				for (int l = 0; l < v2[0][0][0].size(); ++l)
+//				{
+//					v2[i][j][k][l] = conj(v2[i][j][k][l]);
+//				}
+//			}
+//		}
+//	}
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
 #endif
@@ -168,13 +173,10 @@ void SALTEDPredictor::read_model_data()
     features.close();
     projectors.close();
 
-
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j_old[lam] = readVectorFromFile<double>(opt.SALTED_DIR + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
+        wigner3j[lam] = readVectorFromFile<double>(opt.SALTED_DIR + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
     }
-    
-
 
     if (config.sparsify)
     {
@@ -239,12 +241,7 @@ void SALTEDPredictor::read_model_data_h5()
     vector<hsize_t> dims_out_temp;
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j_old[lam] = readHDF5<double>(input, "wigners_old/lam-" + to_string(lam), dims_out_temp);
-    }
-
-    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
-    {
-        wigner3j_new[lam] = readHDF5<double>(input, "wigners_new/lam-" + to_string(lam), dims_out_temp);
+        wigner3j[lam] = readHDF5<double>(input, "wigners/lam-" + to_string(lam), dims_out_temp);
     }
 
     if (config.sparsify)
@@ -277,199 +274,54 @@ void SALTEDPredictor::read_model_data_h5()
 vec SALTEDPredictor::predict()
 {
     using namespace std;
-
-    //Get the maximum neccecary lambda value
-    int lam_max = SALTED_Utils::get_lmax_max(lmax);
-
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
     unordered_map<int, vec> pvec{};
-
-    //Old Version of equicomb
-    //if (!config.fast_equicomb)
+    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        for (int lam = 0; lam < lam_max + 1; lam++)
+        std::cout << "Calculating descriptors for l = " << lam << std::endl;
+        int llmax = 0;
+        unordered_map<int, ivec> lvalues{};
+        for (int l1 = 0; l1 < config.nang1 + 1; l1++)
         {
-            std::cout << "Calculating descriptors for l = " << lam << std::endl;
-            ivec2 llvec = calc_llvec(config.nang1, config.nang2, lam);
-            int llmax = llvec.size();
-
-            cvec2 c2r = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
-
-            featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
-            vec p;
-            vec p_test;
-            ivec2 llvec_t = transpose<int>(llvec);
-            if (config.sparsify)
+            for (int l2 = 0; l2 < config.nang2 + 1; l2++)
             {
-                int nfps = static_cast<int>(vfps[lam].size());
-                equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j_old[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
-                featsize[lam] = nfps;
+                // keep only even combination to enforce inversion symmetry
+                if ((lam + l1 + l2) % 2 == 0)
+                {
+                    if (abs(l2 - lam) <= l1 && l1 <= (l2 + lam))
+                    {
+                        lvalues[llmax] = {l1, l2};
+                        llmax += 1;
+                    }
+                }
             }
-            else
-            {
-                equicomb(natoms, config.nang1, config.nang2, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j_old[lam], llvec_t, lam, c2r, featsize[lam], p);
-            }
-
-            pvec[lam] = p;
         }
-	}
-    //else
-    unordered_map<int, vec> old_pvec = pvec;
-	pvec.clear();
-    {
-        //Matrix of size l1 x l2 with the highest lam value for each combination (initialized as -1 )
-        ivec2 max_lam_per_l1l2(config.nang1 + 1, ivec(config.nang2 + 1, -1));
-
-        //For every lam the corresponding l1 and l2 values (basically llvec from the old version)
-        std::unordered_map<int, ivec2> l1l2_per_lam;
-        get_angular_indexes_symmetric_per_lambda(lam_max, config.nang1, config.nang2, max_lam_per_l1l2, l1l2_per_lam);
-
-        std::cout << "Calculating combinations of v1 and v2..." << std::endl;
-        std::unordered_map<std::string, ivec> feats_per_l1l2;
-        std::unordered_map<int, cvec> prod_vec_map;
-        equicomb_vec_multiply(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), config.nang1, config.nang2, v1, v2, max_lam_per_l1l2, lam_max, prod_vec_map, feats_per_l1l2);
-
-        //int featsize_new = (config.nang1 + 1) * (config.nang2 + 1) * config.nspe1 * config.nrad1 * config.nspe2 * config.nrad2;
-        const int n_feats_per_atom = config.nrad1 * config.nspe1 * config.nrad2 * config.nspe1;
-        const int n_feats = n_feats_per_atom * natoms;
-
-        //#pragma omp parallel
-        for (int lam = 0; lam < lam_max + 1; lam++) {
-            const int l21 = 2 * lam + 1;
-            const ivec2 l1l2 = l1l2_per_lam[lam];
-            const int l1l2_size = l1l2.size();
-
-            // Wigner 3j coefficients
-            vec wigner3j = wigner3j_new[lam];
-            cvec2 c2r_lam = SALTED_Utils::complex_to_real_transformation({ 2 * lam + 1 })[0];
-            cvec c2r_lam_flat = flatten(c2r_lam);
-
-            int iwig = 0;
-            vec normfacts(natoms, 0.0);
-            int featsize_orig = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * l1l2_size;
-
-            std::unordered_map<int,cvec2> p_temp;
-
-            for (int l1l2_index = 0; l1l2_index < l1l2_size; l1l2_index++) {
-                ivec vec = l1l2[l1l2_index];
-
-                int size_inner = 2 * vec[0] + 1;
-                int max_lam_inner = max_lam_per_l1l2[vec[0]][vec[1]];
-                int start = (max_lam_inner - lam) * size_inner;
-                int end = (max_lam_inner + lam + 1) * size_inner;
-
-                ivec feat_indices = feats_per_l1l2[std::to_string(vec[0]) + std::to_string(vec[1])];
-
-                cvec calc_vec(n_feats * l21, 0.0);
-
-				//calculate the product of v1,v1 with the corresponding wigner3j-symbols and sum
-    //#pragma omp for
-                for (int i = 0; i < n_feats; i++) {
-                    cvec prod(size_inner * l21, 0.0);
-                    cvec::iterator temp = prod_vec_map[feat_indices[i]].begin();
-                    std::transform(temp + start, temp + end, wigner3j.begin() + iwig, prod.begin(), std::multiplies<cdouble>());
-                    //Calc the sum over every size_inner for every l21
-                    for (int l = 0; l < l21; l++) {
-                        for (int inner = 0; inner < size_inner; inner++) {
-                            calc_vec[i * l21 + l] += prod[l * size_inner + inner];
-                        }
-                    }
-                }
-
-                cvec2 res = dot(calc_vec, c2r_lam_flat, n_feats, l21, l21, l21, false, true);
-                
-				//Calculate the norm factor for each atom
-                //#pragma omp for
-                for (int iat = 0; iat < natoms; ++iat) {
-                    double normfact_sum = 0.0;
-                    int base_idx = iat * n_feats_per_atom;
-
-                    for (int i = 0; i < n_feats_per_atom; ++i) {
-                        const cvec& res_row = res[base_idx + i];
-                        for (int l = 0; l < l21; ++l) {
-                            normfact_sum += std::real(res_row[l]) * std::real(res_row[l]);
-                        }
-                    }
-                    normfacts[iat] += normfact_sum;
-                }
-                iwig += l21 * size_inner;
-                p_temp[l1l2_index] = res;
-            }
-            
-			//p of size (n1 * n2 * llmax,l21, natoms)
-            vec3 p;
-            if (config.sparsify) {
-                p.assign(natoms, vec2(l21, vec(vfps[lam].size(), 0.0)));
-            }
-            else {
-				p.assign(natoms, vec2(l21, vec(featsize_orig, 0.0)));
-            }
-            //ptemp of size(llmax, natoms*n1*n2, l21)
-
-            for (int iat = 0; iat < natoms; ++iat) {
-                normfacts[iat] = std::sqrt(normfacts[iat]);
-            }
-			int rad1spe1 = config.nrad1 * config.nspe1;
-			int rad2spe2 = config.nrad2 * config.nspe2;
-            //for (int atom = 0; atom < natoms; ++atom) {
-            //    for (int i1 = 0; i1 < rad1spe1; ++i1) {
-            //        for (int i2 = 0; i2 < rad2spe2; ++i2) {
-            //            for (int ll = 0; ll < l1l2_size; ++ll) {
-            //                int indxp = i1 * rad2spe2 * l1l2_size + i2 * l1l2_size + ll;
-     
-            //                int indxp_temp = atom * n_feats_per_atom + i1 * rad2spe2 + i2;
-            //                for (int l = 0; l < l21; ++l) {
-            //                    p[atom][l][indxp] = std::real(p_temp[ll][indxp_temp][l]) / normfacts[atom];
-            //                }
-            //            }
-            //        }
-            //    }
-            //}
-            for (int atom = 0; atom < natoms; ++atom) {
-                for (int fps : vfps[lam]) {
-					int i1 = fps / rad2spe2;
-					int i2 = fps % rad2spe2;
-					int ll = (fps / rad2spe2) % l1l2_size;
-
-
-                    int indxp_temp = atom * n_feats_per_atom + i1 * rad2spe2 + i2;
-                    for (int l = 0; l < l21; ++l) {
-                        p[atom][l][fps] = std::real(p_temp[ll][indxp_temp][l]) / normfacts[atom];
-                    }
-                }
-            }
-
-
-            pvec[lam] = flatten(p);
+        // Fill dense array from dictionary
+        ivec2 llvec(llmax, ivec(2));
+        for (int i = 0; i < llmax; i++)
+        {
+            llvec[i] = lvalues[i];
         }
+
+        cvec2 c2r = SALTED_Utils::complex_to_real_transformation({2 * lam + 1})[0];
+
+        featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
+        vec p;
+        vec p_test;
+        ivec2 llvec_t = transpose<int>(llvec);
+        if (config.sparsify)
+        {
+            int nfps = static_cast<int>(vfps[lam].size());
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
+            featsize[lam] = nfps;
+        }
+        else
+        {
+            equicomb(natoms, config.nang1, config.nang2, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
+        }
+
+        pvec[lam] = p;
     }
-
-	for (int lam = 0; lam < lam_max + 1; lam++)
-	{
-		std::cout << "Old: " << old_pvec[lam].size() << " New: " << pvec[lam].size() << std::endl;
-		for (int i = 0; i < pvec[lam].size(); i++)
-		{
-			if (std::abs(old_pvec[lam][i] - pvec[lam][i]) > 1e-6)
-			{
-                std::cout << "Error at index " << i << " for lam " << lam  << "  " << std::to_string(std::abs(old_pvec[lam][i] - pvec[lam][i])) << std::endl;
-                //find if the old_pvec[lam][i] is anywhere in pvec[lam] and if so print the index
-                bool found = false;
-				for (int j = i; j < pvec[lam].size(); j++)
-				{
-					if (std::abs(old_pvec[lam][i] - pvec[lam][j]) < 1e-6)
-					{
-                        found = true;
-                        break;
-                    }
-				}
-				if (!found)
-				{
-					std::cout << "Not found" << std::endl;
-				}
-			}
-		}
-	}
-
 
     unordered_map<string, vec2> psi_nm{};
     for (const string &spe : config.species)
