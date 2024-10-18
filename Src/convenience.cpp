@@ -233,52 +233,6 @@ std::string get_ending_from_filename(const std::string &input)
     return input.substr(input.rfind(".") + 1);
 }
 
-void write_template_confi()
-{
-    using namespace std;
-    string line;
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    if (exists(programs))
-    {
-        cout << "File already exists! Aborting!" << endl;
-        return;
-    }
-    ofstream conf(programs.c_str());
-#ifdef _WIN32
-    conf << "gaussian=\"D:\\g09\\g09\\\"" << endl;
-    conf << "turbomole=\"D:\\turbomole\\dscf7.1\\\"" << endl;
-    conf << "basis=\"D:\\tonto\\basis_sets\\\"" << endl;
-#else
-    conf << "gaussian=\"/usr/local/g09/g09\"" << endl;
-    conf << "turbomole=\"/usr/local/bin/dscf7.1\"" << endl;
-    conf << "basis=\"/basis_sets/\"" << endl;
-#endif
-    conf << "cpu=4" << endl;
-    conf << "mem=4.0" << endl;
-    conf << "rho=1" << endl;
-    conf << "rdg=1" << endl;
-    conf << "eli=0" << endl;
-    conf << "elf=0" << endl;
-    conf << "lap=0" << endl;
-    conf << "esp=0" << endl;
-    conf << "efv=0" << endl;
-    conf << "def=0" << endl;
-    conf << "hir=0" << endl;
-    conf.flush();
-    conf.close();
-#ifdef _WIN32
-    //	const wchar_t* fileLPCWSTR = programs.c_str();
-    //	wstring stemp = wstring(programs.begin(), programs.end());
-    //	int attr = GetFileAttributes(stemp.c_str());
-    //	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-    //		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
-    //	}
-#endif
-    return;
-};
-
 options::options(const int accuracy,
                  const int threads,
                  const int pbc,
@@ -381,92 +335,6 @@ options::options(const int accuracy,
       debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
 {
     groups.resize(1);
-};
-
-int program_confi(std::string &gaussian_path, std::string &turbomole_path, std::string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
-{
-    using namespace std;
-    counter++;
-    if (counter == 3)
-    {
-        cout << "Too many iterations of tries to read config file, better abort..." << endl;
-        return -1;
-    }
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    ifstream conf(programs.c_str());
-    if (debug)
-        cout << programs << endl;
-    string line;
-    if (conf.good())
-    {
-        if (debug)
-            cout << "File is valid, continuing..." << endl;
-    }
-    else
-    {
-        if (expert)
-        {
-            cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", writing a template for you!" << endl;
-            write_template_confi();
-            if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1)
-                return -1;
-            cout << "Wrote a template for you, read default values!" << endl;
-            return 0;
-        }
-        else
-        {
-            write_template_confi();
-            program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug);
-            return 0;
-        }
-    }
-    conf.seekg(0);
-    getline(conf, line);
-    size_t length;
-    char *tempchar = new char[200];
-    int run = 0;
-    while (!conf.eof())
-    {
-        switch (run)
-        {
-        case 0:
-            length = line.copy(tempchar, line.size() - 11, 10);
-            tempchar[length] = '\0';
-            gaussian_path = tempchar;
-            break;
-        case 1:
-            length = line.copy(tempchar, line.size() - 12, 11);
-            tempchar[length] = '\0';
-            turbomole_path = tempchar;
-            break;
-        case 2:
-            length = line.copy(tempchar, line.size() - 8, 7);
-            tempchar[length] = '\0';
-            basis = tempchar;
-            break;
-        case 3:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            ncpus = stoi(tempchar);
-            break;
-        case 4:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            mem = stod(tempchar);
-            break;
-        default:
-            if (debug)
-                cout << "found everything i was looking for, if you miss something check the switch" << endl;
-            break;
-        }
-        if (debug)
-            cout << run << ". line: " << tempchar << endl;
-        run++;
-        getline(conf, line);
-    }
-    return 1;
 };
 
 bool check_bohr(WFN &wave, bool debug)
@@ -1189,22 +1057,6 @@ bool unsaved_files(std::vector<WFN> &wavy)
     return false;
 };
 
-void progress_bar::write(double fraction)
-{
-    // clamp fraction to valid range [0,1]
-    if (fraction < 0)
-        fraction = 0;
-    else if (fraction > 1)
-        fraction = 1;
-
-    auto width = bar_width - message.size();
-    auto offset = bar_width - static_cast<unsigned>(width * round(fraction / precision) * precision);
-
-    os << '\r' << message;
-    os.write(full_bar.data() + offset, width);
-    os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction / precision) * precision) << "%] " << std::flush;
-}
-
 void readxyzMinMax_fromWFN(
     WFN &wavy,
     double *CoordMinMax,
@@ -1280,122 +1132,30 @@ void readxyzMinMax_fromCIF(
     bool debug)
 {
     using namespace std;
-    if (debug)
-        file << "starting to read cif!" << endl;
-    if (!exists(cif))
-    {
-        file << "CIF does not exists!" << endl;
-        return;
-    }
-    ifstream cif_input(cif.c_str(), ios::in);
-    bvec found;
-    string line;
-    found.resize(7);
-    for (int k = 0; k < 7; k++)
-        found[k] = false;
-    double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
-    double alpha = 0.0, beta = 0.0, gamma = 0.0;
-    svec cell_keywords;
-    cell_keywords.push_back("_cell_length_a");
-    cell_keywords.push_back("_cell_length_b");
-    cell_keywords.push_back("_cell_length_c");
-    cell_keywords.push_back("_cell_angle_alpha");
-    cell_keywords.push_back("_cell_angle_beta");
-    cell_keywords.push_back("_cell_angle_gamma");
-    cell_keywords.push_back("_cell_volume");
-    if (debug)
-        file << "Starting while !.eof()" << endl;
-    while (!cif_input.eof())
-    {
-        if (debug)
-            file << "While line! " << setw(80) << line
-                 << setw(10) << a << found[0]
-                 << setw(10) << b << found[1]
-                 << setw(10) << c << found[2]
-                 << setw(10) << alpha << found[3]
-                 << setw(10) << beta << found[4]
-                 << setw(10) << gamma << found[5]
-                 << setw(10) << v << found[6] << endl;
-        getline(cif_input, line);
-        for (int k = 0; k < cell_keywords.size(); k++)
-        {
-            if (line.find(cell_keywords[k]) != string::npos)
-            {
-                switch (k)
-                {
-                case 0:
-                    a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 1:
-                    b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 2:
-                    c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 3:
-                    alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 4:
-                    beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 5:
-                    gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 6:
-                    v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                default:
-                    file << "This is weird... should never get here... aborting!" << endl;
-                    return;
-                }
-                found[k] = true;
-            }
-        }
-        if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
-            break;
-    }
-    double ca = cos(constants::PI_180 * alpha);
-    double cb = cos(constants::PI_180 * beta);
-    double cg = cos(constants::PI_180 * gamma);
-    double sa = sin(constants::PI_180 * alpha);
-    double sb = sin(constants::PI_180 * beta);
-    double sg = sin(constants::PI_180 * gamma);
-    double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
-    double V = a * b * c * Vp;
+    cell cell(cif);
 
-    if (debug)
-        file << "Making cm" << endl
-             << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
-
-    cm[0][0] = a / 0.529177249;
-    cm[1][0] = 0.0;
-    cm[2][0] = 0.0;
-
-    cm[0][1] = b * cg / 0.529177249;
-    cm[1][1] = b * sg / 0.529177249;
-    cm[2][1] = 0.0;
-
-    cm[0][2] = c * cb / 0.529177249;
-    cm[1][2] = (c * (ca - cb * cg) / sg) / 0.529177249;
-    cm[2][2] = V / (a * b * sg) / 0.529177249;
+    cm[0][0] = constants::ang2bohr(cell.get_a());
+    cm[0][1] = constants::ang2bohr(cell.get_b() * cell.get_cg());
+    cm[0][2] = constants::ang2bohr(cell.get_c() * cell.get_cb());
+    cm[1][1] = constants::ang2bohr(cell.get_b() * cell.get_sg());
+    cm[1][2] = constants::ang2bohr(cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg());
+    cm[2][2] = constants::ang2bohr(cell.get_V() / (cell.get_a() * cell.get_b() * cell.get_sg()));
 
     CoordMinMax[0] = 0.0;
     CoordMinMax[1] = 0.0;
     CoordMinMax[2] = 0.0;
 
-    CoordMinMax[3] = (a + b * cg + c * cb) / 0.529177249;
-    CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
-    CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
+    CoordMinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
+    CoordMinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
+    CoordMinMax[5] = cm[2][2];
 
-    NbSteps[0] = (int)ceil(a / Resolution);
-    NbSteps[1] = (int)ceil(b / Resolution);
-    NbSteps[2] = (int)ceil(c / Resolution);
+    NbSteps[0] = (int)ceil(cell.get_a() / Resolution);
+    NbSteps[1] = (int)ceil(cell.get_b() / Resolution);
+    NbSteps[2] = (int)ceil(cell.get_c() / Resolution);
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
             cm[i][j] /= NbSteps[j];
-
-    cif_input.close();
 }
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
@@ -3044,7 +2804,7 @@ void write_timing_to_file(std::ostream &file,
     }
 
     std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
-    file << "\n\n------------------------------ Time Breakdown! ------------------------------" << endl;
+    file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
     file << "                                     mm:ss:ms" << endl;
     // Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
     for (int i = 0; i < time_points.size() - 1; i++)

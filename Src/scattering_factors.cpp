@@ -265,20 +265,20 @@ void generate_hkl(const double &dmin,
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
     ivec hkl_(3);
     string line, temp;
-    const int extreme = 201;
-    double dmin_l = 0.9 * dmin;
-    for (int h = -extreme; h < extreme; h++)
+    const ivec extreme = { 
+        int(unit_cell.get_a() / (dmin - 0.01)), 
+        int(unit_cell.get_b() / (dmin - 0.01)), 
+        int(unit_cell.get_c() / (dmin - 0.01)) };
+    if (debug)
+        file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
+    for (int h = -extreme[0]; h < extreme[0]; h++)
     {
-        for (int k = -extreme; k < extreme; k++)
+        for (int k = -extreme[1]; k < extreme[2]; k++)
         {
-            // only need 0 to extreme, since we have no DISP signal
-            for (int l = 0; l < extreme; l++)
+            for (int l = -extreme[2]; l < extreme[2]; l++)
             {
                 hkl_ = {h, k, l};
-                if (unit_cell.get_d_of_hkl(hkl_) >= dmin_l)
-                    hkl.emplace(hkl_);
-                else
-                    break;
+                hkl.emplace(hkl_);
             }
         }
     }
@@ -2512,12 +2512,8 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
-#ifdef _OPENMP
-    omp_lock_t l;
-    omp_init_lock(&l);
-#endif
-    ProgressBar pb(k_pt[0].size());
-#pragma omp parallel shared(pb, l, sf)
+    ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
+#pragma omp parallel shared(pb, sf)
     {
 #pragma omp for
         for (int i = 0; i < sf.size(); i++)
@@ -2541,18 +2537,9 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     coef_count += 2 * basis.type + 1;
                 }
             }
-#ifdef _OPENMP
-            omp_set_lock(&l);
-#endif
             pb.update();
-#ifdef _OPENMP
-            omp_unset_lock(&l);
-#endif
         }
     }
-#ifdef _OPENMP
-    omp_destroy_lock(&l);
-#endif
 }
 
 /**
@@ -2585,7 +2572,6 @@ void calc_SF(const int &points,
              bool no_date = false)
 {
     const long long int imax = static_cast<long long int>(dens.size());
-    const long long int step = std::max(static_cast<long long int>(std::floor(imax / 20)), 1LL);
     const long long int smax = static_cast<long long int>(k_pt[0].size());
     sf.reserve(imax * smax);
     sf.resize(imax);
@@ -2602,9 +2588,9 @@ void calc_SF(const int &points,
     {
         long long int dur = get_sec(start, end1);
         if (dur < 1)
-            file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl;
+            file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl << endl;
         else
-            file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl;
+            file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
     }
 
 #ifdef FLO_CUDA
@@ -2636,7 +2622,7 @@ void calc_SF(const int &points,
     );
 #else
 
-    progress_bar *progress = new progress_bar{file, 60u, "Calculating scattering factors"};
+    ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax;
     double *dens_local, *d1_local, *d2_local, *d3_local;
     complex<double> *sf_local;
@@ -2671,8 +2657,7 @@ void calc_SF(const int &points,
                 sf_local[s] += polar(rho, work);
             }
         }
-        if (i != 0 && i % step == 0)
-            progress->write(i / static_cast<double>(imax));
+        progress->update();
     }
     delete (progress);
 
@@ -3463,7 +3448,6 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("Calculation of Charges");
 
-    file << "\nGenerating scattering factors..." << endl;
     cvec2 sf;
     calc_SF_SALTED(
         k_pt,
@@ -3836,7 +3820,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     const double *k2_local = k_pt[1].data();
     const double *k3_local = k_pt[2].data();
     double work, rho;
-    progress_bar *progress = new progress_bar{std::cout, 60u, "Calculating scattering factors"};
+    ProgressBar *progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     for (long long int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
@@ -3863,8 +3847,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 #endif
                 sf_local[s] += polar(rho, work);
             }
-            if (i != 0 && i % step == 0)
-                progress->write(i / static_cast<double>(imax));
+            progress->update();
         }
     }
     delete (progress);

@@ -186,9 +186,6 @@ std::string get_filename_from_path(const std::string &input);
 std::string get_foldername_from_path(const std::string &input);
 std::string get_basename_without_ending(const std::string &input);
 //------------------Functions to work with configuration files--------------------------
-void write_template_confi();
-int program_confi(std::string &gaussian_path, std::string &turbomole_path,
-                  std::string &basis, int &ncpus, double &mem, bool debug = false, bool expert = false, unsigned int counter = 0);
 bool check_bohr(WFN &wave, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
 
@@ -200,53 +197,21 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
+inline void print_centered_text(const std::string& text, int bar_width) {
+    int text_length = text.length();
+    int total_padding = bar_width - text_length;
+    int padding_left = total_padding / 2;
+    int padding_right = total_padding - padding_left;
+
+    std::cout << "["
+        << std::setw(padding_left) << std::setfill(' ') << ""
+        << text
+        << std::setw(padding_right) << std::setfill(' ') << ""
+        << "]" << std::endl;
+}
+
 //-------------------------Progress_bar--------------------------------------------------
-
-class progress_bar
-{
-    static const auto overhead = sizeof " [100%]";
-
-    std::ostream &os;
-    const std::size_t bar_width;
-    std::string message;
-    const std::string full_bar;
-    const double precision;
-
-public:
-    progress_bar(std::ostream &os, std::size_t line_width,
-                 std::string message_, const char symbol = '=', const double p = 0.05)
-        : os{os},
-          bar_width{line_width - overhead},
-          message{std::move(message_)},
-          full_bar{std::string(bar_width, symbol) + std::string(bar_width, ' ')},
-          precision{p}
-    {
-        if (message.size() + 1 >= bar_width || message.find('\n') != message.npos)
-        {
-            os << message << '\n';
-            message.clear();
-        }
-        else
-        {
-            message += ' ';
-        }
-        write(0.0);
-    }
-
-    // not copyable
-    progress_bar(const progress_bar &) = delete;
-    progress_bar &operator=(const progress_bar &) = delete;
-
-    ~progress_bar()
-    {
-        write(1.0);
-        os << '\n';
-    }
-
-    void write(double fraction);
-};
-
-// My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
+// LMS: My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
 class ProgressBar
 {
 public:
@@ -260,6 +225,8 @@ public:
     ProgressBar(const int &worksize, const size_t &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
     {
+        // Write status text
+        print_centered_text(status_text_, bar_width_+2);
         linestart = std::cout.tellp();
     }
 
@@ -270,18 +237,19 @@ public:
 
     void update(std::ostream &os = std::cout)
     {
-        workdone = workdone + 1;
-        if (workdone % percent_ == 0)
+#pragma omp critical
         {
-            set_progress();
-            write_progress(os);
+            workdone += 1;
+            if (workdone % percent_ == 0)
+            {
+                set_progress();
+                write_progress(os);
+            }
         }
     }
 
     void write_progress(std::ostream &os = std::cout)
     {
-        // std::unique_lock lock{ mutex_ };
-
         // No need to write once progress is 100%
         if (progress_ > 100.0f)
             return;
@@ -294,29 +262,29 @@ public:
         }
         else
         {
-            os << "\r" << std::flush;
-        } // Is not a file stream
-
+            os << "\r" << std::flush;// Is not a file stream
+        } 
+        
         // Start bar
         os << "[";
 
         const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
-        for (size_t i = 0; i < bar_width_; ++i)
+        for (size_t i = 0; i <= completed; ++i)
         {
-            if (i <= completed)
-                os << fill_;
-            else
-                os << remainder_;
+            os << fill_;
         }
 
-        // End bar
-        os << "]";
-
         // Write progress percentage
-        os << " " << std::min(static_cast<size_t>(progress_), size_t(100)) << "%";
+        //os << " " << std::min(static_cast<size_t>(progress_), size_t(100)) << "%";
 
-        // Write status text
-        os << " " << status_text_ << std::flush;
+        // End bar
+        if (std::min(static_cast<size_t>(progress_), size_t(100)) == 100.0f)
+        {
+            os << "] 100% " << std::flush;
+            return;
+        }
+
+        os << std::flush;
     }
 
 private:

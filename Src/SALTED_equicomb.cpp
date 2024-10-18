@@ -30,7 +30,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     omp_lock_t l;
     omp_init_lock(&l);
 #endif
-    ProgressBar pb(natoms);
+    ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(pb, l, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null, f_vec, std::cout)
     for (iat = 0; iat < natoms; ++iat)
     {
