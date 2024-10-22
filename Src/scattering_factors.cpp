@@ -3043,7 +3043,7 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
     const int &nr)
 {
     using namespace std;
-    err_checkf(exists(opt.hkl) || !(opt.dmin == 99.0), "HKL file does not exists!", file);
+    err_checkf(exists(opt.hkl) || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100 || opt.hkl_min_max[2][1] != 100, "HKL file does not exists!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
     file << "Number of protons: " << wave[nr].get_nr_electrons() << endl;
     file << "Reading: " << opt.hkl;
@@ -3095,7 +3095,7 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
                 generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
             else
                 generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+        else if (opt.hkl_min_max[0][0] != -100 || opt.hkl_min_max[2][1] != 100)
             generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
         else
             read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
