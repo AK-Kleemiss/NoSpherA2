@@ -3336,14 +3336,14 @@ bool calculate_scattering_factors_HF(
  * @return True if the scattering factors were calculated successfully, false otherwise.
  */
 bool calculate_scattering_factors_ML(
-    const options &opt,
-    const WFN &wave,
+    options &opt,
+    SALTEDPredictor &SP,
     std::ostream &file)
 {
     using namespace std;
-    err_checkf(wave.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
+    err_checkf(SP.wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
-    file << "Number of protons: " << wave.get_nr_electrons() << endl;
+    file << "Number of protons: " << SP.wavy.get_nr_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
     vector<time_point> time_points;
@@ -3355,13 +3355,13 @@ bool calculate_scattering_factors_ML(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    bvec needs_grid(wave.get_ncen(), false);
+    bvec needs_grid(SP.wavy.get_ncen(), false);
     svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[0],
                                       unit_cell,
-                                      wave,
+                                      SP.wavy,
                                       known_atoms,
                                       atom_type_list,
                                       asym_atom_to_type_list,
@@ -3401,7 +3401,7 @@ bool calculate_scattering_factors_ML(
 #if has_RAS
     // Generation of SALTED densitie coefficients
     file << "\nGenerating densities... " << endl;
-    vec coefs = SALTEDPredictor(wave, opt).gen_SALTED_densities();
+    vec coefs = SP.gen_SALTED_densities();
     file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
          << flush;
     time_points.push_back(get_time());
@@ -3429,7 +3429,7 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    vec atom_elecs = calc_atomic_density(wave.atoms, coefs);
+    vec atom_elecs = calc_atomic_density(SP.wavy.atoms, coefs);
     file << "Table of Charges in electrons\n"
          << "       Atom      ML" << endl;
 
@@ -3437,9 +3437,9 @@ bool calculate_scattering_factors_ML(
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
-            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+            file << " " << setw(4) << SP.wavy.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
     }
 
@@ -3452,18 +3452,18 @@ bool calculate_scattering_factors_ML(
     calc_SF_SALTED(
         k_pt,
         coefs,
-        wave.atoms,
+        SP.wavy.atoms,
         sf);
     file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
-    if (wave.get_has_ECPs())
+    if (SP.wavy.get_has_ECPs())
     {
         add_ECP_contribution(
             asym_atom_list,
-            wave,
+            SP.wavy,
             sf,
             unit_cell,
             hkl,
@@ -3475,7 +3475,7 @@ bool calculate_scattering_factors_ML(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-                      wave,
+                      SP.wavy,
                       sf,
                       unit_cell,
                       hkl);
@@ -3488,6 +3488,19 @@ bool calculate_scattering_factors_ML(
 
     time_points.push_back(get_time());
     time_descriptions.push_back("last corrections");
+
+    if (opt.needs_Thakkar_fill) {
+        file << "Performing the remaining calculation of spherical atoms...\n";
+        vector<WFN> tempy;
+        tempy.push_back(WFN(0));
+        tempy[0].read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+        opt.m_hkl_list = hkl;
+        tsc_block<int, cdouble> blocky_thakkar = MTC_thakkar_sfac(opt, file, labels, tempy, 0);
+        blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Spherical Atoms");
+    }
+    
     if (!opt.no_date)
     {
         write_timing_to_file(file,

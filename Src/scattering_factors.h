@@ -74,8 +74,8 @@ bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::o
  * @return True if the calculation is successful, false otherwise.
  */
 bool calculate_scattering_factors_ML(
-    const options &opt,
-    const WFN &wave,
+    options &opt,
+    SALTEDPredictor &SP,
     std::ostream &file);
 
 /**

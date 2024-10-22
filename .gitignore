@@ -67,3 +67,4 @@ NoSpherA2_rascaline
 *.exp
 *.o_RASC
 *.o_RASC_d
+*SALTED_temp.xyz

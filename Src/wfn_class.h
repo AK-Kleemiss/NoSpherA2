@@ -109,6 +109,7 @@ public:
     bool read_gbw(const std::string &filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
     bool read_ptb(const std::string &filename, std::ostream &file, const bool debug = false);
     bool write_wfn(const std::string &fileName, const bool &debug, const bool occupied);
+    bool write_xyz(const std::string& fileName, const bool& debug = false);
     bool set_path(std::string given_path)
     {
         path = given_path;
@@ -167,6 +168,11 @@ public:
     int calculate_charge(std::ostream &file);
     bool guess_multiplicity(std::ostream &file);
     const vec get_norm_const(std::ostream &file, const bool debug = false) const;
+    double get_total_energy() const { return total_energy; };
+    double get_virial_ratio() const { return virial_ratio; };
+    vec get_DensityMatrix() const { return DensityMatrix; };
+    vec get_SpinDensityMatrix() const { return SpinDensityMatrix; };
+    int get_nfunc() const { return nfunc; };
     /**
      * Deletes the basis set information from the given WFN object.
      *

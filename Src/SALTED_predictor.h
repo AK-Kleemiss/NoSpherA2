@@ -14,17 +14,17 @@
 
 class SALTEDPredictor {
 public:
-    SALTEDPredictor(const WFN& wavy, const options &opt);
+    SALTEDPredictor(const WFN& wavy, options &opt);
 
     const std::string get_dfbasis_name();
     vec gen_SALTED_densities();
     const std::string get_h5_filename() const {
         return config.h5_filename;
     };
+    WFN wavy;
 private:
     Config config;
-    const WFN& wavy;
-    const options& opt;
+    options& _opt;
 
     int natoms;
 

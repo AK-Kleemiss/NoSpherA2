@@ -1,16 +1,17 @@
 #include "SALTED_predictor.h"
+#include "constants.h"
 #include <filesystem>
 
 // std::string find_first_h5_file(const std::string& directory_path)
-SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wavy(wavy_in), opt(opt_in)
+SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
 {
-    std::string _path = opt.SALTED_DIR;
+    std::string _path = _opt.SALTED_DIR;
 
-    config.h5_filename = find_first_h5_file(opt.SALTED_DIR);
+    config.h5_filename = find_first_h5_file(_opt.SALTED_DIR);
 
     if (config.h5_filename == "")
     {
-        if (opt.debug)
+        if (_opt.debug)
         {
             std::cout << "No HDF5 file found in the SALTED directory. Using inputs.txt instead." << std::endl;
         }
@@ -20,7 +21,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
     }
     else
     {
-        if (opt.debug)
+        if (_opt.debug)
         {
             std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
         }
@@ -32,7 +33,47 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, const options &opt_in) : wa
         err_not_impl_f("HDF5 files are not supported by this build", std::cout);
 #endif
     }
-    config.predict_filename = wavy.get_path();
+    bool i_know_all = true;
+#pragma omp parallel for reduction(&& : i_know_all)
+    for(int a = 0; a < wavy_in.get_ncen(); a++)
+        if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+            i_know_all = false;
+    if (!i_know_all)
+    {
+        std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
+        for (int a = 0; a < wavy_in.get_ncen(); a++)
+        {
+            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+            {
+                std::cout << constants::atnr2letter(wavy_in.atoms[a].charge) << " ";
+            }
+        }
+        std::cout << "\nI will fill out these atoms using spherical Thakkar densities!\n";
+        wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
+        for (int a = wavy_in.get_ncen()-1; a >= 0; a--) {
+            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+            {
+                wavy.erase_atom(a);
+            }
+        }
+        //remove all known basis sets, to not get problems with newly loaded ones
+        for (int a = 0; a < wavy.get_ncen(); a++) {
+            wavy.atoms[a].basis_set.clear();
+        }
+        std::string new_path = get_foldername_from_path(wavy.get_path());
+        if (new_path == "")
+            new_path = ".";
+        std::string new_fn = std::string("SALTED_temp.xyz");
+        join_path(new_path, new_fn);
+        wavy.write_xyz(new_path);
+        wavy.set_path(new_path);
+        config.predict_filename = wavy.get_path();
+        _opt.needs_Thakkar_fill = true;
+    }
+    else {
+        wavy = wavy_in;
+        config.predict_filename = wavy.get_path();
+    }
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name()
@@ -59,8 +100,8 @@ void calculateConjugate(std::vector<std::vector<std::vector<std::vector<std::com
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-
-    SALTED_Utils::set_lmax_nmax(lmax, nmax, *(wavy.get_basis_set_ptr()), config.species);
+    const std::array<std::vector<primitive>, 118>* bs = wavy.get_basis_set_ptr();
+    SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
     for (int i = 0; i < wavy.atoms.size(); i++)
     {
@@ -70,7 +111,7 @@ void SALTEDPredictor::setup_atomic_environment()
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);
 
     // Print all Atomic symbols
-    if (opt.debug)
+    if (_opt.debug)
     {
         std::cout << "Atomic symbols: ";
         for (const auto &symbol : atomic_symbols)
@@ -147,8 +188,8 @@ void SALTEDPredictor::read_model_data()
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
 
-    H5::H5File features(opt.SALTED_DIR + "/GPR_data/FEAT_M-" + std::to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
-    H5::H5File projectors(opt.SALTED_DIR + "/GPR_data/projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
+    H5::H5File features(_opt.SALTED_DIR + "/GPR_data/FEAT_M-" + std::to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
+    H5::H5File projectors(_opt.SALTED_DIR + "/GPR_data/projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
     std::vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
@@ -175,12 +216,12 @@ void SALTEDPredictor::read_model_data()
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readVectorFromFile<double>(opt.SALTED_DIR + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
+        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
     }
 
     if (config.sparsify)
     {
-        std::string path = opt.SALTED_DIR;
+        std::string path = _opt.SALTED_DIR;
         join_path(path, {"GPR_data", "fps" + to_string(config.ncut) + "-"});
         vfps = read_fps<int64_t>(path, SALTED_Utils::get_lmax_max(lmax));
     };
@@ -188,7 +229,7 @@ void SALTEDPredictor::read_model_data()
     {
         for (string spe : config.species)
         {
-            string path = opt.SALTED_DIR;
+            string path = _opt.SALTED_DIR;
             join_path(path, {"averages", "averages_" + spe + ".npy"});
             read_npy(path, av_coefs[spe]);
         }
@@ -203,7 +244,7 @@ void SALTEDPredictor::read_model_data()
     }
     else
     {
-        string path = opt.SALTED_DIR;
+        string path = _opt.SALTED_DIR;
         join_path(path, {"GPR_data", "weights_N" + to_string(ntrain) + "_reg-6.npy"});
         read_npy(path, weights);
     }
@@ -213,7 +254,7 @@ void SALTEDPredictor::read_model_data()
 void SALTEDPredictor::read_model_data_h5()
 {
     using namespace std;
-    string _H5path = opt.SALTED_DIR;
+    string _H5path = _opt.SALTED_DIR;
     join_path(_H5path, config.h5_filename);
     H5::H5File input(_H5path, H5F_ACC_RDONLY);
     vector<hsize_t> dims_out_descrip;
@@ -278,7 +319,6 @@ vec SALTEDPredictor::predict()
     unordered_map<int, vec> pvec{};
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        std::cout << "Calculating descriptors for l = " << lam << std::endl;
         int llmax = 0;
         unordered_map<int, ivec> lvalues{};
         for (int l1 = 0; l1 < config.nang1 + 1; l1++)
@@ -486,17 +526,17 @@ vec SALTEDPredictor::predict()
 vec SALTEDPredictor::gen_SALTED_densities()
 {
     using namespace std;
-    if (opt.coef_file != "")
+    if (_opt.coef_file != "")
     {
         vec coefs{};
-        cout << "Reading coefficients from file: " << opt.coef_file << endl;
-        read_npy<double>(opt.coef_file, coefs);
+        cout << "Reading coefficients from file: " << _opt.coef_file << endl;
+        read_npy<double>(_opt.coef_file, coefs);
         return coefs;
     }
 
     // Run generation of tsc file
     time_point start;
-    if (opt.debug)
+    if (_opt.debug)
         start = get_time();
 
     setup_atomic_environment();
@@ -516,7 +556,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
     vec coefs = predict();
 
-    if (opt.debug)
+    if (_opt.debug)
     {
         time_point end = get_time();
         long long int dur = get_sec(start, end);
@@ -528,7 +568,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
         cout << "Number of coefficients: " << coefs.size() << endl;
 
-        if (opt.wfn == string("test_cysteine2.xyz"))
+        if (_opt.wfn == string("test_cysteine2.xyz"))
         {
             vector<unsigned long> shape{};
             bool fortran_order;

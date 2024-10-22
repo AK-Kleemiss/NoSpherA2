@@ -44,6 +44,7 @@ WFN::WFN()
     basis_set_name = " ";
     has_ECPs = false;
     comment = "Test";
+    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
@@ -65,6 +66,7 @@ WFN::WFN(int given_origin)
     has_ECPs = false;
     basis_set_name = " ";
     comment = "Test";
+    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
@@ -91,9 +93,8 @@ bool WFN::push_back_atom(const atom &given)
 
 bool WFN::erase_atom(const int &nr)
 {
-    err_checkf(nr <= ncen, "unreasonable atom number", std::cout);
-    int n = nr - 1;
-    atoms.erase(atoms.begin() + n);
+    err_checkf(nr < ncen, "unreasonable atom number", std::cout);
+    removeElement(atoms, atoms[nr]);
     ncen--;
     return true;
 };
@@ -2888,6 +2889,28 @@ bool WFN::write_wfn(const std::string &fileName, const bool &debug, const bool o
     return true;
 };
 
+bool WFN::write_xyz(const std::string& fileName, const bool& debug)
+{
+    using namespace std;
+    try {
+        ofstream f(fileName, ios::out);
+        f << ncen << endl;
+        f << "XYZ File written by NoSpherA2 based on " << path << endl;
+        for (int i = 0; i < ncen; i++)
+            if (atoms[i].label == "")
+                f << constants::atnr2letter(atoms[i].charge) << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+            else
+                f << atoms[i].label << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+        f.flush();
+        f.close();
+    }
+    catch (exception) {
+        err("Error writing the xyz file! Aborting!", cout);
+        return false;
+    }
+    return true;
+};
+
 void WFN::print_primitive(const int &nr) const
 {
     std::cout << "center assignement: " << centers[nr] << " type: " << types[nr]
@@ -3900,19 +3923,30 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
 void WFN::operator=(const WFN &right)
 {
     ncen = right.get_ncen();
-    nmo = right.get_nmo();
     origin = right.get_origin();
     nex = right.get_nex();
     multi = right.get_multi();
     charge = right.get_charge();
+    nfunc = right.get_nfunc();
     has_ECPs = right.get_has_ECPs();
-    for (int i = 0; i < ncen; i++)
+    basis_set = right.get_basis_set_ptr();
+    method = right.get_method();
+    ECP_m = right.get_ECP_mode();
+    comment = right.get_comment();
+    basis_set_name = right.get_basis_set_name();
+    path = right.get_path();
+    multi = right.get_multi();
+    total_energy = right.get_total_energy();
+    virial_ratio = right.get_virial_ratio();
+    DensityMatrix = right.get_DensityMatrix();
+    SpinDensityMatrix = right.get_SpinDensityMatrix();
+    for (int i = 0; i < nex; i++)
     {
         push_back_center(right.get_center(i));
         push_back_type(right.get_type(i));
         push_back_exponent(right.get_exponent(i));
     }
-    for (int i = 0; i < nmo; i++)
+    for (int i = 0; i < right.get_nmo(); i++)
     {
         push_back_MO(i, right.get_MO_primitive_count(i), right.get_MO_energy(i));
         for (int j = 0; j < right.get_MO_primitive_count(i); j++)
@@ -3926,6 +3960,8 @@ void WFN::operator=(const WFN &right)
     {
         atoms.push_back(right.atoms[a]);
     }
+    fill_pre();
+    fill_Afac_pre();
 };
 
 int WFN::calculate_charge()

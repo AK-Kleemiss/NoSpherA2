@@ -342,19 +342,19 @@ int main(int argc, char **argv)
                 BasisSetLibrary basis_library;
                 string df_basis_name;
                 string h5file;
+                SALTEDPredictor temp_pred(wavy[0], opt);
                 {
-                    SALTEDPredictor temp_pred(wavy[0], opt);
                     df_basis_name = temp_pred.get_dfbasis_name();
                     h5file = temp_pred.get_h5_filename();
                 }
                 log_file << "Using " << h5file << " for the prediction" << endl;
-                load_basis_into_WFN(wavy[0], basis_library.get_basis_set(df_basis_name));
+                load_basis_into_WFN(temp_pred.wavy, basis_library.get_basis_set(df_basis_name));
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
                 err_checkf(calculate_scattering_factors_ML(
                     opt,
-                    wavy[0],
+                    temp_pred,
                     log_file),
                     "Error during ML-SF Calcualtion", log_file);
 #else

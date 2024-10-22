@@ -14,6 +14,7 @@ inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
 void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
 #define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
+#define err(error_message, file) error_check(false, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
@@ -198,10 +199,10 @@ bool unsaved_files(std::vector<WFN> &wavy);
 std::string trim(const std::string &s);
 
 inline void print_centered_text(const std::string& text, int bar_width) {
-    int text_length = text.length();
-    int total_padding = bar_width - text_length;
-    int padding_left = total_padding / 2;
-    int padding_right = total_padding - padding_left;
+    const int text_length = text.length();
+    const int total_padding = bar_width - text_length;
+    const int padding_left = total_padding / 2;
+    const int padding_right = total_padding - padding_left;
 
     std::cout << "["
         << std::setw(padding_left) << std::setfill(' ') << ""
@@ -222,7 +223,7 @@ public:
         std::cout << std::endl;
     }
 
-    ProgressBar(const int &worksize, const size_t &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
+    ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
     {
         // Write status text
@@ -407,6 +408,14 @@ constexpr unsigned int doublefactorial(int n)
     return n * doublefactorial(n - 2);
 }
 
+template <typename T>
+void removeElement(std::vector<T>& vec, const T& x) {
+    // Use std::remove to shift elements and get the new end iterator
+    auto new_end = std::remove(vec.begin(), vec.end(), x);
+    // Erase the elements from the new end to the actual end
+    vec.erase(new_end, vec.end());
+}
+
 struct primitive
 {
     int center, type;
@@ -558,6 +567,7 @@ struct options
     bool electron_diffraction = false;
     bool ECP = false;
     bool set_ECPs = false;
+    bool needs_Thakkar_fill = false;
     int hirsh_number = 0;
     int NbSteps[3]{0, 0, 0};
     int accuracy = 2;
