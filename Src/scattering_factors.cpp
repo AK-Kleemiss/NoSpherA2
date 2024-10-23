@@ -3410,6 +3410,7 @@ bool calculate_scattering_factors_ML(
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
     vec coefs;
 #endif
+    SP.unload_BLAS();
 
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;

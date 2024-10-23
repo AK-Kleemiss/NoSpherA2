@@ -10,11 +10,12 @@
 #include "SALTED_equicomb.h"
 #include "SALTED_math.h"
 
-
-
 class SALTEDPredictor {
 public:
     SALTEDPredictor(const WFN& wavy, options &opt);
+	~SALTEDPredictor();
+    void load_BLAS();
+    void unload_BLAS();
 
     const std::string get_dfbasis_name();
     vec gen_SALTED_densities();
@@ -26,8 +27,13 @@ private:
     Config config;
     options& _opt;
 
-    int natoms;
+    
+	bool _blas_enabled = false;
+#ifdef _WIN32
+    void* _hOpenBlas = NULL;
+#endif 
 
+    int natoms;
     std::vector<std::string> atomic_symbols{};
     std::unordered_map<std::string, std::vector<int>> atom_idx{};
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
@@ -47,5 +53,4 @@ private:
 #endif
 
     vec predict();
-
 };

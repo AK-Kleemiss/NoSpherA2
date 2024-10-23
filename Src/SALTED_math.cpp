@@ -1,7 +1,4 @@
 #include "SALTED_math.h"
-#ifdef _WIN32
-#include "DLL_Helper.h"
-#endif
 #if has_RAS
 #include "cblas.h"
 #endif
@@ -113,7 +110,7 @@ std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t l
 // 2D x 2D MATRIX MULTIPLICATION
 //Slow direct implementation
 template <typename T>
-std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2)
+std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2)
 {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
@@ -121,17 +118,28 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
         return {};
     }
 
-    int rows1 = (int)mat1.size();
-    int cols1 = (int)mat1[0].size();
-    int rows2 = (int)mat2.size();
-    int cols2 = (int)mat2[0].size();
+    std::vector<std::vector<T>> mat1Copy = mat1;
+    std::vector<std::vector<T>> mat2Copy = mat2;
+
+    if (transp1) {
+        mat1Copy = transpose(mat1);
+    }
+    if (transp2) {
+        mat2Copy = transpose(mat2);
+    }
+
+    int rows1 = (int)mat1Copy.size();
+    int cols1 = (int)mat1Copy[0].size();
+    int rows2 = (int)mat2Copy.size();
+    int cols2 = (int)mat2Copy[0].size();
 
     // Check if matrix multiplication is possible
-    err_checkf (cols1 == rows2, "Matrix dimensions do not match for multiplication", std::cout);
+    err_checkf(cols1 == rows2, "Matrix dimensions do not match for multiplication", std::cout);
 
     std::vector<std::vector<T>> result(rows1, std::vector<T>(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
     size_t total_size = rows1 * cols2;
+
 #pragma omp parallel
     {
         std::vector<T> local_result(total_size, 0.0);
@@ -144,7 +152,7 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
             j = static_cast<int>((n / cols1) % cols2);
             k = static_cast<int>(n % cols1);
             flatIndex = i * cols2 + j;
-            local_result[flatIndex] += mat1[i][k] * mat2[k][j];
+            local_result[flatIndex] += mat1Copy[i][k] * mat2Copy[k][j];
         }
 
 #pragma omp critical
@@ -162,15 +170,15 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
 
     return result;
 }
-template std::vector<std::vector<float>> self_dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2);
-template vec2 self_dot(const vec2 &mat1, const vec2 &mat2);
-template cvec2 self_dot(const cvec2 &mat1, const cvec2 &mat2);
+template std::vector<std::vector<float>> self_dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2, bool transp1, bool transp2);
+template vec2 self_dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2);
+template cvec2 self_dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2);
 
-typedef void (*ExampleFunctionType)(void);
+//typedef void (*ExampleFunctionType)(void);
 
 //Fast dot product using OpenBLAS
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2, bool transp1, bool transp2) {
+std::vector<std::vector<T>> dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2, bool transp1, bool transp2, bool BLAS_enabled) {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
     {
@@ -185,19 +193,27 @@ std::vector<std::vector<T>> dot(const std::vector<std::vector<T>>& mat1, const s
     // Check if matrix multiplication is possible
     err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
 
-    // Flatten input matrices
-    std::vector<T> flatMat1 = flatten(mat1);
-    std::vector<T> flatMat2 = flatten(mat2);
+
     
-    return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+    if (BLAS_enabled) {
+        // Flatten input matrices
+        std::vector<T> flatMat1 = flatten(mat1);
+        std::vector<T> flatMat2 = flatten(mat2);
+        return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+    }
+    else {
+        std::cout << "Something went wrong, using dot fallback." << std::endl;
+		return self_dot(mat1, mat2, transp1, transp2);
+    }
+    //return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
 }
-template std::vector<std::vector<float>> dot(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2, bool transp1, bool transp2);
-template vec2 dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2);
-template cvec2 dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2);
+template std::vector<std::vector<float>> dot(const std::vector<std::vector<float>>& mat1, const std::vector<std::vector<float>>& mat2, bool transp1, bool transp2, bool BLAS_enabled);
+template vec2 dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2, bool BLAS_enabled);
+template cvec2 dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2, bool BLAS_enabled);
 
 //When the matrices are given as flat vectors
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2) {
+std::vector<std::vector<T>> dot(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2, bool BLAS_enabled) {
     //Check if flatMat1 and flatMat2 have the correct size
     err_checkf(flatMat1.size() == mat1_d0 * mat1_d1, "flat Matrix 1 has incorrect size", std::cout);
     err_checkf(flatMat2.size() == mat2_d0 * mat2_d1, "flat Matrix 2 has incorrect size", std::cout);
@@ -216,101 +232,24 @@ std::vector<std::vector<T>> dot(const std::vector<T>& flatMat1, const std::vecto
 	// Check if matrix multiplication is possible
 	err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
 
-	return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+    if (BLAS_enabled) {
+        return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
+    }
+    else {
+        std::cout << "Something went wrong, using dot fallback." << std::endl;
+        std::vector<T> result_flat(m * n, 0.0);
+        std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
+        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
+        return self_dot(mat1_2D, mat2_2D, transp1, transp2);
+    }
+	//return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
 }
-template std::vector<std::vector<float>> dot(const std::vector<float> & flatMat1, const std::vector<float> & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2);
-template vec2 dot(const vec & flatMat1, const vec & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2);
-template cvec2 dot(const cvec & flatMat1, const cvec & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2);
+template std::vector<std::vector<float>> dot(const std::vector<float> & flatMat1, const std::vector<float> & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
+template vec2 dot(const vec & flatMat1, const vec & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
+template cvec2 dot(const cvec & flatMat1, const cvec & flatMat2, const int& mat1_d0, const int& mat1_d1, const int& mat2_d0, const int& mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
 
 template <typename T>
 std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2)
-#if has_RAS
-#ifdef _WIN32
-//Windows specific implementation
-{
-    std::vector<T> result_flat(m * n, 0.0);
-    HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
-    if (hOpenBlas != NULL)
-    {
-        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sgemm");
-        if (eF != NULL)
-        {
-            if constexpr (std::is_same_v<T, double>)
-            {
-                // Call cblas_dgemm
-                cblas_dgemm(CblasRowMajor,
-                    transp1 ? CblasTrans : CblasNoTrans,
-                    transp2 ? CblasTrans : CblasNoTrans,
-                    m, n, k1,
-                    1.0,
-                    flatMat1.data(), transp1 ? m : k1,
-                    flatMat2.data(), transp2 ? k2 : n,
-                    0.0,
-                    result_flat.data(), n);
-            }
-            else if constexpr (std::is_same_v<T, float>)
-            {
-                // Call cblas_sgemm
-                cblas_sgemm(CblasRowMajor,
-                    transp1 ? CblasTrans : CblasNoTrans,
-                    transp2 ? CblasTrans : CblasNoTrans,
-                    m, n, k1,
-                    1.0f,
-                    flatMat1.data(), transp1 ? m : k1,
-                    flatMat2.data(), transp2 ? k2 : n,
-                    0.0f,
-                    result_flat.data(), n);
-            }
-            else if constexpr (std::is_same_v<T, cdouble>)
-            {
-                cdouble one = cdouble(1.0, 0.0);
-                cdouble zero = cdouble(0.0, 0.0);
-                cblas_zgemm(CblasRowMajor,
-                    transp1 ? CblasTrans : CblasNoTrans,
-                    transp2 ? CblasTrans : CblasNoTrans,
-                    m, n, k1,
-                    &(one),
-                    reinterpret_cast<const cdouble*>(flatMat1.data()), transp1 ? m : k1,
-                    reinterpret_cast<const cdouble*>(flatMat2.data()), transp2 ? k2 : n,
-                    &(zero),
-                    reinterpret_cast<cdouble*>(result_flat.data()), n);
-            }
-            else
-            {
-                err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
-            }
-
-            Shape2D sizes = { m, n };
-            return reshape(result_flat, sizes);
-        }
-        else
-        {
-            // DLL found but function not found
-            err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
-            return {};
-        }
-    }
-    else
-    {
-        // DLL not found, fallback
-        if (!myGlobalBool) {
-            std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
-            myGlobalBool = true;
-        }
-        std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
-        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
-        if (transp1 && !transp2)
-            return self_dot(transpose(mat1_2D), mat2_2D);
-        else if (transp1 && transp2)
-            return self_dot(transpose(mat1_2D), transpose(mat2_2D));
-        else if (!transp1 && transp2)
-            return self_dot(mat1_2D, transpose(mat2_2D));
-        else
-            return self_dot(mat1_2D, mat2_2D);
-    }
-}
-#else
-//Linux specific implementation
 {
     std::vector<T> result_flat(m * n, 0.0);
     if constexpr (std::is_same_v<T, double>)
@@ -361,35 +300,177 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::
     Shape2D sizes = { m, n };
     return reshape(result_flat, sizes);
 }
-#endif
-#else
-// Fallback implementation
-{
-    std::cout << "Something went wrong, using dot fallback." << std::endl;
-    std::vector<T> result_flat(m * n, 0.0);
-    std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
-    std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
-    if (transp1 && !transp2)
-        return self_dot(transpose(mat1_2D), mat2_2D);
-    else if (transp1 && transp2)
-        return self_dot(transpose(mat1_2D), transpose(mat2_2D));
-    else if (!transp1 && transp2)
-        return self_dot(mat1_2D, transpose(mat2_2D));
-    else
-        return self_dot(mat1_2D, mat2_2D);
-}
-#endif
+//#if has_RAS
+//#ifdef _WIN32
+////Windows specific implementation
+//{
+//    std::vector<T> result_flat(m * n, 0.0);
+//    HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
+//    if (hOpenBlas != NULL)
+//    {
+//        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sgemm");
+//        if (eF != NULL)
+//        {
+//            if constexpr (std::is_same_v<T, double>)
+//            {
+//                // Call cblas_dgemm
+//                cblas_dgemm(CblasRowMajor,
+//                    transp1 ? CblasTrans : CblasNoTrans,
+//                    transp2 ? CblasTrans : CblasNoTrans,
+//                    m, n, k1,
+//                    1.0,
+//                    flatMat1.data(), transp1 ? m : k1,
+//                    flatMat2.data(), transp2 ? k2 : n,
+//                    0.0,
+//                    result_flat.data(), n);
+//            }
+//            else if constexpr (std::is_same_v<T, float>)
+//            {
+//                // Call cblas_sgemm
+//                cblas_sgemm(CblasRowMajor,
+//                    transp1 ? CblasTrans : CblasNoTrans,
+//                    transp2 ? CblasTrans : CblasNoTrans,
+//                    m, n, k1,
+//                    1.0f,
+//                    flatMat1.data(), transp1 ? m : k1,
+//                    flatMat2.data(), transp2 ? k2 : n,
+//                    0.0f,
+//                    result_flat.data(), n);
+//            }
+//            else if constexpr (std::is_same_v<T, cdouble>)
+//            {
+//                cdouble one = cdouble(1.0, 0.0);
+//                cdouble zero = cdouble(0.0, 0.0);
+//                cblas_zgemm(CblasRowMajor,
+//                    transp1 ? CblasTrans : CblasNoTrans,
+//                    transp2 ? CblasTrans : CblasNoTrans,
+//                    m, n, k1,
+//                    &(one),
+//                    reinterpret_cast<const cdouble*>(flatMat1.data()), transp1 ? m : k1,
+//                    reinterpret_cast<const cdouble*>(flatMat2.data()), transp2 ? k2 : n,
+//                    &(zero),
+//                    reinterpret_cast<cdouble*>(result_flat.data()), n);
+//            }
+//            else
+//            {
+//                err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
+//            }
+//
+//            Shape2D sizes = { m, n };
+//            return reshape(result_flat, sizes);
+//        }
+//        else
+//        {
+//            // DLL found but function not found
+//            err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
+//            return {};
+//        }
+//    }
+//    else
+//    {
+//        // DLL not found, fallback
+//        if (!myGlobalBool) {
+//            std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+//            myGlobalBool = true;
+//        }
+//        std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
+//        std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
+//        if (transp1 && !transp2)
+//            return self_dot(transpose(mat1_2D), mat2_2D);
+//        else if (transp1 && transp2)
+//            return self_dot(transpose(mat1_2D), transpose(mat2_2D));
+//        else if (!transp1 && transp2)
+//            return self_dot(mat1_2D, transpose(mat2_2D));
+//        else
+//            return self_dot(mat1_2D, mat2_2D);
+//    }
+//}
+//#else
+////Linux specific implementation
+//{
+//    std::vector<T> result_flat(m * n, 0.0);
+//    if constexpr (std::is_same_v<T, double>)
+//    {
+//        // Call cblas_dgemm
+//        cblas_dgemm(CblasRowMajor,
+//            transp1 ? CblasTrans : CblasNoTrans,
+//            transp2 ? CblasTrans : CblasNoTrans,
+//            m, n, k1,
+//            1.0,
+//            flatMat1.data(), transp1 ? m : k1,
+//            flatMat2.data(), transp2 ? k2 : n,
+//            0.0,
+//            result_flat.data(), n);
+//    }
+//    else if constexpr (std::is_same_v<T, float>)
+//    {
+//        // Call cblas_sgemm
+//        cblas_sgemm(CblasRowMajor,
+//            transp1 ? CblasTrans : CblasNoTrans,
+//            transp2 ? CblasTrans : CblasNoTrans,
+//            m, n, k1,
+//            1.0f,
+//            flatMat1.data(), transp1 ? m : k1,
+//            flatMat2.data(), transp2 ? k2 : n,
+//            0.0f,
+//            result_flat.data(), n);
+//    }
+//    else if constexpr (std::is_same_v<T, cdouble>)
+//    {
+//        cdouble one = cdouble(1.0, 0.0);
+//        cdouble zero = cdouble(0.0, 0.0);
+//        cblas_zgemm(CblasRowMajor,
+//            transp1 ? CblasTrans : CblasNoTrans,
+//            transp2 ? CblasTrans : CblasNoTrans,
+//            m, n, k1,
+//            &(one),
+//            reinterpret_cast<const cdouble*>(flatMat1.data()), transp1 ? m : k1,
+//            reinterpret_cast<const cdouble*>(flatMat2.data()), transp2 ? k2 : n,
+//            &(zero),
+//            reinterpret_cast<cdouble*>(result_flat.data()), n);
+//    }
+//    else
+//    {
+//        err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
+//    }
+//
+//    Shape2D sizes = { m, n };
+//    return reshape(result_flat, sizes);
+//}
+//#endif
+//#else
+//// Fallback implementation
+//{
+//    std::cout << "Something went wrong, using dot fallback." << std::endl;
+//    std::vector<T> result_flat(m * n, 0.0);
+//    std::vector<std::vector<T>> mat1_2D = reshape(flatMat1, { m, k1 });
+//    std::vector<std::vector<T>> mat2_2D = reshape(flatMat2, { n, k2 });
+//    if (transp1 && !transp2)
+//        return self_dot(transpose(mat1_2D), mat2_2D);
+//    else if (transp1 && transp2)
+//        return self_dot(transpose(mat1_2D), transpose(mat2_2D));
+//    else if (!transp1 && transp2)
+//        return self_dot(mat1_2D, transpose(mat2_2D));
+//    else
+//        return self_dot(mat1_2D, mat2_2D);
+//}
+//#endif
 template std::vector<std::vector<float>> dot_BLAS(const std::vector<float>& mat1, const std::vector<float>& mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 template vec2 dot_BLAS(const std::vector<double>& mat1, const std::vector<double>& mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 template cvec2 dot_BLAS(const std::vector<cdouble>& mat1, const std::vector<cdouble>& mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
-std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec)
+std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1 = false)
 {
-    int mat_rows = static_cast<int>(mat.size());
-    int mat_cols = static_cast<int>(mat[0].size());
-    int vec_size = static_cast<int>(vec.size());
+    std::vector<std::vector<T>> matCopy = mat;
+    if (transp1) {
+        matCopy = transpose(mat);
+    }
+
+    int mat_rows = static_cast<int>(matCopy.size());
+    int mat_cols = static_cast<int>(matCopy[0].size());
+    int vec_size = static_cast<int>(_vec.size());
 
     // Check if matrix multiplication is possible
     if (mat_cols != vec_size)
@@ -407,7 +488,7 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
         {
             int i = n / mat_cols;
             int j = n % mat_cols;
-            local_result[i] += mat[i][j] * vec[j];
+            local_result[i] += matCopy[i][j] * _vec[j];
         }
 #pragma omp critical
         {
@@ -420,13 +501,13 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
 
     return result;
 }
-template std::vector<float> self_dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& vec);
-template vec self_dot(const vec2& mat, const vec& vec);
-template cvec self_dot(const cvec2& mat, const cvec& vec);
+template std::vector<float> self_dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& _vec, bool transp1);
+template vec self_dot(const vec2& mat, const vec& _vec, bool transp1);
+template cvec self_dot(const cvec2& mat, const cvec& _vec, bool transp1);
 
 // Base implementation of matrix-vector multiplication
 template <typename T>
-std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec, bool transp)
+std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec, bool transp, bool BLAS_enabled)
 {
 	int mat_rows = static_cast<int>(mat.size());
 	int mat_cols = static_cast<int>(mat[0].size());
@@ -435,93 +516,23 @@ std::vector<T> dot(const std::vector<std::vector<T>>& mat, const std::vector<T>&
 	// Check if matrix multiplication is possible
 	err_checkf(mat_cols == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
     
-    return dot_BLAS(flatten(mat), vec, mat_rows, mat_cols, transp);
+    if (BLAS_enabled) {
+        return dot_BLAS(flatten(mat), vec, mat_rows, mat_cols, transp);
+    }
+    else {
+		std::cout << "Something went wrong, using dot fallback." << std::endl;
+		return self_dot(mat, vec, transp);
+
+    }
 }
-template std::vector<float> dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& vec, bool transp);
-template vec dot(const vec2& mat, const vec& vec, bool transp);
-template cvec dot(const cvec2& mat, const cvec& vec, bool transp);
+template std::vector<float> dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& vec, bool transp, bool BLAS_enabled);
+template vec dot(const vec2& mat, const vec& vec, bool transp, bool BLAS_enabled);
+template cvec dot(const cvec2& mat, const cvec& vec, bool transp, bool BLAS_enabled);
 
 template <typename T>
-std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n,  bool transp)
-#if has_RAS
-#ifdef _WIN32
-//Windows specific implementation
+std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n, bool transp)
 {
     std::vector<T> result(transp ? n : m, 0.0);
-    HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
-    if (hOpenBlas != NULL)
-    {
-        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sgemm");
-        if (eF != NULL)
-        {
-            if constexpr (std::is_same_v<T, double>)
-            {
-                // Call cblas_dgemv
-                cblas_dgemv(CblasRowMajor,
-                    transp ? CblasTrans : CblasNoTrans,
-                    m, n,
-                    1.0,
-                    flatMat.data(), transp ? m : n,
-                    vec.data(), 1,
-                    0.0,
-                    result.data(), 1);
-            }
-            else if constexpr (std::is_same_v<T, float>)
-            {
-                // Call cblas_sgemv
-                cblas_sgemv(CblasRowMajor,
-                    transp ? CblasTrans : CblasNoTrans,
-                    m, n,
-                    1.0f,
-                    flatMat.data(), transp ? m : n,
-                    vec.data(), 1,
-                    0.0f,
-                    result.data(), 1);
-            }
-            else if constexpr (std::is_same_v<T, cdouble>)
-			{
-				cdouble one = cdouble(1.0, 0.0);
-				cdouble zero = cdouble(0.0, 0.0);
-				cblas_zgemv(CblasRowMajor,
-					transp ? CblasTrans : CblasNoTrans,
-					m, n,
-					&(one),
-					reinterpret_cast<const cdouble*>(flatMat.data()), transp ? m : n,
-					reinterpret_cast<const cdouble*>(vec.data()), 1,
-					&(zero),
-					reinterpret_cast<cdouble*>(result.data()), 1);
-			}
-			else
-			{
-				err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
-                return {};
-			}
-            return result;
- 
-        }
-        else
-        {
-            // DLL found but function not found
-            err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
-            return {};
-        }
-    }
-    else
-    {
-        std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
-        std::vector<std::vector<T>> mat1_2D = reshape(flatMat, { m, n });
-        if (transp) {
-            return self_dot(transpose(mat1_2D), vec);
-        }
-        else {
-            return self_dot(mat1_2D, vec);
-        }
-    }
-}
-#else
-//Linux specific implementation
-{
-    std::vector<T> result_flat(m * n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
         // Call cblas_dgemv
@@ -532,57 +543,210 @@ std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec
             flatMat.data(), transp ? m : n,
             vec.data(), 1,
             0.0,
-            result_flat.data(), 1);
+            result.data(), 1);
     }
-	else if constexpr (std::is_same_v<T, float>)
-	{
-		// Call cblas_sgemv
-		cblas_sgemv(CblasRowMajor,
-			transp ? CblasTrans : CblasNoTrans,
-			m, n,
-			1.0f,
-			flatMat.data(), transp ? m : n,
-			vec.data(), 1,
-			0.0f,
-			result_flat.data(), 1);
-	}
-	else if constexpr (std::is_same_v<T, cdouble>)
-        {
-		cdouble one = cdouble(1.0, 0.0);
-		cdouble zero = cdouble(0.0, 0.0);
-		cblas_zgemv(CblasRowMajor,
-			transp ? CblasTrans : CblasNoTrans,
-			m, n,
-			&(one),
-			reinterpret_cast<const cdouble*>(flatMat.data()), transp ? m : n,
-			reinterpret_cast<const cdouble*>(vec.data()), 1,
-			&(zero),
-			reinterpret_cast<cdouble*>(result_flat.data()), 1);
-	}
-	else
-	{
-		err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
-	}
-	return result_flat;
-}
-#endif
-#else
-// Fallback implementation
-{
-    std::vector<std::vector<T>> mat1_2D = reshape(flatMat, { m, n });
-    if transp
-        return self_dot(transpose(mat1_2D), vec);
+    else if constexpr (std::is_same_v<T, float>)
+    {
+        // Call cblas_sgemv
+        cblas_sgemv(CblasRowMajor,
+            transp ? CblasTrans : CblasNoTrans,
+            m, n,
+            1.0f,
+            flatMat.data(), transp ? m : n,
+            vec.data(), 1,
+            0.0f,
+            result.data(), 1);
+    }
+    else if constexpr (std::is_same_v<T, cdouble>)
+    {
+        cdouble one = cdouble(1.0, 0.0);
+        cdouble zero = cdouble(0.0, 0.0);
+        cblas_zgemv(CblasRowMajor,
+            transp ? CblasTrans : CblasNoTrans,
+            m, n,
+            &(one),
+            reinterpret_cast<const cdouble*>(flatMat.data()), transp ? m : n,
+            reinterpret_cast<const cdouble*>(vec.data()), 1,
+            &(zero),
+            reinterpret_cast<cdouble*>(result.data()), 1);
+    }
     else
-        return self_dot(mat1_2D, vec);
+    {
+        err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
+        return {};
+    }
+    return result;
 }
-#endif
+//#if has_RAS
+//#ifdef _WIN32
+////Windows specific implementation
+//{
+//    std::vector<T> result(transp ? n : m, 0.0);
+//    HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
+//    if (hOpenBlas != NULL)
+//    {
+//        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sgemm");
+//        if (eF != NULL)
+//        {
+//            if constexpr (std::is_same_v<T, double>)
+//            {
+//                // Call cblas_dgemv
+//                cblas_dgemv(CblasRowMajor,
+//                    transp ? CblasTrans : CblasNoTrans,
+//                    m, n,
+//                    1.0,
+//                    flatMat.data(), transp ? m : n,
+//                    vec.data(), 1,
+//                    0.0,
+//                    result.data(), 1);
+//            }
+//            else if constexpr (std::is_same_v<T, float>)
+//            {
+//                // Call cblas_sgemv
+//                cblas_sgemv(CblasRowMajor,
+//                    transp ? CblasTrans : CblasNoTrans,
+//                    m, n,
+//                    1.0f,
+//                    flatMat.data(), transp ? m : n,
+//                    vec.data(), 1,
+//                    0.0f,
+//                    result.data(), 1);
+//            }
+//            else if constexpr (std::is_same_v<T, cdouble>)
+//			{
+//				cdouble one = cdouble(1.0, 0.0);
+//				cdouble zero = cdouble(0.0, 0.0);
+//				cblas_zgemv(CblasRowMajor,
+//					transp ? CblasTrans : CblasNoTrans,
+//					m, n,
+//					&(one),
+//					reinterpret_cast<const cdouble*>(flatMat.data()), transp ? m : n,
+//					reinterpret_cast<const cdouble*>(vec.data()), 1,
+//					&(zero),
+//					reinterpret_cast<cdouble*>(result.data()), 1);
+//			}
+//			else
+//			{
+//				err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
+//                return {};
+//			}
+//            return result;
+//        }
+//        else
+//        {
+//            // DLL found but function not found
+//            err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
+//            return {};
+//        }
+//    }
+//    else
+//    {
+//        std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+//        std::vector<std::vector<T>> mat1_2D = reshape(flatMat, { m, n });
+//        if (transp) {
+//            return self_dot(transpose(mat1_2D), vec);
+//        }
+//        else {
+//            return self_dot(mat1_2D, vec);
+//        }
+//    }
+//}
+//#else
+////Linux specific implementation
+//{
+//    std::vector<T> result_flat(m * n, 0.0);
+//    if constexpr (std::is_same_v<T, double>)
+//    {
+//        // Call cblas_dgemv
+//        cblas_dgemv(CblasRowMajor,
+//            transp ? CblasTrans : CblasNoTrans,
+//            m, n,
+//            1.0,
+//            flatMat.data(), transp ? m : n,
+//            vec.data(), 1,
+//            0.0,
+//            result_flat.data(), 1);
+//    }
+//	else if constexpr (std::is_same_v<T, float>)
+//	{
+//		// Call cblas_sgemv
+//		cblas_sgemv(CblasRowMajor,
+//			transp ? CblasTrans : CblasNoTrans,
+//			m, n,
+//			1.0f,
+//			flatMat.data(), transp ? m : n,
+//			vec.data(), 1,
+//			0.0f,
+//			result_flat.data(), 1);
+//	}
+//	else if constexpr (std::is_same_v<T, cdouble>)
+//        {
+//		cdouble one = cdouble(1.0, 0.0);
+//		cdouble zero = cdouble(0.0, 0.0);
+//		cblas_zgemv(CblasRowMajor,
+//			transp ? CblasTrans : CblasNoTrans,
+//			m, n,
+//			&(one),
+//			reinterpret_cast<const cdouble*>(flatMat.data()), transp ? m : n,
+//			reinterpret_cast<const cdouble*>(vec.data()), 1,
+//			&(zero),
+//			reinterpret_cast<cdouble*>(result_flat.data()), 1);
+//	}
+//	else
+//	{
+//		err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
+//	}
+//	return result_flat;
+//}
+//#endif
+//#else
+//// Fallback implementation
+//{
+//    std::vector<std::vector<T>> mat1_2D = reshape(flatMat, { m, n });
+//    if transp
+//        return self_dot(transpose(mat1_2D), vec);
+//    else
+//        return self_dot(mat1_2D, vec);
+//}
+//#endif
 template std::vector<float> dot_BLAS(const std::vector<float>& flatMat, const std::vector<float>& vec, const int& m, const int& n, bool transp);
 template vec dot_BLAS(const std::vector<double>& flatMat, const std::vector<double>& vec, const int& m, const int& n, bool transp);
 template cvec dot_BLAS(const std::vector<cdouble>& flatMat, const std::vector<cdouble>& vec, const int& m, const int& n, bool transp);
 
 //1D x 1D Vector multiplication
+//Here only for non-complex values
 template <typename T>
-T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate)
+T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate) {
+    T result{};
+    for (size_t i = 0; i < vec1.size(); ++i)
+    {
+        result += vec1[i] * vec2[i];
+    }
+    return result;
+}
+template float self_dot(const std::vector<float>& vec1, const std::vector<float>& vec2, bool conjugate);
+template double self_dot(const std::vector<double>& vec1, const std::vector<double>& vec2, bool conjugate);
+
+//Special implementation for complex values
+cdouble self_dot(const std::vector<cdouble>& vec1, const std::vector<cdouble>& vec2, bool conjugate) {
+    cdouble result{};
+    if (!conjugate) {
+        for (size_t i = 0; i < vec1.size(); ++i)
+        {
+            result += vec1[i] * vec2[i];
+        }
+    }
+    else {
+        for (size_t i = 0; i < vec1.size(); ++i)
+        {
+            result += std::conj(vec1[i]) * vec2[i];
+        }
+    }
+    return result;
+}
+
+template <typename T>
+T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate, bool BLAS_enabled)
 {
 	// if either of the vectors is empty, return 0
 	if (vec1.empty() || vec2.empty())
@@ -594,130 +758,156 @@ T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate)
 	// Check if vector dimensions match
 	err_checkf (size == vec2.size(), "Vector dimensions do not match for multiplication", std::cout);
 
-    return dot_BLAS(vec1, vec2, conjugate);
+    if (BLAS_enabled) {
+        return dot_BLAS(vec1, vec2, conjugate);
+    }
+    else {
+        return self_dot(vec1, vec2, conjugate);
+    }
+    
 }
-template float dot(const std::vector<float>& vec1, const std::vector<float>& vec2, bool conjugate);
-template double dot(const std::vector<double>& vec1, const std::vector<double>& vec2, bool conjugate);
-template cdouble dot(const std::vector<cdouble>& vec1, const std::vector<cdouble>& vec2, bool conjugate);
+template float dot(const std::vector<float>& vec1, const std::vector<float>& vec2, bool conjugate, bool BLAS_enabled);
+template double dot(const std::vector<double>& vec1, const std::vector<double>& vec2, bool conjugate, bool BLAS_enabled);
+template cdouble dot(const std::vector<cdouble>& vec1, const std::vector<cdouble>& vec2, bool conjugate, bool BLAS_enabled);
 
 
 template <typename T>
 T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate)
-#if has_RAS
-#ifdef _WIN32
-//Windows specific implementation
 {
-	T result = 0.0;
-	HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
-	if (hOpenBlas != NULL)
-	{
-		ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sdot");
-		if (eF != NULL)
-		{
-			if constexpr (std::is_same_v<T, double>)
-			{
-				// Call cblas_ddot
-                if (!conjugate) {
-                    result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-                }
-                else {
-                    result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-                }
-				
-			}
-			else if constexpr (std::is_same_v<T, float>)
-			{
-				// Call cblas_sdot
-				result = cblas_sdot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-			}
-			else if constexpr (std::is_same_v<T, cdouble>)
-			{
-                if (!conjugate) {
-                    result = reinterpret_cast<cdouble&>(cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
-                }
-				else {
-					result = reinterpret_cast<cdouble&>(cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
-				}
-			}
-			else
-			{
-				err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
-                return {};
-			}
-			return result;
-		}
-		else
-		{
-			// DLL found but function not found
-			err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
-            return {};
-		}
-	}
-	else
-	{
-		std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+    T result = 0.0;
+    if constexpr (std::is_same_v<T, double>)
+    {
+        result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
+    }
+    else if constexpr (std::is_same_v<T, float>)
+    {
+        // Call cblas_sdot
+        result = cblas_sdot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
+    }
+    else if constexpr (std::is_same_v<T, cdouble>)
+    {
         if (!conjugate) {
-            for (size_t i = 0; i < vec1.size(); ++i)
-            {
-                result += vec1[i] * vec2[i];
-            }
-		}
-		else {
-            err_not_impl_f("Conjugate dot product not implemented for this data type", std::cout);
-            return {};
+            result = reinterpret_cast<cdouble&>(cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
         }
-		return result;
-	}
+        else {
+            result = reinterpret_cast<cdouble&>(cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
+        }
+    }
+    else
+    {
+        err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
+        return {};
+    }
+    return result;
 }
-#else
-//Linux specific implementation
-{
-	T result = 0.0;
-	if constexpr (std::is_same_v<T, double>)
-	{
-		// Call cblas_ddot
-		result = cblas_ddot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
-	}
-	else if constexpr (std::is_same_v<T, float>)
-	{
-		// Call cblas_sdot
-		result = cblas_sdot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
-	}
-	else if constexpr (std::is_same_v<T, cdouble>)
-	{
-		if (!conjugate) {
-			result = cblas_zdotu(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
-		}
-		else {
-			result = cblas_zdotc(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
-		}
-	}
-	else
-	{
-		err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
-	}
-	return result;
-}
-#endif
-#else
-// Fallback implementation
-{
-	T result = 0.0;
-	if (!conjugate) {
-		for (size_t i = 0; i < vec1.size(); ++i)
-		{
-			result += vec1[i] * vec2[i];
-		}
-	}
-	else {
-		for (size_t i = 0; i < vec1.size(); ++i)
-		{
-			result += conj(vec1[i]) * vec2[i];
-		}
-	}
-	return result;
-}
-#endif
+//#if has_RAS
+//#ifdef _WIN32
+////Windows specific implementation
+//{
+//	T result = 0.0;
+//	HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
+//	if (hOpenBlas != NULL)
+//	{
+//		ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sdot");
+//		if (eF != NULL)
+//		{
+//			if constexpr (std::is_same_v<T, double>)
+//			{
+//                result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
+//			}
+//			else if constexpr (std::is_same_v<T, float>)
+//			{
+//				// Call cblas_sdot
+//				result = cblas_sdot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
+//			}
+//			else if constexpr (std::is_same_v<T, cdouble>)
+//			{
+//                if (!conjugate) {
+//                    result = reinterpret_cast<cdouble&>(cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
+//                }
+//				else {
+//					result = reinterpret_cast<cdouble&>(cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
+//				}
+//			}
+//			else
+//			{
+//				err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
+//                return {};
+//			}
+//			return result;
+//		}
+//		else
+//		{
+//			// DLL found but function not found
+//			err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
+//            return {};
+//		}
+//	}
+//	else
+//	{
+//		std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
+//        if (!conjugate) {
+//            for (size_t i = 0; i < vec1.size(); ++i)
+//            {
+//                result += vec1[i] * vec2[i];
+//            }
+//		}
+//		else {
+//            err_not_impl_f("Conjugate dot product not implemented for this data type", std::cout);
+//            return {};
+//        }
+//		return result;
+//	}
+//}
+//#else
+////Linux specific implementation
+//{
+//	T result = 0.0;
+//	if constexpr (std::is_same_v<T, double>)
+//	{
+//		// Call cblas_ddot
+//		result = cblas_ddot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
+//	}
+//	else if constexpr (std::is_same_v<T, float>)
+//	{
+//		// Call cblas_sdot
+//		result = cblas_sdot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
+//	}
+//	else if constexpr (std::is_same_v<T, cdouble>)
+//	{
+//		if (!conjugate) {
+//			result = cblas_zdotu(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
+//		}
+//		else {
+//			result = cblas_zdotc(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
+//		}
+//	}
+//	else
+//	{
+//		err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
+//	}
+//	return result;
+//}
+//#endif
+//#else
+//// Fallback implementation
+//{
+//	T result = 0.0;
+//	if (!conjugate) {
+//		for (size_t i = 0; i < vec1.size(); ++i)
+//		{
+//			result += vec1[i] * vec2[i];
+//		}
+//	}
+//	else {
+//		for (size_t i = 0; i < vec1.size(); ++i)
+//		{
+//			result += conj(vec1[i]) * vec2[i];
+//		}
+//	}
+//	return result;
+//}
+//#endif
 template float dot_BLAS(const std::vector<float>& vec1, const std::vector<float>& vec2, bool conjugate);    
 template double dot_BLAS(const std::vector<double>& vec1, const std::vector<double>& vec2, bool conjugate);
 template cdouble dot_BLAS(const std::vector<cdouble>& vec1, const std::vector<cdouble>& vec2, bool conjugate);

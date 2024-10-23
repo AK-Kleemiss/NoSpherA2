@@ -2,6 +2,11 @@
 #include "constants.h"
 #include <filesystem>
 
+#ifdef _WIN32
+#include "DLL_Helper.h"
+#endif
+
+
 // std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
 {
@@ -25,6 +30,8 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         {
             std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
         }
+
+		//If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
 #if has_RAS
         join_path(_path, config.h5_filename);
         H5::H5File config_file(_path, H5F_ACC_RDONLY);
@@ -74,6 +81,54 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         wavy = wavy_in;
         config.predict_filename = wavy.get_path();
     }
+}
+
+SALTEDPredictor::~SALTEDPredictor()
+{
+    unload_BLAS();
+}
+
+void SALTEDPredictor::load_BLAS()
+{
+#if has_RAS
+    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
+#ifdef _WIN32
+    typedef void (*ExampleFunctionType)(void);
+    this->_hOpenBlas = static_cast<void*>(LoadLibrary(TEXT("libopenblas.dll")));
+    if (this->_hOpenBlas != NULL)
+    {
+        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)this->_hOpenBlas, "cblas_sgemm");
+        if (eF != NULL) {
+            _blas_enabled = true;
+        }
+    }
+#else
+    _blas_enabled = true;
+#endif
+#endif
+}
+
+void SALTEDPredictor::unload_BLAS() {
+#ifdef _WIN32
+    if (this->_hOpenBlas != NULL) {
+        int ret;
+        int max_iterations = 150;
+        while (max_iterations > 0) {
+            ret = FreeLibrary((HMODULE)this->_hOpenBlas);
+            if (ret == 0) {
+                break;
+            }
+            max_iterations--;
+        }
+        if (max_iterations == 0) {
+            std::cout << "Could not free the OpenBLAS library" << std::endl;
+        }
+        else {
+			this->_blas_enabled = false;
+            this->_hOpenBlas = NULL;
+        }
+    }
+#endif
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name()
@@ -160,20 +215,6 @@ void SALTEDPredictor::setup_atomic_environment()
 
     // Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
     calculateConjugate(v2);
-// #pragma omp parallel for
-//     for (int i = 0; i < v2.size(); ++i)
-//	{
-//		for (int j = 0; j < v2[0].size(); ++j)
-//		{
-//			for (int k = 0; k < v2[0][0].size(); ++k)
-//			{
-//				for (int l = 0; l < v2[0][0][0].size(); ++l)
-//				{
-//					v2[i][j][k][l] = conj(v2[i][j][k][l]);
-//				}
-//			}
-//		}
-//	}
 #else
     err_not_impl_f("RASCALINE is not supported by this build", std::cout);
 #endif
@@ -207,7 +248,9 @@ void SALTEDPredictor::read_model_data()
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
+                load_BLAS();
+                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false, this->_blas_enabled));
+                unload_BLAS();
             }
         }
     }
@@ -274,7 +317,9 @@ void SALTEDPredictor::read_model_data_h5()
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
+                load_BLAS();
+                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false, this->_blas_enabled));
+                unload_BLAS();
             }
         }
     }
@@ -316,7 +361,7 @@ vec SALTEDPredictor::predict()
 {
     using namespace std;
     // Compute equivariant descriptors for each lambda value entering the SPH expansion of the electron density
-    unordered_map<int, vec> pvec{};
+    vec2 pvec(SALTED_Utils::get_lmax_max(lmax) + 1);
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
         int llmax = 0;
@@ -347,7 +392,6 @@ vec SALTEDPredictor::predict()
 
         featsize[lam] = config.nspe1 * config.nspe2 * config.nrad1 * config.nrad2 * llmax;
         vec p;
-        vec p_test;
         ivec2 llvec_t = transpose<int>(llvec);
         if (config.sparsify)
         {
@@ -359,13 +403,17 @@ vec SALTEDPredictor::predict()
         {
             equicomb(natoms, config.nang1, config.nang2, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
-
         pvec[lam] = p;
     }
 
-    unordered_map<string, vec2> psi_nm{};
-    for (const string &spe : config.species)
+    load_BLAS();
+
+    std::vector<vec3> psi_nm(config.species.size());
+    for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
     {
+        const string spe = config.species[spe_idx];
+        psi_nm[spe_idx].resize(lmax[spe] + 1);
+
         if (atom_idx.find(spe) == atom_idx.end())
         {
             continue;
@@ -374,11 +422,10 @@ vec SALTEDPredictor::predict()
         for (int lam = 0; lam < lmax[spe] + 1; ++lam)
         {
             int lam2_1 = 2 * lam + 1;
-
-            // This block collects the rows of pvec corresponding to the atoms of species spe
-            vec pvec_lam;
-            pvec_lam.reserve(atom_idx[spe].size() * lam2_1 * featsize[lam]); // Preallocate memory for pvec_lam to avoid reallocations
             int row_size = featsize[lam] * lam2_1;                           // Size of a block of rows
+          
+            vec pvec_lam;
+            pvec_lam.reserve(atom_idx[spe].size() * row_size); // Preallocate memory for pvec_lam to avoid reallocations
 
             for (int idx : atom_idx[spe])
             {
@@ -388,12 +435,13 @@ vec SALTEDPredictor::predict()
                 // Copy the block directly into flatVec2
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
+    
 
-            vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true);
+            vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true, this->_blas_enabled);
 
             if (config.zeta == 1)
             {
-                psi_nm[spe + to_string(lam)] = kernel_nm;
+				psi_nm[spe_idx][lam] = kernel_nm;
                 continue;
             }
 
@@ -418,16 +466,18 @@ vec SALTEDPredictor::predict()
                     }
                 }
             }
-            psi_nm[spe + to_string(lam)] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
+            psi_nm[spe_idx][lam] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false, this->_blas_enabled);
         }
     }
     pvec.clear();
+    pvec.reserve(0);
 
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
-    for (const string &spe : config.species)
+    for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
     {
+		const string spe = config.species[spe_idx];
         if (atom_idx.find(spe) == atom_idx.end())
         {
             for (int l = 0; l < lmax[spe] + 1; ++l)
@@ -454,16 +504,21 @@ vec SALTEDPredictor::predict()
         {
             for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
             {
-                int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
+                //int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
+                int Mcut = static_cast<int>(psi_nm[spe_idx][l][0].size());
                 // Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
                 vec weights_subset(weights.begin() + isize, weights.begin() + isize + Mcut);
-                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe + to_string(l)], weights_subset, false);
+                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false, this->_blas_enabled);
 
                 isize += Mcut;
             }
         }
     }
+    psi_nm.clear();
+	psi_nm.reserve(0);
+    //std::unordered_map<string, vec2>  temp;
+    //psi_nm.swap(temp);
 
     int Tsize = 0;
     for (int iat = 0; iat < natoms; iat++)
