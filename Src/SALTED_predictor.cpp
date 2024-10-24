@@ -6,7 +6,6 @@
 #include "DLL_Helper.h"
 #endif
 
-
 // std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
 {
@@ -31,7 +30,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
             std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
         }
 
-		//If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
+        // If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
 #if has_RAS
         join_path(_path, config.h5_filename);
         H5::H5File config_file(_path, H5F_ACC_RDONLY);
@@ -42,7 +41,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
     }
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
-    for(int a = 0; a < wavy_in.get_ncen(); a++)
+    for (int a = 0; a < wavy_in.get_ncen(); a++)
         if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
             i_know_all = false;
     if (!i_know_all)
@@ -57,14 +56,16 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         }
         std::cout << "\nI will fill out these atoms using spherical Thakkar densities!\n";
         wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
-        for (int a = wavy_in.get_ncen()-1; a >= 0; a--) {
+        for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
+        {
             if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
             {
                 wavy.erase_atom(a);
             }
         }
-        //remove all known basis sets, to not get problems with newly loaded ones
-        for (int a = 0; a < wavy.get_ncen(); a++) {
+        // remove all known basis sets, to not get problems with newly loaded ones
+        for (int a = 0; a < wavy.get_ncen(); a++)
+        {
             wavy.atoms[a].basis_set.clear();
         }
         std::string new_path = get_foldername_from_path(wavy.get_path());
@@ -77,7 +78,8 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         config.predict_filename = wavy.get_path();
         _opt.needs_Thakkar_fill = true;
     }
-    else {
+    else
+    {
         wavy = wavy_in;
         config.predict_filename = wavy.get_path();
     }
@@ -94,11 +96,12 @@ void SALTEDPredictor::load_BLAS()
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
 #ifdef _WIN32
     typedef void (*ExampleFunctionType)(void);
-    this->_hOpenBlas = static_cast<void*>(LoadLibrary(TEXT("libopenblas.dll")));
+    this->_hOpenBlas = static_cast<void *>(LoadLibrary(TEXT("libopenblas.dll")));
     if (this->_hOpenBlas != NULL)
     {
         ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)this->_hOpenBlas, "cblas_sgemm");
-        if (eF != NULL) {
+        if (eF != NULL)
+        {
             _blas_enabled = true;
         }
     }
@@ -108,23 +111,29 @@ void SALTEDPredictor::load_BLAS()
 #endif
 }
 
-void SALTEDPredictor::unload_BLAS() {
+void SALTEDPredictor::unload_BLAS()
+{
 #ifdef _WIN32
-    if (this->_hOpenBlas != NULL) {
+    if (this->_hOpenBlas != NULL)
+    {
         int ret;
         int max_iterations = 150;
-        while (max_iterations > 0) {
+        while (max_iterations > 0)
+        {
             ret = FreeLibrary((HMODULE)this->_hOpenBlas);
-            if (ret == 0) {
+            if (ret == 0)
+            {
                 break;
             }
             max_iterations--;
         }
-        if (max_iterations == 0) {
+        if (max_iterations == 0)
+        {
             std::cout << "Could not free the OpenBLAS library" << std::endl;
         }
-        else {
-			this->_blas_enabled = false;
+        else
+        {
+            this->_blas_enabled = false;
             this->_hOpenBlas = NULL;
         }
     }
@@ -155,7 +164,7 @@ void calculateConjugate(std::vector<std::vector<std::vector<std::vector<std::com
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-    const std::array<std::vector<primitive>, 118>* bs = wavy.get_basis_set_ptr();
+    const std::array<std::vector<primitive>, 118> *bs = wavy.get_basis_set_ptr();
     SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
     for (int i = 0; i < wavy.atoms.size(); i++)
@@ -422,8 +431,8 @@ vec SALTEDPredictor::predict()
         for (int lam = 0; lam < lmax[spe] + 1; ++lam)
         {
             int lam2_1 = 2 * lam + 1;
-            int row_size = featsize[lam] * lam2_1;                           // Size of a block of rows
-          
+            int row_size = featsize[lam] * lam2_1; // Size of a block of rows
+
             vec pvec_lam;
             pvec_lam.reserve(atom_idx[spe].size() * row_size); // Preallocate memory for pvec_lam to avoid reallocations
 
@@ -435,13 +444,12 @@ vec SALTEDPredictor::predict()
                 // Copy the block directly into flatVec2
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
-    
 
             vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true, this->_blas_enabled);
 
             if (config.zeta == 1)
             {
-				psi_nm[spe_idx][lam] = kernel_nm;
+                psi_nm[spe_idx][lam] = kernel_nm;
                 continue;
             }
 
@@ -470,14 +478,15 @@ vec SALTEDPredictor::predict()
         }
     }
     pvec.clear();
-    pvec.reserve(0);
+    unordered_map<int, vec> temp;
+    pvec.swap(temp);
 
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
     for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
     {
-		const string spe = config.species[spe_idx];
+        const string spe = config.species[spe_idx];
         if (atom_idx.find(spe) == atom_idx.end())
         {
             for (int l = 0; l < lmax[spe] + 1; ++l)
@@ -504,7 +513,7 @@ vec SALTEDPredictor::predict()
         {
             for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
             {
-                //int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
+                // int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
                 int Mcut = static_cast<int>(psi_nm[spe_idx][l][0].size());
                 // Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
@@ -516,9 +525,9 @@ vec SALTEDPredictor::predict()
         }
     }
     psi_nm.clear();
-	psi_nm.reserve(0);
-    //std::unordered_map<string, vec2>  temp;
-    //psi_nm.swap(temp);
+    psi_nm.reserve(0);
+    // std::unordered_map<string, vec2>  temp;
+    // psi_nm.swap(temp);
 
     int Tsize = 0;
     for (int iat = 0; iat < natoms; iat++)
@@ -610,46 +619,36 @@ vec SALTEDPredictor::gen_SALTED_densities()
     }
 
     vec coefs = predict();
-
-    if (_opt.debug)
-    {
-        time_point end = get_time();
-        long long int dur = get_sec(start, end);
-        cout << "Finished ML Density Prediction!" << endl;
-        if (dur < 1)
-            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << get_msec(start, end) << " ms" << endl;
-        else
-            cout << "Time for SALTED prediction: " << fixed << setprecision(0) << dur << " s" << endl;
-
-        cout << "Number of coefficients: " << coefs.size() << endl;
-
-        if (_opt.wfn == string("test_cysteine2.xyz"))
-        {
-            vector<unsigned long> shape{};
-            bool fortran_order;
-            vec ref_coefs{};
-            npy::LoadArrayFromNumpy("test_cysteine.npy", shape, fortran_order, ref_coefs);
-            // Compare coefs with the reference
-            vector<double> diff_vec;
-            double diff = 0.0;
-            for (int i = 0; i < coefs.size(); i++)
-            {
-                diff += abs(coefs[i] - ref_coefs[i]);
-                if (abs(coefs[i] - ref_coefs[i]) > 1e-4 || isnan(coefs[i] - ref_coefs[i]))
-                {
-                    cout << "Difference in coef " << fixed << setprecision(3) << i << " : " << coefs[i] << " - " << ref_coefs[i] << " = " << abs(coefs[i] - ref_coefs[i]) << endl;
-                }
-                diff_vec.push_back((coefs[i] / ref_coefs[i]) - 1);
-            }
-            cout << "Difference between calculated and reference coefs: " << fixed << setprecision(3) << diff << endl;
-            cout << "Maximum ((pred / ref) -1): " << fixed << setprecision(3) << *max_element(diff_vec.begin(), diff_vec.end()) << endl;
-            if (diff > 0.1 || isnan(diff))
-            {
-                cout << "WARNING: The difference between the calculated and reference coefficients is too large!" << endl;
-                exit(1);
-            }
-        }
-    }
-
+    shrink_intermediate_vectors();
     return coefs;
 }
+
+void SALTEDPredictor::shrink_intermediate_vectors()
+{
+    v1.clear();
+    v2.clear();
+    weights.clear();
+    Vmat.clear();
+    natom_dict.clear();
+    lmax.clear();
+    nmax.clear();
+    Mspe.clear();
+    ;
+    vfps.clear();
+    ;
+    wigner3j.clear();
+    av_coefs.clear();
+    power_env_sparse.clear();
+    featsize.clear();
+    v1.shrink_to_fit();
+    v2.shrink_to_fit();
+    weights.shrink_to_fit();
+    std::unordered_map<std::string, vec2> umap;
+    std::unordered_map<std::string, int> umap2;
+    std::unordered_map<std::string, vec> umap3;
+    Vmat.swap(umap);
+    natom_dict.swap(umap2);
+    lmax.swap(umap2);
+    nmax.swap(umap2);
+    power_env_sparse.swap(umap3);
+};

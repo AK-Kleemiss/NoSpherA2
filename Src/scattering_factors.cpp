@@ -265,10 +265,10 @@ void generate_hkl(const double &dmin,
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
     ivec hkl_(3);
     string line, temp;
-    const ivec extreme = { 
-        int(unit_cell.get_a() / (dmin - 0.01)), 
-        int(unit_cell.get_b() / (dmin - 0.01)), 
-        int(unit_cell.get_c() / (dmin - 0.01)) };
+    const ivec extreme = {
+        int(unit_cell.get_a() / (dmin - 0.01)),
+        int(unit_cell.get_b() / (dmin - 0.01)),
+        int(unit_cell.get_c() / (dmin - 0.01))};
     if (debug)
         file << "extreme: " << extreme[0] << " " << extreme[1] << " " << extreme[2] << endl;
     for (int h = -extreme[0]; h < extreme[0]; h++)
@@ -2588,9 +2588,11 @@ void calc_SF(const int &points,
     {
         long long int dur = get_sec(start, end1);
         if (dur < 1)
-            file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl << endl;
+            file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl
+                 << endl;
         else
-            file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl << endl;
+            file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl
+                 << endl;
     }
 
 #ifdef FLO_CUDA
@@ -2622,7 +2624,7 @@ void calc_SF(const int &points,
     );
 #else
 
-    ProgressBar* progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
+    ProgressBar *progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax;
     double *dens_local, *d1_local, *d2_local, *d3_local;
     complex<double> *sf_local;
@@ -3412,6 +3414,8 @@ bool calculate_scattering_factors_ML(
 #endif
     SP.unload_BLAS();
 
+    WFN temp = SP.wavy;
+    SP.~SALTEDPredictor();
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
     make_k_pts(
@@ -3430,7 +3434,7 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    vec atom_elecs = calc_atomic_density(SP.wavy.atoms, coefs);
+    vec atom_elecs = calc_atomic_density(temp.atoms, coefs);
     file << "Table of Charges in electrons\n"
          << "       Atom      ML" << endl;
 
@@ -3438,9 +3442,9 @@ bool calculate_scattering_factors_ML(
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << temp.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
-            file << " " << setw(4) << SP.wavy.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+            file << " " << setw(4) << temp.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
     }
 
@@ -3453,18 +3457,18 @@ bool calculate_scattering_factors_ML(
     calc_SF_SALTED(
         k_pt,
         coefs,
-        SP.wavy.atoms,
+        temp.atoms,
         sf);
     file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
-    if (SP.wavy.get_has_ECPs())
+    if (temp.get_has_ECPs())
     {
         add_ECP_contribution(
             asym_atom_list,
-            SP.wavy,
+            temp,
             sf,
             unit_cell,
             hkl,
@@ -3476,7 +3480,7 @@ bool calculate_scattering_factors_ML(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-                      SP.wavy,
+                      temp,
                       sf,
                       unit_cell,
                       hkl);
@@ -3490,7 +3494,8 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("last corrections");
 
-    if (opt.needs_Thakkar_fill) {
+    if (opt.needs_Thakkar_fill)
+    {
         file << "Performing the remaining calculation of spherical atoms...\n";
         vector<WFN> tempy;
         tempy.push_back(WFN(0));
@@ -3501,7 +3506,7 @@ bool calculate_scattering_factors_ML(
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
     }
-    
+
     if (!opt.no_date)
     {
         write_timing_to_file(file,

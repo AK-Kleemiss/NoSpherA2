@@ -23,6 +23,7 @@ public:
         return config.h5_filename;
     };
     WFN wavy;
+    void shrink_intermediate_vectors();
 private:
     Config config;
     options& _opt;
