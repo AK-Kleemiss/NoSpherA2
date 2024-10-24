@@ -478,8 +478,7 @@ vec SALTEDPredictor::predict()
         }
     }
     pvec.clear();
-    unordered_map<int, vec> temp;
-    pvec.swap(temp);
+    pvec.shrink_to_fit();
 
     unordered_map<string, vec> C{};
     unordered_map<string, int> ispe{};
@@ -525,7 +524,7 @@ vec SALTEDPredictor::predict()
         }
     }
     psi_nm.clear();
-    psi_nm.reserve(0);
+    psi_nm.shrink_to_fit();
     // std::unordered_map<string, vec2>  temp;
     // psi_nm.swap(temp);
 
