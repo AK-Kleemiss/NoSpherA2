@@ -3413,9 +3413,8 @@ bool calculate_scattering_factors_ML(
     vec coefs;
 #endif
     SP.unload_BLAS();
-
     WFN temp = SP.wavy;
-    SP.~SALTEDPredictor();
+
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
     make_k_pts(
