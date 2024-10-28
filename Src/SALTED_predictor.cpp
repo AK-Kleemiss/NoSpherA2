@@ -83,6 +83,8 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         wavy = wavy_in;
         config.predict_filename = wavy.get_path();
     }
+    if (wavy.get_nmo() != 0)
+        wavy.clear_MOs(); //Delete unneccesarry MOs, since we are predicting anyway.
 }
 
 SALTEDPredictor::~SALTEDPredictor()

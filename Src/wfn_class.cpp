@@ -139,6 +139,13 @@ const double WFN::get_MO_energy(const int &mo) const
     return MOs[mo].get_energy();
 }
 
+const void WFN::clear_MOs()
+{
+    MOs.clear();
+    MOs.shrink_to_fit();
+    nmo = 0;
+}
+
 bool WFN::push_back_center(const int &cent)
 {
     if (cent <= ncen && cent > 0)
