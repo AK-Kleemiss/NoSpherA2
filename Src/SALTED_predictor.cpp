@@ -1,5 +1,6 @@
 #include "SALTED_predictor.h"
 #include "constants.h"
+#include "pch.h"
 #include <filesystem>
 
 #ifdef _WIN32
@@ -95,8 +96,8 @@ SALTEDPredictor::~SALTEDPredictor()
 void SALTEDPredictor::load_BLAS()
 {
 #if has_RAS
-    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
 #ifdef _WIN32
+    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
     typedef void (*ExampleFunctionType)(void);
     this->_hOpenBlas = static_cast<void *>(LoadLibrary(TEXT("libopenblas.dll")));
     if (this->_hOpenBlas != NULL)
@@ -108,6 +109,9 @@ void SALTEDPredictor::load_BLAS()
         }
     }
 #else
+    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(_opt.threads);
+    char* env = strdup(nums.c_str());
+    putenv(env);
     _blas_enabled = true;
 #endif
 #endif
