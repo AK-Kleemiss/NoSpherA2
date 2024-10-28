@@ -3342,6 +3342,7 @@ bool calculate_scattering_factors_ML(
     SALTEDPredictor &SP,
     std::ostream &file)
 {
+#if has_RAS == 1
     using namespace std;
     err_checkf(SP.wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3400,18 +3401,14 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("Generating hkl");
 
-#if has_RAS
-    // Generation of SALTED densitie coefficients
+    // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
     file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
-#else
-    err_not_impl_f("RASCALINE is not supported by this build", std::cout);
-    vec coefs;
-#endif
+
     SP.unload_BLAS();
     SP.shrink_intermediate_vectors();
     file << "\nGenerating k-points...  " << flush;
@@ -3520,11 +3517,11 @@ bool calculate_scattering_factors_ML(
     }
     file << " ... done!" << endl;
 
-#ifdef PEOJECT_NAME
-#undef FLO_CUDA
-#endif
-
     return true;
+#else
+    err_not_impl_f("RASCALINE is not supported by this build", file);
+    return false;
+#endif
 }
 
 /**

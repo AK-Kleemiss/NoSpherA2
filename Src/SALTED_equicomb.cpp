@@ -1,6 +1,6 @@
 #include "SALTED_equicomb.h"
 
-#if has_RAS
+#if has_RAS == 1
 #include "cblas.h"
 #endif
 

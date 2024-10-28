@@ -333,7 +333,7 @@ int main(int argc, char **argv)
             }
             else
             {
-#if has_RAS
+#if has_RAS == 1
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 #ifdef _WIN32

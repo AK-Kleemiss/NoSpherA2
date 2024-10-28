@@ -3,7 +3,7 @@
 #include "convenience.h"
 #include "npy.h"
 
-#if has_RAS
+#if has_RAS == 1
 #include "H5Cpp.h"
 #include <H5public.h>
 #include <H5Dpublic.h>
@@ -63,13 +63,10 @@ public:
 
    
     void populateFromFile(const std::string &filename);
-#if has_RAS
     void populateFromFile(const H5::H5File file);
-#endif
 
 private:
     std::vector<std::string> parseVector(const std::string& str);
-#if has_RAS
     void populate_config(const std::string& dataset_name, const int& data);
     void populate_config(const std::string& dataset_name, const float& data);
     void populate_config(const std::string& dataset_name, const double& data);
@@ -87,8 +84,6 @@ private:
         {H5T_FLOAT, std::bind(&Config::handle_float_dataset, this, std::placeholders::_1, std::placeholders::_2)},
         {H5T_STRING, std::bind(&Config::handle_string_dataset, this, std::placeholders::_1, std::placeholders::_2)},
         {H5T_ENUM, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)}
-    };
-#endif
-    
+    };    
 
 };

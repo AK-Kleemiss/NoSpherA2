@@ -1,7 +1,7 @@
 #include "SALTED_io.h"
 #include <filesystem>
 
-#if has_RAS
+#if has_RAS == 1
 template <typename T>
 void readHDF5Data(H5::DataSet& dataset, std::vector<T>& data) {
     // Select correct datatype depending on T
@@ -272,7 +272,7 @@ std::vector<std::string> Config::parseVector(const std::string& value)
     return result;
 }
 
-#if has_RAS
+#if has_RAS == 1
 //Included in h5 file
 void Config::populateFromFile(const H5::H5File file) {
     err_checkf(!file.attrExists("input"), "Group 'input' not found in h5-File!", std::cout);
