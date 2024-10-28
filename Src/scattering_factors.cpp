@@ -3413,8 +3413,7 @@ bool calculate_scattering_factors_ML(
     vec coefs;
 #endif
     SP.unload_BLAS();
-    WFN temp = SP.wavy;
-
+    SP.shrink_intermediate_vectors();
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
     make_k_pts(
@@ -3433,7 +3432,7 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    vec atom_elecs = calc_atomic_density(temp.atoms, coefs);
+    vec atom_elecs = calc_atomic_density(SP.wavy.atoms, coefs);
     file << "Table of Charges in electrons\n"
          << "       Atom      ML" << endl;
 
@@ -3441,9 +3440,9 @@ bool calculate_scattering_factors_ML(
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << temp.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
-            file << " " << setw(4) << temp.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+            file << " " << setw(4) << SP.wavy.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
     }
 
@@ -3456,18 +3455,18 @@ bool calculate_scattering_factors_ML(
     calc_SF_SALTED(
         k_pt,
         coefs,
-        temp.atoms,
+        SP.wavy.atoms,
         sf);
     file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
-    if (temp.get_has_ECPs())
+    if (SP.wavy.get_has_ECPs())
     {
         add_ECP_contribution(
             asym_atom_list,
-            temp,
+            SP.wavy,
             sf,
             unit_cell,
             hkl,
@@ -3479,7 +3478,7 @@ bool calculate_scattering_factors_ML(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-                      temp,
+                      SP.wavy,
                       sf,
                       unit_cell,
                       hkl);
