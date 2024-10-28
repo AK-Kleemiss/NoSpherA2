@@ -88,6 +88,9 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         wavy.clear_MOs(); //Delete unneccesarry MOs, since we are predicting anyway.
 }
 
+SALTEDPredictor::SALTEDPredictor() : _opt(*(new options())) {}
+
+
 SALTEDPredictor::~SALTEDPredictor()
 {
     unload_BLAS();

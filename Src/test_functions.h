@@ -1290,8 +1290,11 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 void test_openblas()
 {
 #if has_RAS
+    SALTEDPredictor SP;
+    SP.load_BLAS();
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
+    SP.unload_BLAS();
     exit(0);
 #else
     err_not_impl_f("Openblas not included in Executable!", std::cout);

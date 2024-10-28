@@ -13,6 +13,7 @@
 class SALTEDPredictor {
 public:
     SALTEDPredictor(const WFN& wavy, options &opt);
+    SALTEDPredictor();
 	~SALTEDPredictor();
     void load_BLAS();
     void unload_BLAS();

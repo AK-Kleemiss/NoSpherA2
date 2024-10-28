@@ -793,33 +793,35 @@ void _test_openblas()
     // Init Mat B with some values
     vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
 
-    // First test regular dot-product
-    compare_matrices(dot(A, B, false, false), self_dot(A, B));
+  //First test regular dot-product
+  compare_matrices(dot(A, B, false, false, true), self_dot(A, B));
 
-    ////Second compare first transpose
-    compare_matrices(dot(A, B, true, false), self_dot(transpose(A), B));
+  ////Second compare first transpose
+  compare_matrices(dot(A, B, true, false, true), self_dot(transpose(A), B));
 
-    ////Third comparte second transpose
-    compare_matrices(dot(A, B, false, true), self_dot(A, transpose(B)));
+  ////Third comparte second transpose
+  compare_matrices(dot(A, B, false, true, true), self_dot(A, transpose(B)));
 
-    ////Fourth compare both transposed
-    compare_matrices(dot(A, B, true, true), self_dot(transpose(A), transpose(B)));
+  ////Fourth compare both transposed
+  compare_matrices(dot(A, B, true, true, true), self_dot(transpose(A), transpose(B)));
 
     // Init Complex matrices
     cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
     cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
 
-    // First test regular dot-product
-    compare_matrices(dot(C, D, false, false), self_dot(C, D));
+  //First test regular dot-product
+  compare_matrices(dot(C, D, false, false, true), self_dot(C, D));
 
-    ////Second compare first transpose
-    compare_matrices(dot(C, D, true, false), self_dot(transpose(C), D));
+  ////Second compare first transpose
+  compare_matrices(dot(C, D, true, false, true), self_dot(transpose(C), D));
 
-    ////Third comparte second transpose
-    compare_matrices(dot(C, D, false, true), self_dot(C, transpose(D)));
+  ////Third comparte second transpose
+  compare_matrices(dot(C, D, false, true, true), self_dot(C, transpose(D)));
 
-    ////Fourth compare both transposed
-    compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
+  ////Fourth compare both transposed
+  compare_matrices(dot(C, D, true, true, true), self_dot(transpose(C), transpose(D)));
+
+  std::cout << "All BLAS tests passed!" << std::endl;
 
     std::cout << "All BLAS tests passed!" << std::endl;
 }
