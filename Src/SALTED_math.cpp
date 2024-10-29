@@ -822,6 +822,4 @@ void _test_openblas()
   compare_matrices(dot(C, D, true, true, true), self_dot(transpose(C), transpose(D)));
 
   std::cout << "All BLAS tests passed!" << std::endl;
-
-    std::cout << "All BLAS tests passed!" << std::endl;
 }
