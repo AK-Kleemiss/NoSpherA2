@@ -63,7 +63,9 @@ public:
 
    
     void populateFromFile(const std::string &filename);
+#if has_RAS == 1
     void populateFromFile(const H5::H5File file);
+#endif
 
 private:
     std::vector<std::string> parseVector(const std::string& str);
@@ -73,6 +75,7 @@ private:
     void populate_config(const std::string& dataset_name, const std::string& data);
     void populate_config(const std::string& dataset_name, const std::vector<std::string>& data);
 
+#if has_RAS == 1
     void handle_int_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
     void handle_float_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
     void handle_string_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
@@ -85,5 +88,6 @@ private:
         {H5T_STRING, std::bind(&Config::handle_string_dataset, this, std::placeholders::_1, std::placeholders::_2)},
         {H5T_ENUM, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)}
     };    
+#endif
 
 };
