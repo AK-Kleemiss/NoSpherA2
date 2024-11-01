@@ -10166,7 +10166,7 @@ int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
     return di;
 }
 
-void GTOnr3c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+void GTOnr3c_drv(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
     void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*), 
         double*, double*, int, int, int*, int*, Opt*, int*, int, int*, int, double*), 
     double* eri, int comp,
@@ -10198,4 +10198,276 @@ void GTOnr3c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Op
         }
         free(buf);
     }
+}
+
+void init_2e_optimizer(Opt& opt, int* atm, int natm, int* bas, int nbas, double* env)
+{
+    opt.index_xyz_array = NULL;
+    opt.non0ctr = NULL;
+    opt.sortedidx = NULL;
+    opt.nbas = nbas;
+    opt.log_max_coeff = NULL;
+    opt.pairdata = NULL;
+}
+
+void Opt_set_log_maxc(Opt& opt, int* atm, int natm,
+    int* bas, int nbas, double* env)
+{
+    int i, iprim, ictr;
+    double* ci;
+    size_t tot_prim = 0;
+    for (i = 0; i < nbas; i++) {
+        tot_prim += bas(2, i);
+    }
+    if (tot_prim == 0) {
+        return;
+    }
+
+    opt.log_max_coeff = (double**)malloc(sizeof(double*) * std::max(nbas, 1));
+    double* plog_maxc = (double*)malloc(sizeof(double) * tot_prim);
+    opt.log_max_coeff[0] = plog_maxc;
+    for (i = 0; i < nbas; i++) {
+        iprim = bas(2, i);
+        ictr = bas(3, i);
+        ci = env + bas(6, i);
+        opt.log_max_coeff[i] = plog_maxc;
+        Opt_log_max_pgto_coeff(plog_maxc, ci, iprim, ictr);
+        plog_maxc += iprim;
+    }
+}
+
+void Opt_setij(Opt& opt, int* ng,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    int i, j, ip, jp;
+    int iprim, jprim, li, lj;
+    double* ai, * aj, * ri, * rj;
+    double expcutoff;
+    if (env[0] == 0) {
+        expcutoff = 60.;
+    }
+    else {
+        expcutoff = std::max(40., env[0]);
+    }
+
+    if (opt.log_max_coeff == NULL) {
+        Opt_set_log_maxc(opt, atm, natm, bas, nbas, env);
+    }
+    double** log_max_coeff = opt.log_max_coeff;
+    double* log_maxci, * log_maxcj;
+
+    size_t tot_prim = 0;
+    for (i = 0; i < nbas; i++) {
+        tot_prim += bas(2, i);
+    }
+    if (tot_prim == 0 || tot_prim > 2048) {
+        return;
+    }
+    opt.pairdata = (PairData**)malloc(sizeof(PairData*) * std::max(nbas * nbas, 1));
+    PairData* pdata = (PairData*)malloc(sizeof(PairData) * tot_prim * tot_prim);
+    opt.pairdata[0] = pdata;
+
+    int ijkl_inc;
+    if ((ng[0] + ng[1]) > (ng[2] + ng[3])) {
+        ijkl_inc = ng[0] + ng[1];
+    }
+    else {
+        ijkl_inc = ng[2] + ng[3];
+    }
+
+    int empty;
+    double rr;
+    PairData* pdata0;
+    for (i = 0; i < nbas; i++) {
+        ri = env + atm(1, bas(0, i));
+        ai = env + bas(5, i);
+        iprim = bas(2, i);
+        li = bas(1, i);
+        log_maxci = log_max_coeff[i];
+
+        for (j = 0; j <= i; j++) {
+            rj = env + atm(1, bas(0, j));
+            aj = env + bas(5, j);
+            jprim = bas(2, j);
+            lj = bas(1, j);
+            log_maxcj = log_max_coeff[j];
+            rr = (ri[0] - rj[0]) * (ri[0] - rj[0])
+                + (ri[1] - rj[1]) * (ri[1] - rj[1])
+                + (ri[2] - rj[2]) * (ri[2] - rj[2]);
+
+            empty = set_pairdata(pdata, ai, aj, ri, rj, log_maxci, log_maxcj,
+                li + ijkl_inc, lj, iprim, jprim, rr, expcutoff, env);
+            if (i == 0 && j == 0) {
+                opt.pairdata[0] = pdata;
+                pdata += iprim * jprim;
+            }
+            else if (!empty) {
+                opt.pairdata[i * nbas + j] = pdata;
+                pdata += iprim * jprim;
+                if (i != j) {
+                    opt.pairdata[j * nbas + i] = pdata;
+                    pdata0 = opt.pairdata[i * nbas + j];
+                    // transpose pairdata
+                    for (ip = 0; ip < iprim; ip++) {
+                        for (jp = 0; jp < jprim; jp++, pdata++) {
+                            memcpy(pdata, pdata0 + jp * iprim + ip, sizeof(PairData));
+                        }
+                    }
+                }
+            }
+            else {
+                opt.pairdata[i * nbas + j] = ((PairData*)0xffffffffffffffffuL);
+                opt.pairdata[j * nbas + i] = ((PairData*)0xffffffffffffffffuL);
+            }
+        }
+    }
+}
+
+void Opt_set_non0coeff(Opt& opt, int* atm, int natm,
+    int* bas, int nbas, double* env)
+{
+    int i, iprim, ictr;
+    double* ci;
+    size_t tot_prim = 0;
+    size_t tot_prim_ctr = 0;
+    for (i = 0; i < nbas; i++) {
+        tot_prim += bas(2, i);
+        tot_prim_ctr += bas(2, i) * bas(3, i);
+    }
+    if (tot_prim == 0) {
+        return;
+    }
+
+    opt.non0ctr = (int**)malloc(sizeof(int*) * std::max(nbas, 1));
+    opt.sortedidx = (int**)malloc(sizeof(int*) * std::max(nbas, 1));
+    int* pnon0ctr = (int*)malloc(sizeof(int) * tot_prim);
+    int* psortedidx = (int*)malloc(sizeof(int) * tot_prim_ctr);
+    opt.non0ctr[0] = pnon0ctr;
+    opt.sortedidx[0] = psortedidx;
+    for (i = 0; i < nbas; i++) {
+        iprim = bas(2, i);
+        ictr = bas(3, i);
+        ci = env + bas(6, i);
+        opt.non0ctr[i] = pnon0ctr;
+        opt.sortedidx[i] = psortedidx;
+        Opt_non0coeff_byshell(psortedidx, pnon0ctr, ci, iprim, ictr);
+        pnon0ctr += iprim;
+        psortedidx += iprim * ictr;
+    }
+}
+
+int _make_fakebas(int* fakebas, int* bas, int nbas, double* env)
+{
+    int i;
+    int max_l = 0;
+    for (i = 0; i < nbas; i++) {
+        max_l = std::max(max_l, bas(1, i));
+    }
+
+    int fakenbas = max_l + 1;
+    for (i = 0; i < 8 * fakenbas; i++) {
+        fakebas[i] = 0;
+    }
+    // fakebas only initializes ANG_OF, since the others does not
+    // affect index_xyz
+    for (i = 0; i <= max_l; i++) {
+        fakebas[8 * i + 1] = i;
+    }
+    return max_l;
+}
+
+int* _allocate_index_xyz(Opt& opt, int max_l, int l_allow, int order)
+{
+    int i;
+    int cumcart = (l_allow + 1) * (l_allow + 2) * (l_allow + 3) / 6;
+    size_t ll = max_l + 1;
+    size_t cc = cumcart;
+    for (i = 1; i < order; i++) {
+        ll *= 16;
+        cc *= cumcart;
+    }
+    int* buf = (int*)malloc(sizeof(int) * cc * 3);
+    int** ppbuf = (int**)malloc(sizeof(int*) * ll);
+    ppbuf[0] = buf;
+    for (i = 1; i < ll; i++) {
+        ppbuf[i] = NULL;
+    }
+    opt.index_xyz_array = ppbuf;
+    return buf;
+}
+
+void gen_idx(Opt& opt, 
+    void (*finit)(Env*, int*, int*, int*, int, int*, int, double*), 
+    void (*findex_xyz)(int*, const Env*),
+    int order, int l_allow, int* ng,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    int i, j, k, l, ptr;
+    int fakebas[8 * 16];
+    int max_l = _make_fakebas(fakebas, bas, nbas, env);
+    int fakenbas = max_l + 1;
+    // index_xyz bufsize may blow up for large max_l
+    l_allow = std::min(max_l, l_allow);
+    int* buf = _allocate_index_xyz(opt, max_l, l_allow, order);
+
+    Env envs;
+    int shls[4] = { 0, };
+    if (order == 2) {
+        for (i = 0; i <= l_allow; i++) {
+            for (j = 0; j <= l_allow; j++) {
+                shls[0] = i; shls[1] = j;
+                (*finit)(&envs, ng, shls, atm, natm, fakebas, fakenbas, env);
+                ptr = i * 16 + j;
+                opt.index_xyz_array[ptr] = buf;
+                (*findex_xyz)(buf, &envs);
+                buf += envs.nf * 3;
+            }
+        }
+
+    }
+    else if (order == 3) {
+        for (i = 0; i <= l_allow; i++) {
+            for (j = 0; j <= l_allow; j++) {
+                for (k = 0; k <= l_allow; k++) {
+                    shls[0] = i; shls[1] = j; shls[2] = k;
+                    (*finit)(&envs, ng, shls, atm, natm, fakebas, fakenbas, env);
+                    ptr = i * 16 * 16 + j * 16 + k;
+                    opt.index_xyz_array[ptr] = buf;
+                    (*findex_xyz)(buf, &envs);
+                    buf += envs.nf * 3;
+                }
+            }
+        }
+
+    }
+    else {
+        for (i = 0; i <= l_allow; i++) {
+            for (j = 0; j <= l_allow; j++) {
+                for (k = 0; k <= l_allow; k++) {
+                    for (l = 0; l <= l_allow; l++) {
+                        shls[0] = i; shls[1] = j; shls[2] = k; shls[3] = l;
+                        (*finit)(&envs, ng, shls, atm, natm, fakebas, fakenbas, env);
+                        ptr = i * 16 * 16 * 16
+                            + j * 16 * 16
+                            + k * 16
+                            + l;
+                        opt.index_xyz_array[ptr] = buf;
+                        (*findex_xyz)(buf, &envs);
+                        buf += envs.nf * 3;
+                    }
+                }
+            }
+        }
+    }
+}
+
+Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
+    int ng[] = { 0,0,0,0,0,1,1,1 };
+    Opt o;
+    init_2e_optimizer(o, atm, natm, bas, nbas, env);
+    Opt_setij(o, ng, atm, natm, bas, nbas, env);
+    Opt_set_non0coeff(o, atm, natm, bas, nbas, env);
+    gen_idx(o, &init_int3c2e_EnvVars, &g2e_index_xyz,
+        3, 12, ng, atm, natm, bas, nbas, env);
+    //LEAKY! THIS OPTIMIZER ALLOCATES MEMORY; THIS WILL NEED CLEANUP LATER ON!
 }
