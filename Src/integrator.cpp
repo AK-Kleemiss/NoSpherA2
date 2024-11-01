@@ -8,10 +8,8 @@
 #include <memory>
 #include <cstddef>
 
-
-
 //This is an implementation of libcint from PySCF in C++ for use during density fitting calculations
-//Libcint is publsihed under Apache License 2.0
+//Libcint is published under Apache License 2.0
 // The original code can be found at
 // https://github.com/sunqm/libcint
 
@@ -84,7 +82,7 @@ int density_fit(const WFN& wavy, const std::string auxname) {
 #define bas(SLOT,I)     bas[8 * (I) + (SLOT)]
 #define atm(SLOT,I)     atm[6 * (I) + (SLOT)]
 
-constexpr double CINTcommon_fac_sp(int l)
+constexpr double common_fac_sp(int l)
 {
     switch (l) {
     case 0: return 0.282094791773878143;
@@ -6744,7 +6742,7 @@ void init_2c2e_Env(Env* envs, int* ng, int* shls, int* atm, int natm, int* bas, 
     envs->ri = env + atm(1, bas(0, i_sh));
     envs->rk = env + atm(1, bas(0, k_sh));
 
-    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->k_l);
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * common_fac_sp(envs->i_l) * common_fac_sp(envs->k_l);
     if (env[0] == 0) {
         envs->expcutoff = 60;
     }
@@ -6814,7 +6812,7 @@ void init_2c2e_Env(Env* envs, int* ng, int* shls, int* atm, int natm, int* bas, 
     envs->g_stride_j = envs->g_stride_k;
 }
 
-void out2e(double* gout, double* g, int* idx,
+void gout2e(double* gout, double* g, int* idx,
     Env* envs, int gout_empty)
 {
     int nf = envs->nf;
@@ -7488,6 +7486,100 @@ struct cart2sp_t {
     double* cart2j_gt_lR; // j > kappa, l < 0
     double* cart2j_gt_lI; // j > kappa, l < 0
 };
+
+void g2e_index_xyz(int* idx, const Env* envs)
+{
+    const int i_l = envs->i_l;
+    const int j_l = envs->j_l;
+    const int k_l = envs->k_l;
+    const int l_l = envs->l_l;
+    const int nfi = envs->nfi;
+    const int nfj = envs->nfj;
+    const int nfk = envs->nfk;
+    const int nfl = envs->nfl;
+    const int di = envs->g_stride_i;
+    const int dk = envs->g_stride_k;
+    const int dl = envs->g_stride_l;
+    const int dj = envs->g_stride_j;
+    int i, j, k, l, n;
+    int ofx, ofkx, oflx;
+    int ofy, ofky, ofly;
+    int ofz, ofkz, oflz;
+    int i_nx[136], i_ny[136], i_nz[136];
+    int j_nx[136], j_ny[136], j_nz[136];
+    int k_nx[136], k_ny[136], k_nz[136];
+    int l_nx[136], l_ny[136], l_nz[136];
+
+    cart_comp(i_nx, i_ny, i_nz, i_l);
+    cart_comp(j_nx, j_ny, j_nz, j_l);
+    cart_comp(k_nx, k_ny, k_nz, k_l);
+    cart_comp(l_nx, l_ny, l_nz, l_l);
+
+    ofx = 0;
+    ofy = envs->g_size;
+    ofz = envs->g_size * 2;
+    n = 0;
+    for (j = 0; j < nfj; j++) {
+        for (l = 0; l < nfl; l++) {
+            oflx = ofx + dj * j_nx[j] + dl * l_nx[l];
+            ofly = ofy + dj * j_ny[j] + dl * l_ny[l];
+            oflz = ofz + dj * j_nz[j] + dl * l_nz[l];
+            for (k = 0; k < nfk; k++) {
+                ofkx = oflx + dk * k_nx[k];
+                ofky = ofly + dk * k_ny[k];
+                ofkz = oflz + dk * k_nz[k];
+                switch (i_l) {
+                case 0:
+                    idx[n + 0] = ofkx;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    n += 3;
+                    break;
+                case 1:
+                    idx[n + 0] = ofkx + di;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    idx[n + 3] = ofkx;
+                    idx[n + 4] = ofky + di;
+                    idx[n + 5] = ofkz;
+                    idx[n + 6] = ofkx;
+                    idx[n + 7] = ofky;
+                    idx[n + 8] = ofkz + di;
+                    n += 9;
+                    break;
+                case 2:
+                    idx[n + 0] = ofkx + di * 2;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    idx[n + 3] = ofkx + di;
+                    idx[n + 4] = ofky + di;
+                    idx[n + 5] = ofkz;
+                    idx[n + 6] = ofkx + di;
+                    idx[n + 7] = ofky;
+                    idx[n + 8] = ofkz + di;
+                    idx[n + 9] = ofkx;
+                    idx[n + 10] = ofky + di * 2;
+                    idx[n + 11] = ofkz;
+                    idx[n + 12] = ofkx;
+                    idx[n + 13] = ofky + di;
+                    idx[n + 14] = ofkz + di;
+                    idx[n + 15] = ofkx;
+                    idx[n + 16] = ofky;
+                    idx[n + 17] = ofkz + di * 2;
+                    n += 18;
+                    break;
+                default:
+                    for (i = 0; i < nfi; i++) {
+                        idx[n + 0] = ofkx + di * i_nx[i]; //(:,ix,kx,lx,jx,1)
+                        idx[n + 1] = ofky + di * i_ny[i]; //(:,iy,ky,ly,jy,2)
+                        idx[n + 2] = ofkz + di * i_nz[i]; //(:,iz,kz,lz,jz,3)
+                        n += 3;
+                    } // i
+                }
+            } // k
+        } // l
+    } // j
+}
 
 double g_trans_cart2sph[] = {
         1, /* factors of s and p are moved to CINTcommon_fac_sp */
@@ -8830,7 +8922,7 @@ int int2c2e_sph(double* out, int* dims, int* shls, int* atms, int natms, int* ba
     int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
     Env envs;
     init_2c2e_Env(&envs, ng, shls, atms, natms, bas, nbas, env);
-    envs.f_gout = &out2e;
+    envs.f_gout = &gout2e;
     return _2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
 };
 
@@ -8898,4 +8990,1212 @@ void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, O
         free(cache);
     }
     SP.unload_BLAS();
+}
+
+void g0_il2d_4d(double* g, Env* envs)
+{
+    int lk = envs->lk_ceil;
+    int lj = envs->lj_ceil;
+    if (lj == 0 && lk == 0) {
+        return;
+    }
+    int nmax = envs->li_ceil + envs->lj_ceil;
+    int mmax = envs->lk_ceil + envs->ll_ceil;
+    //int li = envs->li_ceil;
+    int ll = envs->ll_ceil;
+    int nroots = envs->nrys_roots;
+    int i, j, k, l, ptr, n;
+    int di = envs->g_stride_i;
+    int dk = envs->g_stride_k;
+    int dl = envs->g_stride_l;
+    int dj = envs->g_stride_j;
+    double* rirj = envs->rirj;
+    double* rkrl = envs->rkrl;
+    double* gx = g;
+    double* gy = gx + envs->g_size;
+    double* gz = gy + 2 * envs->g_size;
+    double* p1x, * p1y, * p1z, * p2x, * p2y, * p2z;
+    double rx, ry, rz;
+
+    // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
+    rx = rkrl[0];
+    ry = rkrl[1];
+    rz = rkrl[2];
+    p1x = gx - dk;
+    p1y = gy - dk;
+    p1z = gz - dk;
+    p2x = gx - dk + dl;
+    p2y = gy - dk + dl;
+    p2z = gz - dk + dl;
+    for (k = 1; k <= lk; k++) {
+        for (l = 0; l <= mmax - k; l++) {
+            for (i = 0; i <= nmax; i++) {
+                ptr = l * dl + k * dk + i * di;
+                for (n = ptr; n < ptr + nroots; n++) {
+                    gx[n] = rx * p1x[n] + p2x[n];
+                    gy[n] = ry * p1y[n] + p2y[n];
+                    gz[n] = rz * p1z[n] + p2z[n];
+                }
+            }
+        }
+    }
+
+    // g(i,...,j) = rirj * g(i,...,j-1) +  g(i+1,...,j-1)
+    rx = rirj[0];
+    ry = rirj[1];
+    rz = rirj[2];
+    p1x = gx - dj;
+    p1y = gy - dj;
+    p1z = gz - dj;
+    p2x = gx - dj + di;
+    p2y = gy - dj + di;
+    p2z = gz - dj + di;
+    for (j = 1; j <= lj; j++) {
+        for (l = 0; l <= ll; l++) {
+            for (k = 0; k <= lk; k++) {
+                ptr = j * dj + l * dl + k * dk;
+                for (n = ptr; n < ptr + dk - di * j; n++) {
+                    gx[n] = rx * p1x[n] + p2x[n];
+                    gy[n] = ry * p1y[n] + p2y[n];
+                    gz[n] = rz * p1z[n] + p2z[n];
+                }
+            }
+        }
+    }
+}
+
+void g0_lj2d_4d(double* g, Env* envs)
+{
+    int li = envs->li_ceil;
+    int lk = envs->lk_ceil;
+    if (li == 0 && lk == 0) {
+        return;
+    }
+    int nmax = envs->li_ceil + envs->lj_ceil;
+    int mmax = envs->lk_ceil + envs->ll_ceil;
+    //int ll = envs->ll_ceil;
+    int lj = envs->lj_ceil;
+    int nroots = envs->nrys_roots;
+    int i, j, k, l, ptr, n;
+    int di = envs->g_stride_i;
+    int dk = envs->g_stride_k;
+    int dl = envs->g_stride_l;
+    int dj = envs->g_stride_j;
+    double* rirj = envs->rirj;
+    double* rkrl = envs->rkrl;
+    double* gx = g;
+    double* gy = gx + envs->g_size;
+    double* gz = gy + 2 * envs->g_size;
+    double* p1x, * p1y, * p1z, * p2x, * p2y, * p2z;
+    double rx, ry, rz;
+
+    // g(i,...,j) = rirj * g(i-1,...,j) +  g(i-1,...,j+1)
+    rx = rirj[0];
+    ry = rirj[1];
+    rz = rirj[2];
+    p1x = gx - di;
+    p1y = gy - di;
+    p1z = gz - di;
+    p2x = gx - di + dj;
+    p2y = gy - di + dj;
+    p2z = gz - di + dj;
+    for (i = 1; i <= li; i++) {
+        for (j = 0; j <= nmax - i; j++) {
+            for (l = 0; l <= mmax; l++) {
+                ptr = j * dj + l * dl + i * di;
+                for (n = ptr; n < ptr + nroots; n++) {
+                    gx[n] = rx * p1x[n] + p2x[n];
+                    gy[n] = ry * p1y[n] + p2y[n];
+                    gz[n] = rz * p1z[n] + p2z[n];
+                }
+            }
+        }
+    }
+
+    // g(...,k,l,..) = rkrl * g(...,k-1,l,..) + g(...,k-1,l+1,..)
+    rx = rkrl[0];
+    ry = rkrl[1];
+    rz = rkrl[2];
+    p1x = gx - dk;
+    p1y = gy - dk;
+    p1z = gz - dk;
+    p2x = gx - dk + dl;
+    p2y = gy - dk + dl;
+    p2z = gz - dk + dl;
+    for (j = 0; j <= lj; j++) {
+        for (k = 1; k <= lk; k++) {
+            for (l = 0; l <= mmax - k; l++) {
+                ptr = j * dj + l * dl + k * dk;
+                for (n = ptr; n < ptr + dk; n++) {
+                    gx[n] = rx * p1x[n] + p2x[n];
+                    gy[n] = ry * p1y[n] + p2y[n];
+                    gz[n] = rz * p1z[n] + p2z[n];
+                }
+            }
+        }
+    }
+}
+
+void g0_2e_il2d4d(double* g, Rys2eT* bc, Env* envs)
+{
+    g0_2e_2d(g, bc, envs);
+    g0_il2d_4d(g, envs);
+}
+void g0_2e_lj2d4d(double* g, Rys2eT* bc, Env* envs)
+{
+    g0_2e_2d(g, bc, envs);
+    g0_lj2d_4d(g, envs);
+}
+
+void init_int3c2e_EnvVars(Env* envs, int* ng, int* shls,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    envs->natm = natm;
+    envs->nbas = nbas;
+    envs->atm = atm;
+    envs->bas = bas;
+    envs->env = env;
+    envs->shls = shls;
+
+    const int i_sh = shls[0];
+    const int j_sh = shls[1];
+    const int k_sh = shls[2];
+    envs->i_l = bas(1, i_sh);
+    envs->j_l = bas(1, j_sh);
+    envs->k_l = bas(1, k_sh);
+    envs->l_l = 0;
+    envs->x_ctr[0] = bas(3, i_sh);
+    envs->x_ctr[1] = bas(3, j_sh);
+    envs->x_ctr[2] = bas(3, k_sh);
+    envs->x_ctr[3] = 1;
+    envs->nfi = (envs->i_l + 1) * (envs->i_l + 2) / 2;
+    envs->nfj = (envs->j_l + 1) * (envs->j_l + 2) / 2;
+    envs->nfk = (envs->k_l + 1) * (envs->k_l + 2) / 2;
+    envs->nfl = 1;
+    envs->nf = envs->nfi * envs->nfk * envs->nfj;
+
+    envs->ri = env + atm(1, bas(0, i_sh));
+    envs->rj = env + atm(1, bas(0, j_sh));
+    envs->rk = env + atm(1, bas(0, k_sh));
+
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi
+        * common_fac_sp(envs->i_l) * common_fac_sp(envs->j_l)
+        * common_fac_sp(envs->k_l);
+    if (env[0] == 0) {
+        envs->expcutoff = 60.;
+    }
+    else {
+        envs->expcutoff = std::max(40., env[0]);
+    }
+
+    envs->gbits = ng[4];
+    envs->ncomp_e1 = ng[5];
+    envs->ncomp_e2 = ng[6];
+    envs->ncomp_tensor = ng[7];
+
+    envs->li_ceil = envs->i_l + ng[0];
+    envs->lj_ceil = envs->j_l + ng[1];
+    envs->lk_ceil = 0; // to reuse CINTg0_2e_lj2d4d
+    envs->ll_ceil = envs->k_l + ng[2];
+    int rys_order = (envs->li_ceil + envs->lj_ceil + envs->ll_ceil) / 2 + 1;
+    int nrys_roots = rys_order;
+    double omega = env[8];
+    if (omega < 0 && rys_order <= 3) {
+        nrys_roots *= 2;
+    }
+    envs->rys_order = rys_order;
+    envs->nrys_roots = nrys_roots;
+
+    int dli, dlj, dlk;
+    int ibase = envs->li_ceil > envs->lj_ceil;
+    if (ibase) {
+        dli = envs->li_ceil + envs->lj_ceil + 1;
+        dlj = envs->lj_ceil + 1;
+    }
+    else {
+        dli = envs->li_ceil + 1;
+        dlj = envs->li_ceil + envs->lj_ceil + 1;
+    }
+    dlk = envs->ll_ceil + 1;
+
+    envs->g_stride_i = nrys_roots;
+    envs->g_stride_k = nrys_roots * dli;
+    envs->g_stride_l = nrys_roots * dli;
+    envs->g_stride_j = nrys_roots * dli * dlk;
+    envs->g_size = nrys_roots * dli * dlk * dlj;
+
+    envs->al[0] = 0;
+    envs->rkl[0] = envs->rk[0];
+    envs->rkl[1] = envs->rk[1];
+    envs->rkl[2] = envs->rk[2];
+    envs->g2d_klmax = envs->g_stride_k;
+    envs->rkrl[0] = envs->rk[0];
+    envs->rkrl[1] = envs->rk[1];
+    envs->rkrl[2] = envs->rk[2];
+    // in g0_2d rklrx = rkl - rx = 0 => rkl = rx
+    envs->rx_in_rklrx = envs->rk;
+
+    if (ibase) {
+        envs->g2d_ijmax = envs->g_stride_i;
+        envs->rx_in_rijrx = envs->ri;
+        envs->rirj[0] = envs->ri[0] - envs->rj[0];
+        envs->rirj[1] = envs->ri[1] - envs->rj[1];
+        envs->rirj[2] = envs->ri[2] - envs->rj[2];
+    }
+    else {
+        envs->g2d_ijmax = envs->g_stride_j;
+        envs->rx_in_rijrx = envs->rj;
+        envs->rirj[0] = envs->rj[0] - envs->ri[0];
+        envs->rirj[1] = envs->rj[1] - envs->ri[1];
+        envs->rirj[2] = envs->rj[2] - envs->ri[2];
+    }
+
+    if (rys_order <= 2) {
+        envs->f_g0_2d4d = &g0_2e_2d4d_unrolled;
+        if (rys_order != nrys_roots) {
+            envs->f_g0_2d4d = &srg0_2e_2d4d_unrolled;
+        }
+    }
+    else if (ibase) {
+        envs->f_g0_2d4d = &g0_2e_il2d4d;
+    }
+    else {
+        envs->f_g0_2d4d = &g0_2e_lj2d4d;
+    }
+    envs->f_g0_2e = &g0_2e;
+}
+
+void dcopy_iklj(double* fijkl, const double* gctr,
+    const int ni, const int nj, const int nk, const int nl,
+    const int mi, const int mj, const int mk, const int ml)
+{
+    const size_t nij = ni * nj;
+    const size_t nijk = nij * nk;
+    const size_t mik = mi * mk;
+    const size_t mikl = mik * ml;
+    int i, j, k, l;
+    double* pijkl;
+    const double* pgctr;
+
+    switch (mi) {
+    case 1:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+#pragma GCC ivdep
+                for (j = 0; j < mj; j++) {
+                    pijkl[ni * j] = pgctr[mikl * j];
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+        break;
+    case 3:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+#pragma GCC ivdep
+                for (j = 0; j < mj; j++) {
+                    pijkl[ni * j + 0] = pgctr[mikl * j + 0];
+                    pijkl[ni * j + 1] = pgctr[mikl * j + 1];
+                    pijkl[ni * j + 2] = pgctr[mikl * j + 2];
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+        break;
+    case 5:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+#pragma GCC ivdep
+                for (j = 0; j < mj; j++) {
+                    pijkl[ni * j + 0] = pgctr[mikl * j + 0];
+                    pijkl[ni * j + 1] = pgctr[mikl * j + 1];
+                    pijkl[ni * j + 2] = pgctr[mikl * j + 2];
+                    pijkl[ni * j + 3] = pgctr[mikl * j + 3];
+                    pijkl[ni * j + 4] = pgctr[mikl * j + 4];
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+        break;
+    case 6:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+#pragma GCC ivdep
+                for (j = 0; j < mj; j++) {
+                    pijkl[ni * j + 0] = pgctr[mikl * j + 0];
+                    pijkl[ni * j + 1] = pgctr[mikl * j + 1];
+                    pijkl[ni * j + 2] = pgctr[mikl * j + 2];
+                    pijkl[ni * j + 3] = pgctr[mikl * j + 3];
+                    pijkl[ni * j + 4] = pgctr[mikl * j + 4];
+                    pijkl[ni * j + 5] = pgctr[mikl * j + 5];
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+        break;
+    case 7:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+#pragma GCC ivdep
+                for (j = 0; j < mj; j++) {
+                    pijkl[ni * j + 0] = pgctr[mikl * j + 0];
+                    pijkl[ni * j + 1] = pgctr[mikl * j + 1];
+                    pijkl[ni * j + 2] = pgctr[mikl * j + 2];
+                    pijkl[ni * j + 3] = pgctr[mikl * j + 3];
+                    pijkl[ni * j + 4] = pgctr[mikl * j + 4];
+                    pijkl[ni * j + 5] = pgctr[mikl * j + 5];
+                    pijkl[ni * j + 6] = pgctr[mikl * j + 6];
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+        break;
+    default:
+        for (l = 0; l < ml; l++) {
+            for (k = 0; k < mk; k++) {
+                pijkl = fijkl + k * nij;
+                pgctr = gctr + k * mi;
+                for (j = 0; j < mj; j++) {
+#pragma GCC ivdep
+                    for (i = 0; i < mi; i++) {
+                        pijkl[ni * j + i] = pgctr[mikl * j + i];
+                    }
+                }
+            }
+            fijkl += nijk;
+            gctr += mik;
+        }
+    }
+}
+
+double* sph2e_inner(double* gsph, double* gcart,
+    int l, int nbra, int ncall, int sizsph, int sizcart)
+{
+    int n;
+    switch (l) {
+#ifdef PYPZPX
+    case 0:
+        return gcart;
+    case 1:
+        for (n = 0; n < ncall; n++) {
+            p_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+        }
+        break;
+#else
+    case 0: case 1:
+        return gcart;
+#endif
+    case 2:
+        for (n = 0; n < ncall; n++) {
+            d_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+        }
+        break;
+    case 3:
+        for (n = 0; n < ncall; n++) {
+            f_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+        }
+        break;
+    case 4:
+        for (n = 0; n < ncall; n++) {
+            g_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+        }
+        break;
+    default:
+        for (n = 0; n < ncall; n++) {
+            a_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+        }
+    }
+    return gsph;
+}
+
+void c2s_sph_3c2e1(double* bufijk, double* gctr, int* dims,
+    Env* envs, double* cache)
+{
+    int i_l = envs->i_l;
+    int j_l = envs->j_l;
+    int k_l = envs->k_l;
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int di = i_l * 2 + 1;
+    int dj = j_l * 2 + 1;
+    int dk = k_l * 2 + 1;
+    int ni = dims[0];
+    int nj = dims[1];
+    int nk = dims[2];
+    int nfi = envs->nfi;
+    int nfk = envs->nfk;
+    int nf = envs->nf;
+    int nfik = nfi * nfk;
+    int ofj = ni * dj;
+    int ofk = ni * nj * dk;
+    int ic, jc, kc;
+    int buflen = nfi * nfk * dj;
+    double* buf1;
+    MALLOC_INSTACK(buf1, buflen * 3, cache);
+    double* buf2 = buf1 + buflen;
+    double* buf3 = buf2 + buflen;
+    double* pijk;
+    double* tmp1;
+
+    for (kc = 0; kc < k_ctr; kc++) {
+        for (jc = 0; jc < j_ctr; jc++) {
+            for (ic = 0; ic < i_ctr; ic++) {
+                tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
+                tmp1 = sph2e_inner(buf2, tmp1, k_l, nfi, dj, nfi * dk, nfik);
+                tmp1 = (c2s_bra_sph[i_l])(buf3, dk * dj, tmp1, i_l);
+                pijk = bufijk + ofk * kc + ofj * jc + di * ic;
+                dcopy_iklj(pijk, tmp1, ni, nj, nk, 1, di, dj, dk, 1);
+                gctr += nf;
+            }
+        }
+    }
+}
+
+int set_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double* rj,
+    double* log_maxci, double* log_maxcj,
+    int li_ceil, int lj_ceil, int iprim, int jprim,
+    double rr_ij, double expcutoff, double* env)
+{
+    int ip, jp, n;
+    double aij, eij, cceij, wj;
+    // Normally
+    //    (aj*d/sqrt(aij)+1)^li * (ai*d/sqrt(aij)+1)^lj
+    //    * pi^1.5/aij^{(li+lj+3)/2} * exp(-ai*aj/aij*rr_ij)
+    // is a good approximation for overlap integrals.
+    //    <~ (aj*d/aij+1/sqrt(aij))^li * (ai*d/aij+1/sqrt(aij))^lj * (pi/aij)^1.5
+    //    <~ (d+1/sqrt(aij))^(li+lj) * (pi/aij)^1.5
+    aij = ai[iprim - 1] + aj[jprim - 1];
+    double log_rr_ij = 1.7 - 1.5 * log(aij);
+    int lij = li_ceil + lj_ceil;
+    if (lij > 0) {
+        double dist_ij = sqrt(rr_ij);
+        double omega = env[8];
+        if (omega < 0) {
+            double r_guess = 8.;
+            double omega2 = omega * omega;
+            double theta = omega2 / (omega2 + aij);
+            log_rr_ij += lij * log(dist_ij + theta * r_guess + 1.);
+        }
+        else {
+            log_rr_ij += lij * log(dist_ij + 1.);
+        }
+    }
+    PairData* pdata;
+
+    int empty = 1;
+    for (n = 0, jp = 0; jp < jprim; jp++) {
+        for (ip = 0; ip < iprim; ip++, n++) {
+            aij = 1 / (ai[ip] + aj[jp]);
+            eij = rr_ij * ai[ip] * aj[jp] * aij;
+            cceij = eij - log_rr_ij - log_maxci[ip] - log_maxcj[jp];
+            pdata = pairdata + n;
+            pdata->cceij = cceij;
+            if (cceij < expcutoff) {
+                empty = 0;
+                wj = aj[jp] * aij;
+                pdata->rij[0] = ri[0] + wj * (rj[0] - ri[0]);
+                pdata->rij[1] = ri[1] + wj * (rj[1] - ri[1]);
+                pdata->rij[2] = ri[2] + wj * (rj[2] - ri[2]);
+                pdata->eij = exp(-eij);
+            }
+            else {
+                pdata->rij[0] = 1e18;
+                pdata->rij[1] = 1e18;
+                pdata->rij[2] = 1e18;
+                pdata->eij = 0;
+            }
+        }
+    }
+    return empty;
+}
+
+#define PAIRDATA_NON0IDX_SIZE(ps) \
+                int *bas = envs->bas; \
+                int *shls  = envs->shls; \
+                int i_prim = bas(2, shls[0]); \
+                int j_prim = bas(2, shls[1]); \
+                int k_prim = bas(2, shls[2]); \
+                int ps = (i_prim*j_prim * 5 \
+                           + i_prim * x_ctr[0] \
+                           + j_prim * x_ctr[1] \
+                           + k_prim * x_ctr[2] \
+                           +(i_prim+j_prim)*2 + k_prim + envs->nf*3 + 16);
+
+#define COMMON_ENVS_AND_DECLARE \
+        int *shls = envs->shls; \
+        int *bas = envs->bas; \
+        double *env = envs->env; \
+        int i_sh = shls[0]; \
+        int j_sh = shls[1]; \
+        Opt *opt = envs->opt; \
+        if (opt->pairdata != NULL && \
+            opt->pairdata[i_sh*opt->nbas+j_sh] == ((void *)0xffffffffffffffffuL)) { \
+                return 0; \
+        } \
+        int k_sh = shls[2]; \
+        int i_ctr = envs->x_ctr[0]; \
+        int j_ctr = envs->x_ctr[1]; \
+        int k_ctr = envs->x_ctr[2]; \
+        int i_prim = bas(2, i_sh); \
+        int j_prim = bas(2, j_sh); \
+        int k_prim = bas(2, k_sh); \
+        double *ai = env + bas(5, i_sh); \
+        double *aj = env + bas(5, j_sh); \
+        double *ak = env + bas(5, k_sh); \
+        double *ci = env + bas(6, i_sh); \
+        double *cj = env + bas(6, j_sh); \
+        double *ck = env + bas(6, k_sh); \
+        double expcutoff = envs->expcutoff; \
+        double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2]; \
+        PairData *pdata_base, *pdata_ij; \
+        if (opt->pairdata != NULL) { \
+                pdata_base = opt->pairdata[i_sh*opt->nbas+j_sh]; \
+        } else { \
+                double *log_maxci = opt->log_max_coeff[i_sh]; \
+                double *log_maxcj = opt->log_max_coeff[j_sh]; \
+                MALLOC_INSTACK(pdata_base, i_prim*j_prim, cache); \
+                if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj, \
+                                     log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil, \
+                                     i_prim, j_prim, rr_ij, expcutoff, env)) { \
+                        return 0; \
+                } \
+        } \
+        int n_comp = envs->ncomp_e1 * envs->ncomp_tensor; \
+        size_t nf = envs->nf; \
+        double fac1i, fac1j, fac1k; \
+        int ip, jp, kp; \
+        int _empty[4] = {1, 1, 1, 1}; \
+        int *iempty = _empty + 0; \
+        int *jempty = _empty + 1; \
+        int *kempty = _empty + 2; \
+        int *gempty = _empty + 3; \
+        int *non0ctri = opt->non0ctr[i_sh]; \
+        int *non0ctrj = opt->non0ctr[j_sh]; \
+        int *non0idxi = opt->sortedidx[i_sh]; \
+        int *non0idxj = opt->sortedidx[j_sh]; \
+        int *non0ctrk, *non0idxk; \
+        MALLOC_INSTACK(non0ctrk, k_prim+k_prim*k_ctr, cache); \
+        non0idxk = non0ctrk + k_prim; \
+        Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr); \
+        double expij, cutoff; \
+        double *rij; \
+        double *rkl = envs->rkl; \
+        int *idx = opt->index_xyz_array[envs->i_l*16*16 \
+                                        +envs->j_l*16+envs->k_l]; \
+        if (idx == NULL) { \
+                MALLOC_INSTACK(idx, nf * 3, cache); \
+                g2e_index_xyz(idx, envs); \
+        }
+
+#define ADJUST_CUTOFF      \
+        double omega = env[8]; \
+        if (omega < 0 && envs->rys_order > 1) { \
+                double r_guess = 8.; \
+                double omega2 = omega * omega; \
+                int lij = envs->li_ceil + envs->lj_ceil; \
+                if (lij > 0) { \
+                        double dist_ij = sqrt(rr_ij); \
+                        double aij = ai[i_prim-1] + aj[j_prim-1]; \
+                        double theta = omega2 / (omega2 + aij); \
+                        expcutoff += lij * log( \
+                                (dist_ij+theta*r_guess+1.)/(dist_ij+1.)); \
+                } \
+                if (envs->lk_ceil > 0) { \
+                        double theta = omega2 / (omega2 + ak[k_prim-1]); \
+                        expcutoff += envs->lk_ceil * log(theta*r_guess+1.); \
+                } \
+        }
+
+#define SET_RIJ    \
+        if (pdata_ij->cceij > expcutoff) { \
+                goto i_contracted; \
+        } \
+        envs->ai[0] = ai[ip]; \
+        expij = pdata_ij->eij; \
+        rij = pdata_ij->rij;
+
+int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
+{
+    COMMON_ENVS_AND_DECLARE;
+    ADJUST_CUTOFF;
+    int nc = i_ctr * j_ctr * k_ctr;
+    // (irys,i,j,k,coord,0:1); +1 for nabla-r12
+    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t lenk = nf * nc * n_comp; // gctrk
+    size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
+    size_t leni = nf * i_ctr * n_comp; // gctri
+    size_t len0 = nf * n_comp; // gout
+    size_t len = leng + lenk + lenj + leni + len0;
+    double* g;
+    MALLOC_INSTACK(g, len, cache);
+    double* g1 = g + leng;
+    double* gout, * gctri, * gctrj, * gctrk;
+
+    ALIAS_ADDR_IF_EQUAL(k, m);
+    ALIAS_ADDR_IF_EQUAL(j, k);
+    ALIAS_ADDR_IF_EQUAL(i, j);
+    ALIAS_ADDR_IF_EQUAL(g, i);
+
+    for (kp = 0; kp < k_prim; kp++) {
+        envs->ak[0] = ak[kp];
+        if (k_ctr == 1) {
+            fac1k = envs->common_factor * ck[kp];
+        }
+        else {
+            fac1k = envs->common_factor;
+            *jempty = 1;
+        }
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+            envs->aj[0] = aj[jp];
+            if (j_ctr == 1) {
+                fac1j = fac1k * cj[jp];
+            }
+            else {
+                fac1j = fac1k;
+                *iempty = 1;
+            }
+            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                SET_RIJ;
+                cutoff = expcutoff - pdata_ij->cceij;
+                if (i_ctr == 1) {
+                    fac1i = fac1j * ci[ip] * expij;
+                }
+                else {
+                    fac1i = fac1j * expij;
+                }
+                envs->fac[0] = fac1i;
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    PRIM2CTR(i, gout, len0);
+                }
+            i_contracted:;
+            } // end loop i_prim
+            if (!*iempty) {
+                PRIM2CTR(j, gctri, leni);
+            }
+        } // end loop j_prim
+        if (!*jempty) {
+            PRIM2CTR(k, gctrj, lenj);
+        }
+    } // end loop k_prim
+
+    if (n_comp > 1 && !*kempty) {
+        TRANSPOSE(gctrk);
+    }
+    return !*empty;
+}
+
+int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
+{
+    COMMON_ENVS_AND_DECLARE;
+    ADJUST_CUTOFF;
+    int nc = i_ctr;
+    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t leni = nf * i_ctr * n_comp; // gctri
+    size_t len0 = nf * n_comp; // gout
+    size_t len = leng + leni + len0;
+    double* g;
+    MALLOC_INSTACK(g, len, cache);
+    double* g1 = g + leng;
+    double* gout, * gctri;
+    ALIAS_ADDR_IF_EQUAL(i, m);
+    gout = g1;
+
+    for (kp = 0; kp < k_prim; kp++) {
+        envs->ak[0] = ak[kp];
+        fac1k = envs->common_factor * ck[kp];
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+            envs->aj[0] = aj[jp];
+            fac1j = fac1k * cj[jp];
+            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                SET_RIJ;
+                cutoff = expcutoff - pdata_ij->cceij;
+                fac1i = fac1j * expij;
+                envs->fac[0] = fac1i;
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                    (*envs->f_gout)(gout, g, idx, envs, 1);
+                    PRIM2CTR(i, gout, len0);
+                }
+            i_contracted:;
+            } // end loop i_prim
+        } // end loop j_prim
+    } // end loop k_prim
+
+    if (n_comp > 1 && !*iempty) {
+        TRANSPOSE(gctri);
+    }
+    return !*empty;
+}
+
+int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
+{
+    COMMON_ENVS_AND_DECLARE;
+    ADJUST_CUTOFF;
+    int nc = j_ctr;
+    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t lenj = nf * j_ctr * n_comp; // gctrj
+    size_t len0 = nf * n_comp; // gout
+    size_t len = leng + lenj + len0;
+    double* g;
+    MALLOC_INSTACK(g, len, cache);
+    double* g1 = g + leng;
+    double* gout, * gctrj;
+    ALIAS_ADDR_IF_EQUAL(j, m);
+    gout = g1;
+
+    for (kp = 0; kp < k_prim; kp++) {
+        envs->ak[0] = ak[kp];
+        fac1k = envs->common_factor * ck[kp];
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+            envs->aj[0] = aj[jp];
+            fac1j = fac1k;
+            *iempty = 1;
+            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                SET_RIJ;
+                cutoff = expcutoff - pdata_ij->cceij;
+                fac1i = fac1j * ci[ip] * expij;
+                envs->fac[0] = fac1i;
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                    (*envs->f_gout)(gout, g, idx, envs, *iempty);
+                    *iempty = 0;
+                }
+            i_contracted:;
+            } // end loop i_prim
+            if (!*iempty) {
+                PRIM2CTR(j, gout, len0);
+            }
+        } // end loop j_prim
+    } // end loop k_prim
+
+    if (n_comp > 1 && !*jempty) {
+        TRANSPOSE(gctrj);
+    }
+    return !*empty;
+}
+
+int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
+{
+    COMMON_ENVS_AND_DECLARE;
+    ADJUST_CUTOFF;
+    int nc = 1;
+    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t len0 = envs->nf * n_comp;
+    size_t len = leng + len0;
+    double* g;
+    MALLOC_INSTACK(g, len, cache);
+    double* gout;
+    if (n_comp == 1) {
+        gout = gctr;
+        gempty = empty;
+    }
+    else {
+        gout = g + leng;
+    }
+
+    for (kp = 0; kp < k_prim; kp++) {
+        envs->ak[0] = ak[kp];
+        fac1k = envs->common_factor * ck[kp];
+
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+            envs->aj[0] = aj[jp];
+            fac1j = fac1k * cj[jp];
+            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                SET_RIJ;
+                cutoff = expcutoff - pdata_ij->cceij;
+                fac1i = fac1j * ci[ip] * expij;
+                envs->fac[0] = fac1i;
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    *gempty = 0;
+                }
+            i_contracted:;
+            } // end loop i_prim
+        } // end loop j_prim
+    } // end loop k_prim
+
+    if (n_comp > 1 && !*gempty) {
+        TRANSPOSE(gout);
+    }
+    return !*empty;
+}
+
+int(*f_3c2e_loop[8])(double*, Env*, double*, int*) = {
+        _3c2e_loop,
+        _3c2e_loop,
+        _3c2e_loop,
+        _3c2e_n11_loop,
+        _3c2e_loop,
+        _3c2e_1n1_loop,
+        _3c2e_loop,
+        _3c2e_111_loop,
+};
+
+void Opt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr)
+{
+    int i, ip;
+    double maxc;
+    for (ip = 0; ip < nprim; ip++) {
+        maxc = 0;
+        for (i = 0; i < nctr; i++) {
+            maxc = std::max(maxc, fabs(coeff[i * nprim + ip]));
+        }
+        log_maxc[ip] = log(maxc);
+    }
+}
+
+int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
+{
+    int* shls = envs->shls;
+    int* bas = envs->bas;
+    double* env = envs->env;
+    int i_sh = shls[0];
+    int j_sh = shls[1];
+    int k_sh = shls[2];
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int i_prim = bas(2, i_sh);
+    int j_prim = bas(2, j_sh);
+    int k_prim = bas(2, k_sh);
+    //double *ri = envs->ri;
+    //double *rj = envs->rj;
+    double* ai = env + bas(5, i_sh);
+    double* aj = env + bas(5, j_sh);
+    double* ak = env + bas(5, k_sh);
+    double* ci = env + bas(6, i_sh);
+    double* cj = env + bas(6, j_sh);
+    double* ck = env + bas(6, k_sh);
+
+    double expcutoff = envs->expcutoff;
+    const double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
+    double* log_maxci, * log_maxcj;
+    PairData* pdata_base, * pdata_ij;
+    MALLOC_INSTACK(log_maxci, i_prim + j_prim, cache);
+    MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
+    log_maxcj = log_maxci + i_prim;
+    Opt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
+    Opt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+    if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+        log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+        i_prim, j_prim, rr_ij, expcutoff, env)) {
+        return 0;
+    }
+
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    size_t nf = envs->nf;
+    double fac1i, fac1j, fac1k;
+    int ip, jp, kp;
+    int _empty[4] = { 1, 1, 1, 1 };
+    int* iempty = _empty + 0;
+    int* jempty = _empty + 1;
+    int* kempty = _empty + 2;
+    int* gempty = _empty + 3;
+    /* COMMON_ENVS_AND_DECLARE end */
+
+    double expij, cutoff;
+    double* rij;
+    double* rkl = envs->rk;
+    double omega = env[8];
+    if (omega < 0 && envs->rys_order > 1) {
+        double r_guess = 8.;
+        double omega2 = omega * omega;
+        int lij = envs->li_ceil + envs->lj_ceil;
+        if (lij > 0) {
+            double dist_ij = sqrt(rr_ij);
+            double aij = ai[i_prim - 1] + aj[j_prim - 1];
+            double theta = omega2 / (omega2 + aij);
+            expcutoff += lij * log(
+                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
+        }
+        if (envs->lk_ceil > 0) {
+            double theta = omega2 / (omega2 + ak[k_prim - 1]);
+            expcutoff += envs->lk_ceil * log(theta * r_guess + 1.);
+        }
+    }
+
+    int* idx;
+    MALLOC_INSTACK(idx, nf * 3, cache);
+    g2e_index_xyz(idx, envs);
+
+    int* non0ctri, * non0ctrj, * non0ctrk;
+    int* non0idxi, * non0idxj, * non0idxk;
+    MALLOC_INSTACK(non0ctri, i_prim + j_prim + k_prim + i_prim * i_ctr + j_prim * j_ctr + k_prim * k_ctr, cache);
+    non0ctrj = non0ctri + i_prim;
+    non0ctrk = non0ctrj + j_prim;
+    non0idxi = non0ctrk + k_prim;
+    non0idxj = non0idxi + i_prim * i_ctr;
+    non0idxk = non0idxj + j_prim * j_ctr;
+    Opt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    Opt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+
+    int nc = i_ctr * j_ctr * k_ctr;
+    // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
+    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t lenk = nf * nc * n_comp; // gctrk
+    size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
+    size_t leni = nf * i_ctr * n_comp; // gctri
+    size_t len0 = nf * n_comp; // gout
+    size_t len = leng + lenk + lenj + leni + len0;
+    double* g;
+    MALLOC_INSTACK(g, len, cache);  // must be allocated last in this function
+    double* g1 = g + leng;
+    double* gout, * gctri, * gctrj, * gctrk;
+
+    ALIAS_ADDR_IF_EQUAL(k, m);
+    ALIAS_ADDR_IF_EQUAL(j, k);
+    ALIAS_ADDR_IF_EQUAL(i, j);
+    ALIAS_ADDR_IF_EQUAL(g, i);
+
+    for (kp = 0; kp < k_prim; kp++) {
+        envs->ak[0] = ak[kp];
+        if (k_ctr == 1) {
+            fac1k = envs->common_factor * ck[kp];
+        }
+        else {
+            fac1k = envs->common_factor;
+            *jempty = 1;
+        }
+
+        pdata_ij = pdata_base;
+        for (jp = 0; jp < j_prim; jp++) {
+            envs->aj[0] = aj[jp];
+            if (j_ctr == 1) {
+                fac1j = fac1k * cj[jp];
+            }
+            else {
+                fac1j = fac1k;
+                *iempty = 1;
+            }
+            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
+                if (pdata_ij->cceij > expcutoff) {
+                    goto i_contracted;
+                }
+                envs->ai[0] = ai[ip];
+                expij = pdata_ij->eij;
+                rij = pdata_ij->rij;
+                cutoff = expcutoff - pdata_ij->cceij;
+                if (i_ctr == 1) {
+                    fac1i = fac1j * ci[ip] * expij;
+                }
+                else {
+                    fac1i = fac1j * expij;
+                }
+                envs->fac[0] = fac1i;
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
+                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    PRIM2CTR(i, gout, len0);
+                }
+            i_contracted:;
+            } // end loop i_prim
+            if (!*iempty) {
+                PRIM2CTR(j, gctri, leni);
+            }
+        } // end loop j_prim
+        if (!*jempty) {
+            PRIM2CTR(k, gctrj, lenj);
+        }
+    } // end loop k_prim
+
+    if (n_comp > 1 && !*kempty) {
+        TRANSPOSE(gctrk);
+    }
+    return !*empty;
+}
+
+int _3c2e_drv(double* out, int* dims, Env* envs, Opt* opt,
+    double* cache, void (*f_e1_c2s)(double*, double*, int*,
+        Env*, double*), int is_ssc)
+{
+    int* x_ctr = envs->x_ctr;
+    size_t nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    if (out == NULL) {
+        PAIRDATA_NON0IDX_SIZE(pdata_size);
+        int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+        int len0 = envs->nf * n_comp;
+        int cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
+            nc * n_comp + envs->nf * 3);
+        return cache_size;
+    }
+    double* stack = NULL;
+    if (cache == NULL) {
+        PAIRDATA_NON0IDX_SIZE(pdata_size);
+        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+        size_t len0 = envs->nf * n_comp;
+        size_t cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
+            nc * n_comp + envs->nf * 3);
+        stack = (double*)malloc(sizeof(double) * cache_size);
+        cache = stack;
+    }
+    double* gctr;
+    MALLOC_INSTACK(gctr, nc * n_comp, cache);
+
+    int n;
+    int empty = 1;
+    if (opt != NULL) {
+        envs->opt = opt;
+        n = ((envs->x_ctr[0] == 1) << 2) + ((envs->x_ctr[1] == 1) << 1) + (envs->x_ctr[2] == 1);
+        f_3c2e_loop[n](gctr, envs, cache, &empty);
+    }
+    else {
+        _3c2e_loop_nopt(gctr, envs, cache, &empty);
+    }
+
+    int counts[4];
+    if (f_e1_c2s == &c2s_sph_3c2e1) {
+        counts[0] = (envs->i_l * 2 + 1) * x_ctr[0];
+        counts[1] = (envs->j_l * 2 + 1) * x_ctr[1];
+        if (is_ssc) {
+            counts[2] = envs->nfk * x_ctr[2];
+        }
+        else {
+            counts[2] = (envs->k_l * 2 + 1) * x_ctr[2];
+        }
+    }
+    else {
+        counts[0] = envs->nfi * x_ctr[0];
+        counts[1] = envs->nfj * x_ctr[1];
+        counts[2] = envs->nfk * x_ctr[2];
+    }
+    counts[3] = 1;
+    if (dims == NULL) {
+        dims = counts;
+    }
+    int nout = dims[0] * dims[1] * dims[2];
+    if (!empty) {
+        for (n = 0; n < n_comp; n++) {
+            (*f_e1_c2s)(out + nout * n, gctr + nc * n, dims, envs, cache);
+        }
+    }
+    else {
+        for (n = 0; n < n_comp; n++) {
+            c2s_dset0(out + nout * n, dims, counts);
+        }
+    }
+    if (stack != NULL) {
+        free(stack);
+    }
+    return !empty;
+}
+
+int int3c2e_sph(double* out, int* dims, int* shls, int* atm, int natm, int* bas, int nbas, double* env, Opt* opt, double* cache) {
+    int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
+    Env envs;
+    init_int3c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+    envs.f_gout = &gout2e;
+    return _3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
+};
+
+void GTOnr3c_fill_s1(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*), double* out, double* buf,
+    int comp, int jobid,
+    int* shls_slice, int* ao_loc, Opt* cintopt,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    const int ish0 = shls_slice[0];
+    const int ish1 = shls_slice[1];
+    const int jsh0 = shls_slice[2];
+    const int jsh1 = shls_slice[3];
+    const int ksh0 = shls_slice[4];
+    const int ksh1 = shls_slice[5];
+    const int nksh = ksh1 - ksh0;
+
+    const int ksh = jobid % nksh + ksh0;
+    const int jstart = jobid / nksh * 8 + jsh0;
+    const int jend = std::min(jstart + 8, jsh1);
+    if (jstart >= jend) {
+        return;
+    }
+
+    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
+    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
+    const size_t naok = ao_loc[ksh1] - ao_loc[ksh0];
+    int dims[] = { naoi, naoj, naok };
+
+    const int k0 = ao_loc[ksh] - ao_loc[ksh0];
+    out += naoi * naoj * k0;
+
+    int ish, jsh, i0, j0;
+    int shls[3] = { 0, 0, ksh };
+
+    for (jsh = jstart; jsh < jend; jsh++) {
+        for (ish = ish0; ish < ish1; ish++) {
+            shls[0] = ish;
+            shls[1] = jsh;
+            i0 = ao_loc[ish] - ao_loc[ish0];
+            j0 = ao_loc[jsh] - ao_loc[jsh0];
+            (*intor)(out + j0 * naoi + i0, dims, shls, atm, natm, bas, nbas, env,
+                cintopt, buf);
+        }
+    }
+}
+
+int GTOmax_shell_dim(const int* ao_loc, const int* shls_slice, int ncenter)
+{
+    int i;
+    int i0 = shls_slice[0];
+    int i1 = shls_slice[1];
+    int di = 0;
+    for (i = 1; i < ncenter; i++) {
+        i0 = std::min(i0, shls_slice[i * 2]);
+        i1 = std::max(i1, shls_slice[i * 2 + 1]);
+    }
+    for (i = i0; i < i1; i++) {
+        di = std::max(di, ao_loc[i + 1] - ao_loc[i]);
+    }
+    return di;
+}
+
+void GTOnr3c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*), 
+        double*, double*, int, int, int*, int*, Opt*, int*, int, int*, int, double*), 
+    double* eri, int comp,
+    int* shls_slice, int* ao_loc, Opt* cintopt,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    const int ish0 = shls_slice[0];
+    const int ish1 = shls_slice[1];
+    const int jsh0 = shls_slice[2];
+    const int jsh1 = shls_slice[3];
+    const int ksh0 = shls_slice[4];
+    const int ksh1 = shls_slice[5];
+    const int nish = ish1 - ish0;
+    const int njsh = jsh1 - jsh0;
+    const int nksh = ksh1 - ksh0;
+    const int di = GTOmax_shell_dim(ao_loc, shls_slice, 3);
+    const int cache_size = GTOmax_cache_size(intor, shls_slice, 3,
+        atm, natm, bas, nbas, env);
+    const int njobs = (std::max(nish, njsh) / 8 + 1) * nksh;
+
+#pragma omp parallel
+    {
+        int jobid;
+        double* buf = (double*)malloc(sizeof(double) * (di * di * di * comp + cache_size));
+#pragma omp for nowait schedule(dynamic)
+        for (jobid = 0; jobid < njobs; jobid++) {
+            (*fill)(intor, eri, buf, comp, jobid, shls_slice, ao_loc,
+                cintopt, atm, natm, bas, nbas, env);
+        }
+        free(buf);
+    }
 }
