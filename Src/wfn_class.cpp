@@ -4,6 +4,7 @@
 #include "cube.h"
 #include "constants.h"
 #include "fchk.h"
+#include "integrator.h"
 
 void WFN::fill_pre()
 {
@@ -6806,3 +6807,4 @@ bool WFN::delete_basis_set()
     }
     return true;
 };
+

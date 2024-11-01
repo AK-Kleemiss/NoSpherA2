@@ -2739,6 +2739,7 @@
     <ClCompile Include="..\Src\constants.cpp" />
     <ClCompile Include="..\Src\DLL_Helper.cpp" />
     <ClCompile Include="..\Src\ECPs_corrections.cpp" />
+    <ClCompile Include="..\Src\integrator.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
@@ -2998,6 +2999,7 @@
     <ClInclude Include="..\Lib\hdf5.h" />
     <ClInclude Include="..\Lib\uthash.h" />
     <ClInclude Include="..\Src\DLL_Helper.h" />
+    <ClInclude Include="..\Src\integrator.h" />
     <ClInclude Include="..\Src\JKFit.h" />
     <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\metatensor.hpp" />
