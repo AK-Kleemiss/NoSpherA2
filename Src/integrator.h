@@ -2,13 +2,14 @@
 #include "wfn_class.h"
 #include "SALTED_predictor.h"
 
-int density_fit(const WFN& wavy);
+int density_fit(const WFN& wavy, const std::string auxname);
 
 int lrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
 int R_lsmit(long double* cs, long double* fmt_ints, int n);
 int lrys_jacobi(int n, double x, double lower, double* roots, double* weights);
 int lrys_laguerre(int n, double x, double lower, double* roots, double* weights);
 void lnaive_jacobi_moments(int n, double t, double lower, long double* mus);
+
 
 typedef struct {
     double rij[3];
@@ -106,3 +107,27 @@ struct Env {
     double rij[3];
     double rkl[3];
 };
+
+int int2c2e_sph(double* out, int* dims, int* shls, int* atms,
+    int natms, int* bas, int nbas, double* env, 
+    Opt* opt, double* cache);
+int int3c2e_sph(double* out, int* dims, int* shls, int* atm,
+    int natm, int* bas, int nbas, double* env,
+    Opt* opt, double* cache);
+void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+    double* mat, int comp, int hermi,
+    int* shls_slice, int* ao_loc, Opt* opt,
+    int* atm, int natm, int* bas, int nbas, double* env);
+void GTOnr3c_fill_s1(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*), double* out, double* buf,
+    int comp, int jobid,
+    int* shls_slice, int* ao_loc, Opt* cintopt,
+    int* atm, int natm, int* bas, int nbas, double* env);
+void GTOnr3c_drv(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+        double*, double*, int, int, int*, int*, Opt*, int*, int, int*, int, double*),
+    double* eri, int comp,
+    int* shls_slice, int* ao_loc, Opt* cintopt,
+    int* atm, int natm, int* bas, int nbas, double* env);
+
+Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);
+Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);

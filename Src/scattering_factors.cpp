@@ -12,6 +12,7 @@
 #include "spherical_density.h"
 #include "AtomGrid.h"
 #include "npy.h"
+#include "integrator.h"
 
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
@@ -3228,6 +3229,8 @@ bool calculate_scattering_factors_HF(
     if (opt.debug)
         file << "made it post CIF, now make grids!" << endl;
     vec2 d1, d2, d3, dens;
+
+    density_fit(wave, "cc-pvqz-rifit");
 
     int points = make_hirshfeld_grids(opt.pbc,
                                       opt.accuracy,

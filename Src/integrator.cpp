@@ -13,57 +13,48 @@
 // The original code can be found at
 // https://github.com/sunqm/libcint
 
-// Placeholder for integral computation functions
-double computeTwoElectronIntegral(const basis_set_entry& a, const basis_set_entry& b) {
-    // Implement the integral computation here
-    return 0.0;
-}
-
-double computeThreeElectronIntegral(const basis_set_entry& a, const basis_set_entry& b, const basis_set_entry& c) {
-    // Implement the integral computation here
-    return 0.0;
-}
-
 // Function to compute two-center two-electron integrals (eri2c)
-void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<std::vector<double>>& eri2c) {
+void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<double>& eri2c) {
     size_t nAux = auxBasis.size();
-    eri2c.resize(nAux, std::vector<double>(nAux, 0.0));
+    eri2c.resize(nAux*nAux, 0.0);
 
+    int shl_slice[] = { 0, nAux, 0, nAux, 0, nAux, 0, nAux };
+    double* env = NULL;
+    int nat = 1;
+    int nbas = 1;
+    int* atoms = NULL;
+    int* bas = NULL;
+    int* aoloc = NULL;
+    Opt opty = int2c2e_optimizer(atoms, nat, bas, nbas, env);
     // Compute integrals
-    for (size_t i = 0; i < nAux; ++i) {
-        for (size_t j = 0; j <= i; ++j) {
-            double value = computeTwoElectronIntegral(auxBasis[i], auxBasis[j]);
-            eri2c[i][j] = value;
-            eri2c[j][i] = value; // Symmetric
-        }
-    }
+    GTOint2c(int2c2e_sph, eri2c.data(), 1, 0, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
 void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     const std::vector<basis_set_entry>& auxBasis,
-    std::vector<std::vector<std::vector<double>>>& eri3c) {
+    std::vector<double>& flat_eri3c) {
     size_t nQM = qmBasis.size();
     size_t nAux = auxBasis.size();
-    eri3c.resize(nQM, std::vector<std::vector<double>>(nQM, std::vector<double>(nAux, 0.0)));
+    flat_eri3c.resize(nQM * nQM * nAux, 0.0);
 
+    int shl_slice[] = { 0, nAux, 0, nAux, 0, nAux, 0, nAux };
+    double* env = NULL;
+    int nat = 1;
+    int nbas = 1;
+    int* atoms = NULL;
+    int* bas = NULL;
+    int* aoloc = NULL;
+    Opt opty = int3c2e_optimizer(atoms, nat, bas, nbas, env);
     // Compute integrals
-    for (size_t i = 0; i < nQM; ++i) {
-        for (size_t j = 0; j <= i; ++j) {
-            for (size_t k = 0; k < nAux; ++k) {
-                double value = computeThreeElectronIntegral(qmBasis[i], qmBasis[j], auxBasis[k]);
-                eri3c[i][j][k] = value;
-                eri3c[j][i][k] = value; // Symmetric w.r.t i and j
-            }
-        }
-    }
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, flat_eri3c.data(), 1, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
 }
 
 int density_fit(const WFN& wavy, const std::string auxname) {
     std::vector<basis_set_entry> qmBasis;   // Quantum mechanical basis
     std::vector<basis_set_entry> auxBasis;  // Auxiliary basis
-    std::vector<std::vector<double>> eri2c;
-    std::vector<std::vector<std::vector<double>>> eri3c;
+    std::vector<double> eri2c;
+    std::vector<double> eri3c;
 
     // Initialize basis functions (qmBasis and auxBasis)
 
@@ -7323,7 +7314,7 @@ int _2c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     const int leni = nf * i_ctr * n_comp; // gctri
     const int len0 = nf * n_comp; // gout
     const int len = leng + lenk + leni + len0;
-    double* g;
+    double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
     double* gout, * gctri, * gctrk;
@@ -7332,12 +7323,12 @@ int _2c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     ALIAS_ADDR_IF_EQUAL(i, k);
     ALIAS_ADDR_IF_EQUAL(g, i);
 
-    int* idx;
+    int* idx = NULL;
     MALLOC_INSTACK(idx, envs->nf * 3, cache);
     g1e_index_xyz(idx, envs);
 
-    int* non0ctri, * non0ctrk;
-    int* non0idxi, * non0idxk;
+    int* non0ctri=NULL, * non0ctrk=NULL;
+    int* non0idxi=NULL, * non0idxk=NULL;
     MALLOC_INSTACK(non0ctri, i_prim + k_prim + i_prim * i_ctr + k_prim * k_ctr, cache);
     non0ctrk = non0ctri + i_prim;
     non0idxi = non0ctrk + k_prim;
@@ -7410,8 +7401,8 @@ int _2c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
     int* iempty = _empty + 0;
     int* kempty = _empty + 1;
     int* gempty = _empty + 2;
-    int* non0ctri, * non0ctrk;
-    int* non0idxi, * non0idxk;
+    int* non0ctri=NULL, * non0ctrk=NULL;
+    int* non0idxi=NULL, * non0idxk=NULL;
     MALLOC_INSTACK(non0ctri, i_prim + k_prim + i_prim * i_ctr + k_prim * k_ctr, cache);
     non0ctrk = non0ctri + i_prim;
     non0idxi = non0ctrk + k_prim;
@@ -7432,7 +7423,7 @@ int _2c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
     const int leni = nf * i_ctr * n_comp; // gctri
     const int len0 = nf * n_comp; // gout
     const int len = leng + lenk + leni + len0;
-    double* g;
+    double* g=NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
     double* gout, * gctri, * gctrk;
@@ -8811,11 +8802,11 @@ void c2s_sph_1e(double* opij, double* gctr, int* dims,
     int nf = envs->nf;
     int ic, jc;
     int buflen = nfi * dj;
-    double* buf1, * buf2;
+    double* buf1=NULL, * buf2=NULL;
     MALLOC_INSTACK(buf1, buflen, cache);
     MALLOC_INSTACK(buf2, buflen, cache);
-    double* pij;
-    double* tmp1;
+    double* pij=NULL;
+    double* tmp1=NULL;
 
     for (jc = 0; jc < j_ctr; jc++) {
         for (ic = 0; ic < i_ctr; ic++) {
@@ -8874,7 +8865,7 @@ int _2c2e_drv(double* out, int* dims, Env* envs, Opt* opt, double* cache, void (
         stack = (double*)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
-    double* gctr;
+    double* gctr = NULL;
     MALLOC_INSTACK(gctr, nc * n_comp, cache);
 
     int n;
@@ -9446,7 +9437,7 @@ void c2s_sph_3c2e1(double* bufijk, double* gctr, int* dims,
     int ofk = ni * nj * dk;
     int ic, jc, kc;
     int buflen = nfi * nfk * dj;
-    double* buf1;
+    double* buf1 = NULL;
     MALLOC_INSTACK(buf1, buflen * 3, cache);
     double* buf2 = buf1 + buflen;
     double* buf3 = buf2 + buflen;
@@ -9888,8 +9879,8 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
 
     double expcutoff = envs->expcutoff;
     const double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
-    double* log_maxci, * log_maxcj;
-    PairData* pdata_base, * pdata_ij;
+    double* log_maxci=NULL, * log_maxcj;
+    PairData* pdata_base=NULL, * pdata_ij;
     MALLOC_INSTACK(log_maxci, i_prim + j_prim, cache);
     MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
     log_maxcj = log_maxci + i_prim;
@@ -9933,12 +9924,12 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
         }
     }
 
-    int* idx;
+    int* idx=NULL;
     MALLOC_INSTACK(idx, nf * 3, cache);
     g2e_index_xyz(idx, envs);
 
-    int* non0ctri, * non0ctrj, * non0ctrk;
-    int* non0idxi, * non0idxj, * non0idxk;
+    int* non0ctri=NULL, * non0ctrj, * non0ctrk;
+    int* non0idxi=NULL, * non0idxj, * non0idxk;
     MALLOC_INSTACK(non0ctri, i_prim + j_prim + k_prim + i_prim * i_ctr + j_prim * j_ctr + k_prim * k_ctr, cache);
     non0ctrj = non0ctri + i_prim;
     non0ctrk = non0ctrj + j_prim;
@@ -9957,7 +9948,7 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     size_t leni = nf * i_ctr * n_comp; // gctri
     size_t len0 = nf * n_comp; // gout
     size_t len = leng + lenk + lenj + leni + len0;
-    double* g;
+    double* g= NULL;
     MALLOC_INSTACK(g, len, cache);  // must be allocated last in this function
     double* g1 = g + leng;
     double* gout, * gctri, * gctrj, * gctrk;
@@ -10048,7 +10039,7 @@ int _3c2e_drv(double* out, int* dims, Env* envs, Opt* opt,
         stack = (double*)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
-    double* gctr;
+    double* gctr = NULL;
     MALLOC_INSTACK(gctr, nc * n_comp, cache);
 
     int n;
@@ -10470,6 +10461,7 @@ Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
     gen_idx(o, &init_int3c2e_Env, &g2e_index_xyz,
         3, 12, ng, atm, natm, bas, nbas, env);
     //LEAKY! THIS OPTIMIZER ALLOCATES MEMORY; THIS WILL NEED CLEANUP LATER ON!
+    return o;
 }
 
 Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
@@ -10481,4 +10473,5 @@ Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
     gen_idx(o, &init_int2c2e_Env, &g1e_index_xyz,
         2, 15, ng, atm, natm, bas, nbas, env);
     //LEAKY! THIS OPTIMIZER ALLOCATES MEMORY; THIS WILL NEED CLEANUP LATER ON!
+    return o;
 }
