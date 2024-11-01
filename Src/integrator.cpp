@@ -9563,7 +9563,7 @@ int set_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double*
         double *ck = env + bas(6, k_sh); \
         double expcutoff = envs->expcutoff; \
         double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2]; \
-        PairData *pdata_base, *pdata_ij; \
+        PairData *pdata_base = NULL, *pdata_ij = NULL; \
         if (opt->pairdata != NULL) { \
                 pdata_base = opt->pairdata[i_sh*opt->nbas+j_sh]; \
         } else { \
@@ -9589,7 +9589,7 @@ int set_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double*
         int *non0ctrj = opt->non0ctr[j_sh]; \
         int *non0idxi = opt->sortedidx[i_sh]; \
         int *non0idxj = opt->sortedidx[j_sh]; \
-        int *non0ctrk, *non0idxk; \
+        int *non0ctrk = NULL, *non0idxk = NULL; \
         MALLOC_INSTACK(non0ctrk, k_prim+k_prim*k_ctr, cache); \
         non0idxk = non0ctrk + k_prim; \
         Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr); \
@@ -9642,7 +9642,7 @@ int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
     size_t leni = nf * i_ctr * n_comp; // gctri
     size_t len0 = nf * n_comp; // gout
     size_t len = leng + lenk + lenj + leni + len0;
-    double* g;
+    double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
     double* gout, * gctri, * gctrj, * gctrk;
@@ -9711,7 +9711,7 @@ int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
     size_t leni = nf * i_ctr * n_comp; // gctri
     size_t len0 = nf * n_comp; // gout
     size_t len = leng + leni + len0;
-    double* g;
+    double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
     double* gout, * gctri;
@@ -9754,7 +9754,7 @@ int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
     size_t lenj = nf * j_ctr * n_comp; // gctrj
     size_t len0 = nf * n_comp; // gout
     size_t len = leng + lenj + len0;
-    double* g;
+    double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
     double* gout, * gctrj;
@@ -9800,7 +9800,7 @@ int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
     size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     size_t len0 = envs->nf * n_comp;
     size_t len = leng + len0;
-    double* g;
+    double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* gout;
     if (n_comp == 1) {
