@@ -6714,7 +6714,7 @@ int g0_2e(double* g, double* rij, double* rkl, double cutoff, Env* envs)
     return 1;
 }
 
-void init_2c2e_Env(Env* envs, int* ng, int* shls, int* atm, int natm, int* bas, int nbas, double* env)
+void init_int2c2e_Env(Env* envs, int* ng, int* shls, int* atm, int natm, int* bas, int nbas, double* env)
 {
     envs->natm = natm;
     envs->nbas = nbas;
@@ -6744,7 +6744,7 @@ void init_2c2e_Env(Env* envs, int* ng, int* shls, int* atm, int natm, int* bas, 
 
     envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * common_fac_sp(envs->i_l) * common_fac_sp(envs->k_l);
     if (env[0] == 0) {
-        envs->expcutoff = 60;
+        envs->expcutoff = 60.;
     }
     else {
         envs->expcutoff = std::max(40., env[0]);
@@ -7230,7 +7230,7 @@ void cart_comp(int* nx, int* ny, int* nz, const int lmax)
     }
 }
 
-void g1e_index_xyz(int* idx, Env* envs)
+void g1e_index_xyz(int* idx, const Env* envs)
 {
     const int i_l = envs->i_l;
     const int j_l = envs->j_l;
@@ -8921,7 +8921,7 @@ int _2c2e_drv(double* out, int* dims, Env* envs, Opt* opt, double* cache, void (
 int int2c2e_sph(double* out, int* dims, int* shls, int* atms, int natms, int* bas, int nbas, double* env, Opt* opt, double* cache) {
     int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
     Env envs;
-    init_2c2e_Env(&envs, ng, shls, atms, natms, bas, nbas, env);
+    init_int2c2e_Env(&envs, ng, shls, atms, natms, bas, nbas, env);
     envs.f_gout = &gout2e;
     return _2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
 };
@@ -9147,7 +9147,7 @@ void g0_2e_lj2d4d(double* g, Rys2eT* bc, Env* envs)
     g0_lj2d_4d(g, envs);
 }
 
-void init_int3c2e_EnvVars(Env* envs, int* ng, int* shls,
+void init_int3c2e_Env(Env* envs, int* ng, int* shls,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     envs->natm = natm;
@@ -10102,7 +10102,7 @@ int _3c2e_drv(double* out, int* dims, Env* envs, Opt* opt,
 int int3c2e_sph(double* out, int* dims, int* shls, int* atm, int natm, int* bas, int nbas, double* env, Opt* opt, double* cache) {
     int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
     Env envs;
-    init_int3c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+    init_int3c2e_Env(&envs, ng, shls, atm, natm, bas, nbas, env);
     envs.f_gout = &gout2e;
     return _3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
 };
@@ -10467,7 +10467,18 @@ Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
     init_2e_optimizer(o, atm, natm, bas, nbas, env);
     Opt_setij(o, ng, atm, natm, bas, nbas, env);
     Opt_set_non0coeff(o, atm, natm, bas, nbas, env);
-    gen_idx(o, &init_int3c2e_EnvVars, &g2e_index_xyz,
+    gen_idx(o, &init_int3c2e_Env, &g2e_index_xyz,
         3, 12, ng, atm, natm, bas, nbas, env);
+    //LEAKY! THIS OPTIMIZER ALLOCATES MEMORY; THIS WILL NEED CLEANUP LATER ON!
+}
+
+Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env) {
+    int ng[] = { 0,0,0,0,0,1,1,1 };
+    Opt o;
+    init_2e_optimizer(o, atm, natm, bas, nbas, env);
+    Opt_set_log_maxc(o, atm, natm, bas, nbas, env);
+    Opt_set_non0coeff(o, atm, natm, bas, nbas, env);
+    gen_idx(o, &init_int2c2e_Env, &g1e_index_xyz,
+        2, 15, ng, atm, natm, bas, nbas, env);
     //LEAKY! THIS OPTIMIZER ALLOCATES MEMORY; THIS WILL NEED CLEANUP LATER ON!
 }
