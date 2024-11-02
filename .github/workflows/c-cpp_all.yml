@@ -59,7 +59,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make_Linux
-      run: make NoSpherA2
+      run: sudo apt update && sudo apt install liblapacke-dev liblapack-dev liblapacke liblapack && make NoSpherA2
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -84,7 +84,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make_Linux
-      run: make NoSpherA2_Rascaline
+      run: sudo apt update && sudo apt install liblapacke-dev liblapack-dev liblapacke liblapack && make NoSpherA2_Rascaline
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3

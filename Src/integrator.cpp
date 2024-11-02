@@ -13,21 +13,39 @@
 // The original code can be found at
 // https://github.com/sunqm/libcint
 
+#define bas(SLOT,I)     bas[8 * (I) + (SLOT)] //Basis set data for atom I
+#define atm(SLOT,I)     atm[6 * (I) + (SLOT)] //Atom data for atom I
+
+int* make_loc(int* bas, int nbas) {
+    ivec shell_lengs(nbas, 0);
+    for (int i = 0; i < nbas; i++) {
+        shell_lengs[i] = (2*bas(1,i)+1);
+    }
+    int* ao_loc = new int[nbas+1];
+    ao_loc[0] = 0;
+    std::partial_sum(shell_lengs.begin(), shell_lengs.end(), ao_loc + 1);
+    return ao_loc;
+}
+
 // Function to compute two-center two-electron integrals (eri2c)
 void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<double>& eri2c) {
     size_t nAux = auxBasis.size();
-    eri2c.resize(nAux*nAux, 0.0);
 
-    int shl_slice[] = { 0, nAux, 0, nAux, 0, nAux, 0, nAux };
+    int shl_slice[] = { 0, nAux, 0, nAux};
     double* env = NULL;
     int nat = 1;
     int nbas = 1;
     int* atoms = NULL;
     int* bas = NULL;
-    int* aoloc = NULL;
+    int* aoloc = make_loc(bas, nbas);
+    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+
+    eri2c.resize(naoi * naoj, 0.0);
     Opt opty = int2c2e_optimizer(atoms, nat, bas, nbas, env);
     // Compute integrals
     GTOint2c(int2c2e_sph, eri2c.data(), 1, 0, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
+    free(aoloc);
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
@@ -36,18 +54,23 @@ void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     std::vector<double>& flat_eri3c) {
     size_t nQM = qmBasis.size();
     size_t nAux = auxBasis.size();
-    flat_eri3c.resize(nQM * nQM * nAux, 0.0);
 
-    int shl_slice[] = { 0, nAux, 0, nAux, 0, nAux, 0, nAux };
+    int shl_slice[] = { 0, nQM, 0, nQM, nQM, nQM+nAux, };
     double* env = NULL;
     int nat = 1;
     int nbas = 1;
     int* atoms = NULL;
     int* bas = NULL;
-    int* aoloc = NULL;
+    int* aoloc = make_loc(bas, nbas);
+    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+    int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+
+    flat_eri3c.resize(naoi * naoj * naok, 0.0);
     Opt opty = int3c2e_optimizer(atoms, nat, bas, nbas, env);
     // Compute integrals
     GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, flat_eri3c.data(), 1, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
+    free(aoloc);
 }
 
 int density_fit(const WFN& wavy, const std::string auxname) {
@@ -67,11 +90,6 @@ int density_fit(const WFN& wavy, const std::string auxname) {
     std::cout << "Done!" << std::endl;
     return 0;
 }
-
-
-
-#define bas(SLOT,I)     bas[8 * (I) + (SLOT)]
-#define atm(SLOT,I)     atm[6 * (I) + (SLOT)]
 
 constexpr double common_fac_sp(int l)
 {
