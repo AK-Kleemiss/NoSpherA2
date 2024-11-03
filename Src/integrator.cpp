@@ -32,7 +32,7 @@ void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<doub
     size_t nAux = auxBasis.size();
 
     int shl_slice[] = { 0, nAux, 0, nAux};
-    double* env = NULL;
+    double* env = NULL; //Will partially contain the basis set data
     int nat = 1;
     int nbas = 1;
     int* atoms = NULL;
@@ -56,7 +56,7 @@ void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     size_t nAux = auxBasis.size();
 
     int shl_slice[] = { 0, nQM, 0, nQM, nQM, nQM+nAux, };
-    double* env = NULL;
+    double* env = NULL; //Will partially contain the basis set data
     int nat = 1;
     int nbas = 1;
     int* atoms = NULL;
