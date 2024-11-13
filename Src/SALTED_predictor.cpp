@@ -22,6 +22,10 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         }
         std::string _f_path("inputs.txt");
         join_path(_path, _f_path);
+        if (_opt.debug)
+        {
+            std::cout << "Using inputs file: " << _path << std::endl;
+        }
         config.populateFromFile(_path);
     }
     else

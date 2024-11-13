@@ -68,7 +68,7 @@ std::string NoSpherA2_message(bool no_date)
     t.append("Please give credit and cite corresponding pieces!\nThis Software is published with BSD-2 clause license.\n");
     if (!no_date)
     {
-        t.append("List of contributors of pieces of code or funcitonality:\n");
+        t.append("List of contributors of pieces of code or functionality:\n");
         t.append("      Florian Kleemiss,\n");
         t.append("      Emmanuel Hupf,\n");
         t.append("      Alessandro Genoni,\n");
