@@ -1646,32 +1646,82 @@ static void Calc_Hirshfeld_atom_2(
   }
 };
 
-vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom) {
+enum class dipole_types {
+    atom,
+    geometry,
+    hirshfeld,
+    vdW,
+    Unknown
+};
+
+dipole_types stringTodipole_types(const std::string& str) {
+    static const std::unordered_map<std::string, dipole_types> stringToEnumMap = {
+        {"atom", dipole_types::atom},
+        {"geometry", dipole_types::geometry},
+        {"hirshfeld", dipole_types::hirshfeld},
+        {"vdW", dipole_types::vdW}
+    };
+
+    auto it = stringToEnumMap.find(str);
+    if (it != stringToEnumMap.end()) {
+        return it->second;
+    }
+    else {
+        return dipole_types::Unknown;
+    }
+}
+
+vec calc_dipole_for_atom(WFN& wavy, const int& i, cube& Hirshfeld_atom, vec& charges, std::string type = "atom") {
   double mu_x = 0, mu_y = 0, mu_z = 0;
   double scratch = 0;
   const double ax = wavy.get_atom_coordinate(i, 0), ay = wavy.get_atom_coordinate(i, 1), az = wavy.get_atom_coordinate(i, 2), dv = Hirshfeld_atom.get_dv();
   //const int c = wavy.get_atom_charge(i);
   double charge = 0;
+  vec origin{ 0, 0, 0 };
+  vec bound_atoms;
+  for (int j = 0; j < wavy.get_ncen(); j++) {
+      if (i == j) continue;
+      double dist = sqrt(pow(ax - wavy.get_atom_coordinate(j, 0), 2) + pow(ay - wavy.get_atom_coordinate(j, 1), 2) + pow(az - wavy.get_atom_coordinate(j, 2), 2));
+      double svdW = constants::covalent_radii[wavy.atoms[i].charge] + constants::covalent_radii[wavy.atoms[j].charge];
+      if (dist < 1.1*svdW) {
+          bound_atoms.push_back(j);
+      }
   const double v[9] = { Hirshfeld_atom.get_vector(0, 0), Hirshfeld_atom.get_vector(0, 1), Hirshfeld_atom.get_vector(0, 2),
-												 Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),
-												 Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2) };
+                        Hirshfeld_atom.get_vector(1, 0), Hirshfeld_atom.get_vector(1, 1), Hirshfeld_atom.get_vector(1, 2),
+                        Hirshfeld_atom.get_vector(2, 0), Hirshfeld_atom.get_vector(2, 1), Hirshfeld_atom.get_vector(2, 2) };
+  switch (stringTodipole_types(type)) {
+  case dipole_types::atom:
+      origin = { ax, ay, az };
+      break;
+  case dipole_types::geometry:
+      err_not_impl_f("geometry position not yet implemented", std::cout);
+      origin = { 0, 0, 0 };
+      break;
+  case dipole_types::hirshfeld:
+      err_not_impl_f("hirshfeld centers not yet implemented", std::cout);
+      break;
+  case dipole_types::vdW:
+      err_not_impl_f("vdW radius basis not implemented", std::cout);
+      break;
+  case dipole_types::Unknown:
+      err_not_impl_f("Unknown dipole type", std::cout);
+      break;
+  }
 #pragma omp parallel for reduction(+:mu_x, mu_y, mu_z, charge) private(scratch)
   for (int x = 0; x < Hirshfeld_atom.get_size(0); x++) {
-    for (int y = 0; y < Hirshfeld_atom.get_size(1); y++) {
-      for (int z = 0; z < Hirshfeld_atom.get_size(2); z++) {
-        const double PosGrid[3]{
-                    x * v[0] + y * v[1] + z * v[2] + Hirshfeld_atom.get_origin(0),
-                    x * v[3] + y * v[4] + z * v[5] + Hirshfeld_atom.get_origin(1),
-                    x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2) };
-        //scratch = -Hirshfeld_atom.get_value(x, y, z) * dv + c;
-        //scratch = c;
-        scratch = Hirshfeld_atom.get_value(x, y, z) * dv;
-        charge += scratch;
-        mu_x += (PosGrid[0] - ax) * scratch;
-        mu_y += (PosGrid[1] - ay) * scratch;
-        mu_z += (PosGrid[2] - az) * scratch;
+      for (int y = 0; y < Hirshfeld_atom.get_size(1); y++) {
+          for (int z = 0; z < Hirshfeld_atom.get_size(2); z++) {
+              const double PosGrid[3]{
+                          x * v[0] + y * v[1] + z * v[2] + Hirshfeld_atom.get_origin(0),
+                          x * v[3] + y * v[4] + z * v[5] + Hirshfeld_atom.get_origin(1),
+                          x * v[6] + y * v[7] + z * v[8] + Hirshfeld_atom.get_origin(2) };
+              scratch = Hirshfeld_atom.get_value(x, y, z) * dv;
+              charge += scratch;
+              mu_x += (PosGrid[0] - origin[0]) * scratch;
+              mu_y += (PosGrid[1] - origin[1]) * scratch;
+              mu_z += (PosGrid[2] - origin[2]) * scratch;
+          }
       }
-    }
   }
   return { mu_x, mu_y, mu_z ,charge};
 }
@@ -1727,9 +1777,8 @@ void dipole_moments(options& opt, std::ostream& log2)
   SPHER.set_comment2("from" + wavy.get_path());
   Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
   SPHER.path = get_basename_without_ending(wavy.get_path()) + "_spher.cube";
-  cube Hirsh = Rho;
-  Hirsh.calc_dv();
-  Hirsh.give_parent_wfn(wavy);
+  vector<cube> Hirsh(wavy.get_ncen(), Rho);
+  vec charges(wavy.get_ncen(), 0);
 
   log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 
@@ -1740,14 +1789,16 @@ void dipole_moments(options& opt, std::ostream& log2)
   log2 << " ...done!" << endl;
   vec2 dipole_moments;
   for (int i = 0; i < wavy.get_ncen(); i++) {
-      Hirsh.set_zero();
+      Hirsh[i].calc_dv();
+      Hirsh[i].give_parent_wfn(wavy);
+      Hirsh[i].set_zero();
       log2 << "Calcualting Hirshfeld density for atom: " << i << endl;
-      Calc_Hirshfeld_atom_2(Hirsh, Rho, SPHER, wavy, opt.threads, i, log2);
-      //Hirsh.path = get_basename_without_ending(wavy.get_path()) + "_h" + to_string(i) + ".cube";
-      //Hirsh.write_file(true);
+      Calc_Hirshfeld_atom_2(Hirsh[i], Rho, SPHER, wavy, opt.threads, i, log2);
+      charges[i] = Hirsh[i].sum();
       log2 << "..done!" << endl;
-      dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh));
   }
+  for(int i=0; i<wavy.get_ncen(); i++)
+      dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh[i]));
   log2 << " atom   |  dipole moment x,        y,         z" << endl << "======================================" << endl;
   for (int i = 0; i < wavy.get_ncen(); i++) {
     log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;

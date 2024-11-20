@@ -1707,7 +1707,7 @@ int make_hirshfeld_grids(
     // Total grid as a sum of all atomic grids.
     // Dimensions: [c] [p]
     // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=numerical grid weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
     vec2 total_grid(7);
     file << "Pruning Grid..." << flush;
 

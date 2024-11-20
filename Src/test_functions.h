@@ -497,6 +497,96 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
     return new_result;
 }
 
+void calc_partition_densities() {
+    using namespace std;
+    WFN Hartree_Fock(9);
+    WFN DFT(9);
+    Hartree_Fock.read_known_wavefunction_format("HF.gbw", std::cout, false);
+    DFT.read_known_wavefunction_format("DFT.gbw", std::cout, false);
+
+    vec Pos_C = { Hartree_Fock.atoms[0].x, Hartree_Fock.atoms[0].y, Hartree_Fock.atoms[0].z };
+    vec Pos_H1 = { Hartree_Fock.atoms[1].x, Hartree_Fock.atoms[1].y, Hartree_Fock.atoms[1].z };
+    vec Pos_H2 = { Hartree_Fock.atoms[2].x, Hartree_Fock.atoms[2].y, Hartree_Fock.atoms[2].z };
+    vec Pos_H3 = { Hartree_Fock.atoms[3].x, Hartree_Fock.atoms[3].y, Hartree_Fock.atoms[3].z };
+    vec Pos_H4 = { Hartree_Fock.atoms[4].x, Hartree_Fock.atoms[4].y, Hartree_Fock.atoms[4].z };
+    vec x_coords = {
+        Hartree_Fock.atoms[0].x,
+        Hartree_Fock.atoms[1].x,
+        Hartree_Fock.atoms[2].x,
+        Hartree_Fock.atoms[3].x,
+        Hartree_Fock.atoms[4].x
+    };
+    vec y_coords = {
+        Hartree_Fock.atoms[0].y,
+        Hartree_Fock.atoms[1].y,
+        Hartree_Fock.atoms[2].y,
+        Hartree_Fock.atoms[3].y,
+        Hartree_Fock.atoms[4].y
+    };
+    vec z_coords = {
+        Hartree_Fock.atoms[0].z,
+        Hartree_Fock.atoms[1].z,
+        Hartree_Fock.atoms[2].z,
+        Hartree_Fock.atoms[3].z,
+        Hartree_Fock.atoms[4].z
+    };
+    ivec charges{ 6,1,1,1,1 };
+    const double fac = 0.01;
+    const int min = -100, max = 500;
+    const int size = -min + max + 1;
+    vec C_dens (size, 0.0), H_dens(size, 0.0), total_dens(size, 0.0);
+    vec HF_densities(size, 0.0);
+    vec DFT_densities(size, 0.0);
+    vec B_weights_C(size, 0.0), B_weights_H(size, 0.0);
+    Thakkar C(6);
+    Thakkar H(1);
+    
+    ofstream result("densities.dat", ios::out);
+    ProgressBar pb(size, 100, "=", "", "Calculating densities");
+//#pragma omp parallel 
+//    {
+        vec2 d(16);
+        for (int i = 0; i < 16; i++) d[i].resize(DFT.get_ncen());
+        vec phi(DFT.get_nmo(), 0.0);
+        double x = 0;
+        vec pa(5);
+//#pragma omp for
+        for (int i = 0; i < size; i++) {
+            x = (i+min) * fac;
+            HF_densities[i] = Hartree_Fock.compute_dens(x, 0, 0, d, phi);
+            DFT_densities[i] = DFT.compute_dens(x, 0, 0, d, phi);
+            double temp = abs(x - Pos_C[0]);
+            C_dens[i] = C.get_radial_density(temp);
+            total_dens[i] = C_dens[i];
+            temp = abs(x - Pos_H1[0]);
+            H_dens[i] = H.get_radial_density(temp);
+            total_dens[i] += H_dens[i];
+            temp = sqrt(pow(x - Pos_H2[0], 2) + pow(Pos_H2[1], 2) + pow(Pos_H2[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_H3[0], 2) + pow(Pos_H3[1], 2) + pow(Pos_H3[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
+            total_dens[i] += H.get_radial_density(temp);
+            B_weights_C[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa);
+            B_weights_H[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa);
+            pb.update();
+        }
+//    }
+    for (int i = 0; i < size; i++) {
+        result << setw(10) << setprecision(4) << scientific << (i+min) * fac
+            << setw(16) << setprecision(8) << scientific << HF_densities[i]
+            << setw(16) << setprecision(8) << scientific << DFT_densities[i]
+            << setw(16) << setprecision(8) << scientific << C_dens[i]
+            << setw(16) << setprecision(8) << scientific << H_dens[i]
+            << setw(16) << setprecision(8) << scientific << total_dens[i] 
+            << setw(16) << setprecision(8) << scientific << B_weights_C[i]
+            << setw(16) << setprecision(8) << scientific << B_weights_H[i] << endl;
+    }
+    result.flush();
+    result.close();
+    exit(0);
+};
+
 cdouble calc_spherically_averaged_at_k(vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
                                        const double &k,
                                        const double rel_precision = 1E-4,

@@ -4745,7 +4745,7 @@ const double WFN::compute_dens(
     }
     else
     {
-        err_checkf(d.size() >= 4, "d is too small!", std::cout);
+        err_checkf(d.size() >= 16, "d is too small!", std::cout);
         err_checkf(phi.size() >= get_nmo(true), "phi is too small!", std::cout);
         return compute_dens_cartesian(Pos1, Pos2, Pos3, d, phi);
     }

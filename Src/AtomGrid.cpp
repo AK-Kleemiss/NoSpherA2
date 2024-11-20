@@ -343,7 +343,6 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 }
 
 // JCP 88, 2547 (1988), eq. 20
-// JCP 88, 2547 (1988), eq. 20
 constexpr double f3(const double& x)
 {
   double f = x;
@@ -363,15 +362,15 @@ constexpr double f(const double& x)
 
 // JCP 88, 2547 (1988)
 double get_becke_w(const int& num_centers,
-  const int proton_charges[],
-  const double x_coordinates_bohr[],
-  const double y_coordinates_bohr[],
-  const double z_coordinates_bohr[],
+  const int* proton_charges,
+  const double* x_coordinates_bohr,
+  const double* y_coordinates_bohr,
+  const double* z_coordinates_bohr,
   const int& center_index,
   const double& x,
   const double& y,
   const double& z,
-  vec& pa)
+  std::vector<double>& pa)
 {
   double R_a, R_b;
   double u_ab, a_ab, mu_ab, nu_ab;
@@ -459,15 +458,13 @@ double get_becke_w(const int& num_centers,
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-double get_r_inner(const double& max_error, const double& alpha_inner)
+constexpr double get_r_inner(const double& max_error, const double& alpha_inner)
 {
-  int m = 0;
   double d = 1.9;
 
-  double r = d - std::log(1.0 / max_error);
-  r = r * 2.0 / (m + 3.0);
-  r = std::exp(r) / (alpha_inner);
-  r = std::sqrt(r);
+  double r = (d - constants::log_approx(1.0 / max_error)) * 2./3.;
+  r = constants::exp_approx(r) / (alpha_inner);
+  r = constants::sqrt(r);
 
   return r;
 }

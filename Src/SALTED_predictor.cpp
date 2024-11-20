@@ -250,7 +250,7 @@ void SALTEDPredictor::read_model_data()
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
-
+#if has_RAS == 1
     H5::H5File features(_opt.SALTED_DIR + "/GPR_data/FEAT_M-" + std::to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
     H5::H5File projectors(_opt.SALTED_DIR + "/GPR_data/projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
@@ -259,6 +259,7 @@ void SALTEDPredictor::read_model_data()
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
+
             vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
             power_env_sparse[spe + std::to_string(lam)] = temp_power;
             vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
@@ -278,6 +279,9 @@ void SALTEDPredictor::read_model_data()
     }
     features.close();
     projectors.close();
+#else
+    err_not_impl_f("Not possible wihtout Rascaline and BLAS", std::cout);
+#endif
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {

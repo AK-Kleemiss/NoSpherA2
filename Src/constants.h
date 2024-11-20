@@ -137,6 +137,29 @@ namespace constants
     constexpr size_t socd = sizeof(std::complex<double>);
     constexpr size_t soli = sizeof(long int);
 
+    constexpr double exp_approx(const double& x, int n = 25) {
+        double result = 1.0;
+        double term = 1.0;
+        for (int i = 1; i <= n; ++i) {
+            term *= x / i;
+            result += term;
+        }
+        return result;
+    }
+
+    constexpr double log_approx(const double& x, int n = 25) {
+        if (x <= 0.0) return -1.0; // log is not defined for non-positive values
+        double result = 0.0;
+        double term = (x - 1) / (x + 1);
+        double term_squared = term * term;
+        double current_term = term;
+        for (int i = 1; i <= n; i += 2) {
+            result += current_term / i;
+            current_term *= term_squared;
+        }
+        return 2 * result;
+    }
+
     constexpr long long int ft_fun(const int& nr)
     {
         if (nr >= 0 && nr <= 20)

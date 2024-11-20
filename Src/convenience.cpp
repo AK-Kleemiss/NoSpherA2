@@ -2241,8 +2241,12 @@ void options::digest_options()
             cif = arguments[i + 1];
             err_checkf(exists(cif), "CIF doesn't exist", cout);
         }
-        else if (temp == "-cpus")
+        else if (temp == "-cpus") {
             threads = stoi(arguments[i + 1]);
+#ifdef _OPENMP
+            omp_set_num_threads(threads);
+#endif
+        }
         else if (temp == "-cmtc")
         {
             cif_based_combined_tsc_calc = true;
@@ -2622,6 +2626,9 @@ void options::digest_options()
         else if (temp == "-xyz")
         {
             xyz_file = arguments[i + 1];
+        }
+        else if (temp == "-partitioning_test") {
+            calc_partition_densities();
         }
     }
 };

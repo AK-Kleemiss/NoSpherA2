@@ -97,17 +97,17 @@ class AtomGrid
 };
 
 double get_becke_w(const int& num_centers,
-    const int proton_charges[],
-    const double x_coordinates_bohr[],
-    const double y_coordinates_bohr[],
-    const double z_coordinates_bohr[],
+    const int* proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
     const int& center_index,
     const double& x,
     const double& y,
     const double& z,
     std::vector<double>& pa);
 
-double get_r_inner(const double& max_error, const double& alpha_inner);
+constexpr double get_r_inner(const double& max_error, const double& alpha_inner);
 
 double get_r_outer(const double& max_error,
     const double& alpha_outer,
