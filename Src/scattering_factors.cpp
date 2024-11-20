@@ -2644,20 +2644,12 @@ void calc_SF(const int &points,
 #pragma omp parallel for private(work, rho)
         for (long long int s = 0; s < smax; s++)
         {
+#pragma ivdep
             for (long long int p = pmax - 1; p >= 0; p--)
             {
                 rho = dens_local[p];
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-#ifdef __APPLE__
-#if TARGET_OS_MAC
-                if (rho < 0)
-                {
-                    rho = -rho;
-                    work += M_PI;
-                }
-#endif
-#endif
-                sf_local[s] += polar(rho, work);
+                sf_local[s] += cdouble(rho*cos(work), rho*sin(work));
             }
         }
         progress->update();

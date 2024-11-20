@@ -6081,7 +6081,7 @@ int diagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec
         lapack_int nzc, lapack_int* isuppz,
         lapack_logical* tryrac
         */
-    INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, JOBZ, RANGE, n, diag, diag_off1, VL, VU, IL, IU, &M,
+    INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, JOBZ, RANGE, n, diag, diag_off1, VL, VU, IL, IU, &M, //WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
         eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
     return INFO;
 }
@@ -7047,7 +7047,7 @@ void gout2e(double* gout, double* g, int* idx,
 }
 
 template <typename T>
-inline void MALLOC_INSTACK(T* var, const int& n, double* cache) { var = (T*)(((intptr_t)cache + 7) & (-(intptr_t)8)); cache = (double *)(var + (n));; }
+inline void MALLOC_INSTACK(T* var, const int& n, double* cache) { var = (T*)(((intptr_t)cache + 7) & (-(intptr_t)8)); cache = (double *)(var + (n)); }
 
 int int1e_cache_size(Env* envs)
 {
@@ -7136,7 +7136,7 @@ void dmat_transpose(double* a_t, double* a, int m, int n)
     int i, j, k;
 
     for (j = 0; j < n - 3; j += 4) {
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
@@ -7147,20 +7147,20 @@ void dmat_transpose(double* a_t, double* a, int m, int n)
 
     switch (n - j) {
     case 1:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[j * m + i] = a[i * n + j];
         }
         break;
     case 2:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
         }
         break;
     case 3:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
@@ -7178,7 +7178,7 @@ void dplus_transpose(double* a_t, double* a, int m, int n)
     int i, j, k;
 
     for (j = 0; j < n - 3; j += 4) {
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];
@@ -7189,20 +7189,20 @@ void dplus_transpose(double* a_t, double* a, int m, int n)
 
     switch (n - j) {
     case 1:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[j * m + i] += a[i * n + j];
         }
         break;
     case 2:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];
         }
         break;
     case 3:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];
@@ -8408,7 +8408,7 @@ void dgemm_NN1(int m, int n, int k,
         }
         for (kp = 0; kp < k; kp++) {
             bi = b[kp + k * j];
-#pragma GCC ivdep
+#pragma ivdep
             for (i = 0; i < m; i++) {
                 c[i + ldc * j] += a[i + m * kp] * bi;
             }
@@ -8430,7 +8430,7 @@ void dgemm_TN(int m, int n, int k,
     for (j = 0; j < n; j++) {
         for (i = 0; i < m; i++) {
             ci = 0;
-#pragma GCC ivdep
+#pragma ivdep
             for (kp = 0; kp < k; kp++) {
                 ci += a[kp + k * i] * b[kp + k * j];
             }
@@ -8450,7 +8450,7 @@ void dgemm_NT(int m, int n, int k,
         }
         for (kp = 0; kp < k; kp++) {
             bi = b[j + n * kp];
-#pragma GCC ivdep
+#pragma ivdep
             for (i = 0; i < m; i++) {
                 c[i + m * j] += a[i + m * kp] * bi;
             }
@@ -9292,7 +9292,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
             for (k = 0; k < mk; k++) {
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < mj; j++) {
                     pijkl[ni * j] = pgctr[mikl * j];
                 }
@@ -9306,7 +9306,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
             for (k = 0; k < mk; k++) {
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < mj; j++) {
                     pijkl[ni * j + 0] = pgctr[mikl * j + 0];
                     pijkl[ni * j + 1] = pgctr[mikl * j + 1];
@@ -9322,7 +9322,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
             for (k = 0; k < mk; k++) {
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < mj; j++) {
                     pijkl[ni * j + 0] = pgctr[mikl * j + 0];
                     pijkl[ni * j + 1] = pgctr[mikl * j + 1];
@@ -9340,7 +9340,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
             for (k = 0; k < mk; k++) {
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < mj; j++) {
                     pijkl[ni * j + 0] = pgctr[mikl * j + 0];
                     pijkl[ni * j + 1] = pgctr[mikl * j + 1];
@@ -9359,7 +9359,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
             for (k = 0; k < mk; k++) {
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < mj; j++) {
                     pijkl[ni * j + 0] = pgctr[mikl * j + 0];
                     pijkl[ni * j + 1] = pgctr[mikl * j + 1];
@@ -9380,7 +9380,7 @@ void dcopy_iklj(double* fijkl, const double* gctr,
                 pijkl = fijkl + k * nij;
                 pgctr = gctr + k * mi;
                 for (j = 0; j < mj; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                     for (i = 0; i < mi; i++) {
                         pijkl[ni * j + i] = pgctr[mikl * j + i];
                     }

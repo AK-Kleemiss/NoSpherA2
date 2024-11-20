@@ -23,6 +23,11 @@ void not_implemented(const std::string &file, const int &line, const std::string
 #else
 #define has_RAS 0
 #endif
+#ifdef _WIN32
+#define ivdep loop(ivdep)
+#else
+#define ivdep GCC ivdep
+#endif
 
 typedef std::complex<double> cdouble;
 typedef std::vector<double> vec;

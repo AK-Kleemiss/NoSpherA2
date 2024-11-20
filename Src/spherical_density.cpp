@@ -277,6 +277,11 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
             *max_d = 2;
             *max_f = 1;
         }
+        else
+        {
+            err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+            return;
+        }
     }
     else if (ECP_mode == 2)
     {
@@ -342,6 +347,11 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
             *max_p = 4;
             *max_d = 3;
             *max_f = 1;
+        }
+        else
+        {
+            err_not_impl_f("PLEASE DO NOT MAKE MORE ELECTRONS CORE ELECTRONS!", std::cout);
+            return;
         }
     }
     else
