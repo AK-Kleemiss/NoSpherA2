@@ -465,7 +465,7 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
     for (int i = 0; i < 16; i++)
         d[i].resize(1, 0.0);
 
-    while (ratio > rel_precision && angle / constants::PI < 1E4)
+    while (ratio > rel_precision)
     {
         const double da = constants::PI / angle;
         const double da2 = da * da;
@@ -489,12 +489,70 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
             old_result = new_result;
             new_result = v / constants::FOUR_PI;
             ratio = abs(old_result / new_result - 1.0);
+            if ((new_result < 1E-15 && angle > 36)) {
+#pragma omp critical
+                std::cout << "Aborted due to too small density at r = " << r << " and angle = " << angle << std::endl;
+                break;
+            }
+            if (angle > 360) {
+#pragma omp critical
+                std::cout << "Aborted due to too large angle = " << angle << std::endl;
+                break;
+            }
         }
         angle *= 1.2;
     }
     if (print)
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::setw(14) << angle << std::endl;
     return new_result;
+}
+
+void bondwise_laplacian_plots(std::string& wfn_name) {
+    char cwd[1024];
+#ifdef _WIN32
+    if (_getcwd(cwd, sizeof(cwd)) != NULL)
+#else
+    if (getcwd(cwd, sizeof(cwd)) != NULL)
+#endif
+        std::cout << "Current working dir: " << cwd << std::endl;
+    WFN wavy(9);
+    wavy.read_known_wavefunction_format(wfn_name, std::cout);
+
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
+
+    int points = 1001;
+
+    for (int i = 0; i < wavy.get_ncen(); i++) {
+        for (int j = i+1; j < wavy.get_ncen(); j++) {
+            std::string path = cwd;
+            double distance = sqrt(pow(wavy.atoms[i].x - wavy.atoms[j].x, 2) + pow(wavy.atoms[i].y - wavy.atoms[j].y, 2) + pow(wavy.atoms[i].z - wavy.atoms[j].z, 2));
+            double svdW = constants::ang2bohr(constants::covalent_radii[wavy.atoms[i].charge] + constants::covalent_radii[wavy.atoms[j].charge]);
+            if (distance < 1.35 * svdW)
+            {
+                std::cout << "Bond between " << i << " ("<< wavy.atoms[i].charge << ") and " << j << " (" << wavy.atoms[j].charge << ") with distance " << distance << " and svdW " << svdW << std::endl;
+                const vec bond_vec = { (wavy.atoms[j].x - wavy.atoms[i].x)/points, (wavy.atoms[j].y - wavy.atoms[i].y)/points, (wavy.atoms[j].z - wavy.atoms[i].z)/points };
+                double dr = distance / points;
+                vec lapl(points, 0.0);
+                vec pos = { wavy.atoms[i].x, wavy.atoms[i].y, wavy.atoms[i].z };
+#pragma omp parallel for
+                for (int k = 0; k < points; k++) {
+                    vec t_pos = { pos[0], pos[1], pos[2] };
+                    t_pos[0] += k*bond_vec[0];
+                    t_pos[1] += k*bond_vec[1];
+                    t_pos[2] += k*bond_vec[2];
+                    lapl[k] = wavy.computeLap(t_pos.data());
+                }
+                std::string outname(wfn_name + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
+                join_path(path, outname);
+                std::ofstream result(path, std::ios::out);
+                for (int k = 0; k < points; k++) {
+                    result << std::setw(10) << std::scientific << std::setprecision(6) << dr*k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
+                }
+                result.flush();
+                result.close();
+            }
+        }
+    }
 }
 
 void calc_partition_densities() {
@@ -703,7 +761,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     for (long long int _r = 1; _r < upper_r; _r++)
     {
         double r = _r * dr;
-        double v = calc_spherically_averaged_at_r(wavy, r, 1E-4, 20);
+        double v = calc_spherically_averaged_at_r(wavy, r, 1E-4, 20, opt.debug);
         radial_dens[_r] = v;
         if (_r >= 1)
             tot_int += v * r * r * (r - (_r - 1) * dr);

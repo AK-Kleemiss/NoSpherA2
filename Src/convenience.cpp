@@ -2177,6 +2177,11 @@ void options::digest_options()
                 n++;
             }
         }
+        else if (temp == "-laplacian_bonds") {
+            wfn = arguments[i + 1];
+            bondwise_laplacian_plots(wfn);
+            exit(0);
+        }
         else if (temp == "-atom_dens")
         {
             wfn = arguments[i + 1];

@@ -5989,6 +5989,105 @@ const void WFN::computeLapELI(
     Lap = Hess[0] + Hess[1] + Hess[2];
 };
 
+const double WFN::computeLap(
+    const double* PosGrid // [3] vector with current position on te grid
+) const
+{
+    const int _nmo = get_nmo(false);
+    vec phi(7 * _nmo, 0.0);
+    double* phi_temp;
+    double chi[7]{ 0, 0, 0, 0, 0, 0, 0 };
+    double d[3]{ 0, 0, 0 };
+    int iat = 0;
+    int l[3]{ 0, 0, 0 };
+    double ex = 0;
+    double xl[3][3]{ {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+
+    for (int j = 0; j < nex; j++)
+    {
+        iat = get_center(j) - 1;
+
+        constants::type2vector(get_type(j), l);
+        d[0] = PosGrid[0] - atoms[iat].x;
+        d[1] = PosGrid[1] - atoms[iat].y;
+        d[2] = PosGrid[2] - atoms[iat].z;
+        double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+            continue;
+        ex = exp(temp);
+        for (int k = 0; k < 3; k++)
+        {
+            if (l[k] == 0)
+            {
+                xl[k][0] = 1.0;
+                xl[k][1] = 0.0;
+                xl[k][2] = 0.0;
+            }
+            else if (l[k] == 1)
+            {
+                xl[k][0] = d[k];
+                xl[k][1] = 1.0;
+                xl[k][2] = 0.0;
+            }
+            else if (l[k] == 2)
+            {
+                xl[k][0] = d[k] * d[k];
+                xl[k][1] = 2 * d[k];
+                xl[k][2] = 2;
+            }
+            else if (l[k] == 3)
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d[k];
+                xl[k][1] = 3 * d2;
+                xl[k][2] = 6 * d[k];
+            }
+            else if (l[k] == 4)
+            {
+                double d2 = d[k] * d[k];
+                xl[k][0] = d2 * d2;
+                xl[k][1] = 4 * d2 * d[k];
+                xl[k][2] = 12 * d2;
+            }
+            else
+            {
+                return -100;
+            }
+        }
+        double ex2 = 2 * get_exponent(j);
+        chi[0] = xl[0][0] * xl[1][0] * xl[2][0] * ex;
+        chi[1] = (xl[0][1] - ex2 * pow(d[0], l[0] + 1)) * xl[1][0] * xl[2][0] * ex;
+        chi[2] = (xl[1][1] - ex2 * pow(d[1], l[1] + 1)) * xl[0][0] * xl[2][0] * ex;
+        chi[3] = (xl[2][1] - ex2 * pow(d[2], l[2] + 1)) * xl[0][0] * xl[1][0] * ex;
+        double temp_ex = pow(ex2, 2);
+        chi[4] = (xl[0][2] - ex2 * (2 * l[0] + 1) * xl[0][0] + temp_ex * pow(d[0], l[0] + 2)) * xl[1][0] * xl[2][0] * ex;
+        chi[5] = (xl[1][2] - ex2 * (2 * l[1] + 1) * xl[1][0] + temp_ex * pow(d[1], l[1] + 2)) * xl[2][0] * xl[0][0] * ex;
+        chi[6] = (xl[2][2] - ex2 * (2 * l[2] + 1) * xl[2][0] + temp_ex * pow(d[2], l[2] + 2)) * xl[0][0] * xl[1][0] * ex;
+        for (int mo = 0; mo < _nmo; mo++)
+        {
+            phi_temp = &phi[mo * 7];
+            for (int i = 0; i < 7; i++)
+                phi_temp[i] += MOs[mo].get_coefficient_f(j) * chi[i]; // build MO values at this point
+        }
+    }
+
+    double Hess[3]{ 0, 0, 0 };
+
+    for (int mo = 0; mo < _nmo; mo++)
+    {
+        const double occ = get_MO_occ(mo);
+        const double docc = 2 * occ;
+        if (occ != 0)
+        {
+            phi_temp = &phi[mo * 7];
+            Hess[0] += docc * (*phi_temp * phi_temp[4] + pow(phi_temp[1], 2));
+            Hess[1] += docc * (*phi_temp * phi_temp[5] + pow(phi_temp[2], 2));
+            Hess[2] += docc * (*phi_temp * phi_temp[6] + pow(phi_temp[3], 2));
+        }
+    }
+    return Hess[0] + Hess[1] + Hess[2];
+};
+
 const double WFN::computeMO(
     const double *PosGrid, // [3] array with current position on the grid
     const int &mo) const

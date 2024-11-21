@@ -239,6 +239,7 @@ public:
     const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap) const;
     const void computeELIELF(const double *PosGrid, double &Elf, double &Eli) const;
     const void computeLapELI(const double *PosGrid, double &Eli, double &Lap) const;
+    const double computeLap(const double* PosGrid) const;
     const void computeELI(const double *PosGrid, double &Eli) const;
     const void computeELF(const double *PosGrid, double &Elf) const;
     const double computeMO(const double *PosGrid, const int &mo) const;
