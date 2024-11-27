@@ -39,7 +39,7 @@ jobs:
 
   build_windows:
     runs-on: windows-2022
-    needs: [build_Linux,build_Linux_rascaline]
+    needs: [build_Linux]
 
     steps:
     - uses: actions/checkout@v4
