@@ -437,12 +437,12 @@ double get_becke_w(const int& num_centers,
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-constexpr double get_r_inner(const double& max_error, const double& alpha_inner)
+const double get_r_inner(const double& max_error, const double& alpha_inner)
 {
   double d = 1.9;
 
-  double r = (d - constants::log_approx(1.0 / max_error)) * 2./3.;
-  r = constants::exp_approx(r) / (alpha_inner);
+  double r = (d - log(1.0 / max_error)) * 2./3.;
+  r = exp(r) / (alpha_inner);
   r = constants::sqrt(r);
 
   return r;
