@@ -53,6 +53,7 @@ jobs:
         name: executable_Windows
         path: |
           Windows/x64/Release/NoSpherA2.exe
+
   build_Linux:
     runs-on: ubuntu-latest
 
