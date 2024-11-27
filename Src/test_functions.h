@@ -421,7 +421,10 @@ double calc_grid_averaged_at_r(const WFN& wavy,
     double dens = 0.0;
     for (int iang = start; iang < size; iang++) {
         p = angular_off + iang;
-        dens += wavy.compute_dens(angular_x[p] * r, angular_y[p] * r, angular_z[p] * r, d, _phi) * constants::FOUR_PI * angular_w[p];
+        double x = angular_x[p] * r + wavy.atoms[0].x;
+        double y = angular_y[p] * r + wavy.atoms[0].y;
+        double z = angular_z[p] * r + wavy.atoms[0].z;
+        dens += wavy.compute_dens(x, y, z, d, _phi) * constants::FOUR_PI * angular_w[p];
     }
     if (print)
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
@@ -917,6 +920,7 @@ void Calc_MO_spherical_harmonics(
     }
 };
 
+
 void calc_rho_cube(WFN &dummy)
 {
     using namespace std;
@@ -999,45 +1003,6 @@ void calc_rho_cube(WFN &dummy)
     std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho.cube");
     CubeRho.write_file(fn, false);
 };
-
-double numerical_3d_integral(std::function<double(double *)> f, double stepsize = 0.001, double r_max = 10.0)
-{
-    double tot_int = 0;
-    double da = stepsize * constants::PI;
-    double dr = stepsize;
-    int upper = static_cast<int>(constants::TWO_PI / da);
-    long long int total_calcs = upper * (long long int)(constants::PI / da * r_max / dr);
-    std::cout << "Integrating over " << total_calcs << " points" << std::endl;
-
-    ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Integrating");
-
-#pragma omp parallel for reduction(+ : tot_int) schedule(dynamic)
-    for (int phic = 0; phic <= upper; phic++)
-    {
-        double phi = phic * da;
-        double cp = std::cos(phi);
-        double sp = std::sin(phi);
-        for (double theta = 0; theta <= constants::PI; theta += da)
-        {
-            double st = std::sin(theta);
-            double ct = std::cos(theta);
-            double x0 = st * cp, y0 = st * sp;
-            double ang_mom = dr * da * da * st;
-            for (double r = r_max; r >= 0; r -= dr)
-            {
-                double d[4]{r * x0,
-                            r * y0,
-                            r * ct,
-                            r};
-                tot_int += f(d) * r * r * ang_mom;
-            }
-        }
-        progress->update();
-    }
-
-    std::cout << "\ntotal integral : " << std::fixed << std::setprecision(4) << tot_int << std::endl;
-    return tot_int;
-}
 
 double s_value(double *d)
 {
