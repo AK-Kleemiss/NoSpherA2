@@ -4,28 +4,20 @@
 
 cube::cube()
 {
-    size.resize(3, 0);
-    origin.resize(3, 0.0);
-    vectors.resize(3);
-    for (int i = 0; i < 3; i++)
-    {
-        vectors[i].resize(3, 0.0);
-    }
     loaded = false;
     na = 0;
     parent_wavefunction = new WFN(6);
+    size = { 0, 0, 0 };
+    origin = { 0.0, 0.0, 0.0 };
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
 cube::cube(int x, int y, int z, int g_na, bool grow_values)
 {
-    size.push_back(x);
-    size.push_back(y);
-    size.push_back(z);
-    origin.resize(3, 0.0);
-    vectors.resize(3);
-    for (int i = 0; i < 3; i++)
-        vectors[i].resize(3, 0.0);
+    size[0] = x;
+    size[1] = y;
+    size[2] = z;
+    origin = { 0.0, 0.0, 0.0 };
     loaded = grow_values;
     if (grow_values)
     {
@@ -60,15 +52,13 @@ cube::cube(int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vect
     na = g_na;
     parent_wavefunction = new WFN(6);
     cout << "Assigned Nr of Atoms" << endl;
-    vectors.resize(3);
-    size.resize(3);
     for (int i = 0; i < 3; i++)
     {
         cout << i << ". dimension" << endl;
         size[i] = g_size[i];
-        origin.push_back(g_origin[i]);
+        origin[i] = g_origin[i];
         for (int j = 0; j < 3; j++)
-            vectors[i].push_back(g_vectors[i][j]);
+            vectors[i][j] = g_vectors[i][j];
     }
     values.resize(size[0]);
 #pragma omp parallel for
@@ -92,15 +82,13 @@ cube::cube(const cube &given)
     path = given.path;
     comment1 = given.get_comment1();
     comment2 = given.get_comment2();
-		dv = given.get_dv();
-    vectors.resize(3);
-    size.resize(3);
+	dv = given.get_dv();
     for (int i = 0; i < 3; i++)
     {
         size[i] = given.get_size(i);
-        origin.push_back(given.get_origin(i));
+        origin[i] = given.get_origin(i);
         for (int j = 0; j < 3; j++)
-            vectors[i].push_back(given.get_vector(i, j));
+            vectors[i][j] = given.get_vector(i, j);
     }
     loaded = given.get_loaded();
     if (loaded)
@@ -120,6 +108,14 @@ cube::cube(const cube &given)
     }
 };
 
+std::array<double, 3> cube::get_pos(const int& i, const int& j, const int& k) {
+    return {
+        i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
+        i * vectors[1][0] + j * vectors[1][1] + k * vectors[1][2] + origin[1],
+        i * vectors[2][0] + j * vectors[2][1] + k * vectors[2][2] + origin[2]
+    };
+}
+
 bool cube::read_file(bool full, bool header, bool expert)
 {
     using namespace std;
@@ -130,14 +126,8 @@ bool cube::read_file(bool full, bool header, bool expert)
         getline(file, comment1);
         getline(file, comment2);
         getline(file, line);
-        origin.resize(3);
         std::istringstream iss(line);
         iss >> na >> origin[0] >> origin[1] >> origin[2];
-
-        size.resize(3);
-        vectors.resize(3);
-        for (int i = 0; i < 3; i++)
-            vectors[i].resize(3);
 
         for (int i = 0; i < 3; i++) {
             getline(file, line);
@@ -568,18 +558,130 @@ void cube::calc_dv() {
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
+// Function to compute cross product
+std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b) {
+    return {
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
+    };
+}
+
+// Function to compute dot product
+template <typename T>
+double dot(const T& a, T& b) {
+    err_checkf(a.size() == b.size(), "Vectors must have the same size!", std::cout);
+    double result = 0;
+    for (int i = 0; i < a.size(); i++) {
+        result += a[i] * b[i];
+    }
+    return result;
+}
+
+double cube::ewald_sum(const int kMax){
+
+    std::array<double, 3> lengths{ array_length(vectors[0]), array_length(vectors[1]), array_length(vectors[2]) };
+    double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
+    double alpha = 2.0 * constants::sqr_pi / shortest_length;
+    double realSpaceEnergy = 0.0;
+    double reciprocalSpaceEnergy = 0.0;
+    double selfEnergy = 0.0;
+
+    std::array<std::array<double, 3>, 3> cell_vectors;
+    cell_vectors[0] = { vectors[0][0] * size[0], vectors[0][1] * size[0], vectors[0][2] * size[0] };
+    cell_vectors[1] = { vectors[1][0] * size[1], vectors[1][1] * size[1], vectors[1][2] * size[1] };
+    cell_vectors[2] = { vectors[2][0] * size[2], vectors[2][1] * size[2], vectors[2][2] * size[2] };
+
+    // Compute volume of the unit cell
+    std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
+    double volume = fabs(dot(cell_vectors[0], crossProduct));
+
+    // Compute reciprocal lattice vectors
+    std::array<std::array<double, 3>, 3> reciprocalLattice = {
+        cross(cell_vectors[1], cell_vectors[2]),
+        cross(cell_vectors[2], cell_vectors[0]),
+        cross(cell_vectors[0], cell_vectors[1])
+    };
+    for (auto& vec : reciprocalLattice) {
+        for (double& x : vec) x *= 2 * constants::PI / volume;
+    }
+
+    // Real-space contribution
+    for (int i = 0; i < size[0]; i++) {
+        for (int j = 0; j < size[1]; j++) {
+            for (int k = 0; k < size[2]; k++) {
+                std::array<double, 3> ri = get_pos(i, j, k);
+                for (int l = i; l < 3; l++) {
+                    for (int m = (l == i ? j : 0); m < 3; m++) {
+                        for (int n = (l == i && m == j ? k + 1 : 0); n < 3; n++) {
+                            std::array<double, 3> rj = get_pos(l, m, n);
+                            std::array<double, 3> rij{ ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
+                            double length = array_length(rij);
+                            if (length > 0) {
+                                realSpaceEnergy += get_value(i,j,k) * get_value(l,m,n) * erfc(alpha * length) / length;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Reciprocal-space contribution
+    for (int h = -kMax; h <= kMax; ++h) {
+        for (int k = -kMax; k <= kMax; ++k) {
+            for (int l = -kMax; l <= kMax; ++l) {
+                if (h == 0 && k == 0 && l == 0) continue;
+
+                std::array<double, 3> kvec = { 0, 0, 0 };
+                for (int d = 0; d < 3; ++d) {
+                    kvec[d] = h * reciprocalLattice[0][d] +
+                        k * reciprocalLattice[1][d] +
+                        l * reciprocalLattice[2][d];
+                }
+                double k2 = dot(kvec, kvec);
+
+                double chargeSum = 0.0;
+                for (int i = 0; i < size[0]; i++) {
+                    for (int j = 0; j < size[1]; j++) {
+                        for (int m = 0; m < size[2]; m++) {
+                            std::array<double, 3> pos = get_pos(i,j,m);
+                            double kDotR = dot(kvec, pos);
+                            chargeSum += get_value(i, j, m) * cos(kDotR);
+                        }
+                    }
+                }
+
+                reciprocalSpaceEnergy += (constants::FOUR_PI / volume) *
+                    exp(-k2 / (4 * alpha * alpha)) / k2 *
+                    chargeSum * chargeSum;
+
+            }
+        }
+    }
+
+    // Self-energy term
+    for (int i = 0; i < size[0]; i++) {
+        for (int j = 0; j < size[1]; j++) {
+            for (int m = 0; m < size[2]; m++) {
+                selfEnergy += get_value(i,j,m) * get_value(i,j,m);
+            }
+        }
+    }
+    selfEnergy *= -alpha / constants::sqr_pi;
+
+    // Total energy
+    double totalEnergy = realSpaceEnergy + reciprocalSpaceEnergy + selfEnergy;
+    return totalEnergy;
+}
+
 void cube::operator=(cube &right)
 {
-    size.resize(3);
     for (int i = 0; i < 3; i++)
         size[i] = right.get_size(i);
     comment1 = right.get_comment1();
     comment2 = right.get_comment2();
     na = right.get_na();
-    origin.resize(3);
-    vectors.resize(3);
-    for (int i = 0; i < 3; i++)
-        vectors[i].resize(3);
     values.resize(size[0]);
 #pragma omp parallel for
     for (int i = 0; i < size[0]; i++)

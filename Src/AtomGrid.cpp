@@ -9,27 +9,6 @@
 #include <io.h>
 #endif
 
-int get_closest_num_angular(const int& n)
-{
-  int m = 0;
-
-  for (int i = 0; i < constants::max_LT; i++) {
-    m = constants::lebedev_table[i];
-    if (m >= n)
-      return m;
-  }
-  return -1;
-};
-
-int get_angular_order(const int& n)
-{
-  for (int i = 0; i < constants::max_LT; i++) {
-    if (constants::lebedev_table[i] == n)
-      return i;
-  }
-  return -1;
-};
-
 AtomGrid::AtomGrid(const double radial_precision,
   const int min_num_angular_points,
   const int max_num_angular_points,
@@ -41,9 +20,9 @@ AtomGrid::AtomGrid(const double radial_precision,
 {
   using namespace std;
   const int min_num_angular_points_closest =
-    get_closest_num_angular(min_num_angular_points);
+    constants::get_closest_num_angular(min_num_angular_points);
   const int max_num_angular_points_closest =
-    get_closest_num_angular(max_num_angular_points);
+    constants::get_closest_num_angular(max_num_angular_points);
   err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
   vec angular_x(constants::max_LT * constants::MAG, 0.0);
@@ -53,7 +32,7 @@ AtomGrid::AtomGrid(const double radial_precision,
   int angular_off;
   lebedev_sphere ls;
 
-  for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
+  for (int i = constants::get_angular_order(min_num_angular_points_closest); i < constants::get_angular_order(max_num_angular_points_closest) + 1; i++) {
     angular_off = i * constants::MAG;
     ls.ld_by_order(constants::lebedev_table[i],
       angular_x.data() + angular_off,
@@ -117,13 +96,13 @@ AtomGrid::AtomGrid(const double radial_precision,
     if (radial_r < rb) {
       num_angular = static_cast<int>(max_num_angular_points_closest *
         (radial_r / rb));
-      num_angular = get_closest_num_angular(num_angular);
+      num_angular = constants::get_closest_num_angular(num_angular);
       err_checkf(num_angular != -1, "No valid value for angular number found!", file);
       if (num_angular < min_num_angular_points_closest)
         num_angular = min_num_angular_points_closest;
     }
 
-    angular_off = get_angular_order(num_angular) * constants::MAG;
+    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
     err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
     const int start = (int) atom_grid_x_bohr_.size();
     angular_off -= start;

@@ -47,6 +47,16 @@ int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);
 double vec_sum(const vec &in);
 cdouble vec_sum(const cvec &in);
+double vec_length(const vec& in);
+template <typename array>
+double array_length(const array& in) {
+    double sum = 0.0;
+    for (double val : in)
+    {
+        sum += val * val;
+    }
+    return sqrt(sum);
+}
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -203,8 +213,8 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string& text, int bar_width) {
-    const int text_length = text.length();
+inline void print_centered_text(const std::string& text, size_t& bar_width) {
+    const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
     const int padding_right = total_padding - padding_left;
@@ -231,8 +241,9 @@ public:
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
     {
+        size_t bw = bar_width_ + 2;
         // Write status text
-        print_centered_text(status_text_, bar_width_+2);
+        print_centered_text(status_text_, bw);
         linestart = std::cout.tellp();
     }
 
@@ -319,9 +330,7 @@ void readxyzMinMax_fromCIF(
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
-    double Resolution,
-    std::ofstream &file,
-    bool debug = false);
+    double Resolution);
 
 bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 

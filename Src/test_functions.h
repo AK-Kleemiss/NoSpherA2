@@ -7,6 +7,7 @@
 #include "properties.h"
 #include "JKFit.h"
 #include "SALTED_utilities.h"
+#include "sphere_lebedev_rule.h"
 #if has_RAS
 #include "SALTED_math.h"
 #include "rascaline.hpp"
@@ -99,158 +100,6 @@ void thakkar_d_test(options &opt)
         result.flush();
         result.close();
     }
-}
-
-void test_density_cubes(options &opt, std::ostream &log_file)
-{
-    using namespace std;
-    vector<WFN> wavy(10);
-    // ScF2+ test file against ORCA calcualted cubes
-    log_file << "====================ScF2+ Test===============================" << endl;
-    wavy[0].read_known_wavefunction_format("test.molden", log_file);
-    cube Rho(100, 100, 100, wavy[0].get_ncen(), true);
-    Rho.set_origin(0, -7), Rho.set_origin(1, -7), Rho.set_origin(2, -7);
-    Rho.set_vector(0, 0, 0.141414);
-    Rho.set_vector(1, 1, 0.141414);
-    Rho.set_vector(2, 2, 0.141414);
-    Rho.path = get_basename_without_ending(wavy[0].get_path()) + "_rho.cube";
-    log_file << "Calcualting Rho...";
-    Calc_Rho(Rho, wavy[0], opt.threads, 7.0, log_file);
-    log_file << " ...done!" << endl;
-    // Rho.write_file(wavy[0], true);
-    const double test_molden = Rho.sum();
-    log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << test_molden << endl;
-    cube Rho2("test.eldens.cube", true, wavy[0], log_file);
-    const double test_ref = Rho2.sum();
-    log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << test_ref << endl;
-    for (int i = 0; i < 1; i++)
-    {
-        cube MO(100, 100, 100, wavy[0].get_ncen(), true);
-        MO.set_origin(0, -7), MO.set_origin(1, -7), MO.set_origin(2, -7);
-        MO.set_vector(0, 0, 0.141414);
-        MO.set_vector(1, 1, 0.141414);
-        MO.set_vector(2, 2, 0.141414);
-        MO.path = get_basename_without_ending(wavy[0].get_path()) + "_MO_" + to_string(i) + ".cube";
-        log_file << "Calcualting MO " + to_string(i) + "...";
-        Calc_MO(MO, i, wavy[0], opt.threads, 4.0, log_file);
-        log_file << " ...done!" << endl;
-        // MO.write_file(wavy[0], true);
-        string name("test.mo" + to_string(i) + "a.cube");
-        cube MO2(name, true, wavy[0], log_file);
-        log_file << "sum in the cube: " << setprecision(4) << fixed << MO.sum() << endl;
-        log_file << "sum in the reference cube: " << setprecision(4) << fixed << MO2.sum() << endl;
-    }
-
-    // F- ion calculations
-    log_file << "====================F Test===============================" << endl;
-    wavy[1].read_known_wavefunction_format("F_full.molden", log_file);
-    wavy[1].write_wfn("F_conv.wfn", false, true);
-    cube Rho_2(71, 71, 71, wavy[1].get_ncen(), true);
-    Rho_2.set_origin(0, -7), Rho_2.set_origin(1, -7), Rho_2.set_origin(2, -7);
-    Rho_2.set_vector(0, 0, 0.2);
-    Rho_2.set_vector(1, 1, 0.2);
-    Rho_2.set_vector(2, 2, 0.2);
-    Rho_2.path = get_basename_without_ending(wavy[1].get_path()) + "_rho.cube";
-    log_file << "Calcualting Rho...";
-    Calc_Rho(Rho_2, wavy[1], opt.threads, 7.0, log_file);
-    log_file << " ...done!" << endl;
-    // Rho_2.write_file(wavy[1], true);
-    const double F_molden = Rho_2.sum();
-    log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << F_molden << endl;
-    wavy[4].read_known_wavefunction_format("f_ref.wfx", log_file);
-    cube Rho_3(71, 71, 71, wavy[4].get_ncen(), true);
-    Rho_3.set_origin(0, -7), Rho_3.set_origin(1, -7), Rho_3.set_origin(2, -7);
-    Rho_3.set_vector(0, 0, 0.2);
-    Rho_3.set_vector(1, 1, 0.2);
-    Rho_3.set_vector(2, 2, 0.2);
-    Rho_3.path = get_basename_without_ending(wavy[4].get_path()) + "_rho.cube";
-    log_file << "Calcualting Rho...";
-    Calc_Rho_spherical_harmonics(Rho_3, wavy[4], opt.threads, log_file);
-    log_file << " ...done!" << endl;
-    // Rho_3.write_file(wavy[1], true);
-    const double F_ref = Rho_3.sum();
-    log_file << "Number of electrons in the reference cube: " << setprecision(4) << fixed << F_ref << endl;
-
-    // Ce conevrsion for test of f type
-    log_file << "====================Ce Test===============================" << endl;
-    wavy[2].read_known_wavefunction_format("Ce_full.molden", log_file);
-    wavy[2].write_wfn("Ce_conv.wfn", false, true);
-    cube Rho_4(141, 141, 141, wavy[2].get_ncen(), true);
-    Rho_4.set_origin(0, -7), Rho_4.set_origin(1, -7), Rho_4.set_origin(2, -7);
-    Rho_4.set_vector(0, 0, 0.1);
-    Rho_4.set_vector(1, 1, 0.1);
-    Rho_4.set_vector(2, 2, 0.1);
-    Rho_4.path = get_basename_without_ending(wavy[2].get_path()) + "_rho.cube";
-    log_file << "Calcualting Rho...";
-    Calc_Rho(Rho_4, wavy[2], opt.threads, 7.0, log_file);
-    log_file << " ...done!" << endl;
-    // Rho_4.write_file(wavy[2], true);
-    const double Ce_molden = Rho_4.sum();
-    log_file << "Number of electrons in the cube: " << setprecision(4) << fixed << Ce_molden << endl;
-
-    Rho_4.set_zero();
-    wavy[5].read_known_wavefunction_format("Ce_full.wfn", log_file);
-    Calc_Rho(Rho_4, wavy[5], opt.threads, 7.0, log_file);
-    Rho_4.path = get_basename_without_ending(wavy[5].get_path()) + "_reference_rho.cube";
-    // Rho_4.write_file(wavy[5], true);
-    const double Ce_ref = Rho_4.sum();
-    log_file << "Number of electrons in the ref cube: " << setprecision(4) << fixed << Ce_ref << endl;
-
-    // Sc conversion
-    log_file << "====================Sc Test===============================" << endl;
-    wavy[3].read_known_wavefunction_format("Sc_full.molden", log_file);
-    wavy[3].write_wfn("Sc_conv.wfn", false, true);
-
-    // Lu g-type test
-    log_file << "====================Lu Test===============================" << endl;
-    wavy[6].read_known_wavefunction_format("Lu_jorge.molden", log_file);
-    wavy[6].write_wfn("Lu_conv.wfn", false, true);
-    cube Rho4(141, 141, 141, wavy[6].get_ncen(), true);
-    Rho4.set_origin(0, -7), Rho4.set_origin(1, -7), Rho4.set_origin(2, -7);
-    Rho4.set_vector(0, 0, 0.1);
-    Rho4.set_vector(1, 1, 0.1);
-    Rho4.set_vector(2, 2, 0.1);
-    Calc_Rho(Rho4, wavy[6], opt.threads, 7.0, log_file);
-    Rho4.path = get_basename_without_ending(wavy[6].get_path()) + "_rho.cube";
-    // Rho4.write_file(wavy[6], true);
-    const double Lu_molden = Rho4.sum();
-    log_file << "Number of electrons in cube: " << setprecision(4) << fixed << Lu_molden << endl;
-
-    wavy[7].read_known_wavefunction_format("Lu_jorge.wfn", log_file);
-    cube Rho_5(141, 141, 141, wavy[7].get_ncen(), true);
-    Rho_5.set_origin(0, -7), Rho_5.set_origin(1, -7), Rho_5.set_origin(2, -7);
-    Rho_5.set_vector(0, 0, 0.1);
-    Rho_5.set_vector(1, 1, 0.1);
-    Rho_5.set_vector(2, 2, 0.1);
-    Calc_Rho(Rho_5, wavy[7], opt.threads, 7.0, log_file);
-    Rho_5.path = get_basename_without_ending(wavy[7].get_path()) + "_reference_rho.cube";
-    // Rho_5.write_file(wavy[7], true);
-    const double Lu_wfn = Rho_5.sum();
-    Rho_5 -= Rho4;
-    Rho_5.path = get_basename_without_ending(wavy[7].get_path()) + "_diff_rho.cube";
-    // Rho_5.write_file(wavy[7], true);
-    log_file << "Number of electrons in the ref cube: " << setprecision(4) << fixed << Lu_wfn << endl;
-    log_file << "Number of electrons in the diff cube: " << setprecision(4) << fixed << Rho_5.diff_sum() << endl;
-
-    wavy[8].read_known_wavefunction_format("Lu_def2.molden", log_file);
-    wavy[8].write_wfn("Lu_def2_conv.wfn", false, true);
-    wavy[8].set_has_ECPs(true);
-    cube Rho5(141, 141, 141, wavy[8].get_ncen(), true);
-    Rho5.set_origin(0, -7), Rho5.set_origin(1, -7), Rho5.set_origin(2, -7);
-    Rho5.set_vector(0, 0, 0.1);
-    Rho5.set_vector(1, 1, 0.1);
-    Rho5.set_vector(2, 2, 0.1);
-    Calc_Rho(Rho5, wavy[8], opt.threads, 7.0, log_file);
-    Rho5.path = get_basename_without_ending(wavy[8].get_path()) + "_rho.cube";
-    // Rho4.write_file(wavy[6], true);
-    const double Lu_def2 = Rho5.sum();
-    log_file << "Number of electrons in cube: " << setprecision(4) << fixed << Lu_def2 << endl;
-
-    err_checkf(abs(test_molden - test_ref) < 0.1, "Difference in test too big!", log_file);
-    err_checkf(abs(F_molden - F_ref) < 0.1, "Difference in F too big!", log_file);
-    err_checkf(abs(Ce_molden - Ce_ref) < 0.1, "Difference in Ce too big!", log_file);
-    err_checkf(abs(Lu_molden - Lu_wfn) < 0.1, "Difference in Lu too big!", log_file);
-    log_file << "All tests successfull!" << endl;
 }
 
 void sfac_scan(options &opt, std::ostream &log_file)
@@ -347,7 +196,6 @@ void sfac_scan(options &opt, std::ostream &log_file)
     const int imax = (int)dens.size();
     const int smax = (int)k_pt[0].size();
     int pmax = (int)dens[0].size();
-    const int step = max((int)floor(smax / 20), 1);
     std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.resize(imax);
 #pragma omp parallel for
@@ -494,17 +342,90 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
                 std::cout << "Aborted due to too small density at r = " << r << " and angle = " << angle << std::endl;
                 break;
             }
+            if (new_result > 1E90) {
+#pragma omp critical
+                std::cout << "Aborted due too large density value at r = " << r << std::endl;
+                break;
+            }
             if (angle > 360) {
 #pragma omp critical
                 std::cout << "Aborted due to too large angle = " << angle << std::endl;
                 break;
             }
         }
+        else {
+            new_result = 0.0;
+#pragma omp critical
+            std::cout << "ZERO result at r = " << r << std::endl;
+            break;
+        }
         angle *= 1.2;
     }
     if (print)
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << " " << (ratio > rel_precision) << std::setw(14) << angle << std::endl;
     return new_result;
+}
+
+double calc_grid_averaged_at_r(const WFN& wavy,
+    const double& r,
+    const int& min_angular = 60,
+    const int& max_angular = 1000,
+    const bool print = false)
+{
+
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_angular);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_angular);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+
+    vec angular_x(constants::max_LT * constants::MAG, 0.0);
+    vec angular_y(constants::max_LT * constants::MAG, 0.0);
+    vec angular_z(constants::max_LT * constants::MAG, 0.0);
+    vec angular_w(constants::max_LT * constants::MAG, 0.0);
+    int angular_off;
+    lebedev_sphere ls;
+
+    for (int i = constants::get_angular_order(min_num_angular_points_closest); i < constants::get_angular_order(max_num_angular_points_closest) + 1; i++) {
+        angular_off = i * constants::MAG;
+        ls.ld_by_order(constants::lebedev_table[i],
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
+    }
+
+    const double rb = constants::bragg_angstrom[wavy.atoms[0].charge] / (5.0E10 * constants::a0);
+
+    int num_angular = max_num_angular_points_closest;
+    if (r < rb) {
+        num_angular = static_cast<int>(max_num_angular_points_closest *
+            (r / rb));
+        num_angular = constants::get_closest_num_angular(num_angular);
+        err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+        if (num_angular < min_num_angular_points_closest)
+            num_angular = min_num_angular_points_closest;
+    }
+
+    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+    err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+    const int start = 0;
+    vec2 d;
+    vec _phi(wavy.get_nmo(), 0.0);
+    d.resize(16);
+    for (int i = 0; i < 16; i++)
+        d[i].resize(1, 0.0);
+    angular_off -= start;
+    const int size = start + num_angular;
+    int p = 0;
+    double dens = 0.0;
+    for (int iang = start; iang < size; iang++) {
+        p = angular_off + iang;
+        dens += wavy.compute_dens(angular_x[p] * r, angular_y[p] * r, angular_z[p] * r, d, _phi) * constants::FOUR_PI * angular_w[p];
+    }
+    if (print)
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
+    return dens;
 }
 
 void bondwise_laplacian_plots(std::string& wfn_name) {
@@ -536,11 +457,11 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
                 vec pos = { wavy.atoms[i].x, wavy.atoms[i].y, wavy.atoms[i].z };
 #pragma omp parallel for
                 for (int k = 0; k < points; k++) {
-                    vec t_pos = { pos[0], pos[1], pos[2] };
+                    std::array<double, 3> t_pos = { pos[0], pos[1], pos[2] };
                     t_pos[0] += k*bond_vec[0];
                     t_pos[1] += k*bond_vec[1];
                     t_pos[2] += k*bond_vec[2];
-                    lapl[k] = wavy.computeLap(t_pos.data());
+                    lapl[k] = wavy.computeLap(t_pos);
                 }
                 std::string outname(wfn_name + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
                 join_path(path, outname);
@@ -710,6 +631,7 @@ cdouble calc_spherically_averaged_at_k(vec2 &d1, vec2 &d2, vec2 &d3, vec2 &dens,
 
 void spherically_averaged_density(options &opt, const ivec val_els_alpha, const ivec val_els_beta)
 {
+    std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
     WFN wavy(9);
     wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
@@ -737,6 +659,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
                 cout << "Deleting from Beta: " << i - offset << endl;
                 wavy.delete_MO(i);
                 MOs_to_delete[i + deleted] = true;
+                deleted++;
             }
     }
     cout << "MOs deleted: " << deleted << endl;
@@ -752,28 +675,28 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     const double dr = 0.00008;
     const long long int upper_r = 250000;
     // Calcualte density on angular grid at each point of radial grid, average and integrate
-    long double tot_int = 0;
-    vec radial_dens(upper_r, 0.0);
-    ProgressBar * progress = new ProgressBar(upper_r, 65, "=", " ", "Calculating Densities");
-    const long long int step = max(static_cast<long long int>(floor(upper_r / 20)), 1LL);
+    long double tot_int2 = 0;
+    vec radial_dens2(upper_r, 0.0);
+    ProgressBar * progress = new ProgressBar(upper_r, 85, "=", " ", "Calculating Densities");
+    cout << endl;
 
-#pragma omp parallel for reduction(+ : tot_int) num_threads(opt.threads) schedule(dynamic)
+#pragma omp parallel for reduction(+ : tot_int2) num_threads(opt.threads)
     for (long long int _r = 1; _r < upper_r; _r++)
     {
         double r = _r * dr;
-        double v = calc_spherically_averaged_at_r(wavy, r, 1E-4, 20, opt.debug);
-        radial_dens[_r] = v;
-        if (_r >= 1)
-            tot_int += v * r * r * (r - (_r - 1) * dr);
+        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 360, 5800, opt.debug);
+        if (_r >= 1) {
+            tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
+        }
         progress->update();
     }
     delete (progress);
     cout << "Start writing the file" << endl;
     string el = constants::atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
-    out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int * constants::FOUR_PI << "\n";
+    out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int2 << "\n";
     for (int i = 0; i < upper_r; i++)
-        out << setw(24) << scientific << setprecision(15) << i * dr << setw(24) << scientific << setprecision(16) << radial_dens[i] << "\n";
+        out << setw(24) << scientific << setprecision(15) << i * dr << setw(24) << scientific << setprecision(16) << radial_dens2[i] / constants::FOUR_PI << "\n";
     out.flush();
     out.close();
 }
@@ -954,21 +877,11 @@ double compute_MO_spherical_new(double x, double y, double z, double expon, doub
 void Calc_MO_spherical_harmonics(
     cube &CubeMO,
     WFN &wavy,
-    int cpus,
     std::ostream &file,
     bool nodate)
 {
     using namespace std;
-#ifdef _OPENMP
-    if (cpus != -1)
-    {
-        if (cpus > 1)
-            omp_set_nested(1);
-    }
-#endif
-
     time_point start = get_time();
-
     ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(CubeMO.get_size(0), 60, "=", " ", "Calculating MOs");

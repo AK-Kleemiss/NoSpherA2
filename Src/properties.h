@@ -13,7 +13,6 @@ class cell;
  * @param CubeDEF The cube object representing the deflection.
  * @param CubeRho The cube object representing the density.
  * @param wavy The WFN object representing the wave.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius value for the calculation.
  * @param file The output stream to write the results to.
  */
@@ -21,7 +20,6 @@ void Calc_Static_Def(
     cube &CubeDEF,
     cube &CubeRho,
     WFN &wavy,
-    int cpus,
     double radius,
     std::ostream &file,
     bool wrap = true);
@@ -35,7 +33,6 @@ void Calc_Static_Def(
  * @param CubeRho The cube object representing the density.
  * @param CubeSpher The cube object representing the spherical coordinates.
  * @param wavy The WFN object representing the wave function.
- * @param cpus The number of CPUs to be used for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param file The output stream to write the results to.
  */
@@ -44,7 +41,6 @@ void Calc_Static_Def(
     cube &CubeRho,
     cube &CubeSpher,
     WFN &wavy,
-    int cpus,
     double radius,
     std::ostream &file,
     bool wrap = true);
@@ -53,14 +49,12 @@ void Calc_Static_Def(
  *
  * @param CubeSpher The cube object to store the spherical density.
  * @param wavy The WFN object containing the wavefunction data.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param file The output stream to write the results to.
  */
 void Calc_Spherical_Dens(
     cube &CubeSpher,
     WFN &wavy,
-    int cpus,
     double radius,
     std::ostream &file,
     bool wrap = true);
@@ -69,14 +63,12 @@ void Calc_Spherical_Dens(
  *
  * @param CubeRho The cube object to store the calculated density.
  * @param wavy The WFN object containing the wavefunction information.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param file The output stream to write the results to.
  */
 void Calc_Rho(
     cube& CubeRho,
     WFN& wavy,
-    int cpus,
     double radius,
     std::ostream& file,
     bool wrap = true);
@@ -86,27 +78,23 @@ void Calc_Rho(
  *
  * @param CubeRho The cube object to store the calculated spherical harmonics.
  * @param wavy The WFN object containing the input data for the calculation.
- * @param cpus The number of CPUs to use for the calculation.
  * @param file The output stream to write the result to.
  */
 void Calc_Rho_spherical_harmonics(
     cube &CubeRho,
     WFN &wavy,
-    int cpus,
     std::ostream &file);
 /**
  * Calculates the molecular orbital (MO) using the spherical harmonics.
  *
  * @param CubeMO The cube object to store the calculated spherical harmonics.
  * @param wavy The WFN object containing the wavefunction information.
- * @param cpus The number of CPUs to use for the calculation.
  * @param MO The index of the molecular orbital to calculate the spherical harmonics for.
  * @param file The output stream to write the calculated spherical harmonics.
  */
 void Calc_MO_spherical_harmonics(
     cube &CubeRho,
     WFN &wavy,
-    int cpus,
     int MO,
     std::ostream &file,
     bool nodate = false);
@@ -120,7 +108,6 @@ void Calc_MO_spherical_harmonics(
  * @param CubeLap The cube object representing the Laplacian of the electron density.
  * @param CubeESP The cube object representing the electrostatic potential.
  * @param wavy The WFN object representing the wavefunction.
- * @param cpus The number of CPUs to be used for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param file The output stream to write the results to.
  * @param test A boolean flag indicating whether to run the function in test mode.
@@ -133,7 +120,6 @@ void Calc_Prop(
     cube &CubeLap,
     cube &CubeESP,
     WFN &wavy,
-    int cpus,
     double radius,
     std::ostream &file,
     bool test,
@@ -143,7 +129,6 @@ void Calc_Prop(
  *
  * @param CubeESP The cube object to store the calculated ESP.
  * @param wavy The WFN object containing the wavefunction information.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius parameter for the ESP calculation.
  * @param no_date A flag indicating whether to include the date in the output.
  * @param file The output stream to write the ESP results.
@@ -151,7 +136,6 @@ void Calc_Prop(
 void Calc_ESP(
     cube &CubeESP,
     WFN &wavy,
-    int cpus,
     double radius,
     bool no_date,
     std::ostream &file,
@@ -162,7 +146,6 @@ void Calc_ESP(
  * @param CubeMO The cube object to store the calculated MO.
  * @param mo The index of the MO to calculate.
  * @param wavy The WFN object containing the wavefunction data.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius for the calculation.
  * @param file The output stream to write the calculated MO.
  */
@@ -170,7 +153,6 @@ void Calc_MO(
     cube &CubeMO,
     int mo,
     WFN &wavy,
-    int cpus,
     double radius,
     std::ostream &file,
     bool wrap = true);
@@ -179,14 +161,12 @@ void Calc_MO(
  *
  * @param Cube_S_Rho The cube object to store the calculated S_Rho cube.
  * @param wavy The WFN object used for the calculation.
- * @param cpus The number of CPUs to use for the calculation.
  * @param file The output stream to write the results to.
  * @param nodate A boolean flag indicating whether to include the date in the output.
  */
 void Calc_S_Rho(
     cube &Cube_S_Rho,
     WFN &wavy,
-    int cpus,
     std::ostream &file,
     bool& nodate);
 /**
@@ -195,7 +175,6 @@ void Calc_S_Rho(
  * @param CubeHDEF The cube object representing the Hirshfeld Density.
  * @param CubeRho The cube object representing the electron density.
  * @param wavy The WFN object containing additional information.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param ignore_atom The index of the atom to ignore in the calculation.
  * @param file The output stream to write the results to.
@@ -204,7 +183,6 @@ void Calc_Hirshfeld(
     cube &CubeHDEF,
     cube &CubeRho,
     WFN &wavy,
-    int cpus,
     double radius,
     int ignore,
     std::ostream &file,
@@ -216,7 +194,6 @@ void Calc_Hirshfeld(
  * @param CubeRho The cube object representing the electron density.
  * @param CubeSpherical The cube object representing the spherical density.
  * @param wavy The WFN object containing the wavefunction information.
- * @param cpus The number of CPUs to be used for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param ignore_atom The index of the atom to be ignored in the calculation.
  * @param file The output stream to write the results to.
@@ -226,7 +203,6 @@ void Calc_Hirshfeld(
     cube &CubeRho,
     cube &CubeSpherical,
     WFN &wavy,
-    int cpus,
     double radius,
     int ignore,
     std::ostream &file,
@@ -238,7 +214,6 @@ void Calc_Hirshfeld(
  * @param CubeRho The cube object containing the electron density.
  * @param CubeSpherical The cube object containing the spherical density.
  * @param wavy The WFN object containing the wavefunction information.
- * @param cpus The number of CPUs to use for the calculation.
  * @param radius The radius parameter for the calculation.
  * @param ignore_atom The index of the atom to ignore in the calculation.
  * @param file The output stream to write the results to.
@@ -248,7 +223,6 @@ void Calc_Hirshfeld_atom(
     cube &CubeRho,
     cube &CubeSpherical,
     WFN &wavy,
-    int cpus,
     double radius,
     int ignore_atom,
     std::ostream &file,

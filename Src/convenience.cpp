@@ -72,7 +72,8 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Florian Kleemiss,\n");
         t.append("      Emmanuel Hupf,\n");
         t.append("      Alessandro Genoni,\n");
-        t.append("      Lukas Seifert,\n");
+        t.append("      Lukas M. Seifert,\n");
+        t.append("      Daniel Brüx,\n");
         t.append("      and many more in communications or by feedback!\n");
 #if has_RAS == 1
         t.append("NoSpherA2 uses Rascaline, Metatensor, OpenBLAS and the HDF5 library.\n");
@@ -1127,9 +1128,7 @@ void readxyzMinMax_fromCIF(
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
-    double Resolution,
-    std::ofstream &file,
-    bool debug)
+    double Resolution)
 {
     using namespace std;
     cell cell(cif);
@@ -2184,6 +2183,7 @@ void options::digest_options()
         }
         else if (temp == "-atom_dens")
         {
+            cout << NoSpherA2_message() << endl;
             wfn = arguments[i + 1];
             err_checkf(exists(wfn), "WFN doesn't exist", cout);
             ivec val_MOs;
@@ -2331,8 +2331,10 @@ void options::digest_options()
         else if (temp == "-draw_orbits")
         {
             vec opts = split_string<double>(arguments[i + 1], ",");
-            double resolution = 0.025;
-            double radius = 3.5;
+            int l = static_cast<int>(opts[0]);
+            int m = static_cast<int>(opts[1]);
+            resolution = 0.025;
+            radius = 3.5;
             if (opts.size() >= 3)
             {
                 resolution = opts[2];
@@ -2342,7 +2344,7 @@ void options::digest_options()
                 radius = opts[3];
             }
 
-            draw_orbital(opts[0], opts[1], resolution, radius);
+            draw_orbital(l, m, resolution, radius);
             exit(0);
         }
         else if (temp == "-e_field")
@@ -2518,11 +2520,6 @@ void options::digest_options()
             calc = rdg = true;
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
-        else if (temp == "-rho_cube_test")
-        {
-            test_density_cubes(*this, log_file);
-            exit(0);
-        }
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
@@ -2968,6 +2965,15 @@ cdouble vec_sum(const cvec &in)
     for (int i = 0; i < in.size(); i++)
         res += in[i];
     return res;
+}
+
+double vec_length(const vec& in) {
+    double sum = 0.0;
+    for (double val : in)
+    {
+        sum += val * val;
+    }
+    return sqrt(sum);
 }
 
 void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)

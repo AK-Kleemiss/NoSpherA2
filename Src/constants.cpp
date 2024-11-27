@@ -531,4 +531,25 @@ namespace constants {
             return spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * sin(m * phi);
         }
     }
+
+    int get_closest_num_angular(const int& n)
+    {
+        int m = 0;
+
+        for (int i = 0; i < max_LT; i++) {
+            m = lebedev_table[i];
+            if (m >= n)
+                return m;
+        }
+        return -1;
+    };
+
+    int get_angular_order(const int& n)
+    {
+        for (int i = 0; i < max_LT; i++) {
+            if (lebedev_table[i] == n)
+                return i;
+        }
+        return -1;
+    };
 }

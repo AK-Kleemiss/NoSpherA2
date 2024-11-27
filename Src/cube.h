@@ -2,8 +2,14 @@
 
 #include <vector>
 #include <string>
+#include <array>
 
 class WFN;
+// Structure to hold charge and position
+struct Charge {
+    std::array<double, 3> r; // Fractional position (x, y, z)
+    double q;                // Charge
+};
 
 class cube
 {
@@ -32,6 +38,7 @@ public:
   double sum();
   double diff_sum();
   std::vector<double> double_sum();
+  std::array<double, 3> get_pos(const int& i, const int& j, const int& k);
   double get_value(int x, int y, int z) const;
   bool set_value(int x, int y, int z, double value);
   bool read_file(bool full, bool header, bool expert = false);
@@ -42,6 +49,7 @@ public:
   double get_vector(int i, int j) const;
   bool set_vector(int i, int j, double value);
   double get_origin(unsigned int i) const;
+  double ewald_sum(const int kMax);
   void calc_dv();
   double get_dv() const { return dv; };
   void set_dv(const double& given);
@@ -61,9 +69,9 @@ private:
   bool loaded;
   std::string comment1;
   std::string comment2;
-  std::vector <int> size;
-  std::vector <double> origin;
-  std::vector < std::vector <double> > vectors;
+  std::array <int, 3> size;
+  std::array <double, 3> origin;
+  std::array < std::array <double, 3>, 3> vectors;
   std::vector < std::vector < std::vector <double> > > values;
   WFN* parent_wavefunction;
 };

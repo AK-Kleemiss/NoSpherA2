@@ -5319,7 +5319,7 @@ void WFN::pop_back_MO()
 }
 
 const void WFN::computeValues(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double,3>& PosGrid, // [3] vector with current position on te grid
     double &Rho,           // Value of Electron Density
     double &normGrad,      // Gradiant Vector
     double *Hess,          // Hessian Matrix, later used to determine lambda2
@@ -5456,7 +5456,7 @@ const void WFN::computeValues(
 };
 
 const void WFN::computeELIELF(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
     double &Elf,           // Value of the ELF
     double &Eli            // Value of the ELI
 ) const
@@ -5562,7 +5562,7 @@ const void WFN::computeELIELF(
 };
 
 const void WFN::computeELI(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
     double &Eli            // Value of the ELI
 ) const
 {
@@ -5663,7 +5663,7 @@ const void WFN::computeELI(
 };
 
 const void WFN::computeELF(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
     double &Elf            // Value of the ELF
 ) const
 {
@@ -5764,7 +5764,7 @@ const void WFN::computeELF(
 };
 
 const void WFN::computeLapELIELF(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
     double &Elf,           // Value of the ELF
     double &Eli,           // Value of the ELI
     double &Lap            // Value for the Laplacian
@@ -5879,7 +5879,7 @@ const void WFN::computeLapELIELF(
 };
 
 const void WFN::computeLapELI(
-    const double *PosGrid, // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid, // [3] vector with current position on te grid
     double &Eli,           // Value of the ELI
     double &Lap            // Value for the Laplacian
 ) const
@@ -5990,7 +5990,7 @@ const void WFN::computeLapELI(
 };
 
 const double WFN::computeLap(
-    const double* PosGrid // [3] vector with current position on te grid
+    const std::array<double, 3>& PosGrid // [3] vector with current position on te grid
 ) const
 {
     const int _nmo = get_nmo(false);
@@ -6089,7 +6089,7 @@ const double WFN::computeLap(
 };
 
 const double WFN::computeMO(
-    const double *PosGrid, // [3] array with current position on the grid
+    const std::array<double, 3>& PosGrid, // [3] array with current position on the grid
     const int &mo) const
 {
     double result = 0.0;
@@ -6572,7 +6572,7 @@ void WFN::write_wfn_CIF(const std::string &fileName) const
     file.close();
 }
 
-const double WFN::computeESP(const double *PosGrid, const vec2 &d2) const
+const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2 &d2) const
 {
     double ESP = 0;
     double P[3]{0, 0, 0};
@@ -6736,7 +6736,7 @@ const double WFN::computeESP(const double *PosGrid, const vec2 &d2) const
     return ESP;
 };
 
-const double WFN::computeESP_noCore(const double *PosGrid, const vec2 &d2) const
+const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2 &d2) const
 {
     double ESP = 0;
     double P[3]{0, 0, 0};

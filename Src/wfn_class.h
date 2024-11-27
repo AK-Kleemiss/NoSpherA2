@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <array>
 
 class MO;
 
@@ -235,17 +236,17 @@ public:
     const double compute_dens(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3) const;
     const double compute_spin_dens(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
-    const void computeValues(const double *PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap) const;
-    const void computeLapELIELF(const double *PosGrid, double &Elf, double &Eli, double &Lap) const;
-    const void computeELIELF(const double *PosGrid, double &Elf, double &Eli) const;
-    const void computeLapELI(const double *PosGrid, double &Eli, double &Lap) const;
-    const double computeLap(const double* PosGrid) const;
-    const void computeELI(const double *PosGrid, double &Eli) const;
-    const void computeELF(const double *PosGrid, double &Elf) const;
-    const double computeMO(const double *PosGrid, const int &mo) const;
+    const void computeValues(const std::array<double, 3>& PosGrid, double &Rho, double &normGrad, double *Hess, double &Elf, double &Eli, double &Lap) const;
+    const void computeLapELIELF(const std::array<double, 3>& PosGrid, double &Elf, double &Eli, double &Lap) const;
+    const void computeELIELF(const std::array<double, 3>& PosGrid, double &Elf, double &Eli) const;
+    const void computeLapELI(const std::array<double, 3>& PosGrid, double &Eli, double &Lap) const;
+    const double computeLap(const std::array<double, 3>& PosGrid) const;
+    const void computeELI(const std::array<double,3>&PosGrid, double &Eli) const;
+    const void computeELF(const std::array<double,3>&PosGrid, double &Elf) const;
+    const double computeMO(const std::array<double, 3>& PosGrid, const int &mo) const;
     const double compute_MO_spherical(const double &Pos1, const double &Pos2, const double &Pos3, const int &MO) const;
-    const double computeESP(const double *PosGrid, const vec2 &d2) const;
-    const double computeESP_noCore(const double *PosGrid, const vec2 &d2) const;
+    const double computeESP(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
+    const double computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
     //----------DM Handling--------------------------------
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);
