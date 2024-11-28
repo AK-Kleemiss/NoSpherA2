@@ -73,7 +73,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Emmanuel Hupf,\n");
         t.append("      Alessandro Genoni,\n");
         t.append("      Lukas M. Seifert,\n");
-        t.append("      Daniel Brüx,\n");
+        t.append("      Daniel Bruex,\n");
         t.append("      and many more in communications or by feedback!\n");
 #if has_RAS == 1
         t.append("NoSpherA2 uses Rascaline, Metatensor, OpenBLAS and the HDF5 library.\n");
