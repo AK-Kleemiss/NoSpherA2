@@ -1,12 +1,12 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -lgomp -static-libgcc -static-libstdc++
+LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -llapacke -Wl,-Bstatic -llapack 
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
 LIBHDF5 := ../Lib/libhdf5.a
-LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a /usr/lib/x86_64-linux-gnu/liblapacke.a /usr/lib/x86_64-linux-gnu/liblapack.a
+LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
 all: NoSpherA2 
 
@@ -43,14 +43,14 @@ NoSpherA2_old: ${OBJS} ${USER_OBJS}
 
 NoSpherA2: ${OBJS_RASC}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${OBJS_RASC} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
+	g++ -o "NoSpherA2" ${OBJS_RASC} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
 	${RM} ${OBJS_RASC}
 	cp NoSpherA2 ../
 	@echo 'Done building rascaline version of NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_RASC_d}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_Debug" ${OBJS_RASC_d} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBOPENBLAS} ${LIBS}
+	g++ -o "NoSpherA2_Debug" ${OBJS_RASC_d} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
 	${RM} ${OBJS_RASC_d}
 	cp NoSpherA2_Rascaline_Debug ../
 	@echo 'Done building rascaline version of NoSpherA2'
