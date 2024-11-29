@@ -60,7 +60,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: make_Linux
-      run: sudo apt update && sudo apt install liblapacke-dev liblapack-dev liblapacke && make NoSpherA2
+      run: sudo apt update && sudo apt install liblapacke-dev liblapack-dev libgfortran-$(g++ -dumpversion)-dev libgfortran5 build-essential g++ make && make NoSpherA2
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
