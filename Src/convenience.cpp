@@ -2386,6 +2386,19 @@ void options::digest_options()
             calc = elf = true;
         else if (temp == "-esp")
             calc = esp = true;
+        else if (temp == "-ewal_sum") {
+            //bool read, WFN& wave, std::ostream& file,
+            WFN temp(9);
+            cube residual(arguments[i + 1], true, temp, std::cout);
+            if (argc >= i + 3)
+            {
+                int k_max = stod(arguments[i + 2]);
+                residual.ewald_sum(k_max);
+            }
+            else
+                residual.ewald_sum();
+            exit(0);
+        }
         else if (temp == "-fchk")
             fchk = arguments[i + 1];
         else if (temp == "-fractal")

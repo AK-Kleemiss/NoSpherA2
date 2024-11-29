@@ -607,18 +607,23 @@ double cube::ewald_sum(const int kMax){
     }
 
     // Real-space contribution
+#pragma omp parallel for reduction(+:realSpaceEnergy)
     for (int i = 0; i < size[0]; i++) {
+        double length = 0;
+        std::array<double, 3> ri;
+        std::array<double, 3> rj;
+        std::array<double, 3> rij;
         for (int j = 0; j < size[1]; j++) {
             for (int k = 0; k < size[2]; k++) {
-                std::array<double, 3> ri = get_pos(i, j, k);
+                ri = get_pos(i, j, k);
                 for (int l = i; l < 3; l++) {
                     for (int m = (l == i ? j : 0); m < 3; m++) {
                         for (int n = (l == i && m == j ? k + 1 : 0); n < 3; n++) {
-                            std::array<double, 3> rj = get_pos(l, m, n);
-                            std::array<double, 3> rij{ ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
-                            double length = array_length(rij);
+                            rj = get_pos(l, m, n);
+                            rij = { ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
+                            length = array_length(rij);
                             if (length > 0) {
-                                realSpaceEnergy += get_value(i,j,k) * get_value(l,m,n) * erfc(alpha * length) / length;
+                                realSpaceEnergy += abs(get_value(i,j,k) * get_value(l,m,n)) * erfc(alpha * length) / length;
                             }
                         }
                     }
@@ -626,52 +631,77 @@ double cube::ewald_sum(const int kMax){
             }
         }
     }
+    double result = 0.0;
+    double res_temp = 0;
+    for (int k_vec = 1; k_vec <= kMax; k_vec++) {
+#pragma omp parallel for reduction(+:res_temp)
+        for (int h = -k_vec; h <= k_vec; ++h) {
+            for (int k = -k_vec; k <= k_vec; ++k) {
+                for (int l = -k_vec; l <= k_vec; ++l) {
+                    if (h == 0 && k == 0 && l == 0) continue;
+                    if (h != -k_vec && h != k_vec && k != -k_vec && k != k_vec && l != -k_vec && l != k_vec) continue;
 
-    // Reciprocal-space contribution
-    for (int h = -kMax; h <= kMax; ++h) {
-        for (int k = -kMax; k <= kMax; ++k) {
-            for (int l = -kMax; l <= kMax; ++l) {
-                if (h == 0 && k == 0 && l == 0) continue;
+                    std::array<double, 3> kvec = { 0, 0, 0 };
+                    for (int d = 0; d < 3; ++d) {
+                        kvec[d] = h * reciprocalLattice[0][d] +
+                            k * reciprocalLattice[1][d] +
+                            l * reciprocalLattice[2][d];
+                    }
+                    double k2 = dot(kvec, kvec);
 
-                std::array<double, 3> kvec = { 0, 0, 0 };
-                for (int d = 0; d < 3; ++d) {
-                    kvec[d] = h * reciprocalLattice[0][d] +
-                        k * reciprocalLattice[1][d] +
-                        l * reciprocalLattice[2][d];
-                }
-                double k2 = dot(kvec, kvec);
-
-                double chargeSum = 0.0;
-                for (int i = 0; i < size[0]; i++) {
-                    for (int j = 0; j < size[1]; j++) {
-                        for (int m = 0; m < size[2]; m++) {
-                            std::array<double, 3> pos = get_pos(i,j,m);
-                            double kDotR = dot(kvec, pos);
-                            chargeSum += get_value(i, j, m) * cos(kDotR);
+                    double chargeSumc = 0.0;
+                    double chargeSums = 0.0;
+                    std::array<double, 3> pos;
+                    double kDotR, v;
+                    for (int i = 0; i < size[0]; i++) {
+                        for (int j = 0; j < size[1]; j++) {
+                            for (int m = 0; m < size[2]; m++) {
+                                pos = get_pos(i, j, m);
+                                kDotR = dot(kvec, pos);
+                                v = abs(get_value(i, j, m));
+                                chargeSumc += v * cos(kDotR);
+                                chargeSums += v * sin(kDotR);
+                            }
                         }
                     }
+
+                    res_temp += (constants::FOUR_PI / volume) *
+                        exp(-k2 / (4 * alpha * alpha)) / abs(k2) *
+                        ((chargeSumc * chargeSumc) + (chargeSums * chargeSums));
+
                 }
-
-                reciprocalSpaceEnergy += (constants::FOUR_PI / volume) *
-                    exp(-k2 / (4 * alpha * alpha)) / k2 *
-                    chargeSum * chargeSum;
-
             }
         }
+        if ((res_temp - result) / res_temp < 1E-2) {
+            std::cout << "Converged at " << k_vec << " k-points" << std::endl;
+            result = res_temp;
+            break;
+        }
+        else {
+            std::cout << "Not converged at " << k_vec << " k-points: " << res_temp << std::endl;
+        }
+        result = res_temp;
     }
+    reciprocalSpaceEnergy = result;
 
     // Self-energy term
+#pragma omp parallel for reduction(+:selfEnergy)
     for (int i = 0; i < size[0]; i++) {
         for (int j = 0; j < size[1]; j++) {
             for (int m = 0; m < size[2]; m++) {
-                selfEnergy += get_value(i,j,m) * get_value(i,j,m);
+                selfEnergy += abs(get_value(i,j,m) * get_value(i,j,m));
             }
         }
     }
+    //assuming the total charge is zero no need for charged system term
     selfEnergy *= -alpha / constants::sqr_pi;
+    selfEnergy -= 2.0 * constants::PI / (alpha * alpha * volume);
 
     // Total energy
     double totalEnergy = realSpaceEnergy + reciprocalSpaceEnergy + selfEnergy;
+    std::cout << "Real-space energy: " << realSpaceEnergy << std::endl;
+    std::cout << "Reciprocal-space energy: " << reciprocalSpaceEnergy << std::endl;
+    std::cout << "Self-energy: " << selfEnergy << std::endl;
     return totalEnergy;
 }
 
