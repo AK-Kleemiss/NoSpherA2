@@ -616,9 +616,9 @@ double cube::ewald_sum(const int kMax){
         for (int j = 0; j < size[1]; j++) {
             for (int k = 0; k < size[2]; k++) {
                 ri = get_pos(i, j, k);
-                for (int l = i; l < 3; l++) {
-                    for (int m = (l == i ? j : 0); m < 3; m++) {
-                        for (int n = (l == i && m == j ? k + 1 : 0); n < 3; n++) {
+                for (int l = i; l < size[0]; l++) {
+                    for (int m = (l == i ? j : 0); m < size[1]; m++) {
+                        for (int n = (l == i && m == j ? k + 1 : 0); n < size[2]; n++) {
                             rj = get_pos(l, m, n);
                             rij = { ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
                             length = array_length(rij);
