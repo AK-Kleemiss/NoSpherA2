@@ -430,6 +430,88 @@ double calc_grid_averaged_at_r(const WFN& wavy,
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
+/// not like above //////////////////////////////////////////////////////////////////////////
+double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
+    const int i, /// now counts for several atoms
+    const double& r,
+    const int& min_angular = 60,
+    const int& max_angular = 1000,
+    const bool print = false)
+{
+
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_angular);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_angular);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+
+    vec angular_x(constants::max_LT * constants::MAG, 0.0);
+    vec angular_y(constants::max_LT * constants::MAG, 0.0);
+    vec angular_z(constants::max_LT * constants::MAG, 0.0);
+    vec angular_w(constants::max_LT * constants::MAG, 0.0);
+    int angular_off;
+    lebedev_sphere ls;
+
+    for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+        angular_off = j * constants::MAG;
+        ls.ld_by_order(constants::lebedev_table[j],
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
+    }
+
+    const double rb = constants::bragg_angstrom[wavy.atoms[i].charge] / (5.0E10 * constants::a0);
+
+    int num_angular = max_num_angular_points_closest;
+    if (r < rb) {
+        num_angular = static_cast<int>(max_num_angular_points_closest *
+            (r / rb));
+        num_angular = constants::get_closest_num_angular(num_angular);
+        err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+        if (num_angular < min_num_angular_points_closest)
+            num_angular = min_num_angular_points_closest;
+    }
+
+    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+    err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+    const int start = 0;
+    angular_off -= start;
+    const int size = start + num_angular;
+    int p = 0;
+    double dens = 0.0;
+	Thakkar A(wavy.atoms[i].charge); /// for the atom i, a Thakkar object is created
+#pragma omp parallel
+    {
+        vec2 d(16);
+        vec _phi(wavy.get_nmo(), 0.0);
+        for (int j = 0; j < 16; j++)
+            d[j].resize(wavy.get_ncen(), 0.0);
+#pragma omp for reduction(+:dens)
+        for (int iang = start; iang < size; iang++) {
+            p = angular_off + iang;
+            const double x = angular_x[p] * r + wavy.atoms[i].x; /// moving the lebedev points to the atom i
+            const double y = angular_y[p] * r + wavy.atoms[i].y;
+            const double z = angular_z[p] * r + wavy.atoms[i].z;
+            const std::array<double, 3> d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.atoms[i].x is 0 
+            const double dist = array_length(d_);
+            const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
+            double rho_all = rho_a; /// the molecular density based on pro-atoms
+            for (int atom = 0; atom < wavy.atoms.size(); atom++) { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
+                if (atom == i) continue; /// if the atom is the same as the atom i, the loop is skipped
+                const std::array<double, 3> d_atom = { x - wavy.atoms[atom].x, y - wavy.atoms[atom].y, z - wavy.atoms[atom].z };
+                const double dist_atom = array_length(d_atom); /// is like d_, but for another atom 
+                Thakkar thakkar_atom(wavy.atoms[atom].charge);
+                rho_all += thakkar_atom.get_radial_density(dist_atom);
+            }
+            const double hirsh_weight = rho_a / rho_all;
+            dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+        }
+    }
+    if (print)
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
+    return dens;
+}
 
 void bondwise_laplacian_plots(std::string& wfn_name) {
     char cwd[1024];

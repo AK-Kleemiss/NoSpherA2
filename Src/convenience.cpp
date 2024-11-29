@@ -2575,6 +2575,30 @@ void options::digest_options()
             dmin = fromString<double>(arguments[i + 4]);
             calc_sfac_diffuse(*this, std::cout);
         }
+        else if (temp == "-spherical_aver_hirsh")
+        {
+			string wfn_name = arguments[i + 1];
+			WFN wavy(0);
+			cout << "Reading wavefunction: " << wfn_name << endl;
+			wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+			cout << "Assigning ECPs" << endl;
+			if (ECP)
+				wavy.set_has_ECPs(true);
+			cout << "Starting spherical averaging" << endl; 
+			double dens;
+
+  
+            for (int index_atom = 0; index_atom < wavy.atoms.size(); index_atom += 1) {
+                ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
+                for (double r = 0.001; r < 5.0; r += 0.002) {
+                    dens = calc_hirsh_grid_averaged_at_r(wavy, index_atom, r, 360, 5800);  /// what does r = 1 do?
+                    outputFile << r << " " << dens << "\n";
+                }
+             outputFile.close();
+            } 
+            cout << "Data written to output.dat" << endl;
+			exit(0);
+        }
         else if (temp == "-spherical_harmonic")
         {
             spherical_harmonic_test();

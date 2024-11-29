@@ -1225,9 +1225,9 @@ double make_sphericals(
     using namespace std;
     const double incr = pow(incr_start, max(1, accuracy - 1));
     const double lincr = log(incr);
-    vector<Thakkar> sphericals;
+    vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
     for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.push_back(Thakkar(atom_type_list[i]));
+        sphericals.push_back(Thakkar(atom_type_list[i])); // push_back is like a copy without making a copy
     // Make radial grids
     if (debug)
     {

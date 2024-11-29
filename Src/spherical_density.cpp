@@ -142,7 +142,7 @@ void Thakkar::calc_custom_orbs(
     }
 }
 
-const double Thakkar::get_radial_density(double& dist)
+const double Thakkar::get_radial_density(const double& dist)
 {
     // Speedup things for H
     if (atomic_number == 1)
@@ -800,7 +800,7 @@ const int Gaussian_Atom::previous_element_coef()
     return counter;
 };
 
-const double Gaussian_Atom::get_radial_density(double& dist)
+const double Gaussian_Atom::get_radial_density(const double& dist)
 {
     double Rho = 0.0;
     if (_first_ex == 200000000)
@@ -826,7 +826,7 @@ const double Gaussian_Atom::get_radial_density(double& dist)
     return Rho / (constants::FOUR_PI); // 4pi is the angular function
 };
 
-const double Spherical_Gaussian_Density::get_radial_density(double& dist)
+const double Spherical_Gaussian_Density::get_radial_density(const double& dist)
 {
     double res = 0;
     double d2 = dist * dist;

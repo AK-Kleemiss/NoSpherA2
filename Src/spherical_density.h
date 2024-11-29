@@ -99,7 +99,7 @@ public:
 		atomic_number = 1;
 		charge = 0;
 	};
-	virtual const double get_radial_density(double &dist)
+	virtual const double get_radial_density(const double &dist)
 	{
 		err_not_impl_SA();
         (void)dist;
@@ -180,7 +180,7 @@ protected:
 public:
 	Thakkar(const int g_atom_number, const int ECP_mode = 1);
 	Thakkar();
-	const double get_radial_density(double &dist) override;
+	const double get_radial_density(const double &dist) override;
 	const double get_radial_custom_density(
 		const double &dist,
 		const int &max_s,
@@ -246,7 +246,7 @@ protected:
 public:
 	Gaussian_Atom(const int g_atom_number, std::string &basis);
 	Gaussian_Atom() = default;
-	const double get_radial_density(double &dist) override;
+	const double get_radial_density(const double &dist) override;
 	const double get_form_factor(const double &k_vector) override;
 	const double get_core_form_factor(const double &k_vector, const int &core_els) override;
 	const double get_custom_form_factor(
@@ -324,7 +324,7 @@ public:
 		}
 	};
 	Spherical_Gaussian_Density() : c(NULL), nex(0), z(NULL), charge(0), atomic_number(1), ECP_mode(1){};
-	virtual const double get_radial_density(double &dist);
+	virtual const double get_radial_density(const double &dist);
 	virtual const double get_form_factor(const double &k_vector);
 	const int get_atomic_number() const { return atomic_number; };
 	const int get_charge() const { return charge; };

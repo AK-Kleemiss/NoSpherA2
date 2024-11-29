@@ -579,7 +579,7 @@ double dot(const T& a, T& b) {
 }
 
 double cube::ewald_sum(const int kMax){
-
+    calc_dv();
     std::array<double, 3> lengths{ array_length(vectors[0]), array_length(vectors[1]), array_length(vectors[2]) };
     double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
     double alpha = 2.0 * constants::sqr_pi / shortest_length;
@@ -623,7 +623,7 @@ double cube::ewald_sum(const int kMax){
                             rij = { ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
                             length = array_length(rij);
                             if (length > 0) {
-                                realSpaceEnergy += abs(get_value(i,j,k) * get_value(l,m,n)) * erfc(alpha * length) / length;
+                                realSpaceEnergy += abs(get_value(i,j,k) * get_value(l,m,n)) * dv * dv * erfc(alpha * length) / length;
                             }
                         }
                     }
@@ -658,7 +658,7 @@ double cube::ewald_sum(const int kMax){
                             for (int m = 0; m < size[2]; m++) {
                                 pos = get_pos(i, j, m);
                                 kDotR = dot(kvec, pos);
-                                v = abs(get_value(i, j, m));
+                                v = abs(get_value(i, j, m))*dv;
                                 chargeSumc += v * cos(kDotR);
                                 chargeSums += v * sin(kDotR);
                             }
@@ -694,7 +694,7 @@ double cube::ewald_sum(const int kMax){
         }
     }
     //assuming the total charge is zero no need for charged system term
-    selfEnergy *= -alpha / constants::sqr_pi;
+    selfEnergy *= -alpha / constants::sqr_pi * dv * dv;
     selfEnergy -= 2.0 * constants::PI / (alpha * alpha * volume);
 
     // Total energy
