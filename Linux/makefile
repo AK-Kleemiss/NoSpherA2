@@ -1,8 +1,8 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -llapacke -Wl,-Bstatic -llapack -Wl,-Bstatic -lgfortran -Wl,-Bstatic -lm
-LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgfortran.a
+LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -llapacke -Wl,-Bstatic -llapack -Wl,-Bstatic -lgfortran -Wl,-Bstatic -lquadmath -Wl,-Bstatic -lm
+LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgfortran.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libquadmath.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
 LIBHDF5 := ../Lib/libhdf5.a
