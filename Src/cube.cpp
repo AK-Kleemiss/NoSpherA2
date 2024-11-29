@@ -698,10 +698,11 @@ double cube::ewald_sum(const int kMax){
     selfEnergy -= 2.0 * constants::PI / (alpha * alpha * volume);
 
     // Total energy
-    double totalEnergy = realSpaceEnergy + reciprocalSpaceEnergy + selfEnergy;
+    const double totalEnergy = realSpaceEnergy + reciprocalSpaceEnergy + selfEnergy;
     std::cout << "Real-space energy: " << realSpaceEnergy << std::endl;
     std::cout << "Reciprocal-space energy: " << reciprocalSpaceEnergy << std::endl;
     std::cout << "Self-energy: " << selfEnergy << std::endl;
+	std::cout << "Total energy: " << totalEnergy << std::endl;
     return totalEnergy;
 }
 
