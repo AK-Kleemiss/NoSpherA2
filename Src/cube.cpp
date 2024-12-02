@@ -108,14 +108,6 @@ cube::cube(const cube &given)
     }
 };
 
-std::array<double, 3> cube::get_pos(const int& i, const int& j, const int& k) {
-    return {
-        i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
-        i * vectors[1][0] + j * vectors[1][1] + k * vectors[1][2] + origin[1],
-        i * vectors[2][0] + j * vectors[2][1] + k * vectors[2][2] + origin[2]
-    };
-}
-
 bool cube::read_file(bool full, bool header, bool expert)
 {
     using namespace std;
@@ -569,8 +561,7 @@ std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<dou
 
 // Function to compute dot product
 template <typename T>
-double dot(const T& a, T& b) {
-    err_checkf(a.size() == b.size(), "Vectors must have the same size!", std::cout);
+inline const double dot(const T& a, const T& b) {
     double result = 0;
     for (int i = 0; i < a.size(); i++) {
         result += a[i] * b[i];
@@ -578,23 +569,70 @@ double dot(const T& a, T& b) {
     return result;
 }
 
-double cube::ewald_sum(const int kMax){
+bool has_converged(const double& current_value, double& previous_value, const double threshold, std::deque<double>& history, const int window_size) {
+    // Calculate relative and absolute differences
+    double relative_diff = std::abs((current_value - previous_value) / current_value);
+    double absolute_diff = std::abs(current_value - previous_value);
+
+    // Update history
+    history.push_back(current_value);
+    if (history.size() > window_size) {
+        history.pop_front();
+    }
+    double moving_average = 0;
+    bool moving_average_converged = false;
+
+    // Calculate moving average
+    if (history.size() != 1) {
+        double sum = 0.0;
+        for (double value : history) {
+            sum += value;
+        }
+        moving_average = sum / history.size();
+        moving_average_converged = std::abs((current_value - moving_average) / moving_average) < threshold;
+    }
+
+    // Check convergence criteria
+    bool relative_converged = relative_diff < threshold;
+    bool absolute_converged = absolute_diff < threshold;
+
+    previous_value = current_value;
+    if (relative_converged || absolute_converged || moving_average_converged) {
+        std::cout << "Converged rel/abs/moving " << relative_converged << "/" << absolute_converged << "/" << moving_average_converged << ": " << current_value << std::endl;
+        return true;
+    }
+    else {
+        std::cout << "Not Converged, due to rel/abs/moving " << relative_converged << "/" << absolute_converged << "/" << moving_average_converged << ": " << current_value << std::endl;
+        return false;
+    }
+}
+
+double cube::ewald_sum(const int kMax) {
     calc_dv();
-    std::array<double, 3> lengths{ array_length(vectors[0]), array_length(vectors[1]), array_length(vectors[2]) };
-    double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
-    double alpha = 2.0 * constants::sqr_pi / shortest_length;
+    const std::array<double, 3> lengths{ array_length(vectors[0])*size[0], array_length(vectors[1])*size[1], array_length(vectors[2])*size[2]};
+    const double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
+    const double alpha = 2.0 * constants::sqr_pi / shortest_length;
+    std::cout << "shortest length: " << shortest_length << " alpha: " << alpha << std::endl;
     double realSpaceEnergy = 0.0;
     double reciprocalSpaceEnergy = 0.0;
     double selfEnergy = 0.0;
 
     std::array<std::array<double, 3>, 3> cell_vectors;
-    cell_vectors[0] = { vectors[0][0] * size[0], vectors[0][1] * size[0], vectors[0][2] * size[0] };
-    cell_vectors[1] = { vectors[1][0] * size[1], vectors[1][1] * size[1], vectors[1][2] * size[1] };
-    cell_vectors[2] = { vectors[2][0] * size[2], vectors[2][1] * size[2], vectors[2][2] * size[2] };
+    cell_vectors[0] = { vectors[0][0] * size[0], vectors[1][0] * size[0], vectors[2][0] * size[0] };
+    cell_vectors[1] = { vectors[0][1] * size[1], vectors[1][1] * size[1], vectors[2][1] * size[1] };
+    cell_vectors[2] = { vectors[0][2] * size[2], vectors[1][2] * size[2], vectors[2][2] * size[2] };
+    std::cout << "Cell lattice:" << std::endl;
+    for (int i = 0; i < 3; i++) {
+        std::cout << std::setw(10) << cell_vectors[i][0] << std::setw(10) << cell_vectors[i][1] << std::setw(10) << cell_vectors[i][2] << std::endl;
+    }
 
     // Compute volume of the unit cell
-    std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
-    double volume = fabs(dot(cell_vectors[0], crossProduct));
+    const std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
+    const double volume = fabs(dot(cell_vectors[0], crossProduct));
+    std::cout << "Volume: " << volume << std::endl;
+    const int grid_points = size[0] * size[1] * size[2];
+    std::cout << "Number of grid points: " << grid_points << std::endl;
+    std::cout << "dv*points: " << dv * grid_points << std::endl;
 
     // Compute reciprocal lattice vectors
     std::array<std::array<double, 3>, 3> reciprocalLattice = {
@@ -605,83 +643,116 @@ double cube::ewald_sum(const int kMax){
     for (auto& vec : reciprocalLattice) {
         for (double& x : vec) x *= 2 * constants::PI / volume;
     }
-
-    // Real-space contribution
-#pragma omp parallel for reduction(+:realSpaceEnergy)
+    std::cout << "Reciprocal cell lattice:" << std::endl;
+    for (int i = 0; i < 3; i++) {
+        std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
+    }
+    
+    
+    std::vector<std::array<double, 3>> ri(grid_points);
+    std::vector<std::vector<std::array<double, 3>>> rij(grid_points);
     for (int i = 0; i < size[0]; i++) {
-        double length = 0;
-        std::array<double, 3> ri;
-        std::array<double, 3> rj;
-        std::array<double, 3> rij;
         for (int j = 0; j < size[1]; j++) {
             for (int k = 0; k < size[2]; k++) {
-                ri = get_pos(i, j, k);
-                for (int l = i; l < size[0]; l++) {
-                    for (int m = (l == i ? j : 0); m < size[1]; m++) {
-                        for (int n = (l == i && m == j ? k + 1 : 0); n < size[2]; n++) {
-                            rj = get_pos(l, m, n);
-                            rij = { ri[0] - rj[0], ri[1] - rj[1], ri[2] - rj[2] };
-                            length = array_length(rij);
-                            if (length > 0) {
-                                realSpaceEnergy += abs(get_value(i,j,k) * get_value(l,m,n)) * dv * dv * erfc(alpha * length) / length;
-                            }
+                ri[i * size[1] * size[2] + j * size[2] + k] = get_pos(i, j, k);
+                rij[i * size[1] * size[2] + j * size[2] + k].resize(grid_points);
+                for (int l = 0; l < size[0]; l++) {
+                    for (int m = 0; m < size[1]; m++) {
+                        for (int n = 0; n < size[2]; n++) {
+                            std::array<double, 3> rj = get_pos(l, m, n);
+                            rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n] = 
+                            { ri[i * size[1] * size[2] + j * size[2] + k][0] - rj[0], 
+                              ri[i * size[1] * size[2] + j * size[2] + k][1] - rj[1], 
+                              ri[i * size[1] * size[2] + j * size[2] + k][2] - rj[2]};
                         }
                     }
                 }
             }
         }
     }
+
+    // Real-space contribution
+#pragma omp parallel for reduction(+:realSpaceEnergy)
+    for (int i = 0; i < size[0]; i++) {
+        double length = 0, fac = 0, v1 = 0;
+        for (int j = 0; j < size[1]; j++) {
+            for (int k = 0; k < size[2]; k++) {
+                v1 = values[i][j][k];
+#pragma ivdep
+                for (int l = 0; l < size[0]; l++) {
+                    for (int m = 0; m < size[1]; m++) {
+                        for (int n = 0; n < size[2]; n++) {
+                            length = array_length(rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n]);
+                            if (length > 6.0 || length == 0) continue;
+                            fac = erfc(alpha * length) / length;
+                            if (abs(fac) < 1E-10) continue;
+                            realSpaceEnergy += v1 * values[l][m][n] * fac;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    realSpaceEnergy *= dv * dv * 0.5;
+    std::cout << "Real-space energy: " << realSpaceEnergy << std::endl;
     double result = 0.0;
     double res_temp = 0;
+    const double FOUR_alsq = 4 * alpha * alpha;
+    std::vector<std::array<int, 3>> known_kVecs;
+    const int window_size = 5;
+    std::deque<double> history;
     for (int k_vec = 1; k_vec <= kMax; k_vec++) {
-#pragma omp parallel for reduction(+:res_temp)
+        double temp = 0;
         for (int h = -k_vec; h <= k_vec; ++h) {
             for (int k = -k_vec; k <= k_vec; ++k) {
                 for (int l = -k_vec; l <= k_vec; ++l) {
                     if (h == 0 && k == 0 && l == 0) continue;
                     if (h != -k_vec && h != k_vec && k != -k_vec && k != k_vec && l != -k_vec && l != k_vec) continue;
-
-                    std::array<double, 3> kvec = { 0, 0, 0 };
-                    for (int d = 0; d < 3; ++d) {
-                        kvec[d] = h * reciprocalLattice[0][d] +
-                            k * reciprocalLattice[1][d] +
-                            l * reciprocalLattice[2][d];
+                    bool known = false;
+                    for (int i = 0; i < known_kVecs.size(); i++) {
+                        if (((known_kVecs[i][0] == +h) && (known_kVecs[i][1] == +k) && (known_kVecs[i][2] == +l)) ||
+                            ((known_kVecs[i][0] == -h) && (known_kVecs[i][1] == -k) && (known_kVecs[i][2] == -l))
+                            ) {
+                            known = true;
+                            break;
+                        }
                     }
-                    double k2 = dot(kvec, kvec);
+                    if (known) continue;
+                    known_kVecs.push_back({ h, k, l });
 
-                    double chargeSumc = 0.0;
-                    double chargeSums = 0.0;
-                    std::array<double, 3> pos;
-                    double kDotR, v;
-                    for (int i = 0; i < size[0]; i++) {
-                        for (int j = 0; j < size[1]; j++) {
-                            for (int m = 0; m < size[2]; m++) {
-                                pos = get_pos(i, j, m);
-                                kDotR = dot(kvec, pos);
-                                v = abs(get_value(i, j, m))*dv;
-                                chargeSumc += v * cos(kDotR);
-                                chargeSums += v * sin(kDotR);
+                    const std::array<double, 3> kvec = {
+                        h * reciprocalLattice[0][0] + k * reciprocalLattice[1][0] + l * reciprocalLattice[2][0],
+                        h * reciprocalLattice[0][1] + k * reciprocalLattice[1][1] + l * reciprocalLattice[2][1],
+                        h * reciprocalLattice[0][2] + k * reciprocalLattice[1][2] + l * reciprocalLattice[2][2]
+                    };
+                    const double k2 = dot(kvec, kvec);
+#pragma omp parallel for reduction(+:temp)
+                    for (int d1 = 0; d1 < size[0]; d1++) {
+                        double v1 = 0, kDotR = 0;
+#pragma ivdep
+                        for (int d2 = 0; d2 < size[1]; d2++) {
+                            for (int d3 = 0; d3 < size[2]; d3++) {
+                                v1 = values[d1][d2][d3];
+                                for (int d4 = 0; d4 < size[0]; d4++) {
+                                    for (int d5 = 0; d5 < size[1]; d5++) {
+                                        for (int d6 = 0; d6 < size[2]; d6++) {
+                                            kDotR = dot(kvec, rij[d1 * size[1] * size[2] + d2 * size[2] + d3][d4 * size[1] * size[2] + d5 * size[2] + d6]);
+                                            temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
-
-                    res_temp += (constants::FOUR_PI / volume) *
-                        exp(-k2 / (4 * alpha * alpha)) / abs(k2) *
-                        ((chargeSumc * chargeSumc) + (chargeSums * chargeSums));
-
                 }
             }
         }
-        if ((res_temp - result) / res_temp < 1E-2) {
-            std::cout << "Converged at " << k_vec << " k-points" << std::endl;
-            result = res_temp;
+        res_temp += 2.0 * constants::PI / volume * temp * 2 * dv * dv;
+        if (has_converged(res_temp, result, 7E-3, history, window_size)) {
             break;
         }
-        else {
-            std::cout << "Not converged at " << k_vec << " k-points: " << res_temp << std::endl;
-        }
-        result = res_temp;
     }
+
     reciprocalSpaceEnergy = result;
 
     // Self-energy term
@@ -689,20 +760,19 @@ double cube::ewald_sum(const int kMax){
     for (int i = 0; i < size[0]; i++) {
         for (int j = 0; j < size[1]; j++) {
             for (int m = 0; m < size[2]; m++) {
-                selfEnergy += abs(get_value(i,j,m) * get_value(i,j,m));
+                selfEnergy += get_value(i, j, m) * get_value(i, j, m);
             }
         }
     }
     //assuming the total charge is zero no need for charged system term
     selfEnergy *= -alpha / constants::sqr_pi * dv * dv;
-    selfEnergy -= 2.0 * constants::PI / (alpha * alpha * volume);
 
     // Total energy
     const double totalEnergy = realSpaceEnergy + reciprocalSpaceEnergy + selfEnergy;
     std::cout << "Real-space energy: " << realSpaceEnergy << std::endl;
     std::cout << "Reciprocal-space energy: " << reciprocalSpaceEnergy << std::endl;
     std::cout << "Self-energy: " << selfEnergy << std::endl;
-	std::cout << "Total energy: " << totalEnergy << std::endl;
+    std::cout << "Total energy: " << totalEnergy << std::endl;
     return totalEnergy;
 }
 

@@ -38,7 +38,13 @@ public:
   double sum();
   double diff_sum();
   std::vector<double> double_sum();
-  std::array<double, 3> get_pos(const int& i, const int& j, const int& k);
+  inline std::array<double, 3> get_pos(const int& i, const int& j, const int& k) {
+      return {
+          i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
+          i * vectors[1][0] + j * vectors[1][1] + k * vectors[1][2] + origin[1],
+          i * vectors[2][0] + j * vectors[2][1] + k * vectors[2][2] + origin[2]
+      };
+  };
   double get_value(int x, int y, int z) const;
   bool set_value(int x, int y, int z, double value);
   bool read_file(bool full, bool header, bool expert = false);

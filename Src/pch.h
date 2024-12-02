@@ -29,6 +29,7 @@
 #include <float.h>
 #include <algorithm>
 #include <atomic>
+#include <deque>
 
 // Here are the system specific libaries
 #ifdef _WIN32

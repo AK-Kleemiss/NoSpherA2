@@ -49,7 +49,7 @@ double vec_sum(const vec &in);
 cdouble vec_sum(const cvec &in);
 double vec_length(const vec& in);
 template <typename array>
-double array_length(const array& in) {
+const double array_length(const array& in) {
     double sum = 0.0;
     for (double val : in)
     {
