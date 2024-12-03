@@ -581,6 +581,7 @@ bool has_converged(const double& current_value, double& previous_value, const do
     }
     double moving_average = 0;
     bool moving_average_converged = false;
+    bool absolute_converged = false;
 
     // Calculate moving average
     if (history.size() != 1) {
@@ -590,11 +591,11 @@ bool has_converged(const double& current_value, double& previous_value, const do
         }
         moving_average = sum / history.size();
         moving_average_converged = std::abs((current_value - moving_average) / moving_average) < rel_threshold;
+        absolute_converged = absolute_diff < rel_threshold * rsE;
     }
 
     // Check convergence criteria
     bool relative_converged = relative_diff < rel_threshold;
-    bool absolute_converged = absolute_diff < rel_threshold * rsE;
 
     previous_value = current_value;
     if (relative_converged || absolute_converged || moving_average_converged) {
@@ -707,7 +708,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
             for (int k = -k_vec; k <= k_vec; ++k) {
                 for (int l = -k_vec; l <= k_vec; ++l) {
                     if (h == 0 && k == 0 && l == 0) continue;
-                    if (h != -k_vec && h != k_vec && k != -k_vec && k != k_vec && l != -k_vec && l != k_vec) continue;
+                    if (abs(h) + abs(k) + abs(l) != k_vec) continue;
                     bool known = false;
                     for (int i = 0; i < known_kVecs.size(); i++) {
                         if (((known_kVecs[i][0] == +h) && (known_kVecs[i][1] == +k) && (known_kVecs[i][2] == +l)) ||
@@ -747,7 +748,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                 }
             }
         }
-        res_temp += 2.0 * constants::PI / volume * temp * 2 * dv * dv;
+        res_temp += 4.0 * constants::PI / volume * temp * dv * dv;
         if (has_converged(res_temp, result, conv, realSpaceEnergy, history, window_size)) {
             break;
         }

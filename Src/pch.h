@@ -30,6 +30,12 @@
 #include <algorithm>
 #include <atomic>
 #include <deque>
+#ifdef __SSE2__
+#include <emmintrin.h>
+#endif
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
 
 // Here are the system specific libaries
 #ifdef _WIN32
