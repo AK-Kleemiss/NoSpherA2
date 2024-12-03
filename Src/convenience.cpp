@@ -2393,7 +2393,10 @@ void options::digest_options()
             if (argc >= i + 3)
             {
                 int k_max = stod(arguments[i + 2]);
-                residual.ewald_sum(k_max);
+                if (argc >= i + 4)
+                    residual.ewald_sum(k_max, stod(arguments[i + 3]));
+                else
+                    residual.ewald_sum(k_max);
             }
             else
                 residual.ewald_sum();

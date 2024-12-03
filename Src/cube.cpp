@@ -569,7 +569,7 @@ inline const double dot(const T& a, const T& b) {
     return result;
 }
 
-bool has_converged(const double& current_value, double& previous_value, const double threshold, std::deque<double>& history, const int window_size) {
+bool has_converged(const double& current_value, double& previous_value, const double rel_threshold, const double rsE, std::deque<double>& history, const int window_size) {
     // Calculate relative and absolute differences
     double relative_diff = std::abs((current_value - previous_value) / current_value);
     double absolute_diff = std::abs(current_value - previous_value);
@@ -589,12 +589,12 @@ bool has_converged(const double& current_value, double& previous_value, const do
             sum += value;
         }
         moving_average = sum / history.size();
-        moving_average_converged = std::abs((current_value - moving_average) / moving_average) < threshold;
+        moving_average_converged = std::abs((current_value - moving_average) / moving_average) < rel_threshold;
     }
 
     // Check convergence criteria
-    bool relative_converged = relative_diff < threshold;
-    bool absolute_converged = absolute_diff < threshold;
+    bool relative_converged = relative_diff < rel_threshold;
+    bool absolute_converged = absolute_diff < rel_threshold * rsE;
 
     previous_value = current_value;
     if (relative_converged || absolute_converged || moving_average_converged) {
@@ -607,7 +607,7 @@ bool has_converged(const double& current_value, double& previous_value, const do
     }
 }
 
-double cube::ewald_sum(const int kMax) {
+double cube::ewald_sum(const int kMax, const double conv) {
     calc_dv();
     const std::array<double, 3> lengths{ array_length(vectors[0])*size[0], array_length(vectors[1])*size[1], array_length(vectors[2])*size[2]};
     const double shortest_length = std::min({ lengths[0], lengths[1], lengths[2] });
@@ -748,7 +748,7 @@ double cube::ewald_sum(const int kMax) {
             }
         }
         res_temp += 2.0 * constants::PI / volume * temp * 2 * dv * dv;
-        if (has_converged(res_temp, result, 7E-3, history, window_size)) {
+        if (has_converged(res_temp, result, conv, realSpaceEnergy, history, window_size)) {
             break;
         }
     }
@@ -760,7 +760,7 @@ double cube::ewald_sum(const int kMax) {
     for (int i = 0; i < size[0]; i++) {
         for (int j = 0; j < size[1]; j++) {
             for (int m = 0; m < size[2]; m++) {
-                selfEnergy += get_value(i, j, m) * get_value(i, j, m);
+                selfEnergy += values[i][j][m] * values[i][j][m];
             }
         }
     }
