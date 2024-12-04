@@ -58,9 +58,9 @@ Total number of electrons in the wavefunction: 106.637
 Generating hkl indices up to d=:              0.90... done!
 Nr of reflections generated:                 10240
 Number of symmetry operations:                   4
-Nr of reflections to be used:                16944
+Nr of reflections to be used:                 9982
 
-Number of k-points to evaluate: 16944 for 2826 gridpoints.
+Number of k-points to evaluate: 9982 for 2826 gridpoints.
 [                Calculating Scattering Factors                ]
 [=============================================================] 100% 
 Number of protons: 106

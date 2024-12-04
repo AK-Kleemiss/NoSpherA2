@@ -16,7 +16,7 @@ Reading:                         test_cysteine.cif... done!
 Generating hkl indices up to d=:              0.73... done!
 Nr of reflections generated:                 12096
 Number of symmetry operations:                   4
-Nr of reflections to be used:                14918
+Nr of reflections to be used:                 7672
 
 Generating densities... 
 [              Calculating descriptors for l = 0               ]
@@ -34,7 +34,7 @@ Generating densities...
 													... done!
 
 Generating k-points...                            ... done!
-Number of k - points to evaluate : 14918
+Number of k - points to evaluate : 7672
 Table of Charges in electrons
        Atom      ML
          S    -0.108
