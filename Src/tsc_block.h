@@ -72,7 +72,7 @@ public:
     }
     scatterer = given_scatterer;
     index.resize(3);
-    for (const vec &hkl : given_index)
+    for (const hkl_d &hkl : given_index)
     {
       for (int i = 0; i < 3; i++)
         index[i].push_back(static_cast<numtype_index>(hkl[i]));
@@ -97,7 +97,7 @@ public:
     }
     scatterer = given_scatterer;
     index.resize(3);
-    for (const ivec &hkl : given_index)
+    for (const hkl_t &hkl : given_index)
     {
       for (int i = 0; i < 3; i++)
         index[i].push_back(hkl[i]);

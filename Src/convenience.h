@@ -487,12 +487,13 @@ struct tonto_primitive
     tonto_primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
     tonto_primitive(int c, int t, double e, double coef);
 };
+typedef std::array<int, 3> hkl_t;
+typedef std::set<hkl_t> hkl_list;
+typedef std::set<hkl_t>::const_iterator hkl_list_it;
 
-typedef std::set<ivec> hkl_list;
-typedef std::set<ivec>::const_iterator hkl_list_it;
-
-typedef std::set<vec> hkl_list_d;
-typedef std::set<vec>::const_iterator hkl_list_it_d;
+typedef std::array<double, 3> hkl_d;
+typedef std::set<hkl_d> hkl_list_d;
+typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
 
 //---------------- Object for handling all input options -------------------------------
 struct options

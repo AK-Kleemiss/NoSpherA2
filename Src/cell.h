@@ -166,7 +166,7 @@ public:
      * @return The d-spacing of the crystal lattice plane in Angstrom
      */
     template <typename numtype>
-    double get_d_of_hkl(const std::vector<numtype> hkl) const
+    double get_d_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // d will be in Angstrom
         // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
@@ -191,7 +191,7 @@ public:
      * @return sin theta over lambda of the hkl plane
      */
     template <typename numtype>
-    double get_stl_of_hkl(const std::vector<numtype> hkl) const
+    double get_stl_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // Result will be in Angstrom^-1
         return 1.0 / (2 * get_d_of_hkl(hkl));

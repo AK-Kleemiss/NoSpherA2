@@ -50,7 +50,7 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
     double temp[1]{0.0};
     int hkl_temp[1]{0};
     k_pt.resize(3);
-    ivec hkl_(3);
+    hkl_t hkl_;
     for (int run = 0; run < nr[0]; run++)
     {
         for (int i = 0; i < 3; i++)
@@ -132,7 +132,7 @@ void read_hkl(const std::string &hkl_filename,
               bool debug = false)
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
-    ivec hkl_(3);
+    hkl_t hkl_;
     err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
     std::ifstream hkl_input(hkl_filename.c_str(), std::ios::in);
     hkl_input.seekg(0, hkl_input.beg);
@@ -159,12 +159,12 @@ void read_hkl(const std::string &hkl_filename,
         // if (debug) file << endl;
         hkl.emplace(hkl_);
     }
-    hkl_list_it found = hkl.find(ivec{0, 0, 0});
+    hkl_list_it found = hkl.find(hkl_t{0, 0, 0});
     if (found != hkl.end())
     {
         if (debug)
             file << "popping back 0 0 0" << std::endl;
-        hkl.erase(ivec{0, 0, 0});
+        hkl.erase(hkl_t{0, 0, 0});
     }
     hkl_input.close();
     file << " done!\nNr of reflections read from file: " << hkl.size() << std::endl;
@@ -173,9 +173,9 @@ void read_hkl(const std::string &hkl_filename,
         file << "Number of reflections before twin: " << hkl.size() << std::endl;
     if (twin_law.size() > 0)
     {
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t&hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(ivec{
+                hkl.emplace(hkl_t{
                     static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     static_cast<int>(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     static_cast<int>(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
@@ -205,7 +205,7 @@ void read_hkl(const std::string &hkl_filename,
     else
         file << "Number of symmetry operations: " << sym[0][0].size() << std::endl;
 
-    ivec tempv(3);
+    hkl_t tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -215,7 +215,7 @@ void read_hkl(const std::string &hkl_filename,
         {
             continue;
         }
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
         {
             tempv = {0, 0, 0};
             for (int h = 0; h < 3; h++)
@@ -227,7 +227,7 @@ void read_hkl(const std::string &hkl_filename,
         }
     }
 
-    for (const ivec &hkl__ : hkl_enlarged)
+    for (const hkl_t &hkl__ : hkl_enlarged)
     {
         tempv = hkl__;
         tempv[0] *= -1;
@@ -240,8 +240,8 @@ void read_hkl(const std::string &hkl_filename,
     }
     hkl = hkl_enlarged;
     // Remove 0 0 0 if it exists
-    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
-        hkl.erase(ivec{0, 0, 0});
+    if (hkl.find(hkl_t{0, 0, 0}) != hkl.end())
+        hkl.erase(hkl_t{0, 0, 0});
     file << "Nr of reflections to be used: " << hkl.size() << std::endl;
 }
 
@@ -264,7 +264,7 @@ void generate_hkl(const double &dmin,
 {
     using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-    ivec hkl_(3);
+    hkl_t hkl_;
     string line, temp;
     const ivec extreme = {
         int(unit_cell.get_a() / (dmin - 0.01)),
@@ -289,9 +289,9 @@ void generate_hkl(const double &dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(ivec{
+                hkl.emplace(hkl_t{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
@@ -321,7 +321,7 @@ void generate_hkl(const double &dmin,
     else
         file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
 
-    ivec tempv(3);
+    hkl_t tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -331,7 +331,7 @@ void generate_hkl(const double &dmin,
         {
             continue;
         }
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t&hkl__ : hkl)
         {
             tempv = {0, 0, 0};
             for (int h = 0; h < 3; h++)
@@ -342,21 +342,26 @@ void generate_hkl(const double &dmin,
             hkl_enlarged.emplace(tempv);
         }
     }
+    hkl.clear();
+    if (debug)
+        file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const ivec &hkl__ : hkl_enlarged)
+    for (const hkl_t& hkl__ : hkl_enlarged)
     {
+        if (hkl.find(hkl__) != hkl.end())
+            continue;
         tempv = hkl__;
         tempv[0] *= -1;
         tempv[1] *= -1;
         tempv[2] *= -1;
-        if (hkl.find(tempv) != hkl.end() && hkl.find(hkl__) == hkl.end())
+        if (hkl.find(tempv) == hkl.end())
         {
             hkl.emplace(hkl__);
         }
     }
     // Remove 0 0 0 if it exists
-    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
-        hkl.erase(ivec{0, 0, 0});
+    if (hkl.find(hkl_t{0, 0, 0}) != hkl.end())
+        hkl.erase(hkl_t{0, 0, 0});
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -369,7 +374,7 @@ void generate_hkl(const ivec2 &hkl_min_max,
                   bool ED)
 {
     using namespace std;
-    ivec hkl_(3);
+    hkl_t hkl_;
     string line, temp;
     int h_max = std::max(abs(hkl_min_max[0][1]), abs(hkl_min_max[0][0])),
         k_max = std::max(abs(hkl_min_max[1][1]), abs(hkl_min_max[1][0])),
@@ -398,9 +403,9 @@ void generate_hkl(const ivec2 &hkl_min_max,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(ivec{
+                hkl.emplace(hkl_t{
                     int(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     int(twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     int(twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
@@ -430,7 +435,7 @@ void generate_hkl(const ivec2 &hkl_min_max,
     else
         file << "Number of symmetry operations: " << setw(19) << sym[0][0].size() << endl;
 
-    ivec tempv(3);
+    hkl_t tempv;
     hkl_list hkl_enlarged = hkl;
     for (int s = 0; s < sym[0][0].size(); s++)
     {
@@ -440,7 +445,7 @@ void generate_hkl(const ivec2 &hkl_min_max,
         {
             continue;
         }
-        for (const ivec &hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
         {
             tempv = {0, 0, 0};
             for (int h = 0; h < 3; h++)
@@ -451,21 +456,26 @@ void generate_hkl(const ivec2 &hkl_min_max,
             hkl_enlarged.emplace(tempv);
         }
     }
+    hkl.clear();
+    if(debug)
+        file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const ivec &hkl__ : hkl_enlarged)
+    for (const hkl_t &hkl__ : hkl_enlarged)
     {
+        if (hkl.find(hkl__) != hkl.end())
+            continue;
         tempv = hkl__;
         tempv[0] *= -1;
         tempv[1] *= -1;
         tempv[2] *= -1;
-        if (hkl.find(tempv) != hkl.end() && hkl.find(hkl__) == hkl.end())
+        if (hkl.find(tempv) == hkl.end())
         {
             hkl.emplace(hkl__);
         }
     }
     // Remove 0 0 0 if it exists
-    if (hkl.find(ivec{0, 0, 0}) != hkl.end())
-        hkl.erase(ivec{0, 0, 0});
+    if (hkl.find(hkl_t{0, 0, 0}) != hkl.end())
+        hkl.erase(hkl_t{0, 0, 0});
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
@@ -490,7 +500,7 @@ void generate_fractional_hkl(const double &dmin,
 {
     using namespace std;
     file << "Generating hkl indices up to d=: " << fixed << setw(17) << setprecision(2) << dmin << flush;
-    vec hkl_(3);
+    hkl_d hkl_;
     string line, temp;
     const int extreme = 201;
     double dmin_l = 0.9 * dmin;
@@ -521,9 +531,9 @@ void generate_fractional_hkl(const double &dmin,
         file << "Number of reflections before twin: " << hkl.size() << endl;
     if (twin_law.size() > 0)
     {
-        for (const vec &hkl__ : hkl)
+        for (const hkl_d &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
-                hkl.emplace(vec{
+                hkl.emplace(hkl_d{
                     (twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
                     (twin_law[i][3] * hkl__[0] + twin_law[i][4] * hkl__[1] + twin_law[i][5] * hkl__[2]),
                     (twin_law[i][6] * hkl__[0] + twin_law[i][7] * hkl__[1] + twin_law[i][8] * hkl__[2])});
@@ -2450,12 +2460,12 @@ void make_k_pts(const bool &read_k_pts,
         if (debug)
             file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
         // Create local copy of hkl list for faster access
-        const ivec2 hkl_vector(hkl.begin(), hkl.end());
+        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
 
 #pragma omp parallel for
         for (int ref = 0; ref < size; ref++)
         {
-            const ivec hkl_ = hkl_vector[ref];
+            const hkl_t hkl_ = hkl_vector[ref];
             for (int x = 0; x < 3; x++)
             {
                 for (int j = 0; j < 3; j++)
@@ -2766,7 +2776,7 @@ void convert_to_ED(const ivec &asym_atom_list,
                    const hkl_list &hkl)
 {
     double h2;
-    const ivec2 hkl_vector(hkl.begin(), hkl.end());
+    const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
 #pragma omp parallel for private(h2) shared(hkl_vector)
     for (int s = 0; s < hkl.size(); s++)
     {
@@ -3798,7 +3808,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
         log_file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
     }
     int i_ = 0;
-    for (const vec &hkl_ : hkl)
+    for (const hkl_d &hkl_ : hkl)
     {
         for (int x = 0; x < 3; x++)
         {
