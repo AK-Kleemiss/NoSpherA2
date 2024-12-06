@@ -29,7 +29,7 @@ int* make_loc(int* bas, int nbas) {
 
 // Function to compute two-center two-electron integrals (eri2c)
 void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<double>& eri2c) {
-    size_t nAux = auxBasis.size();
+    int nAux = auxBasis.size();
 
     int shl_slice[] = { 0, nAux, 0, nAux};
     double* env = NULL; //Will partially contain the basis set data
@@ -52,8 +52,8 @@ void computeEri2c(const std::vector<basis_set_entry>& auxBasis, std::vector<doub
 void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     const std::vector<basis_set_entry>& auxBasis,
     std::vector<double>& flat_eri3c) {
-    size_t nQM = qmBasis.size();
-    size_t nAux = auxBasis.size();
+    int nQM = qmBasis.size();
+    int nAux = auxBasis.size();
 
     int shl_slice[] = { 0, nQM, 0, nQM, nQM, nQM+nAux, };
     double* env = NULL; //Will partially contain the basis set data
