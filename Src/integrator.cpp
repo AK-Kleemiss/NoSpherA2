@@ -7133,7 +7133,7 @@ void prim_to_ctr_1(double* gc, double* gp, double* coeff, size_t nf,
 
 void dmat_transpose(double* a_t, double* a, int m, int n)
 {
-    int i, j, k;
+    int i, j;
 
     for (j = 0; j < n - 3; j += 4) {
 #pragma ivdep
@@ -7175,7 +7175,7 @@ void dmat_transpose(double* a_t, double* a, int m, int n)
  */
 void dplus_transpose(double* a_t, double* a, int m, int n)
 {
-    int i, j, k;
+    int i, j;
 
     for (j = 0; j < n - 3; j += 4) {
 #pragma ivdep
@@ -7325,7 +7325,7 @@ int _2c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     int* iempty = _empty + 0;
     int* kempty = _empty + 1;
     int* gempty = _empty + 2;
-    size_t nf = envs->nf;
+    int nf = envs->nf;
     const int nc = i_ctr * k_ctr;
     const int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     const int lenk = nf * nc * n_comp; // gctrk
@@ -7434,7 +7434,7 @@ int _2c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
 
     int* idx = envs->opt->index_xyz_array[envs->i_l * 16 + envs->k_l];
 
-    size_t nf = envs->nf;
+    int nf = envs->nf;
     const int nc = i_ctr * k_ctr;
     const int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     const int lenk = nf * nc * n_comp; // gctrk
@@ -9645,12 +9645,12 @@ int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
     ADJUST_CUTOFF;
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,coord,0:1); +1 for nabla-r12
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t lenk = nf * nc * n_comp; // gctrk
-    size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
-    size_t leni = nf * i_ctr * n_comp; // gctri
-    size_t len0 = nf * n_comp; // gout
-    size_t len = leng + lenk + lenj + leni + len0;
+    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    int lenk = nf * nc * n_comp; // gctrk
+    int lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
+    int leni = nf * i_ctr * n_comp; // gctri
+    int len0 = nf * n_comp; // gout
+    int len = leng + lenk + lenj + leni + len0;
     double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
@@ -9716,10 +9716,10 @@ int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = i_ctr;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t leni = nf * i_ctr * n_comp; // gctri
-    size_t len0 = nf * n_comp; // gout
-    size_t len = leng + leni + len0;
+    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    int leni = nf * i_ctr * n_comp; // gctri
+    int len0 = nf * n_comp; // gout
+    int len = leng + leni + len0;
     double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
@@ -9759,10 +9759,10 @@ int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = j_ctr;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t lenj = nf * j_ctr * n_comp; // gctrj
-    size_t len0 = nf * n_comp; // gout
-    size_t len = leng + lenj + len0;
+    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    int lenj = nf * j_ctr * n_comp; // gctrj
+    int len0 = nf * n_comp; // gout
+    int len = leng + lenj + len0;
     double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* g1 = g + leng;
@@ -9806,9 +9806,9 @@ int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = 1;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t len0 = envs->nf * n_comp;
-    size_t len = leng + len0;
+    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    int len0 = envs->nf * n_comp;
+    int len = leng + len0;
     double* g = NULL;
     MALLOC_INSTACK(g, len, cache);
     double* gout;
@@ -9960,12 +9960,12 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
 
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t lenk = nf * nc * n_comp; // gctrk
-    size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
-    size_t leni = nf * i_ctr * n_comp; // gctri
-    size_t len0 = nf * n_comp; // gout
-    size_t len = leng + lenk + lenj + leni + len0;
+    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    int lenk = nf * nc * n_comp; // gctrk
+    int lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
+    int leni = nf * i_ctr * n_comp; // gctri
+    int len0 = nf * n_comp; // gout
+    int len = leng + lenk + lenj + leni + len0;
     double* g= NULL;
     MALLOC_INSTACK(g, len, cache);  // must be allocated last in this function
     double* g1 = g + leng;
@@ -10037,7 +10037,7 @@ int _3c2e_drv(double* out, int* dims, Env* envs, Opt* opt,
         Env*, double*), int is_ssc)
 {
     int* x_ctr = envs->x_ctr;
-    size_t nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
+    int nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
     int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
     if (out == NULL) {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
@@ -10050,9 +10050,9 @@ int _3c2e_drv(double* out, int* dims, Env* envs, Opt* opt,
     double* stack = NULL;
     if (cache == NULL) {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
-        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        size_t len0 = envs->nf * n_comp;
-        size_t cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
+        int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+        int len0 = envs->nf * n_comp;
+        int cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
             nc * n_comp + envs->nf * 3);
         stack = (double*)malloc(sizeof(double) * cache_size);
         cache = stack;
@@ -10136,9 +10136,9 @@ void GTOnr3c_fill_s1(int (*intor)(double*, int*, int*, int*, int, int*, int, dou
         return;
     }
 
-    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
-    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-    const size_t naok = ao_loc[ksh1] - ao_loc[ksh0];
+    const int naoi = ao_loc[ish1] - ao_loc[ish0];
+    const int naoj = ao_loc[jsh1] - ao_loc[jsh0];
+    const int naok = ao_loc[ksh1] - ao_loc[ksh0];
     int dims[] = { naoi, naoj, naok };
 
     const int k0 = ao_loc[ksh] - ao_loc[ksh0];
