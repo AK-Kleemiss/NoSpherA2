@@ -769,7 +769,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     for (long long int _r = 1; _r < upper_r; _r++)
     {
         double r = _r * dr;
-        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 360, 5800, opt.debug);
+        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800, opt.debug);
         if (_r >= 1) {
             tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
         }
