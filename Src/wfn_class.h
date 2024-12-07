@@ -248,6 +248,7 @@ public:
     const double computeESP(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
     const double computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
     //----------DM Handling--------------------------------
+    bool build_DM(std::string basis_set_path, bool debug = false);
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);
     const double get_DM(const int &nr) const;

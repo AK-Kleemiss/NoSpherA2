@@ -78,7 +78,7 @@ void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
 void einsum_blas(const vec& eri3c, const vec& dm, vec& result, int I, int J, int P) {
     // Perform matrix multiplication using cblas_dgemm
     std::vector<double> temp_result(I * J * P, 0.0);
-    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I * J, P, 1, 1.0, dm.data(), 1, eri3c.data(), P, 0.0, temp_result.data(), P);
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, I * J, P, 1, 1.0, dm.data(), 1, eri3c.data(), P, 0.0, temp_result.data(), P);
 
     // Sum the resulting matrix along the appropriate axis
     for (int p = 0; p < P; ++p) {
@@ -91,17 +91,37 @@ void einsum_blas(const vec& eri3c, const vec& dm, vec& result, int I, int J, int
     }
 }
 
-void solve_linear_system(vec eri2c, vec& rho, int N) {
+vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2) {
+    const int I = v1.size();
+    const int J = v1[0].size();
+    const int P = v1[0][0].size();
+    // Initialize the result vector
+    vec rho(P, 0.0);
+
+    // Perform the summation
+    for (int p = 0; p < P; ++p) {
+        for (int i = 0; i < I; ++i) {
+            for (int j = 0; j < J; ++j) {
+                rho[p] += v1[i][j][p] * v2[i][j];
+            }
+        }
+    }
+    return rho;
+}
+
+void solve_linear_system(const vec2& A, vec& b) {
+    err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     // LAPACK variables
-    int n = N; // The order of the matrix eri2c
-    int nrhs = 1; // Number of right-hand sides (columns of rho)
-    int lda = n; // Leading dimension of eri2c
-    int ldb = n; // Leading dimension of rho
-    std::vector<int> ipiv(n); // Pivot indices
-    int info; // Output status
+    const int n = A.size(); // The order of the matrix eri2c
+    const int nrhs = 1;         // Number of right-hand sides (columns of rho and )
+    const int lda = n;          // Leading dimension of eri2c
+    const int ldb = n;          // Leading dimension of rho
+    ivec ipiv(n, 0);      // Pivot indices
+    vec temp = flatten(transpose(A));
+
 
     // Call LAPACK function to solve the system
-    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, eri2c.data(), lda, ipiv.data(), rho.data(), ldb);
+    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
 
     if (info != 0) {
         std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
@@ -116,6 +136,9 @@ int density_fit(const WFN& wavy, const std::string auxname) {
 
     // Initialize basis functions (qmBasis and auxBasis)
 
+
+    wavy.get_DensityMatrix();
+
     // Compute integrals
     computeEri2c(auxBasis, eri2c);
     computeEri3c(qmBasis, auxBasis, eri3c);
@@ -128,11 +151,30 @@ int density_fit(const WFN& wavy, const std::string auxname) {
 
 int fixed_density_fit_test() {
     void* blas = math_load_BLAS(4);
+    if (blas == NULL) {
+        ExtractDLL("libopenblas.dll");
+        blas = math_load_BLAS(4);
+    }
     err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
     vec2 dm = {
         {0.60245569, 0.60245569,},
         {0.60245569, 0.60245569,},
     };
+
+    vec2 eri2c_test{ {1.,2.}, {3., 4.} };
+    vec3 eri3c_test{ {{1.,2.}, {3.,4.}}, {{5.,6.},{7.,8.}} };
+
+    //vec rho_t(2, 0.0);
+    vec rho = einsum_ijk_ij_p(eri3c_test, dm);
+    solve_linear_system(eri2c_test, rho);
+    std::cout << "Test done!" << std::endl;
+
+    WFN wavy(8);
+    wavy.read_known_wavefunction_format("H2.molden", std::cout);
+
+
+
+
     vec2 eri2c{
         {5.19870815,  9.45570563, 12.35839308,  0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   0.,          0.,          3.01064326,  7.22843174, 10.70109626,  0.,   0., -1.81824542,  0.,          0., -3.16522589,  0.,   0.,          0.90587703,  0.,          0.},
         {9.45570563, 21.11552664, 30.43158895,  0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   0.,          0.,          7.22843174, 17.64603115, 27.15849891,  0.,   0., -2.71979468,  0.,          0., -5.41825866,  0.,   0.,          0.7165021,   0.,          0.},
@@ -192,12 +234,9 @@ int fixed_density_fit_test() {
              0.          ,0.         , 0.         , 0.        ,  0.,
              0.          ,0.         , 0. }
         } };
-    vec result(28, 0.0);
-    vec feri3c = flatten(eri3c);
-    vec fdm = flatten(dm);
-    einsum_blas(feri3c, fdm, result, 2, 2, 28);
+    vec result = einsum_ijk_ij_p(eri3c, dm);
 
-    solve_linear_system(flatten(eri2c), result, 28);
+    solve_linear_system(eri2c, result);
     std::cout << "Done!" << std::endl;
     math_unload_BLAS(blas);
     return 0;

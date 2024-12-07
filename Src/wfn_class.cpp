@@ -5,6 +5,7 @@
 #include "constants.h"
 #include "fchk.h"
 #include "integrator.h"
+#include "basis_set.h"
 
 void WFN::fill_pre()
 {
@@ -3259,6 +3260,526 @@ bool WFN::set_SDM(const int &nr, const double &value)
     else
     {
         std::cout << "invalid arguments for set_SDM! Input was: " << nr << ";" << value << std::endl;
+        return false;
+    }
+};
+
+bool WFN::build_DM(std::string basis_set_path, bool debug) {
+    using namespace std;
+    int elcount = 0;
+    elcount -= get_charge();
+    for (int i = 0; i < get_ncen(); i++)
+    {
+        elcount += get_atom_charge(i);
+    }
+    int alpha_els = 0, beta_els = 0, temp_els = elcount;
+    while (temp_els > 1)
+    {
+        alpha_els++;
+        beta_els++;
+        temp_els -= 2;
+    }
+    alpha_els += temp_els;
+    int diff = get_multi() - 1;
+    while (alpha_els - beta_els != diff)
+    {
+        alpha_els++;
+        beta_els--;
+    }
+    if (debug)
+    {
+        cout << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
+    }
+    if (get_nr_basis_set_loaded() == 0)
+    {
+        if (debug)
+            cout << "No basis set loaded, will load a complete basis set now!" << endl;
+        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug, false), "ERROR during reading of missing basis set!", cout);
+    }
+    else if (get_nr_basis_set_loaded() < get_ncen())
+    {
+        cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
+        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", cout);
+    }
+    else if (get_nr_basis_set_loaded() > get_ncen())
+    {
+        err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", cout);
+    }
+    // set_modified();
+    vec CMO;
+    vec CMO_beta;
+    if (debug)
+    {
+        cout << "Origin: " << get_origin() << endl;
+    }
+    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
+    {
+        //-----------------------check ordering and order accordingly----------------------
+        sort_wfn(check_order(debug), debug);
+        //---------------normalize basis set---------------------------------
+        if (debug)
+            cout << "starting to normalize the basis set" << endl;
+        vec norm_const;
+        //-----------debug output---------------------------------------------------------
+        if (debug)
+        {
+            cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
+            print_atom_long(0);
+            cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+            cout << "Status report:" << endl;
+            cout << "size of norm_const: " << norm_const.size() << endl;
+            cout << "WFN MO counter: " << get_nmo() << endl;
+            cout << "Number of atoms: " << get_ncen() << endl;
+            cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+            cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+        }
+
+        //-------------------normalize the basis set shell wise into a copy vector---------
+        vec2 basis_coefficients(get_ncen());
+#pragma omp parallel for
+        for (int a = 0; a < get_ncen(); a++)
+        {
+            for (int p = 0; p < get_atom_primitive_count(a); p++)
+            {
+                double temp_c = get_atom_basis_set_exponent(a, p);
+                switch (get_atom_primitive_type(a, p))
+                {
+                case 1:
+                    temp_c = 8 * pow(temp_c, 3) / constants::PI3;
+                    break;
+                case 2:
+                    temp_c = 128 * pow(temp_c, 5) / constants::PI3;
+                    break;
+                case 3:
+                    temp_c = 2048 * pow(temp_c, 7) / (9 * constants::PI3);
+                    break;
+                case 4:
+                    temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
+                    break;
+                case -1:
+                    cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
+                    break;
+                }
+                temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
+                basis_coefficients[a].push_back(temp_c);
+            }
+        }
+        for (int a = 0; a < get_ncen(); a++)
+        {
+            double aiaj = 0.0;
+            double factor = 0.0;
+            for (int s = 0; s < get_atom_shell_count(a); s++)
+            {
+                int type_temp = get_shell_type(a, s);
+                err_chkf(type_temp != -1, "ERROR in type assignement!!", cout);
+                if (debug)
+                {
+                    cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+                        << "start: " << get_shell_start(a, s)
+                        << " stop: " << get_shell_end(a, s) << endl
+                        << "factor: ";
+                }
+                switch (type_temp)
+                {
+                case 1:
+                    factor = 0;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++)
+                        {
+                            aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
+                            double term = constants::PI3 / pow(aiaj, 3);
+                            term = pow(term, 0.5);
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                        }
+                    }
+                    if (factor == 0)
+                        return false;
+                    factor = pow(factor, -0.5);
+                    if (debug)
+                        cout << factor << endl;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        if (debug)
+                        {
+                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                                << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        }
+                        // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
+                        basis_coefficients[a][i] *= factor;
+                        norm_const.push_back(basis_coefficients[a][i]);
+                    }
+                    break;
+                case 2:
+                    factor = 0;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++)
+                        {
+                            aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
+                            double term = constants::PI3 / (4 * pow(aiaj, 5));
+                            term = pow(term, 0.5);
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                        }
+                    }
+                    if (factor == 0)
+                        return false;
+                    factor = pow(factor, -0.5);
+                    if (debug)
+                        cout << factor << endl;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        if (debug)
+                        {
+                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                                << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        }
+                        // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
+                        basis_coefficients[a][i] *= factor;
+                        for (int k = 0; k < 3; k++)
+                            norm_const.push_back(basis_coefficients[a][i]);
+                    }
+                    break;
+                case 3:
+                    factor = 0;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++)
+                        {
+                            aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
+                            double term = constants::PI3 / (16 * pow(aiaj, 7));
+                            term = pow(term, 0.5);
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                        }
+                    }
+                    if (factor == 0)
+                        return false;
+                    factor = (pow(factor, -0.5)) / sqrt(3);
+                    if (debug)
+                        cout << factor << endl;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        if (debug)
+                        {
+                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                                << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        }
+                        // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
+                        basis_coefficients[a][i] *= factor;
+                        for (int k = 0; k < 3; k++)
+                            norm_const.push_back(basis_coefficients[a][i]);
+                        for (int k = 0; k < 3; k++)
+                            norm_const.push_back(sqrt(3) * basis_coefficients[a][i]);
+                    }
+                    break;
+                case 4:
+                    factor = 0;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        for (int j = get_shell_start(a, s); j <= get_shell_end(a, s); j++)
+                        {
+                            aiaj = get_atom_basis_set_exponent(a, i) + get_atom_basis_set_exponent(a, j);
+                            double term = constants::PI3 / (64 * pow((aiaj), 9));
+                            term = pow(term, 0.5);
+                            factor += basis_coefficients[a][i] * basis_coefficients[a][j] * term;
+                        }
+                    }
+                    if (factor == 0)
+                        return false;
+                    factor = pow(factor, -0.5) / sqrt(15);
+                    if (debug)
+                        cout << factor << endl;
+                    for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
+                    {
+                        if (debug)
+                        {
+                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                                << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
+                        }
+                        // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
+                        basis_coefficients[a][i] *= factor;
+                        for (int l = 0; l < 3; l++)
+                            norm_const.push_back(basis_coefficients[a][i]);
+                        for (int l = 0; l < 6; l++)
+                            norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
+                        norm_const.push_back(sqrt(15) * basis_coefficients[a][i]);
+                    }
+                    break;
+                }
+                if (debug)
+                    cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
+            }
+        }
+        //-----------debug output---------------------------------------------------------
+        if (debug)
+        {
+            cout << "exemplary output of the first atom with all it's properties: " << endl;
+            print_atom_long(0);
+            cout << "ended normalizing the basis set, now for the norm_cprims" << endl;
+            cout << "Status report:" << endl;
+            cout << "size of norm_const: " << norm_const.size() << endl;
+            cout << "WFN MO counter: " << get_nmo() << endl;
+            cout << "Number of atoms: " << get_ncen() << endl;
+            cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+            cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+        }
+        //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
+        int run = 0;
+        vec2 changed_coefs;
+        changed_coefs.resize(get_nmo());
+        if (debug)
+        {
+            cout << "Opening norm_cprim!" << endl;
+            ofstream norm_cprim("norm_prim.debug", ofstream::out);
+            for (int m = 0; m < get_nmo(); m++)
+            {
+                norm_cprim << m << ". MO:" << endl;
+                changed_coefs[m].resize(get_MO_primitive_count(m), 0.0);
+                for (int p = 0; p < get_MO_primitive_count(m); p++)
+                {
+                    changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
+                    if (m == 0)
+                        cout << p << ". primitive; " << m << ". MO "
+                        << "norm nonst: " << norm_const[p]
+                        << " temp after normalization: " << changed_coefs[m][p] << "\n";
+                    norm_cprim << " " << changed_coefs[m][p] << endl;
+                    run++;
+                }
+            }
+            norm_cprim.flush();
+            norm_cprim.close();
+            cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
+            cout << "Total count in CPRIM: " << run << endl;
+        }
+        else
+        {
+#pragma omp parallel for
+            for (int m = 0; m < get_nmo(); m++)
+            {
+                changed_coefs[m].resize(get_MO_primitive_count(m), 0.0);
+                for (int p = 0; p < get_MO_primitive_count(m); p++)
+                {
+                    changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
+                }
+            }
+        }
+        //--------------Build CMO of alessandro from the first elements of each shell-------------
+        int nao = 0;
+        for (int a = 0; a < get_ncen(); a++)
+        {
+            for (int s = 0; s < get_atom_shell_count(a); s++)
+            {
+                switch (get_shell_type(a, s))
+                {
+                case 1:
+                    nao++;
+                    break;
+                case 2:
+                    nao += 3;
+                    break;
+                case 3:
+                    nao += 6;
+                    break;
+                case 4:
+                    nao += 10;
+                    break;
+                }
+            }
+        }
+        int nshell = 0;
+        for (int m = 0; m < get_nmo(); m++)
+        {
+            int run_2 = 0;
+            for (int a = 0; a < get_ncen(); a++)
+            {
+                for (int s = 0; s < get_atom_shell_count(a); s++)
+                {
+                    // if (debug) cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value\n"l;
+                    switch (get_shell_type(a, s))
+                    {
+                    case 1:
+                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
+                        if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
+                            cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                        break;
+                    case 2:
+                        for (int i = 0; i < 3; i++)
+                            CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                        if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
+                            cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                        break;
+                    case 3:
+                        for (int i = 0; i < 6; i++)
+                            CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                        if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
+                            cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                        break;
+                    case 4:
+                        // this hardcoded piece is due to the order of f-type functions in the fchk
+                        for (int i = 0; i < 3; i++)
+                            CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 6]);
+                        for (int i = 0; i < 2; i++)
+                            CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i + 3]);
+                        for (int i = 0; i < 2; i++)
+                            CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i + 7]);
+                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
+                        CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
+                        if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
+                            cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                        break;
+                    }
+                    run_2++;
+                }
+                if (debug && m == 0)
+                    cout << "finished with atom!" << endl;
+            }
+            if (debug)
+                cout << "finished with MO!" << endl;
+            if (nshell != run_2)
+                nshell = run_2;
+        }
+        if (alpha_els != beta_els)
+        {
+            for (int m = alpha_els; m < alpha_els + beta_els; m++)
+            {
+                int run_2 = 0;
+                for (int a = 0; a < get_ncen(); a++)
+                {
+                    for (int s = 0; s < get_atom_shell_count(a); s++)
+                    {
+                        if (debug)
+                            cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
+                        switch (get_shell_type(a, s))
+                        {
+                        case 1:
+                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
+                            if (m == 0)
+                                nao++;
+                            if (debug && get_atom_shell_primitives(a, s) != 1)
+                                cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                            break;
+                        case 2:
+                            for (int i = 0; i < 3; i++)
+                                CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                            if (debug && get_atom_shell_primitives(a, s) != 1)
+                                cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            if (m == 0)
+                                nao += 3;
+                            break;
+                        case 3:
+                            for (int i = 0; i < 6; i++)
+                                CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                            if (debug && get_atom_shell_primitives(a, s) != 1)
+                                cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            if (m == 0)
+                                nao += 6;
+                            break;
+                        case 4:
+                            // this hardcoded piece is due to the order of f-type functions in the fchk
+                            for (int i = 0; i < 3; i++)
+                                CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
+                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 6]);
+                            for (int i = 0; i < 2; i++)
+                                CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i + 3]);
+                            for (int i = 0; i < 2; i++)
+                                CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i + 7]);
+                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
+                            CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
+                            if (debug && get_atom_shell_primitives(a, s) != 1)
+                                cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                            if (m == 0)
+                                nao += 10;
+                            break;
+                        }
+                        run_2++;
+                    }
+                    if (debug)
+                        cout << "finished with atom!" << endl;
+                }
+                if (debug)
+                    cout << "finished with MO!" << endl;
+                if (nshell != run_2)
+                    nshell = run_2;
+            }
+        }
+
+        if (debug)
+        {
+            ofstream cmo("cmo.debug", ofstream::out);
+            for (int p = 0; p < CMO.size(); p++)
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    cmo << scientific << setw(14) << setprecision(7) << CMO[p + i] << " ";
+                }
+                p += 4;
+                cmo << endl;
+            }
+            cmo.flush();
+            cmo.close();
+            cout << CMO.size() << " Elements in CMO" << endl;
+            cout << norm_const.size() << " = nprim" << endl;
+            cout << nao << " = nao" << endl;
+            cout << nshell << " = nshell" << endl;
+        }
+        //------------------ make the DM -----------------------------
+        int naotr = nao * (nao + 1) / 2;
+        vec kp;
+        resize_DM(naotr, 0.0);
+        if (alpha_els != beta_els)
+            resize_SDM(naotr, 0.0);
+        if (debug)
+        {
+            cout << "I made kp!" << endl
+                << nao << " is the maximum for iu" << endl;
+            cout << "Making DM now!" << endl;
+        }
+        for (int iu = 0; iu < nao; iu++)
+        {
+#pragma omp parallel for
+            for (int iv = 0; iv <= iu; iv++)
+            {
+                const int iuv = (iu * (iu + 1) / 2) + iv;
+                // if (debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
+                double temp;
+                // if (debug) cout << "Working on MO: ";
+                for (int m = 0; m < get_nmo(); m++)
+                {
+                    // if (debug && m == 0) cout << m << " " << flush;
+                    // else if (debug && m != get_nmo() - 1) cout << "." << flush;
+                    // else cout << get_nmo() - 1 << flush;
+                    if (alpha_els != beta_els)
+                    {
+                        if (m < alpha_els)
+                        {
+                            temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), cout);
+                        }
+                        else
+                        {
+                            temp = get_MO_occ(m) * CMO_beta[iu + ((m - alpha_els) * nao)] * CMO_beta[iv + ((m - alpha_els) * nao)];
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), cout);
+                        }
+                    }
+                    else
+                    {
+                        if (get_MO_occ(m) == 0.0)
+                            continue;
+                        temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
+                        err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM!", cout);
+                    }
+                    // else if (debug) cout << "DM after: " << get_DM(iuv) << endl;
+                }
+                // if (debug) cout << endl;
+            }
+        }
+    }
+    else
+    {
+        cout << "Sorry, this origin is not supported yet!" << endl;
         return false;
     }
 };
