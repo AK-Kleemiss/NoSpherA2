@@ -719,7 +719,10 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
     WFN wavy(9);
+    wavy.set_charge(opt.charge);
+    wavy.set_multi(opt.mult);
     wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+    cout << "Number of MOs before: " << wavy.get_nmo() << endl;
     wavy.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
     bvec MOs_to_delete(wavy.get_nmo(), false);

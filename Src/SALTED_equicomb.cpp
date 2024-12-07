@@ -116,7 +116,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     double inner, normfact;
     const cdouble null(0.0, 0.0);
 
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nang1, nang2, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, p, featsize, null)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, p, featsize, null)
     for (iat = 0; iat < natoms; ++iat)
     {
         const int l21 = 2 * lam + 1;
