@@ -106,15 +106,7 @@ void SALTEDPredictor::load_BLAS()
 #ifdef _WIN32
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
     typedef void (*ExampleFunctionType)(void);
-    this->_hOpenBlas = static_cast<void *>(LoadLibrary(TEXT("libopenblas.dll")));
-    if (this->_hOpenBlas != NULL)
-    {
-        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)this->_hOpenBlas, "cblas_sgemm");
-        if (eF != NULL)
-        {
-            _blas_enabled = true;
-        }
-    }
+    this->_hOpenBlas = math_load_BLAS(_opt.threads);
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(_opt.threads);
     char* env = strdup(nums.c_str());
@@ -127,29 +119,7 @@ void SALTEDPredictor::load_BLAS()
 void SALTEDPredictor::unload_BLAS()
 {
 #ifdef _WIN32
-    if (this->_hOpenBlas != NULL)
-    {
-        int ret;
-        int max_iterations = 150;
-        while (max_iterations > 0)
-        {
-            ret = FreeLibrary((HMODULE)this->_hOpenBlas);
-            if (ret == 0)
-            {
-                break;
-            }
-            max_iterations--;
-        }
-        if (max_iterations == 0)
-        {
-            std::cout << "Could not free the OpenBLAS library" << std::endl;
-        }
-        else
-        {
-            this->_blas_enabled = false;
-            this->_hOpenBlas = NULL;
-        }
-    }
+    math_unload_BLAS(this->_hOpenBlas);
 #endif
 }
 
@@ -427,7 +397,7 @@ vec SALTEDPredictor::predict()
         }
         else
         {
-            equicomb(natoms, config.nang1, config.nang2, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
+            equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
         pvec[lam] = p;
     }

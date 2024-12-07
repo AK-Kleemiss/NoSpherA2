@@ -69,3 +69,5 @@ NoSpherA2_rascaline
 *.o_RASC_d
 *SALTED_temp.xyz
 tests/SALTED/sfacs.dat
+*.exp
+*.lib

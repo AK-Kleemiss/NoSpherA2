@@ -213,7 +213,7 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string& text, size_t& bar_width) {
+inline void print_centered_text(const std::string& text, int& bar_width) {
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
@@ -241,7 +241,7 @@ public:
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
     {
-        size_t bw = bar_width_ + 2;
+        int bw = bar_width_ + 2;
         // Write status text
         print_centered_text(status_text_, bw);
         linestart = std::cout.tellp();
@@ -308,7 +308,7 @@ private:
     const int worksize_;
     const float workpart_;
     const int percent_;
-    size_t bar_width_;
+    int bar_width_;
     std::string fill_;
     std::string remainder_;
     std::string status_text_;

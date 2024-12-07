@@ -130,3 +130,6 @@ T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugat
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
 
 void _test_openblas();
+
+void* math_load_BLAS(int num_threads);
+void math_unload_BLAS(void* _hOpenBlas);

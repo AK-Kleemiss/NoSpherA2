@@ -2,6 +2,7 @@
 #include "cell.h"
 #include "tsc_block.h"
 #include "test_functions.h"
+#include "integrator.h"
 #include "properties.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -2650,6 +2651,9 @@ void options::digest_options()
         {
             test_analytical_fourier();
             exit(0);
+        }
+        else if (temp == "-test_RI") {
+            fixed_density_fit_test();
         }
         else if (temp == "-wfn")
         {

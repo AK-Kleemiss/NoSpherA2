@@ -4,9 +4,11 @@
 
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
-#include "lapacke.h"
 #include <memory>
 #include <cstddef>
+#include "lapacke.h"
+#include "cblas.h"
+#include "SALTED_math.h"
 
 //This is an implementation of libcint from PySCF in C++ for use during density fitting calculations
 //Libcint is published under Apache License 2.0
@@ -73,6 +75,39 @@ void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     free(aoloc);
 }
 
+void einsum_blas(const vec& eri3c, const vec& dm, vec& result, int I, int J, int P) {
+    // Perform matrix multiplication using cblas_dgemm
+    std::vector<double> temp_result(I * J * P, 0.0);
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, I * J, P, 1, 1.0, dm.data(), 1, eri3c.data(), P, 0.0, temp_result.data(), P);
+
+    // Sum the resulting matrix along the appropriate axis
+    for (int p = 0; p < P; ++p) {
+        result[p] = 0.0;
+        for (int i = 0; i < I; ++i) {
+            for (int j = 0; j < J; ++j) {
+                result[p] += temp_result[(i * J + j) * P + p];
+            }
+        }
+    }
+}
+
+void solve_linear_system(vec eri2c, vec& rho, int N) {
+    // LAPACK variables
+    int n = N; // The order of the matrix eri2c
+    int nrhs = 1; // Number of right-hand sides (columns of rho)
+    int lda = n; // Leading dimension of eri2c
+    int ldb = n; // Leading dimension of rho
+    std::vector<int> ipiv(n); // Pivot indices
+    int info; // Output status
+
+    // Call LAPACK function to solve the system
+    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, eri2c.data(), lda, ipiv.data(), rho.data(), ldb);
+
+    if (info != 0) {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
+}
+
 int density_fit(const WFN& wavy, const std::string auxname) {
     std::vector<basis_set_entry> qmBasis;   // Quantum mechanical basis
     std::vector<basis_set_entry> auxBasis;  // Auxiliary basis
@@ -91,6 +126,83 @@ int density_fit(const WFN& wavy, const std::string auxname) {
     return 0;
 }
 
+int fixed_density_fit_test() {
+    void* blas = math_load_BLAS(4);
+    err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
+    vec2 dm = {
+        {0.60245569, 0.60245569,},
+        {0.60245569, 0.60245569,},
+    };
+    vec2 eri2c{
+        {5.19870815,  9.45570563, 12.35839308,  0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   0.,          0.,          3.01064326,  7.22843174, 10.70109626,  0.,   0., -1.81824542,  0.,          0., -3.16522589,  0.,   0.,          0.90587703,  0.,          0.},
+        {9.45570563, 21.11552664, 30.43158895,  0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   0.,          0.,          7.22843174, 17.64603115, 27.15849891,  0.,   0., -2.71979468,  0.,          0., -5.41825866,  0.,   0.,          0.7165021,   0.,          0.},
+        {12.35839308, 30.43158895, 47.51332266,  0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   0.,          0.,         10.70109626, 27.15849891, 43.71681781,  0.,   0., -2.40501078,  0.,          0., -5.45538584,  0.,   0.,          0.34262858,  0.,          0.},
+        {0.,          0.        ,  0.,          2.98672814,  0.,          0.,   4.01618213,  0.,          0.,          0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          1.40570429,   0., -0.,          2.52095233,  0., -0.,          0.,   0.,          0., -1.02543666,  0.},
+        {0.         , 0.         , 0.          ,0.          ,2.98672814  ,0.,   0.,          4.01618213,  0.,          0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   1.40570429, -0.,          0.,          2.52095233, -0.,          0., -1.02543666,  0.,          0.,          0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,2.98672814,   0.,          0.,          4.01618213,  0.,          0.,          0.,   0.,          0.,          1.81824542,  2.71979468,  2.40501078,  0.,   0., -0.51875067,  0.,          0.,          0.29259347,  0.,   0., -0.07438893,  0.,          0.},
+        {0.         , 0.         , 0.          ,4.01618213  ,0.          ,0.,   7.0373349,   0.,          0.,          0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          2.52095233,   0., -0.,          5.02200529,  0., -0.,          0.,   0.,          0., -1.15041631,  0.},
+        {0.         , 0.         , 0.          ,0.          ,4.01618213  ,0.,   0.,          7.0373349,   0.,          0.,          0.,          0.,   0.,          0.,          0.,          0.,          0.,          0.,   2.52095233, -0.,          0.,          5.02200529, -0.,          0., -1.15041631,  0.,          0.,          0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,4.01618213,   0.,          0.,          7.0373349,   0.,          0.,          0.,   0.,          0.,          3.16522589,  5.41825866,  5.45538584,  0.,   0.,          0.29259347,  0.,          0.,          1.75312933,  0.,   0., -0.56790607,  0.,          0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          1.57696834,  0.         , 0. ,  0.   ,       0.   ,       0. ,         0. ,         0. ,         0.,   0.,          0.,          0.,          0.,          0.,          0.54855118,   0.,          0.,          0.,          0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  1.57696834 , 0.  , 0.    ,      0.         , 0.       ,   0.   ,       0.     ,     0.  , 1.02543666 , 0.      ,    0.    ,      1.15041631 , 0.        ,  0. ,-0.54294546 , 0.     ,     0.   ,       0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  0.         , 1.57696834 ,  0.     ,     0.      ,    0.90587703 , 0.7165021  , 0.34262858 , 0.,   0.      ,    0.07438893,  0.     ,     0. ,         0.56790607 , 0. ,  0., -0.08810792 , 0.      ,    0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  0.         , 0.  , 1.57696834,  0.       ,   0.    ,      0.    ,      0.   ,       1.02543666,   0.  ,        0.  ,        1.15041631,  0.       ,   0.   ,       0.  , 0.       ,   0. ,-0.54294546,  0.},
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  0.         , 0.  , 0.         , 1.57696834 , 0.     ,     0.    ,      0.    ,      0. ,  0.    ,      0.       ,   0.       ,   0.    ,      0.     ,     0. ,  0.    ,      0.     ,     0.  ,        0.54855118},
+        {3.01064326 , 7.22843174 ,10.70109626  ,0.          ,0.          ,1.81824542  , 0.    ,      0.    ,      3.16522589  ,0.  ,        0. ,         0.90587703 ,  0.    ,      0.      ,    5.19870815  ,9.45570563 ,12.35839308,  0. ,  0.  ,        0.    ,      0.     ,     0.    ,      0.      ,    0. ,  0.     ,     0.  ,        0.      ,    0.},
+        {7.22843174 ,17.64603115 ,27.15849891  ,0.          ,0.          ,2.71979468 ,  0.     ,     0.     ,     5.41825866  ,0.   ,       0.   ,       0.7165021 ,  0.     ,     0.      ,    9.45570563, 21.11552664 ,30.43158895 , 0. ,  0.   ,       0.     ,     0.     ,     0.    ,      0.      ,    0.  , 0.      ,    0.   ,       0.     ,     0.},
+        {10.70109626, 27.15849891, 43.71681781 , 0.         , 0.         , 2.40501078  , 0.     ,     0.    ,      5.45538584 , 0.  ,        0.  ,        0.34262858 ,  0.    ,      0.      ,   12.35839308 ,30.43158895 ,47.51332266,  0.,   0.  ,        0.    ,      0.    ,      0.  ,        0.    ,      0. ,  0.    ,      0. ,         0.   ,       0.},
+        {0.         , 0.         , 0.          ,1.40570429  ,0.          ,0.  , 2.52095233 , 0.        ,  0.         , 0.        ,  0.         , 0.  , 1.02543666 , 0.      ,    0.   ,       0.   ,       0.  ,        2.98672814 ,  0.        ,  0.          ,4.01618213,  0.      ,    0.        ,  0.   ,0.       ,   0.        ,  0.     ,     0.},
+        {0.         , 0.         , 0.          ,0.          ,1.40570429  ,0.  , 0.         , 2.52095233,  0.         , 0.        ,  1.02543666 , 0. ,  0.         , 0.      ,    0.   ,       0.   ,       0.  ,        0.   ,2.98672814,  0.   ,       0.     ,     4.01618213 , 0. ,         0.   ,0.     ,     0.   ,       0.   ,       0.},
+        {-1.81824542, -2.71979468, -2.40501078 ,-0.        ,-0.         ,-0.51875067 ,-0., -0.       ,   0.29259347,  0.       ,   0.        ,  0.07438893   ,0.          ,0.       ,   0.       ,   0.      ,    0.      ,    0.   ,0.       ,   2.98672814 , 0.       ,   0.     ,     4.01618213,  0. ,  0.       ,   0.       ,   0.   ,       0. },
+        {0.         , 0.         , 0.          ,2.52095233  ,0.          ,0. ,  5.02200529 , 0.        ,  0.         , 0.        ,  0.         , 0.,   1.15041631,  0.      ,    0.   ,       0.   ,       0.  ,        4.01618213,   0.        ,  0.          ,7.0373349 ,  0.      ,    0.         , 0. ,  0.        ,  0.        ,  0.   ,       0. },
+        {0.         , 0.         , 0.          ,0.          ,2.52095233  ,0. ,  0.         , 5.02200529,  0.         , 0.        ,  1.15041631 , 0.,   0.        ,  0.      ,    0.   ,       0.   ,       0.  ,        0.  , 4.01618213 , 0.   ,       0.     ,     7.0373349 ,  0. ,         0.   ,0.   ,       0.   ,       0.   ,       0. },
+        {-3.16522589, -5.41825866, -5.45538584 ,-0.         ,-0.         , 0.29259347 ,-0., -0.  ,        1.75312933,  0.      ,    0.       ,   0.56790607   ,0.         , 0.      ,    0.      ,    0.     ,     0.     ,     0.   ,0.      ,    4.01618213,  0.      ,   0.     ,     7.0373349 ,  0. ,  0.       ,   0.       ,   0. ,         0. },
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0. ,  0.       ,   0.   ,       0.         , 0.54855118,  0.         , 0.  , 0.        ,  0.         , 0.   ,       0.   ,       0.  ,        0.  , 0.          ,0.    ,      0.      ,    0.    ,     0.   ,       1.57696834 ,  0.          ,0.         , 0.   ,       0. },
+        {0.         , 0.         , 0.          ,0.          ,-1.02543666 , 0. ,  0., -1.15041631,  0.        ,  0., -0.54294546,  0.  , 0.         , 0.         , 0.         , 0.   ,       0.   ,       0.  , 0.         , 0.          ,0.    ,      0.      ,    0.    ,     0.   ,1.57696834 , 0.    ,      0.     ,     0. },
+        {0.90587703 , 0.7165021  , 0.34262858  ,0.          ,0.          ,-0.07438893  , 0.      ,    0. - 0.56790607,  0.    ,      0. ,-0.08810792,   0.        ,  0.       ,   0.  ,        0. ,         0.,          0.,   0.       ,   0.  ,        0.    ,      0.  ,       0. ,         0.,   0.  ,        1.57696834 , 0.   ,       0. },
+        {0.         , 0.         , 0.          ,-1.02543666 , 0.         , 0. ,-1.15041631,  0. ,         0.        ,  0.    ,      0.   ,       0., -0.54294546 , 0.        ,  0.   ,       0.  ,        0. ,         0.,   0.         , 0.   ,       0.     ,     0.   ,      0.  ,        0. ,  0.  ,        0.         , 1.57696834 , 0. },
+        {0.         , 0.         , 0.          ,0.          ,0.          ,0.  , 0.         , 0.,          0.         , 0.     ,     0.     ,     0. ,  0.          ,0.54855118 , 0.    ,      0.   ,       0.  ,        0. ,  0.        ,  0.    ,      0.      ,    0.    ,     0.   ,       0.  , 0.   ,       0.         , 0.          ,1.57696834 }
+    };
+    vec3 eri3c{
+        {
+            {1.95647032  ,3.94550015 , 5.44434985 , 0. ,         0.            ,
+             0.          ,0.         , 0.         , 0. ,         0.,
+             0.          ,0.         , 0.         , 0. ,         1.3058732,
+             3.16766661  ,4.79834086 , 0.         , 0. ,-0.6241081,
+             0.          ,0.         , -1.15224588, 0. ,         0.,
+             0.24996002  ,0.         , 0.},
+            {1.07410572  ,2.36148332,  3.3968143 ,  0.         , 0.,
+             0.27120783  ,0.        ,  0.        ,  0.44664828 , 0.,
+             0.          ,0.06726545,  0.        ,  0.         , 1.07410572,
+             2.36148332  ,3.3968143 ,  0.        ,  0.         ,-0.27120783,
+             0.          ,0.        , -0.44664828,  0.         , 0.,
+             0.06726545  ,0.        ,  0. }
+        },
+        {
+            {1.07410572 , 2.36148332 , 3.3968143  , 0.        ,  0.,
+             0.27120783 , 0.         , 0.         , 0.44664828,  0.,
+             0.         , 0.06726545 , 0.         , 0.        ,  1.07410572,
+             2.36148332 , 3.3968143  , 0.         , 0.        , -0.27120783,
+             0.         , 0.         ,-0.44664828 , 0.        ,  0.,
+             0.06726545 , 0.         , 0. },
+            {1.3058732   ,3.16766661 , 4.79834086 , 0.        ,  0.,
+             0.6241081   ,0.         , 0.         , 1.15224588,  0.,
+             0.          ,0.24996002 , 0.         , 0.        ,  1.95647032,
+             3.94550015  ,5.44434985 , 0.         , 0.        ,  0.,
+             0.          ,0.         , 0.         , 0.        ,  0.,
+             0.          ,0.         , 0. }
+        } };
+    vec result(28, 0.0);
+    vec feri3c = flatten(eri3c);
+    vec fdm = flatten(dm);
+    einsum_blas(feri3c, fdm, result, 2, 2, 28);
+
+    solve_linear_system(flatten(eri2c), result, 28);
+    std::cout << "Done!" << std::endl;
+    math_unload_BLAS(blas);
+    return 0;
+}
+
 constexpr double common_fac_sp(int l)
 {
     switch (l) {
@@ -100,7 +212,7 @@ constexpr double common_fac_sp(int l)
     }
 }
 
-inline void _g0_2d4d_0000(double* g, Rys2eT* bc)
+inline void _g0_2d4d_0000(double* g)
 {
     g[0] = 1;
     g[1] = 1;
@@ -331,7 +443,7 @@ inline void _g0_2d4d_0021(double* g, Rys2eT* bc, Env* envs)
     g[45] = g[37] * (zkzl + cpz[1]) + 2 * b01[1] * g[35];
 }
 
-inline void _g0_2d4d_0030(double* g, Rys2eT* bc, Env* envs)
+inline void _g0_2d4d_0030(double* g, Rys2eT* bc)
 {
     double* cpx = bc->c0px;
     double* cpy = bc->c0py;
@@ -1367,7 +1479,7 @@ void g0_2e_2d4d_unrolled(double* g, Rys2eT* bc, Env* envs)
     int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
         (envs->lk_ceil << 2) | (envs->ll_ceil));
     switch (type_ijkl) {
-    case 0b00000000: _g0_2d4d_0000(g, bc); return;
+    case 0b00000000: _g0_2d4d_0000(g); return;
     case 0b00000001: _g0_2d4d_0001(g, bc); return;
     case 0b00000010: _g0_2d4d_0002(g, bc); return;
     case 0b00000011: _g0_2d4d_0003(g, bc); return;
@@ -1376,7 +1488,7 @@ void g0_2e_2d4d_unrolled(double* g, Rys2eT* bc, Env* envs)
     case 0b00000110: _g0_2d4d_0012(g, bc, envs); return;
     case 0b00001000: _g0_2d4d_0020(g, bc); return;
     case 0b00001001: _g0_2d4d_0021(g, bc, envs); return;
-    case 0b00001100: _g0_2d4d_0030(g, bc, envs); return;
+    case 0b00001100: _g0_2d4d_0030(g, bc); return;
     case 0b00010000: _g0_2d4d_0100(g, bc); return;
     case 0b00010001: _g0_2d4d_0101(g, bc); return;
     case 0b00010010: _g0_2d4d_0102(g, bc); return;
@@ -1408,7 +1520,7 @@ void g0_2e_2d4d_unrolled(double* g, Rys2eT* bc, Env* envs)
         (int)envs->ll_ceil, (int)envs->lj_ceil);
 }
 
-inline void _srg0_2d4d_0000(double* g, Rys2eT* bc)
+inline void _srg0_2d4d_0000(double* g)
 {
     g[0] = 1;
     g[1] = 1;
@@ -3571,7 +3683,7 @@ void srg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, Env* envs)
     int type_ijkl = ((envs->li_ceil << 6) | (envs->lj_ceil << 4) |
         (envs->lk_ceil << 2) | (envs->ll_ceil));
     switch (type_ijkl) {
-    case 0b00000000: _srg0_2d4d_0000(g, bc); return;
+    case 0b00000000: _srg0_2d4d_0000(g); return;
     case 0b00000001: _srg0_2d4d_0001(g, bc); return;
     case 0b00000010: _srg0_2d4d_0002(g, bc); return;
     case 0b00000011: _srg0_2d4d_0003(g, bc); return;
@@ -5165,15 +5277,6 @@ int rys_root5(double X, double* roots, double* weights)
     return 0;
 }
 
-long double SQRTL(const long double& x)
-{
-    long double z = sqrt(x);
-    // ref. Babylonian method
-    // http://en.wikipedia.org/wiki/Methods_of_computing_square_roots
-    // An extra update should be enough due to the quadratic convergence
-    return (z * z + x) / (z * 2);
-}
-
 typedef int QuadratureFunction(int n, double x, double lower, double* roots, double* weights);
 int segment_solve(int n, double x, double lower, double* u, double* w,
     double breakpoint, QuadratureFunction fn1, QuadratureFunction fn2)
@@ -5794,8 +5897,8 @@ int R_lsmit(long double* cs, long double* fmt_ints, int n)
         SET_ZERO(cs, n, 1);
         return 1;
     }
-    tmp = 1 / SQRTL(tmp);
-    cs[0 + 0 * n] = 1 / SQRTL(fmt_ints[0]);
+    tmp = 1 / sqrtl(tmp);
+    cs[0 + 0 * n] = 1 / sqrtl(fmt_ints[0]);
     cs[0 + 1 * n] = fac * tmp;
     cs[1 + 1 * n] = tmp;
 
@@ -5824,7 +5927,7 @@ int R_lsmit(long double* cs, long double* fmt_ints, int n)
             fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=%d)\n", n - 1, j);
             return j;
         }
-        fac = 1 / SQRTL(fac);
+        fac = 1 / sqrtl(fac);
         cs[j + j * n] = fac;
         for (k = 0; k < j; ++k) {
             cs[k + j * n] = fac * v[k];
@@ -6064,15 +6167,9 @@ int _dlaev2(double* eig, double* vec, double* diag, double* diag_off1)
 
 int diagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec)
 {
-    const char JOBZ = 'V';
-    const char RANGE = 'A';
-    double VL = 0.0, VU = 0.0;
-    int IL = 0, IU = 0, M = 0;
-    int LDZ = n;
-    int NZC = n;
+    int M = 0;
     int ISUPPZ[32 * 2];
     int TRYRAC = 1;
-    int INFO = 0;
     /*
         int matrix_layout, char jobz, char range,
         lapack_int n, double* d, double* e, double vl,
@@ -6081,8 +6178,8 @@ int diagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec
         lapack_int nzc, lapack_int* isuppz,
         lapack_logical* tryrac
         */
-    INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, JOBZ, RANGE, n, diag, diag_off1, VL, VU, IL, IU, &M, //WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
-        eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
+     int INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, //WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
+        eig, vec, n, n, ISUPPZ, &TRYRAC);
     return INFO;
 }
 
@@ -6156,8 +6253,8 @@ void flocke_jacobi_moments(int n, double t, double* mus)
     double t_inv = .5 / t;
     double mu1 = 1.;//DBL_EPSILON; // can be arbitrary number != 0
     double mu2 = 0.;
-    double mu0, rn;
-    int i;
+    double mu0 = 0, rn = 0;
+    int i = 0;
 
     // Miller algorithm
     for (i = n - 1 + 20; i >= n; i--) {
@@ -7290,7 +7387,7 @@ void Opt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
                 kp++;
             }
         }
-        // Append the index of zero-coeff to sortedidx for function CINTprim_to_ctr_0
+        // Append the index of zero-coeff to sortedidx for function prim_to_ctr_0
         for (j = 0; j < kp; j++) {
             sortedidx[k + j] = zeroidx[j];
         }
