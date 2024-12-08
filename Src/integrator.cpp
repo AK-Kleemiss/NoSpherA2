@@ -171,6 +171,7 @@ int fixed_density_fit_test() {
 
     WFN wavy(8);
     wavy.read_known_wavefunction_format("H2.molden", std::cout);
+    wavy.build_DM("STO-3G", true);
 
 
 

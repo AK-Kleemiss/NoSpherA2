@@ -2654,6 +2654,7 @@ void options::digest_options()
         }
         else if (temp == "-test_RI") {
             fixed_density_fit_test();
+            exit(0);
         }
         else if (temp == "-wfn")
         {

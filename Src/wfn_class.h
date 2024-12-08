@@ -44,8 +44,9 @@ private:
     // 10,11,12,13,14,15,16 = 0, +1, -1, +2, -2, +3, -3 etc...
     ivec types;
     vec exponents;
-    vec DensityMatrix;
-    vec SpinDensityMatrix;
+    vec UT_DensityMatrix;
+    vec UT_SpinDensityMatrix;
+    vec2 DM;
     const std::array<std::vector<primitive>, 118> *basis_set;
 
     bool erase_center(const int &g_nr);
@@ -172,8 +173,8 @@ public:
     const vec get_norm_const(std::ostream &file, const bool debug = false) const;
     double get_total_energy() const { return total_energy; };
     double get_virial_ratio() const { return virial_ratio; };
-    vec get_DensityMatrix() const { return DensityMatrix; };
-    vec get_SpinDensityMatrix() const { return SpinDensityMatrix; };
+    vec get_DensityMatrix() const { return UT_DensityMatrix; };
+    vec get_SpinDensityMatrix() const { return UT_SpinDensityMatrix; };
     int get_nfunc() const { return nfunc; };
     /**
      * Deletes the basis set information from the given WFN object.
@@ -252,13 +253,13 @@ public:
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);
     const double get_DM(const int &nr) const;
-    const int get_DM_size() const { return (int)DensityMatrix.size(); };
+    const int get_DM_size() const { return (int)UT_DensityMatrix.size(); };
     void resize_DM(const int &size, const double &value = 0.0);
     //----------S_DM Handling--------------------------------
     void push_back_SDM(const double &value = 0.0);
     bool set_SDM(const int &nr, const double &value = 0.0);
     const double get_SDM(const int &nr) const;
-    const int get_SDM_size() const { return (int)SpinDensityMatrix.size(); };
+    const int get_SDM_size() const { return (int)UT_SpinDensityMatrix.size(); };
     void resize_SDM(const int &size, const double &value = 0.0);
     //-----------Cube handling-------------------------
     bool push_back_cube(const std::string &filepath, const bool &full, const bool &expert = false);

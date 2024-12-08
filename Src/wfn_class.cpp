@@ -1316,24 +1316,24 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
     bool g9 = false;
     while (line.find("[MO]") == string::npos)
     {
-        if (line.find("[5D]") != string::npos)
+        if (line.find("[5D]") != string::npos || line.find("[5d]") != string::npos)
         {
             d5 = true;
         }
-        if (line.find("[7F]") != string::npos)
+        if (line.find("[7F]") != string::npos || line.find("[7f]") != string::npos)
         {
             f7 = true;
         }
-        if (line.find("[9G]") != string::npos)
+        if (line.find("[9G]") != string::npos || line.find("[9g]") != string::npos)
         {
             g9 = true;
         }
-        if (line.find("[5D7F]") != string::npos)
+        if (line.find("[5D7F]") != string::npos || line.find("[5d7f]") != string::npos)
         {
             f7 = true;
             d5 = true;
         }
-        if (line.find("[5D7F9G]") != string::npos)
+        if (line.find("[5D7F9G]") != string::npos || line.find("[5d7f9g]") != string::npos)
         {
             f7 = true;
             d5 = true;
@@ -1341,6 +1341,7 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
         }
         getline(rf, line); // Read more lines until we reach MO block
     }
+    vec2 coefficients(2);
     if (d5 && f7 && g9)
     {
         int run = 0;
@@ -1431,6 +1432,7 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
                 getline(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
+                coefficients[spin].push_back(stod(temp[1]));
                 // err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
                 switch (prims[basis_run].type)
                 {
@@ -1718,6 +1720,7 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
                 getline(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
+                coefficients[spin].push_back(stod(temp[1]));
                 switch (prims[basis_run].type)
                 {
                 case 1:
@@ -2345,6 +2348,12 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
                 MO_run++;
             }
         }
+        // build denisty matrix
+        vec2 coeff_temp(1);
+        coeff_temp = transpose(coefficients);
+        DM = dot(coefficients, coeff_temp);
+
+
         if (debug)
         {
             file << "\nI read " << MO_run << "/" << dimension << " MOs of " << operators << " operators successfully" << endl;
@@ -3196,30 +3205,30 @@ const int WFN::get_atom_charge(const int &nr) const
 
 void WFN::push_back_DM(const double &value)
 {
-    DensityMatrix.push_back(value);
+    UT_DensityMatrix.push_back(value);
 };
 
 void WFN::resize_DM(const int &size, const double &value)
 {
-    DensityMatrix.resize(size, value);
+    UT_DensityMatrix.resize(size, value);
 };
 
 const double WFN::get_DM(const int &nr) const
 {
-    if (nr >= 0 && nr < DensityMatrix.size())
-        return DensityMatrix[nr];
+    if (nr >= 0 && nr < UT_DensityMatrix.size())
+        return UT_DensityMatrix[nr];
     else
     {
-        std::cout << "Requested nr out of range! Size: " << DensityMatrix.size() << " nr: " << nr << std::endl;
+        std::cout << "Requested nr out of range! Size: " << UT_DensityMatrix.size() << " nr: " << nr << std::endl;
         return -1;
     }
 };
 
 bool WFN::set_DM(const int &nr, const double &value)
 {
-    if (nr >= 0 && nr < DensityMatrix.size())
+    if (nr >= 0 && nr < UT_DensityMatrix.size())
     {
-        DensityMatrix[nr] = value;
+        UT_DensityMatrix[nr] = value;
         return true;
     }
     else
@@ -3231,30 +3240,30 @@ bool WFN::set_DM(const int &nr, const double &value)
 
 void WFN::push_back_SDM(const double &value)
 {
-    SpinDensityMatrix.push_back(value);
+    UT_SpinDensityMatrix.push_back(value);
 };
 
 void WFN::resize_SDM(const int &size, const double &value)
 {
-    SpinDensityMatrix.resize(size, value);
+    UT_SpinDensityMatrix.resize(size, value);
 };
 
 const double WFN::get_SDM(const int &nr) const
 {
-    if (nr >= 0 && nr < SpinDensityMatrix.size())
-        return SpinDensityMatrix[nr];
+    if (nr >= 0 && nr < UT_SpinDensityMatrix.size())
+        return UT_SpinDensityMatrix[nr];
     else
     {
-        std::cout << "Requested nr out of range! Size: " << SpinDensityMatrix.size() << " nr: " << nr << std::endl;
+        std::cout << "Requested nr out of range! Size: " << UT_SpinDensityMatrix.size() << " nr: " << nr << std::endl;
         return -1;
     }
 };
 
 bool WFN::set_SDM(const int &nr, const double &value)
 {
-    if (nr >= 0 && nr < SpinDensityMatrix.size())
+    if (nr >= 0 && nr < UT_SpinDensityMatrix.size())
     {
-        SpinDensityMatrix[nr] = value;
+        UT_SpinDensityMatrix[nr] = value;
         return true;
     }
     else
@@ -3266,25 +3275,42 @@ bool WFN::set_SDM(const int &nr, const double &value)
 
 bool WFN::build_DM(std::string basis_set_path, bool debug) {
     using namespace std;
-    int elcount = 0;
-    elcount -= get_charge();
-    for (int i = 0; i < get_ncen(); i++)
+    int elcount = -get_charge();
+    if (debug)
+        cout << "elcount: " << elcount << std::endl;
+    for (int i = 0; i < ncen; i++)
     {
         elcount += get_atom_charge(i);
+        elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
     }
+    if (debug)
+        cout << "elcount after: " << elcount << std::endl;
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
         alpha_els++;
         beta_els++;
         temp_els -= 2;
+        if (debug)
+            cout << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", cout);
+        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!", cout);
+        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!", cout);
     }
     alpha_els += temp_els;
-    int diff = get_multi() - 1;
+    if (debug)
+        cout << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+    const int mult = get_multi();
+    int diff = 0;
+    if (mult != 0)
+        diff = get_multi() - 1;
+    if (debug)
+        cout << "diff: " << diff << std::endl;
     while (alpha_els - beta_els != diff)
     {
         alpha_els++;
         beta_els--;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", cout);
     }
     if (debug)
     {
@@ -3361,6 +3387,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     break;
                 }
                 temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
+                if (debug)
+                    cout << "temp_c:" << temp_c << std::endl;
                 basis_coefficients[a].push_back(temp_c);
             }
         }
@@ -4467,8 +4495,8 @@ void WFN::operator=(const WFN &right)
     multi = right.get_multi();
     total_energy = right.get_total_energy();
     virial_ratio = right.get_virial_ratio();
-    DensityMatrix = right.get_DensityMatrix();
-    SpinDensityMatrix = right.get_SpinDensityMatrix();
+    UT_DensityMatrix = right.get_DensityMatrix();
+    UT_SpinDensityMatrix = right.get_SpinDensityMatrix();
     for (int i = 0; i < nex; i++)
     {
         push_back_center(right.get_center(i));

@@ -434,41 +434,41 @@ template std::vector<float> dot_BLAS(const std::vector<float> &flatMat, const st
 template vec dot_BLAS(const std::vector<double> &flatMat, const std::vector<double> &vec, const int &m, const int &n, bool transp);
 template cvec dot_BLAS(const std::vector<cdouble> &flatMat, const std::vector<cdouble> &vec, const int &m, const int &n, bool transp);
 
+template <typename T>
+T conj(const T& val)
+{
+    if constexpr (std::is_same_v<T, cdouble>)
+    {
+        return std::conj(val);
+    }
+    else
+    {
+        return val;
+    }
+}
+
 // 1D x 1D Vector multiplication
-// Here only for non-complex values
 template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    for (size_t i = 0; i < vec1.size(); ++i)
-    {
-        result += vec1[i] * vec2[i];
+    if (conjugate) {
+        for (size_t i = 0; i < vec1.size(); ++i)
+        {
+            result += conj(vec1[i]) * vec2[i];
+        }
     }
-    return result;
-}
-template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
-template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-
-// Special implementation for complex values
-cdouble self_dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate)
-{
-    cdouble result{};
-    if (!conjugate)
-    {
+    else {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];
         }
     }
-    else
-    {
-        for (size_t i = 0; i < vec1.size(); ++i)
-        {
-            result += std::conj(vec1[i]) * vec2[i];
-        }
-    }
     return result;
 }
+template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
+template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
+template std::complex<double> self_dot(const std::vector<std::complex<double>>& vec1, const std::vector<std::complex<double>>& vec2, bool conjugate);
 
 template <typename T>
 T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate, bool BLAS_enabled)
@@ -692,6 +692,23 @@ std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &mat)
 template vec2 transpose(const vec2 &mat);
 template cvec2 transpose(const cvec2 &mat);
 template ivec2 transpose(const ivec2 &mat);
+
+// vec -> 2D MATRIX
+template <class T>
+std::vector<std::vector<T>> transpose(const std::vector<T>& vector)
+{
+    int size = static_cast<int>(vector.size());
+    std::vector<std::vector<T>> result(1, std::vector<T>(size));
+
+    for (int i = 0; i < size; ++i)
+    {
+        result[0][i] = vector[i];
+    }
+    return result;
+}
+template vec2 transpose(const vec& vector);
+template cvec2 transpose(const cvec& vector);
+template ivec2 transpose(const ivec& vector);
 
 // Reorder 3D Vectors following a given order
 template <typename T>
