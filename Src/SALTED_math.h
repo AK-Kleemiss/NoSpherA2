@@ -46,10 +46,10 @@ template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original);
 
 // Function to collect rows from a vec2 based on a vector of indices
-vec2 collectRows(const vec2 &matrix, const std::vector<int> &indices);
+vec2 collectRows(const vec2 &matrix, const ivec &indices);
 
 // Function to collect rows from a vec3 based on a vector of indices
-vec3 collectRows(const vec3 &cube, const std::vector<int> &indices);
+vec3 collectRows(const vec3 &cube, const ivec &indices);
 
 // FLATTEN Operation
 //  Flatten vector 2D
@@ -123,8 +123,12 @@ T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate, bo
 template <typename T>
 T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
+// Self written matrix multiplication with flat vectors
 template <typename T>
 T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+
+template <typename T>
+std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1 = false);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);

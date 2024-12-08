@@ -178,7 +178,7 @@ template cvec2 self_dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool
 
 // typedef void (*ExampleFunctionType)(void);
 
-// Fast dot product using OpenBLAS
+// Fast 2Dx2D dot product using OpenBLAS
 template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2, bool BLAS_enabled)
 {
@@ -356,6 +356,45 @@ std::vector<T> self_dot(const std::vector<std::vector<T>> &mat, const std::vecto
 template std::vector<float> self_dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &_vec, bool transp1);
 template vec self_dot(const vec2 &mat, const vec &_vec, bool transp1);
 template cvec self_dot(const cvec2 &mat, const cvec &_vec, bool transp1);
+
+// 2D x 1D MATRIX MULTIPLICATION
+template <typename T>
+std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1)
+{
+    std::vector<std::vector<T>> matCopy = mat;
+    if (transp1)
+    {
+        matCopy = transpose(mat);
+    }
+
+    int mat_rows = static_cast<int>(matCopy.size());
+    int mat_cols = static_cast<int>(matCopy[0].size());
+    int vec_size = static_cast<int>(_vec.size());
+
+    // Check if matrix multiplication is possible
+    if (mat_cols != vec_size || mat_rows != vec_size)
+    {
+        throw std::invalid_argument("Matrix dimensions do not match for multiplication");
+    }
+
+    std::vector<std::vector<T>> result(mat_rows, std::vector<T>(mat_cols));
+#pragma omp parallel
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < mat_rows; i++)
+        {
+            for (int j = 0; j < mat_cols; j++)
+            {
+                result[i][j] = matCopy[i][j] * _vec[j];
+            }
+        }
+    }
+
+    return result;
+}
+template std::vector<std::vector<float>> diag_dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& _vec, bool transp1);
+template vec2 diag_dot(const vec2& mat, const vec& _vec, bool transp1);
+template cvec2 diag_dot(const cvec2& mat, const cvec& _vec, bool transp1);
 
 // Base implementation of matrix-vector multiplication
 template <typename T>

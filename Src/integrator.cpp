@@ -171,7 +171,10 @@ int fixed_density_fit_test() {
 
     WFN wavy(8);
     wavy.read_known_wavefunction_format("H2.molden", std::cout);
-    wavy.build_DM("STO-3G", true);
+    //wavy.build_DM("STO-3G", true);
+
+    WFN wavy_gbw(9);
+    wavy_gbw.read_known_wavefunction_format("H2.gbw", std::cout);
 
 
 
@@ -192,8 +195,8 @@ int fixed_density_fit_test() {
         {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  0.         , 0.  , 1.57696834,  0.       ,   0.    ,      0.    ,      0.   ,       1.02543666,   0.  ,        0.  ,        1.15041631,  0.       ,   0.   ,       0.  , 0.       ,   0. ,-0.54294546,  0.},
         {0.         , 0.         , 0.          ,0.          ,0.          ,0.,   0.,          0.,          0.,          0.        ,  0.         , 0.  , 0.         , 1.57696834 , 0.     ,     0.    ,      0.    ,      0. ,  0.    ,      0.       ,   0.       ,   0.    ,      0.     ,     0. ,  0.    ,      0.     ,     0.  ,        0.54855118},
         {3.01064326 , 7.22843174 ,10.70109626  ,0.          ,0.          ,1.81824542  , 0.    ,      0.    ,      3.16522589  ,0.  ,        0. ,         0.90587703 ,  0.    ,      0.      ,    5.19870815  ,9.45570563 ,12.35839308,  0. ,  0.  ,        0.    ,      0.     ,     0.    ,      0.      ,    0. ,  0.     ,     0.  ,        0.      ,    0.},
-        {7.22843174 ,17.64603115 ,27.15849891  ,0.          ,0.          ,2.71979468 ,  0.     ,     0.     ,     5.41825866  ,0.   ,       0.   ,       0.7165021 ,  0.     ,     0.      ,    9.45570563, 21.11552664 ,30.43158895 , 0. ,  0.   ,       0.     ,     0.     ,     0.    ,      0.      ,    0.  , 0.      ,    0.   ,       0.     ,     0.},
-        {10.70109626, 27.15849891, 43.71681781 , 0.         , 0.         , 2.40501078  , 0.     ,     0.    ,      5.45538584 , 0.  ,        0.  ,        0.34262858 ,  0.    ,      0.      ,   12.35839308 ,30.43158895 ,47.51332266,  0.,   0.  ,        0.    ,      0.    ,      0.  ,        0.    ,      0. ,  0.    ,      0. ,         0.   ,       0.},
+        {7.22843174 ,17.64603115 ,27.15849891  ,0.          ,0.          ,2.71979468  , 0.     ,     0.     ,     5.41825866  ,0.   ,       0.   ,       0.7165021 ,  0.     ,     0.      ,    9.45570563, 21.11552664 ,30.43158895 , 0. ,  0.   ,       0.     ,     0.     ,     0.    ,      0.      ,    0.  , 0.      ,    0.   ,       0.     ,     0.},
+        {10.70109626, 27.15849891, 43.71681781 ,0.          ,0.          ,2.40501078  , 0.     ,     0.    ,      5.45538584 , 0.  ,        0.  ,        0.34262858 ,  0.    ,      0.      ,   12.35839308 ,30.43158895 ,47.51332266,  0.,   0.  ,        0.    ,      0.    ,      0.  ,        0.    ,      0. ,  0.    ,      0. ,         0.   ,       0.},
         {0.         , 0.         , 0.          ,1.40570429  ,0.          ,0.  , 2.52095233 , 0.        ,  0.         , 0.        ,  0.         , 0.  , 1.02543666 , 0.      ,    0.   ,       0.   ,       0.  ,        2.98672814 ,  0.        ,  0.          ,4.01618213,  0.      ,    0.        ,  0.   ,0.       ,   0.        ,  0.     ,     0.},
         {0.         , 0.         , 0.          ,0.          ,1.40570429  ,0.  , 0.         , 2.52095233,  0.         , 0.        ,  1.02543666 , 0. ,  0.         , 0.      ,    0.   ,       0.   ,       0.  ,        0.   ,2.98672814,  0.   ,       0.     ,     4.01618213 , 0. ,         0.   ,0.     ,     0.   ,       0.   ,       0.},
         {-1.81824542, -2.71979468, -2.40501078 ,-0.        ,-0.         ,-0.51875067 ,-0., -0.       ,   0.29259347,  0.       ,   0.        ,  0.07438893   ,0.          ,0.       ,   0.       ,   0.      ,    0.      ,    0.   ,0.       ,   2.98672814 , 0.       ,   0.     ,     4.01618213,  0. ,  0.       ,   0.       ,   0.   ,       0. },
@@ -208,7 +211,7 @@ int fixed_density_fit_test() {
     };
     vec3 eri3c{
         {
-            {1.95647032  ,3.94550015 , 5.44434985 , 0. ,         0.            ,
+            {1.95647032  ,3.94550015 , 5.44434985 , 0. ,         0.,
              0.          ,0.         , 0.         , 0. ,         0.,
              0.          ,0.         , 0.         , 0. ,         1.3058732,
              3.16766661  ,4.79834086 , 0.         , 0. ,-0.6241081,
@@ -9683,103 +9686,88 @@ int set_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double*
                            + k_prim * x_ctr[2] \
                            +(i_prim+j_prim)*2 + k_prim + envs->nf*3 + 16);
 
-#define COMMON_ENVS_AND_DECLARE \
-        int *shls = envs->shls; \
-        int *bas = envs->bas; \
-        double *env = envs->env; \
-        int i_sh = shls[0]; \
-        int j_sh = shls[1]; \
-        Opt *opt = envs->opt; \
-        if (opt->pairdata != NULL && \
-            opt->pairdata[i_sh*opt->nbas+j_sh] == ((void *)0xffffffffffffffffuL)) { \
-                return 0; \
-        } \
-        int k_sh = shls[2]; \
-        int i_ctr = envs->x_ctr[0]; \
-        int j_ctr = envs->x_ctr[1]; \
-        int k_ctr = envs->x_ctr[2]; \
-        int i_prim = bas(2, i_sh); \
-        int j_prim = bas(2, j_sh); \
-        int k_prim = bas(2, k_sh); \
-        double *ai = env + bas(5, i_sh); \
-        double *aj = env + bas(5, j_sh); \
-        double *ak = env + bas(5, k_sh); \
-        double *ci = env + bas(6, i_sh); \
-        double *cj = env + bas(6, j_sh); \
-        double *ck = env + bas(6, k_sh); \
-        double expcutoff = envs->expcutoff; \
-        double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2]; \
-        PairData *pdata_base = NULL, *pdata_ij = NULL; \
-        if (opt->pairdata != NULL) { \
-                pdata_base = opt->pairdata[i_sh*opt->nbas+j_sh]; \
-        } else { \
-                double *log_maxci = opt->log_max_coeff[i_sh]; \
-                double *log_maxcj = opt->log_max_coeff[j_sh]; \
-                MALLOC_INSTACK(pdata_base, i_prim*j_prim, cache); \
-                if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj, \
-                                     log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil, \
-                                     i_prim, j_prim, rr_ij, expcutoff, env)) { \
-                        return 0; \
-                } \
-        } \
-        int n_comp = envs->ncomp_e1 * envs->ncomp_tensor; \
-        size_t nf = envs->nf; \
-        double fac1i, fac1j, fac1k; \
-        int ip, jp, kp; \
-        int _empty[4] = {1, 1, 1, 1}; \
-        int *iempty = _empty + 0; \
-        int *jempty = _empty + 1; \
-        int *kempty = _empty + 2; \
-        int *gempty = _empty + 3; \
-        int *non0ctri = opt->non0ctr[i_sh]; \
-        int *non0ctrj = opt->non0ctr[j_sh]; \
-        int *non0idxi = opt->sortedidx[i_sh]; \
-        int *non0idxj = opt->sortedidx[j_sh]; \
-        int *non0ctrk = NULL, *non0idxk = NULL; \
-        MALLOC_INSTACK(non0ctrk, k_prim+k_prim*k_ctr, cache); \
-        non0idxk = non0ctrk + k_prim; \
-        Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr); \
-        double expij, cutoff; \
-        double *rij; \
-        double *rkl = envs->rkl; \
-        int *idx = opt->index_xyz_array[envs->i_l*16*16 \
-                                        +envs->j_l*16+envs->k_l]; \
-        if (idx == NULL) { \
-                MALLOC_INSTACK(idx, nf * 3, cache); \
-                g2e_index_xyz(idx, envs); \
-        }
-
-#define ADJUST_CUTOFF      \
-        double omega = env[8]; \
-        if (omega < 0 && envs->rys_order > 1) { \
-                double r_guess = 8.; \
-                double omega2 = omega * omega; \
-                int lij = envs->li_ceil + envs->lj_ceil; \
-                if (lij > 0) { \
-                        double dist_ij = sqrt(rr_ij); \
-                        double aij = ai[i_prim-1] + aj[j_prim-1]; \
-                        double theta = omega2 / (omega2 + aij); \
-                        expcutoff += lij * log( \
-                                (dist_ij+theta*r_guess+1.)/(dist_ij+1.)); \
-                } \
-                if (envs->lk_ceil > 0) { \
-                        double theta = omega2 / (omega2 + ak[k_prim-1]); \
-                        expcutoff += envs->lk_ceil * log(theta*r_guess+1.); \
-                } \
-        }
-
-#define SET_RIJ    \
-        if (pdata_ij->cceij > expcutoff) { \
-                goto i_contracted; \
-        } \
-        envs->ai[0] = ai[ip]; \
-        expij = pdata_ij->eij; \
-        rij = pdata_ij->rij;
-
 int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
 {
-    COMMON_ENVS_AND_DECLARE;
-    ADJUST_CUTOFF;
+    int* shls = envs->shls;
+    int* bas = envs->bas;
+    double* env = envs->env;
+    int i_sh = shls[0];
+    int j_sh = shls[1];
+    Opt* opt = envs->opt;
+    if (opt->pairdata != NULL && opt->pairdata[i_sh * opt->nbas + j_sh] == ((void*)0xffffffffffffffffuL)) {
+        return 0;
+    }
+    int k_sh = shls[2];
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int i_prim = bas(2, i_sh);
+    int j_prim = bas(2, j_sh);
+    int k_prim = bas(2, k_sh);
+    double* ai = env + bas(5, i_sh);
+    double* aj = env + bas(5, j_sh);
+    double* ak = env + bas(5, k_sh);
+    double* ci = env + bas(6, i_sh);
+    double* cj = env + bas(6, j_sh);
+    double* ck = env + bas(6, k_sh);
+    double expcutoff = envs->expcutoff;
+    double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
+    PairData* pdata_base = NULL, * pdata_ij = NULL;
+    if (opt->pairdata != NULL) {
+        pdata_base = opt->pairdata[i_sh * opt->nbas + j_sh];
+    }
+    else {
+        double* log_maxci = opt->log_max_coeff[i_sh];
+        double* log_maxcj = opt->log_max_coeff[j_sh];
+        MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
+        if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+            log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+            i_prim, j_prim, rr_ij, expcutoff, env)) {
+            return 0;
+        }
+    }
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    size_t nf = envs->nf;
+    double fac1i, fac1j, fac1k;
+    int ip, jp, kp;
+    int _empty[4] = { 1, 1, 1, 1 };
+    int* iempty = _empty + 0;
+    int* jempty = _empty + 1;
+    int* kempty = _empty + 2;
+    int* gempty = _empty + 3;
+    int* non0ctri = opt->non0ctr[i_sh];
+    int* non0ctrj = opt->non0ctr[j_sh];
+    int* non0idxi = opt->sortedidx[i_sh];
+    int* non0idxj = opt->sortedidx[j_sh];
+    int* non0ctrk = NULL, * non0idxk = NULL;
+    MALLOC_INSTACK(non0ctrk, k_prim + k_prim * k_ctr, cache);
+    non0idxk = non0ctrk + k_prim;
+    Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    double expij, cutoff;
+    double* rij;
+    double* rkl = envs->rkl;
+    int* idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
+    if (idx == NULL) {
+        MALLOC_INSTACK(idx, nf * 3, cache);
+        g2e_index_xyz(idx, envs);
+    }
+    double omega = env[8];
+    if (omega < 0 && envs->rys_order > 1) {
+        double r_guess = 8.;
+        double omega2 = omega * omega;
+        int lij = envs->li_ceil + envs->lj_ceil;
+        if (lij > 0) {
+            double dist_ij = sqrt(rr_ij);
+            double aij = ai[i_prim - 1] + aj[j_prim - 1];
+            double theta = omega2 / (omega2 + aij);
+            expcutoff += lij * log(
+                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
+        }
+        if (envs->lk_ceil > 0) {
+            double theta = omega2 / (omega2 + ak[k_prim - 1]);
+            expcutoff += envs->lk_ceil * log(theta * r_guess + 1.);
+        }
+    }
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,coord,0:1); +1 for nabla-r12
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
@@ -9818,7 +9806,12 @@ int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
                 *iempty = 1;
             }
             for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                SET_RIJ;
+                if (pdata_ij->cceij > expcutoff) {
+                    continue;
+                }
+                envs->ai[0] = ai[ip];
+                expij = pdata_ij->eij;
+                rij = pdata_ij->rij;
                 cutoff = expcutoff - pdata_ij->cceij;
                 if (i_ctr == 1) {
                     fac1i = fac1j * ci[ip] * expij;
@@ -9831,7 +9824,6 @@ int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
                     (*envs->f_gout)(gout, g, idx, envs, *gempty);
                     PRIM2CTR(i, gout, len0);
                 }
-            i_contracted:;
             } // end loop i_prim
             if (!*iempty) {
                 PRIM2CTR(j, gctri, leni);
@@ -9850,8 +9842,84 @@ int _3c2e_loop(double* gctr, Env* envs, double* cache, int* empty)
 
 int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
 {
-    COMMON_ENVS_AND_DECLARE;
-    ADJUST_CUTOFF;
+    int* shls = envs->shls;
+    int* bas = envs->bas;
+    double* env = envs->env;
+    int i_sh = shls[0];
+    int j_sh = shls[1];
+    Opt* opt = envs->opt;
+    if (opt->pairdata != NULL && opt->pairdata[i_sh * opt->nbas + j_sh] == ((void*)0xffffffffffffffffuL)) {
+        return 0;
+    }
+    int k_sh = shls[2];
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int i_prim = bas(2, i_sh);
+    int j_prim = bas(2, j_sh);
+    int k_prim = bas(2, k_sh);
+    double* ai = env + bas(5, i_sh);
+    double* aj = env + bas(5, j_sh);
+    double* ak = env + bas(5, k_sh);
+    double* ci = env + bas(6, i_sh);
+    double* cj = env + bas(6, j_sh);
+    double* ck = env + bas(6, k_sh);
+    double expcutoff = envs->expcutoff;
+    double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
+    PairData* pdata_base = NULL, * pdata_ij = NULL;
+    if (opt->pairdata != NULL) {
+        pdata_base = opt->pairdata[i_sh * opt->nbas + j_sh];
+    }
+    else {
+        double* log_maxci = opt->log_max_coeff[i_sh];
+        double* log_maxcj = opt->log_max_coeff[j_sh];
+        MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
+        if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+            log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+            i_prim, j_prim, rr_ij, expcutoff, env)) {
+            return 0;
+        }
+    }
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    size_t nf = envs->nf;
+    double fac1i, fac1j, fac1k;
+    int ip, jp, kp;
+    int _empty[4] = { 1, 1, 1, 1 };
+    int* iempty = _empty + 0;
+    int* jempty = _empty + 1;
+    int* kempty = _empty + 2;
+    int* gempty = _empty + 3;
+    int* non0ctri = opt->non0ctr[i_sh];
+    int* non0idxi = opt->sortedidx[i_sh];
+    int* non0ctrk = NULL, * non0idxk = NULL;
+    MALLOC_INSTACK(non0ctrk, k_prim + k_prim * k_ctr, cache);
+    non0idxk = non0ctrk + k_prim;
+    Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    double expij, cutoff;
+    double* rij;
+    double* rkl = envs->rkl;
+    int* idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
+    if (idx == NULL) {
+        MALLOC_INSTACK(idx, nf * 3, cache);
+        g2e_index_xyz(idx, envs);
+    }
+    double omega = env[8];
+    if (omega < 0 && envs->rys_order > 1) {
+        double r_guess = 8.;
+        double omega2 = omega * omega;
+        int lij = envs->li_ceil + envs->lj_ceil;
+        if (lij > 0) {
+            double dist_ij = sqrt(rr_ij);
+            double aij = ai[i_prim - 1] + aj[j_prim - 1];
+            double theta = omega2 / (omega2 + aij);
+            expcutoff += lij * log(
+                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
+        }
+        if (envs->lk_ceil > 0) {
+            double theta = omega2 / (omega2 + ak[k_prim - 1]);
+            expcutoff += envs->lk_ceil * log(theta * r_guess + 1.);
+        }
+    }
     int nc = i_ctr;
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     int leni = nf * i_ctr * n_comp; // gctri
@@ -9872,7 +9940,12 @@ int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
             envs->aj[0] = aj[jp];
             fac1j = fac1k * cj[jp];
             for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                SET_RIJ;
+                if (pdata_ij->cceij > expcutoff) {
+                    continue;
+                }
+                envs->ai[0] = ai[ip];
+                expij = pdata_ij->eij;
+                rij = pdata_ij->rij;
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * expij;
                 envs->fac[0] = fac1i;
@@ -9880,7 +9953,6 @@ int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
                     (*envs->f_gout)(gout, g, idx, envs, 1);
                     PRIM2CTR(i, gout, len0);
                 }
-            i_contracted:;
             } // end loop i_prim
         } // end loop j_prim
     } // end loop k_prim
@@ -9893,8 +9965,84 @@ int _3c2e_n11_loop(double* gctr, Env* envs, double* cache, int* empty)
 
 int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
 {
-    COMMON_ENVS_AND_DECLARE;
-    ADJUST_CUTOFF;
+    int* shls = envs->shls;
+    int* bas = envs->bas;
+    double* env = envs->env;
+    int i_sh = shls[0];
+    int j_sh = shls[1];
+    Opt* opt = envs->opt;
+    if (opt->pairdata != NULL && opt->pairdata[i_sh * opt->nbas + j_sh] == ((void*)0xffffffffffffffffuL)) {
+        return 0;
+    }
+    int k_sh = shls[2];
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int i_prim = bas(2, i_sh);
+    int j_prim = bas(2, j_sh);
+    int k_prim = bas(2, k_sh);
+    double* ai = env + bas(5, i_sh);
+    double* aj = env + bas(5, j_sh);
+    double* ak = env + bas(5, k_sh);
+    double* ci = env + bas(6, i_sh);
+    double* cj = env + bas(6, j_sh);
+    double* ck = env + bas(6, k_sh);
+    double expcutoff = envs->expcutoff;
+    double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
+    PairData* pdata_base = NULL, * pdata_ij = NULL;
+    if (opt->pairdata != NULL) {
+        pdata_base = opt->pairdata[i_sh * opt->nbas + j_sh];
+    }
+    else {
+        double* log_maxci = opt->log_max_coeff[i_sh];
+        double* log_maxcj = opt->log_max_coeff[j_sh];
+        MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
+        if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+            log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+            i_prim, j_prim, rr_ij, expcutoff, env)) {
+            return 0;
+        }
+    }
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    size_t nf = envs->nf;
+    double fac1i, fac1j, fac1k;
+    int ip, jp, kp;
+    int _empty[4] = { 1, 1, 1, 1 };
+    int* iempty = _empty + 0;
+    int* jempty = _empty + 1;
+    int* kempty = _empty + 2;
+    int* gempty = _empty + 3;
+    int* non0ctrj = opt->non0ctr[j_sh];
+    int* non0idxj = opt->sortedidx[j_sh];
+    int* non0ctrk = NULL, * non0idxk = NULL;
+    MALLOC_INSTACK(non0ctrk, k_prim + k_prim * k_ctr, cache);
+    non0idxk = non0ctrk + k_prim;
+    Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    double expij, cutoff;
+    double* rij;
+    double* rkl = envs->rkl;
+    int* idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
+    if (idx == NULL) {
+        MALLOC_INSTACK(idx, nf * 3, cache);
+        g2e_index_xyz(idx, envs);
+    }
+    double omega = env[8];
+    if (omega < 0 && envs->rys_order > 1) {
+        double r_guess = 8.;
+        double omega2 = omega * omega;
+        int lij = envs->li_ceil + envs->lj_ceil;
+        if (lij > 0) {
+            double dist_ij = sqrt(rr_ij);
+            double aij = ai[i_prim - 1] + aj[j_prim - 1];
+            double theta = omega2 / (omega2 + aij);
+            expcutoff += lij * log(
+                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
+        }
+        if (envs->lk_ceil > 0) {
+            double theta = omega2 / (omega2 + ak[k_prim - 1]);
+            expcutoff += envs->lk_ceil * log(theta * r_guess + 1.);
+        }
+    }
     int nc = j_ctr;
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     int lenj = nf * j_ctr * n_comp; // gctrj
@@ -9916,7 +10064,12 @@ int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
             fac1j = fac1k;
             *iempty = 1;
             for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                SET_RIJ;
+                if (pdata_ij->cceij > expcutoff) {
+                    continue;
+                }
+                envs->ai[0] = ai[ip];
+                expij = pdata_ij->eij;
+                rij = pdata_ij->rij;
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
@@ -9924,7 +10077,6 @@ int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
                     (*envs->f_gout)(gout, g, idx, envs, *iempty);
                     *iempty = 0;
                 }
-            i_contracted:;
             } // end loop i_prim
             if (!*iempty) {
                 PRIM2CTR(j, gout, len0);
@@ -9940,8 +10092,82 @@ int _3c2e_1n1_loop(double* gctr, Env* envs, double* cache, int* empty)
 
 int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
 {
-    COMMON_ENVS_AND_DECLARE;
-    ADJUST_CUTOFF;
+    int* shls = envs->shls;
+    int* bas = envs->bas;
+    double* env = envs->env;
+    int i_sh = shls[0];
+    int j_sh = shls[1];
+    Opt* opt = envs->opt;
+    if (opt->pairdata != NULL && opt->pairdata[i_sh * opt->nbas + j_sh] == ((void*)0xffffffffffffffffuL)) {
+        return 0;
+    }
+    int k_sh = shls[2];
+    int i_ctr = envs->x_ctr[0];
+    int j_ctr = envs->x_ctr[1];
+    int k_ctr = envs->x_ctr[2];
+    int i_prim = bas(2, i_sh);
+    int j_prim = bas(2, j_sh);
+    int k_prim = bas(2, k_sh);
+    double* ai = env + bas(5, i_sh);
+    double* aj = env + bas(5, j_sh);
+    double* ak = env + bas(5, k_sh);
+    double* ci = env + bas(6, i_sh);
+    double* cj = env + bas(6, j_sh);
+    double* ck = env + bas(6, k_sh);
+    double expcutoff = envs->expcutoff;
+    double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
+    PairData* pdata_base = NULL, * pdata_ij = NULL;
+    if (opt->pairdata != NULL) {
+        pdata_base = opt->pairdata[i_sh * opt->nbas + j_sh];
+    }
+    else {
+        double* log_maxci = opt->log_max_coeff[i_sh];
+        double* log_maxcj = opt->log_max_coeff[j_sh];
+        MALLOC_INSTACK(pdata_base, i_prim * j_prim, cache);
+        if (set_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
+            log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
+            i_prim, j_prim, rr_ij, expcutoff, env)) {
+            return 0;
+        }
+    }
+    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
+    size_t nf = envs->nf;
+    double fac1i, fac1j, fac1k;
+    int ip, jp, kp;
+    int _empty[4] = { 1, 1, 1, 1 };
+    int* iempty = _empty + 0;
+    int* jempty = _empty + 1;
+    int* kempty = _empty + 2;
+    int* gempty = _empty + 3;
+    int* non0ctrk = NULL, * non0idxk = NULL;
+    MALLOC_INSTACK(non0ctrk, k_prim + k_prim * k_ctr, cache);
+    non0idxk = non0ctrk + k_prim;
+    Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    double expij, cutoff;
+    double* rij;
+    double* rkl = envs->rkl;
+    int* idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
+    if (idx == NULL) {
+        MALLOC_INSTACK(idx, nf * 3, cache);
+        g2e_index_xyz(idx, envs);
+    }
+    double omega = env[8];
+    if (omega < 0 && envs->rys_order > 1) {
+        double r_guess = 8.;
+        double omega2 = omega * omega;
+        int lij = envs->li_ceil + envs->lj_ceil;
+        if (lij > 0) {
+            double dist_ij = sqrt(rr_ij);
+            double aij = ai[i_prim - 1] + aj[j_prim - 1];
+            double theta = omega2 / (omega2 + aij);
+            expcutoff += lij * log(
+                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
+        }
+        if (envs->lk_ceil > 0) {
+            double theta = omega2 / (omega2 + ak[k_prim - 1]);
+            expcutoff += envs->lk_ceil * log(theta * r_guess + 1.);
+        }
+    }
     int nc = 1;
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     int len0 = envs->nf * n_comp;
@@ -9966,7 +10192,12 @@ int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
             envs->aj[0] = aj[jp];
             fac1j = fac1k * cj[jp];
             for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                SET_RIJ;
+                if (pdata_ij->cceij > expcutoff) {
+                    continue;
+                }
+                envs->ai[0] = ai[ip];
+                expij = pdata_ij->eij;
+                rij = pdata_ij->rij;
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
@@ -9974,7 +10205,6 @@ int _3c2e_111_loop(double* gctr, Env* envs, double* cache, int* empty)
                     (*envs->f_gout)(gout, g, idx, envs, *gempty);
                     *gempty = 0;
                 }
-            i_contracted:;
             } // end loop i_prim
         } // end loop j_prim
     } // end loop k_prim
@@ -10023,8 +10253,6 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    //double *ri = envs->ri;
-    //double *rj = envs->rj;
     double* ai = env + bas(5, i_sh);
     double* aj = env + bas(5, j_sh);
     double* ak = env + bas(5, k_sh);
@@ -10056,7 +10284,6 @@ int _3c2e_loop_nopt(double* gctr, Env* envs, double* cache, int* empty)
     int* jempty = _empty + 1;
     int* kempty = _empty + 2;
     int* gempty = _empty + 3;
-    /* COMMON_ENVS_AND_DECLARE end */
 
     double expij, cutoff;
     double* rij;

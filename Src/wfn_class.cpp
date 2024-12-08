@@ -1341,7 +1341,8 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
         }
         getline(rf, line); // Read more lines until we reach MO block
     }
-    vec2 coefficients(2);
+    vec3 coefficients(2);
+    vec occ;
     if (d5 && f7 && g9)
     {
         int run = 0;
@@ -1417,6 +1418,8 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
             remove_empty_elements(temp);
             occup = stod(temp[1]);
             push_back_MO(run, occup, ene, spin);
+            occ.push_back(occup);
+            coefficients[spin].push_back(vec());
             // int run_coef = 0;
             int p_run = 0;
             vec2 p_temp(3);
@@ -1432,7 +1435,7 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
                 getline(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
-                coefficients[spin].push_back(stod(temp[1]));
+                coefficients[spin][MO_run].push_back(stod(temp[1]));
                 // err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
                 switch (prims[basis_run].type)
                 {
@@ -1705,6 +1708,8 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
             remove_empty_elements(temp);
             occup = stod(temp[1]);
             push_back_MO(run, occup, ene, spin);
+            occ.push_back(occup);
+            coefficients[spin].push_back(vec());
             // int run_coef = 0;
             int p_run = 0;
             vec2 p_temp(3);
@@ -1720,7 +1725,7 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
                 getline(rf, line);
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
-                coefficients[spin].push_back(stod(temp[1]));
+                coefficients[spin][MO_run].push_back(stod(temp[1]));
                 switch (prims[basis_run].type)
                 {
                 case 1:
@@ -1917,6 +1922,8 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
+    vec2 temp_co = diag_dot(coefficients[0], occ, true);
+    DM = dot(temp_co, coefficients[0]);
 
     return true;
 };
@@ -2349,9 +2356,10 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
             }
         }
         // build denisty matrix
-        vec2 coeff_temp(1);
-        coeff_temp = transpose(coefficients);
-        DM = dot(coefficients, coeff_temp);
+        vec2 coeff_temp;
+        coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
+        vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
+        DM = dot(temp_co, coeff_temp, false, true);
 
 
         if (debug)
