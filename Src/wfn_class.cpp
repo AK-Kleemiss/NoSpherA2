@@ -6957,6 +6957,9 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
+
+    //To do: Make Density Matrix from MOs
+
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
     inFile.close();
     return true;
