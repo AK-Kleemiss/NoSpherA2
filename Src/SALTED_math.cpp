@@ -898,10 +898,9 @@ void* math_load_BLAS(int num_threads)
     }
     return _hOpenBlas;
 #else
-    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(_opt.threads);
+    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
     char* env = strdup(nums.c_str());
     putenv(env);
-    _blas_enabled = true;
 #endif
 #endif
 }
