@@ -3,8 +3,8 @@ RM := rm
 
 all: lipo
 
-OBJS_x86_64 := wfn_class.o_x86_64 atoms.o_x86_64 properties.o_x86_64 spherical_density.o_x86_64 AtomGrid.o_x86_64 basis_set.o_x86_64 convenience.o_x86_64 sphere_lebedev_rule.o_x86_64 scattering_factors.o_x86_64 cube.o_x86_64 fchk.o_x86_64 JKFit.o_x86_64 NoSpherA2.o_x86_64 SALTED_utilities.o_x86_64 constants.o_x86_64 ECPs_corrections.o_x86_64
-OBJS_arm64 := wfn_class.o_arm64 atoms.o_arm64 properties.o_arm64 spherical_density.o_arm64 AtomGrid.o_arm64 basis_set.o_arm64 convenience.o_arm64 sphere_lebedev_rule.o_arm64 scattering_factors.o_arm64 cube.o_arm64 fchk.o_arm64 JKFit.o_arm64 NoSpherA2.o_arm64 SALTED_utilities.o_arm64 constants.o_arm64 ECPs_corrections.o_arm64
+OBJS_x86_64 := wfn_class.o_x86_64 atoms.o_x86_64 properties.o_x86_64 spherical_density.o_x86_64 AtomGrid.o_x86_64 basis_set.o_x86_64 convenience.o_x86_64 sphere_lebedev_rule.o_x86_64 scattering_factors.o_x86_64 cube.o_x86_64 fchk.o_x86_64 JKFit.o_x86_64 NoSpherA2.o_x86_64 SALTED_utilities.o_x86_64 constants.o_x86_64 ECPs_corrections.o_x86_64 integrator.o_x86_64
+OBJS_arm64 := wfn_class.o_arm64 atoms.o_arm64 properties.o_arm64 spherical_density.o_arm64 AtomGrid.o_arm64 basis_set.o_arm64 convenience.o_arm64 sphere_lebedev_rule.o_arm64 scattering_factors.o_arm64 cube.o_arm64 fchk.o_arm64 JKFit.o_arm64 NoSpherA2.o_arm64 SALTED_utilities.o_arm64 constants.o_arm64 ECPs_corrections.o_arm64 integrator.o_arm64
 
 GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -fopenmp -static -MMD -MP
 
