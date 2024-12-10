@@ -75,22 +75,6 @@ void computeEri3c(const std::vector<basis_set_entry>& qmBasis,
     free(aoloc);
 }
 
-void einsum_blas(const vec& eri3c, const vec& dm, vec& result, int I, int J, int P) {
-    // Perform matrix multiplication using cblas_dgemm
-    std::vector<double> temp_result(I * J * P, 0.0);
-    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, I * J, P, 1, 1.0, dm.data(), 1, eri3c.data(), P, 0.0, temp_result.data(), P);
-
-    // Sum the resulting matrix along the appropriate axis
-    for (int p = 0; p < P; ++p) {
-        result[p] = 0.0;
-        for (int i = 0; i < I; ++i) {
-            for (int j = 0; j < J; ++j) {
-                result[p] += temp_result[(i * J + j) * P + p];
-            }
-        }
-    }
-}
-
 vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2) {
     const int I = v1.size();
     const int J = v1[0].size();
@@ -150,12 +134,14 @@ int density_fit(const WFN& wavy, const std::string auxname) {
 }
 
 int fixed_density_fit_test() {
+#ifdef _WIN32
     void* blas = math_load_BLAS(4);
     if (blas == NULL) {
         ExtractDLL("libopenblas.dll");
         blas = math_load_BLAS(4);
     }
     err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
+#endif // __WIN32
     vec2 dm = {
         {0.60245569, 0.60245569,},
         {0.60245569, 0.60245569,},
@@ -171,7 +157,6 @@ int fixed_density_fit_test() {
 
     WFN wavy(8);
     wavy.read_known_wavefunction_format("H2.molden", std::cout);
-    //wavy.build_DM("STO-3G", true);
 
     WFN wavy_gbw(9);
     wavy_gbw.read_known_wavefunction_format("H2.gbw", std::cout);
@@ -242,7 +227,9 @@ int fixed_density_fit_test() {
 
     solve_linear_system(eri2c, result);
     std::cout << "Done!" << std::endl;
+#ifdef _WIN32
     math_unload_BLAS(blas);
+#endif
     return 0;
 }
 
