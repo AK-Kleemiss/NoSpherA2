@@ -2741,7 +2741,7 @@
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
-    <ClCompile Include="..\Src\SALTED_math.cpp" />
+    <ClCompile Include="..\Src\math.cpp" />
     <ClCompile Include="..\Src\SALTED_predictor.cpp" />
     <ClCompile Include="..\Src\SALTED_utilities.cpp" />
   </ItemGroup>
@@ -3007,7 +3007,7 @@
     <ClInclude Include="..\Src\rascaline.hpp" />
     <ClInclude Include="..\Src\SALTED_equicomb.h" />
     <ClInclude Include="..\Src\SALTED_io.h" />
-    <ClInclude Include="..\Src\SALTED_math.h" />
+    <ClInclude Include="..\Src\math.h" />
     <ClInclude Include="..\Src\SALTED_predictor.h" />
     <ClInclude Include="..\Src\SALTED_utilities.h" />
     <ClInclude Include="resource.h" />

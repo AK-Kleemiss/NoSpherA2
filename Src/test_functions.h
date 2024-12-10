@@ -9,7 +9,7 @@
 #include "SALTED_utilities.h"
 #include "sphere_lebedev_rule.h"
 #if has_RAS
-#include "SALTED_math.h"
+#include "math.h"
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif

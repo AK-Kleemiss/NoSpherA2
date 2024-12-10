@@ -8,6 +8,12 @@
 #include "properties.h"
 
 bool myGlobalBool = false;
+#ifdef _WIN32
+bool has_BLAS = false;
+#else
+bool has_BLAS = true;
+#endif
+void* BLAS_pointer = nullptr;
 
 int main(int argc, char **argv)
 {

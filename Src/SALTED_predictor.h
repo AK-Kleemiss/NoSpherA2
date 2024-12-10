@@ -4,11 +4,10 @@
 #include "convenience.h"
 #include "JKFit.h"
 
-#include "SALTED_math.h"
+#include "math.h"
 #include "SALTED_io.h"
 #include "SALTED_utilities.h"
 #include "SALTED_equicomb.h"
-#include "SALTED_math.h"
 
 class SALTEDPredictor {
 public:
@@ -28,12 +27,6 @@ public:
 private:
     Config config;
     options& _opt;
-
-    
-	bool _blas_enabled = false;
-#ifdef _WIN32
-    void* _hOpenBlas = NULL;
-#endif 
 
     int natoms;
     std::vector<std::string> atomic_symbols{};

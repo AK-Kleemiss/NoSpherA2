@@ -53,3 +53,5 @@
 #include <cstring>
 #endif
 
+extern void* BLAS_pointer;
+extern bool has_BLAS;

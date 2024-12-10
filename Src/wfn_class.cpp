@@ -1922,8 +1922,8 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
-    //vec2 temp_co = diag_dot(coefficients[0], occ, true);
-    //DM = dot(temp_co, coefficients[0]);
+    vec2 temp_co = diag_dot(coefficients[0], occ, true);
+    DM = dot(temp_co, coefficients[0]);
     
     return true;
 };
@@ -2356,9 +2356,9 @@ bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool d
             }
         }
         // build denisty matrix
-        //vec2 coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
-        //vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
-        //DM = dot(temp_co, coeff_temp, false, true);
+        vec2 coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
+        vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
+        DM = dot(temp_co, coeff_temp, false, true);
 
 
         if (debug)
@@ -3817,6 +3817,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         cout << "Sorry, this origin is not supported yet!" << endl;
         return false;
     }
+    return true;
 };
 
 int WFN::check_order(const bool &debug) const

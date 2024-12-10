@@ -2,7 +2,6 @@
 
 #include "convenience.h"
 #include <complex>
-#include "SALTED_math.h"
 
 //Sparse implementation if sparsification is enabled
 void equicomb(int natoms, int nrad1, int nrad2,

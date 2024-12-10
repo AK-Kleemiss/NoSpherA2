@@ -106,12 +106,13 @@ void SALTEDPredictor::load_BLAS()
 #ifdef _WIN32
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
     typedef void (*ExampleFunctionType)(void);
-    this->_hOpenBlas = math_load_BLAS(_opt.threads);
+    BLAS_pointer = math_load_BLAS(_opt.threads);
+    has_BLAS = BLAS_pointer != NULL;
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(_opt.threads);
     char* env = strdup(nums.c_str());
     putenv(env);
-    _blas_enabled = true;
+    has_BLAS = true;
 #endif
 #endif
 }
@@ -119,7 +120,7 @@ void SALTEDPredictor::load_BLAS()
 void SALTEDPredictor::unload_BLAS()
 {
 #ifdef _WIN32
-    math_unload_BLAS(this->_hOpenBlas);
+    math_unload_BLAS(BLAS_pointer);
 #endif
 }
 
@@ -242,7 +243,7 @@ void SALTEDPredictor::read_model_data()
             if (config.zeta == 1)
             {
                 load_BLAS();
-                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false, this->_blas_enabled));
+                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
                 unload_BLAS();
             }
         }
@@ -314,7 +315,7 @@ void SALTEDPredictor::read_model_data_h5()
             if (config.zeta == 1)
             {
                 load_BLAS();
-                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false, this->_blas_enabled));
+                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
                 unload_BLAS();
             }
         }
@@ -432,7 +433,7 @@ vec SALTEDPredictor::predict()
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
 
-            vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true, this->_blas_enabled);
+            vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true);
 
             if (config.zeta == 1)
             {
@@ -461,7 +462,7 @@ vec SALTEDPredictor::predict()
                     }
                 }
             }
-            psi_nm[spe_idx][lam] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false, this->_blas_enabled);
+            psi_nm[spe_idx][lam] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
         }
     }
     pvec.clear();
@@ -504,7 +505,7 @@ vec SALTEDPredictor::predict()
                 // Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
                 vec weights_subset(weights.begin() + isize, weights.begin() + isize + Mcut);
-                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false, this->_blas_enabled);
+                C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false);
 
                 isize += Mcut;
             }

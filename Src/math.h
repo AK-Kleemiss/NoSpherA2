@@ -72,8 +72,7 @@ template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1,
                             const std::vector<std::vector<T>> &mat2,
                             bool transp1=false,
-                            bool transp2=false,
-	                        bool BLAS_enabled=false);
+                            bool transp2=false);
 
 //BLAS dot product from flattend matrices
 template <typename T>
@@ -84,8 +83,7 @@ std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1,
                                 const int& mat2_d0,
                                 const int& mat2_d1,
                                 bool transp1=false,
-                                bool transp2=false,
-                                bool BLAS_enabled=false);
+                                bool transp2=false);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
@@ -103,8 +101,7 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, co
 template <typename T>
 std::vector<T> dot(const std::vector<std::vector<T>>& mat, 
                     const std::vector<T>& vec,
-                    bool transp,
-                    bool BLAS_enabled = false);
+                    bool transp);
 
 //BLAS implementation of matrix multiplication 2D x 1D
 template <typename T>
@@ -117,7 +114,7 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
 // 1D x 1D MATRIX MULTIPLICATION
 // Wrapper for BLAS dot product
 template <typename T>
-T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate, bool BLAS_enabled = false);
+T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
 //BLAS implementation of matrix multiplication 1D x 1D
 template <typename T>

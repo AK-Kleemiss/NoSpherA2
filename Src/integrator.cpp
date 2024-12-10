@@ -10,7 +10,7 @@
 #include "lapacke.h"
 #include "cblas.h"
 #endif
-#include "SALTED_math.h"
+#include "math.h"
 
 // This is an implementation of libcint from PySCF in C++ for use during density fitting calculations
 // Libcint is published under Apache License 2.0
