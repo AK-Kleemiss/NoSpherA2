@@ -88,6 +88,24 @@ bool calculate_scattering_factors_ML(
  * @param kpts The list of k-points.
  * @return The calculated scattering factors.
  */
+itsc_block calculate_scattering_factors_MTC_SALTED(
+    options& opt,
+    SALTEDPredictor& SP,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts = NULL);
+
+/**
+ * @brief Calculates the MTC (Modified Thakkar) scattering factors.
+ * @param opt The options for scattering factors calculations.
+ * @param wave The list of wavefunctions.
+ * @param file The output stream to write the results to.
+ * @param known_atoms The list of known atoms.
+ * @param nr The number of wavefunctions.
+ * @param kpts The list of k-points.
+ * @return The calculated scattering factors.
+ */
 itsc_block calculate_scattering_factors_MTC(
     options &opt,
     const std::vector<WFN> &wave,
@@ -181,6 +199,8 @@ svec read_atoms_from_CIF(
     ivec &asym_atom_list,
     bvec &needs_grid,
     std::ostream &file,
+    ivec &constant_atoms,
+    const bool SALTED = false,
     const bool debug = false);
 
 /**

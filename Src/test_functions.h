@@ -125,6 +125,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
+    ivec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
 
@@ -138,6 +139,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                                       asym_atom_list,
                                       needs_grid,
                                       std::cout,
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -1481,7 +1483,7 @@ void test_analytical_fourier()
     bool correct = true;
 
     cdouble max_diff, diff;
-    for (int type = 0; type < 6; type++)
+    for (int type = 6; type < 7; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);

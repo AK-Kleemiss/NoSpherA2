@@ -164,8 +164,8 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v6 -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -cpus 8 -acc 4</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Coeffs_From_ML</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v6 -cpus 12 -v -hkl_min_max -9 9 -20 20 -13 13 -cif thpp.cif -mtc thpp_p1.xyz 0,1 thpp_p2.xyz 0,2 -mtc_mult 1 1 -mtc_charge 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
