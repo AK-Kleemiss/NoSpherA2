@@ -183,11 +183,9 @@ int fixed_density_fit_test()
     solve_linear_system(eri2c_test, rho);
     std::cout << "Test done!" << std::endl;
 
-    WFN wavy(8);
-    wavy.read_known_wavefunction_format("H2.molden", std::cout);
+    WFN wavy("H2.molden");
 
-    WFN wavy_gbw(9);
-    wavy_gbw.read_known_wavefunction_format("H2.gbw", std::cout);
+    WFN wavy_gbw("H2.gbw");
 
     vec2 eri2c{
         {5.19870815, 9.45570563, 12.35839308, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 3.01064326, 7.22843174, 10.70109626, 0., 0., -1.81824542, 0., 0., -3.16522589, 0., 0., 0.90587703, 0., 0.},

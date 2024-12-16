@@ -106,10 +106,9 @@ void sfac_scan(options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
-    auto t = new WFN(1);
+    auto t = new WFN(opt.wfn);
     wavy.push_back(*t);
     delete t;
-    wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     Thakkar O(wavy[0].atoms[0].charge);
     Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
     Thakkar_Anion O_an(wavy[0].atoms[0].charge);
@@ -426,8 +425,8 @@ double calc_grid_averaged_at_r(const WFN& wavy,
         double z = angular_z[p] * r + wavy.atoms[0].z;
         dens += wavy.compute_dens(x, y, z, d, _phi) * constants::FOUR_PI * angular_w[p];
     }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
+    //if (print)
+    //    std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
 /// not like above //////////////////////////////////////////////////////////////////////////
@@ -521,8 +520,7 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
     if (getcwd(cwd, sizeof(cwd)) != NULL)
 #endif
         std::cout << "Current working dir: " << cwd << std::endl;
-    WFN wavy(9);
-    wavy.read_known_wavefunction_format(wfn_name, std::cout);
+    WFN wavy(wfn_name);
 
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 
@@ -563,10 +561,8 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
 
 void calc_partition_densities() {
     using namespace std;
-    WFN Hartree_Fock(9);
-    WFN DFT(9);
-    Hartree_Fock.read_known_wavefunction_format("HF.gbw", std::cout, false);
-    DFT.read_known_wavefunction_format("DFT.gbw", std::cout, false);
+    WFN Hartree_Fock("HF.gbw");
+    WFN DFT("DFT.gbw");
 
     vec Pos_C = { Hartree_Fock.atoms[0].x, Hartree_Fock.atoms[0].y, Hartree_Fock.atoms[0].z };
     vec Pos_H1 = { Hartree_Fock.atoms[1].x, Hartree_Fock.atoms[1].y, Hartree_Fock.atoms[1].z };
@@ -718,10 +714,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 {
     std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
-    WFN wavy(9);
-    wavy.set_charge(opt.charge);
-    wavy.set_multi(opt.mult);
-    wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+    WFN wavy(opt.wfn, opt.charge, opt.mult);
     cout << "Number of MOs before: " << wavy.get_nmo() << endl;
     wavy.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
@@ -1103,8 +1096,7 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     vec data{};
 
     npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-    WFN dummy(7);
-    dummy.read_xyz(xyzfile, std::cout);
+    WFN dummy(xyzfile);
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
 
@@ -1121,8 +1113,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
     using namespace std;
     for (int i = 0; i < 1; i++)
     {
-        WFN wavy(8);
-        wavy.read_molden("Co2.molden", cout, true);
+        WFN wavy("Co2.molden");
         opt.cif = "Co2.cif";
         opt.dmin = 0.5;
         cout << "STARTING CALC" << endl;
@@ -1148,19 +1139,15 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     string dat = "core_dens_" + ele + ".dat";
     int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
-
-    WFN ECP_way_Au(9);
     string def2 = ele + "_def2TZVP.gbw";
-    ECP_way_Au.read_gbw(def2, cout, false, false);
+    WFN ECP_way_Au(def2);
     ECP_way_Au.delete_unoccupied_MOs();
     ECP_way_Au.set_has_ECPs(true, true, 1);
 
     string jorge = ele + "_jorge.gbw";
-    WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw(jorge, cout, false);
+    WFN wavy_full_Au(jorge);
     wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw(jorge, cout, false);
+    WFN wavy_val_Au(jorge);
     wavy_val_Au.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
@@ -1248,16 +1235,13 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
-    WFN ECP_way_Au(9);
-    ECP_way_Au.read_gbw(ele + "_def2TZVP.gbw", cout, false, false);
+    WFN ECP_way_Au(ele + "_def2TZVP.gbw");
     ECP_way_Au.delete_unoccupied_MOs();
     ECP_way_Au.set_has_ECPs(true, true, 1);
 
-    WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw(ele + "_jorge.gbw", cout, false);
+    WFN wavy_full_Au(ele + "_jorge.gbw");
     wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw(ele + "_jorge.gbw", cout, false);
+    WFN wavy_val_Au(ele + "_jorge.gbw");
     wavy_val_Au.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);

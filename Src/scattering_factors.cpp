@@ -3498,8 +3498,7 @@ bool calculate_scattering_factors_ML(
     {
         file << "Performing the remaining calculation of spherical atoms...\n";
         vector<WFN> tempy;
-        tempy.push_back(WFN(0));
-        tempy[0].read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+        tempy.push_back(WFN(opt.wfn));
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = MTC_thakkar_sfac(opt, file, labels, tempy, 0);
         blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);

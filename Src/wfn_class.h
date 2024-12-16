@@ -75,6 +75,8 @@ private:
 public:
     WFN();
     WFN(int given_origin);
+    WFN(const std::string& filename);
+    WFN(const std::string& filename, const int g_charge, const int g_mult);
     std::vector<cube> cub;
     std::vector<atom> atoms;
 

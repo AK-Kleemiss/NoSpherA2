@@ -247,6 +247,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB_reader|x64'">
+    <LocalDebuggerCommandArguments>-v -mult 2 -atom_dens wfn.xtb</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ptb_H_file</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_properties|x64'">
     <LocalDebuggerCommandArguments>-wfn olex2\Wfn_Job\sucrose.wfx -cif sucrose.cif -lap -eli -def -v -cpus 30</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>..\tests\sucrose_fchk_SF</LocalDebuggerWorkingDirectory>

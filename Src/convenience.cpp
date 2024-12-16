@@ -661,6 +661,20 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
+{
+    int size_begin = 0, size_end = 0;
+    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char*>(Target), size_begin);
+    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    if (size_begin != size_end)
+    {
+        std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
+        return false;
+    }
+    return true;
+}
+
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 {
     norm_const = pow(
@@ -2540,9 +2554,8 @@ void options::digest_options()
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
-            WFN wavy(0);
             cout << "Reading wavefunction: " << wfn_name << endl;
-            wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+            WFN wavy(wfn_name);
             cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy.set_has_ECPs(true);
@@ -2582,9 +2595,8 @@ void options::digest_options()
         else if (temp == "-spherical_aver_hirsh")
         {
 			string wfn_name = arguments[i + 1];
-			WFN wavy(0);
 			cout << "Reading wavefunction: " << wfn_name << endl;
-			wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+			WFN wavy(wfn_name);
 			cout << "Assigning ECPs" << endl;
 			if (ECP)
 				wavy.set_has_ECPs(true);

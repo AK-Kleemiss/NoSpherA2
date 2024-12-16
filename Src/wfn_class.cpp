@@ -73,6 +73,49 @@ WFN::WFN(int given_origin)
     fill_Afac_pre();
 };
 
+WFN::WFN(const std::string & filename)
+{
+    ncen = 0;
+    nfunc = 0;
+    nmo = 0;
+    nex = 0;
+    charge = 0;
+    multi = 0;
+    ECP_m = 0;
+    total_energy = 0.0;
+    d_f_switch = false;
+    modified = false;
+    distance_switch = false;
+    has_ECPs = false;
+    basis_set_name = " ";
+    comment = "Test";
+    basis_set = NULL;
+    fill_pre();
+    fill_Afac_pre();
+    read_known_wavefunction_format(filename, std::cout, false);
+};
+
+WFN::WFN(const std::string& filename, const int g_charge, const int g_mult) {
+    ncen = 0;
+    nfunc = 0;
+    nmo = 0;
+    nex = 0;
+    charge = g_charge;
+    multi = g_mult;
+    ECP_m = 0;
+    total_energy = 0.0;
+    d_f_switch = false;
+    modified = false;
+    distance_switch = false;
+    has_ECPs = false;
+    basis_set_name = " ";
+    comment = "Test";
+    basis_set = NULL;
+    fill_pre();
+    fill_Afac_pre();
+    read_known_wavefunction_format(filename, std::cout, false);
+};
+
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
 {
     ncen++;
@@ -6790,27 +6833,22 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         return false;
     }
     inFile.seekg(0, std::ios::beg);
-    int one = 0, two = 0, three = 0, four = 0;
-    double dummy = 0.0;
-    inFile.read(reinterpret_cast<char *>(&one), sizeof(one));
-    inFile.read(reinterpret_cast<char *>(&two), sizeof(two));
-    inFile.read(reinterpret_cast<char *>(&three), sizeof(three));
-    inFile.read(reinterpret_cast<char *>(&four), sizeof(four));
+    int one = 2;
+    err_checkf(read_block_from_fortran_binary(inFile, &one), "Error reading initial number", std::cout);
+    err_checkf(one != 2, "Error reading first number in the xtb file!", std::cout);
 
-    int ncent = 0, nbf = 0, nmomax = 0, nprims = 0;
-    inFile.read(reinterpret_cast<char *>(&ncent), sizeof(ncent));
-    inFile.read(reinterpret_cast<char *>(&nbf), sizeof(nbf));
-    inFile.read(reinterpret_cast<char *>(&nmomax), sizeof(nmomax));
-    inFile.read(reinterpret_cast<char *>(&nprims), sizeof(nprims));
-    inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
+    int infos[4] = { 0, 0, 0, 0 }; //ncent nbf nmomax nprims
+    err_checkf(read_block_from_fortran_binary(inFile, infos), "Error reading sizes of data", std::cout);
+    int ncent = infos[0];
+    int nbf = infos[1];
+    int nmomax = infos[2];
+    int nprims = infos[3];
 
     svec atyp(ncent);
-    char temp[3]{0, 0, 0};
+    char temp[3]{0, 0, '\0'};
     for (int i = 0; i < ncent; ++i)
     {
-        inFile.read(&temp[0], sizeof(char[2]));
-        temp[2] = '\0';
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
+        err_checkf(read_block_from_fortran_binary(inFile, temp), "Error reading atom label " + std::to_string(i), std::cout);
         atyp[i] = temp;
         atyp[i].erase(remove(atyp[i].begin(), atyp[i].end(), ' '), atyp[i].end());
     }
@@ -6819,64 +6857,26 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
     ivec _charge(ncent);
     for (int i = 0; i < ncent; ++i)
     {
-        inFile.read(reinterpret_cast<char *>(&x[i]), sizeof(x[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-        inFile.read(reinterpret_cast<char *>(&y[i]), sizeof(y[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-        inFile.read(reinterpret_cast<char *>(&z[i]), sizeof(z[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-        inFile.read(reinterpret_cast<char *>(&_charge[i]), sizeof(_charge[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
+        err_checkf(read_block_from_fortran_binary(inFile, &x[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &y[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &z[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
+        err_checkf(read_block_from_fortran_binary(inFile, &_charge[i]), "Error reading atom data for atom " + std::to_string(i), std::cout);
     }
 
     ivec lao(nprims), aoatcart(nprims), ipao(nprims);
-    for (int i = 0; i < nprims; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&lao[i]), sizeof(lao[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    }
-    for (int i = 0; i < nprims; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&aoatcart[i]), sizeof(aoatcart[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    }
-    for (int i = 0; i < nprims; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&ipao[i]), sizeof(ipao[i]));
-        inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    }
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &lao[i]), "Error reading basis set information lao of primitive " + std::to_string(i), std::cout);
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &aoatcart[i]), "Error reading basis set information aotcart of primitive " + std::to_string(i), std::cout);
+    for (int i = 0; i < nprims; ++i) err_checkf(read_block_from_fortran_binary(inFile, &ipao[i]), "Error reading basis set information ipao of primitive " + std::to_string(i), std::cout);
 
     vec exps(nprims), contr(nprims);
-    for (int i = 0; i < nprims; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&exps[i]), sizeof(exps[i]));
-    }
-    inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    for (int i = 0; i < nprims; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&contr[i]), sizeof(contr[i]));
-    }
-    inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-
+    err_checkf(read_block_from_fortran_binary(inFile, exps.data()), "Error reading exponents!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, contr.data()), "Error reading contraction coefs!", std::cout);
     vec occ(nmomax), eval(nmomax);
-    for (int i = 0; i < nmomax; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&occ[i]), sizeof(occ[i]));
-    }
-    inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    for (int i = 0; i < nmomax; ++i)
-    {
-        inFile.read(reinterpret_cast<char *>(&eval[i]), sizeof(eval[i]));
-    }
-    inFile.read(reinterpret_cast<char *>(&dummy), sizeof(dummy));
-    vec2 momat(nmomax, vec(nbf));
-    for (int i = 0; i < nmomax; ++i)
-    {
-        for (int j = 0; j < nbf; ++j)
-        {
-            inFile.read(reinterpret_cast<char *>(&momat[i][j]), sizeof(momat[i][j]));
-        }
-    }
+    err_checkf(read_block_from_fortran_binary(inFile, occ.data()), "Error reading occupancies!", std::cout);
+    err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
+    vec tempvec(nbf*nmomax);
+    err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
+    vec2 momat = reshape(tempvec, { nmomax, nbf });
 
     // making it into the wavefunction data
     for (int i = 0; i < ncent; i++)
@@ -6923,10 +6923,10 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         beta_els--;
 		err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", file);
     }
-    for (int i = beta_els; i < alpha_els; i++)
-    {
-        occ[i] = 1.0;
-    }
+    //for (int i = beta_els; i < alpha_els; i++)
+    //{
+    //    occ[i] = 1.0;
+    //}
     if (debug)
     {
         file << "al/be els after:" << alpha_els << " " << beta_els << std::endl;

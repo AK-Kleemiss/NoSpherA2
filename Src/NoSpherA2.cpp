@@ -64,8 +64,7 @@ int main(int argc, char **argv)
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (opt.wfn2.length() != 0)
     {
-        WFN wav(9), wav2(9);
-        wav.read_known_wavefunction_format(opt.wfn, log_file, opt.debug), wav2.read_known_wavefunction_format(opt.wfn2, log_file, opt.debug);
+        WFN wav(opt.wfn), wav2(opt.wfn2);
         if (opt.debug)
             cout << opt.wfn << opt.wfn2 << endl;
         wav.delete_unoccupied_MOs();
