@@ -14,6 +14,8 @@
 #include "npy.h"
 #include "integrator.h"
 
+#include "SALTED_utilities.h"
+
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
 #include "cuda_runtime.h"
@@ -3642,10 +3644,12 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
             SP.wavy.atoms.erase(SP.wavy.atoms.begin()+current_index, SP.wavy.atoms.begin() + current_index+1);
             constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
             current_index--;
+			SP.wavy.set_ncen(SP.wavy.get_ncen() - 1);
         }
         current_index++;
     }
-
+    SP.wavy.write_xyz("temp_rascaline.xyz");
+    //SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_1.xyz");
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
@@ -3684,18 +3688,20 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
         int current_coef_index = 0;
         for (int i = 0; i < constant_atoms.size(); i++) {
             //Count up all coeffs for one atom
-            const int lim = (int)SP.wavy.atoms[i].basis_set.size();
+            const int lim = (int)SP.wavy.atoms[current_index].basis_set.size();
             for (int i_basis = 0; i_basis < lim; i_basis++)
             {
-                current_coef_index += 2 * SP.wavy.atoms[i].basis_set[i_basis].p.type + 1;
+                current_coef_index += 2 * SP.wavy.atoms[current_index].basis_set[i_basis].p.type + 1;
             }
 
             //Remove atoms and coeffs from list if they are constant atoms
             if (constant_atoms[i] == 1) {
+				labels.erase(labels.begin() + current_index, labels.begin() + current_index + 1);
                 SP.wavy.atoms.erase(SP.wavy.atoms.begin() + current_index, SP.wavy.atoms.begin() + current_index + 1);
-                coefs.erase(coefs.begin() + last_coef_index, coefs.begin() + current_coef_index + 1);
+                coefs.erase(coefs.begin() + last_coef_index, coefs.begin() + current_coef_index+1);
                 current_index--;
 				current_coef_index = last_coef_index;
+                SP.wavy.set_ncen(SP.wavy.get_ncen() - 1);
             }
 			last_coef_index = current_coef_index;
 
@@ -3704,19 +3710,20 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
             current_index++;
         };
     }
-
+    //SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
+	calc_cube_ML(coefs,SP.wavy);
 
     vec atom_elecs = calc_atomic_density(SP.wavy.atoms, coefs);
     file << "Table of Charges in electrons\n"
         << "       Atom      ML" << endl;
 
-    for (int i = 0; i < asym_atom_list.size(); i++)
+    for (int i = 0; i < SP.wavy.atoms.size(); i++)
     {
-        int a = asym_atom_list[i];
+
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(a) - atom_elecs[i];
+            << fixed << setw(10) << setprecision(3) << SP.wavy.atoms[i].charge - atom_elecs[i];
         if (opt.debug)
-            file << " " << setw(4) << SP.wavy.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+            file << " " << setw(4) << SP.wavy.atoms[i].charge << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
     }
     auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);

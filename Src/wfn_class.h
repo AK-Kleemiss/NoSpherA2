@@ -61,6 +61,7 @@ private:
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;
     bool has_ECPs;
+	bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
     // precomputed factors and helper functions for ESP calc
     long long int pre[9][5][5][9];
     void fill_pre();
@@ -127,6 +128,7 @@ public:
     void set_charge(const int &in) { charge = in; };
     const int get_nex() const { return nex; };
     const int get_ncen() const { return ncen; };
+	const void set_ncen(const int& in) { ncen = in; };
     const int get_nmo() const { return nmo; };
     const int get_nmo(const bool &only_occ) const;
     const int get_origin() const { return origin; };

@@ -1139,6 +1139,7 @@ void readxyzMinMax_fromWFN(
     bool bohrang = true;
     if (!no_bohr)
         bohrang = !check_bohr(wavy, false);
+
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
         PosAtoms[0][j] = wavy.atoms[j].x;
@@ -1169,6 +1170,7 @@ void readxyzMinMax_fromWFN(
     NbSteps[1] = (int)ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
     NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
+
 
 void readxyzMinMax_fromCIF(
     std::string cif,

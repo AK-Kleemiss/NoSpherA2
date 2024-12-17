@@ -82,14 +82,14 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         join_path(new_path, new_fn);
         wavy.write_xyz(new_path);
         wavy.set_path(new_path);
-        config.predict_filename = wavy.get_path();
         _opt.needs_Thakkar_fill = true;
     }
     else
     {
         wavy = wavy_in;
-        config.predict_filename = wavy.get_path();
     }
+    wavy.write_xyz("temp_rascaline.xyz");
+	config.predict_filename = "temp_rascaline.xyz";
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); //Delete unneccesarry MOs, since we are predicting anyway.
 }

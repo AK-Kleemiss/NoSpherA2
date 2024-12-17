@@ -769,6 +769,7 @@ bool WFN::read_wfn(const std::string &fileName, const bool &debug, std::ostream 
     {
         err_checkf(add_exp(dum_center[j], dum_type[j], dum_exp[j]), "Error while writing MO coefficients...\n", file);
     }
+	isBohr = true;
     int linecount = 0;
     int monum = 0;
     vec2 temp_val;
@@ -951,6 +952,7 @@ bool WFN::read_xyz(const std::string &filename, std::ostream &file, const bool d
                  << " charge: " << dum_ch[i] << endl;
         }
     }
+	isBohr = true;
     //---------------------Start writing everything from the temp arrays into wave ---------------------
     if (debug)
         file << "finished with reading the file, now i'm going to make everything permantent in the wavefunction...\n";
@@ -1030,6 +1032,7 @@ bool WFN::read_wfx(const std::string &fileName, const bool &debug, std::ostream 
     for (int i = 0; i < temp_ncen; i++)
         push_back_atom(constants::atnr2letter(nrs[i]) + to_string(i + 1), pos[0][i], pos[1][i], pos[2][i], nrs[i]);
     err_checkf(ncen == temp_ncen, "Mismatch in atom position size", file);
+	isBohr = true;
     for (int i = 0; i < 3; i++)
         pos[i].resize(0);
     pos.resize(0);
@@ -2924,8 +2927,14 @@ bool WFN::write_xyz(const std::string& fileName, const bool& debug)
         for (int i = 0; i < ncen; i++)
             if (atoms[i].label == "")
                 f << constants::atnr2letter(atoms[i].charge) << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
-            else
-                f << atoms[i].label << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+            else{
+                if (isBohr) {
+                    f << atoms[i].label << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].x) << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].y) << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].z) << endl;
+                }else
+                {
+                    f << atoms[i].label << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+                }
+            }
         f.flush();
         f.close();
     }
@@ -4487,6 +4496,7 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
 
 void WFN::operator=(const WFN &right)
 {
+    isBohr = right.isBohr;
     ncen = right.get_ncen();
     origin = right.get_origin();
     nex = right.get_nex();
@@ -4527,6 +4537,7 @@ void WFN::operator=(const WFN &right)
     }
     fill_pre();
     fill_Afac_pre();
+
 };
 
 int WFN::calculate_charge()
