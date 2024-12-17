@@ -3698,7 +3698,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
             if (constant_atoms[i] == 1) {
 				labels.erase(labels.begin() + current_index, labels.begin() + current_index + 1);
                 SP.wavy.atoms.erase(SP.wavy.atoms.begin() + current_index, SP.wavy.atoms.begin() + current_index + 1);
-                coefs.erase(coefs.begin() + last_coef_index, coefs.begin() + current_coef_index+1);
+                coefs.erase(coefs.begin() + last_coef_index, coefs.begin() + current_coef_index);
                 current_index--;
 				current_coef_index = last_coef_index;
                 SP.wavy.set_ncen(SP.wavy.get_ncen() - 1);
