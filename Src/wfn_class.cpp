@@ -4634,35 +4634,6 @@ bool WFN::guess_multiplicity(std::ostream &file)
     return true;
 };
 
-/*
-bool WFN::change_center(int nr, int value){
-    if(nr>centers.size()||nr<0||value <=0){
-        cout << "This is an imposible choice" << endl;
-        Enter();
-        return false;
-    }
-    else centers[nr]=value;
-};
-
-bool WFN::change_type(int nr, int value){
-    if(nr>types.size()||nr<0||value <=0||value>20){
-        cout << "This is an imposible choice" << endl;								NOT NEEDED AT THIS POINT
-        Enter();
-        return false;
-    }
-    else types[nr]=value;
-};
-
-bool WFN::change_exponent(int nr, double value){
-    if(nr>exponents.size()||nr<0||value <=0){
-        cout << "This is an imposible choice" << endl;
-        Enter();
-        return false;
-    }
-    else exponents[nr]=value;
-};
-*/
-
 bool WFN::push_back_cube(const std::string &filepath, const bool &full, const bool &expert)
 {
     cub.push_back(cube(filepath, full, *this, std::cout, expert));
@@ -6958,7 +6929,9 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
 
-    //To do: Make Density Matrix from MOs
+    // build density matrix
+    vec2 temp_co = diag_dot(momat, occ, true);
+    DM = dot(temp_co, momat, false, false);
 
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);
     inFile.close();
