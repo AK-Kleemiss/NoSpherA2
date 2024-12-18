@@ -125,7 +125,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
 

@@ -571,7 +571,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                          ivec &asym_atom_list,
                          bvec &needs_grid,
                          std::ostream &file,
-                         ivec &constant_atoms,
+                         bvec &constant_atoms,
                          const bool SALTED,
                          const bool debug)
 {
@@ -655,14 +655,14 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                     file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
                 if (fields[group_field].c_str()[0] == '.') {
-                    constant_atoms.push_back(1);
+                    constant_atoms.push_back(true);
                 }
                 else {
-                    constant_atoms.push_back(0);
+                    constant_atoms.push_back(false);
                 }
 
                 bool old_atom = false;
-//#pragma omp parallel for reduction(|| : old_atom)
+#pragma omp parallel for reduction(|| : old_atom)
                 for (int run = 0; run < known_atoms.size(); run++)
                 {
                     if (fields[label_field] == known_atoms[run])
@@ -2832,7 +2832,7 @@ bool thakkar_sfac(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-	ivec constant_atoms;
+	bvec constant_atoms;
     bvec needs_grid(wave.get_ncen(), false);
     svec known_atoms;
 
@@ -3074,7 +3074,7 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,
@@ -3211,7 +3211,7 @@ bool calculate_scattering_factors_HF(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(wave.get_ncen(), false);
     svec known_atoms;
 
@@ -3382,7 +3382,7 @@ bool calculate_scattering_factors_ML(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(SP.wavy.get_ncen(), false);
     svec known_atoms;
 
@@ -3591,7 +3591,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(SP.wavy.get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,
@@ -3695,7 +3695,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
             }
 
             //Remove atoms and coeffs from list if they are constant atoms
-            if (constant_atoms[i] == 1) {
+            if (constant_atoms[i]) {
                 labels.erase(labels.begin() + i, labels.begin() + i + 1);
                 SP.wavy.atoms.erase(SP.wavy.atoms.begin() + i, SP.wavy.atoms.begin() + i + 1);
                 coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
@@ -3837,7 +3837,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-	ivec constant_atoms;    
+	bvec constant_atoms;    
     bvec needs_grid(wave[nr].get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,
@@ -4010,7 +4010,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-    ivec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
 

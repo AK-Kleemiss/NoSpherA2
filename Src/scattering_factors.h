@@ -199,7 +199,7 @@ svec read_atoms_from_CIF(
     ivec &asym_atom_list,
     bvec &needs_grid,
     std::ostream &file,
-    ivec &constant_atoms,
+    bvec &constant_atoms,
     const bool SALTED = false,
     const bool debug = false);
 
