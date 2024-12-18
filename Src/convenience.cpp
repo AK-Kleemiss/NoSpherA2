@@ -1073,58 +1073,41 @@ bool unsaved_files(std::vector<WFN> &wavy)
     return false;
 };
 
+
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
+    WFN& wavy,
+    double* CoordMinMax,
+    int* NbSteps,
     double Radius,
     double Increments,
     bool no_bohr)
 {
     vec2 PosAtoms;
-    PosAtoms.resize(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++)
-        PosAtoms[i].resize(3);
+    PosAtoms.resize(3);
+    for (int i = 0; i < 3; i++)
+        PosAtoms[i].resize(wavy.get_ncen());
     bool bohrang = true;
     if (!no_bohr)
         bohrang = !check_bohr(wavy, false);
+
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-        PosAtoms[j][0] = wavy.atoms[j].x;
-        PosAtoms[j][1] = wavy.atoms[j].y;
-        PosAtoms[j][2] = wavy.atoms[j].z;
+        PosAtoms[0][j] = wavy.atoms[j].x;
+        PosAtoms[1][j] = wavy.atoms[j].y;
+        PosAtoms[2][j] = wavy.atoms[j].z;
         if (!bohrang)
         {
             for (int i = 0; i < 3; i++)
-                PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
-        }
-        if (j == 0)
-        {
-            CoordMinMax[0] = PosAtoms[j][0];
-            CoordMinMax[3] = PosAtoms[j][0];
-            CoordMinMax[1] = PosAtoms[j][1];
-            CoordMinMax[4] = PosAtoms[j][1];
-            CoordMinMax[2] = PosAtoms[j][2];
-            CoordMinMax[5] = PosAtoms[j][2];
-        }
-        else
-        {
-            if (CoordMinMax[0] > PosAtoms[j][0])
-                CoordMinMax[0] = PosAtoms[j][0];
-            if (CoordMinMax[3] < PosAtoms[j][0])
-                CoordMinMax[3] = PosAtoms[j][0];
-
-            if (CoordMinMax[1] > PosAtoms[j][1])
-                CoordMinMax[1] = PosAtoms[j][1];
-            if (CoordMinMax[4] < PosAtoms[j][1])
-                CoordMinMax[4] = PosAtoms[j][1];
-
-            if (CoordMinMax[2] > PosAtoms[j][2])
-                CoordMinMax[2] = PosAtoms[j][2];
-            if (CoordMinMax[5] < PosAtoms[j][2])
-                CoordMinMax[5] = PosAtoms[j][2];
-        }
+                PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
+        } 
     }
+	CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
+	CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
+	CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
+	CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
+	CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
+	CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
+
     const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
     CoordMinMax[3] += temp_rad;
@@ -1137,6 +1120,7 @@ void readxyzMinMax_fromWFN(
     NbSteps[1] = (int)ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
     NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
+
 
 void readxyzMinMax_fromCIF(
     std::string cif,

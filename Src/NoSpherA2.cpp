@@ -176,7 +176,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers();
-            if (wavy[i].get_origin() != 7)
+            if (wavy[i].get_origin() != 7 & !opt.SALTED)
             {
                 result.append(calculate_scattering_factors_MTC(
                                   opt,
@@ -186,6 +186,38 @@ int main(int argc, char **argv)
                                   i,
                                   &known_kpts),
                               log_file);
+            }
+            else if (opt.SALTED) {
+#if has_RAS == 1
+                // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
+                // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
+#ifdef _WIN32
+                check_OpenBLAS_DLL(opt.debug);
+#endif
+                BasisSetLibrary basis_library;
+                string df_basis_name;
+                string h5file;
+                SALTEDPredictor temp_pred(wavy[i], opt);
+                {
+                    df_basis_name = temp_pred.get_dfbasis_name();
+                    h5file = temp_pred.get_h5_filename();
+                }
+                log_file << "Using " << h5file << " for the prediction" << endl;
+                load_basis_into_WFN(temp_pred.wavy, basis_library.get_basis_set(df_basis_name));
+
+                if (opt.debug)
+                    log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
+                result.append(calculate_scattering_factors_MTC_SALTED(
+                    opt,
+					temp_pred,
+                    log_file,
+                    known_scatterer,
+                    i,
+                    &known_kpts), log_file);
+#else
+                log_file << "SALTED is not available in this build!" << endl;
+                exit(-1);
+#endif
             }
             else
             {

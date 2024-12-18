@@ -300,8 +300,7 @@ void Config::populateFromFile(const H5::H5File file) {
 }
 
 void Config::populate_config(const std::string& dataset_name, const int& data) {
-    if (dataset_name == "predict_filename") this->predict_filename = data;
-    else if (dataset_name == "average" || dataset_name == "averages") this->average = data != 0; // Assuming boolean stored as integer
+    if (dataset_name == "average" || dataset_name == "averages") this->average = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "field") this->field = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "sparsify") this->sparsify = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "ncut") this->ncut = data;
@@ -332,8 +331,7 @@ void Config::populate_config(const std::string& dataset_name, const double& data
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const std::string& data) {
-    if (dataset_name == "predict_filename") this->predict_filename = data;
-    else if (dataset_name == "dfbasis") this->dfbasis = data;
+    if (dataset_name == "dfbasis") this->dfbasis = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 void Config::populate_config(const std::string& dataset_name, const std::vector<std::string>& data) {

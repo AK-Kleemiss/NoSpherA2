@@ -82,3 +82,6 @@ const double calc_density_ML(const double& x,
     const int& atom_nr = -1);
 
 vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs);
+
+
+void calc_cube_ML(vec data, WFN& dummy, const int atom = -1);

@@ -1,0 +1,109 @@
+data_mohrs_salt_IAM
+_audit_creation_method            
+ 'Olex2: 2024.11.02 svn.r19aeb66f MSC:194134123 on WIN64, Python: 3.8.10, wxWidgets: 3.2.5 for OlexSys'
+_chemical_name_common              '?'
+_chemical_name_systematic          '?'
+_chemical_formula_moiety           'Fe H12 O6, 2(O4 S), 2(H4 N)'
+_chemical_formula_sum              'Fe H20 N2 O14 S2'
+_chemical_formula_weight           196.07
+_chemical_melting_point            ?
+_space_group_crystal_system        'monoclinic'
+_space_group_IT_number             14
+_space_group_name_H-M_alt          'P 1 21/c 1'
+_space_group_name_Hall             '-P 2ybc'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+ 2 -X,1/2+Y,1/2-Z
+ 3 -X,-Y,-Z
+ 4 +X,1/2-Y,1/2+Z
+
+_cell_length_a                     6.2898(2)
+_cell_length_b                     12.4250(3)
+_cell_length_c                     9.1801(3)
+_cell_angle_alpha                  90
+_cell_angle_beta                   106.757(3)
+_cell_angle_gamma                  90
+_cell_volume                       686.97(4)
+_cell_formula_units_Z              2
+_exptl_crystal_size_max            0.21
+_exptl_crystal_size_mid            0.33
+_exptl_crystal_size_min            0.16
+_diffrn_reflns_av_R_equivalents    0.0134
+_diffrn_reflns_av_unetI/netI       0.0081
+_diffrn_reflns_limit_h_max         14
+_diffrn_reflns_limit_h_min         -14
+_diffrn_reflns_limit_k_max         27
+_diffrn_reflns_limit_k_min         -12
+_diffrn_reflns_limit_l_max         20
+_diffrn_reflns_limit_l_min         -19
+_diffrn_reflns_number              58432
+_diffrn_reflns_theta_max           53.03
+_diffrn_reflns_theta_min           2.84
+_diffrn_ambient_temperature        100.15
+_diffrn_radiation_wavelength       0.71073
+_reflns_number_total               8095
+_refine_diff_density_max           0.56
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+ Fe1 Fe 0.5 0.5 0 0.006216 Uani 1 . 2 .
+ S S 0.236368 0.369011 0.411901 0.006607 Uani 1 . 1 .
+ O2 O 0.80204 0.570925 -0.001087 0.009958 Uani 1 . 1 .
+ O4 O 0.120599 0.43758 0.280502 0.009424 Uani 1 . 1 .
+ O5 O 0.08754 0.277401 0.419095 0.010653 Uani 1 . 1 .
+ O6 O 0.444933 0.326776 0.38926 0.010702 Uani 1 . 1 .
+ O3 O 0.670671 0.392388 0.178857 0.010476 Uani 1 . 1 .
+ O1 O 0.529837 0.383469 -0.164145 0.010606 Uani 1 . 1 .
+ H1a H 0.457528 0.397187 -0.25185 0.033014 Uani 1 . 1 .
+ H1b H 0.502872 0.321208 -0.144636 0.023434 Uani 1 . 1 .
+ O7 O 0.282104 0.43239 0.551892 0.013363 Uani 1 . 1 .
+ N N 0.853052 0.34161 0.635747 0.011069 Uani 1 . 1 .
+ H3a H 0.796379 0.408678 0.215818 0.027493 Uani 1 . 1 .
+ H2a H 0.828465 0.63491 0.022873 0.024012 Uani 1 . 1 .
+ H3b H 0.609969 0.38342 0.241273 0.03042 Uani 1 . 1 .
+ H2b H 0.844692 0.563321 -0.076206 0.02884 Uani 1 . 1 .
+ Ha H 0.865293 0.409369 0.663237 0.025983 Uani 1 . 1 .
+ Hb H 0.717063 0.333792 0.576006 0.029028 Uani 1 . 1 .
+ Hc H 0.944471 0.325339 0.580868 0.027924 Uani 1 . 1 .
+ Hd H 0.878616 0.297091 0.7121 0.035404 Uani 1 . 1 .
+
+loop_
+  _atom_site_aniso_label
+  _atom_site_aniso_U_11
+  _atom_site_aniso_U_22
+  _atom_site_aniso_U_33
+  _atom_site_aniso_U_23
+  _atom_site_aniso_U_13
+  _atom_site_aniso_U_12
+ Fe1 0.006751 0.00634 0.005406 0.000178 0.001513 -0.000297
+ S 0.007339 0.006681 0.005697 0.000498 0.001717 0.000437
+ O2 0.010459 0.009602 0.010974 -0.00103 0.004934 -0.001545
+ O4 0.010698 0.009801 0.007402 0.002633 0.002019 0.00162
+ O5 0.010303 0.008778 0.01358 0.002132 0.004558 -0.001033
+ O6 0.008202 0.010136 0.014398 0.000824 0.00426 0.001376
+ O3 0.009617 0.012331 0.009014 0.002295 0.001945 0.000378
+ O1 0.014226 0.00926 0.008364 -0.000769 0.00331 -0.000312
+ H1a 0.033014 0.033014 0.033014 -0 0.009518 -0
+ H1b 0.023434 0.023434 0.023434 -0 0.006756 -0
+ O7 0.018146 0.013403 0.007215 -0.002613 0.001548 0.001177
+ N 0.011526 0.011144 0.011274 0.000412 0.004457 0.000211
+ H3a 0.027493 0.027493 0.027493 -0 0.007927 -0
+ H2a 0.024012 0.024012 0.024012 -0 0.006923 -0
+ H3b 0.03042 0.03042 0.03042 -0 0.008771 -0
+ H2b 0.02884 0.02884 0.02884 -0 0.008315 -0
+ Ha 0.025983 0.025983 0.025983 -0 0.007491 -0
+ Hb 0.029028 0.029028 0.029028 -0 0.008369 -0
+ Hc 0.027924 0.027924 0.027924 -0 0.008051 -0
+ Hd 0.035404 0.035404 0.035404 -0 0.010207 -0
+
