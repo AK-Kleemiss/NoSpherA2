@@ -224,6 +224,9 @@ int fixed_density_fit_test()
     vec result = einsum_ijk_ij_p(eri3c, dm);
 
     solve_linear_system(eri2c, result);
+
+    vec result_gbw = einsum_ijk_ij_p(eri3c, wavy_gbw.get_dm());
+    solve_linear_system(eri2c, result_gbw);
     std::cout << "Done!" << std::endl;
 #ifdef _WIN32
     math_unload_BLAS(blas);

@@ -257,6 +257,7 @@ public:
     const double get_DM(const int &nr) const;
     const int get_DM_size() const { return (int)UT_DensityMatrix.size(); };
     void resize_DM(const int &size, const double &value = 0.0);
+    vec2 get_dm() const { return DM; };
     //----------S_DM Handling--------------------------------
     void push_back_SDM(const double &value = 0.0);
     bool set_SDM(const int &nr, const double &value = 0.0);
