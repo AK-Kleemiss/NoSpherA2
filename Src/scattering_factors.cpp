@@ -3639,7 +3639,8 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     //Remove all unneccecary atoms from wavy
     int current_index = 0;
     for (int i = 0; i < needs_grid.size() ; i++) {
-		std::cout << "atom: " << i << " needs grid: " << needs_grid[i] << std::endl;
+        if (opt.debug)std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+
         if (!needs_grid[i]) {
             SP.wavy.atoms.erase(SP.wavy.atoms.begin()+current_index, SP.wavy.atoms.begin() + current_index+1);
             constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
@@ -3648,8 +3649,8 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
         }
         current_index++;
     }
+    //We need tp write a new xyz-file as rascaline needs one for the calculation
     SP.wavy.write_xyz("temp_rascaline.xyz");
-    //SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_1.xyz");
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
@@ -3680,38 +3681,32 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-	//Remove all unneccecary atoms from wavy only if it is not the first calculation
+    //Remove all unneccecary atoms from wavy only if it is not the first calculation
     if (nr != 0) {
         //We need coeffs for the atoms and coeff seperateley
-        current_index = 0;
-        int last_coef_index = 0;
-        int current_coef_index = 0;
-        for (int i = 0; i < constant_atoms.size(); i++) {
+        int current_coef_index = coefs.size();
+        for (int i = constant_atoms.size() -1; i >= 0 ; i--) {
             //Count up all coeffs for one atom
-            const int lim = (int)SP.wavy.atoms[current_index].basis_set.size();
+            const int lim = (int)SP.wavy.atoms[i].basis_set.size();
+			int coef_count = 0;
             for (int i_basis = 0; i_basis < lim; i_basis++)
             {
-                current_coef_index += 2 * SP.wavy.atoms[current_index].basis_set[i_basis].p.type + 1;
+                coef_count += 2 * SP.wavy.atoms[i].basis_set[i_basis].p.type + 1;
             }
 
             //Remove atoms and coeffs from list if they are constant atoms
             if (constant_atoms[i] == 1) {
-				labels.erase(labels.begin() + current_index, labels.begin() + current_index + 1);
-                SP.wavy.atoms.erase(SP.wavy.atoms.begin() + current_index, SP.wavy.atoms.begin() + current_index + 1);
-                coefs.erase(coefs.begin() + last_coef_index, coefs.begin() + current_coef_index);
-                current_index--;
-				current_coef_index = last_coef_index;
+                labels.erase(labels.begin() + i, labels.begin() + i + 1);
+                SP.wavy.atoms.erase(SP.wavy.atoms.begin() + i, SP.wavy.atoms.begin() + i + 1);
+                coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
                 SP.wavy.set_ncen(SP.wavy.get_ncen() - 1);
             }
-			last_coef_index = current_coef_index;
-
-
-
-            current_index++;
+			current_coef_index -= coef_count;
         };
     }
+
     //SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
-	calc_cube_ML(coefs,SP.wavy);
+	//calc_cube_ML(coefs,SP.wavy);
 
     vec atom_elecs = calc_atomic_density(SP.wavy.atoms, coefs);
     file << "Table of Charges in electrons\n"
