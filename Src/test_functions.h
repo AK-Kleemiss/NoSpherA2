@@ -124,6 +124,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
+    bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
 
@@ -137,6 +138,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                                       asym_atom_list,
                                       needs_grid,
                                       std::cout,
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -823,69 +825,6 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
-{
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
-    CubeRho.give_parent_wfn(dummy);
-
-    for (int i = 0; i < 3; i++)
-    {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
-    CubeRho.set_comment2("from " + dummy.get_path());
-    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
-
-    time_point start = get_time();
-
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom != -1)
-        std::cout << "Calculation for atom " << atom << std::endl;
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
-
-                if (atom == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms));
-                else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    using namespace std;
-    time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-    if (atom == -1)
-    {
-        CubeRho.write_file(true);
-    }
-    else
-    {
-        std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
-        CubeRho.write_file(fn, false);
-    }
-};
 
 // Only valid for one atom positioned at 0,0,0
 double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type)
@@ -1465,7 +1404,7 @@ void test_analytical_fourier()
     bool correct = true;
 
     cdouble max_diff, diff;
-    for (int type = 0; type < 6; type++)
+    for (int type = 6; type < 7; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
