@@ -1968,6 +1968,17 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
     {
         err_not_impl_f("PLEASE DONT MIX CARTESIAN AND SPERHICAL HARMINICS; THAT IS ANNOYING!", std::cout);
     }
+    //Make the matrix symmetric
+    while (coefficients[0].size() < coefficients[0][0].size()) {
+        coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
+        occ.push_back(0);
+    }
+    while (coefficients[0][0].size() < coefficients[0].size()) {
+        for (int i = 0; i < coefficients[0].size(); i++) {
+            coefficients[0][i].push_back(0.0);
+        }
+        occ.push_back(0);
+    }
     vec2 temp_co = diag_dot(coefficients[0], occ, true);
     DM = dot(temp_co, coefficients[0]);
     

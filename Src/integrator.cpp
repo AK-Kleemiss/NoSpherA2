@@ -221,12 +221,25 @@ int fixed_density_fit_test()
          {1.07410572, 2.36148332, 3.3968143, 0., 0., 0.27120783, 0., 0., 0.44664828, 0., 0., 0.06726545, 0., 0., 1.07410572, 2.36148332, 3.3968143, 0., 0., -0.27120783, 0., 0., -0.44664828, 0., 0., 0.06726545, 0., 0.}},
         {{1.07410572, 2.36148332, 3.3968143, 0., 0., 0.27120783, 0., 0., 0.44664828, 0., 0., 0.06726545, 0., 0., 1.07410572, 2.36148332, 3.3968143, 0., 0., -0.27120783, 0., 0., -0.44664828, 0., 0., 0.06726545, 0., 0.},
          {1.3058732, 3.16766661, 4.79834086, 0., 0., 0.6241081, 0., 0., 1.15224588, 0., 0., 0.24996002, 0., 0., 1.95647032, 3.94550015, 5.44434985, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.}}};
+    
     vec result = einsum_ijk_ij_p(eri3c, dm);
-
     solve_linear_system(eri2c, result);
 
     vec result_gbw = einsum_ijk_ij_p(eri3c, wavy_gbw.get_dm());
     solve_linear_system(eri2c, result_gbw);
+
+    vec result_molden = einsum_ijk_ij_p(eri3c, wavy.get_dm());
+    solve_linear_system(eri2c, result_molden);
+    vec diff_gbw(result.size());
+    vec diff_molden(result.size());
+    err_checkf(result.size() == result_gbw.size(), "Error, Size mismatch", std::cout);
+    err_checkf(result.size() == result_molden.size(), "Error, Size mismatch", std::cout);
+    for (int i = 0; i < result.size(); i++) {
+        diff_gbw[i] = result[i] - result_gbw[i];
+        diff_molden[i] = result[i] - result_molden[i];
+    }
+    std::cout << "Min/Max Difference (gbw): " << *std::min_element(diff_gbw.begin(), diff_gbw.end()) << "/" << *std::min_element(diff_gbw.begin(), diff_gbw.end()) << std::endl;
+    std::cout << "Min/Max Difference (molden): " << *std::min_element(diff_molden.begin(), diff_molden.end()) << "/" << *std::min_element(diff_molden.begin(), diff_molden.end()) << std::endl;
     std::cout << "Done!" << std::endl;
 #ifdef _WIN32
     math_unload_BLAS(blas);

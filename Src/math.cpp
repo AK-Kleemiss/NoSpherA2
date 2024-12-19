@@ -372,10 +372,7 @@ std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, con
     int vec_size = static_cast<int>(_vec.size());
 
     // Check if matrix multiplication is possible
-    if (mat_cols != vec_size || mat_rows != vec_size)
-    {
-        throw std::invalid_argument("Matrix dimensions do not match for multiplication");
-    }
+    err_checkf (mat_cols == vec_size || mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
 
     std::vector<std::vector<T>> result(mat_rows, std::vector<T>(mat_cols));
 #pragma omp parallel
