@@ -6940,6 +6940,10 @@ bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool d
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
 
+    while (momat.size() < nbf) {
+        momat.push_back(vec(nbf, 0.0));
+        occ.push_back(0);
+    }
     // build density matrix
     vec2 temp_co = diag_dot(momat, occ, true);
     DM = dot(temp_co, momat, false, false);
