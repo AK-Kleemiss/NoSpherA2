@@ -1675,7 +1675,7 @@ int make_hirshfeld_grids(
     if (debug)
         file << "Becke Grid exists" << endl;
     else
-        file << setw(44) << "done! Number of gridpoints: " << defaultfloat << points << endl;
+        file << setw(55) << "done! Number of gridpoints: " << defaultfloat << points << endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("Becke Grid setup");
