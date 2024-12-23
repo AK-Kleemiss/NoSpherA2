@@ -1675,7 +1675,7 @@ int make_hirshfeld_grids(
     if (debug)
         file << "Becke Grid exists" << endl;
     else
-        file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
+        file << setw(44) << "done! Number of gridpoints: " << defaultfloat << points << endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("Becke Grid setup");
@@ -3480,8 +3480,7 @@ bool calculate_scattering_factors_ML(
         coefs,
         SP.wavy.atoms,
         sf);
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
-         << flush;
+    file << setw(13 * 4) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
@@ -3654,8 +3653,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
-        << flush;
+    file << setw(13*4) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
 
@@ -3731,7 +3729,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
         coefs,
         SP.wavy.atoms,
         sf);
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
+    file << setw(13*4) << "... done!\n"
         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
