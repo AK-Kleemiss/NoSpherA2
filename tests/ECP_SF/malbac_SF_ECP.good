@@ -7,13 +7,13 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                   malbac.gbw done!
+Reading:                                 "malbac.gbw" done!
 Number of atoms in Wavefunction file: 52 Number of MOs: 1133
 Number of protons: 276
 Number of electrons: 248
 Number of ECP electrons: 28
-Reading:                                malbac.cif... done!
-Reading:                                   malbac.hkl done!
+Reading:                                 "malbac.cif" done!
+Reading:                                 "malbac.hkl" done!
 Nr of reflections read from file: 15646
 Number of symmetry operations: 1
 Nr of reflections to be used: 9134

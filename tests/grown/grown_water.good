@@ -7,12 +7,12 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                    water.wfx done!
+Reading:                                  "water.wfx" done!
 Number of atoms in Wavefunction file: 48 Number of MOs: 261
 Number of protons: 261
 Number of electrons: 261
-Reading:                                 water.cif... done!
-Reading:                                    water.hkl done!
+Reading:                                  "water.cif" done!
+Reading:                                  "water.hkl" done!
 Nr of reflections read from file: 3019
 Number of symmetry operations: 2
 Nr of reflections to be used: 5928

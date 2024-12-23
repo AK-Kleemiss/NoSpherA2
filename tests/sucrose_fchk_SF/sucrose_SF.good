@@ -7,12 +7,12 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                    olex2/Wfn_job/sucrose.wfx done!
+Reading:                  "olex2/Wfn_job/sucrose.wfx" done!
 Number of atoms in Wavefunction file: 45 Number of MOs: 91
 Number of protons: 182
 Number of electrons: 182
-Reading:                               sucrose.cif... done!
-Reading:                    olex2/Wfn_job/sucrose.hkl done!
+Reading:                                "sucrose.cif" done!
+Reading:                  "olex2/Wfn_job/sucrose.hkl" done!
 Nr of reflections read from file: 4027
 Number of symmetry operations: 2
 Nr of reflections to be used: 4021

@@ -7,7 +7,7 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                               sucrose.cif
+Reading:                                "sucrose.cif"
 Calculating:
 Laplacian, ELI, 
 Calculating for 6336 Gridpoints.

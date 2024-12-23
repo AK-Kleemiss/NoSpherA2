@@ -7,12 +7,12 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                            test_cysteine.xyz done!
+Reading:                          "test_cysteine.xyz" done!
 Number of atoms in Wavefunction file: 14 Number of MOs: 0
-Using  for the prediction
+Using "" for the prediction
 Using basis set: cc-pvqz-jkfit
 Number of protons: 64
-Reading:                         test_cysteine.cif... done!
+Reading:                          "test_cysteine.cif" done!
 Generating hkl indices up to d=:              0.73... done!
 Nr of reflections generated:                 12096
 Number of symmetry operations:                   4
@@ -31,7 +31,7 @@ Generating densities...
 [#############################################################] 100% 
 [              Calculating descriptors for l = 5               ]
 [#############################################################] 100% 
-													... done!
+                                        ... done!
 
 Generating k-points...                            ... done!
 Number of k - points to evaluate : 7672
@@ -54,5 +54,5 @@ Table of Charges in electrons
 Total number of analytical Electrons: 64.2941
 [               Generating scattering factors...               ]
 [#############################################################] 100% 
-													... done!
+                                         ... done!
 Writing tsc file...  ... done!

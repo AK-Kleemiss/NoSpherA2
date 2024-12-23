@@ -7,12 +7,12 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                      wfn.xtb done!
+Reading:                                    "wfn.xtb" done!
 Number of atoms in Wavefunction file: 45 Number of MOs: 409
 Number of protons: 182
 Number of electrons: 136
 Number of ECP electrons: 46
-Reading:                               sucrose.cif... done!
+Reading:                                "sucrose.cif" done!
 Generating hkl indices up to d=:              0.80... done!
 Nr of reflections generated:                 11232
 Number of symmetry operations:                   2
