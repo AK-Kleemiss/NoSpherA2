@@ -15,7 +15,7 @@ template <typename T>
 void readHDF5Data(H5::DataSet& dataset, std::vector<T>& data);
 
 template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<size_t> &dims_out);
+std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<size_t> &dims_out);
 #endif
 
 std::filesystem::path find_first_h5_file(const std::filesystem::path& directory_path);

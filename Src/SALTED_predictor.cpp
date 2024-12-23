@@ -296,10 +296,8 @@ void SALTEDPredictor::read_model_data_h5()
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
-            filesystem::path spar_descrip = "sparse_descriptors";
-            spar_descrip = spar_descrip/ spe / to_string(lam);
-            filesystem::path proj = "projectors";
-            proj = proj / spe / to_string(lam);
+            string spar_descrip = "sparse_descriptors/" + spe + "/" + to_string(lam);
+            string proj = "projectors/" + spe + "/" + to_string(lam);
             vec temp_power = readHDF5<double>(input, spar_descrip, dims_out_descrip);
             power_env_sparse[spe + to_string(lam)] = temp_power;
             vec temp_proj = readHDF5<double>(input, proj, dims_out_proj);
@@ -319,18 +317,18 @@ void SALTEDPredictor::read_model_data_h5()
     }
 
     vector<hsize_t> dims_out_temp;
-    filesystem::path wigner = "wigners";
+    string wigner = "wigners";
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readHDF5<double>(input, wigner / ("lam-" + to_string(lam)), dims_out_temp);
+        wigner3j[lam] = readHDF5<double>(input, wigner + "/lam-" + to_string(lam), dims_out_temp);
     }
 
     if (config.sparsify)
     {
-        filesystem::path path = "fps";
+        string fps = "fps";
         for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
         {
-            vfps[lam] = readHDF5<int64_t>(input, path/("lam-" + to_string(lam)), dims_out_temp);
+            vfps[lam] = readHDF5<int64_t>(input, fps + "/lam-" + to_string(lam), dims_out_temp);
         }
     };
     if (config.average)

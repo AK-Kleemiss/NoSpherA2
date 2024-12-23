@@ -29,7 +29,7 @@ template void readHDF5Data(H5::DataSet& dataset, std::vector<int>& data);
 template void readHDF5Data(H5::DataSet& dataset, std::vector<int64_t>& data);
 
 template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t> &dims_out) {
+std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out) {
 
     try {
         H5::Exception::dontPrint();
@@ -77,10 +77,10 @@ std::vector<T> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std
     }
     return {};
 }
-template std::vector<double> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<float> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<int> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<int64_t> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<double> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<float> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int64_t> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
 #endif
 
 
