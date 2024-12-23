@@ -219,7 +219,7 @@ void SALTEDPredictor::read_model_data()
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
 #if has_RAS == 1
-    H5::H5File features(_opt.SALTED_DIR / "GPR_data" / ("FEAT_M - " + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
+    H5::H5File features(_opt.SALTED_DIR / "GPR_data" / ("FEAT_M-" + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
     H5::H5File projectors(_opt.SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
     std::vector<hsize_t> dims_out_proj;
