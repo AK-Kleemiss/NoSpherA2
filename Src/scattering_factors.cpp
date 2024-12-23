@@ -43,7 +43,7 @@
 void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
 {
     err_checkf(std::filesystem::exists("kpts.dat"), "k-points file does not exist!", file);
-    file << "Reading: kpts.dat" << std::flush;
+    file << "Reading:                                    kpts.dat" << std::flush;
     std::ifstream k_points_file("kpts.dat", std::ios::binary);
     err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
     int nr[1]{0};
@@ -837,7 +837,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
 
     for (int i = 0; i < atom_type_list.size(); i++)
         err_checkf((atom_type_list[i] <= 113 || atom_type_list[i] == 119) && atom_type_list[i] > 0, "Unreasonable atom type detected: " + toString(atom_type_list[i]) + " (Happens if Atoms were not identified correctly)", file);
-    file << "... done!" << endl;
+    file << " done!" << endl;
     if (debug)
     {
         file << "There are " << atom_type_list.size() << " types of atoms" << endl;
@@ -3430,7 +3430,7 @@ bool calculate_scattering_factors_ML(
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
-    file << "\t\t\t\t\t\t\t\t\t\t\t\t\t... done!\n"
+    file << setw(13*4) << "... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
