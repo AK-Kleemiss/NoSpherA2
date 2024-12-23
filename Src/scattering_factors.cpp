@@ -3430,7 +3430,7 @@ bool calculate_scattering_factors_ML(
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
-    file << setw(13*4) << "... done!\n"
+    file << setw(12*4+2) << "... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
@@ -3480,7 +3480,7 @@ bool calculate_scattering_factors_ML(
         coefs,
         SP.wavy.atoms,
         sf);
-    file << setw(13 * 4) << "... done!" << endl;
+    file << setw(12 * 4+2) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
