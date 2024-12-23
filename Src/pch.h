@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <atomic>
 #include <deque>
+#include <filesystem>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif

@@ -19,7 +19,7 @@ public:
 
     const std::string get_dfbasis_name();
     vec gen_SALTED_densities();
-    const std::string get_h5_filename() const {
+    const std::filesystem::path get_h5_filename() const {
         return config.h5_filename;
     };
     WFN wavy;

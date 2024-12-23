@@ -15,6 +15,7 @@
 #define H5Location_H
 
 #include "H5Classes.h" // contains forward class declarations
+#include <filesystem>
 
 namespace H5 {
 
@@ -125,6 +126,8 @@ class H5_DLLCPP H5Location : public IdComponent {
     DataSet openDataSet(const char *name, const DSetAccPropList &dapl = DSetAccPropList::DEFAULT) const;
     DataSet openDataSet(const H5std_string    &name,
                         const DSetAccPropList &dapl = DSetAccPropList::DEFAULT) const;
+    DataSet openDataSet(const std::filesystem::path& name,
+                        const DSetAccPropList& dapl = DSetAccPropList::DEFAULT) const;
 
     H5L_info2_t getLinkInfo(const char            *link_name,
                             const LinkAccPropList &lapl = LinkAccPropList::DEFAULT) const;

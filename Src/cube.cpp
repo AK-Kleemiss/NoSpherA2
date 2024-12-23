@@ -35,7 +35,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(const std::string &filepath, bool read, WFN &wave, std::ostream &file, bool expert)
+cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, bool expert)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
@@ -111,7 +111,7 @@ cube::cube(const cube &given)
 bool cube::read_file(bool full, bool header, bool expert)
 {
     using namespace std;
-    ifstream file(path.c_str());
+    ifstream file(path);
     string line;
     if (header)
     {
@@ -223,42 +223,20 @@ bool cube::read_file(bool full, bool header, bool expert)
 
 bool cube::write_file(bool force, bool absolute)
 {
-    using namespace std;
     if (exists(path))
     {
         if (force)
-            remove(path.c_str());
+            std::filesystem::remove(path);
         else
         {
-            cout << "File already exists, aborting!" << endl;
+            std::cout << "File already exists, aborting!" << std::endl;
             return false;
         }
     }
-    /*bool end = false;
-    if (!force) {
-      while (exists(path) && !end) {
-        cout << "File already exists, do you want to overwrite it? ";
-        if (!yesno()) {
-          cout << "Do you want to give a new name? ";
-          if (yesno()) {
-            cout << "Please give the new path where it should be saved: ";
-            cin >> path;
-          }
-          else {
-            cout << "okay, canceling!" << endl;
-            return (false);
-          }
-        }
-        else end = true;
-      }
-    }
-    else {
-      if (exists(path))
-        remove(path.c_str());
-    }*/
-    stringstream stream;
-    string temp;
-    ofstream of(path.c_str(), ios::out);
+    using namespace std;
+    std::stringstream stream;
+    std::string temp;
+    std::ofstream of(path, std::ios::out);
     of << comment1 << endl;
     of << comment2 << endl;
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << endl;
@@ -302,12 +280,12 @@ bool cube::write_file(bool force, bool absolute)
     return (true);
 };
 
-bool cube::write_file(std::string &given_path, bool debug)
+bool cube::write_file(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
     string temp;
-    ofstream of(given_path.c_str(), ios::out);
+    ofstream of(given_path, ios::out);
     of << comment1 << "\n";
     of << comment2 << "\n";
     of << setw(5) << na << fixed << setw(12) << setprecision(6) << origin[0] << fixed << setw(12) << setprecision(6) << origin[1] << fixed << setw(12) << setprecision(6) << origin[2] << "\n";
@@ -363,12 +341,11 @@ bool cube::write_file(std::string &given_path, bool debug)
     return (true);
 };
 
-bool cube::write_xdgraph(std::string &given_path, bool debug)
+bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
 {
     using namespace std;
     stringstream stream;
-    string temp;
-    ofstream of(given_path.c_str(), ios::out);
+    ofstream of(given_path, ios::out);
     of << "2DGRDFIL  0" << endl
        << "cuQCT    FOU" << endl
        << endl;
@@ -501,8 +478,9 @@ bool cube::fractal_dimension(const double stepsize)
     }
     {
         using namespace std;
-        string output(path + "_fractal_plot");
-        ofstream of(output.c_str(), ios::out);
+        std::filesystem::path out_file = path;
+        out_file.replace_extension(".cube_fractal_plot");
+        ofstream of(out_file, ios::out);
         of << setw(8) << scientific << setprecision(8) << steps
             << setw(16) << scientific << setprecision(8) << map_min
             << setw(16) << scientific << setprecision(8) << map_max
@@ -814,7 +792,7 @@ void cube::operator=(cube &right)
 cube cube::operator+(cube &right) const
 {
     cube res_cube(path, true, *parent_wavefunction, std::cout, false);
-    res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "+" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
+    res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
@@ -833,7 +811,7 @@ cube cube::operator+(cube &right) const
         int run_x = 0;
         int run_y = 0;
         string line2;
-        ifstream file2(right.path.c_str(), ios::in);
+        ifstream file2(right.path, ios::in);
         double tmp[6]{0, 0, 0, 0, 0, 0};
         for (int i = 0; i < 6 + na; i++)
             if (!right.get_loaded())
@@ -907,7 +885,7 @@ cube cube::operator+(cube &right) const
 cube cube::operator-(cube &right) const
 {
     cube res_cube(path, true, *parent_wavefunction, std::cout, false);
-    res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "-" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
+    res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
@@ -926,7 +904,7 @@ cube cube::operator-(cube &right) const
         int run_x = 0;
         int run_y = 0;
         string line2;
-        ifstream file2(right.path.c_str(), ios::in);
+        ifstream file2(right.path, ios::in);
         double tmp[6]{0, 0, 0, 0, 0, 0};
         for (int i = 0; i < 6 + na; i++)
             if (!right.get_loaded())
@@ -1001,7 +979,7 @@ cube cube::operator-(cube &right) const
 cube cube::operator*(cube &right) const
 {
     cube res_cube(path, true, *parent_wavefunction, std::cout, false);
-    res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "*" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
+    res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
@@ -1019,7 +997,7 @@ cube cube::operator*(cube &right) const
         int run_x = 0;
         int run_y = 0;
         string line2;
-        ifstream file2(right.path.c_str(), ios::in);
+        ifstream file2(right.path, ios::in);
         double tmp[6]{0, 0, 0, 0, 0, 0};
         for (int i = 0; i < 6 + na; i++)
             if (!right.get_loaded())
@@ -1094,7 +1072,7 @@ cube cube::operator*(cube &right) const
 cube cube::operator/(cube &right) const
 {
     cube res_cube(path, true, *parent_wavefunction, std::cout, false);
-    res_cube.path = get_foldername_from_path(path) + get_filename_from_path(path).substr(0, get_filename_from_path(path).rfind(".cub")) + "_" + get_filename_from_path(right.path).substr(0, get_filename_from_path(right.path).rfind(".cub")) + ".cube";
+    res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
@@ -1112,7 +1090,7 @@ cube cube::operator/(cube &right) const
         int run_x = 0;
         int run_y = 0;
         string line2;
-        ifstream file2(right.path.c_str(), ios::in);
+        ifstream file2(right.path, ios::in);
         double tmp[6]{0, 0, 0, 0, 0, 0};
         for (int i = 0; i < 6 + na; i++)
             if (!right.get_loaded())
@@ -1392,7 +1370,7 @@ bool cube::set_origin(unsigned int i, double value)
     return (true);
 };
 
-std::string cube::super_cube()
+std::filesystem::path cube::super_cube()
 {
     using namespace std;
     int m[3]{0, 0, 0};
@@ -1417,9 +1395,9 @@ std::string cube::super_cube()
         cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[2];
     }
-    string new_path(path);
-    new_path += "_super";
-    ofstream of(new_path.c_str(), ios::out);
+    std::filesystem::path new_path(path);
+    new_path.replace_extension(".cube_super");
+    ofstream of(new_path, ios::out);
     of << comment1 << " SUPER CUBE" << endl;
     of << comment2 << endl;
     of << "   " << m[0] * m[1] * m[2] * parent_wavefunction->get_ncen() << " " << origin[0] << " " << origin[1] << " " << origin[2] << endl;
@@ -1471,6 +1449,47 @@ std::string cube::super_cube()
     of.flush();
     of.close();
     return (new_path);
+};
+
+cube cube::super_cube(int x, int y, int z)
+{
+    using namespace std;
+    int m[3]{ x, y, z };
+    std::filesystem::path new_path(path);
+    WFN super_wfn(parent_wavefunction->get_path());
+    for (int h = 0; h < m[0]; h++)
+        for (int j = 0; j < m[1]; j++)
+            for (int k = 0; k < m[2]; k++)
+                for (int a = 0; a < parent_wavefunction->get_ncen(); a++)
+                {
+                    super_wfn.push_back_atom(constants::atnr2letter(parent_wavefunction->get_atom_charge(a)), parent_wavefunction->get_atom_coordinate(a, 0) + h * size[0] * vectors[0][0] + j * size[1] * vectors[1][0] + k * size[2] * vectors[2][0], parent_wavefunction->get_atom_coordinate(a, 1) + h * size[0] * vectors[0][1] + j * size[1] * vectors[1][1] + k * size[2] * vectors[2][1], parent_wavefunction->get_atom_coordinate(a, 2) + h * size[0] * vectors[0][2] + j * size[1] * vectors[1][2] + k * size[2] * vectors[2][2], parent_wavefunction->get_atom_charge(a));
+                }
+
+    new_path.replace_extension(".cube_super");
+    cube out = cube(m[0] * size[0], m[1] * size[1], m[2] * size[2], m[0] * m[1] * m[2] * parent_wavefunction->get_ncen(), true);
+    out.set_path(new_path);
+    out.parent_wavefunction = &super_wfn;
+    out.set_comment1(comment1 + " SUPER CUBE");
+    out.set_comment2(comment2);
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++)
+            out.set_vector(i, j, vectors[i][j]);
+        out.set_origin(i, origin[i]);
+    }
+    int runs = 0;
+    for (int mult_x = 0; mult_x < m[0]; mult_x++)
+        for (int run_x = 0; run_x < size[0]; run_x++)
+            for (int mult_y = 0; mult_y < m[1]; mult_y++)
+                for (int run_y = 0; run_y < size[1]; run_y++)
+                {
+                    runs = 0;
+                    for (int mult_z = 0; mult_z < m[2]; mult_z++)
+                        for (int run_z = 0; run_z < size[2]; run_z++)
+                        {
+                            out.set_value(run_x + mult_x * size[0], run_y + mult_y * size[1], run_z + mult_z * size[2], values[run_x][run_y][run_z]);
+                        }
+                }
+    return (out);
 };
 
 void cube::set_zero()

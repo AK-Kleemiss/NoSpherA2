@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         return 0;
     }
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
-    if (opt.wfn2.length() != 0)
+    if (!opt.wfn2.empty())
     {
         WFN wav(opt.wfn), wav2(opt.wfn2);
         if (opt.debug)
@@ -87,11 +87,11 @@ int main(int argc, char **argv)
             Rho2.set_vector(i, i, len[i]);
         }
         Rho1.set_comment1("Calculated density using NoSpherA2");
-        Rho1.set_comment2("from " + wav.get_path());
+        Rho1.set_comment2("from " + wav.get_path().string());
         Rho2.set_comment1("Calculated density using NoSpherA2");
-        Rho2.set_comment2("from " + wav2.get_path());
-        Rho1.path = get_basename_without_ending(wav.get_path()) + "_rho.cube";
-        Rho2.path = get_basename_without_ending(wav2.get_path()) + "_rho.cube";
+        Rho2.set_comment2("from " + wav2.get_path().string());
+        Rho1.set_path(std::filesystem::path(wav.get_path().stem().string() + "_rho.cube"));
+        Rho2.set_path(std::filesystem::path(wav2.get_path().stem().string() + "_rho.cube"));
         Calc_Rho(Rho1, wav, opt.radius, log_file, false);
         Calc_Rho(Rho2, wav2, opt.radius, log_file, false);
         cube Rho_diff(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wav.get_ncen(), true);
@@ -113,12 +113,12 @@ int main(int argc, char **argv)
         cout << "RSR between the two cubes: " << setw(16) << scientific << setprecision(16) << Rho1.rrs(Rho2) << endl;
         cout << "Ne of shifted electrons: " << Rho_diff.diff_sum() << endl;
         cout << "Writing cube 1..." << flush;
-        Rho1.write_file(Rho1.path, false);
+        Rho1.write_file(Rho1.get_path(), false);
         cout << " ... done!\nWriting cube 2..." << flush;
-        Rho2.write_file(Rho2.path, false);
-        Rho_diff.path = get_basename_without_ending(wav2.get_path()) + "_diff.cube";
+        Rho2.write_file(Rho2.get_path(), false);
+        Rho_diff.set_path(wav2.get_path().stem().string() + "_diff.cube");
         cout << " ... done\nWriting difference..." << flush;
-        Rho_diff.write_file(Rho_diff.path, false);
+        Rho_diff.write_file(Rho_diff.get_path(), false);
         cout << " ... done :)" << endl;
         cout << "Bye Bye!" << endl;
         return 0;
@@ -143,9 +143,9 @@ int main(int argc, char **argv)
 
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
-            err_checkf(exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i], log_file);
+            err_checkf(std::filesystem::exists(opt.combined_tsc_calc_files[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_files[i].string(), log_file);
             if (opt.cif_based_combined_tsc_calc)
-                err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i], log_file);
+                err_checkf(std::filesystem::exists(opt.combined_tsc_calc_cifs[i]), "Specified file for combined calculation doesn't exist! " + opt.combined_tsc_calc_cifs[i].string(), log_file);
         }
         wavy.resize(opt.combined_tsc_calc_files.size());
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
 #endif
                 BasisSetLibrary basis_library;
                 string df_basis_name;
-                string h5file;
+                filesystem::path h5file;
                 SALTEDPredictor temp_pred(wavy[i], opt);
                 {
                     df_basis_name = temp_pred.get_dfbasis_name();
@@ -306,36 +306,19 @@ int main(int argc, char **argv)
         if (opt.basis_set != "" || opt.fchk != "")
         {
             // Make a fchk out of the wfn/wfx file
-            join_path(opt.basis_set_path, opt.basis_set);
+            filesystem::path tmp = opt.basis_set_path / opt.basis_set;
             if (opt.debug)
                 log_file << "Checking for " << opt.basis_set_path << " " << exists(opt.basis_set_path) << endl;
             // err_checkf(exists(opt.basis_set_path), "Basis set file does not exist!", log_file);
-            wavy[0].set_basis_set_name(opt.basis_set_path);
+            wavy[0].set_basis_set_name(tmp.string());
 
-            string outputname;
+            std::filesystem::path outputname;
             if (opt.fchk != "")
                 outputname = opt.fchk;
             else
             {
                 outputname = wavy[0].get_path();
-                if (opt.debug)
-                    log_file << "Loaded path..." << endl;
-                size_t where(0);
-                int len = 4;
-                if (wavy[0].get_origin() == 2)
-                    where = outputname.find(".wfn");
-                else if (wavy[0].get_origin() == 4)
-                    where = outputname.find(".ffn");
-                else if (wavy[0].get_origin() == 6)
-                    where = outputname.find(".wfx");
-                else if (wavy[0].get_origin() == 8)
-                    where = outputname.find(".molden"), len = 7;
-                else if (wavy[0].get_origin() == 9)
-                    where = outputname.find(".gbw");
-                if (where >= outputname.length() && where != string::npos)
-                    err_checkf(false, "Cannot make output file name!", log_file);
-                else
-                    outputname.erase(where, len);
+                outputname.replace_extension(".fchk");
             }
             wavy[0].assign_charge(wavy[0].calculate_charge());
             if (opt.mult == 0)
@@ -378,7 +361,7 @@ int main(int argc, char **argv)
 #endif
                 BasisSetLibrary basis_library;
                 string df_basis_name;
-                string h5file;
+                filesystem::path h5file;
                 SALTEDPredictor temp_pred(wavy[0], opt);
                 {
                     df_basis_name = temp_pred.get_dfbasis_name();
@@ -404,7 +387,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn + ".cif");
+            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
         // log_file.close();
         return 0;
     }
@@ -428,7 +411,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn + ".cif");
+            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
         return 0;
     }
     std::cout << NoSpherA2_message(opt.no_date);

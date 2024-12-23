@@ -13,6 +13,7 @@
 
 #ifndef H5File_H
 #define H5File_H
+#include <filesystem>
 
 namespace H5 {
 
@@ -30,6 +31,9 @@ class H5_DLLCPP H5File : public Group {
     H5File(const H5std_string &name, unsigned int flags,
            const FileCreatPropList &create_plist = FileCreatPropList::DEFAULT,
            const FileAccPropList   &access_plist = FileAccPropList::DEFAULT);
+    H5File(const std::filesystem::path& name, unsigned int flags,
+           const FileCreatPropList& create_plist = FileCreatPropList::DEFAULT,
+           const FileAccPropList& access_plist = FileAccPropList::DEFAULT);
     H5File(const char *name, unsigned int flags, const FileAccPropList &access_plist);
     H5File(const H5std_string &name, unsigned int flags, const FileAccPropList &access_plist);
 

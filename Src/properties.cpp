@@ -1165,26 +1165,26 @@ void properties_calculation(options &opt)
     DEF.set_comment1("Calculated static deformation density values using NoSpherA2");
     Hirsh.set_comment1("Calculated Hirshfeld atom density values using NoSpherA2");
     S_Rho.set_comment1("Calculated spin density using NoSpherA2");
-    Rho.set_comment2("from " + wavy.get_path());
-    RDG.set_comment2("from " + wavy.get_path());
-    Elf.set_comment2("from " + wavy.get_path());
-    Eli.set_comment2("from " + wavy.get_path());
-    Lap.set_comment2("from " + wavy.get_path());
-    ESP.set_comment2("from " + wavy.get_path());
-    MO.set_comment2("from" + wavy.get_path());
-    HDEF.set_comment2("from" + wavy.get_path());
-    DEF.set_comment2("from" + wavy.get_path());
-    Hirsh.set_comment2("from" + wavy.get_path());
-    S_Rho.set_comment2("from" + wavy.get_path());
-    Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
-    RDG.path = get_basename_without_ending(wavy.get_path()) + "_rdg.cube";
-    Elf.path = get_basename_without_ending(wavy.get_path()) + "_elf.cube";
-    Eli.path = get_basename_without_ending(wavy.get_path()) + "_eli.cube";
-    Lap.path = get_basename_without_ending(wavy.get_path()) + "_lap.cube";
-    ESP.path = get_basename_without_ending(wavy.get_path()) + "_esp.cube";
-    DEF.path = get_basename_without_ending(wavy.get_path()) + "_def.cube";
-    Hirsh.path = get_basename_without_ending(wavy.get_path()) + "_hirsh.cube";
-    S_Rho.path = get_basename_without_ending(wavy.get_path()) + "_s_rho.cube";
+    Rho.set_comment2("from " + wavy.get_path().string());
+    RDG.set_comment2("from " + wavy.get_path().string());
+    Elf.set_comment2("from " + wavy.get_path().string());
+    Eli.set_comment2("from " + wavy.get_path().string());
+    Lap.set_comment2("from " + wavy.get_path().string());
+    ESP.set_comment2("from " + wavy.get_path().string());
+    MO.set_comment2("from" + wavy.get_path().string());
+    HDEF.set_comment2("from" + wavy.get_path().string());
+    DEF.set_comment2("from" + wavy.get_path().string());
+    Hirsh.set_comment2("from" + wavy.get_path().string());
+    S_Rho.set_comment2("from" + wavy.get_path().string());
+    Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+    RDG.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rdg.cube");
+    Elf.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_elf.cube");
+    Eli.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_eli.cube");
+    Lap.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_lap.cube");
+    ESP.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_esp.cube");
+    DEF.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_def.cube");
+    Hirsh.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_hirsh.cube");
+    S_Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_s_rho.cube");
 
     if (opt.debug)
     {
@@ -1228,7 +1228,7 @@ void properties_calculation(options &opt)
         {
             log2 << "Calcualting MO: " << opt.MOs[i] << endl;
             MO.set_zero();
-            MO.path = get_basename_without_ending(wavy.get_path()) + "_MO_" + to_string(opt.MOs[i]) + ".cube";
+            MO.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_MO_" + to_string(opt.MOs[i]) + ".cube");
             Calc_MO(MO, opt.MOs[i], wavy, opt.radius, log2, opt.cif != "");
             MO.write_file(true);
         }
@@ -1269,7 +1269,7 @@ void properties_calculation(options &opt)
             for (int a = 0; a < wavy.get_ncen(); a++)
             {
                 log2 << "Calcualting Hirshfeld deformation density for atom: " << a << endl;
-                HDEF.path = get_basename_without_ending(wavy.get_path()) + "_HDEF_" + to_string(a) + ".cube";
+                HDEF.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_HDEF_" + to_string(a) + ".cube");
                 Calc_Hirshfeld(HDEF, Rho, temp, wavy, opt.radius, a, log2, opt.cif != "");
                 HDEF.write_file(true);
                 HDEF.set_zero();
@@ -1293,9 +1293,9 @@ void properties_calculation(options &opt)
     log2 << "Writing cubes to Disk..." << flush;
     if (opt.rdg)
     {
-        Rho.path = get_basename_without_ending(wavy.get_path()) + "_signed_rho.cube";
+        Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_signed_rho.cube");
         Rho.write_file(true);
-        Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
+        Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
         Rho.write_file(true, true);
     }
     else if (opt.lap || opt.eli || opt.elf || opt.esp)
@@ -1417,13 +1417,13 @@ void do_combine_mo(options &opt)
             MO2.set_zero();
             Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout);
             cout << "writing files..." << flush;
-            filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "+" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+            filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
             fns.push_back(filename);
             total.set_zero();
             total = MO1;
             total += MO2;
             total.write_file(filename, false);
-            filename = get_basename_without_ending(wavy1.get_path()) + "_" + std::to_string(opt.cmo1[v1]) + "-" + get_basename_without_ending(wavy2.get_path()) + "_" + std::to_string(opt.cmo2[j]) + ".cube";
+            filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "-" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
             fns.push_back(filename);
             total.set_zero();
             total = MO1;
@@ -1620,10 +1620,10 @@ void dipole_moments(options &opt, std::ostream &log2)
         log2 << "Origins etc are set up" << endl;
     Rho.set_comment1("Calculated density using NoSpherA2");
     SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-    Rho.set_comment2("from " + wavy.get_path());
-    SPHER.set_comment2("from" + wavy.get_path());
-    Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
-    SPHER.path = get_basename_without_ending(wavy.get_path()) + "_spher.cube";
+    Rho.set_comment2("from " + wavy.get_path().string());
+    SPHER.set_comment2("from" + wavy.get_path().string());
+    Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
+    SPHER.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_spher.cube");
     vector<cube> Hirsh(wavy.get_ncen(), Rho);
     vec charges(wavy.get_ncen(), 0);
 
@@ -1676,8 +1676,8 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int th
     if (debug)
         log2 << "Origins etc are set up" << endl;
     Rho.set_comment1("Calculated density using NoSpherA2");
-    Rho.set_comment2("from " + wavy.get_path());
-    Rho.path = get_basename_without_ending(wavy.get_path()) + "_rho.cube";
+    Rho.set_comment2("from " + wavy.get_path().string());
+    Rho.set_path((wavy.get_path().parent_path() / wavy.get_path().stem()).string() + "_rho.cube");
     vector<cube> Hirsh(wavy.get_ncen(), Rho);
     vec charges(wavy.get_ncen(), 0);
 
@@ -1756,8 +1756,8 @@ void polarizabilities(options &opt, std::ostream &log2)
     if (opt.debug)
         log2 << "Origins etc are set up" << endl;
     SPHER.set_comment1("Calculated Atomic Hirshfeld deformation density values using NoSpherA2");
-    SPHER.set_comment2("from" + wavy[0].get_path());
-    SPHER.path = get_basename_without_ending(wavy[0].get_path()) + "_spher.cube";
+    SPHER.set_comment2("from" + wavy[0].get_path().string());
+    SPHER.set_path((wavy[0].get_path().parent_path() / wavy[0].get_path().stem()).string() + "_spher.cube");
 
     log2 << "Calculating for " << fixed << setprecision(0) << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << " Gridpoints." << endl;
 

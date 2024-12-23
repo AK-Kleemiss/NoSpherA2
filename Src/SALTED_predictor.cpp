@@ -12,7 +12,7 @@
 // std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
 {
-    std::string _path = _opt.SALTED_DIR;
+    std::filesystem::path _path = _opt.SALTED_DIR;
 
     config.h5_filename = find_first_h5_file(_opt.SALTED_DIR);
 
@@ -22,8 +22,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         {
             std::cout << "No HDF5 file found in the SALTED directory. Using inputs.txt instead." << std::endl;
         }
-        std::string _f_path("inputs.txt");
-        join_path(_path, _f_path);
+        _path = _path / "inputs.txt";
         if (_opt.debug)
         {
             std::cout << "Using inputs file: " << _path << std::endl;
@@ -39,7 +38,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
 
         // If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
 #if has_RAS
-        join_path(_path, config.h5_filename);
+        _path = _path / config.h5_filename;
         H5::H5File config_file(_path, H5F_ACC_RDONLY);
         config.populateFromFile(config_file);
 #else
@@ -75,13 +74,9 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         {
             wavy.atoms[a].basis_set.clear();
         }
-        std::string new_path = get_foldername_from_path(wavy.get_path());
-        if (new_path == "")
-            new_path = ".";
-        std::string new_fn = std::string("SALTED_temp.xyz");
-        join_path(new_path, new_fn);
-        wavy.write_xyz(new_path);
-        wavy.set_path(new_path);
+        std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz";
+        wavy.write_xyz(new_fn);
+        wavy.set_path(new_fn);
         _opt.needs_Thakkar_fill = true;
     }
     else
@@ -224,8 +219,8 @@ void SALTEDPredictor::read_model_data()
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
 #if has_RAS == 1
-    H5::H5File features(_opt.SALTED_DIR + "/GPR_data/FEAT_M-" + std::to_string(config.Menv) + ".h5", H5F_ACC_RDONLY);
-    H5::H5File projectors(_opt.SALTED_DIR + "/GPR_data/projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5", H5F_ACC_RDONLY);
+    H5::H5File features(_opt.SALTED_DIR / "GPR_data" / ("FEAT_M - " + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
+    H5::H5File projectors(_opt.SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
     std::vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
@@ -258,21 +253,19 @@ void SALTEDPredictor::read_model_data()
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR + "/wigners/wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat");
+        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR / "wigners" / ("wigner_lam - " + to_string(lam) + "_lmax1 - " + to_string(config.nang1) + "_lmax2 - " + to_string(config.nang2) + ".dat"));
     }
 
     if (config.sparsify)
     {
-        std::string path = _opt.SALTED_DIR;
-        join_path(path, {"GPR_data", "fps" + to_string(config.ncut) + "-"});
+        filesystem::path path = _opt.SALTED_DIR / "GPR_data" / ("fps" + to_string(config.ncut) + "-");
         vfps = read_fps<int64_t>(path, SALTED_Utils::get_lmax_max(lmax));
     };
     if (config.average)
     {
         for (string spe : config.species)
         {
-            string path = _opt.SALTED_DIR;
-            join_path(path, {"averages", "averages_" + spe + ".npy"});
+            filesystem::path path = _opt.SALTED_DIR / "averages" / ("averages_" + spe + ".npy");
             read_npy(path, av_coefs[spe]);
         }
     }
@@ -286,8 +279,7 @@ void SALTEDPredictor::read_model_data()
     }
     else
     {
-        string path = _opt.SALTED_DIR;
-        join_path(path, {"GPR_data", "weights_N" + to_string(ntrain) + "_reg-6.npy"});
+        filesystem::path path = _opt.SALTED_DIR / "GPR_data"/ ("weights_N" + to_string(ntrain) + "_reg-6.npy");
         read_npy(path, weights);
     }
 }
@@ -296,8 +288,7 @@ void SALTEDPredictor::read_model_data()
 void SALTEDPredictor::read_model_data_h5()
 {
     using namespace std;
-    string _H5path = _opt.SALTED_DIR;
-    join_path(_H5path, config.h5_filename);
+    const filesystem::path _H5path = _opt.SALTED_DIR / config.h5_filename;
     H5::H5File input(_H5path, H5F_ACC_RDONLY);
     vector<hsize_t> dims_out_descrip;
     vector<hsize_t> dims_out_proj;
@@ -305,9 +296,13 @@ void SALTEDPredictor::read_model_data_h5()
     {
         for (int lam = 0; lam < lmax[spe] + 1; lam++)
         {
-            vec temp_power = readHDF5<double>(input, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
+            filesystem::path spar_descrip = "sparse_descriptors";
+            spar_descrip = spar_descrip/ spe / to_string(lam);
+            filesystem::path proj = "projectors";
+            proj = proj / spe / to_string(lam);
+            vec temp_power = readHDF5<double>(input, spar_descrip, dims_out_descrip);
             power_env_sparse[spe + to_string(lam)] = temp_power;
-            vec temp_proj = readHDF5<double>(input, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
+            vec temp_proj = readHDF5<double>(input, proj, dims_out_proj);
             Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{(int)dims_out_proj[0], (int)dims_out_proj[1]});
 
             if (lam == 0)
@@ -324,16 +319,18 @@ void SALTEDPredictor::read_model_data_h5()
     }
 
     vector<hsize_t> dims_out_temp;
+    filesystem::path wigner = "wigners";
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readHDF5<double>(input, "wigners/lam-" + to_string(lam), dims_out_temp);
+        wigner3j[lam] = readHDF5<double>(input, wigner / ("lam-" + to_string(lam)), dims_out_temp);
     }
 
     if (config.sparsify)
     {
+        filesystem::path path = "fps";
         for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
         {
-            vfps[lam] = readHDF5<int64_t>(input, "fps/lam-" + to_string(lam), dims_out_temp);
+            vfps[lam] = readHDF5<int64_t>(input, path/("lam-" + to_string(lam)), dims_out_temp);
         }
     };
     if (config.average)

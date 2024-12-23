@@ -1,6 +1,7 @@
 #pragma once
 
 #include "constants.h"
+#include <filesystem>
 /**
  * @class cell
  * @brief Represents a crystal cell in three-dimensional space.
@@ -34,7 +35,7 @@ public:
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
     };
-    cell(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    cell(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
         if (debug)
             file << "starting to read cif!" << std::endl;
@@ -246,9 +247,9 @@ public:
      * @return true if successful
      * @return false if unsuccessful
      */
-    bool read_CIF(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    bool read_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
+        std::ifstream cif_input(filename, std::ios::in);
         bvec found;
         found.resize(7);
         for (int k = 0; k < 7; k++)
@@ -376,9 +377,9 @@ public:
      * @param file where to print output
      * @param debug flag to print debug information
      */
-    void read_symm_CIF(std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    void read_symm_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
+        std::ifstream cif_input(filename, std::ios::in);
         std::string line;
         cif_input.clear();
         cif_input.seekg(0, cif_input.beg);

@@ -73,7 +73,7 @@ WFN::WFN(int given_origin)
     fill_Afac_pre();
 };
 
-WFN::WFN(const std::string & filename)
+WFN::WFN(const std::filesystem::path & filename)
 {
     ncen = 0;
     nfunc = 0;
@@ -95,7 +95,7 @@ WFN::WFN(const std::string & filename)
     read_known_wavefunction_format(filename, std::cout, false);
 };
 
-WFN::WFN(const std::string& filename, const int g_charge, const int g_mult) {
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult) {
     ncen = 0;
     nfunc = 0;
     nmo = 0;
@@ -516,29 +516,29 @@ const std::string WFN::hdr(const bool &occupied) const
     return temp;
 };
 
-void WFN::read_known_wavefunction_format(const std::string &fileName, std::ostream &file, const bool debug)
+void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
-    if (fileName.find(".wfn") != std::string::npos)
+    if (fileName.extension() == ".wfn")
         origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
-    else if (fileName.find(".ffn") != std::string::npos)
+    else if (fileName.extension() == ".ffn")
         origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
-    else if (fileName.find(".wfx") != std::string::npos)
+    else if (fileName.extension() == ".wfx")
         origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
-    else if (fileName.find(".fch") != std::string::npos)
+    else if (fileName.extension() == ".fch" || fileName.extension() == ".fchk" || fileName.extension() == ".FCh" || fileName.extension() == ".FChK" || fileName.extension() == ".FChk")
         origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
-    else if (fileName.find(".xyz") != std::string::npos)
+    else if (fileName.extension() == ".xyz")
         origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
-    else if (fileName.find(".molden") != std::string::npos)
+    else if (fileName.extension() == ".molden")
         origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
-    else if (fileName.find(".gbw") != std::string::npos)
+    else if (fileName.extension() == ".gbw")
         origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
-    else if (fileName.find(".xtb") != std::string::npos)
+    else if (fileName.extension() == ".xtb")
         origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
 };
 
-bool WFN::read_wfn(const std::string &fileName, const bool &debug, std::ostream &file)
+bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
     using namespace std;
     if (ncen > 0)
@@ -550,8 +550,8 @@ bool WFN::read_wfn(const std::string &fileName, const bool &debug, std::ostream 
         return false;
     }
     origin = 2;
-    err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
-    ifstream rf(fileName.c_str());
+    err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
+    ifstream rf(fileName);
     if (rf.good())
         path = fileName;
     string line;
@@ -941,10 +941,10 @@ bool WFN::read_wfn(const std::string &fileName, const bool &debug, std::ostream 
     return true;
 };
 
-bool WFN::read_xyz(const std::string &filename, std::ostream &file, const bool debug)
+bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     using namespace std;
-    err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", file);
+    err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
     origin = 7;
     ifstream rf(filename.c_str());
     if (rf.good())
@@ -1005,11 +1005,11 @@ bool WFN::read_xyz(const std::string &filename, std::ostream &file, const bool d
     return true;
 };
 
-bool WFN::read_wfx(const std::string &fileName, const bool &debug, std::ostream &file)
+bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
     origin = 6;
     using namespace std;
-    err_checkf(exists(fileName), "Couldn't open or find " + fileName + ", leaving", file);
+    err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
     path = fileName;
     string line;
@@ -1266,10 +1266,10 @@ bool WFN::read_wfx(const std::string &fileName, const bool &debug, std::ostream 
     return true;
 };
 
-bool WFN::read_molden(const std::string &filename, std::ostream &file, const bool debug)
+bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     using namespace std;
-    err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
+    err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
@@ -1985,11 +1985,11 @@ bool WFN::read_molden(const std::string &filename, std::ostream &file, const boo
     return true;
 };
 
-bool WFN::read_gbw(const std::string &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
+bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
 {
     using namespace std;
     // Details form https://orcaforum.kofo.mpg.de/viewtopic.php?f=8&t=3299&start=20
-    err_checkf(exists(filename), "couldn't open or find " + filename + ", leaving", file);
+    err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
@@ -2710,12 +2710,12 @@ const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int
     }
 };
 
-bool WFN::write_wfn(const std::string &fileName, const bool &debug, const bool occupied)
+bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied)
 {
     using namespace std;
     if (debug)
     {
-        if (exists(fileName))
+        if (std::filesystem::exists(fileName))
         {
             cout << "File already existed!";
             return false;
@@ -2727,7 +2727,7 @@ bool WFN::write_wfn(const std::string &fileName, const bool &debug, const bool o
         }
     }
 
-    ofstream rf(fileName.c_str(), ios::out);
+    ofstream rf(fileName, ios::out);
     string line;
     if (!rf.is_open())
     {
@@ -2971,7 +2971,7 @@ bool WFN::write_wfn(const std::string &fileName, const bool &debug, const bool o
     return true;
 };
 
-bool WFN::write_xyz(const std::string& fileName, const bool& debug)
+bool WFN::write_xyz(const std::filesystem::path& fileName, const bool& debug)
 {
     using namespace std;
     try {
@@ -4730,7 +4730,7 @@ void WFN::delete_unoccupied_MOs()
     }
 };
 
-bool WFN::read_fchk(const std::string &filename, std::ostream &log, const bool debug)
+bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, const bool debug)
 {
     vec2 mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
     if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h))
@@ -6814,7 +6814,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
         return temp;
 }
 
-bool WFN::read_ptb(const std::string &filename, std::ostream &file, const bool debug)
+bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
     origin = 10;
     if (debug)
@@ -7122,7 +7122,7 @@ const std::string WFN::get_CIF_table(const int nr) const
     return ss.str();
 }
 
-void WFN::write_wfn_CIF(const std::string &fileName) const
+void WFN::write_wfn_CIF(const std::filesystem::path &fileName) const
 {
     err_checkf(basis_set_name != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);

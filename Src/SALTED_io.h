@@ -15,26 +15,26 @@ template <typename T>
 void readHDF5Data(H5::DataSet& dataset, std::vector<T>& data);
 
 template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<size_t> &dims_out);
+std::vector<T> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<size_t> &dims_out);
 #endif
 
-std::string find_first_h5_file(const std::string& directory_path);
+std::filesystem::path find_first_h5_file(const std::filesystem::path& directory_path);
 
 template <class T>
-std::vector<T> readVectorFromFile(const std::string &filename);
+std::vector<T> readVectorFromFile(const std::filesystem::path &filename);
 
 template <typename T>
-std::unordered_map<int, std::vector<T>> read_fps(std::string filename, int lmax_max);
+std::unordered_map<int, std::vector<T>> read_fps(std::filesystem::path& filename, int lmax_max);
 
 template <typename Scalar>
-void read_npy(std::string filename, std::vector<Scalar> &data);
+void read_npy(std::filesystem::path& filename, std::vector<Scalar> &data);
 
 struct Config
 {
 public:
     bool from_h5;
-    std::string h5_filename = "";
-    std::string predict_filename;
+    std::filesystem::path h5_filename = "";
+    std::filesystem::path predict_filename;
     bool average;
     bool field;
     bool sparsify;
@@ -62,23 +62,23 @@ public:
     int nspe2 = -1;
 
    
-    void populateFromFile(const std::string &filename);
+    void populateFromFile(const std::filesystem::path &filename);
 #if has_RAS == 1
     void populateFromFile(const H5::H5File file);
 #endif
 
 private:
     std::vector<std::string> parseVector(const std::string& str);
-    void populate_config(const std::string& dataset_name, const int& data);
-    void populate_config(const std::string& dataset_name, const float& data);
-    void populate_config(const std::string& dataset_name, const double& data);
-    void populate_config(const std::string& dataset_name, const std::string& data);
-    void populate_config(const std::string& dataset_name, const std::vector<std::string>& data);
+    void populate_config(const std::filesystem::path& dataset_name, const int& data);
+    void populate_config(const std::filesystem::path& dataset_name, const float& data);
+    void populate_config(const std::filesystem::path& dataset_name, const double& data);
+    void populate_config(const std::filesystem::path& dataset_name, const std::string& data);
+    void populate_config(const std::filesystem::path& dataset_name, const std::vector<std::string>& data);
 
 #if has_RAS == 1
-    void handle_int_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
-    void handle_float_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
-    void handle_string_dataset(const std::string& dataset_name, H5::DataSet& dataSet);
+    void handle_int_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet);
+    void handle_float_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet);
+    void handle_string_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet);
 
     static herr_t op_func(hid_t loc_id, const char* name, const H5L_info_t* info, void* operator_data);
 

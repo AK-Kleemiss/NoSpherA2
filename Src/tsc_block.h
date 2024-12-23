@@ -104,7 +104,7 @@ public:
     }
     anomalous_dispersion = false;
   };
-  tsc_block(std::string &file_name)
+  tsc_block(std::filesystem::path &file_name)
   {
     anomalous_dispersion = false;
     using namespace std;
@@ -339,11 +339,11 @@ public:
       }
     }
   };
-  void write_tsc_file(const std::string &cif, std::string name = "experimental.tsc")
+  void write_tsc_file(const std::filesystem::path &cif, std::filesystem::path name = "experimental.tsc")
   {
     std::ofstream tsc_file(name, std::ios::out);
 
-    tsc_file << "TITLE: " << get_filename_from_path(cif).substr(0, cif.find(".cif")) << std::endl
+    tsc_file << "TITLE: " << cif.stem().string() << std::endl
              << "SYMM: ";
     tsc_file << "expanded";
     if (anomalous_dispersion)
@@ -370,11 +370,11 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
-  void write_tsc_file_non_integer(const std::string &cif, std::string name = "experimental.tsc")
+  void write_tsc_file_non_integer(const std::filesystem::path &cif, std::filesystem::path name = "experimental.tsc")
   {
     std::ofstream tsc_file(name, std::ios::out);
 
-    tsc_file << "TITLE: " << get_filename_from_path(cif).substr(0, cif.find(".cif")) << std::endl
+    tsc_file << "TITLE: " << cif.stem() << std::endl
              << "SYMM: ";
     tsc_file << "expanded";
     if (anomalous_dispersion)
@@ -399,7 +399,7 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
-  void write_tscb_file(std::string cif_name = "test.cif", std::string name = "experimental.tscb")
+  void write_tscb_file(std::filesystem::path cif_name = "test.cif", std::filesystem::path name = "experimental.tscb")
   {
     std::ofstream tsc_file(name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
 
@@ -434,7 +434,7 @@ public:
 
 inline bool merge_tscs(
     const std::string &mode,
-    const svec &files,
+    const pathvec &files,
     const bool old_tsc)
 {
   // Currently only for Mode "pure merge"
@@ -445,7 +445,7 @@ inline bool merge_tscs(
   if (files.size() == 0)
     return false;
   svec labels;
-  svec local_files(files);
+  pathvec local_files(files);
   ivec2  indices;                    //[i] is h,k or l, [j] is the number of the reflection
   cvec2 form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
 
@@ -456,17 +456,17 @@ inline bool merge_tscs(
   for (int f = 0; f < files.size(); f++)
   {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    if (ends_with(files[f], ".tscb"))
+    if (files[f].extension() == ".tscb")
     {
-      std::string name = files[f];
-      std::string new_name = get_basename_without_ending(name) + ".tsc";
-      std::cout << "Converting to: " << new_name << std::endl;
+      std::filesystem::path name = files[f];
+      std::filesystem::path new_name = name.replace_extension(".tsc");
+      std::cout << "Converting to: " << new_name.string() << std::endl;
       tsc_block<int, cdouble> blocky(name);
       blocky.write_tsc_file(new_name, new_name);
       local_files[f] = new_name;
       std::cout << "Now reading converted: " << new_name << std::endl;
     }
-    std::ifstream inf(local_files[f].c_str(), std::ios::in);
+    std::ifstream inf(local_files[f], std::ios::in);
     std::string line;
     bool data = false;
     bvec is_a_new_scatterer;
@@ -623,7 +623,7 @@ inline bool merge_tscs(
 
 inline bool merge_tscs_without_checks(
     const std::string &mode,
-    const svec &files,
+    const pathvec &files,
     const bool old_tsc)
 {
   // Currently only for Mode "pure merge"
@@ -634,7 +634,7 @@ inline bool merge_tscs_without_checks(
   if (files.size() == 0)
     return false;
   svec labels;
-  svec local_files(files);
+  pathvec local_files(files);
   ivec2 indices;                    //[i] is h,k or l, [j] is the number of the reflection
   cvec2 form_fact; //[i] (len(labels)) scatterer, [j](len(indices[0])) reflection correpsonding to indices
   svec header;
@@ -644,10 +644,10 @@ inline bool merge_tscs_without_checks(
   for (int f = 0; f < files.size(); f++)
   {
     std::cout << "Reading file number: " << f + 1 << ": " << files[f] << std::endl;
-    if (ends_with(files[f], ".tscb"))
+    if (files[f].extension() == ".tscb")
     {
-      std::string name = files[f];
-      std::string new_name = get_basename_without_ending(name) + ".tsc";
+      std::filesystem::path name = files[f];
+      std::filesystem::path new_name = name.replace_extension(".tsc");
       std::cout << "Converting to: " << new_name << std::endl;
       tsc_block<int, cdouble> blocky(name);
       blocky.write_tsc_file(new_name, new_name);

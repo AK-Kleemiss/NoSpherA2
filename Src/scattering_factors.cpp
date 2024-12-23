@@ -42,7 +42,7 @@
  */
 void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
 {
-    err_checkf(exists("kpts.dat"), "k-points file does not exist!", file);
+    err_checkf(std::filesystem::exists("kpts.dat"), "k-points file does not exist!", file);
     file << "Reading: kpts.dat" << std::flush;
     std::ifstream k_points_file("kpts.dat", std::ios::binary);
     err_checkf(k_points_file.good(), "Error Reading the k-points!", file);
@@ -126,7 +126,7 @@ void save_k_points(vec2 &k_pt, hkl_list &hkl)
  * @param file The output stream to write debug information to.
  * @param debug Flag indicating whether debug information should be printed.
  */
-void read_hkl(const std::string &hkl_filename,
+void read_hkl(const std::filesystem::path &hkl_filename,
               hkl_list &hkl,
               const vec2 &twin_law,
               cell &unit_cell,
@@ -135,8 +135,8 @@ void read_hkl(const std::string &hkl_filename,
 {
     file << "Reading: " << std::setw(44) << hkl_filename << std::flush;
     hkl_t hkl_;
-    err_checkf(exists(hkl_filename), "HKL file does not exists!", file);
-    std::ifstream hkl_input(hkl_filename.c_str(), std::ios::in);
+    err_checkf(std::filesystem::exists(hkl_filename), "HKL file does not exists!", file);
+    std::ifstream hkl_input(hkl_filename, std::ios::in);
     hkl_input.seekg(0, hkl_input.beg);
     std::regex r{R"([abcdefghijklmnopqrstuvwxyz\(\)ABCDEFGHIJKLMNOPQRSTUVW])"};
     std::string line, temp;
@@ -3579,14 +3579,14 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
-    string cif;
+    filesystem::path cif;
     if (opt.cif_based_combined_tsc_calc)
         cif = opt.combined_tsc_calc_cifs[nr];
     else
         cif = opt.cif;
 
     cell unit_cell(cif, file, opt.debug);
-    ifstream cif_input(cif.c_str(), std::ios::in);
+    ifstream cif_input(cif, std::ios::in);
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
@@ -3803,13 +3803,13 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
     if (!opt.cif_based_combined_tsc_calc)
     {
-        err_checkf(exists(opt.cif), "CIF " + opt.cif + " does not exists!", file);
+        err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
     }
     else
     {
         for (int i = 0; i < opt.combined_tsc_calc_cifs.size(); i++)
         {
-            err_checkf(exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i] + " does not exists!", file);
+            err_checkf(filesystem::exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i].string() + " does not exists!", file);
         }
     }
     err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
@@ -3825,7 +3825,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
-    string cif;
+    filesystem::path cif;
     if (opt.cif_based_combined_tsc_calc)
         cif = opt.combined_tsc_calc_cifs[nr];
     else

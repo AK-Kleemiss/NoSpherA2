@@ -514,7 +514,7 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     return dens;
 }
 
-void bondwise_laplacian_plots(std::string& wfn_name) {
+void bondwise_laplacian_plots(std::filesystem::path& wfn_name) {
     char cwd[1024];
 #ifdef _WIN32
     if (_getcwd(cwd, sizeof(cwd)) != NULL)
@@ -530,7 +530,7 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
 
     for (int i = 0; i < wavy.get_ncen(); i++) {
         for (int j = i+1; j < wavy.get_ncen(); j++) {
-            std::string path = cwd;
+            std::filesystem::path path = cwd;
             double distance = sqrt(pow(wavy.atoms[i].x - wavy.atoms[j].x, 2) + pow(wavy.atoms[i].y - wavy.atoms[j].y, 2) + pow(wavy.atoms[i].z - wavy.atoms[j].z, 2));
             double svdW = constants::ang2bohr(constants::covalent_radii[wavy.atoms[i].charge] + constants::covalent_radii[wavy.atoms[j].charge]);
             if (distance < 1.35 * svdW)
@@ -548,8 +548,8 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
                     t_pos[2] += k*bond_vec[2];
                     lapl[k] = wavy.computeLap(t_pos);
                 }
-                std::string outname(wfn_name + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
-                join_path(path, outname);
+                std::filesystem::path outname(wfn_name.string() + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
+                path = path / std::filesystem::path(outname);
                 std::ofstream result(path, std::ios::out);
                 for (int k = 0; k < points; k++) {
                     result << std::setw(10) << std::scientific << std::setprecision(6) << dr*k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
@@ -955,8 +955,8 @@ void calc_rho_cube(WFN &dummy)
         CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2");
-    CubeRho.set_comment2("from " + dummy.get_path());
-    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
+    CubeRho.set_comment2("from " + dummy.get_path().string());
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
 
     time_point start = get_time();
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
@@ -1017,7 +1017,7 @@ void calc_rho_cube(WFN &dummy)
     CubeRho.calc_dv();
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
 
-    std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho.cube");
+    std::filesystem::path fn((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
     CubeRho.write_file(fn, false);
 };
 
@@ -1570,7 +1570,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 #ifdef _OPENMP
     omp_destroy_lock(&l);
 #endif
-    CubeMO.path = "Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube";
+    CubeMO.set_path("Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube");
     CubeMO.write_file();
 }
 

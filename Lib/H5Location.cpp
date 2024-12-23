@@ -999,6 +999,22 @@ H5Location::openDataSet(const H5std_string &name, const DSetAccPropList &dapl) c
 }
 
 //--------------------------------------------------------------------------
+// Function:    H5Location::openDataSet
+///\brief       This is an overloaded member function, provided for convenience.
+///             It differs from the above function in that it takes an
+///             \c H5std_string for \a name.
+// 2000
+// Modification:
+//      Jul 2018
+//              Added DSetAccPropList argument
+//--------------------------------------------------------------------------
+DataSet
+H5Location::openDataSet(const std::filesystem::path& name, const DSetAccPropList& dapl) const
+{
+    return (openDataSet(name, dapl));
+}
+
+//--------------------------------------------------------------------------
 // Function:    H5Location::link
 ///\brief       Creates a soft link from \a link_name to \a target_name.
 ///\param       target_name - IN: Name of object, can be a non-existing object

@@ -7,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <array>
+#include <filesystem>
 
 class MO;
 
@@ -25,7 +26,7 @@ private:
     double virial_ratio;
     std::string basis_set_name;
     std::string comment;
-    std::string path;
+    std::filesystem::path path;
     std::string method;
 
     std::vector<MO> MOs;
@@ -76,8 +77,8 @@ private:
 public:
     WFN();
     WFN(int given_origin);
-    WFN(const std::string& filename);
-    WFN(const std::string& filename, const int g_charge, const int g_mult);
+    WFN(const std::filesystem::path& filename);
+    WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult);
     std::vector<cube> cub;
     std::vector<atom> atoms;
 
@@ -106,17 +107,17 @@ public:
     void change_basis_set_name(std::string name) { basis_set_name = name; };
     bool add_primitive(const int &cent, const int &type, const double &e, double *values);
     bool add_exp(const int &cent, const int &type, const double &e);
-    void read_known_wavefunction_format(const std::string &fileName, std::ostream &file, const bool debug = false);
-    bool read_wfn(const std::string &fileName, const bool &debug, std::ostream &file);
-    bool read_wfx(const std::string &fileName, const bool &debug, std::ostream &file);
-    bool read_fchk(const std::string &filename, std::ostream &log, const bool debug = false);
-    bool read_xyz(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool read_molden(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool read_gbw(const std::string &filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
-    bool read_ptb(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool write_wfn(const std::string &fileName, const bool &debug, const bool occupied);
-    bool write_xyz(const std::string& fileName, const bool& debug = false);
-    bool set_path(std::string given_path)
+    void read_known_wavefunction_format(const std::filesystem::path&fileName, std::ostream &file, const bool debug = false);
+    bool read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file);
+    bool read_wfx(const std::filesystem::path&fileName, const bool &debug, std::ostream &file);
+    bool read_fchk(const std::filesystem::path&filename, std::ostream &log, const bool debug = false);
+    bool read_xyz(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool read_molden(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool read_gbw(const std::filesystem::path&filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
+    bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied);
+    bool write_xyz(const std::filesystem::path& fileName, const bool& debug = false);
+    bool set_path(std::filesystem::path given_path)
     {
         path = given_path;
         return true;
@@ -138,7 +139,7 @@ public:
     const std::string get_comment() const { return comment; };
     const std::string get_CIF_table(const int nr = 0) const;
     const std::string get_basis_set_CIF(const int nr = 0) const;
-    void write_wfn_CIF(const std::string &filename) const;
+    void write_wfn_CIF(const std::filesystem::path &filename) const;
     const double get_exponent(int nr) const { return exponents[nr]; };
     const unsigned int get_nr_electrons() const;
     const unsigned int get_nr_ECP_electrons() const;
@@ -146,7 +147,7 @@ public:
     const std::string get_centers(const bool &bohr) const;
     const std::string get_basis_set_name() const { return basis_set_name; };
     void set_basis_set_name(const std::string &input) { basis_set_name = input; };
-    const std::string get_path() const { return path; };
+    const std::filesystem::path get_path() const { return path; };
     const std::string hdr(const bool &occupied) const;
     void set_method(const std::string &input) { method = input; };
     const std::string get_method() const { return method; };

@@ -29,7 +29,7 @@ template void readHDF5Data(H5::DataSet& dataset, std::vector<int>& data);
 template void readHDF5Data(H5::DataSet& dataset, std::vector<int64_t>& data);
 
 template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out) {
+std::vector<T> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t> &dims_out) {
 
     try {
         H5::Exception::dontPrint();
@@ -77,14 +77,14 @@ std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<h
     }
     return {};
 }
-template std::vector<double> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<float> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<int> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-template std::vector<int64_t> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<double> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<float> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
+template std::vector<int64_t> readHDF5(H5::H5File file, std::filesystem::path dataset_name, std::vector<hsize_t>& dims_out);
 #endif
 
 
-std::string find_first_h5_file(const std::string& directory_path) {
+std::filesystem::path find_first_h5_file(const std::filesystem::path& directory_path) {
     try {
         // Iterate through the directory
         for (const auto& entry : std::filesystem::directory_iterator(directory_path)) {
@@ -101,48 +101,44 @@ std::string find_first_h5_file(const std::string& directory_path) {
         std::cerr << "General error: " << e.what() << std::endl;
     }
 
-    return "";  // Return an empty string if no .h5 file is found
+    return std::filesystem::path();  // Return an empty path if no .h5 file is found
 }
 
 
 template <typename Scalar>
-void read_npy(std::string filename, std::vector<Scalar> &data)
+void read_npy(std::filesystem::path& filename, std::vector<Scalar> &data)
 {
     std::vector<unsigned long> shape{};
     bool fortran_order;
     npy::LoadArrayFromNumpy(filename, shape, fortran_order, data);
 }
-template void read_npy(std::string filename, std::vector<double> &data);
-template void read_npy(std::string filename, std::vector<float> &data);
+template void read_npy(std::filesystem::path& filename, std::vector<double> &data);
+template void read_npy(std::filesystem::path& filename, std::vector<float> &data);
 
 
 template <typename T>
-std::unordered_map<int, std::vector<T>> read_fps(std::string filename, int lmax_max)
+std::unordered_map<int, std::vector<T>> read_fps(std::filesystem::path& filename, int lmax_max)
 {
     std::unordered_map<int, std::vector<T>> vfps{};
-    std::vector<T> data{};
+    std::filesystem::path p;
     for (int lam = 0; lam < lmax_max + 1; lam++)
     {
-        data.clear();
-        read_npy(filename + std::to_string(lam) + ".npy", data);
-        vfps[lam] = data;
+        p = (filename.string() + std::to_string(lam) + ".npy");
+        read_npy(p, vfps[lam]);
     }
     return vfps;
 }
-template std::unordered_map<int, std::vector<double>> read_fps(std::string filename, int lmax_max);
-template std::unordered_map<int, std::vector<int64_t>> read_fps(std::string filename, int lmax_max);
+template std::unordered_map<int, std::vector<double>> read_fps(std::filesystem::path& filename, int lmax_max);
+template std::unordered_map<int, std::vector<int64_t>> read_fps(std::filesystem::path& filename, int lmax_max);
 
 template <class T>
-std::vector<T> readVectorFromFile(const std::string &filename)
+std::vector<T> readVectorFromFile(const std::filesystem::path&filename)
 {
     std::vector<T> result;
     std::ifstream file(filename);
     std::string line;
 
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Could not open file: " + filename);
-    }
+    err_checkf(file.is_open(), "Could not open file: " + filename.string(), std::cout);
 
     while (std::getline(file, line))
     {
@@ -170,16 +166,16 @@ std::vector<T> readVectorFromFile(const std::string &filename)
 
     return result;
 }
-template std::vector<double> readVectorFromFile(const std::string &filename);
-template std::vector<int> readVectorFromFile(const std::string &filename);
+template std::vector<double> readVectorFromFile(const std::filesystem::path&filename);
+template std::vector<int> readVectorFromFile(const std::filesystem::path&filename);
 
 
 // ----------------- Functions to populate the Config struct -----------------
 
 //From txt file
-void Config::populateFromFile(const std::string &filename)
+void Config::populateFromFile(const std::filesystem::path &filename)
 {
-    err_checkf(exists(filename), "Couldn't open or find " + filename + ", leaving", std::cout);
+    err_checkf(std::filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", std::cout);
     std::ifstream file(filename);
     std::string line;
     while (std::getline(file, line))
@@ -299,7 +295,7 @@ void Config::populateFromFile(const H5::H5File file) {
     this->from_h5 = true;
 }
 
-void Config::populate_config(const std::string& dataset_name, const int& data) {
+void Config::populate_config(const std::filesystem::path& dataset_name, const int& data) {
     if (dataset_name == "average" || dataset_name == "averages") this->average = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "field") this->field = data != 0; // Assuming boolean stored as integer
     else if (dataset_name == "sparsify") this->sparsify = data != 0; // Assuming boolean stored as integer
@@ -312,7 +308,7 @@ void Config::populate_config(const std::string& dataset_name, const int& data) {
     else if (dataset_name == "Ntrain") this->Ntrain = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
-void Config::populate_config(const std::string& dataset_name, const float& data) {
+void Config::populate_config(const std::filesystem::path& dataset_name, const float& data) {
     if (dataset_name == "rcut1") this->rcut1 = data;
     else if (dataset_name == "rcut2") this->rcut2 = data;
     else if (dataset_name == "sig1") this->sig1 = data;
@@ -321,7 +317,7 @@ void Config::populate_config(const std::string& dataset_name, const float& data)
     else if (dataset_name == "trainfrac") this->trainfrac = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
-void Config::populate_config(const std::string& dataset_name, const double& data) {
+void Config::populate_config(const std::filesystem::path& dataset_name, const double& data) {
     if (dataset_name == "rcut1") this->rcut1 = data;
     else if (dataset_name == "rcut2") this->rcut2 = data;
     else if (dataset_name == "sig1") this->sig1 = data;
@@ -330,23 +326,23 @@ void Config::populate_config(const std::string& dataset_name, const double& data
     else if (dataset_name == "trainfrac") this->trainfrac = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
-void Config::populate_config(const std::string& dataset_name, const std::string& data) {
+void Config::populate_config(const std::filesystem::path& dataset_name, const std::string& data) {
     if (dataset_name == "dfbasis") this->dfbasis = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
-void Config::populate_config(const std::string& dataset_name, const std::vector<std::string>& data) {
+void Config::populate_config(const std::filesystem::path& dataset_name, const std::vector<std::string>& data) {
     if (dataset_name == "species") this->species = data;
     else if (dataset_name == "neighspe1") this->neighspe1 = data;
     else if (dataset_name == "neighspe2") this->neighspe2 = data;
     else std::cout << "Unknown dataset name: " << dataset_name << std::endl;
 }
 
-void Config::handle_int_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {
+void Config::handle_int_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet) {
     int data{};
     dataSet.read(&data, H5::PredType::NATIVE_INT);
     populate_config(dataset_name, data);
 }
-void Config::handle_float_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {
+void Config::handle_float_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet) {
     size_t byteSize = dataSet.getFloatType().getSize();
     if (byteSize == 4) {
 		float data{};
@@ -359,7 +355,7 @@ void Config::handle_float_dataset(const std::string& dataset_name, H5::DataSet& 
         populate_config(dataset_name, data);
 	}
 }
-void Config::handle_string_dataset(const std::string& dataset_name, H5::DataSet& dataSet) {
+void Config::handle_string_dataset(const std::filesystem::path& dataset_name, H5::DataSet& dataSet) {
     H5::DataSpace dataspace = dataSet.getSpace();
     hsize_t dims_out[2];
     int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);

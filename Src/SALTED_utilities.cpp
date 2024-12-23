@@ -152,7 +152,7 @@ std::string Rascaline_Descriptors::gen_parameters()
 }
 
 //How about this?
-Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
+Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
                                              const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
                                              const double& center_atom_weight, const double& spline_accuracy, const double& cutoff_width)
 {
@@ -173,7 +173,7 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const 
 // RASCALINE1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
+    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath.string());
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
@@ -424,8 +424,8 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
         CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
-    CubeRho.set_comment2("from " + dummy.get_path());
-    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
+    CubeRho.set_comment2("from " + dummy.get_path().string());
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
 
     time_point start = get_time();
 
@@ -469,7 +469,6 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
     }
     else
     {
-        std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
-        CubeRho.write_file(fn, false);
+        CubeRho.write_file((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_" + std::to_string(atom) + ".cube", false);
     }
 };

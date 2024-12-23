@@ -509,7 +509,7 @@ namespace npy {
   }
 
   template <typename Scalar>
-  inline npy_data<Scalar> read_npy(const std::string& filename) {
+  inline npy_data<Scalar> read_npy(const std::filesystem::path& filename) {
     std::ifstream stream(filename, std::ifstream::binary);
     if (!stream) {
       throw std::runtime_error("io error: failed to open a file.");
@@ -555,7 +555,7 @@ namespace npy {
   }
 
   template <typename Scalar>
-  inline void write_npy(const std::string& filename, const npy_data_ptr<Scalar>& data_ptr) {
+  inline void write_npy(const std::filesystem::path& filename, const npy_data_ptr<Scalar>& data_ptr) {
     std::ofstream stream(filename, std::ofstream::binary);
     if (!stream) {
       throw std::runtime_error("io error: failed to open a file.");
@@ -568,7 +568,7 @@ namespace npy {
 
   // NOLINTBEGIN(*-avoid-c-arrays)
   template <typename Scalar>
-  inline void SaveArrayAsNumpy(const std::string& filename, bool fortran_order, unsigned int n_dims,
+  inline void SaveArrayAsNumpy(const std::filesystem::path& filename, bool fortran_order, unsigned int n_dims,
     const unsigned long shape[], const Scalar* data) {
     const npy_data_ptr<Scalar> ptr{ data, {shape, shape + n_dims}, fortran_order };
 
@@ -576,13 +576,13 @@ namespace npy {
   }
 
   template <typename Scalar>
-  inline void SaveArrayAsNumpy(const std::string& filename, bool fortran_order, unsigned int n_dims,
+  inline void SaveArrayAsNumpy(const std::filesystem::path& filename, bool fortran_order, unsigned int n_dims,
     const unsigned long shape[], const std::vector<Scalar>& data) {
     SaveArrayAsNumpy(filename, fortran_order, n_dims, shape, data.data());
   }
 
   template <typename Scalar>
-  inline void LoadArrayFromNumpy(const std::string& filename, std::vector<unsigned long>& shape, bool& fortran_order,
+  inline void LoadArrayFromNumpy(const std::filesystem::path& filename, std::vector<unsigned long>& shape, bool& fortran_order,
     std::vector<Scalar>& data) {
     const npy_data<Scalar> n_data = read_npy<Scalar>(filename);
 
@@ -593,7 +593,7 @@ namespace npy {
   }
 
   template <typename Scalar>
-  inline void LoadArrayFromNumpy(const std::string& filename, std::vector<unsigned long>& shape,
+  inline void LoadArrayFromNumpy(const std::filesystem::path& filename, std::vector<unsigned long>& shape,
     std::vector<Scalar>& data) {
     bool fortran_order = false;
     LoadArrayFromNumpy<Scalar>(filename, shape, fortran_order, data);
