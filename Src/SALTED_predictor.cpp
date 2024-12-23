@@ -253,7 +253,7 @@ void SALTEDPredictor::read_model_data()
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR / "wigners" / ("wigner_lam - " + to_string(lam) + "_lmax1 - " + to_string(config.nang1) + "_lmax2 - " + to_string(config.nang2) + ".dat"));
+        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR / "wigners" / ("wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat"));
     }
 
     if (config.sparsify)
