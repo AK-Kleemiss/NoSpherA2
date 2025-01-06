@@ -1,6 +1,7 @@
 #include "integrator.h"
 #include "convenience.h"
 #include "constants.h"
+#include "JKFit.h"
 
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
@@ -20,48 +21,82 @@
 #define bas(SLOT, I) bas[8 * (I) + (SLOT)] // Basis set data for atom I
 #define atm(SLOT, I) atm[6 * (I) + (SLOT)] // Atom data for atom I
 
-int *make_loc(int *bas, int nbas)
-{
-    ivec shell_lengs(nbas, 0);
-    for (int i = 0; i < nbas; i++)
-    {
-        shell_lengs[i] = (2 * bas(1, i) + 1);
+//int *make_loc(int *bas, int nbas)
+//{
+//    ivec shell_lengs(nbas, 0);
+//    for (int i = 0; i < nbas; i++)
+//    {
+//        shell_lengs[i] = (2 * bas(1, i) + 1);
+//    }
+//    int *ao_loc = new int[nbas + 1];
+//    ao_loc[0] = 0;
+//    std::partial_sum(shell_lengs.begin(), shell_lengs.end(), ao_loc + 1);
+//    return ao_loc;
+//}
+
+int* make_loc(int* bas, int nbas) {
+    constexpr int ANG_OF = 1; // Column index for angular momentum
+    constexpr int NCTR_OF = 2; // Column index for contraction coefficients
+
+    std::vector<int> dims(nbas, 0);
+
+    // Calculate (2*l + 1) * nctr for spherical harmonics
+    for (size_t i = 0; i < nbas; i++) {
+        int l = bas(ANG_OF, i);
+		int nctr = bas(NCTR_OF, i);
+        dims[i] = (2 * l + 1) * nctr;
     }
-    int *ao_loc = new int[nbas + 1];
+
+    // Create the ao_loc array
+    int* ao_loc = new int[nbas + 1];
     ao_loc[0] = 0;
-    std::partial_sum(shell_lengs.begin(), shell_lengs.end(), ao_loc + 1);
+
+    // Compute the cumulative sum
+    std::partial_sum(dims.begin(), dims.end(), ao_loc + 1);
+
     return ao_loc;
 }
 
 // Function to compute two-center two-electron integrals (eri2c)
-void computeEri2c(const std::vector<basis_set_entry> &auxBasis, std::vector<double> &eri2c)
+void computeEri2c(WFN wavy, std::vector<double> &eri2c)
 {
-    int nAux = auxBasis.size();
+    wavy.calc_integration_parameters();
+    
+    int* bas = wavy.get_ptr_bas();
+	int* atm = wavy.get_ptr_atm();
+	double* env = wavy.get_ptr_env();
 
-    int shl_slice[] = {0, nAux, 0, nAux};
-    double *env = NULL; // Will partially contain the basis set data
-    int nat = 1;
-    int nbas = 1;
-    int *atoms = NULL;
-    int *bas = NULL;
-    int *aoloc = make_loc(bas, nbas);
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+	//Read values from bas
+	for (int i = 0; i < 8; i++) {
+		std::cout << bas(i,0) << std::endl;
+	}
 
-    eri2c.resize(naoi * naoj, 0.0);
-    Opt opty = int2c2e_optimizer(atoms, nat, bas, nbas, env);
-    // Compute integrals
-    GTOint2c(int2c2e_sph, eri2c.data(), 1, 0, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
-    free(aoloc);
+
+    int nbas = wavy.get_nbas();
+
+	int shl_slice[] = { 0, nbas, 0, nbas };
+	int nat = 1;  //No idea what this has to be
+	int *aoloc = make_loc(bas, nbas);
+	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+
+	eri2c.resize(naoi * naoj, 0.0);
+	Opt opty = int2c2e_optimizer(atm, nat, bas, nbas, env);
+	// Compute integrals
+	GTOint2c(int2c2e_sph, eri2c.data(), 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+	free(aoloc);
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
-void computeEri3c(const std::vector<basis_set_entry> &qmBasis,
-                  const std::vector<basis_set_entry> &auxBasis,
+void computeEri3c(WFN &wavy,
+                  WFN &wavy_aux,
                   std::vector<double> &flat_eri3c)
-{
-    int nQM = qmBasis.size();
-    int nAux = auxBasis.size();
+{   
+    wavy.calc_integration_parameters();
+    wavy_aux.calc_integration_parameters();
+
+    int nQM = wavy.get_nbas();
+    int nAux = wavy.get_nbas();
 
     int shl_slice[] = {
         0,
@@ -110,71 +145,6 @@ vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
     return rho;
 }
 
-void gen_integration_parameters(WFN wavy) {
-	//atom: (Z, ptr, nuclear_model=1, ptr+3, 0,0)  nuclear_model seems to be 1 for all atoms  USURE!!! Nested arrays per atom
-    //basis: (atom_id, l, nprim, ncentr, kappa=0, ptr, ptr+nprim, 0)  atom_id has to be consistent with order in other arrays  |  Nested arrays for each contracted basis function and then stacked for all atoms
-    //env: (leading 20*0, x,y,z,zeta=0, coefficients_l=0, exponentsl=0, ... )  flat array for everything
-
-    vec _env(20 + wavy.get_ncen() * 4, 0);
-    int bas_ptr_start = _env.size();
-    std::map<int, int> known_elements;
-    for (int atom_idx = 0; atom_idx < wavy.get_ncen(); atom_idx++) {
-        //check if the atom is already as key in the map
-		if (known_elements.find(wavy.atoms[atom_idx].charge) != known_elements.end()) {
-			continue;
-		}
-        known_elements.insert({ wavy.atoms[atom_idx].charge , bas_ptr_start });
-        int func_count = 0;
-        for (int shell = 0; shell < wavy.get_atom_shell_count(atom_idx); shell++) {
-            int n_func = wavy.atoms[atom_idx].shellcount[shell];
-            for (int func = 0; func < n_func; func++) {
-                _env.push_back(wavy.atoms[atom_idx].basis_set[func + func_count].exponent);
-            }
-            for (int func = 0; func < n_func; func++) {
-                _env.push_back(wavy.atoms[atom_idx].basis_set[func + func_count].coefficient);
-            }
-            func_count += n_func;
-        }
-        bas_ptr_start += func_count;
-        
-    }
-
-    //_atm is of shape (natoms, 6)
-    ivec2 _atm(wavy.get_ncen(), ivec(6, 0));
-    ivec2 _bas;
-    
-    int ptr = 20;
-    for (int atom_idx = 0; atom_idx < wavy.get_ncen(); atom_idx++)
-    {
-        //Assign_atoms
-        _atm[atom_idx][0] = wavy.atoms[atom_idx].charge; // Z
-        _atm[atom_idx][1] = ptr; // ptr
-        _atm[atom_idx][2] = 1; // nuclear_model
-        ptr += 3;
-        _atm[atom_idx][3] = ptr; // ptr+3
-        ptr += 1;
-
-        _env[20 + (atom_idx) * 4] = wavy.atoms[atom_idx].x;
-        _env[20 + (atom_idx) * 4 + 1] = wavy.atoms[atom_idx].y;
-        _env[20 + (atom_idx) * 4 + 2] = wavy.atoms[atom_idx].z;
-
-        //Define Basis functions for each atom
-        int bas_ptr = known_elements[wavy.atoms[atom_idx].charge];
-        for (int shell = 0; shell < wavy.get_atom_shell_count(atom_idx); shell += 1) {
-            ivec bas_entry(8, 0);
-            bas_entry[0] = atom_idx; // atom_id
-            bas_entry[1] = wavy.get_shell_type(atom_idx, shell) - 1; // l s=0, p=1, d=2 ...
-            bas_entry[2] = wavy.atoms[atom_idx].shellcount[shell];  // nprim
-            bas_entry[3] = 1; // ncentr    Not sure 
-            bas_entry[5] = bas_ptr;  //Pointer to the end of the _env vector
-            bas_ptr += bas_entry[2];
-            bas_entry[6] = bas_ptr;
-
-            _bas.push_back(bas_entry);
-            bas_ptr += bas_entry[2] * bas_entry[3];
-        }
-    }
-}
 
 void solve_linear_system(const vec2 &A, vec &b)
 {
@@ -198,10 +168,10 @@ void solve_linear_system(const vec2 &A, vec &b)
 #endif
 }
 
-int density_fit(const WFN &wavy, const std::string auxname)
+int density_fit( WFN &wavy, const std::string auxname)
 {
-    std::vector<basis_set_entry> qmBasis;  // Quantum mechanical basis
-    std::vector<basis_set_entry> auxBasis; // Auxiliary basis
+	WFN wavy_aux;
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(auxname));
     std::vector<double> eri2c;
     std::vector<double> eri3c;
 
@@ -210,8 +180,8 @@ int density_fit(const WFN &wavy, const std::string auxname)
     wavy.get_DensityMatrix();
 
     // Compute integrals
-    computeEri2c(auxBasis, eri2c);
-    computeEri3c(qmBasis, auxBasis, eri3c);
+    computeEri2c(wavy_aux, eri2c);
+    computeEri3c(wavy, wavy_aux, eri3c);
 
     // Convert eri3c to matrix form and perform contractions using BLAS
 
@@ -251,7 +221,8 @@ int fixed_density_fit_test()
 
     WFN wavy_gbw("H2.gbw");
 
-    gen_integration_parameters(wavy_gbw);
+    vec eri2c_test_test;
+	computeEri2c(wavy_gbw, eri2c_test_test);
 	return 0;
 
     WFN wavy("H2.molden");
