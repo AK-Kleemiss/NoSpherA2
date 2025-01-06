@@ -110,6 +110,72 @@ vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
     return rho;
 }
 
+void gen_integration_parameters(WFN wavy) {
+	//atom: (Z, ptr, nuclear_model=1, ptr+3, 0,0)  nuclear_model seems to be 1 for all atoms  USURE!!! Nested arrays per atom
+    //basis: (atom_id, l, nprim, ncentr, kappa=0, ptr, ptr+nprim, 0)  atom_id has to be consistent with order in other arrays  |  Nested arrays for each contracted basis function and then stacked for all atoms
+    //env: (leading 20*0, x,y,z,zeta=0, coefficients_l=0, exponentsl=0, ... )  flat array for everything
+
+    vec _env(20 + wavy.get_ncen() * 4, 0);
+    int bas_ptr_start = _env.size();
+    std::map<int, int> known_elements;
+    for (int atom_idx = 0; atom_idx < wavy.get_ncen(); atom_idx++) {
+        //check if the atom is already as key in the map
+		if (known_elements.find(wavy.atoms[atom_idx].charge) != known_elements.end()) {
+			continue;
+		}
+        known_elements.insert({ wavy.atoms[atom_idx].charge , bas_ptr_start });
+        int func_count = 0;
+        for (int shell = 0; shell < wavy.get_atom_shell_count(atom_idx); shell++) {
+            int n_func = wavy.atoms[atom_idx].shellcount[shell];
+            for (int func = 0; func < n_func; func++) {
+                _env.push_back(wavy.atoms[atom_idx].basis_set[func + func_count].exponent);
+            }
+            for (int func = 0; func < n_func; func++) {
+                _env.push_back(wavy.atoms[atom_idx].basis_set[func + func_count].coefficient);
+            }
+            func_count += n_func;
+        }
+        bas_ptr_start += func_count;
+        
+    }
+
+    //_atm is of shape (natoms, 6)
+    ivec2 _atm(wavy.get_ncen(), ivec(6, 0));
+    ivec2 _bas;
+    
+    int ptr = 20;
+    for (int atom_idx = 0; atom_idx < wavy.get_ncen(); atom_idx++)
+    {
+        //Assign_atoms
+        _atm[atom_idx][0] = wavy.atoms[atom_idx].charge; // Z
+        _atm[atom_idx][1] = ptr; // ptr
+        _atm[atom_idx][2] = 1; // nuclear_model
+        ptr += 3;
+        _atm[atom_idx][3] = ptr; // ptr+3
+        ptr += 1;
+
+        _env[20 + (atom_idx) * 4] = wavy.atoms[atom_idx].x;
+        _env[20 + (atom_idx) * 4 + 1] = wavy.atoms[atom_idx].y;
+        _env[20 + (atom_idx) * 4 + 2] = wavy.atoms[atom_idx].z;
+
+        //Define Basis functions for each atom
+        int bas_ptr = known_elements[wavy.atoms[atom_idx].charge];
+        for (int shell = 0; shell < wavy.get_atom_shell_count(atom_idx); shell += 1) {
+            ivec bas_entry(8, 0);
+            bas_entry[0] = atom_idx; // atom_id
+            bas_entry[1] = wavy.get_shell_type(atom_idx, shell) - 1; // l s=0, p=1, d=2 ...
+            bas_entry[2] = wavy.atoms[atom_idx].shellcount[shell];  // nprim
+            bas_entry[3] = 1; // ncentr    Not sure 
+            bas_entry[5] = bas_ptr;  //Pointer to the end of the _env vector
+            bas_ptr += bas_entry[2];
+            bas_entry[6] = bas_ptr;
+
+            _bas.push_back(bas_entry);
+            bas_ptr += bas_entry[2] * bas_entry[3];
+        }
+    }
+}
+
 void solve_linear_system(const vec2 &A, vec &b)
 {
     err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
@@ -183,9 +249,12 @@ int fixed_density_fit_test()
     solve_linear_system(eri2c_test, rho);
     std::cout << "Test done!" << std::endl;
 
-    WFN wavy("H2.molden");
-
     WFN wavy_gbw("H2.gbw");
+
+    gen_integration_parameters(wavy_gbw);
+	return 0;
+
+    WFN wavy("H2.molden");
 
     vec2 eri2c{
         {5.19870815, 9.45570563, 12.35839308, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 3.01064326, 7.22843174, 10.70109626, 0., 0., -1.81824542, 0., 0., -3.16522589, 0., 0., 0.90587703, 0., 0.},
