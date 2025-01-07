@@ -7,12 +7,12 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                     test.wfn done!
+Reading:                                   "test.wfn" done!
 Number of atoms in Wavefunction file: 18 Number of MOs: 135
 Number of protons: 135
 Number of electrons: 135
-Reading:                                  test.cif... done!
-Reading:                                     test.hkl done!
+Reading:                                   "test.cif" done!
+Reading:                                   "test.hkl" done!
 Nr of reflections read from file: 23
 Number of symmetry operations: 4
 Nr of reflections to be used: 12

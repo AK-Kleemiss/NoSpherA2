@@ -2,6 +2,7 @@
 #include "cell.h"
 #include "tsc_block.h"
 #include "test_functions.h"
+#include "integrator.h"
 #include "properties.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -144,7 +145,7 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(std::string &from, std::string &to)
+void copy_file(std::filesystem::path &from, std::filesystem::path &to)
 {
     std::ifstream source(from.c_str(), std::ios::binary);
     std::ofstream dest(to.c_str(), std::ios::binary);
@@ -157,7 +158,7 @@ void copy_file(std::string &from, std::string &to)
 
 //---------------------------Configuration files ---------------------------------------------------
 
-std::string get_home_path(void)
+std::filesystem::path get_home_path(void)
 {
 #ifdef _WIN32
     std::string temp1 = getenv("HOMEDRIVE");
@@ -169,174 +170,6 @@ std::string get_home_path(void)
     return home;
 #endif
 }
-
-void join_path(std::string &s1, std::string &s2)
-{
-#ifdef _WIN32
-    s1.append("\\");
-#else
-    if (s1.substr(s1.length() - 1) != "/")
-        s1.append("/");
-#endif
-    s1.append(s2);
-}
-
-void join_path(std::string &s1, std::initializer_list<std::string> s2)
-{
-    std::string separator;
-#ifdef _WIN32
-    separator = "\\";
-#else
-    separator = "/";
-#endif
-    // Ensure that the initial path has a trailing separator if needed
-    if (!s1.empty() && s1.back() != '/' && s1.back() != '\\')
-    {
-        s1.append(separator);
-    }
-    // Iterate over each segment in the initializer list
-    for (auto it = s2.begin(); it != s2.end(); ++it)
-    {
-        s1.append(*it);
-        // Append the separator if it's not the last segment
-        if (std::next(it) != s2.end() && it->back() != '/' && it->back() != '\\')
-        {
-            s1.append(separator);
-        }
-    }
-}
-
-std::string get_filename_from_path(const std::string &input)
-{
-#ifdef _WIN32
-    return input.substr(input.rfind("\\") + 1);
-#else
-    return input.substr(input.rfind("/") + 1);
-#endif
-}
-
-std::string get_foldername_from_path(const std::string &input)
-{
-#ifdef _WIN32
-    return input.substr(0, input.rfind("\\") + 1);
-#else
-    return input.substr(0, input.rfind("/") + 1);
-#endif
-}
-
-std::string get_basename_without_ending(const std::string &input)
-{
-    return input.substr(0, input.rfind("."));
-}
-
-std::string get_ending_from_filename(const std::string &input)
-{
-    return input.substr(input.rfind(".") + 1);
-}
-
-options::options(const int accuracy,
-                 const int threads,
-                 const int pbc,
-                 const double resolution,
-                 const double radius,
-                 const bool becke,
-                 const bool electron_diffraction,
-                 const bool ECP,
-                 const bool set_ECPs,
-                 const int ECP_mode,
-                 const bool calc,
-                 const bool eli,
-                 const bool esp,
-                 const bool elf,
-                 const bool lap,
-                 const bool rdg,
-                 const bool hdef,
-                 const bool def,
-                 const bool fract,
-                 const bool hirsh,
-                 const bool s_rho,
-                 const bool SALTED,
-                 const bool Olex2_1_3_switch,
-                 const bool iam_switch,
-                 const bool read_k_pts,
-                 const bool save_k_pts,
-                 const bool combined_tsc_calc,
-                 const bool binary_tsc,
-                 const bool cif_based_combined_tsc_calc,
-                 const bool no_date,
-                 const bool gbw2wfn,
-                 const bool old_tsc,
-                 const bool thakkar_d_plot,
-                 const double sfac_scan,
-                 const double sfac_diffuse,
-                 const double dmin,
-                 const int hirsh_number,
-                 const ivec &MOs,
-                 const ivec2 &_groups,
-                 const vec2 &twin_law,
-                 const ivec2 &combined_tsc_groups,
-                 const bool all_mos,
-                 const bool test,
-                 const std::string &wfn,
-                 const std::string &fchk,
-                 const std::string &basis_set,
-                 const std::string &hkl,
-                 const std::string &cif,
-                 const std::string &method,
-                 const std::string &xyz_file,
-                 const std::string &coef_file,
-                 const std::string &fract_name,
-                 const svec &combined_tsc_calc_files,
-                 const svec &combined_tsc_calc_cifs,
-                 const std::string &wavename,
-                 const std::string &gaussian_path,
-                 const std::string &turbomole_path,
-                 const std::string &basis_set_path,
-                 const std::string &SALTED_DIR,
-                 const std::string &SALTED_DFBASIS,
-                 const svec &arguments,
-                 const svec &combine_mo,
-                 const svec &Cations,
-                 const svec &Anions,
-                 const ivec &cmo1,
-                 const ivec &cmo2,
-                 const ivec &ECP_nrs,
-                 const ivec &ECP_elcounts,
-                 const double mem,
-                 const unsigned int mult,
-                 const bool debug,
-                 const hkl_list &m_hkl_list,
-                 std::ostream &log_file)
-    : accuracy(accuracy), threads(threads), pbc(pbc),
-      resolution(resolution), radius(radius), becke(becke),
-      electron_diffraction(electron_diffraction), ECP(ECP),
-      set_ECPs(set_ECPs), ECP_mode(ECP_mode), calc(calc),
-      eli(eli), esp(esp), elf(elf), lap(lap), rdg(rdg),
-      hdef(hdef), def(def), fract(fract), hirsh(hirsh),
-      s_rho(s_rho), SALTED(SALTED), SALTED_DIR(SALTED_DIR), SALTED_DFBASIS(SALTED_DFBASIS),
-      Olex2_1_3_switch(Olex2_1_3_switch), iam_switch(iam_switch),
-      read_k_pts(read_k_pts), save_k_pts(save_k_pts),
-      combined_tsc_calc(combined_tsc_calc), binary_tsc(binary_tsc),
-      cif_based_combined_tsc_calc(cif_based_combined_tsc_calc),
-      no_date(no_date), gbw2wfn(gbw2wfn), old_tsc(old_tsc),
-      thakkar_d_plot(thakkar_d_plot), d_sfac_scan(sfac_scan),
-      sfac_diffuse(sfac_diffuse), dmin(dmin), hirsh_number(hirsh_number),
-      MOs(MOs), groups(_groups), twin_law(twin_law),
-      combined_tsc_groups(combined_tsc_groups), all_mos(all_mos),
-      test(test), wfn(wfn), fchk(fchk), basis_set(basis_set),
-      hkl(hkl), cif(cif), method(method), xyz_file(xyz_file),
-      coef_file(coef_file), fract_name(fract_name),
-      combined_tsc_calc_files(combined_tsc_calc_files),
-      combined_tsc_calc_cifs(combined_tsc_calc_cifs),
-      wavename(wavename), gaussian_path(gaussian_path),
-      turbomole_path(turbomole_path), basis_set_path(basis_set_path),
-      arguments(arguments), combine_mo(combine_mo), Cations(Cations),
-      Anions(Anions), cmo1(cmo1), cmo2(cmo2), ECP_nrs(ECP_nrs),
-      ECP_elcounts(ECP_elcounts), mem(mem), mult(mult),
-      debug(debug), m_hkl_list(m_hkl_list), log_file(log_file)
-{
-    groups.resize(1);
-};
 
 bool check_bohr(WFN &wave, bool debug)
 {
@@ -660,6 +493,20 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
+{
+    int size_begin = 0, size_end = 0;
+    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char*>(Target), size_begin);
+    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    if (size_begin != size_end)
+    {
+        std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
+        return false;
+    }
+    return true;
+}
+
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 {
     norm_const = pow(
@@ -956,7 +803,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         cout << "_____________________________________________________________" << endl;
         cout << "WFN ";
         stream << setw(2) << w;
-        cout << stream.str() << ") " << get_basename_without_ending(wavy[w].get_path()) << endl;
+        cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
         stream.str("");
         for (int c = 0; c < wavy[w].cub.size(); c++)
         {
@@ -973,8 +820,8 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
             }
             else
                 cout << "     ";
-            cout << "   |_ " << get_basename_without_ending(wavy[w].cub[c].path);
-            if (!exists(wavy[w].cub[c].path))
+            cout << "   |_ " << wavy[w].cub[c].get_path().stem();
+            if (!exists(wavy[w].cub[c].get_path()))
                 cout << " (MEM ONLY)";
             cout << endl;
         }
@@ -1053,63 +900,46 @@ bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
         for (int c = 0; c < wavy[w].cub.size(); c++)
-            if (!exists(wavy[w].cub[c].path))
+            if (!exists(wavy[w].cub[c].get_path()))
                 return true;
     return false;
 };
 
+
 void readxyzMinMax_fromWFN(
-    WFN &wavy,
-    double *CoordMinMax,
-    int *NbSteps,
+    WFN& wavy,
+    double* CoordMinMax,
+    int* NbSteps,
     double Radius,
     double Increments,
     bool no_bohr)
 {
     vec2 PosAtoms;
-    PosAtoms.resize(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++)
-        PosAtoms[i].resize(3);
+    PosAtoms.resize(3);
+    for (int i = 0; i < 3; i++)
+        PosAtoms[i].resize(wavy.get_ncen());
     bool bohrang = true;
     if (!no_bohr)
         bohrang = !check_bohr(wavy, false);
+
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-        PosAtoms[j][0] = wavy.atoms[j].x;
-        PosAtoms[j][1] = wavy.atoms[j].y;
-        PosAtoms[j][2] = wavy.atoms[j].z;
+        PosAtoms[0][j] = wavy.atoms[j].x;
+        PosAtoms[1][j] = wavy.atoms[j].y;
+        PosAtoms[2][j] = wavy.atoms[j].z;
         if (!bohrang)
         {
             for (int i = 0; i < 3; i++)
-                PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
-        }
-        if (j == 0)
-        {
-            CoordMinMax[0] = PosAtoms[j][0];
-            CoordMinMax[3] = PosAtoms[j][0];
-            CoordMinMax[1] = PosAtoms[j][1];
-            CoordMinMax[4] = PosAtoms[j][1];
-            CoordMinMax[2] = PosAtoms[j][2];
-            CoordMinMax[5] = PosAtoms[j][2];
-        }
-        else
-        {
-            if (CoordMinMax[0] > PosAtoms[j][0])
-                CoordMinMax[0] = PosAtoms[j][0];
-            if (CoordMinMax[3] < PosAtoms[j][0])
-                CoordMinMax[3] = PosAtoms[j][0];
-
-            if (CoordMinMax[1] > PosAtoms[j][1])
-                CoordMinMax[1] = PosAtoms[j][1];
-            if (CoordMinMax[4] < PosAtoms[j][1])
-                CoordMinMax[4] = PosAtoms[j][1];
-
-            if (CoordMinMax[2] > PosAtoms[j][2])
-                CoordMinMax[2] = PosAtoms[j][2];
-            if (CoordMinMax[5] < PosAtoms[j][2])
-                CoordMinMax[5] = PosAtoms[j][2];
-        }
+                PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
+        } 
     }
+	CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
+	CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
+	CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
+	CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
+	CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
+	CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
+
     const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
     CoordMinMax[3] += temp_rad;
@@ -1123,8 +953,9 @@ void readxyzMinMax_fromWFN(
     NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
 
+
 void readxyzMinMax_fromCIF(
-    std::string cif,
+    std::filesystem::path cif,
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
@@ -1469,11 +1300,11 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
-    ifstream asym_cif_input(cif.c_str(), std::ios::in);
+    ifstream asym_cif_input(cif, std::ios::in);
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
     string line;
@@ -2185,7 +2016,7 @@ void options::digest_options()
         {
             cout << NoSpherA2_message() << endl;
             wfn = arguments[i + 1];
-            err_checkf(exists(wfn), "WFN doesn't exist", cout);
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", cout);
             ivec val_MOs;
             ivec val_MOs_beta;
             if (argc >= i + 3)
@@ -2238,13 +2069,13 @@ void options::digest_options()
         else if (temp == "-coef")
         {
             coef_file = arguments[i + 1];
-            err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", cout);
             SALTED = true;
         }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
-            err_checkf(exists(cif), "CIF doesn't exist", cout);
+            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", cout);
         }
         else if (temp == "-cpus") {
             threads = stoi(arguments[i + 1]);
@@ -2393,7 +2224,10 @@ void options::digest_options()
             if (argc >= i + 3)
             {
                 int k_max = stod(arguments[i + 2]);
-                residual.ewald_sum(k_max);
+                if (argc >= i + 4)
+                    residual.ewald_sum(k_max, stod(arguments[i + 3]));
+                else
+                    residual.ewald_sum(k_max);
             }
             else
                 residual.ewald_sum();
@@ -2426,7 +2260,7 @@ void options::digest_options()
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
-            err_checkf(exists(hkl), "hkl doesn't exist", cout);
+            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", cout);
         }
         else if (temp == "-hkl_min_max")
         {
@@ -2446,7 +2280,7 @@ void options::digest_options()
             method = arguments[i + 1];
         else if (temp == "-merge")
         {
-            svec filenames;
+            pathvec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -2458,7 +2292,7 @@ void options::digest_options()
         }
         else if (temp == "-merge_nocheck")
         {
-            svec filenames;
+            pathvec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -2536,9 +2370,8 @@ void options::digest_options()
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
-            WFN wavy(0);
             cout << "Reading wavefunction: " << wfn_name << endl;
-            wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+            WFN wavy(wfn_name);
             cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy.set_has_ECPs(true);
@@ -2578,9 +2411,8 @@ void options::digest_options()
         else if (temp == "-spherical_aver_hirsh")
         {
 			string wfn_name = arguments[i + 1];
-			WFN wavy(0);
 			cout << "Reading wavefunction: " << wfn_name << endl;
-			wavy.read_known_wavefunction_format(wfn_name, cout, debug);
+			WFN wavy(wfn_name);
 			cout << "Assigning ECPs" << endl;
 			if (ECP)
 				wavy.set_has_ECPs(true);
@@ -2632,13 +2464,13 @@ void options::digest_options()
         }
         else if (temp == "-tscb")
         {
-            string name = arguments[i + 1];
+            std::filesystem::path name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
-            if (get_ending_from_filename(name) == "tscb")
-                blocky.write_tsc_file(cif_name, get_basename_without_ending(name) + ".tsc");
-            else if (get_ending_from_filename(name) == "tsc")
-                blocky.write_tscb_file(cif_name, get_basename_without_ending(name) + ".tscb");
+            if (name.extension() == "tscb")
+                blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            else if (name.extension() == "tsc")
+                blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
             else
                 err_checkf(false, "Wrong file ending!", cout);
             exit(0);
@@ -2648,10 +2480,14 @@ void options::digest_options()
             test_analytical_fourier();
             exit(0);
         }
+        else if (temp == "-test_RI") {
+            fixed_density_fit_test();
+            exit(0);
+        }
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!", cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2777,19 +2613,6 @@ std::string trim(const std::string &s)
 
     return std::string(start, end + 1);
 }
-
-bool exists(const std::string &name)
-{
-    if (FILE *file = fopen(name.c_str(), "r"))
-    {
-        fclose(file);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-};
 
 int CountWords(const char *str)
 {
@@ -3163,16 +2986,10 @@ std::wstring s2ws(const std::string &s)
     return r;
 }
 
-bool ExtractDLL(const std::string &dllName)
+bool ExtractDLL(const std::filesystem::path &dllName)
 {
-    // Convert the DLL name to a wide string
-    std::wstring wideDllName = s2ws(dllName);
-
-    // Check if the DLL already exists
-    if (GetFileAttributes(wideDllName.c_str()) != INVALID_FILE_ATTRIBUTES)
-    {
+    if (std::filesystem::exists(dllName))
         return true; // DLL already exists
-    }
 
     // Find the resource
     HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
@@ -3210,16 +3027,15 @@ bool check_OpenBLAS_DLL(const bool &debug)
     if (debug)
         std::cout << "Checking for OpenBLAS DLL" << std::endl;
     // Get the path of the executable
-    char exePath[MAX_PATH];
-    GetModuleFileNameA(NULL, exePath, MAX_PATH); // get path to NoSpherA2 executable
-    if (debug)
-        std::cout << "Executable path: " << exePath << std::endl;
-    std::string exeDir = get_foldername_from_path(exePath);
+    char tempPath[MAX_PATH];
+    GetModuleFileNameA(NULL, tempPath, MAX_PATH); // get path to NoSpherA2 executable
+    std::filesystem::path exeDir(tempPath);
+    exeDir = exeDir.parent_path();
     if (debug)
         std::cout << "Executable directory: " << exeDir << std::endl;
 
     // Define the DLL name
-    std::string dllName = exeDir + "\\libopenblas.dll";
+    std::filesystem::path dllName = exeDir / "libopenblas.dll";
     if (debug)
         std::cout << "DLL name: " << dllName << std::endl;
     if (exists(dllName))

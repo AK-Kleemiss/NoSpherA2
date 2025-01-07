@@ -209,10 +209,10 @@ namespace constants {
             switch (m)
             {
             case 0: // I Z^6
-                SH = constants::c_13_1024p * (231 * z * z * z * z * z * z - 315 * z * z * z * z + 105 * z * z - 5);
+                SH = (sqrt(26 / (1024*constants::PI))) * (231 * z * z * z * z * z * z - 315 * z * z * z * z + 105 * z * z - 5);
                 break;
             case 1:
-                SH = constants::c_273_256p * x * (21 * z * z * z * z - 14 * z * z + 1.0);
+                //SH = constants::c_546_1024p * (33 x* z*z*z*z -30 x* z*z + 5*x + 33*y*z*z*z*z - )
                 break;
             case -1:
                 SH = constants::c_165_256p * 2 * y * (21 * z * z * z * z - 14 * z * z + 1.0);
@@ -242,10 +242,9 @@ namespace constants {
                 SH = constants::c_693_2048p * (2 * y * y * y * y * y - 20 * x * x * y * y * y + 10 * y * x * x * x * x);
                 break;
             case 6:
-                SH = constants::c_3003_2048p * (x * x * x * x * x * x - 15 * x * x * x * x * y * y + 15 * x * x * y * y * y * y - y * y * y * y * y);  //THIS WAS GUESS BY GITHUB MAKE SURE THIS WORKS
                 break;
             case -6:
-                SH = constants::c_3003_2048p * (6 * x * x * x * x * y - 20 * x * x * y * y * y + 6 * y * y * y * y * y);  //THIS WAS GUESS BY GITHUB MAKE SURE THIS WORKS
+				SH = sqrt(6006 / (4096 * constants::PI)) * (x * x * x * x * x * x - 15 * x * x * x * x * y * y + 15 * x * x * y * y * y * y - y * y * y * y * y * y);
                 break;
             default:
                 err_not_impl_f("Wrong spherical harmonic called!", std::cout);
@@ -257,6 +256,7 @@ namespace constants {
         return SH;
     }
 
+    // https://www.wolframalpha.com/input?i=LegendreP%5B6%2C6%2Cx%5D watch the signs!
     double associated_legendre_polynomial(const int &l, const int &m, const double &x) {
         switch (l) {
         case 0:
@@ -397,51 +397,102 @@ namespace constants {
                 err_checkf(false, "This is impossible!", std::cout);
             }
             break;
-        case 6:  //THIS IS WILDLY UNTESTED BECAUSE I DONT TRUST constants::spherical_harmonic!!!! (WORKS FOR m=0)
+        case 6:  //Values are correct, only sign may be wrong
             switch (m) {
             case 0:
-                return 14.4375 * x * x * x * x * x * x - 19.6875 * x * x * x * x + 6.5625 * x * x - 0.3125;
+                return -(1.0 / 16.0) * (231 * x * x * x * x * x * x - 315 * x * x * x * x + 105 * x * x - 5);
                 break;
             case 1:
-                return -2.625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
+                return (21.0 / 8.0) * sqrt(1 - x * x) * (33 * x * x * x * x * x - 30 * x * x * x + 5 * x);
                 break;
             case 2:
-                return -13.125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
+                return (105.0 / 8.0) * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
                 break;
             case 3:
-                return -157.5 * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
+                return (315.0 / 2.0) * pow(1 - x * x, 1.5) * (11 * x * x * x - 3 * x);
                 break;
             case 4:
-                return 472.5 * pow(x * x - 1, 2.0) * (11 * x * x - 1);
+                return -(945.0 / 2.0) * pow(x * x - 2.0, 2.0) * (11 * x * x - 1);
                 break;
             case 5:
-                return -10395.0 * x * pow(1 - x * x, 2.5);
+                return 10395.0 * x * pow(1 - x * x, 2.5);
                 break;
             case 6:
-                return -10395.0 * pow(x * x - 1, 3.0);
+                return 10395.0 * pow(x * x - 1, 3.0);
                 break;
             case -1:
-                return 0.0625 * x * sqrt(1 - x * x) * (33 * x * x * x * x - 30 * x * x + 5);
+                return -(1.0 / 16.0) * sqrt(1 - x * x) * (33 * x * x * x * x * x - 30 * x * x * x + 5 * x);
                 break;
             case -2:
-                return -0.0078125 * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
+                return  (1.0 / 128.0) * (x * x - 1) * (33 * x * x * x * x - 18 * x * x + 1);
                 break;
             case -3:
-                return -(1.0 / 384.0) * pow(1 - x * x, 1.5) * x * (11 * x * x - 3);
+                return -(1.0 / 384.0) * pow(1 - x * x, 1.5) * (11 * x * x * -3 * x);
                 break;
             case -4:
-                return (1.0 / 3840.0) * pow(x * x - 1, 2.0) * (11 * x * x - 1);
+                return -(1.0 / 3840.0) * pow(x * x - 1, 2.0) * (11 * x * x - 1);
                 break;
             case -5:
-                return (1.0 / 3840.0) * x * pow(1 - x * x, 2.5);
+                return -(1.0 / 3840.0) * x * pow(1 - x * x, 2.5);
                 break;
             case -6:
-                return -(1.0 / 46080.0) * pow(x * x - 1, 3.0);
+                return (1.0 / 46080.0) * pow(x * x - 1, 3.0);
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
             }
             break;
+        case 7: //Values are correct, only sign may be wrong
+            switch (m)
+            {
+            case 0:
+                return (1.0 / 16.0) * (429 * x * x * x * x * x * x * x - 693 * x * x * x * x * x + 315 * x * x * x - 35 * x);
+                break;
+            case 1:
+                return (7.0 / 16.0) * sqrt(1 - x * x) * (429 * x * x * x * x * x * x - 495 * x * x * x * x + 135 * x * x - 5);
+                break;
+            case 2:
+                return (63.0 / 8.0) * (x * x - 1) * (143 * x * x * x * x * x - 110 * x * x * x + 15 * x);
+                break;
+            case 3:
+                return (315.0 / 8.0) * pow(1 - x * x, 1.5) * (143 * x * x * x * x - 66 * x * x + 3);
+                break;
+            case 4:
+                return -(3465.0 / 2.0) * pow(x * x - 1, 2.0) * (13 * x * x * x - 3 * x);
+                break;
+            case 5:
+                return (10395.0 / 2.0) * pow(1 - x * x, 2.5) * (13 * x * x - 1);
+                break;
+            case 6:
+                return 135135.0 * pow(x * x - 1, 3.0) * x;
+                break;
+            case 7:
+                return 135135.0 * pow(1 - x * x, 3.5);
+                break;
+            case -1:
+                return -(1.0 / 128.0) * sqrt(1 - x * x) * (429 * x * x * x * x * x * x - 495 * x * x * x * x + 135 * x * x - 5);
+                break;
+            case -2:
+                return (1.0 / 384.0) * (x * x - 1) * (143 * x * x * x * x * x - 110 * x * x * x + 15 * x);
+                break;
+            case -3:
+                return -(1.0 / 3840.0) * pow(1 - x * x, 1.5) * (143 * x * x * x * x - 66 * x * x + 3);
+                break;
+            case -4:
+                return -(1.0 / 3840.0) * pow(x * x - 1, 2.0) * (13 * x * x * x - 3 * x);
+                break;
+            case -5:
+                return -(1.0 / 46080.0) * pow(1 - x * x, 2.5) * (13 * x * x - 1);
+                break;
+            case -6:
+                return (1.0 / 46080.0) * pow(x * x - 1, 3.0) * x;
+                break;
+            case -7:
+                return -(1.0 / 645120.0) * pow(1 - x * x, 3.5);
+                break;
+            default:
+                err_checkf(false, "This is impossible!", std::cout);
+            }
         default:
             err_not_impl_f("associated_legendre_polynomial l > 6 ", std::cout);
             return -1000.;

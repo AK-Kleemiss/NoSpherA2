@@ -7,13 +7,13 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                                ZP2_part1.gbw done!
+Reading:                              "ZP2_part1.gbw" done!
 Number of atoms in Wavefunction file: 25 Number of MOs: 251
-Reading:                                ZP2_part2.gbw done!
+Reading:                              "ZP2_part2.gbw" done!
 Number of atoms in Wavefunction file: 25 Number of MOs: 251
 Number of protons: 106
 Number of electrons: 106
-Reading:                                   ZP2.cif... done!
+Reading:                                    "ZP2.cif" done!
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!
@@ -58,14 +58,14 @@ Total number of electrons in the wavefunction: 106.637
 Generating hkl indices up to d=:              0.90... done!
 Nr of reflections generated:                 10240
 Number of symmetry operations:                   4
-Nr of reflections to be used:                16944
+Nr of reflections to be used:                 9982
 
-Number of k-points to evaluate: 16944 for 2826 gridpoints.
+Number of k-points to evaluate: 9982 for 2826 gridpoints.
 [                Calculating Scattering Factors                ]
 [=============================================================] 100% 
 Number of protons: 106
 Number of electrons: 106.00
-Reading:                                   ZP2.cif... done!
+Reading:                                    "ZP2.cif" done!
 There are:
   25 atoms read from the wavefunction, of which 
   25 are identified as asymmetric unit atoms!

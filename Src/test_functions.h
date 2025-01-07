@@ -9,7 +9,7 @@
 #include "SALTED_utilities.h"
 #include "sphere_lebedev_rule.h"
 #if has_RAS
-#include "SALTED_math.h"
+#include "math.h"
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif
@@ -106,10 +106,9 @@ void sfac_scan(options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
-    auto t = new WFN(1);
+    auto t = new WFN(opt.wfn);
     wavy.push_back(*t);
     delete t;
-    wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     Thakkar O(wavy[0].atoms[0].charge);
     Thakkar_Cation O_cat(wavy[0].atoms[0].charge);
     Thakkar_Anion O_an(wavy[0].atoms[0].charge);
@@ -125,6 +124,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
+    bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
 
@@ -138,6 +138,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                                       asym_atom_list,
                                       needs_grid,
                                       std::cout,
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -426,8 +427,8 @@ double calc_grid_averaged_at_r(const WFN& wavy,
         double z = angular_z[p] * r + wavy.atoms[0].z;
         dens += wavy.compute_dens(x, y, z, d, _phi) * constants::FOUR_PI * angular_w[p];
     }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
+    //if (print)
+    //    std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
 /// not like above //////////////////////////////////////////////////////////////////////////
@@ -513,7 +514,7 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     return dens;
 }
 
-void bondwise_laplacian_plots(std::string& wfn_name) {
+void bondwise_laplacian_plots(std::filesystem::path& wfn_name) {
     char cwd[1024];
 #ifdef _WIN32
     if (_getcwd(cwd, sizeof(cwd)) != NULL)
@@ -521,8 +522,7 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
     if (getcwd(cwd, sizeof(cwd)) != NULL)
 #endif
         std::cout << "Current working dir: " << cwd << std::endl;
-    WFN wavy(9);
-    wavy.read_known_wavefunction_format(wfn_name, std::cout);
+    WFN wavy(wfn_name);
 
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", std::cout);
 
@@ -530,7 +530,7 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
 
     for (int i = 0; i < wavy.get_ncen(); i++) {
         for (int j = i+1; j < wavy.get_ncen(); j++) {
-            std::string path = cwd;
+            std::filesystem::path path = cwd;
             double distance = sqrt(pow(wavy.atoms[i].x - wavy.atoms[j].x, 2) + pow(wavy.atoms[i].y - wavy.atoms[j].y, 2) + pow(wavy.atoms[i].z - wavy.atoms[j].z, 2));
             double svdW = constants::ang2bohr(constants::covalent_radii[wavy.atoms[i].charge] + constants::covalent_radii[wavy.atoms[j].charge]);
             if (distance < 1.35 * svdW)
@@ -548,8 +548,8 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
                     t_pos[2] += k*bond_vec[2];
                     lapl[k] = wavy.computeLap(t_pos);
                 }
-                std::string outname(wfn_name + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
-                join_path(path, outname);
+                std::filesystem::path outname(wfn_name.string() + "_bondwise_laplacian_" + std::to_string(i) + "_" + std::to_string(j) + ".dat");
+                path = path / std::filesystem::path(outname);
                 std::ofstream result(path, std::ios::out);
                 for (int k = 0; k < points; k++) {
                     result << std::setw(10) << std::scientific << std::setprecision(6) << dr*k << " " << std::setw(10) << std::scientific << std::setprecision(6) << lapl[k] << std::endl;
@@ -563,10 +563,8 @@ void bondwise_laplacian_plots(std::string& wfn_name) {
 
 void calc_partition_densities() {
     using namespace std;
-    WFN Hartree_Fock(9);
-    WFN DFT(9);
-    Hartree_Fock.read_known_wavefunction_format("HF.gbw", std::cout, false);
-    DFT.read_known_wavefunction_format("DFT.gbw", std::cout, false);
+    WFN Hartree_Fock("HF.gbw");
+    WFN DFT("DFT.gbw");
 
     vec Pos_C = { Hartree_Fock.atoms[0].x, Hartree_Fock.atoms[0].y, Hartree_Fock.atoms[0].z };
     vec Pos_H1 = { Hartree_Fock.atoms[1].x, Hartree_Fock.atoms[1].y, Hartree_Fock.atoms[1].z };
@@ -718,8 +716,8 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
 {
     std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
-    WFN wavy(9);
-    wavy.read_known_wavefunction_format(opt.wfn, cout, opt.debug);
+    WFN wavy(opt.wfn, opt.charge, opt.mult);
+    cout << "Number of MOs before: " << wavy.get_nmo() << endl;
     wavy.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
     bvec MOs_to_delete(wavy.get_nmo(), false);
@@ -769,7 +767,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     for (long long int _r = 1; _r < upper_r; _r++)
     {
         double r = _r * dr;
-        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 360, 5800, opt.debug);
+        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800, opt.debug);
         if (_r >= 1) {
             tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
         }
@@ -827,69 +825,6 @@ void spherical_harmonic_test()
     }
 };
 
-void calc_cube_ML(vec data, WFN &dummy, const int atom = -1)
-{
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1);
-    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
-    CubeRho.give_parent_wfn(dummy);
-
-    for (int i = 0; i < 3; i++)
-    {
-        CubeRho.set_origin(i, MinMax[i]);
-        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
-    CubeRho.set_comment2("from " + dummy.get_path());
-    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
-
-    time_point start = get_time();
-
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom != -1)
-        std::cout << "Calculation for atom " << atom << std::endl;
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
-
-                if (atom == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms));
-                else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    using namespace std;
-    time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-    if (atom == -1)
-    {
-        CubeRho.write_file(true);
-    }
-    else
-    {
-        std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho_" + std::to_string(atom) + ".cube");
-        CubeRho.write_file(fn, false);
-    }
-};
 
 // Only valid for one atom positioned at 0,0,0
 double compute_MO_spherical_orig(double x, double y, double z, double expon, double coef, int type)
@@ -1020,8 +955,8 @@ void calc_rho_cube(WFN &dummy)
         CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2");
-    CubeRho.set_comment2("from " + dummy.get_path());
-    CubeRho.path = get_basename_without_ending(dummy.get_path()) + "_rho.cube";
+    CubeRho.set_comment2("from " + dummy.get_path().string());
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
 
     time_point start = get_time();
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
@@ -1082,7 +1017,7 @@ void calc_rho_cube(WFN &dummy)
     CubeRho.calc_dv();
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
 
-    std::string fn(get_basename_without_ending(dummy.get_path()) + "_rho.cube");
+    std::filesystem::path fn((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
     CubeRho.write_file(fn, false);
 };
 
@@ -1100,8 +1035,7 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     vec data{};
 
     npy::LoadArrayFromNumpy(coef_fn, shape, fortran_order, data);
-    WFN dummy(7);
-    dummy.read_xyz(xyzfile, std::cout);
+    WFN dummy(xyzfile);
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
 
@@ -1118,8 +1052,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
     using namespace std;
     for (int i = 0; i < 1; i++)
     {
-        WFN wavy(8);
-        wavy.read_molden("Co2.molden", cout, true);
+        WFN wavy("Co2.molden");
         opt.cif = "Co2.cif";
         opt.dmin = 0.5;
         cout << "STARTING CALC" << endl;
@@ -1145,19 +1078,15 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     string dat = "core_dens_" + ele + ".dat";
     int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
-
-    WFN ECP_way_Au(9);
     string def2 = ele + "_def2TZVP.gbw";
-    ECP_way_Au.read_gbw(def2, cout, false, false);
+    WFN ECP_way_Au(def2);
     ECP_way_Au.delete_unoccupied_MOs();
     ECP_way_Au.set_has_ECPs(true, true, 1);
 
     string jorge = ele + "_jorge.gbw";
-    WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw(jorge, cout, false);
+    WFN wavy_full_Au(jorge);
     wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw(jorge, cout, false);
+    WFN wavy_val_Au(jorge);
     wavy_val_Au.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
@@ -1245,16 +1174,13 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     const int el_nr = constants::get_Z_from_label(ele.c_str()) + 1;
     Thakkar T_Au(el_nr);
 
-    WFN ECP_way_Au(9);
-    ECP_way_Au.read_gbw(ele + "_def2TZVP.gbw", cout, false, false);
+    WFN ECP_way_Au(ele + "_def2TZVP.gbw");
     ECP_way_Au.delete_unoccupied_MOs();
     ECP_way_Au.set_has_ECPs(true, true, 1);
 
-    WFN wavy_full_Au(9);
-    wavy_full_Au.read_gbw(ele + "_jorge.gbw", cout, false);
+    WFN wavy_full_Au(ele + "_jorge.gbw");
     wavy_full_Au.delete_unoccupied_MOs();
-    WFN wavy_val_Au(9);
-    wavy_val_Au.read_gbw(ele + "_jorge.gbw", cout, false);
+    WFN wavy_val_Au(ele + "_jorge.gbw");
     wavy_val_Au.delete_unoccupied_MOs();
     cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
@@ -1478,7 +1404,7 @@ void test_analytical_fourier()
     bool correct = true;
 
     cdouble max_diff, diff;
-    for (int type = 0; type < 6; type++)
+    for (int type = 6; type < 7; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
@@ -1644,7 +1570,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 #ifdef _OPENMP
     omp_destroy_lock(&l);
 #endif
-    CubeMO.path = "Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube";
+    CubeMO.set_path("Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube");
     CubeMO.write_file();
 }
 

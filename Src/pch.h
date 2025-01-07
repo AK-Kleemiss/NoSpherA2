@@ -30,6 +30,13 @@
 #include <algorithm>
 #include <atomic>
 #include <deque>
+#include <filesystem>
+#ifdef __SSE2__
+#include <emmintrin.h>
+#endif
+#ifdef __AVX__
+#include <immintrin.h>
+#endif
 
 // Here are the system specific libaries
 #ifdef _WIN32
@@ -47,3 +54,5 @@
 #include <cstring>
 #endif
 
+extern void* BLAS_pointer;
+extern bool has_BLAS;

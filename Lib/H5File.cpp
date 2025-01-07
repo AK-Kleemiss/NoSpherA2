@@ -12,6 +12,7 @@
 
 #include <iostream>
 #include <string>
+#include <filesystem>
 
 #include "H5Include.h"
 #include "H5Exception.h"
@@ -114,6 +115,30 @@ H5File::H5File(const H5std_string &name, unsigned int flags, const FileCreatProp
         p_get_file(name.c_str(), flags, create_plist, access_plist);
     }
     catch (FileIException &open_file) {
+        throw open_file;
+    }
+}
+
+//--------------------------------------------------------------------------
+// Function:    H5File overloaded constructor
+///\brief       Opens an HDF5 file using a non-default access property list
+///\param       name         - IN: Name of the file - \c std::filesystem::path
+///                            or \c std::string
+///\param       flags        - IN: File access flags
+///\param       create_plist - IN: File creation property list, used when
+///             modifying default file meta-data.  Default to
+///             FileCreatPropList::DEFAULT
+/// \param      access_plist - IN: File access property list. Default to
+///             FileAccPropList::DEFAULT
+/// December 2024 by Florian Kleemiss
+H5File::H5File(const std::filesystem::path& name, unsigned int flags, const FileCreatPropList& create_plist,
+    const FileAccPropList& access_plist)
+    : Group(), id(H5I_INVALID_HID)
+{
+    try {
+        p_get_file(name.string().c_str(), flags, create_plist, access_plist);
+    }
+    catch (FileIException& open_file) {
         throw open_file;
     }
 }

@@ -7,13 +7,13 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                olex2/Wfn_job/Part_1/thpp.wfx done!
+Reading:              "olex2/Wfn_job/Part_1/thpp.wfx" done!
 Number of atoms in Wavefunction file: 26 Number of MOs: 58
-Reading:                olex2/Wfn_job/Part_2/thpp.wfx done!
+Reading:              "olex2/Wfn_job/Part_2/thpp.wfx" done!
 Number of atoms in Wavefunction file: 26 Number of MOs: 58
 Number of protons: 116
 Number of electrons: 116
-Reading:                                  thpp.cif... done!
+Reading:                                   "thpp.cif" done!
 There are:
   26 atoms read from the wavefunction, of which 
   26 are identified as asymmetric unit atoms!
@@ -56,7 +56,7 @@ Table of Charges in electrons
       H14C     0.111     0.074     0.065
 Total number of electrons in the wavefunction: 114.734
  and Hirshfeld electrons (asym unit): 116.040
-Reading:                                     thpp.hkl done!
+Reading:                                   "thpp.hkl" done!
 Nr of reflections read from file: 2975
 Number of symmetry operations: 2
 Nr of reflections to be used: 5832
@@ -66,12 +66,12 @@ Number of k-points to evaluate: 5832 for 2208 gridpoints.
 [=============================================================] 100% 
 Number of protons: 116
 Number of electrons: 116.000
-Reading:                                  thpp.cif... done!
+Reading:                                   "thpp.cif" done!
 There are:
   26 atoms read from the wavefunction, of which 
    6 are identified as asymmetric unit atoms!
 
-Making Becke Grids... ...                             done! Number of gridpoints: 408
+Making Becke Grids... ...                  done! Number of gridpoints: 408
 Calculating spherical densities...                    done!
 Pruning Grid...                                       done! Number of gridpoints: 408
 Calculating non-spherical densities...                done!

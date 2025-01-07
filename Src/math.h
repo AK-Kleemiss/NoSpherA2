@@ -46,10 +46,10 @@ template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original);
 
 // Function to collect rows from a vec2 based on a vector of indices
-vec2 collectRows(const vec2 &matrix, const std::vector<int> &indices);
+vec2 collectRows(const vec2 &matrix, const ivec &indices);
 
 // Function to collect rows from a vec3 based on a vector of indices
-vec3 collectRows(const vec3 &cube, const std::vector<int> &indices);
+vec3 collectRows(const vec3 &cube, const ivec &indices);
 
 // FLATTEN Operation
 //  Flatten vector 2D
@@ -72,8 +72,7 @@ template <typename T>
 std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1,
                             const std::vector<std::vector<T>> &mat2,
                             bool transp1=false,
-                            bool transp2=false,
-	                        bool BLAS_enabled=false);
+                            bool transp2=false);
 
 //BLAS dot product from flattend matrices
 template <typename T>
@@ -84,8 +83,7 @@ std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1,
                                 const int& mat2_d0,
                                 const int& mat2_d1,
                                 bool transp1=false,
-                                bool transp2=false,
-                                bool BLAS_enabled=false);
+                                bool transp2=false);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
@@ -103,8 +101,7 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, co
 template <typename T>
 std::vector<T> dot(const std::vector<std::vector<T>>& mat, 
                     const std::vector<T>& vec,
-                    bool transp,
-                    bool BLAS_enabled = false);
+                    bool transp);
 
 //BLAS implementation of matrix multiplication 2D x 1D
 template <typename T>
@@ -117,16 +114,23 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
 // 1D x 1D MATRIX MULTIPLICATION
 // Wrapper for BLAS dot product
 template <typename T>
-T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate, bool BLAS_enabled = false);
+T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
 //BLAS implementation of matrix multiplication 1D x 1D
 template <typename T>
 T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
+// Self written matrix multiplication with flat vectors
 template <typename T>
 T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+
+template <typename T>
+std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1 = false);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
 
 void _test_openblas();
+
+void* math_load_BLAS(int num_threads);
+void math_unload_BLAS(void* _hOpenBlas);

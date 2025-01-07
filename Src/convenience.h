@@ -41,6 +41,7 @@ typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<std::string> svec;
+typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point time_point;
 
 int vec_sum(const bvec &in);
@@ -132,9 +133,7 @@ namespace sha
 bool is_similar_rel(const double &first, const double &second, const double &tolerance);
 bool is_similar(const double &first, const double &second, const double &tolerance);
 bool is_similar_abs(const double &first, const double &second, const double &tolerance);
-std::string get_home_path(void);
-void join_path(std::string &s1, std::string &s2);
-void join_path(std::string &s1, std::initializer_list<std::string> s2);
+std::filesystem::path get_home_path(void);
 char asciitolower(char in);
 
 bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g);
@@ -193,14 +192,13 @@ void write_timing_to_file(std::ostream &file, std::vector<time_point> time_point
 
 int CountWords(const char *str);
 
-bool exists(const std::string &name);
+//inline bool exists(const std::filesystem::path& name) {
+//    return std::filesystem::exists(name);
+//};
 
-void copy_file(std::string &from, std::string &to);
+void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
-std::string get_filename_from_path(const std::string &input);
-std::string get_foldername_from_path(const std::string &input);
-std::string get_basename_without_ending(const std::string &input);
 //------------------Functions to work with configuration files--------------------------
 bool check_bohr(WFN &wave, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
@@ -213,7 +211,7 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string& text, size_t& bar_width) {
+inline void print_centered_text(const std::string& text, int& bar_width) {
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
@@ -227,7 +225,7 @@ inline void print_centered_text(const std::string& text, size_t& bar_width) {
 }
 
 //-------------------------Progress_bar--------------------------------------------------
-// LMS: My implementation of a progress bar, i would like it to stay within one line that is compatible with parallel loops
+// LMS: My implementation of a progress bar, I would like it to stay within one line that is compatible with parallel loops
 class ProgressBar
 {
 public:
@@ -241,7 +239,7 @@ public:
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
     {
-        size_t bw = bar_width_ + 2;
+        int bw = bar_width_ + 2;
         // Write status text
         print_centered_text(status_text_, bw);
         linestart = std::cout.tellp();
@@ -308,7 +306,7 @@ private:
     const int worksize_;
     const float workpart_;
     const int percent_;
-    size_t bar_width_;
+    int bar_width_;
     std::string fill_;
     std::string remainder_;
     std::string status_text_;
@@ -326,13 +324,13 @@ void readxyzMinMax_fromWFN(
     bool no_bohr = false);
 
 void readxyzMinMax_fromCIF(
-    std::string cif,
+    std::filesystem::path cif,
     double *CoordMinMax,
     int *NbSteps,
     vec2 &cm,
     double Resolution);
 
-bool read_fracs_ADPs_from_CIF(std::string cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 
 double double_from_string_with_esd(std::string in);
 
@@ -487,12 +485,13 @@ struct tonto_primitive
     tonto_primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
     tonto_primitive(int c, int t, double e, double coef);
 };
+typedef std::array<int, 3> hkl_t;
+typedef std::set<hkl_t> hkl_list;
+typedef std::set<hkl_t>::const_iterator hkl_list_it;
 
-typedef std::set<ivec> hkl_list;
-typedef std::set<ivec>::const_iterator hkl_list_it;
-
-typedef std::set<vec> hkl_list_d;
-typedef std::set<vec>::const_iterator hkl_list_it_d;
+typedef std::array<double, 3> hkl_d;
+typedef std::set<hkl_d> hkl_list_d;
+typedef std::set<hkl_d>::const_iterator hkl_list_it_d;
 
 //---------------- Object for handling all input options -------------------------------
 struct options
@@ -521,35 +520,35 @@ struct options
     ivec2 hkl_min_max{{-100, 100}, {-100, 100}, {-100, 100}};
     vec2 twin_law;
     ivec2 combined_tsc_groups;
-    svec combined_tsc_calc_files;
-    svec combined_tsc_calc_cifs;
+    pathvec combined_tsc_calc_files;
+    pathvec combined_tsc_calc_cifs;
     std::vector<unsigned int> combined_tsc_calc_mult;
     ivec combined_tsc_calc_charge;
     svec arguments;
-    svec combine_mo;
+    pathvec combine_mo;
     svec Cations;
     svec Anions;
-    svec pol_wfns;
+    pathvec pol_wfns;
     ivec cmo1;
     ivec cmo2;
     ivec ECP_nrs;
     ivec ECP_elcounts;
-    std::string SALTED_DIR;
+    std::filesystem::path SALTED_DIR;
     std::string SALTED_DFBASIS;
-    std::string wfn;
-    std::string wfn2;
-    std::string fchk;
+    std::filesystem::path wfn;
+    std::filesystem::path wfn2;
+    std::filesystem::path fchk;
     std::string basis_set;
-    std::string hkl;
-    std::string cif;
+    std::filesystem::path hkl;
+    std::filesystem::path cif;
     std::string method;
-    std::string xyz_file;
-    std::string coef_file;
+    std::filesystem::path xyz_file;
+    std::filesystem::path coef_file;
     std::string fract_name;
-    std::string wavename;
-    std::string gaussian_path;
-    std::string turbomole_path;
-    std::string basis_set_path;
+    std::filesystem::path wavename;
+    std::filesystem::path gaussian_path;
+    std::filesystem::path turbomole_path;
+    std::filesystem::path basis_set_path;
     bool debug = false;
     bool calc = false;
     bool eli = false;
@@ -621,80 +620,6 @@ struct options
         groups.resize(1);
         look_for_debug(argc, argv);
     };
-
-    options(const int accuracy,
-            const int threads,
-            const int pbc,
-            const double resolution,
-            const double radius,
-            const bool becke,
-            const bool electron_diffraction,
-            const bool ECP,
-            const bool set_ECPs,
-            const int ECP_mode,
-            const bool calc,
-            const bool eli,
-            const bool esp,
-            const bool elf,
-            const bool lap,
-            const bool rdg,
-            const bool hdef,
-            const bool def,
-            const bool fract,
-            const bool hirsh,
-            const bool s_rho,
-            const bool SALTED,
-            const bool Olex2_1_3_switch,
-            const bool iam_switch,
-            const bool read_k_pts,
-            const bool save_k_pts,
-            const bool combined_tsc_calc,
-            const bool binary_tsc,
-            const bool cif_based_combined_tsc_calc,
-            const bool no_date,
-            const bool gbw2wfn,
-            const bool old_tsc,
-            const bool thakkar_d_plot,
-            const double sfac_scan,
-            const double sfac_diffuse,
-            const double dmin,
-            const int hirsh_number,
-            const ivec &MOs,
-            const ivec2 &groups,
-            const vec2 &twin_law,
-            const ivec2 &combined_tsc_groups,
-            const bool all_mos,
-            const bool test,
-            const std::string &wfn,
-            const std::string &fchk,
-            const std::string &basis_set,
-            const std::string &hkl,
-            const std::string &cif,
-            const std::string &method,
-            const std::string &xyz_file,
-            const std::string &coef_file,
-            const std::string &fract_name,
-            const svec &combined_tsc_calc_files,
-            const svec &combined_tsc_calc_cifs,
-            const std::string &wavename,
-            const std::string &gaussian_path,
-            const std::string &turbomole_path,
-            const std::string &basis_set_path,
-            const std::string &SALTED_DIR,
-            const std::string &SALTED_DFBASIS,
-            const svec &arguments,
-            const svec &combine_mo,
-            const svec &Cations,
-            const svec &Anions,
-            const ivec &cmo1,
-            const ivec &cmo2,
-            const ivec &ECP_nrs,
-            const ivec &ECP_elcounts,
-            const double mem,
-            const unsigned int mult,
-            const bool debug,
-            const hkl_list &m_hkl_list,
-            std::ostream &log_file);
 };
 
 const double gaussian_radial(primitive &p, double &r);
@@ -712,8 +637,11 @@ bool is_nan(double &in);
 bool is_nan(float &in);
 bool is_nan(long double &in);
 bool is_nan(cdouble &in);
+
+bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
+
 #ifdef _WIN32
-bool ExtractDLL(const std::string &dllName);
+bool ExtractDLL(const std::filesystem::path &dllName);
 bool check_OpenBLAS_DLL(const bool &debug = false);
 #endif
 

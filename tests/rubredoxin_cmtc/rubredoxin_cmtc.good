@@ -7,17 +7,17 @@
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
-Reading:                               residues/1.gbw done!
+Reading:                             "residues/1.gbw" done!
 Number of atoms in Wavefunction file: 18 Number of MOs: 364
-Reading:                               residues/2.gbw done!
+Reading:                             "residues/2.gbw" done!
 Number of atoms in Wavefunction file: 34 Number of MOs: 700
-Reading:                               residues/3.gbw done!
+Reading:                             "residues/3.gbw" done!
 Number of atoms in Wavefunction file: 34 Number of MOs: 700
-Reading:                               residues/4.gbw done!
+Reading:                             "residues/4.gbw" done!
 Number of atoms in Wavefunction file: 31 Number of MOs: 642
 Number of protons: 57
 Number of electrons: 56
-Reading:                            residues/1.cif... done!
+Reading:                             "residues/1.cif" done!
 There are:
   18 atoms read from the wavefunction, of which 
   12 are identified as asymmetric unit atoms!
@@ -46,7 +46,7 @@ Table of Charges in electrons
        O_2    -0.212     0.253    -0.345
 Total number of electrons in the wavefunction: 39.030
  and Hirshfeld electrons (asym unit): 39.007
-Reading:                                   1yk4_h.hkl done!
+Reading:                                 "1yk4_h.hkl" done!
 Nr of reflections read from file: 200
 Number of symmetry operations: 4
 Nr of reflections to be used: 800
@@ -56,7 +56,7 @@ Number of k-points to evaluate: 800 for 2758 gridpoints.
 [=============================================================] 100% 
 Number of protons: 111
 Number of electrons: 110.000
-Reading:                            residues/2.cif... done!
+Reading:                             "residues/2.cif" done!
 There are:
   34 atoms read from the wavefunction, of which 
   22 are identified as asymmetric unit atoms!
@@ -99,7 +99,7 @@ Total number of electrons in the wavefunction: 69.941
 [=============================================================] 100% 
 Number of protons: 111
 Number of electrons: 110.000
-Reading:                            residues/3.cif... done!
+Reading:                             "residues/3.cif" done!
 There are:
   34 atoms read from the wavefunction, of which 
   19 are identified as asymmetric unit atoms!
@@ -139,7 +139,7 @@ Total number of electrons in the wavefunction: 48.469
 [=============================================================] 100% 
 Number of protons: 102
 Number of electrons: 102.000
-Reading:                            residues/4.cif... done!
+Reading:                             "residues/4.cif" done!
 There are:
   31 atoms read from the wavefunction, of which 
   19 are identified as asymmetric unit atoms!

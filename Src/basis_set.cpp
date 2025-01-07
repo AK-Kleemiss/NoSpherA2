@@ -18,7 +18,7 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
 {
     using namespace std;
     string basis_set_name;
-    string temp;
+    std::filesystem::path temp;
     bool end = false;
     bool manual = false;
     while (!end)
@@ -50,7 +50,7 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
     }
     if (debug)
         cout << "File of basis set to load: " << temp << endl;
-    ifstream ifile(temp.c_str(), ios::in);
+    ifstream ifile(temp, ios::in);
     //  Looking for all the types of atoms we need to find
     svec elements_list;
     bool found = false;
@@ -217,19 +217,19 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
                 {
                 case 's':
                 case 'S':
-                    temp_vals[1] *= pow((2 * temp[0] / pi), 0.75);
+                    temp_vals[1] *= pow((2 * temp_vals[0] / pi), 0.75);
                     break;
                 case 'p':
                 case 'P':
-                    temp_vals[1] *= pow((128 * pow(temp[0], 5) / pow(pi, 3)), 0.25);
+                    temp_vals[1] *= pow((128 * pow(temp_vals[0], 5) / pow(pi, 3)), 0.25);
                     break;
                 case 'd':
                 case 'D':
-                    temp_vals[1] *= (pow(2048 * pow(temp[0], 7) / (9 * pow(pi, 3)), 0.25));
+                    temp_vals[1] *= (pow(2048 * pow(temp_vals[0], 7) / (9 * pow(pi, 3)), 0.25));
                     break;
                 case 'f':
                 case 'F':
-                    temp_vals[1] *= pow((32768 * pow(temp[0], 9) / (225 * pow(pi, 3))), 0.25);
+                    temp_vals[1] *= pow((32768 * pow(temp_vals[0], 9) / (225 * pow(pi, 3))), 0.25);
                     break;
                 default:
                     cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -254,43 +254,43 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
                         {
                         case 's':
                         case 'S':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 1, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type S" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type S" << endl;
                             break;
                         case 'p':
                         case 'P':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 2, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type P" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type P" << endl;
                             break;
                         case 'd':
                         case 'D':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 3, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type D" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type D" << endl;
                             break;
                         case 'f':
                         case 'F':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 4, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type F" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type F" << endl;
                             break;
                         default:
                             cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -300,7 +300,7 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
                 }         // end for h = ncen
                 //nr_exp++;
                 if (debug)
-                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
+                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
                 if (dum > count)
                 {
                     cout << "this should not happen, lets stop before i do something silly!" << endl;
@@ -331,24 +331,17 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
  * @param manual A boolean flag indicating whether to manually input the basis set name.
  * @return Returns true if the basis set is successfully read and set, false otherwise.
  */
-bool read_basis_set_vanilla(const std::string& basis_set_path, WFN& wave, const bool& debug, bool manual)
+bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug, bool manual)
 {
     using namespace std;
     string basis_set_name;
-    string temp_name;
+    std::filesystem::path temp_name;
     bool end = false;
     while (!end)
     {
-        if (wave.get_basis_set_name().length() < 3 || manual)
-        {
-            cout << "Which basis set do you want to load?" << endl;
-            cin >> basis_set_name;
-        }
-        else if (!manual)
-            basis_set_name = wave.get_basis_set_name();
+        basis_set_name = wave.get_basis_set_name();
         // assemble basis set name and look if file exists
-        temp_name = basis_set_path;
-        temp_name.append(basis_set_name);
+        temp_name = basis_set_path / basis_set_name;
         if (exists(temp_name))
         {
             if (debug)
@@ -366,7 +359,7 @@ bool read_basis_set_vanilla(const std::string& basis_set_path, WFN& wave, const 
     wave.set_basis_set_name(basis_set_name);
     if (debug)
         cout << "File of basis set to load: " << temp_name << endl;
-    ifstream ifile(temp_name.c_str(), ios::in);
+    ifstream ifile(temp_name, ios::in);
     //  Looking for all the types of atoms we need to find
     svec elements_list;
     bool found = false;
@@ -595,26 +588,17 @@ bool read_basis_set_vanilla(const std::string& basis_set_path, WFN& wave, const 
  * @param debug Flag indicating whether to enable debug mode.
  * @return Returns true if the basis set was successfully read and updated, false otherwise.
  */
-bool read_basis_set_missing(const std::string &basis_set_path, WFN &wave, bool debug)
+bool read_basis_set_missing(const std::filesystem::path &basis_set_path, WFN &wave, bool debug)
 {
     using namespace std;
-    string basis_set_name;
-    string temp;
+    filesystem::path temp_p;
     bool end = false;
     bool manual = false;
     while (!end)
     {
-        if (wave.get_basis_set_name().length() < 3)
-        {
-            cout << "Which basis set do you want to load?" << endl;
-            cin >> basis_set_name;
-        }
-        else if (!manual)
-            basis_set_name = wave.get_basis_set_name();
         // assemble basis set name and look if file exists
-        temp = basis_set_path;
-        temp.append(basis_set_name);
-        if (exists(temp))
+        temp_p = basis_set_path / wave.get_basis_set_name();
+        if (exists(temp_p))
         {
             if (debug)
                 cout << "basis set is valid, continueing..." << endl;
@@ -630,8 +614,8 @@ bool read_basis_set_missing(const std::string &basis_set_path, WFN &wave, bool d
         }
     }
     if (debug)
-        cout << "File of basis set to load: " << temp << endl;
-    ifstream ifile(temp.c_str(), ios::in);
+        cout << "File of basis set to load: " << temp_p << endl;
+    ifstream ifile(temp_p, ios::in);
     //  Looking for all the types of atoms we need to find
     svec elements_list;
     bool found = false;
@@ -809,43 +793,43 @@ bool read_basis_set_missing(const std::string &basis_set_path, WFN &wave, bool d
                         {
                         case 's':
                         case 'S':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 1, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type S" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type S" << endl;
                             break;
                         case 'p':
                         case 'P':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 2, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type P" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type P" << endl;
                             break;
                         case 'd':
                         case 'D':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 3, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type D" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type D" << endl;
                             break;
                         case 'f':
                         case 'F':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 4, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
                             if (debug)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type F" << endl;
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type F" << endl;
                             break;
                         default:
                             cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -855,7 +839,7 @@ bool read_basis_set_missing(const std::string &basis_set_path, WFN &wave, bool d
                 }         // end for h = ncen
                 //nr_exp++;
                 if (debug)
-                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
+                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_num[0] << " exp: " << temp_num[1] << endl;
                 if (dum > count)
                 {
                     cout << "this should not happen, lets stop before i do something silly!" << endl;

@@ -10,8 +10,8 @@ LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 
 all: NoSpherA2 
 
-OBJS := wfn_class.o atoms.o properties.o spherical_density.o AtomGrid.o basis_set.o convenience.o sphere_lebedev_rule.o scattering_factors.o cube.o fchk.o JKFit.o NoSpherA2.o SALTED_utilities.o constants.o ECPs_corrections.o integrator.o hdf5.o SALTED.o
-OBJS_RASC_d := wfn_class.o_RASC_d atoms.o_RASC_d properties.o_RASC_d spherical_density.o_RASC_d AtomGrid.o_RASC_d basis_set.o_RASC_d convenience.o_RASC_d sphere_lebedev_rule.o_RASC_d scattering_factors.o_RASC_d cube.o_RASC_d fchk.o_RASC_d JKFit.o_RASC_d NoSpherA2.o_RASC_d SALTED_utilities.o_RASC_d constants.o_RASC_d SALTED_math.o_RASC_d SALTED_equicomb.o_RASC_d SALTED_io.o_RASC_d SALTED_predictor.o_RASC_d hdf5.o_RASC_d ECPs_corrections.o_RASC_d integrator.o_RASC_d
+OBJS := wfn_class.o atoms.o properties.o spherical_density.o AtomGrid.o basis_set.o convenience.o sphere_lebedev_rule.o scattering_factors.o cube.o fchk.o JKFit.o NoSpherA2.o SALTED_utilities.o constants.o ECPs_corrections.o integrator.o hdf5.o math.o SALTED_io.o SALTED_predictor.o SALTED_equicomb.o
+OBJS_RASC_d := wfn_class.o_RASC_d atoms.o_RASC_d properties.o_RASC_d spherical_density.o_RASC_d AtomGrid.o_RASC_d basis_set.o_RASC_d convenience.o_RASC_d sphere_lebedev_rule.o_RASC_d scattering_factors.o_RASC_d cube.o_RASC_d fchk.o_RASC_d JKFit.o_RASC_d NoSpherA2.o_RASC_d SALTED_utilities.o_RASC_d constants.o_RASC_d math.o_RASC_d SALTED_equicomb.o_RASC_d SALTED_io.o_RASC_d SALTED_predictor.o_RASC_d hdf5.o_RASC_d ECPs_corrections.o_RASC_d integrator.o_RASC_d
 GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 GCC_OPTS_DEBUG := -std=c++17 -Og -g -c -fmessage-length=0 -static -MMD -MP
 

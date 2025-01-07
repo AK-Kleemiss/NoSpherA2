@@ -152,7 +152,7 @@ std::string Rascaline_Descriptors::gen_parameters()
 }
 
 //How about this?
-Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
+Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path& filepath, const int& nrad, const int& nang, const double& atomic_gaussian_width,
                                              const double& rcut, const int& n_atoms, const std::vector<std::string>& neighspe, const std::vector<std::string>& species,
                                              const double& center_atom_weight, const double& spline_accuracy, const double& cutoff_width)
 {
@@ -173,7 +173,7 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::string& filepath, const 
 // RASCALINE1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath);
+    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath.string());
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
@@ -408,3 +408,67 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
     return atom_elecs;
 
 }
+
+
+void calc_cube_ML(vec data, WFN& dummy, const int atom)
+{
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    readxyzMinMax_fromWFN(dummy, MinMax, steps, 2.5, 0.1, true);
+    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    CubeRho.give_parent_wfn(dummy);
+
+    for (int i = 0; i < 3; i++)
+    {
+        CubeRho.set_origin(i, MinMax[i]);
+        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+    CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
+    CubeRho.set_comment2("from " + dummy.get_path().string());
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
+
+    time_point start = get_time();
+
+    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
+    if (atom != -1)
+        std::cout << "Calculation for atom " << atom << std::endl;
+
+#pragma omp parallel for schedule(dynamic)
+    for (int i = 0; i < CubeRho.get_size(0); i++)
+    {
+        for (int j = 0; j < CubeRho.get_size(1); j++)
+            for (int k = 0; k < CubeRho.get_size(2); k++)
+            {
+
+                vec PosGrid{
+                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
+                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
+                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) };
+
+                if (atom == -1)
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms));
+                else
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
+            }
+        progress->update();
+    }
+    delete (progress);
+
+    using namespace std;
+    time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
+    if (atom == -1)
+    {
+        CubeRho.write_file(true);
+    }
+    else
+    {
+        CubeRho.write_file((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_" + std::to_string(atom) + ".cube", false);
+    }
+};

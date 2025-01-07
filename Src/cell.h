@@ -1,6 +1,7 @@
 #pragma once
 
 #include "constants.h"
+#include <filesystem>
 /**
  * @class cell
  * @brief Represents a crystal cell in three-dimensional space.
@@ -34,11 +35,11 @@ public:
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
     };
-    cell(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    cell(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
         if (debug)
             file << "starting to read cif!" << std::endl;
-        file << "Reading: " << std::setw(41) << filename << std::flush;
+        file << "Reading: " << std::setw(44) << filename << std::flush;
         sym.resize(3);
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
@@ -166,7 +167,7 @@ public:
      * @return The d-spacing of the crystal lattice plane in Angstrom
      */
     template <typename numtype>
-    double get_d_of_hkl(const std::vector<numtype> hkl) const
+    double get_d_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // d will be in Angstrom
         // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
@@ -191,7 +192,7 @@ public:
      * @return sin theta over lambda of the hkl plane
      */
     template <typename numtype>
-    double get_stl_of_hkl(const std::vector<numtype> hkl) const
+    double get_stl_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // Result will be in Angstrom^-1
         return 1.0 / (2 * get_d_of_hkl(hkl));
@@ -246,9 +247,9 @@ public:
      * @return true if successful
      * @return false if unsuccessful
      */
-    bool read_CIF(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    bool read_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
+        std::ifstream cif_input(filename, std::ios::in);
         bvec found;
         found.resize(7);
         for (int k = 0; k < 7; k++)
@@ -376,9 +377,9 @@ public:
      * @param file where to print output
      * @param debug flag to print debug information
      */
-    void read_symm_CIF(std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    void read_symm_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
+        std::ifstream cif_input(filename, std::ios::in);
         std::string line;
         cif_input.clear();
         cif_input.seekg(0, cif_input.beg);

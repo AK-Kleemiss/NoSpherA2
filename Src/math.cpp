@@ -1,4 +1,4 @@
-#include "SALTED_math.h"
+#include "math.h"
 #if has_RAS
 #include "cblas.h"
 #include "openblas_config.h"
@@ -178,9 +178,9 @@ template cvec2 self_dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool
 
 // typedef void (*ExampleFunctionType)(void);
 
-// Fast dot product using OpenBLAS
+// Fast 2Dx2D dot product using OpenBLAS
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2, bool BLAS_enabled)
+std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2)
 {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
@@ -196,7 +196,7 @@ std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const s
     // Check if matrix multiplication is possible
     err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
 
-    if (BLAS_enabled)
+    if (has_BLAS)
     {
         // Flatten input matrices
         std::vector<T> flatMat1 = flatten(mat1);
@@ -210,13 +210,13 @@ std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1, const s
     }
     // return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
 }
-template std::vector<std::vector<float>> dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2, bool transp1, bool transp2, bool BLAS_enabled);
-template vec2 dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2, bool BLAS_enabled);
-template cvec2 dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2, bool BLAS_enabled);
+template std::vector<std::vector<float>> dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2, bool transp1, bool transp2);
+template vec2 dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2);
+template cvec2 dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2);
 
 // When the matrices are given as flat vectors
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2, bool BLAS_enabled)
+std::vector<std::vector<T>> dot(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2)
 {
     // Check if flatMat1 and flatMat2 have the correct size
     err_checkf(flatMat1.size() == mat1_d0 * mat1_d1, "flat Matrix 1 has incorrect size", std::cout);
@@ -236,7 +236,7 @@ std::vector<std::vector<T>> dot(const std::vector<T> &flatMat1, const std::vecto
     // Check if matrix multiplication is possible
     err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
 
-    if (BLAS_enabled)
+    if (has_BLAS)
     {
         return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
     }
@@ -250,9 +250,9 @@ std::vector<std::vector<T>> dot(const std::vector<T> &flatMat1, const std::vecto
     }
     // return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
 }
-template std::vector<std::vector<float>> dot(const std::vector<float> &flatMat1, const std::vector<float> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
-template vec2 dot(const vec &flatMat1, const vec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
-template cvec2 dot(const cvec &flatMat1, const cvec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2, bool BLAS_enabled);
+template std::vector<std::vector<float>> dot(const std::vector<float> &flatMat1, const std::vector<float> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
+template vec2 dot(const vec &flatMat1, const vec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
+template cvec2 dot(const cvec &flatMat1, const cvec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 
 template <typename T>
 std::vector<std::vector<T>> dot_BLAS(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
@@ -357,9 +357,45 @@ template std::vector<float> self_dot(const std::vector<std::vector<float>> &mat,
 template vec self_dot(const vec2 &mat, const vec &_vec, bool transp1);
 template cvec self_dot(const cvec2 &mat, const cvec &_vec, bool transp1);
 
+// 2D x 1D MATRIX MULTIPLICATION
+template <typename T>
+std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1)
+{
+    std::vector<std::vector<T>> matCopy = mat;
+    if (transp1)
+    {
+        matCopy = transpose(mat);
+    }
+
+    int mat_rows = static_cast<int>(matCopy.size());
+    int mat_cols = static_cast<int>(matCopy[0].size());
+    int vec_size = static_cast<int>(_vec.size());
+
+    // Check if matrix multiplication is possible
+    err_checkf (mat_cols == vec_size || mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
+
+    std::vector<std::vector<T>> result(mat_rows, std::vector<T>(mat_cols));
+#pragma omp parallel
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < mat_rows; i++)
+        {
+            for (int j = 0; j < mat_cols; j++)
+            {
+                result[i][j] = matCopy[i][j] * _vec[j];
+            }
+        }
+    }
+
+    return result;
+}
+template std::vector<std::vector<float>> diag_dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& _vec, bool transp1);
+template vec2 diag_dot(const vec2& mat, const vec& _vec, bool transp1);
+template cvec2 diag_dot(const cvec2& mat, const cvec& _vec, bool transp1);
+
 // Base implementation of matrix-vector multiplication
 template <typename T>
-std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &vec, bool transp, bool BLAS_enabled)
+std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &vec, bool transp)
 {
     int mat_rows = static_cast<int>(mat.size());
     int mat_cols = static_cast<int>(mat[0].size());
@@ -368,7 +404,7 @@ std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> 
     // Check if matrix multiplication is possible
     err_checkf(mat_cols == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
 
-    if (BLAS_enabled)
+    if (has_BLAS)
     {
         return dot_BLAS(flatten(mat), vec, mat_rows, mat_cols, transp);
     }
@@ -378,9 +414,9 @@ std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> 
         return self_dot(mat, vec, transp);
     }
 }
-template std::vector<float> dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &vec, bool transp, bool BLAS_enabled);
-template vec dot(const vec2 &mat, const vec &vec, bool transp, bool BLAS_enabled);
-template cvec dot(const cvec2 &mat, const cvec &vec, bool transp, bool BLAS_enabled);
+template std::vector<float> dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &vec, bool transp);
+template vec dot(const vec2 &mat, const vec &vec, bool transp);
+template cvec dot(const cvec2 &mat, const cvec &vec, bool transp);
 
 template <typename T>
 std::vector<T> dot_BLAS(const std::vector<T> &flatMat, const std::vector<T> &vec, const int &m, const int &n, bool transp)
@@ -434,44 +470,44 @@ template std::vector<float> dot_BLAS(const std::vector<float> &flatMat, const st
 template vec dot_BLAS(const std::vector<double> &flatMat, const std::vector<double> &vec, const int &m, const int &n, bool transp);
 template cvec dot_BLAS(const std::vector<cdouble> &flatMat, const std::vector<cdouble> &vec, const int &m, const int &n, bool transp);
 
+template <typename T>
+T conj(const T& val)
+{
+    if constexpr (std::is_same_v<T, cdouble>)
+    {
+        return std::conj(val);
+    }
+    else
+    {
+        return val;
+    }
+}
+
 // 1D x 1D Vector multiplication
-// Here only for non-complex values
 template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    for (size_t i = 0; i < vec1.size(); ++i)
-    {
-        result += vec1[i] * vec2[i];
+    if (conjugate) {
+        for (size_t i = 0; i < vec1.size(); ++i)
+        {
+            result += conj(vec1[i]) * vec2[i];
+        }
     }
-    return result;
-}
-template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
-template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-
-// Special implementation for complex values
-cdouble self_dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate)
-{
-    cdouble result{};
-    if (!conjugate)
-    {
+    else {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];
         }
     }
-    else
-    {
-        for (size_t i = 0; i < vec1.size(); ++i)
-        {
-            result += std::conj(vec1[i]) * vec2[i];
-        }
-    }
     return result;
 }
+template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
+template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
+template std::complex<double> self_dot(const std::vector<std::complex<double>>& vec1, const std::vector<std::complex<double>>& vec2, bool conjugate);
 
 template <typename T>
-T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate, bool BLAS_enabled)
+T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     // if either of the vectors is empty, return 0
     if (vec1.empty() || vec2.empty())
@@ -483,7 +519,7 @@ T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate, bo
     // Check if vector dimensions match
     err_checkf(size == vec2.size(), "Vector dimensions do not match for multiplication", std::cout);
 
-    if (BLAS_enabled)
+    if (has_BLAS)
     {
         return dot_BLAS(vec1, vec2, conjugate);
     }
@@ -492,9 +528,9 @@ T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate, bo
         return self_dot(vec1, vec2, conjugate);
     }
 }
-template float dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate, bool BLAS_enabled);
-template double dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate, bool BLAS_enabled);
-template cdouble dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate, bool BLAS_enabled);
+template float dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
+template double dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
+template cdouble dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
 
 template <typename T>
 T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
@@ -693,6 +729,23 @@ template vec2 transpose(const vec2 &mat);
 template cvec2 transpose(const cvec2 &mat);
 template ivec2 transpose(const ivec2 &mat);
 
+// vec -> 2D MATRIX
+template <class T>
+std::vector<std::vector<T>> transpose(const std::vector<T>& vector)
+{
+    int size = static_cast<int>(vector.size());
+    std::vector<std::vector<T>> result(1, std::vector<T>(size));
+
+    for (int i = 0; i < size; ++i)
+    {
+        result[0][i] = vector[i];
+    }
+    return result;
+}
+template vec2 transpose(const vec& vector);
+template cvec2 transpose(const cvec& vector);
+template ivec2 transpose(const ivec& vector);
+
 // Reorder 3D Vectors following a given order
 template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original)
@@ -792,34 +845,91 @@ void _test_openblas()
     vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
     // Init Mat B with some values
     vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-
+  math_load_BLAS(1);
   //First test regular dot-product
-  compare_matrices(dot(A, B, false, false, true), self_dot(A, B));
+  compare_matrices(dot(A, B, false, false), self_dot(A, B));
 
   ////Second compare first transpose
-  compare_matrices(dot(A, B, true, false, true), self_dot(transpose(A), B));
+  compare_matrices(dot(A, B, true, false), self_dot(transpose(A), B));
 
   ////Third comparte second transpose
-  compare_matrices(dot(A, B, false, true, true), self_dot(A, transpose(B)));
+  compare_matrices(dot(A, B, false, true), self_dot(A, transpose(B)));
 
   ////Fourth compare both transposed
-  compare_matrices(dot(A, B, true, true, true), self_dot(transpose(A), transpose(B)));
+  compare_matrices(dot(A, B, true, true), self_dot(transpose(A), transpose(B)));
 
     // Init Complex matrices
     cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
     cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
 
   //First test regular dot-product
-  compare_matrices(dot(C, D, false, false, true), self_dot(C, D));
+  compare_matrices(dot(C, D, false, false), self_dot(C, D));
 
   ////Second compare first transpose
-  compare_matrices(dot(C, D, true, false, true), self_dot(transpose(C), D));
+  compare_matrices(dot(C, D, true, false), self_dot(transpose(C), D));
 
   ////Third comparte second transpose
-  compare_matrices(dot(C, D, false, true, true), self_dot(C, transpose(D)));
+  compare_matrices(dot(C, D, false, true), self_dot(C, transpose(D)));
 
   ////Fourth compare both transposed
-  compare_matrices(dot(C, D, true, true, true), self_dot(transpose(C), transpose(D)));
+  compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
 
   std::cout << "All BLAS tests passed!" << std::endl;
+}
+#ifdef _WIN32
+#include "DLL_Helper.h"
+#endif
+
+void* math_load_BLAS(int num_threads)
+{
+#if has_RAS
+#ifdef _WIN32
+    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
+    typedef void (*ExampleFunctionType)(void);
+    BLAS_pointer = static_cast<void*>(LoadLibrary(TEXT("libopenblas.dll")));
+    if (BLAS_pointer != NULL)
+    {
+        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)BLAS_pointer, "cblas_sgemm");
+        if (eF == NULL)
+            return NULL;
+    }
+    has_BLAS = true;
+    return BLAS_pointer;
+#else
+    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
+    char* env = strdup(nums.c_str());
+    putenv(env);
+    has_BLAS = true;
+    return NULL;
+#endif
+#endif
+}
+
+void math_unload_BLAS(void* _hOpenBlas)
+{
+#ifdef _WIN32
+    if (_hOpenBlas != NULL)
+    {
+        int ret;
+        int max_iterations = 150;
+        while (max_iterations > 0)
+        {
+            ret = FreeLibrary((HMODULE)_hOpenBlas);
+            if (ret == 0)
+            {
+                break;
+            }
+            max_iterations--;
+        }
+        if (max_iterations == 0)
+        {
+            std::cout << "Could not free the OpenBLAS library" << std::endl;
+        }
+        else
+        {
+            _hOpenBlas = NULL;
+        }
+    }
+    has_BLAS = false;
+#endif
 }

@@ -8,8 +8,8 @@ This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Number of protons: 182
-Reading: sucrose.hklReading:                               sucrose.cif... done!
-Reading:                                  sucrose.hkl done!
+Reading: "sucrose.hkl"Reading:                                "sucrose.cif" done!
+Reading:                                "sucrose.hkl" done!
 Nr of reflections read from file: 3318
 Number of symmetry operations: 2
 Nr of reflections to be used: 3726

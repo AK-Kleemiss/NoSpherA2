@@ -131,3 +131,4 @@ void GTOnr3c_drv(int (*intor)(double*, int*, int*, int*, int, int*, int, double*
 
 Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);
 Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);
+int fixed_density_fit_test();

@@ -7,6 +7,7 @@
 #include <string>
 #include <fstream>
 #include <array>
+#include <filesystem>
 
 class MO;
 
@@ -25,7 +26,7 @@ private:
     double virial_ratio;
     std::string basis_set_name;
     std::string comment;
-    std::string path;
+    std::filesystem::path path;
     std::string method;
 
     std::vector<MO> MOs;
@@ -44,8 +45,9 @@ private:
     // 10,11,12,13,14,15,16 = 0, +1, -1, +2, -2, +3, -3 etc...
     ivec types;
     vec exponents;
-    vec DensityMatrix;
-    vec SpinDensityMatrix;
+    vec UT_DensityMatrix;
+    vec UT_SpinDensityMatrix;
+    vec2 DM;
     const std::array<std::vector<primitive>, 118> *basis_set;
 
     bool erase_center(const int &g_nr);
@@ -60,6 +62,7 @@ private:
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;
     bool has_ECPs;
+	bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
     // precomputed factors and helper functions for ESP calc
     long long int pre[9][5][5][9];
     void fill_pre();
@@ -71,9 +74,15 @@ private:
     const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
 
+	//----------RI-FIT methods---------------------------
+	ivec _atm, _bas;
+	vec _env;
+
 public:
     WFN();
     WFN(int given_origin);
+    WFN(const std::filesystem::path& filename);
+    WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult);
     std::vector<cube> cub;
     std::vector<atom> atoms;
 
@@ -102,17 +111,17 @@ public:
     void change_basis_set_name(std::string name) { basis_set_name = name; };
     bool add_primitive(const int &cent, const int &type, const double &e, double *values);
     bool add_exp(const int &cent, const int &type, const double &e);
-    void read_known_wavefunction_format(const std::string &fileName, std::ostream &file, const bool debug = false);
-    bool read_wfn(const std::string &fileName, const bool &debug, std::ostream &file);
-    bool read_wfx(const std::string &fileName, const bool &debug, std::ostream &file);
-    bool read_fchk(const std::string &filename, std::ostream &log, const bool debug = false);
-    bool read_xyz(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool read_molden(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool read_gbw(const std::string &filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
-    bool read_ptb(const std::string &filename, std::ostream &file, const bool debug = false);
-    bool write_wfn(const std::string &fileName, const bool &debug, const bool occupied);
-    bool write_xyz(const std::string& fileName, const bool& debug = false);
-    bool set_path(std::string given_path)
+    void read_known_wavefunction_format(const std::filesystem::path&fileName, std::ostream &file, const bool debug = false);
+    bool read_wfn(const std::filesystem::path &fileName, const bool &debug, std::ostream &file);
+    bool read_wfx(const std::filesystem::path&fileName, const bool &debug, std::ostream &file);
+    bool read_fchk(const std::filesystem::path&filename, std::ostream &log, const bool debug = false);
+    bool read_xyz(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool read_molden(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool read_gbw(const std::filesystem::path&filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
+    bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
+    bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied);
+    bool write_xyz(const std::filesystem::path& fileName, const bool& debug = false);
+    bool set_path(std::filesystem::path given_path)
     {
         path = given_path;
         return true;
@@ -126,6 +135,7 @@ public:
     void set_charge(const int &in) { charge = in; };
     const int get_nex() const { return nex; };
     const int get_ncen() const { return ncen; };
+	const void set_ncen(const int& in) { ncen = in; };
     const int get_nmo() const { return nmo; };
     const int get_nmo(const bool &only_occ) const;
     const int get_origin() const { return origin; };
@@ -133,7 +143,7 @@ public:
     const std::string get_comment() const { return comment; };
     const std::string get_CIF_table(const int nr = 0) const;
     const std::string get_basis_set_CIF(const int nr = 0) const;
-    void write_wfn_CIF(const std::string &filename) const;
+    void write_wfn_CIF(const std::filesystem::path &filename) const;
     const double get_exponent(int nr) const { return exponents[nr]; };
     const unsigned int get_nr_electrons() const;
     const unsigned int get_nr_ECP_electrons() const;
@@ -141,7 +151,7 @@ public:
     const std::string get_centers(const bool &bohr) const;
     const std::string get_basis_set_name() const { return basis_set_name; };
     void set_basis_set_name(const std::string &input) { basis_set_name = input; };
-    const std::string get_path() const { return path; };
+    const std::filesystem::path get_path() const { return path; };
     const std::string hdr(const bool &occupied) const;
     void set_method(const std::string &input) { method = input; };
     const std::string get_method() const { return method; };
@@ -172,8 +182,8 @@ public:
     const vec get_norm_const(std::ostream &file, const bool debug = false) const;
     double get_total_energy() const { return total_energy; };
     double get_virial_ratio() const { return virial_ratio; };
-    vec get_DensityMatrix() const { return DensityMatrix; };
-    vec get_SpinDensityMatrix() const { return SpinDensityMatrix; };
+    vec get_DensityMatrix() const { return UT_DensityMatrix; };
+    vec get_SpinDensityMatrix() const { return UT_SpinDensityMatrix; };
     int get_nfunc() const { return nfunc; };
     /**
      * Deletes the basis set information from the given WFN object.
@@ -248,16 +258,18 @@ public:
     const double computeESP(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
     const double computeESP_noCore(const std::array<double, 3>& PosGrid, const vec2 &d2) const;
     //----------DM Handling--------------------------------
+    bool build_DM(std::string basis_set_path, bool debug = false);
     void push_back_DM(const double &value = 0.0);
     bool set_DM(const int &nr, const double &value = 0.0);
     const double get_DM(const int &nr) const;
-    const int get_DM_size() const { return (int)DensityMatrix.size(); };
+    const int get_DM_size() const { return (int)UT_DensityMatrix.size(); };
     void resize_DM(const int &size, const double &value = 0.0);
+    vec2 get_dm() const { return DM; };
     //----------S_DM Handling--------------------------------
     void push_back_SDM(const double &value = 0.0);
     bool set_SDM(const int &nr, const double &value = 0.0);
     const double get_SDM(const int &nr) const;
-    const int get_SDM_size() const { return (int)SpinDensityMatrix.size(); };
+    const int get_SDM_size() const { return (int)UT_SpinDensityMatrix.size(); };
     void resize_SDM(const int &size, const double &value = 0.0);
     //-----------Cube handling-------------------------
     bool push_back_cube(const std::string &filepath, const bool &full, const bool &expert = false);
@@ -268,6 +280,14 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     const double *get_ptr_exponents() { return &exponents[0]; };
     const double *get_ptr_mo_coefficients(const int &mo);
+    //----------RI-FIT methods---------------------------
+    //Return pointers to the array underlying _atm
+    void calc_integration_parameters();
+	int* get_ptr_atm() { return _atm.data(); };
+	int* get_ptr_bas() { return _bas.data(); };
+	double* get_ptr_env() { return _env.data(); };
+    int get_nbas() { return _bas.size(); };
+
 };
 
 #include "mo_class.h"
