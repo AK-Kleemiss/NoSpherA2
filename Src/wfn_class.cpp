@@ -7457,6 +7457,7 @@ bool WFN::delete_basis_set()
 {
     for (int a = 0; a < get_ncen(); a++)
     {
+        atoms[a].shellcount.resize(0);
         int nr_prim = get_atom_primitive_count(a);
         for (int p = 0; p < nr_prim; p++)
         {

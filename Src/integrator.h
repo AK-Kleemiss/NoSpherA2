@@ -25,16 +25,23 @@ private:
 
     int nbas = 0;
     void calc_integration_parameters();
-    void collect_basis_data_from_gbw();
-	void collect_basis_data_internal();
+    void collect_basis_data();
+ //   void collect_basis_data_from_gbw();
+	//void collect_basis_data_internal();
 
     void populate_atm();
 	void populate_bas();
 	void populate_env();
 
     vec normalize_gto(vec coef, vec exp, int l);
+    double gaussian_int(int n, double exp) {
+        double n1 = (n + 1) * 0.5;
+        return std::tgamma(n1) / (2.0 * pow(exp, n1));
+    }
 public:
+    Int_Params();
 	Int_Params(const WFN& wavy);
+	Int_Params operator+(const Int_Params& other);
 
     // Getters
 	int* get_ptr_atm() { return _atm.data(); };

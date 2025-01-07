@@ -22,6 +22,11 @@
 #define atm(SLOT, I) atm[6 * (I) + (SLOT)] // Atom data for atom I
 
 
+Int_Params::Int_Params() {
+    wfn_origin = 0;
+    ncen = 0;
+}
+
 Int_Params::Int_Params(const WFN& wavy) {
     atoms = wavy.atoms;
 	wfn_origin = wavy.get_origin();
@@ -32,8 +37,7 @@ Int_Params::Int_Params(const WFN& wavy) {
 vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
     //GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++) {
-        exp[i] = std::sqrt(std::pow(2, (2 * l + 3)) * constants::ft[l + 1] * std::pow((2 * exp[i]), (l + 1.5))) / (constants::ft[2 * l + 2] * std::sqrt(constants::PI));
-		coef[i] *= exp[i];
+        coef[i] *= 1.0 / std::sqrt(gaussian_int(l * 2 + 2, 2 * exp[i]));
     }
 
     //Normalize contracted GTO
@@ -45,9 +49,8 @@ vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
     //    return numpy.einsum('pi,i->pi', cs, s1)
 	vec2 ee(coef.size(), vec(coef.size(), 0.0));
 	for (int i = 0; i < coef.size(); i++) {
-		for (int j = 0; j < i; j++) {
-            int n1 = (l * 2 + 2 + 1) * 0.5;
-            ee[i][j] = ee[j][i] = std::tgamma(n1) / (2. * std::pow((exp[i] + exp[j]), n1));
+		for (int j = 0; j < i + 1; j++) {
+            ee[i][j] = ee[j][i] = gaussian_int(l * 2 + 2, exp[i] + exp[j]);
 		}
 	}
 	//Do the einsum by hand
@@ -68,41 +71,7 @@ vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
 	return coef;
 }
 
-//void Int_Params::collect_basis_data() {
-//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-//        nbas += atoms[atom_idx].shellcount.size();
-//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
-//            continue;
-//        }
-//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
-//        vec coefficients, exponents;
-//        for (int shell = 0; shell < basis.size(); shell++){
-//            coefficients.push_back(basis[shell].coefficient);
-//			exponents.push_back(basis[shell].exponent);
-//		}
-//        if (wfn_origin == 9) {
-//            for (int i = 0; i < coefficients.size(); i++) {
-//                coefficients[i] *= std::sqrt(constants::PI) * 2;
-//            }
-//        }
-//        if (wfn_origin == 0) {
-//            int coef_idx = 0;
-//            for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
-//				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
-//				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
-//				
-//
-//                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].type - 1);
-//                coef_idx += atoms[atom_idx].shellcount[shell];
-//            }
-//        }
-//
-//
-//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
-//    }
-//}
-
-void Int_Params::collect_basis_data_from_gbw() {
+void Int_Params::collect_basis_data() {
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
         nbas += atoms[atom_idx].shellcount.size();
         if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
@@ -111,18 +80,70 @@ void Int_Params::collect_basis_data_from_gbw() {
         std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
         vec coefficients, exponents;
         for (int shell = 0; shell < basis.size(); shell++){
-			double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
-            coefficients.push_back(coef);
-    		exponents.push_back(basis[shell].exponent);
-    	}
+            coefficients.push_back(basis[shell].coefficient);
+			exponents.push_back(basis[shell].exponent);
+		}
+        if (wfn_origin == 9) {
+            for (int i = 0; i < coefficients.size(); i++) {
+				coefficients[i] *= constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
+            }
+        }
+        if (wfn_origin == 0) {
+            int coef_idx = 0;
+            for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
+				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
+				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
+				
+
+                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].type);
+                
+
+				//Place the new coefs at the correct place in the coefficients vector
+				std::copy(shell_coefs.begin(), shell_coefs.end(), coefficients.begin() + coef_idx);
+                coef_idx += atoms[atom_idx].shellcount[shell];
+            }
+        }
+
 
         basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
     }
 }
 
-void Int_Params::collect_basis_data_internal() {
-
-}
+//void Int_Params::collect_basis_data_from_gbw() {
+//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+//        nbas += atoms[atom_idx].shellcount.size();
+//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
+//            continue;
+//        }
+//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+//        vec coefficients, exponents;
+//        for (int shell = 0; shell < basis.size(); shell++){
+//			double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
+//            coefficients.push_back(coef);
+//    		exponents.push_back(basis[shell].exponent);
+//    	}
+//
+//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
+//    }
+//}
+//
+//void Int_Params::collect_basis_data_internal() {
+//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+//        nbas += atoms[atom_idx].shellcount.size();
+//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
+//            continue;
+//        }
+//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+//        vec coefficients, exponents;
+//        for (int shell = 0; shell < basis.size(); shell++) {
+//            double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
+//            coefficients.push_back(coef);
+//            exponents.push_back(basis[shell].exponent);
+//        }
+//
+//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
+//    }
+//}
 
 void Int_Params::populate_atm() {
     //atom: (Z, ptr, nuclear_model=1, ptr+3, 0,0)  nuclear_model seems to be 1 for all atoms  USURE!!! Nested arrays per atom
@@ -187,7 +208,12 @@ void Int_Params::populate_bas() {
 		int bas_ptr = basis_sets[atoms[atom_idx].charge][2][0];
         for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell += 1) {
 			_bas[index * 8 + 0] = atom_idx; // atom_id
-			_bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type - 1; // l s=0, p=1, d=2 ...
+            if (wfn_origin == 0) {
+                _bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type; // l s=0, p=1, d=2 ...
+			}
+			else {
+				_bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type - 1; // l s=0, p=1, d=2 ...
+			}		
 			_bas[index * 8 + 2] = atoms[atom_idx].shellcount[shell];  // nprim
 			_bas[index * 8 + 3] = 1; // ncentr    Not sure
 			_bas[index * 8 + 5] = bas_ptr;  //Pointer to the end of the _env vector
@@ -202,19 +228,54 @@ void Int_Params::populate_bas() {
 }
 
 void Int_Params::calc_integration_parameters() {
-    if (wfn_origin == 9){
-        collect_basis_data_from_gbw();
-    }
-	else if (wfn_origin == 0){
-		collect_basis_data_internal();
-	}
-    else{
-		std::cout << "Unsupported WFN origin" << std::endl;
-        exit(1);
-	}
+    collect_basis_data();
     populate_atm();
     populate_env();
     populate_bas();
+}
+
+Int_Params Int_Params::operator+(const Int_Params& other) {
+    //off = len(env1)
+    //natm_off = len(atm1)
+    //atm2 = numpy.copy(atm2)
+    //bas2 = numpy.copy(bas2)
+    //atm2[:, PTR_COORD] += off
+    //atm2[:, PTR_ZETA] += off
+    //bas2[:, ATOM_OF] += natm_off
+    //bas2[:, PTR_EXP] += off
+    //bas2[:, PTR_COEFF] += off
+	//atm = numpy.vstack((atm1, atm2))
+	//bas = numpy.vstack((bas1, bas2))
+	//env = numpy.hstack((env1, env2))
+    
+	Int_Params combined;
+	combined._atm.resize(_atm.size() + other._atm.size(), 0);
+	combined._bas.resize(_bas.size() + other._bas.size(), 0);
+	combined._env.resize(_env.size() + other._env.size(), 0);
+    combined.ncen = ncen;
+	combined.nbas = nbas + other.nbas;
+
+	std::copy(_atm.begin(), _atm.end(), combined._atm.begin());
+	std::copy(_bas.begin(), _bas.end(), combined._bas.begin());
+	std::copy(_env.begin(), _env.end(), combined._env.begin());
+	std::copy(other._env.begin(), other._env.end(), combined._env.begin() + _env.size());
+
+	int off = _env.size();
+	int natm_off = _atm.size() / 6.0;
+	ivec atm2 = other._atm;
+	ivec bas2 = other._bas;
+    for (int a = 0; a < natm_off; a++) {
+		atm2[a * 6 + 1] += off;
+		atm2[a * 6 + 3] += off;
+    }
+    for (int b = 0; b < other.nbas; b++) {
+		bas2[b * 8 + 0] += natm_off;
+		bas2[b * 8 + 5] += off;
+		bas2[b * 8 + 6] += off;
+    }
+	std::copy(atm2.begin(), atm2.end(), combined._atm.begin() + _atm.size());
+	std::copy(bas2.begin(), bas2.end(), combined._bas.begin() + _bas.size());
+	return combined;
 }
 
 
@@ -269,6 +330,12 @@ void computeEri3c(Int_Params &param1,
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
 
+    Int_Params combined = param1 + param2;
+
+    int* bas = combined.get_ptr_bas();
+    int* atm = combined.get_ptr_atm();
+    double* env = combined.get_ptr_env();
+
     int shl_slice[] = {
         0,
         nQM,
@@ -277,20 +344,17 @@ void computeEri3c(Int_Params &param1,
         nQM,
         nQM + nAux,
     };
-    double *env = NULL; // Will partially contain the basis set data
     int nat = 1;
-    int nbas = 1;
-    int *atoms = NULL;
-    int *bas = NULL;
+    int nbas = combined.get_nbas();
     int *aoloc = make_loc(bas, nbas);
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
     flat_eri3c.resize(naoi * naoj * naok, 0.0);
-    Opt opty = int3c2e_optimizer(atoms, nat, bas, nbas, env);
+    Opt opty = int3c2e_optimizer(atm, nat, bas, nbas, env);
     // Compute integrals
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, flat_eri3c.data(), 1, shl_slice, aoloc, &opty, atoms, nat, bas, nbas, env);
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, flat_eri3c.data(), 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
     free(aoloc);
 }
 
@@ -396,8 +460,17 @@ int fixed_density_fit_test()
     WFN wavy_gbw("H2.gbw");
 	Int_Params normal_basis(wavy_gbw);
 
+    WFN wavy_aux(0);
+	wavy_aux.atoms = wavy_gbw.atoms;
+    wavy_aux.set_ncen(wavy_gbw.get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("cc-pvqz-jkfit"));
+	Int_Params aux_basis(wavy_aux);
+
     vec eri2c_test_test;
-	computeEri2c(normal_basis, eri2c_test_test);
+    vec eri3c_test_test;
+	computeEri2c(aux_basis, eri2c_test_test);
+    computeEri3c(normal_basis, aux_basis, eri3c_test_test);
 
 #ifdef _WIN32
     math_unload_BLAS(blas);
