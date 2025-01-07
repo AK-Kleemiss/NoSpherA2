@@ -188,7 +188,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|x64'">
-    <LocalDebuggerCommandArguments>-cpus 8 -spherical_aver_fukui carbon_charge_0.gbw carbon_fukui.cube</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cpus 8 -spherical_aver_fukui carbon_charge_0.gbw carbon_charge_1.gbw</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Daniel_Test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

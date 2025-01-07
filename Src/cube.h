@@ -7,6 +7,7 @@
 #include <filesystem>
 
 class WFN;
+class atom;
 // Structure to hold charge and position
 struct Charge {
     std::array<double, 3> r; // Fractional position (x, y, z)
@@ -74,6 +75,7 @@ public:
   std::string get_comment2() const { return comment2; };
   std::filesystem::path get_path() const { return path; };
   void set_path(const std::filesystem::path& given) { path = given; };
+  std::vector<atom> get_parent_wfn_atoms() const;
 private:
   double dv;
   int na;
@@ -89,3 +91,4 @@ private:
 };
 
 #include "wfn_class.h"
+#include "atoms.h"

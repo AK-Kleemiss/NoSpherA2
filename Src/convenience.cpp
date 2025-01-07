@@ -2410,23 +2410,23 @@ void options::digest_options()
         }
         else if (temp == "-atom_dens_diff")
         {
-			string name_wfn_1 = arguments[i + 1];
-			string name_wfn_2 = arguments[i + 2];
+			filesystem::path name_wfn_1 = arguments[i + 1];
+			filesystem::path name_wfn_2 = arguments[i + 2];
 
 			subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05); 
 			exit(0);
         }
         else if (temp == "-spherical_aver_fukui")
 		{
-			string wfn_name = arguments[i + 1];
-            string cube_name = arguments[i + 2];
-			cube cube_from_file;
-			cube_from_file.path = cube_name;
-			cube_from_file.read_file(true, true);
+			filesystem::path wfn1_name = arguments[i + 1];
+            filesystem::path wfn2_name = arguments[i + 2];
+			WFN wavy1(wfn1_name);
+			WFN wavy2(wfn2_name);
 
-			ofstream outputFile("fukui_averaged_density.dat");
+			ofstream outputFile("fukui_averaged_density_wfn.dat");
 			for (double r = 0.001; r < 5.0; r += 0.002) {
-				double dens = calc_grid_averaged_at_r_from_cube(wfn_name, cube_from_file, r, 360, 5800);
+				//double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
+                double dens = calc_fukui_averaged_at_r(wfn1_name, wfn2_name, r, 360, 5800);
 				outputFile << r << " " << dens << "\n";
 			}
         }

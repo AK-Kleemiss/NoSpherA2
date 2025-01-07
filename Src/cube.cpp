@@ -1514,6 +1514,9 @@ cube cube::super_cube(int x, int y, int z)
                 }
     return (out);
 };
+std::vector<atom> cube::get_parent_wfn_atoms() const {
+	return parent_wavefunction->atoms;
+};
 
 void cube::set_zero()
 {
