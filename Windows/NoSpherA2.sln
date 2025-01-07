@@ -32,9 +32,7 @@ Global
 		D_xTB_Co_molden|x64 = D_xTB_Co_molden|x64
 		D_xTB_F_molden|x64 = D_xTB_F_molden|x64
 		D_xTB_molden|x64 = D_xTB_molden|x64
-		D_xTB_molden|x86 = D_xTB_molden|x86
 		debug_Daniel|x64 = debug_Daniel|x64
-		debug_Daniel|x86 = debug_Daniel|x86
 		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
 		Debug_Fractal|x64 = Debug_Fractal|x64
 		Debug_gbw2wfn|x64 = Debug_gbw2wfn|x64
@@ -103,12 +101,8 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x64.Build.0 = D_xTB_F_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.Build.0 = D_xTB_molden|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x86.ActiveCfg = D_xTB_molden|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x86.Build.0 = D_xTB_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x64.ActiveCfg = debug_Daniel|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x64.Build.0 = debug_Daniel|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x86.ActiveCfg = debug_Daniel|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x86.Build.0 = debug_Daniel|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
@@ -178,9 +172,7 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_Co_molden|x64.ActiveCfg = Debug_SF_MTC_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_F_molden|x64.ActiveCfg = Debug_SF_Disorder|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_molden|x64.ActiveCfg = Debug_SF_twin|x64
-		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_xTB_molden|x86.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.debug_Daniel|x64.ActiveCfg = Debug_gbw2wfn|x64
-		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.debug_Daniel|x86.ActiveCfg = Debug_gbw2wfn|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_fchk_generation|x64.ActiveCfg = Debug_Fractal|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.Debug_gbw2wfn|x64.ActiveCfg = Debug_gbw2wfn|x64
