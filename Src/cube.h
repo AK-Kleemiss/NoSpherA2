@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <cmath>
 
 class WFN;
 // Structure to hold charge and position
@@ -45,6 +46,7 @@ public:
           i * vectors[2][0] + j * vectors[2][1] + k * vectors[2][2] + origin[2]
       };
   };
+  double get_interpolated_value(double x, double y, double z) const;
   double get_value(int x, int y, int z) const;
   bool set_value(int x, int y, int z, double value);
   bool read_file(bool full, bool header, bool expert = false);

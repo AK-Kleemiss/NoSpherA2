@@ -32,6 +32,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     }
     na = g_na;
     parent_wavefunction = new WFN(6);
+    vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
@@ -524,6 +525,28 @@ int cube::get_size(int direction) const
         return (-1);
 };
 
+double cube::get_interpolated_value(double x, double y, double z) const
+{
+	if (x < origin[0] || y < origin[1] || z < origin[2] || x > origin[0] + vectors[0][0] * size[0] || y > origin[1] + vectors[1][1] * size[1] || z > origin[2] + vectors[2][2] * size[2])
+		return (0.0);
+	double x1 = (x - origin[0]) / vectors[0][0];
+	double y1 = (y - origin[1]) / vectors[1][1];
+	double z1 = (z - origin[2]) / vectors[2][2];
+	int x0 = int(x1);
+	int y0 = int(y1);
+	int z0 = int(z1);
+	x1 -= x0;
+	y1 -= y0;
+	z1 -= z0;
+	double c00 = get_value(x0, y0, z0) * (1 - x1) + get_value(x0 + 1, y0, z0) * x1;
+	double c10 = get_value(x0, y0 + 1, z0) * (1 - x1) + get_value(x0 + 1, y0 + 1, z0) * x1;
+	double c01 = get_value(x0, y0, z0 + 1) * (1 - x1) + get_value(x0 + 1, y0, z0 + 1) * x1;
+	double c11 = get_value(x0, y0 + 1, z0 + 1) * (1 - x1) + get_value(x0 + 1, y0 + 1, z0 + 1) * x1;
+	double c0 = c00 * (1 - y1) + c10 * y1;
+	double c1 = c01 * (1 - y1) + c11 * y1;
+	return (c0 * (1 - z1) + c1 * z1);
+};
+    
 double cube::get_value(int x, int y, int z) const
 {
     if (x < size[0] && y < size[1] && z < size[2] && x >= 0 && y >= 0 && z >= 0)
