@@ -21,30 +21,211 @@
 #define bas(SLOT, I) bas[8 * (I) + (SLOT)] // Basis set data for atom I
 #define atm(SLOT, I) atm[6 * (I) + (SLOT)] // Atom data for atom I
 
-//int *make_loc(int *bas, int nbas)
-//{
-//    ivec shell_lengs(nbas, 0);
-//    for (int i = 0; i < nbas; i++)
-//    {
-//        shell_lengs[i] = (2 * bas(1, i) + 1);
+
+Int_Params::Int_Params(const WFN& wavy) {
+    atoms = wavy.atoms;
+	wfn_origin = wavy.get_origin();
+	ncen = wavy.get_ncen();
+	calc_integration_parameters();
+}
+
+vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
+    //GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
+    for (int i = 0; i < coef.size(); i++) {
+        exp[i] = std::sqrt(std::pow(2, (2 * l + 3)) * constants::ft[l + 1] * std::pow((2 * exp[i]), (l + 1.5))) / (constants::ft[2 * l + 2] * std::sqrt(constants::PI));
+		coef[i] *= exp[i];
+    }
+
+    //Normalize contracted GTO
+    //#ee = numpy.empty((nprim, nprim))
+    //    #for i in range(nprim) :
+    //    #    for j in range(i + 1) :
+    //    #        ee[i, j] = ee[j, i] = gaussian_int(angl * 2 + 2, es[i] + es[j])
+    //    #s1 = 1 / numpy.sqrt(numpy.einsum('pi,pq,qi->i', cs, ee, cs))
+    //    return numpy.einsum('pi,i->pi', cs, s1)
+	vec2 ee(coef.size(), vec(coef.size(), 0.0));
+	for (int i = 0; i < coef.size(); i++) {
+		for (int j = 0; j < i; j++) {
+            int n1 = (l * 2 + 2 + 1) * 0.5;
+            ee[i][j] = ee[j][i] = std::tgamma(n1) / (2. * std::pow((exp[i] + exp[j]), n1));
+		}
+	}
+	//Do the einsum by hand
+	vec s1(coef.size(), 0.0);
+	for (int i = 0; i < coef.size(); i++) {
+		for (int j = 0; j < coef.size(); j++) {
+			for (int k = 0; k < coef.size(); k++) {
+				s1[i] += coef[k] * ee[k][j] * coef[j];
+			}
+		}
+	}
+	for (int i = 0; i < s1.size(); i++) {
+		s1[i] = 1.0/ std::sqrt(s1[i]);
+	}
+	for (int i = 0; i < coef.size(); i++) {
+		coef[i] *= s1[i];
+	}
+	return coef;
+}
+
+//void Int_Params::collect_basis_data() {
+//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+//        nbas += atoms[atom_idx].shellcount.size();
+//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
+//            continue;
+//        }
+//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+//        vec coefficients, exponents;
+//        for (int shell = 0; shell < basis.size(); shell++){
+//            coefficients.push_back(basis[shell].coefficient);
+//			exponents.push_back(basis[shell].exponent);
+//		}
+//        if (wfn_origin == 9) {
+//            for (int i = 0; i < coefficients.size(); i++) {
+//                coefficients[i] *= std::sqrt(constants::PI) * 2;
+//            }
+//        }
+//        if (wfn_origin == 0) {
+//            int coef_idx = 0;
+//            for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
+//				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
+//				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
+//				
+//
+//                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].type - 1);
+//                coef_idx += atoms[atom_idx].shellcount[shell];
+//            }
+//        }
+//
+//
+//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
 //    }
-//    int *ao_loc = new int[nbas + 1];
-//    ao_loc[0] = 0;
-//    std::partial_sum(shell_lengs.begin(), shell_lengs.end(), ao_loc + 1);
-//    return ao_loc;
 //}
+
+void Int_Params::collect_basis_data_from_gbw() {
+    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+        nbas += atoms[atom_idx].shellcount.size();
+        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
+            continue;
+        }
+        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+        vec coefficients, exponents;
+        for (int shell = 0; shell < basis.size(); shell++){
+			double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
+            coefficients.push_back(coef);
+    		exponents.push_back(basis[shell].exponent);
+    	}
+
+        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
+    }
+}
+
+void Int_Params::collect_basis_data_internal() {
+
+}
+
+void Int_Params::populate_atm() {
+    //atom: (Z, ptr, nuclear_model=1, ptr+3, 0,0)  nuclear_model seems to be 1 for all atoms  USURE!!! Nested arrays per atom
+	_atm.resize(ncen * 6, 0);
+	int ptr = 20;
+	for (int atom_idx = 0; atom_idx < ncen; atom_idx++)
+	{
+		//Assign_atoms
+		_atm[atom_idx * 6 + 0] = atoms[atom_idx].charge; // Z
+		_atm[atom_idx * 6 + 1] = ptr; // ptr
+		_atm[atom_idx * 6 + 2] = 1; // nuclear_model
+		ptr += 3;
+		_atm[atom_idx * 6 + 3] = ptr; // ptr+3
+		ptr += 1;
+	}
+}
+
+void Int_Params::populate_env() {
+    //env: (leading 20*0, (x,y,z,zeta=0)*ncen, (coefficients_l=0, exponentsl=0, ...)*ncen )  flat array for everything
+    _env.resize(20 + ncen * 4, 0);
+	int env_offset = 20;  //Do not know if this is needed
+    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+        _env[env_offset + atom_idx * 4] = atoms[atom_idx].x;
+        _env[env_offset + atom_idx * 4 + 1] = atoms[atom_idx].y;
+        _env[env_offset + atom_idx * 4 + 2] = atoms[atom_idx].z;
+		_env[env_offset + atom_idx * 4 + 3] = 0;  //zeta
+    }
+	ivec seen_elements;
+    int bas_ptr = _env.size();
+	for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+		if (std::find(seen_elements.begin(), seen_elements.end(), atoms[atom_idx].charge) != seen_elements.end()) {continue;}
+		seen_elements.push_back(atoms[atom_idx].charge);
+
+        basis_sets[atoms[atom_idx].charge][2][0] = (double)bas_ptr;
+
+		vec2 basis_data = basis_sets[atoms[atom_idx].charge];
+		vec coefficients = basis_data[0];
+		vec exponents = basis_data[1];
+
+		int func_count = 0;
+        for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
+            int n_funcs = atoms[atom_idx].shellcount[shell];
+            for (int func = 0; func < n_funcs; func++){
+				_env.push_back(exponents[func + func_count]);
+			}
+            for (int func = 0; func < n_funcs; func++) {
+				_env.push_back(coefficients[func + func_count]);
+            }
+            func_count += n_funcs;
+        }
+        bas_ptr += func_count;
+
+	}
+
+}
+
+void Int_Params::populate_bas() {
+    //basis: (atom_id, l, nprim, ncentr, kappa=0, ptr, ptr+nprim, 0)  atom_id has to be consistent with order in other arrays  |  Nested arrays for each contracted basis function and then stacked for all atoms
+    _bas.resize(8 * nbas, 0);
+    int index = 0;
+    for (int atom_idx = 0; atom_idx < ncen; atom_idx++){
+		int bas_ptr = basis_sets[atoms[atom_idx].charge][2][0];
+        for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell += 1) {
+			_bas[index * 8 + 0] = atom_idx; // atom_id
+			_bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type - 1; // l s=0, p=1, d=2 ...
+			_bas[index * 8 + 2] = atoms[atom_idx].shellcount[shell];  // nprim
+			_bas[index * 8 + 3] = 1; // ncentr    Not sure
+			_bas[index * 8 + 5] = bas_ptr;  //Pointer to the end of the _env vector
+			bas_ptr += _bas[index * 8 + 2];
+			_bas[index * 8 + 6] = bas_ptr;
+			//_bas 8 is set to 0 
+			bas_ptr += _bas[index * 8 + 2] * _bas[atom_idx * 8 + 3];
+            index++;
+        }
+    }
+
+}
+
+void Int_Params::calc_integration_parameters() {
+    if (wfn_origin == 9){
+        collect_basis_data_from_gbw();
+    }
+	else if (wfn_origin == 0){
+		collect_basis_data_internal();
+	}
+    else{
+		std::cout << "Unsupported WFN origin" << std::endl;
+        exit(1);
+	}
+    populate_atm();
+    populate_env();
+    populate_bas();
+}
+
 
 int* make_loc(int* bas, int nbas) {
     constexpr int ANG_OF = 1; // Column index for angular momentum
-    constexpr int NCTR_OF = 2; // Column index for contraction coefficients
+    constexpr int NCTR_OF = 3; // Column index for number of centers
 
-    std::vector<int> dims(nbas, 0);
-
+    ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++) {
-        int l = bas(ANG_OF, i);
-		int nctr = bas(NCTR_OF, i);
-        dims[i] = (2 * l + 1) * nctr;
+        dims[i] = (2 * bas(ANG_OF, i) + 1) * bas(NCTR_OF, i);
     }
 
     // Create the ao_loc array
@@ -52,31 +233,24 @@ int* make_loc(int* bas, int nbas) {
     ao_loc[0] = 0;
 
     // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc + 1);
-
+    std::partial_sum(dims.begin(), dims.end(), ao_loc+1);
+    
     return ao_loc;
 }
 
 // Function to compute two-center two-electron integrals (eri2c)
-void computeEri2c(WFN wavy, std::vector<double> &eri2c)
+void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
 {
-    wavy.calc_integration_parameters();
-    
-    int* bas = wavy.get_ptr_bas();
-	int* atm = wavy.get_ptr_atm();
-	double* env = wavy.get_ptr_env();
+    int* bas = params.get_ptr_bas();
+	int* atm = params.get_ptr_atm();
+	double* env = params.get_ptr_env();
 
-	//Read values from bas
-	for (int i = 0; i < 8; i++) {
-		std::cout << bas(i,0) << std::endl;
-	}
-
-
-    int nbas = wavy.get_nbas();
+    int nbas = params.get_nbas();
 
 	int shl_slice[] = { 0, nbas, 0, nbas };
 	int nat = 1;  //No idea what this has to be
 	int *aoloc = make_loc(bas, nbas);
+
 	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
@@ -88,15 +262,12 @@ void computeEri2c(WFN wavy, std::vector<double> &eri2c)
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
-void computeEri3c(WFN &wavy,
-                  WFN &wavy_aux,
+void computeEri3c(Int_Params &param1,
+                  Int_Params &param2,
                   std::vector<double> &flat_eri3c)
 {   
-    wavy.calc_integration_parameters();
-    wavy_aux.calc_integration_parameters();
-
-    int nQM = wavy.get_nbas();
-    int nAux = wavy.get_nbas();
+    int nQM = param1.get_nbas();
+    int nAux = param2.get_nbas();
 
     int shl_slice[] = {
         0,
@@ -179,9 +350,12 @@ int density_fit( WFN &wavy, const std::string auxname)
 
     wavy.get_DensityMatrix();
 
+	Int_Params normal_basis(wavy);
+	Int_Params aux_basis(wavy);
+
     // Compute integrals
-    computeEri2c(wavy_aux, eri2c);
-    computeEri3c(wavy, wavy_aux, eri3c);
+    computeEri2c(aux_basis, eri2c);
+    computeEri3c(normal_basis, aux_basis, eri3c);
 
     // Convert eri3c to matrix form and perform contractions using BLAS
 
@@ -220,9 +394,14 @@ int fixed_density_fit_test()
     std::cout << "Test done!" << std::endl;
 
     WFN wavy_gbw("H2.gbw");
+	Int_Params normal_basis(wavy_gbw);
 
     vec eri2c_test_test;
-	computeEri2c(wavy_gbw, eri2c_test_test);
+	computeEri2c(normal_basis, eri2c_test_test);
+
+#ifdef _WIN32
+    math_unload_BLAS(blas);
+#endif
 	return 0;
 
     WFN wavy("H2.molden");
@@ -8908,7 +9087,7 @@ void rys_roots(int nroots, double x, double *u, double *w)
         err = 0;
         break;
     }
-    err_checkf(err, "rys_roots: nroots problem!", std::cout);
+    err_checkf(err == 0, "rys_roots: nroots problem!", std::cout);
 }
 
 int segment_solve1(int n, double x, double lower, double *u, double *w,
@@ -9693,10 +9872,10 @@ void gout2e(double *gout, double *g, int *idx,
 }
 
 template <typename T>
-inline void MALLOC_INSTACK(T *var, const int &n, double *cache)
+inline void MALLOC_INSTACK(T*& var, const int& n, double*& cache)
 {
-    var = (T *)(((intptr_t)cache + 7) & (-(intptr_t)8));
-    cache = (double *)(var + (n));
+    var = (T*)(((intptr_t)cache + 7) & (-(intptr_t)8));
+    cache = (double*)(var + (n));
 }
 
 int int1e_cache_size(Env *envs)
@@ -30167,15 +30346,13 @@ void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, doubl
     const int naoj = ao_loc[jsh1] - ao_loc[jsh0];
     const int cache_size = GTOmax_cache_size(intor, shls_slice, 2,
                                              atm, natm, bas, nbas, env);
-    SALTEDPredictor SP;
-    SP.load_BLAS();
-#pragma omp parallel
+//#pragma omp parallel
     {
         int dims[] = {naoi, naoj};
         int ish, jsh, ij, i0, j0;
         int shls[2];
         double *cache = (double *)malloc(sizeof(double) * cache_size);
-#pragma omp for schedule(dynamic, 4)
+//#pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish * njsh; ij++)
         {
             ish = ij / njsh;
@@ -30191,7 +30368,6 @@ void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, doubl
         }
         free(cache);
     }
-    SP.unload_BLAS();
 }
 
 void g0_il2d_4d(double *g, Env *envs)

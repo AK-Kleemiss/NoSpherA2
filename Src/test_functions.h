@@ -699,9 +699,10 @@ double subtract_dens_from_gbw(std::filesystem::path& wfn_name_1,
         dens2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
 	
-    dens1.set_path((wavy1.get_path().parent_path() / wavy1.get_path().stem()).string() + "_rho.cube");
-	dens2.set_path(wavy2.get_path().stem() += "_rho.cube");
-    
+ //   dens1.path = get_basename_without_ending(wavy1.get_path()) + "_rho.cube";
+	//dens2.path = get_basename_without_ending(wavy2.get_path()) + "_rho.cube";
+    dens1.set_path(wavy1.get_path().parent_path() / (wavy1.get_path().stem().string() + "_rho.cube"));
+	dens2.set_path(wavy2.get_path().parent_path() / (wavy2.get_path().stem().string() + "_rho.cube"));
 
 	Calc_Rho(dens1, wavy1, r, std::cout, false);
 	Calc_Rho(dens2, wavy2, r, std::cout, false);
