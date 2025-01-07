@@ -1,6 +1,3 @@
-## avogadro generated ORCA input file 
-# Advanced Mode
-# 
 ! R2SCAN SP 6-31G NormalPrint
 
 * xyz 0 1
