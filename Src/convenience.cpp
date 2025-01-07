@@ -2417,18 +2417,17 @@ void options::digest_options()
 			exit(0);
         }
         else if (temp == "-spherical_aver_fukui")
-		{
-			filesystem::path wfn1_name = arguments[i + 1];
+        {
+            filesystem::path wfn1_name = arguments[i + 1];
             filesystem::path wfn2_name = arguments[i + 2];
-			WFN wavy1(wfn1_name);
-			WFN wavy2(wfn2_name);
-
-			ofstream outputFile("fukui_averaged_density_wfn.dat");
-			for (double r = 0.001; r < 5.0; r += 0.002) {
-				//double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
-                double dens = calc_fukui_averaged_at_r(wfn1_name, wfn2_name, r, 360, 5800);
-				outputFile << r << " " << dens << "\n";
-			}
+            WFN wavy1(wfn1_name);
+            WFN wavy2(wfn2_name);
+            ofstream outputFile("fukui_averaged_density_wfn.dat");
+            for (double r = 0.001; r < 10.0; r += 0.001) {
+                //double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
+                double dens = calc_fukui_averaged_at_r(wfn1_name, wfn2_name, r, 5810, 5810);
+                outputFile << r << " " << dens << "\n";
+            }
         }
         else if (temp == "-spherical_aver_hirsh")
         {

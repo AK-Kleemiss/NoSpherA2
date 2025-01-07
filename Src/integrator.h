@@ -11,6 +11,39 @@ int lrys_laguerre(int n, double x, double lower, double* roots, double* weights)
 void lnaive_jacobi_moments(int n, double t, double lower, long double* mus);
 
 
+class Int_Params {
+private:
+    int ncen = 0;           // Number of centers (atoms)
+    int wfn_origin = 0;
+    std::vector<atom> atoms;
+
+    std::map<int, vec2> basis_sets;  //Maps atomic number -> (vec(coefs), vec(expon))
+    
+    ivec _atm;              // Flattened ATM array
+    ivec _bas;              // Flattened BAS array
+    vec _env;
+
+    int nbas = 0;
+    void calc_integration_parameters();
+    void collect_basis_data_from_gbw();
+	void collect_basis_data_internal();
+
+    void populate_atm();
+	void populate_bas();
+	void populate_env();
+
+    vec normalize_gto(vec coef, vec exp, int l);
+public:
+	Int_Params(const WFN& wavy);
+
+    // Getters
+	int* get_ptr_atm() { return _atm.data(); };
+	int* get_ptr_bas() { return _bas.data(); };
+	double* get_ptr_env() { return _env.data(); };
+
+    int get_nbas() { return nbas; };  // Number of basis segments
+};
+
 typedef struct {
     double rij[3];
     double eij;

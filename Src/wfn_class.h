@@ -74,10 +74,6 @@ private:
     const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
 
-	//----------RI-FIT methods---------------------------
-	ivec _atm, _bas;
-	vec _env;
-
 public:
     WFN();
     WFN(int given_origin);
@@ -280,14 +276,6 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     const double *get_ptr_exponents() { return &exponents[0]; };
     const double *get_ptr_mo_coefficients(const int &mo);
-    //----------RI-FIT methods---------------------------
-    //Return pointers to the array underlying _atm
-    void calc_integration_parameters();
-	int* get_ptr_atm() { return _atm.data(); };
-	int* get_ptr_bas() { return _bas.data(); };
-	double* get_ptr_env() { return _env.data(); };
-    int get_nbas() { return _bas.size(); };
-
 };
 
 #include "mo_class.h"
