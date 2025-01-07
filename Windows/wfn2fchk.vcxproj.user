@@ -2,7 +2,7 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LocalDebuggerCommandArguments>-test_RI</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>E:\temp\xtb_files</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>E:\xtb_files</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
@@ -152,7 +152,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|x64'">
-    <LocalDebuggerCommandArguments>-wfn F2.molden -cif F2.cif -dmin 0.5 -v -acc 1 -ECP 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cpus 8 -spherical_aver_fukui carbon_charge_0.gbw carbon_charge_1.gbw</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -178,6 +178,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
     <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v6 -cpus 12 -v -hkl_min_max -9 9 -20 20 -13 13 -cif thpp.cif -mtc thpp_p1.xyz 0,1 thpp_p2.xyz 0,2 -mtc_mult 1 1 -mtc_charge 0 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-SALTED ..\SALTED\Model -cif malbac.cif -wfn malbac.gbw -dmin 0.73 -cpus 8 -acc 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
@@ -266,13 +268,13 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
-    <LocalDebuggerCommandArguments>-wfn wfn.xtb -cif sucrose.cif -dmin 0.6 -ECP 3</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn wfn.xtb -cif sucrose.cif -dmin 0.6 -ECP 3 -acc 1</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\sucrose_IAM_SF</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB_reader|x64'">
-    <LocalDebuggerCommandArguments>-v -mult 2 -atom_dens wfn.xtb</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-v -mult 2 -atom_dens H.gbw</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ptb_H_file</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
