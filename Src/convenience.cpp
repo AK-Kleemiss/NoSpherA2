@@ -2408,6 +2408,28 @@ void options::digest_options()
             dmin = fromString<double>(arguments[i + 4]);
             calc_sfac_diffuse(*this, std::cout);
         }
+        else if (temp == "-atom_dens_diff")
+        {
+			string name_wfn_1 = arguments[i + 1];
+			string name_wfn_2 = arguments[i + 2];
+
+			subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05); 
+			exit(0);
+        }
+        else if (temp == "-spherical_aver_fukui")
+		{
+			string wfn_name = arguments[i + 1];
+            string cube_name = arguments[i + 2];
+			cube cube_from_file;
+			cube_from_file.path = cube_name;
+			cube_from_file.read_file(true, true);
+
+			ofstream outputFile("fukui_averaged_density.dat");
+			for (double r = 0.001; r < 5.0; r += 0.002) {
+				double dens = calc_grid_averaged_at_r_from_cube(wfn_name, cube_from_file, r, 360, 5800);
+				outputFile << r << " " << dens << "\n";
+			}
+        }
         else if (temp == "-spherical_aver_hirsh")
         {
 			string wfn_name = arguments[i + 1];
@@ -2423,7 +2445,7 @@ void options::digest_options()
             for (int index_atom = 0; index_atom < wavy.atoms.size(); index_atom += 1) {
                 ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
                 for (double r = 0.001; r < 5.0; r += 0.002) {
-                    dens = calc_hirsh_grid_averaged_at_r(wavy, index_atom, r, 360, 5800);  /// what does r = 1 do?
+                    dens = calc_hirsh_grid_averaged_at_r(wavy, index_atom, r, 360, 5800); 
                     outputFile << r << " " << dens << "\n";
                 }
              outputFile.close();

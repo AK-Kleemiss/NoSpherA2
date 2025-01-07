@@ -431,7 +431,7 @@ double calc_grid_averaged_at_r(const WFN& wavy,
     //    std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
 }
-/// not like above //////////////////////////////////////////////////////////////////////////
+/// not like above //////////////////////////////////////////////////////////////////////////-spherical_aver_hirsh in convience.cpp////////
 double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     const int i, /// now counts for several atoms
     const double& r,
@@ -512,6 +512,151 @@ double calc_hirsh_grid_averaged_at_r(const WFN& wavy,
     if (print)
         std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
     return dens;
+}
+double calc_grid_averaged_at_r_from_cube(std::string& wfn_name, const cube& cuby,
+    const double& r,
+    const int& min_angular = 60,
+    const int& max_angular = 1000,
+    const bool print = false)
+{
+
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_angular);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_angular);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+
+    vec angular_x(constants::max_LT * constants::MAG, 0.0);
+    vec angular_y(constants::max_LT * constants::MAG, 0.0);
+    vec angular_z(constants::max_LT * constants::MAG, 0.0);
+    vec angular_w(constants::max_LT * constants::MAG, 0.0);
+    int angular_off;
+    lebedev_sphere ls;
+
+    for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+        angular_off = j * constants::MAG;
+        ls.ld_by_order(constants::lebedev_table[j],
+            angular_x.data() + angular_off,
+            angular_y.data() + angular_off,
+            angular_z.data() + angular_off,
+            angular_w.data() + angular_off);
+    }
+
+    WFN wavy(9);
+    wavy.read_known_wavefunction_format(wfn_name, std::cout);
+    const double rb = constants::bragg_angstrom[wavy.atoms[0].charge] / (5.0E10 * constants::a0);
+
+    int num_angular = max_num_angular_points_closest;
+    if (r < rb) {
+        num_angular = static_cast<int>(max_num_angular_points_closest *
+            (r / rb));
+        num_angular = constants::get_closest_num_angular(num_angular);
+        err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+        if (num_angular < min_num_angular_points_closest)
+            num_angular = min_num_angular_points_closest;
+    }
+
+    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+    err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+    const int start = 0;
+    angular_off -= start;
+    const int size = start + num_angular;
+    int p = 0;
+    double dens = 0.0;
+    
+#pragma omp parallel
+    {
+        vec2 d(16);
+        for (int j = 0; j < 16; j++)
+            d[j].resize(wavy.get_ncen(), 0.0);
+#pragma omp for reduction(+:dens)
+        for (int iang = start; iang < size; iang++) {
+            p = angular_off + iang;
+            const double x = angular_x[p] * r + wavy.atoms[0].x; /// moving the lebedev points to the atom i
+            const double y = angular_y[p] * r + wavy.atoms[0].y;
+            const double z = angular_z[p] * r + wavy.atoms[0].z;
+			dens += cuby.get_interpolated_value(x, y, z) * constants::FOUR_PI * angular_w[p];
+        }
+    }
+    if (print)
+        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
+    return dens;
+}
+double subtract_dens_from_gbw(std::string& wfn_name_1,
+	std::string& wfn_name_2, const double& r, const double& resol)
+{
+    using namespace std;
+
+	WFN wavy1(9);
+	WFN wavy2(9);
+	wavy1.read_known_wavefunction_format(wfn_name_1, std::cout);
+	wavy2.read_known_wavefunction_format(wfn_name_2, std::cout); //  reading the WFNs
+
+    double MinMax1[6];
+    int steps1[3];
+	readxyzMinMax_fromWFN(wavy1, MinMax1, steps1, r, resol, true);
+
+	double MinMax2[6];
+	int steps2[3];
+	readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, r, resol, true); // and getting the MinMax and steps
+
+    double MinMax[6]{ 100, 100, 100, -100, -100, -100 };
+    int steps[3]{ 0, 0, 0 };
+    for (int i = 0; i < 3; i++)
+    {
+        if (MinMax1[i] < MinMax[i])
+            MinMax[i] = MinMax1[i];
+        if (MinMax1[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = MinMax1[i + 3];
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        if (MinMax2[i] < MinMax[i])
+            MinMax[i] = MinMax2[i];
+        if (MinMax2[i + 3] > MinMax[i + 3])
+            MinMax[i + 3] = MinMax2[i + 3];
+        steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / resol);
+    }
+    int counter = 0;
+    
+	cube dens1(steps[0], steps[1], steps[2], wavy1.get_ncen(), true);
+	cube dens2(steps[0], steps[1], steps[2], wavy2.get_ncen(), true);
+    dens1.give_parent_wfn(wavy1);
+    dens2.give_parent_wfn(wavy2);
+
+    for (int i = 0; i < 3; i++)
+    {
+        dens1.set_origin(i, MinMax[i]);
+        dens1.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        dens2.set_origin(i, MinMax[i]);
+        dens2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+	
+    dens1.path = get_basename_without_ending(wavy1.get_path()) + "_rho.cube";
+	dens2.path = get_basename_without_ending(wavy2.get_path()) + "_rho.cube";
+
+	Calc_Rho(dens1, wavy1, r, std::cout, false);
+	Calc_Rho(dens2, wavy2, r, std::cout, false);
+    dens1.write_file(true);
+	dens2.write_file(true);
+
+    cube difference = dens1 - dens2;
+    
+    for (int i = 0; i < 3; i++)
+    {
+		difference.set_origin(i, MinMax[i]);
+		difference.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+    difference.give_parent_wfn(wavy1);
+    difference.write_file("difference.cube", false);
+	difference.calc_dv();
+	dens1.calc_dv();
+	dens2.calc_dv();
+	std::cout << dens1.sum() << std::endl;
+	std::cout << dens2.sum() << std::endl;
+	std::cout << difference.sum() << std::endl;
+    return 0;
+	
 }
 
 void bondwise_laplacian_plots(std::filesystem::path& wfn_name) {
