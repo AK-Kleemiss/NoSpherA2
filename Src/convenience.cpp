@@ -2219,8 +2219,8 @@ void options::digest_options()
             calc = esp = true;
         else if (temp == "-ewal_sum") {
             //bool read, WFN& wave, std::ostream& file,
-            WFN temp(9);
-            cube residual(arguments[i + 1], true, temp, std::cout);
+            WFN* temp = new WFN(9);
+            cube residual(arguments[i + 1], true, *temp, std::cout);
             if (argc >= i + 3)
             {
                 int k_max = stod(arguments[i + 2]);
@@ -2231,6 +2231,7 @@ void options::digest_options()
             }
             else
                 residual.ewald_sum();
+            delete(temp);
             exit(0);
         }
         else if (temp == "-fchk")
@@ -2371,12 +2372,13 @@ void options::digest_options()
         {
             string wfn_name = arguments[i + 1];
             cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN wavy(wfn_name);
+            WFN* wavy = new WFN(wfn_name);
             cout << "Assigning ECPs" << endl;
             if (ECP)
-                wavy.set_has_ECPs(true);
+                wavy->set_has_ECPs(true);
             cout << "Starting cube calculation" << endl;
-            calc_rho_cube(wavy);
+            calc_rho_cube(*wavy);
+            delete(wavy);
             exit(0);
         }
         else if (temp.find("-s_rho") < 1)
@@ -2420,36 +2422,42 @@ void options::digest_options()
         {
             filesystem::path wfn1_name = arguments[i + 1];
             filesystem::path wfn2_name = arguments[i + 2];
-            WFN wavy1(wfn1_name);
-            WFN wavy2(wfn2_name);
+            WFN* wavy1 = new WFN(wfn1_name);
+            WFN* wavy2 = new WFN(wfn2_name);
             ofstream outputFile("fukui_averaged_density_wfn.dat");
             for (double r = 0.001; r < 10.0; r += 0.001) {
                 //double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
-                double dens = calc_fukui_averaged_at_r(wfn1_name, wfn2_name, r, 5810, 5810);
+                double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
                 outputFile << r << " " << dens << "\n";
             }
+            outputFile.close();
+            cout << "Data written to output.dat" << endl;
+            delete(wavy1);
+            delete(wavy2);
+            exit(0);
         }
         else if (temp == "-spherical_aver_hirsh")
         {
 			string wfn_name = arguments[i + 1];
 			cout << "Reading wavefunction: " << wfn_name << endl;
-			WFN wavy(wfn_name);
+			WFN* wavy = new WFN(wfn_name);
 			cout << "Assigning ECPs" << endl;
 			if (ECP)
-				wavy.set_has_ECPs(true);
+				wavy->set_has_ECPs(true);
 			cout << "Starting spherical averaging" << endl; 
 			double dens;
 
   
-            for (int index_atom = 0; index_atom < wavy.atoms.size(); index_atom += 1) {
+            for (int index_atom = 0; index_atom < wavy->atoms.size(); index_atom += 1) {
                 ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
                 for (double r = 0.001; r < 5.0; r += 0.002) {
-                    dens = calc_hirsh_grid_averaged_at_r(wavy, index_atom, r, 360, 5800); 
+                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800); 
                     outputFile << r << " " << dens << "\n";
                 }
-             outputFile.close();
-            } 
+                outputFile.close();
+            }
             cout << "Data written to output.dat" << endl;
+            delete(wavy);
 			exit(0);
         }
         else if (temp == "-spherical_harmonic")
