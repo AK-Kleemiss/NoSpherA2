@@ -41,6 +41,7 @@ private:
 public:
     Int_Params();
 	Int_Params(const WFN& wavy);
+    Int_Params(WFN& wavy, const std::string auxname);
 	Int_Params operator+(const Int_Params& other);
 
     // Getters

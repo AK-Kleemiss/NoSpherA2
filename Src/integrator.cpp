@@ -34,6 +34,14 @@ Int_Params::Int_Params(const WFN& wavy) {
 	calc_integration_parameters();
 }
 
+Int_Params::Int_Params(WFN& wavy, const std::string auxname) {
+    atoms = wavy.atoms;
+    wfn_origin = wavy.get_origin();
+    ncen = wavy.get_ncen();
+    calc_integration_parameters();
+    load_basis_into_WFN(wavy, BasisSetLibrary().get_basis_set(auxname));
+}
+
 vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
     //GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++) {
@@ -464,8 +472,7 @@ int fixed_density_fit_test()
 	wavy_aux.atoms = wavy_gbw.atoms;
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("cc-pvqz-jkfit"));
-	Int_Params aux_basis(wavy_aux);
+	Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");
 
     vec eri2c_test_test;
     vec eri3c_test_test;
