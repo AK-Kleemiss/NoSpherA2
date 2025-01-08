@@ -40,7 +40,7 @@ public:
   double sum();
   double diff_sum();
   std::vector<double> double_sum();
-  inline std::array<double, 3> get_pos(const int& i, const int& j, const int& k) {
+  inline std::array<double, 3> get_pos(const int& i, const int& j, const int& k) const {
       return {
           i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
           i * vectors[1][0] + j * vectors[1][1] + k * vectors[1][2] + origin[1],

@@ -31016,7 +31016,7 @@ double *sph2e_inner(double *gsph, double *gcart,
                     int l, int nbra, int ncall, int sizsph, int sizcart)
 {
     int n;
-    double* temp = gsph + n * sizsph;
+    double* temp;
     switch (l)
     {
 #ifdef PYPZPX
@@ -31036,24 +31036,28 @@ double *sph2e_inner(double *gsph, double *gcart,
     case 2:
         for (n = 0; n < ncall; n++)
         {
+            temp = gsph + n * sizsph;
             d_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     case 3:
         for (n = 0; n < ncall; n++)
         {
+            temp = gsph + n * sizsph;
             f_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     case 4:
         for (n = 0; n < ncall; n++)
         {
+            temp = gsph + n * sizsph;
             g_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     default:
         for (n = 0; n < ncall; n++)
         {
+            temp = gsph + n * sizsph;
             a_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
     }
