@@ -10,6 +10,16 @@ BasisSet::BasisSet(const std::array<std::vector<primitive>, 35>& data) {
 		_data[i] = {};
 	}
 }
+// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {
+	for (int i = 0; i < 1; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 1; i < 118; i++) {
+		_data[i] = {};
+	}
+}
+
 
 BasisSet::BasisSet(const std::array<std::vector<primitive>, 86>& data) {
 	for (int i = 0; i < 86; i++) {
@@ -37,6 +47,7 @@ const std::vector<primitive>& BasisSet::operator[](int element) const {
 
 
 BasisSetLibrary::BasisSetLibrary() {
+	basisSets["6-31G**_rifit"] = BasisSet(_6_31Gdp_rifit);
 	basisSets["combo_basis_fit"] = BasisSet(combo_basis_fit);
 	basisSets["def2_universal_JKfit"] = BasisSet(def2_universal_JKfit);
 	basisSets["def2_SVP_JKfit"] = BasisSet(def2_SVP_JKfit);
@@ -59,6 +70,20 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_r
 	std::cout << "Using basis set: " << found_basis << std::endl;
 	return basisSets[found_basis];
 }
+
+const std::array<std::vector<primitive>, 1> _6_31Gdp_rifit =
+{
+	{
+		{
+			//{0, 0, 13.087376, 1.0},
+			//{0, 0, 1.185515, 1.0},
+			//{0, 0, 0.368163, 1.0},
+			//{0, 1, 2.288385, 1.0},
+			//{0, 1, 1.311828, 1.0},
+			{0, 2, 1.875349, 1.0},
+		}, //H
+	}
+};
 
 
 const std::array<std::vector<primitive>, 118> combo_basis_fit =
@@ -37447,7 +37472,9 @@ const std::array<std::vector<primitive>, 86> def2_universal_JKfit =
 const std::array<std::vector<primitive>, 86> def2_SVP_JKfit =
 {
     {
-        {{0, 0, 22.068343, 0.1},
+        {{0, 0, 22.068343, 0.053033986},
+	     {0, 0, 4.3905712, 0.3946522022},
+		 {0, 0, 1.0540787, 0.9172987712},
          {0, 0, 0.2717874, 1.0},
          {0, 1, 1.8529979, 1.0},
          {0, 1, 0.3881034, 1.0},

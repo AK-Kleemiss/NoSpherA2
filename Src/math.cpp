@@ -729,6 +729,26 @@ template vec2 transpose(const vec2 &mat);
 template cvec2 transpose(const cvec2 &mat);
 template ivec2 transpose(const ivec2 &mat);
 
+// Flat 2D MATRIX
+template <class T>
+std::vector<T> transpose(const std::vector<T>& mat, const int rows, const int cols)
+{
+    std::vector<T> result(rows * cols);
+    
+	for (int i = 0; i < rows; ++i)
+	{
+		for (int j = 0; j < cols; ++j)
+		{
+			result[j * rows + i] = mat[i * cols + j];
+		}
+	}
+
+    return result;
+}
+template vec  transpose(const vec&  mat, const int rows, const int cols);
+template cvec transpose(const cvec& mat, const int rows, const int cols);
+template ivec transpose(const ivec& mat, const int rows, const int cols);
+
 // vec -> 2D MATRIX
 template <class T>
 std::vector<std::vector<T>> transpose(const std::vector<T>& vector)

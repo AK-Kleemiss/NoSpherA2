@@ -28,6 +28,7 @@ Int_Params::Int_Params() {
 }
 
 Int_Params::Int_Params(const WFN& wavy) {
+	//Constructor, copying the atoms and basis set from the WFN object
     atoms = wavy.atoms;
 	wfn_origin = wavy.get_origin();
 	ncen = wavy.get_ncen();
@@ -35,11 +36,12 @@ Int_Params::Int_Params(const WFN& wavy) {
 }
 
 Int_Params::Int_Params(WFN& wavy, const std::string auxname) {
+	//Constructor, copying the atoms, but replacing the basis set with the aux basis set
+    load_basis_into_WFN(wavy, BasisSetLibrary().get_basis_set(auxname));
     atoms = wavy.atoms;
     wfn_origin = wavy.get_origin();
     ncen = wavy.get_ncen();
     calc_integration_parameters();
-    load_basis_into_WFN(wavy, BasisSetLibrary().get_basis_set(auxname));
 }
 
 vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
@@ -81,22 +83,28 @@ vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
 
 void Int_Params::collect_basis_data() {
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
+		//Collect number of basis functions per atom
         nbas += atoms[atom_idx].shellcount.size();
+		//Skip if the basis set for this element has already been collected
         if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
             continue;
         }
+
         std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+		//Populate coefficients and exponents vectors
         vec coefficients, exponents;
         for (int shell = 0; shell < basis.size(); shell++){
             coefficients.push_back(basis[shell].coefficient);
 			exponents.push_back(basis[shell].exponent);
 		}
+
+        //Normalize the GTOs depending on the context
         if (wfn_origin == 9) {
             for (int i = 0; i < coefficients.size(); i++) {
 				coefficients[i] *= constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
             }
         }
-        if (wfn_origin == 0) {
+        else if (wfn_origin == 0) {
             int coef_idx = 0;
             for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
 				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
@@ -111,47 +119,14 @@ void Int_Params::collect_basis_data() {
                 coef_idx += atoms[atom_idx].shellcount[shell];
             }
         }
-
-
+        else
+        {
+			std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
+        }
+		//Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector])
         basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
     }
 }
-
-//void Int_Params::collect_basis_data_from_gbw() {
-//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-//        nbas += atoms[atom_idx].shellcount.size();
-//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
-//            continue;
-//        }
-//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
-//        vec coefficients, exponents;
-//        for (int shell = 0; shell < basis.size(); shell++){
-//			double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
-//            coefficients.push_back(coef);
-//    		exponents.push_back(basis[shell].exponent);
-//    	}
-//
-//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
-//    }
-//}
-//
-//void Int_Params::collect_basis_data_internal() {
-//    for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-//        nbas += atoms[atom_idx].shellcount.size();
-//        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
-//            continue;
-//        }
-//        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
-//        vec coefficients, exponents;
-//        for (int shell = 0; shell < basis.size(); shell++) {
-//            double coef = basis[shell].coefficient * constants::sqr_pi * 2;  //Conversion factor from GBW to libcint
-//            coefficients.push_back(coef);
-//            exponents.push_back(basis[shell].exponent);
-//        }
-//
-//        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
-//    }
-//}
 
 void Int_Params::populate_atm() {
     //atom: (Z, ptr, nuclear_model=1, ptr+3, 0,0)  nuclear_model seems to be 1 for all atoms  USURE!!! Nested arrays per atom
@@ -229,6 +204,8 @@ void Int_Params::populate_bas() {
 			_bas[index * 8 + 6] = bas_ptr;
 			//_bas 8 is set to 0 
 			bas_ptr += _bas[index * 8 + 2] * _bas[atom_idx * 8 + 3];
+            
+            nao += (_bas[index * 8 + 1] * 2 + 1) * _bas[index * 8 + 3];  //2l+1 + n_centr
             index++;
         }
     }
@@ -243,31 +220,23 @@ void Int_Params::calc_integration_parameters() {
 }
 
 Int_Params Int_Params::operator+(const Int_Params& other) {
-    //off = len(env1)
-    //natm_off = len(atm1)
-    //atm2 = numpy.copy(atm2)
-    //bas2 = numpy.copy(bas2)
-    //atm2[:, PTR_COORD] += off
-    //atm2[:, PTR_ZETA] += off
-    //bas2[:, ATOM_OF] += natm_off
-    //bas2[:, PTR_EXP] += off
-    //bas2[:, PTR_COEFF] += off
-	//atm = numpy.vstack((atm1, atm2))
-	//bas = numpy.vstack((bas1, bas2))
-	//env = numpy.hstack((env1, env2))
-    
+	//Combine two Int_Params objects
+	//Create a new Int_Params object and resize the arrays to fit the new size
 	Int_Params combined;
 	combined._atm.resize(_atm.size() + other._atm.size(), 0);
 	combined._bas.resize(_bas.size() + other._bas.size(), 0);
 	combined._env.resize(_env.size() + other._env.size(), 0);
-    combined.ncen = ncen;
+    combined.ncen = ncen + other.ncen;
 	combined.nbas = nbas + other.nbas;
 
+	//Copy all the data from the first object into the respective containers in the combined object
 	std::copy(_atm.begin(), _atm.end(), combined._atm.begin());
 	std::copy(_bas.begin(), _bas.end(), combined._bas.begin());
 	std::copy(_env.begin(), _env.end(), combined._env.begin());
+	//Also copy the _env data from the second object to the end of the _env data in the combined object
 	std::copy(other._env.begin(), other._env.end(), combined._env.begin() + _env.size());
 
+	//Update the pointers in the second object to point to the correct place in the combined _env vector
 	int off = _env.size();
 	int natm_off = _atm.size() / 6.0;
 	ivec atm2 = other._atm;
@@ -281,6 +250,7 @@ Int_Params Int_Params::operator+(const Int_Params& other) {
 		bas2[b * 8 + 5] += off;
 		bas2[b * 8 + 6] += off;
     }
+	//Copy the data from the second object into the combined objects
 	std::copy(atm2.begin(), atm2.end(), combined._atm.begin() + _atm.size());
 	std::copy(bas2.begin(), bas2.end(), combined._bas.begin() + _bas.size());
 	return combined;
@@ -315,25 +285,39 @@ void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
 	double* env = params.get_ptr_env();
 
     int nbas = params.get_nbas();
+	int nat = params.get_natoms();
 
 	int shl_slice[] = { 0, nbas, 0, nbas };
-	int nat = 1;  //No idea what this has to be
 	int *aoloc = make_loc(bas, nbas);
 
 	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
-	eri2c.resize(naoi * naoj, 0.0);
+    //err_checkf(naoi == naoj, "Inconsistent matrix size", std::cout);
 	Opt opty = int2c2e_optimizer(atm, nat, bas, nbas, env);
+
 	// Compute integrals
-	GTOint2c(int2c2e_sph, eri2c.data(), 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+    vec res(naoi * naoj, 0.0);
+    eri2c.resize(naoi * naoj, 0.0);
+	//GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+    GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice, aoloc, NULL, atm, nat, bas, nbas, env);
+
+    
+
+    //res is in fortran order, write the result in regular ordering
+    for (int i = 0; i < naoi; i++) {
+        for (int j = 0; j < naoj; j++) {
+			eri2c[j * naoi + i] = res[i * naoj + j];
+        }
+    }
+
 	free(aoloc);
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
 void computeEri3c(Int_Params &param1,
                   Int_Params &param2,
-                  std::vector<double> &flat_eri3c)
+                  std::vector<double> &eri3c)
 {   
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
@@ -352,17 +336,33 @@ void computeEri3c(Int_Params &param1,
         nQM,
         nQM + nAux,
     };
-    int nat = 1;
+    int nat = combined.get_natoms();
     int nbas = combined.get_nbas();
     int *aoloc = make_loc(bas, nbas);
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
 
-    flat_eri3c.resize(naoi * naoj * naok, 0.0);
     Opt opty = int3c2e_optimizer(atm, nat, bas, nbas, env);
+
     // Compute integrals
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, flat_eri3c.data(), 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+    //vec res(naoi * naoj * naok, 0.0);
+    eri3c.resize(naoi * naoj * naok, 0.0);
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, eri3c.data(), 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+
+ //   //res is in fortran order, write the result in regular ordering
+	//
+	//for (int i = 0; i < naoi; i++)
+	//{
+	//	for (int j = 0; j < naoj; j++)
+	//	{
+	//		for (int k = 0; k < naok; k++)
+	//		{
+	//			eri3c[k * naoi * naoj + j * naoi + i] = res[i * naoj * naok + j * naok + k];
+	//		}
+	//	}
+	//}
+
     free(aoloc);
 }
 
@@ -388,6 +388,30 @@ vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
     return rho;
 }
 
+vec einsum_ijp_ij_p(const vec& v1, const vec& v2, const int I, const int J, const int P) {
+    // Initialize the result vector
+    vec rho(P, 0.0);
+
+    //v1 of size I * J * P
+    //v2 of size I * J
+
+    // Perform the summation
+    for (int p = 0; p < P; ++p)
+    {
+        for (int i = 0; i < I; ++i)
+        {
+            for (int j = 0; j < J; ++j)
+            {
+                int inda = p * I * J + i * J + j;
+				rho[p] += v1[p * I * J + i * J + j] * v2[i * J + j];
+            }
+        }
+    }
+
+    return rho;
+}
+
+
 
 void solve_linear_system(const vec2 &A, vec &b)
 {
@@ -399,6 +423,30 @@ void solve_linear_system(const vec2 &A, vec &b)
     const int ldb = n;      // Leading dimension of rho
     ivec ipiv(n, 0);        // Pivot indices
     vec temp = flatten(transpose(A));
+
+#if has_RAS == 1
+    // Call LAPACK function to solve the system
+    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
+
+    if (info != 0)
+    {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
+#endif
+}
+
+void solve_linear_system(const vec& A, const int &size_A,  vec& b)
+{
+    err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    // LAPACK variables
+    const int n = size_A; // The order of the matrix eri2c
+    const int nrhs = 1;     // Number of right-hand sides (columns of rho and )
+    const int lda = n;      // Leading dimension of eri2c
+    const int ldb = n;      // Leading dimension of rho
+    ivec ipiv(n, 0);        // Pivot indices
+
+    //Manually transpose the flattened matrix in A of size(size_A, size_A)
+    vec temp = transpose(A, n, n);
 
 #if has_RAS == 1
     // Call LAPACK function to solve the system
@@ -472,12 +520,30 @@ int fixed_density_fit_test()
 	wavy_aux.atoms = wavy_gbw.atoms;
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
-	Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");
+	//Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");
+    Int_Params aux_basis(wavy_aux, "6-31G**_rifit");
 
     vec eri2c_test_test;
     vec eri3c_test_test;
 	computeEri2c(aux_basis, eri2c_test_test);
+
+
+	std::ofstream file("eri2c_nospherA2.txt");
+	if (file.is_open())
+	{
+		for (int i = 0; i < eri2c_test_test.size(); i++)
+		{
+			file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c_test_test[i] << std::endl;
+		}
+		file.close();
+	}
+
     computeEri3c(normal_basis, aux_basis, eri3c_test_test);
+
+    vec dm_test = flatten(wavy_gbw.get_dm());
+	vec rho_test = einsum_ijp_ij_p(eri3c_test_test, dm_test, normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao());
+    vec2 intermediate = reshape(eri2c_test_test, { aux_basis.get_nao(), aux_basis.get_nao() });
+    solve_linear_system(intermediate, rho_test);
 
 #ifdef _WIN32
     math_unload_BLAS(blas);
@@ -8916,6 +8982,8 @@ int _dlaev2(double *eig, double *vec, double *diag, double *diag_off1)
     return 0;
 }
 
+
+//FOR LUKAS: MIGHT BE DODGY?! WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
 int diagonalize(int n, double *diag, double *diag_off1, double *eig, double *vec)
 {
     int M = 0;
@@ -10452,11 +10520,11 @@ static int _len_cart[] = {
 
 struct cart2sp_t
 {
-    double *cart2sph;
-    double *cart2j_lt_lR; // j < kappa, l > 0
-    double *cart2j_lt_lI; // j < kappa, l > 0
-    double *cart2j_gt_lR; // j > kappa, l < 0
-    double *cart2j_gt_lI; // j > kappa, l < 0
+    vec cart2sph;
+   //double *cart2j_lt_lR; // j < kappa, l > 0
+   //double *cart2j_lt_lI; // j < kappa, l > 0
+   //double *cart2j_gt_lR; // j > kappa, l < 0
+   //double *cart2j_gt_lI; // j > kappa, l < 0
 };
 
 void g2e_index_xyz(int *idx, const Env *envs)
@@ -10557,6 +10625,43 @@ void g2e_index_xyz(int *idx, const Env *envs)
         } // l
     } // j
 }
+
+vec g_trans_cart_2_spher_s({ 1.0 });
+#ifdef PYPZPX
+vec g_trans_cart_2_spher_p({ 0,1,0,0,0,1,1,0,0 });
+#else
+vec g_trans_cart_2_spher_p({ 1,0,0,0,1,0,0,0,1 });
+#endif
+vec g_trans_cart_2_spher_d({// dxy
+    0,  1.092548430592079070,   0,  0,  0,  0,
+    // dyz
+    0,
+    0,
+    0,
+    0,
+    1.092548430592079070,
+    0,
+    // dz2
+    -0.315391565252520002,
+    0,
+    0,
+    -0.315391565252520002,
+    0,
+    0.630783130505040012,
+    // dxz
+    0,
+    0,
+    1.092548430592079070,
+    0,
+    0,
+    0,
+    // dy2
+    0.546274215296039535,
+    0,
+    0,
+    -0.546274215296039535,
+    0,
+    0 });
 
 double g_trans_cart2sph[] = {
     1, /* factors of s and p are moved to CINTcommon_fac_sp */
@@ -29826,27 +29931,46 @@ double g_trans_cart2sph[] = {
 };
 
 // [*] = n(n+1)(n+2)(n+3)/4+(n+1)(n+2)(n+3)/6
+//static struct cart2sp_t g_c2s[] = {
+//    {g_trans_cart2sph, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 1, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 10, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 40, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 110, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 245, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 476, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 840, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 1380, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 2145, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 3190, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 4576, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 6370, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 8645, NULL, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 11480, NULL, NULL, NULL, NULL},
+//    {g_trans_cart2sph + 14960, NULL, NULL, NULL, NULL},
+//};
+
 static struct cart2sp_t g_c2s[] = {
-    {g_trans_cart2sph, NULL, NULL, NULL},
-    {g_trans_cart2sph + 1, NULL, NULL, NULL},
-    {g_trans_cart2sph + 10, NULL, NULL, NULL},
-    {g_trans_cart2sph + 40, NULL, NULL, NULL},
-    {g_trans_cart2sph + 110, NULL, NULL, NULL},
-    {g_trans_cart2sph + 245, NULL, NULL, NULL},
-    {g_trans_cart2sph + 476, NULL, NULL, NULL},
-    {g_trans_cart2sph + 840, NULL, NULL, NULL},
-    {g_trans_cart2sph + 1380, NULL, NULL, NULL},
-    {g_trans_cart2sph + 2145, NULL, NULL, NULL},
-    {g_trans_cart2sph + 3190, NULL, NULL, NULL},
-    {g_trans_cart2sph + 4576, NULL, NULL, NULL},
-    {g_trans_cart2sph + 6370, NULL, NULL, NULL},
-    {g_trans_cart2sph + 8645, NULL, NULL, NULL, NULL},
-    {g_trans_cart2sph + 11480, NULL, NULL, NULL, NULL},
-    {g_trans_cart2sph + 14960, NULL, NULL, NULL, NULL},
+    g_trans_cart_2_spher_s,
+    g_trans_cart_2_spher_p,
+    g_trans_cart_2_spher_d,
+    //{g_trans_cart2sph + 40},
+    //{g_trans_cart2sph + 110},
+    //{g_trans_cart2sph + 245},
+    //{g_trans_cart2sph + 476},
+    //{g_trans_cart2sph + 840},
+    //{g_trans_cart2sph + 1380},
+    //{g_trans_cart2sph + 2145},
+    //{g_trans_cart2sph + 3190},
+    //{g_trans_cart2sph + 4576},
+    //{g_trans_cart2sph + 6370},
+    //{g_trans_cart2sph + 8645},
+    //{g_trans_cart2sph + 11480},
+    //{g_trans_cart2sph + 14960},
 };
 
 void dgemm_NN1(int m, int n, int k,
-               double *a, double *b, double *c, int ldc)
+               double* a, vec& b, double *c, int ldc)
 {
     int i, j, kp;
     double bi;
@@ -29869,13 +29993,13 @@ void dgemm_NN1(int m, int n, int k,
 }
 
 void dgemm_NN(int m, int n, int k,
-              double *a, double *b, double *c)
+              double *a, vec& b, double *c)
 {
     dgemm_NN1(m, n, k, a, b, c, m);
 }
 
 void dgemm_TN(int m, int n, int k,
-              double *a, double *b, double *c)
+              const vec& a, double *b, double *c)
 {
     int i, j, kp;
     double ci;
@@ -29895,7 +30019,7 @@ void dgemm_TN(int m, int n, int k,
 }
 
 void dgemm_NT(int m, int n, int k,
-              double *a, double *b, double *c)
+              const vec& a, double *b, double *c)
 {
     int i, j, kp;
     double bi;
@@ -29918,7 +30042,7 @@ void dgemm_NT(int m, int n, int k,
 }
 
 // transform integrals from cartesian to spheric
-double *a_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *a_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
 {
     int nf = _len_cart[l];
     int nd = l * 2 + 1;
@@ -29926,7 +30050,7 @@ double *a_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
     return gsph;
 }
 
-double *a_ket_cart2spheric(double *gsph, double *gcart,
+double *a_ket_cart2spheric(double *&gsph, double *gcart,
                            int lds, int nbra, int l)
 {
     int nf = _len_cart[l];
@@ -29936,15 +30060,15 @@ double *a_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform s function from cartesian to spheric
-double *s_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *s_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
 {
     return gcart;
 }
-double *s_ket_cart2spheric(double *gsph, double *gcart, int lds, int nbra, int l)
+double *s_ket_cart2spheric(double *&gsph, double *gcart, int lds, int nbra, int l)
 {
     return gcart;
 }
-double *s_ket_cart2spheric_copy(double *gsph, double *gcart,
+double *s_ket_cart2spheric_copy(double *&gsph, double *gcart,
                                 int lds, int nbra, int l)
 {
     int i;
@@ -29956,7 +30080,7 @@ double *s_ket_cart2spheric_copy(double *gsph, double *gcart,
 }
 
 // transform p function from cartesian to spheric
-double *p_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *p_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
 {
 #ifdef PYPZPX
     int i;
@@ -29971,7 +30095,7 @@ double *p_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
     return gcart;
 #endif
 }
-double *p_ket_cart2spheric(double *gsph, double *gcart,
+double *p_ket_cart2spheric(double *&gsph, double *gcart,
                            int lds, int nbra, int l)
 {
 #ifdef PYPZPX
@@ -29987,7 +30111,7 @@ double *p_ket_cart2spheric(double *gsph, double *gcart,
     return gcart;
 #endif
 }
-double *p_ket_cart2spheric_copy(double *gsph, double *gcart,
+double *p_ket_cart2spheric_copy(double *&gsph, double *gcart,
                                 int lds, int nbra, int l)
 {
     int i;
@@ -30010,9 +30134,9 @@ double *p_ket_cart2spheric_copy(double *gsph, double *gcart,
 }
 
 // transform d function from cartesian to spheric
-double *d_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *d_bra_cart2spheric(double*& gsph, int nket, double *gcart, int l)
 {
-    double *coeff_c2s = g_c2s[2].cart2sph;
+    vec coeff_c2s = g_c2s[2].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nket; i++)
@@ -30027,10 +30151,10 @@ double *d_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
     }
     return pgsph;
 }
-double *d_ket_cart2spheric(double *gsph, double *gcart,
+double *d_ket_cart2spheric(double*& gsph, double *gcart,
                            int lds, int nbra, int l)
 {
-    double *coeff_c2s = g_c2s[2].cart2sph;
+    vec coeff_c2s = g_c2s[2].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
@@ -30057,9 +30181,9 @@ double *d_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform f function from cartesian to spheric
-double *f_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *f_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
 {
-    double *coeff_c2s = g_c2s[3].cart2sph;
+    vec coeff_c2s = g_c2s[3].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nket; i++)
@@ -30076,10 +30200,10 @@ double *f_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
     }
     return pgsph;
 }
-double *f_ket_cart2spheric(double *gsph, double *gcart,
+double *f_ket_cart2spheric(double *&gsph, double *gcart,
                            int lds, int nbra, int l)
 {
-    double *coeff_c2s = g_c2s[3].cart2sph;
+    vec coeff_c2s = g_c2s[3].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
@@ -30114,9 +30238,9 @@ double *f_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform g function from cartesian to spheric
-double *g_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *g_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
 {
-    double *coeff_c2s = g_c2s[4].cart2sph;
+    vec coeff_c2s = g_c2s[4].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nket; i++)
@@ -30135,10 +30259,10 @@ double *g_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
     }
     return pgsph;
 }
-double *g_ket_cart2spheric(double *gsph, double *gcart,
+double *g_ket_cart2spheric(double *&gsph, double *gcart,
                            int lds, int nbra, int l)
 {
-    double *coeff_c2s = g_c2s[4].cart2sph;
+    vec coeff_c2s = g_c2s[4].cart2sph;
     double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
@@ -30180,7 +30304,7 @@ double *g_ket_cart2spheric(double *gsph, double *gcart,
     return pgsph;
 }
 
-double *(*c2s_bra_sph[])(double *, int, double *, int) = {
+double *(*c2s_bra_sph[])(double *&, int, double *, int) = {
     s_bra_cart2spheric,
     p_bra_cart2spheric,
     d_bra_cart2spheric,
@@ -30199,7 +30323,7 @@ double *(*c2s_bra_sph[])(double *, int, double *, int) = {
     a_bra_cart2spheric,
 };
 
-double *(*c2s_ket_sph[])(double *, double *, int, int, int) = {
+double *(*c2s_ket_sph[])(double *&, double *, int, int, int) = {
     s_ket_cart2spheric,
     p_ket_cart2spheric,
     d_ket_cart2spheric,
@@ -30892,6 +31016,7 @@ double *sph2e_inner(double *gsph, double *gcart,
                     int l, int nbra, int ncall, int sizsph, int sizcart)
 {
     int n;
+    double* temp = gsph + n * sizsph;
     switch (l)
     {
 #ifdef PYPZPX
@@ -30911,25 +31036,25 @@ double *sph2e_inner(double *gsph, double *gcart,
     case 2:
         for (n = 0; n < ncall; n++)
         {
-            d_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+            d_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     case 3:
         for (n = 0; n < ncall; n++)
         {
-            f_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+            f_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     case 4:
         for (n = 0; n < ncall; n++)
         {
-            g_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+            g_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
         break;
     default:
         for (n = 0; n < ncall; n++)
         {
-            a_ket_cart2spheric(gsph + n * sizsph, gcart + n * sizcart, nbra, nbra, l);
+            a_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
         }
     }
     return gsph;

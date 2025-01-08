@@ -41,6 +41,15 @@ std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector
 template <class T>
 std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &mat);
 
+// Flat 2D MATRIX
+template <class T>
+std::vector<T> transpose(const std::vector<T>& mat, const int rows, const int cols);
+
+// vec -> 2D MATRIX
+template <typename T>
+std::vector<std::vector<T>> transpose(const std::vector<T>& vector);
+
+
 // Reorder 3D std::vectors following a given order
 template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original);

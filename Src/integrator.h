@@ -23,6 +23,7 @@ private:
     ivec _bas;              // Flattened BAS array
     vec _env;
 
+    int nao = 0;
     int nbas = 0;
     void calc_integration_parameters();
     void collect_basis_data();
@@ -50,6 +51,8 @@ public:
 	double* get_ptr_env() { return _env.data(); };
 
     int get_nbas() { return nbas; };  // Number of basis segments
+	int get_nao() { return nao; };    // Number of atomic orbitals  
+    int get_natoms() { return ncen; };
 };
 
 typedef struct {
