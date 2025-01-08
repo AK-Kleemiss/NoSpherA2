@@ -36,7 +36,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, bool expert, bool header)
+cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, const bool expert, const bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
