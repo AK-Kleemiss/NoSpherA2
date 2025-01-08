@@ -31,6 +31,7 @@ void Calc_Spherical_Dens(
 #pragma omp parallel for schedule(dynamic)
     for (int i = low_i; i < high_i; i++)
     {
+        vec dists(wavy.get_ncen(), 0);
         for (int j = low_j; j < high_j; j++)
             for (int k = low_k; k < high_k; k++)
             {
@@ -42,19 +43,17 @@ void Calc_Spherical_Dens(
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    dists[a] = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
+                    if (dists[a] < constants::ang2bohr(radius))
                         skip = false;
                 }
                 if (skip)
                     continue;
 
                 double dens_all = 0.0;
-                double dist;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dist = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
-                    dens_all += atoms[a].get_radial_density(dist);
-                    ;
+                    dens_all += atoms[a].get_radial_density(dists[a]);
                 }
 
                 int temp_i, temp_j, temp_k;

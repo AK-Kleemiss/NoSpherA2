@@ -2258,6 +2258,10 @@ void options::digest_options()
             hdef = calc = true;
         else if (temp == "-hirsh")
             calc = hirsh = true, hirsh_number = stoi(arguments[i + 1]);
+        else if (temp == "-hirshfeld_surface") {
+            hirshfeld_surface = arguments[i + 1];
+            hirshfeld_surface2 = arguments[i + 2];
+        }
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];

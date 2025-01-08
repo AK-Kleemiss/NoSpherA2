@@ -17,7 +17,7 @@ public:
     void load_BLAS();
     void unload_BLAS();
 
-    const std::string get_dfbasis_name();
+    const std::string get_dfbasis_name() const;
     vec gen_SALTED_densities();
     const std::filesystem::path get_h5_filename() const {
         return config.h5_filename;

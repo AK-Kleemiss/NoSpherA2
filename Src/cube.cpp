@@ -36,18 +36,18 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, bool expert)
+cube::cube(const std::filesystem::path &filepath, bool read, WFN &wave, std::ostream &file, bool expert, bool header)
 {
     err_checkf(exists(filepath), "Sorry, this file does not exist!", file);
     parent_wavefunction = &wave;
     na = parent_wavefunction->get_ncen();
     path = filepath;
-    err_checkf(read_file(read, true, expert), "Sorry, something went wrong while reading!", file);
+    err_checkf(read_file(read, header, expert), "Sorry, something went wrong while reading!", file);
     loaded = read;
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-cube::cube(int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
+cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &g_vectors, const vec3 &g_values)
 {
     using namespace std;
     na = g_na;
@@ -814,7 +814,7 @@ void cube::operator=(cube &right)
 
 cube cube::operator+(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
+    cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -907,7 +907,7 @@ cube cube::operator+(cube &right) const
 
 cube cube::operator-(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
+    cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1001,7 +1001,7 @@ cube cube::operator-(cube &right) const
 
 cube cube::operator*(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
+    cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1094,7 +1094,7 @@ cube cube::operator*(cube &right) const
 
 cube cube::operator/(cube &right) const
 {
-    cube res_cube(path, true, *parent_wavefunction, std::cout, false);
+    cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1102,8 +1102,15 @@ cube cube::operator/(cube &right) const
     if (right.get_loaded())
         for (int x = 0; x < size[0]; x++)
             for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
+                for (int z = 0; z < size[2]; z++) {
+                    if (right.get_value(x, y, z) == 0)
+                        res_cube.set_value(x, y, z, 1E100);
+                    if (values[x][y][z] != 0)
+                        res_cube.set_value(x, y, z, values[x][y][z] / right.get_value(x, y, z));
+                    else
+                        res_cube.set_value(x, y, z, 0);
+                }
+                    
     else
     {
         using namespace std;

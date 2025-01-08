@@ -544,6 +544,8 @@ struct options
     std::string method;
     std::filesystem::path xyz_file;
     std::filesystem::path coef_file;
+    std::filesystem::path hirshfeld_surface;
+    std::filesystem::path hirshfeld_surface2;
     std::string fract_name;
     std::filesystem::path wavename;
     std::filesystem::path gaussian_path;

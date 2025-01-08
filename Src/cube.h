@@ -19,8 +19,8 @@ class cube
 public:
   cube();
   cube(int x, int y, int z, int g_na = 0, bool grow_values = false);
-  cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, bool expert = false);
-  cube(int g_na, const std::vector <int>& g_size, const std::vector <double>& g_origin, const std::vector < std::vector<double> >& g_vectors, const std::vector<std::vector<std::vector<double> > >& g_values);
+  cube(const std::filesystem::path& filepath, bool read, WFN& wave, std::ostream& file, bool expert = false, bool header = true);
+  cube(const int g_na, const std::vector <int>& g_size, const std::vector <double>& g_origin, const std::vector < std::vector<double> >& g_vectors, const std::vector<std::vector<std::vector<double> > >& g_values);
   cube(const cube& given);
   int get_size(int direction) const;
   bool get_loaded() const { return loaded; };

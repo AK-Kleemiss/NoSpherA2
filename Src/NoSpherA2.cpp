@@ -6,6 +6,7 @@
 #include "cube.h"
 #include "scattering_factors.h"
 #include "properties.h"
+#include "isosurface.h"
 
 bool myGlobalBool = false;
 #ifdef _WIN32
@@ -61,6 +62,48 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         return 0;
     }
+    //Perform Hirshfeld surface based on input and quit
+    if (opt.hirshfeld_surface != "") {
+        if (opt.radius < 2.5) {
+            std::cout << "Resetting Radius to at least 2.5!" << endl;
+            opt.radius = 2.5;
+        }
+        wavy.push_back(WFN(opt.hirshfeld_surface));
+        wavy.push_back(WFN(opt.hirshfeld_surface2));
+        readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
+        cube Hirshfeld_grid(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
+        cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
+        Hirshfeld_grid.give_parent_wfn(wavy[0]);
+        Hirshfeld_grid2.give_parent_wfn(wavy[1]);
+        double len[3]{ 0, 0, 0 };
+        for (int i = 0; i < 3; i++)
+        {
+            len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
+        }
+        for (int i = 0; i < 3; i++)
+        {
+            Hirshfeld_grid.set_origin(i, opt.MinMax[i]);
+            Hirshfeld_grid2.set_origin(i, opt.MinMax[i]);
+            Hirshfeld_grid.set_vector(i, i, len[i]);
+            Hirshfeld_grid2.set_vector(i, i, len[i]);
+        }
+        Hirshfeld_grid.set_comment1("Calculated density using NoSpherA2");
+        Hirshfeld_grid.set_comment2("from " + wavy[0].get_path().string());
+        Hirshfeld_grid2.set_comment1("Calculated density using NoSpherA2");
+        Hirshfeld_grid2.set_comment2("from " + wavy[1].get_path().string());
+        Calc_Spherical_Dens(Hirshfeld_grid, wavy[0], opt.radius, log_file, false);
+        Calc_Spherical_Dens(Hirshfeld_grid2, wavy[1], opt.radius, log_file, false);
+        cube Total_Dens = Hirshfeld_grid + Hirshfeld_grid2;
+        Total_Dens.give_parent_wfn(wavy[0]);
+        cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
+        Hirshfeld_weight.give_parent_wfn(wavy[0]);
+
+        auto triangles = marchingCubes(Hirshfeld_weight, 0.5);
+        writeObj("Hirshfeld_surface.obj", triangles);
+        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout << "Finished!" << endl;
+        return 0;
+    }
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (!opt.wfn2.empty())
     {
@@ -95,7 +138,7 @@ int main(int argc, char **argv)
         Rho2.set_path(std::filesystem::path(wavy[1].get_path().stem().string() + "_rho.cube"));
         Calc_Rho(Rho1, wavy[0], opt.radius, log_file, false);
         Calc_Rho(Rho2, wavy[1], opt.radius, log_file, false);
-        cube Rho_diff(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
+        cube Rho_diff = Rho1 - Rho2;
 #pragma omp parallel for schedule(dynamic)
         for (int i = 0; i < Rho1.get_size(0); i++)
         {

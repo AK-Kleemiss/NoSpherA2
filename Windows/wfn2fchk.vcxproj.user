@@ -5,6 +5,11 @@
     <LocalDebuggerWorkingDirectory>E:\xtb_files</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
+    <LocalDebuggerCommandArguments>-hirshfeld_surface asu.xyz pack.xyz -resolution 0.1 -radius 3.0</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\isosurface</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
     <LocalDebuggerCommandArguments>-sfac_scan 2.0 epoxide.cif epoxide.gbw -acc 3</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)../tests/sfac_scan</LocalDebuggerWorkingDirectory>

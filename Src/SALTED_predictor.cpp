@@ -121,7 +121,7 @@ void SALTEDPredictor::unload_BLAS()
 #endif
 }
 
-const std::string SALTEDPredictor::get_dfbasis_name()
+const std::string SALTEDPredictor::get_dfbasis_name() const
 {
     return config.dfbasis;
 }

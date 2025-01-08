@@ -17,6 +17,7 @@ Global
 		D_ECP_pot|x64 = D_ECP_pot|x64
 		D_ESP|x64 = D_ESP|x64
 		D_gbw_SF|x64 = D_gbw_SF|x64
+		D_isosurface|x64 = D_isosurface|x64
 		D_ML|x64 = D_ML|x64
 		D_OpenShell_gbw|x64 = D_OpenShell_gbw|x64
 		D_polarizability|x64 = D_polarizability|x64
@@ -71,6 +72,8 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ESP|x64.Build.0 = D_ESP|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_gbw_SF|x64.ActiveCfg = D_gbw_SF|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_gbw_SF|x64.Build.0 = D_gbw_SF|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_isosurface|x64.ActiveCfg = D_isosurface|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_isosurface|x64.Build.0 = D_isosurface|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ML|x64.ActiveCfg = D_ML|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ML|x64.Build.0 = D_ML|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|x64.ActiveCfg = D_OpenShell_gbw|x64
@@ -157,6 +160,7 @@ Global
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_ECP_pot|x64.ActiveCfg = D_ECP_pot|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_ESP|x64.ActiveCfg = D_ESP|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_gbw_SF|x64.ActiveCfg = D_gbw_SF|x64
+		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_isosurface|x64.ActiveCfg = Debug_SF_twin|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_ML|x64.ActiveCfg = D_ML|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_OpenShell_gbw|x64.ActiveCfg = D_OpenShell_gbw|x64
 		{E8C28545-BF28-4EC6-BD08-F3131327FF86}.D_polarizability|x64.ActiveCfg = Debug_SF_Disorder|x64
@@ -203,6 +207,7 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ECP_pot|x64.ActiveCfg = D_ECP_pot|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ESP|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_gbw_SF|x64.ActiveCfg = Debug|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_isosurface|x64.ActiveCfg = D_isosurface|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ML|x64.ActiveCfg = D_ML|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_polarizability|x64.ActiveCfg = D_polarizability|x64
