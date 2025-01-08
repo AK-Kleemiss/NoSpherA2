@@ -481,3 +481,70 @@ bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>
     std::cout << "OBJ file written to " << filename << std::endl;
     return true;
 }
+
+// Writes a mesh (list of triangles) to an .obj file:
+bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles)
+{
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file: " << filename << std::endl;
+        return false;
+    }
+
+    file << "mtllib " << filename.stem() << ".mtl\n";
+
+    // 1) Write each triangle’s vertices
+    //    Keep track of how many vertices we’ve written so far
+    //    so we can index them properly in the 'f' lines.
+    size_t vertexCount = 0;
+    for (const auto& tri : triangles) {
+        // "v x y z"
+        file << "v " << tri.v1[0] << " " << tri.v1[1] << " " << tri.v1[2] << "\n";
+        file << "v " << tri.v2[0] << " " << tri.v2[1] << " " << tri.v2[2] << "\n";
+        file << "v " << tri.v3[0] << " " << tri.v3[1] << " " << tri.v3[2] << "\n";
+    }
+
+    // 2) Write faces
+    //    Each triangle is 3 vertices, so the i-th triangle’s vertices
+    //    have indices: 3*i+1, 3*i+2, 3*i+3 (1-based)
+    for (size_t i = 0; i < triangles.size(); i++) {
+        size_t i1 = 3 * i + 1;
+        size_t i2 = 3 * i + 2;
+        size_t i3 = 3 * i + 3;
+        // "f index1 index2 index3"
+        file << "usemtl FaceMaterial_" << i << "\n";
+        file << "f " << i1 << " " << i2 << " " << i3 << "\n";
+    }
+
+    file.close();
+    std::cout << "OBJ file written to " << filename << std::endl;
+    return true;
+}
+
+// We'll assume faces[i] has color faceColors[i]
+bool writeMTL(const std::string& mtlFilename,
+    const std::vector<RGB>& faceColors)
+{
+    std::ofstream out(mtlFilename);
+    if (!out.is_open()) {
+        return false;
+    }
+
+    out << "# Materials\n\n";
+
+    // Write one "newmtl" block per face
+    for (size_t i = 0; i < faceColors.size(); i++) {
+        out << "newmtl FaceMaterial_" << i << "\n";
+        out << "Ka 1.0 1.0 1.0\n";  // ambient is often set to white
+        out << "Kd " << faceColors[i].r << " "
+            << faceColors[i].g << " "
+            << faceColors[i].b << "\n";  // diffuse
+        out << "Ks 0.0 0.0 0.0\n";
+        out << "Ns 0.0\n";
+        out << "d 1.0\n";
+        out << "illum 1\n\n";
+    }
+
+    out.close();
+    return true;
+}
