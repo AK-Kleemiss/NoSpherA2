@@ -257,7 +257,7 @@ Int_Params Int_Params::operator+(const Int_Params& other) {
 }
 
 
-int* make_loc(int* bas, int nbas) {
+ivec make_loc(ivec &bas, int nbas) {
     constexpr int ANG_OF = 1; // Column index for angular momentum
     constexpr int NCTR_OF = 3; // Column index for number of centers
 
@@ -268,11 +268,10 @@ int* make_loc(int* bas, int nbas) {
     }
 
     // Create the ao_loc array
-    int* ao_loc = new int[nbas + 1];
-    ao_loc[0] = 0;
+    ivec ao_loc(nbas+1, 0);
 
     // Compute the cumulative sum
-    std::partial_sum(dims.begin(), dims.end(), ao_loc+1);
+    std::partial_sum(dims.begin(), dims.end(), ao_loc.begin()+1);
     
     return ao_loc;
 }
@@ -280,15 +279,19 @@ int* make_loc(int* bas, int nbas) {
 // Function to compute two-center two-electron integrals (eri2c)
 void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
 {
-    int* bas = params.get_ptr_bas();
-	int* atm = params.get_ptr_atm();
-	double* env = params.get_ptr_env();
+ //   int* bas = params.get_ptr_bas();
+	//int* atm = params.get_ptr_atm();
+	//double* env = params.get_ptr_env();
+
+	ivec bas = params.get_bas();
+	ivec atm = params.get_atm();
+	vec env = params.get_env();
 
     int nbas = params.get_nbas();
 	int nat = params.get_natoms();
 
-	int shl_slice[] = { 0, nbas, 0, nbas };
-	int *aoloc = make_loc(bas, nbas);
+	ivec shl_slice = { 0, nbas, 0, nbas };
+	ivec aoloc = make_loc(bas, nbas);
 
 	int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
 	int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
@@ -310,8 +313,6 @@ void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
 			eri2c[j * naoi + i] = res[i * naoj + j];
         }
     }
-
-	free(aoloc);
 }
 
 // Function to compute three-center two-electron integrals (eri3c)
@@ -324,11 +325,14 @@ void computeEri3c(Int_Params &param1,
 
     Int_Params combined = param1 + param2;
 
-    int* bas = combined.get_ptr_bas();
-    int* atm = combined.get_ptr_atm();
-    double* env = combined.get_ptr_env();
+    //int* bas = combined.get_ptr_bas();
+    //int* atm = combined.get_ptr_atm();
+    //double* env = combined.get_ptr_env();
+	ivec bas = combined.get_bas();
+	ivec atm = combined.get_atm();
+	vec env = combined.get_env();
 
-    int shl_slice[] = {
+    ivec shl_slice = {
         0,
         nQM,
         0,
@@ -338,7 +342,7 @@ void computeEri3c(Int_Params &param1,
     };
     int nat = combined.get_natoms();
     int nbas = combined.get_nbas();
-    int *aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc(bas, nbas);
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
@@ -362,8 +366,6 @@ void computeEri3c(Int_Params &param1,
 	//		}
 	//	}
 	//}
-
-    free(aoloc);
 }
 
 vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
@@ -9586,7 +9588,7 @@ void sr_rys_roots(int nroots, double x, double lower, double *u, double *w)
     }
 }
 
-int g0_2e(double *g, double *rij, double *rkl, double cutoff, Env *envs)
+int g0_2e(double *g, vec &rij, vec &rkl, double cutoff, Env *envs)
 {
     int irys;
     int nroots = envs->nrys_roots;
@@ -9722,7 +9724,7 @@ int g0_2e(double *g, double *rij, double *rkl, double cutoff, Env *envs)
     return 1;
 }
 
-void init_int2c2e_Env(Env *envs, int *ng, int *shls, int *atm, int natm, int *bas, int nbas, double *env)
+void init_int2c2e_Env(Env *envs, int *ng, ivec &shls, ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     envs->natm = natm;
     envs->nbas = nbas;
@@ -9747,8 +9749,12 @@ void init_int2c2e_Env(Env *envs, int *ng, int *shls, int *atm, int natm, int *ba
     envs->nfl = 1;
     envs->nf = envs->nfi * envs->nfk;
 
-    envs->ri = env + atm(1, bas(0, i_sh));
-    envs->rk = env + atm(1, bas(0, k_sh));
+
+    //envs->ri = env + atm(1, bas(0, i_sh));
+    //envs->rk = env + atm(1, bas(0, k_sh));
+
+	std::copy(env.begin() + atm(1, bas(0, i_sh)), env.begin() + atm(1, bas(0, i_sh)) + 3, envs->ri.begin());
+    std::copy(env.begin() + atm(1, bas(0, k_sh)), env.begin() + atm(1, bas(0, k_sh)) + 3, envs->rk.begin());
 
     envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * common_fac_sp(envs->i_l) * common_fac_sp(envs->k_l);
     if (env[0] == 0)
@@ -10028,8 +10034,8 @@ inline void MALLOC_INSTACK(T*& var, const int& n, double*& cache)
 
 int int1e_cache_size(Env *envs)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
     int i_prim = bas(2, shls[0]);
     int j_prim = bas(2, shls[1]);
     int *x_ctr = envs->x_ctr;
@@ -10311,22 +10317,34 @@ void Opt_non0coeff_byshell(int *sortedidx, int *non0ctr, double *ci,
 
 int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int k_sh = shls[1];
     int i_ctr = envs->x_ctr[0];
     int k_ctr = envs->x_ctr[1];
     int i_prim = bas(2, i_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *ck = env + bas(6, k_sh);
+
+	
+    //double *ai = env + bas(5, i_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *ck = env + bas(6, k_sh);
+
+    double* ai = &env[bas(5, i_sh)];
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
     double expcutoff = envs->expcutoff;
-    double *ri = envs->ri;
-    double *rk = envs->rk;
+
+    //double *ri = envs->ri;
+	vec ri = envs->ri;
+
+
+    vec rk = envs->rk;
     int n_comp = envs->ncomp_tensor;
     double fac1i, fac1k;
     int ip, kp;
@@ -10416,22 +10434,31 @@ int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
 
 int _2c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int k_sh = shls[1];
     int i_ctr = envs->x_ctr[0];
     int k_ctr = envs->x_ctr[1];
     int i_prim = bas(2, i_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *ck = env + bas(6, k_sh);
+    //double *ai = env + bas(5, i_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	double* ai = &env[bas(5, i_sh)];
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
     double expcutoff = envs->expcutoff;
-    double *ri = envs->ri;
-    double *rk = envs->rk;
+    //double *ri = envs->ri;
+	vec ri = envs->ri;
+
+    //double *rk = envs->rk;
+	vec rk = envs->rk;
     int n_comp = envs->ncomp_tensor;
     double fac1i, fac1k;
     int ip, kp;
@@ -30356,7 +30383,7 @@ static void dcopy_ij(double *out, double *gctr,
     }
 }
 
-void c2s_sph_1e(double *opij, double *gctr, int *dims,
+void c2s_sph_1e(double *opij, double *gctr, ivec &dims,
                 Env *envs, double *cache)
 {
     int i_l = envs->i_l;
@@ -30391,7 +30418,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
     }
 }
 
-void c2s_dset0(double *out, int *dims, int *counts)
+void c2s_dset0(double *out, ivec &dims, int *counts)
 {
     int ni = dims[0];
     int nj = dims[1];
@@ -30399,7 +30426,7 @@ void c2s_dset0(double *out, int *dims, int *counts)
     size_t nij = ni * nj;
     size_t nijk = nij * nk;
     int i, j, k, l;
-    if (dims == counts)
+    if (dims.data() == counts)
     {
         for (i = 0; i < nijk * counts[3]; i++)
         {
@@ -30429,7 +30456,7 @@ void c2s_dset0(double *out, int *dims, int *counts)
     }
 }
 
-int _2c2e_drv(double *out, int *dims, Env *envs, Opt *opt, double *cache, void (*f_c2s)(double *, double *, int *, Env *, double *))
+int _2c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt, double *cache, void (*f_c2s)(double *, double *, ivec &, Env *, double *))
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1];
@@ -30473,9 +30500,10 @@ int _2c2e_drv(double *out, int *dims, Env *envs, Opt *opt, double *cache, void (
     }
     counts[2] = 1;
     counts[3] = 1;
-    if (dims == NULL)
+    if (dims.data() == NULL)
     {
-        dims = counts;
+		std::copy(counts, counts + 4, dims.data());
+        //dims = counts;
     }
     int nout = dims[0] * dims[1];
     if (!empty)
@@ -30499,17 +30527,17 @@ int _2c2e_drv(double *out, int *dims, Env *envs, Opt *opt, double *cache, void (
     return !empty;
 }
 
-int int2c2e_sph(double *out, int *dims, int *shls, int *atms, int natms, int *bas, int nbas, double *env, Opt *opt, double *cache)
+int int2c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natms, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Env envs;
-    init_int2c2e_Env(&envs, ng, shls, atms, natms, bas, nbas, env);
+    init_int2c2e_Env(&envs, ng, shls, atm, natms, bas, nbas, env);
     envs.f_gout = &gout2e;
     return _2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
 };
 
-int GTOmax_cache_size(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *), int *shls_slice, int ncenter,
-                      int *atm, int natm, int *bas, int nbas, double *env)
+int GTOmax_cache_size(int (*intor)(double *, ivec &,ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), ivec &shls_slice, int ncenter,
+                      ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int i;
     int i0 = shls_slice[0];
@@ -30519,10 +30547,10 @@ int GTOmax_cache_size(int (*intor)(double *, int *, int *, int *, int, int *, in
         i0 = std::min(i0, shls_slice[i * 2]);
         i1 = std::max(i1, shls_slice[i * 2 + 1]);
     }
-    int (*f)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *) = (int (*)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *))intor;
+    int (*f)(double *, int *, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *) = (int (*)(double *, int *, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *))intor;
     int cache_size = 0;
     int n;
-    int shls[4]{i0, i0, i0, i0};
+    ivec shls{i0, i0, i0, i0};
     for (i = i0; i < i1; i++)
     {
         shls[0] = i;
@@ -30535,10 +30563,10 @@ int GTOmax_cache_size(int (*intor)(double *, int *, int *, int *, int, int *, in
     return cache_size;
 }
 
-void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *),
+void GTOint2c(int (*intor)(double *, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
               double *mat, int comp, int hermi,
-              int *shls_slice, int *ao_loc, Opt *opt,
-              int *atm, int natm, int *bas, int nbas, double *env)
+              ivec &shls_slice, ivec &ao_loc, Opt *opt,
+              ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -30552,9 +30580,9 @@ void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, doubl
                                              atm, natm, bas, nbas, env);
 //#pragma omp parallel
     {
-        int dims[] = {naoi, naoj};
+        ivec dims = {naoi, naoj};
         int ish, jsh, ij, i0, j0;
-        int shls[2];
+        ivec shls(2,0);
         double *cache = (double *)malloc(sizeof(double) * cache_size);
 //#pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish * njsh; ij++)
@@ -30747,8 +30775,8 @@ void g0_2e_lj2d4d(double *g, Rys2eT *bc, Env *envs)
     g0_lj2d_4d(g, envs);
 }
 
-void init_int3c2e_Env(Env *envs, int *ng, int *shls,
-                      int *atm, int natm, int *bas, int nbas, double *env)
+void init_int3c2e_Env(Env *envs, int *ng, ivec &shls,
+                      ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     envs->natm = natm;
     envs->nbas = nbas;
@@ -30774,9 +30802,13 @@ void init_int3c2e_Env(Env *envs, int *ng, int *shls,
     envs->nfl = 1;
     envs->nf = envs->nfi * envs->nfk * envs->nfj;
 
-    envs->ri = env + atm(1, bas(0, i_sh));
-    envs->rj = env + atm(1, bas(0, j_sh));
-    envs->rk = env + atm(1, bas(0, k_sh));
+    //envs->ri = env + atm(1, bas(0, i_sh));
+    //envs->rj = env + atm(1, bas(0, j_sh));
+    //envs->rk = env + atm(1, bas(0, k_sh));
+
+	std::copy(env.begin() + atm(1, bas(0, i_sh)), env.begin() + atm(1, bas(0, i_sh)) + 3, envs->ri.begin());
+	std::copy(env.begin() + atm(1, bas(0, j_sh)), env.begin() + atm(1, bas(0, j_sh)) + 3, envs->rj.begin());
+	std::copy(env.begin() + atm(1, bas(0, k_sh)), env.begin() + atm(1, bas(0, k_sh)) + 3, envs->rk.begin());
 
     envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * common_fac_sp(envs->i_l) * common_fac_sp(envs->j_l) * common_fac_sp(envs->k_l);
     if (env[0] == 0)
@@ -31064,7 +31096,7 @@ double *sph2e_inner(double *gsph, double *gcart,
     return gsph;
 }
 
-void c2s_sph_3c2e1(double *bufijk, double *gctr, int *dims,
+void c2s_sph_3c2e1(double *bufijk, double *gctr, ivec &dims,
                    Env *envs, double *cache)
 {
     int i_l = envs->i_l;
@@ -31111,10 +31143,10 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, int *dims,
     }
 }
 
-int set_pairdata(PairData *pairdata, double *ai, double *aj, double *ri, double *rj,
+int set_pairdata(PairData *pairdata, vec &ai, vec &aj, vec &ri, vec &rj,
                  double *log_maxci, double *log_maxcj,
                  int li_ceil, int lj_ceil, int iprim, int jprim,
-                 double rr_ij, double expcutoff, double *env)
+                 double rr_ij, double expcutoff, vec &env)
 {
     int ip, jp, n;
     double aij, eij, cceij, wj;
@@ -31177,8 +31209,8 @@ int set_pairdata(PairData *pairdata, double *ai, double *aj, double *ri, double 
 }
 
 #define PAIRDATA_NON0IDX_SIZE(ps) \
-    int *bas = envs->bas;         \
-    int *shls = envs->shls;       \
+    ivec bas = envs->bas;         \
+    ivec shls = envs->shls;       \
     int i_prim = bas(2, shls[0]); \
     int j_prim = bas(2, shls[1]); \
     int k_prim = bas(2, shls[2]); \
@@ -31186,9 +31218,9 @@ int set_pairdata(PairData *pairdata, double *ai, double *aj, double *ri, double 
 
 int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int j_sh = shls[1];
     Opt *opt = envs->opt;
@@ -31203,12 +31235,21 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *aj = env + bas(5, j_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *cj = env + bas(6, j_sh);
-    double *ck = env + bas(6, k_sh);
+    //double *ai = env + bas(5, i_sh);
+    //double *aj = env + bas(5, j_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *cj = env + bas(6, j_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* cj = &env[bas(6, j_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
+	vec ai(env.begin() + bas(5, i_sh), env.begin() + bas(5, i_sh) + i_prim);
+	vec aj(env.begin() + bas(5, j_sh), env.begin() + bas(5, j_sh) + j_prim);
+
     double expcutoff = envs->expcutoff;
     double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
     PairData *pdata_base = NULL, *pdata_ij = NULL;
@@ -31246,8 +31287,11 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
     non0idxk = non0ctrk + k_prim;
     Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     double expij, cutoff;
-    double *rij;
-    double *rkl = envs->rkl;
+    //double *rij;
+    //double *rkl = envs->rkl;
+    vec rij(3, 0.0);
+	vec rkl = envs->rkl;
+
     int *idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
     if (idx == NULL)
     {
@@ -31325,7 +31369,7 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
                 }
                 envs->ai[0] = ai[ip];
                 expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
+                vec rij(pdata_ij->rij.begin(), pdata_ij->rij.end());
                 cutoff = expcutoff - pdata_ij->cceij;
                 if (i_ctr == 1)
                 {
@@ -31362,9 +31406,9 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
 
 int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int j_sh = shls[1];
     Opt *opt = envs->opt;
@@ -31379,12 +31423,22 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *aj = env + bas(5, j_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *cj = env + bas(6, j_sh);
-    double *ck = env + bas(6, k_sh);
+
+    //double *ai = env + bas(5, i_sh);
+    //double *aj = env + bas(5, j_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *cj = env + bas(6, j_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* cj = &env[bas(6, j_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
+	vec ai(env.begin() + bas(5, i_sh), env.begin() + bas(5, i_sh) + i_prim);
+	vec aj(env.begin() + bas(5, j_sh), env.begin() + bas(5, j_sh) + j_prim);
+
     double expcutoff = envs->expcutoff;
     double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
     PairData *pdata_base = NULL, *pdata_ij = NULL;
@@ -31420,8 +31474,7 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
     non0idxk = non0ctrk + k_prim;
     Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     double expij, cutoff;
-    double *rij;
-    double *rkl = envs->rkl;
+    vec rkl = envs->rkl;
     int *idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
     if (idx == NULL)
     {
@@ -31477,7 +31530,8 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
                 }
                 envs->ai[0] = ai[ip];
                 expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
+				vec rij(pdata_ij->rij.begin(), pdata_ij->rij.end());
+
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * expij;
                 envs->fac[0] = fac1i;
@@ -31499,9 +31553,9 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
 
 int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int j_sh = shls[1];
     Opt *opt = envs->opt;
@@ -31516,12 +31570,22 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *aj = env + bas(5, j_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *cj = env + bas(6, j_sh);
-    double *ck = env + bas(6, k_sh);
+    //double *ai = env + bas(5, i_sh);
+    //double *aj = env + bas(5, j_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *cj = env + bas(6, j_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* cj = &env[bas(6, j_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
+	vec ai(env.begin() + bas(5, i_sh), env.begin() + bas(5, i_sh) + i_prim);
+	vec aj(env.begin() + bas(5, j_sh), env.begin() + bas(5, j_sh) + j_prim);
+
+
     double expcutoff = envs->expcutoff;
     double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
     PairData *pdata_base = NULL, *pdata_ij = NULL;
@@ -31557,8 +31621,8 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
     non0idxk = non0ctrk + k_prim;
     Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     double expij, cutoff;
-    double *rij;
-    double *rkl = envs->rkl;
+    vec rij;
+    vec rkl = envs->rkl;
     int *idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
     if (idx == NULL)
     {
@@ -31615,7 +31679,7 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
                 }
                 envs->ai[0] = ai[ip];
                 expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
+				std::copy(pdata_ij->rij.begin(), pdata_ij->rij.end(), rij.begin());
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
@@ -31641,9 +31705,9 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
 
 int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int j_sh = shls[1];
     Opt *opt = envs->opt;
@@ -31658,12 +31722,22 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *aj = env + bas(5, j_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *cj = env + bas(6, j_sh);
-    double *ck = env + bas(6, k_sh);
+    //double *ai = env + bas(5, i_sh);
+    //double *aj = env + bas(5, j_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *cj = env + bas(6, j_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* cj = &env[bas(6, j_sh)];
+	double* ck = &env[bas(6, k_sh)];
+
+	vec ai(env.begin() + bas(5, i_sh), env.begin() + bas(5, i_sh) + i_prim);
+	vec aj(env.begin() + bas(5, j_sh), env.begin() + bas(5, j_sh) + j_prim);
+
+
     double expcutoff = envs->expcutoff;
     double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
     PairData *pdata_base = NULL, *pdata_ij = NULL;
@@ -31697,8 +31771,8 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     non0idxk = non0ctrk + k_prim;
     Opt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     double expij, cutoff;
-    double *rij;
-    double *rkl = envs->rkl;
+    //double *rij;
+    vec rkl = envs->rkl;
     int *idx = opt->index_xyz_array[envs->i_l * 16 * 16 + envs->j_l * 16 + envs->k_l];
     if (idx == NULL)
     {
@@ -31760,7 +31834,7 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
                 }
                 envs->ai[0] = ai[ip];
                 expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
+                vec rij(pdata_ij->rij.begin(), pdata_ij->rij.end());
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
@@ -31808,9 +31882,9 @@ void Opt_log_max_pgto_coeff(double *log_maxc, double *coeff, int nprim, int nctr
 
 int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
 {
-    int *shls = envs->shls;
-    int *bas = envs->bas;
-    double *env = envs->env;
+    ivec shls = envs->shls;
+    ivec bas = envs->bas;
+    vec env = envs->env;
     int i_sh = shls[0];
     int j_sh = shls[1];
     int k_sh = shls[2];
@@ -31820,12 +31894,22 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     int i_prim = bas(2, i_sh);
     int j_prim = bas(2, j_sh);
     int k_prim = bas(2, k_sh);
-    double *ai = env + bas(5, i_sh);
-    double *aj = env + bas(5, j_sh);
-    double *ak = env + bas(5, k_sh);
-    double *ci = env + bas(6, i_sh);
-    double *cj = env + bas(6, j_sh);
-    double *ck = env + bas(6, k_sh);
+    //double *ai = env + bas(5, i_sh);
+    //double *aj = env + bas(5, j_sh);
+    //double *ak = env + bas(5, k_sh);
+    //double *ci = env + bas(6, i_sh);
+    //double *cj = env + bas(6, j_sh);
+    //double *ck = env + bas(6, k_sh);
+
+	//double* ai = &env[bas(5, i_sh)];
+	//double* aj = &env[bas(5, j_sh)];
+	vec ai(env.begin() + bas(5, i_sh), env.begin() + bas(5, i_sh) + i_prim);  
+    vec aj(env.begin() + bas(5, j_sh), env.begin() + bas(5, j_sh) + j_prim);
+
+	double* ak = &env[bas(5, k_sh)];
+	double* ci = &env[bas(6, i_sh)];
+	double* cj = &env[bas(6, j_sh)];
+	double* ck = &env[bas(6, k_sh)];
 
     double expcutoff = envs->expcutoff;
     const double rr_ij = (envs->rirj)[0] * (envs->rirj)[0] + (envs->rirj)[1] * (envs->rirj)[1] + (envs->rirj)[2] * (envs->rirj)[2];
@@ -31854,8 +31938,9 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     int *gempty = _empty + 3;
 
     double expij, cutoff;
-    double *rij;
-    double *rkl = envs->rk;
+    //double *rij;
+    vec rij(3, 0.0);
+    vec rkl = envs->rk;
     double omega = env[8];
     if (omega < 0 && envs->rys_order > 1)
     {
@@ -31945,7 +32030,9 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
                 }
                 envs->ai[0] = ai[ip];
                 expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
+
+				std::copy(pdata_ij->rij.begin(), pdata_ij->rij.end(), rij.begin());
+
                 cutoff = expcutoff - pdata_ij->cceij;
                 if (i_ctr == 1)
                 {
@@ -31981,8 +32068,8 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     return !*empty;
 }
 
-int _3c2e_drv(double *out, int *dims, Env *envs, Opt *opt,
-              double *cache, void (*f_e1_c2s)(double *, double *, int *, Env *, double *), int is_ssc)
+int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
+              double *cache, void (*f_e1_c2s)(double *, double *, ivec &, Env *, double *), int is_ssc)
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
@@ -32044,9 +32131,10 @@ int _3c2e_drv(double *out, int *dims, Env *envs, Opt *opt,
         counts[2] = envs->nfk * x_ctr[2];
     }
     counts[3] = 1;
-    if (dims == NULL)
+    if (dims.data() == NULL)
     {
-        dims = counts;
+		std::copy(counts, counts + 4, dims.begin());
+        //dims = counts;
     }
     int nout = dims[0] * dims[1] * dims[2];
     if (!empty)
@@ -32070,7 +32158,7 @@ int _3c2e_drv(double *out, int *dims, Env *envs, Opt *opt,
     return !empty;
 }
 
-int int3c2e_sph(double *out, int *dims, int *shls, int *atm, int natm, int *bas, int nbas, double *env, Opt *opt, double *cache)
+int int3c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natm, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Env envs;
@@ -32079,10 +32167,10 @@ int int3c2e_sph(double *out, int *dims, int *shls, int *atm, int natm, int *bas,
     return _3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
 };
 
-void GTOnr3c_fill_s1(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *), double *out, double *buf,
+void GTOnr3c_fill_s1(int (*intor)(double *, ivec &, ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), double *out, double *buf,
                      int comp, int jobid,
-                     int *shls_slice, int *ao_loc, Opt *cintopt,
-                     int *atm, int natm, int *bas, int nbas, double *env)
+                     ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
+                     ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -32103,13 +32191,13 @@ void GTOnr3c_fill_s1(int (*intor)(double *, int *, int *, int *, int, int *, int
     const int naoi = ao_loc[ish1] - ao_loc[ish0];
     const int naoj = ao_loc[jsh1] - ao_loc[jsh0];
     const int naok = ao_loc[ksh1] - ao_loc[ksh0];
-    int dims[] = {naoi, naoj, naok};
+    ivec dims = {naoi, naoj, naok};
 
     const int k0 = ao_loc[ksh] - ao_loc[ksh0];
     out += naoi * naoj * k0;
 
     int ish, jsh, i0, j0;
-    int shls[3] = {0, 0, ksh};
+    ivec shls = {0, 0, ksh};
 
     for (jsh = jstart; jsh < jend; jsh++)
     {
@@ -32125,7 +32213,7 @@ void GTOnr3c_fill_s1(int (*intor)(double *, int *, int *, int *, int, int *, int
     }
 }
 
-int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
+int GTOmax_shell_dim(const ivec &ao_loc, const ivec &shls_slice, int ncenter)
 {
     int i;
     int i0 = shls_slice[0];
@@ -32143,12 +32231,12 @@ int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
     return di;
 }
 
-void GTOnr3c_drv(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *),
-                 void (*fill)(int (*intor)(double *, int *, int *, int *, int, int *, int, double *, Opt *, double *),
-                              double *, double *, int, int, int *, int *, Opt *, int *, int, int *, int, double *),
+void GTOnr3c_drv(int (*intor)(double *,ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
+                 void (*fill)(int (*intor)(double *, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
+                              double *, double *, int, int, ivec &, ivec &, Opt *, ivec&, int, ivec&, int, vec&),
                  double *eri, int comp,
-                 int *shls_slice, int *ao_loc, Opt *cintopt,
-                 int *atm, int natm, int *bas, int nbas, double *env)
+                 ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
+                 ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     const int ish0 = shls_slice[0];
     const int ish1 = shls_slice[1];
@@ -32178,7 +32266,7 @@ void GTOnr3c_drv(int (*intor)(double *, int *, int *, int *, int, int *, int, do
     }
 }
 
-void init_2e_optimizer(Opt &opt, int *atm, int natm, int *bas, int nbas, double *env)
+void init_2e_optimizer(Opt &opt, ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     opt.index_xyz_array = NULL;
     opt.non0ctr = NULL;
@@ -32188,8 +32276,8 @@ void init_2e_optimizer(Opt &opt, int *atm, int natm, int *bas, int nbas, double 
     opt.pairdata = NULL;
 }
 
-void Opt_set_log_maxc(Opt &opt, int *atm, int natm,
-                      int *bas, int nbas, double *env)
+void Opt_set_log_maxc(Opt &opt, ivec &atm, int natm,
+                      ivec &bas, int nbas, vec &env)
 {
     int i, iprim, ictr;
     double *ci;
@@ -32210,7 +32298,10 @@ void Opt_set_log_maxc(Opt &opt, int *atm, int natm,
     {
         iprim = bas(2, i);
         ictr = bas(3, i);
-        ci = env + bas(6, i);
+        //ci = env + bas(6, i);
+		ci = &env[bas(6, i)];
+
+
         opt.log_max_coeff[i] = plog_maxc;
         Opt_log_max_pgto_coeff(plog_maxc, ci, iprim, ictr);
         plog_maxc += iprim;
@@ -32218,11 +32309,12 @@ void Opt_set_log_maxc(Opt &opt, int *atm, int natm,
 }
 
 void Opt_setij(Opt &opt, int *ng,
-               int *atm, int natm, int *bas, int nbas, double *env)
+               ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int i, j, ip, jp;
     int iprim, jprim, li, lj;
-    double *ai, *aj, *ri, *rj;
+	vec ai(3, 0.0), aj(3, 0.0), ri(3, 0.0), rj(3, 0.0);
+
     double expcutoff;
     if (env[0] == 0)
     {
@@ -32268,16 +32360,25 @@ void Opt_setij(Opt &opt, int *ng,
     PairData *pdata0;
     for (i = 0; i < nbas; i++)
     {
-        ri = env + atm(1, bas(0, i));
-        ai = env + bas(5, i);
+        //ri = env + atm(1, bas(0, i));
+        //ai = env + bas(5, i);
+
+		std::copy(env.begin() + atm(1, bas(0, i)), env.begin() + atm(1, bas(0, i)) + 3, ri.begin());
+		std::copy(env.begin() + bas(5, i), env.begin() + bas(5, i) + 3, ai.begin());
+		
+
         iprim = bas(2, i);
         li = bas(1, i);
         log_maxci = log_max_coeff[i];
 
         for (j = 0; j <= i; j++)
         {
-            rj = env + atm(1, bas(0, j));
-            aj = env + bas(5, j);
+            //rj = env + atm(1, bas(0, j));
+            //aj = env + bas(5, j);
+
+			std::copy(env.begin() + atm(1, bas(0, j)), env.begin() + atm(1, bas(0, j)) + 3, rj.begin());
+			std::copy(env.begin() + bas(5, j), env.begin() + bas(5, j) + 3, aj.begin());
+
             jprim = bas(2, j);
             lj = bas(1, j);
             log_maxcj = log_max_coeff[j];
@@ -32317,8 +32418,8 @@ void Opt_setij(Opt &opt, int *ng,
     }
 }
 
-void Opt_set_non0coeff(Opt &opt, int *atm, int natm,
-                       int *bas, int nbas, double *env)
+void Opt_set_non0coeff(Opt &opt, ivec &atm, int natm,
+                       ivec &bas, int nbas, vec &env)
 {
     int i, iprim, ictr;
     double *ci;
@@ -32344,7 +32445,11 @@ void Opt_set_non0coeff(Opt &opt, int *atm, int natm,
     {
         iprim = bas(2, i);
         ictr = bas(3, i);
-        ci = env + bas(6, i);
+
+        //ci = env + bas(6, i);
+
+		ci = &env[bas(6, i)];
+
         opt.non0ctr[i] = pnon0ctr;
         opt.sortedidx[i] = psortedidx;
         Opt_non0coeff_byshell(psortedidx, pnon0ctr, ci, iprim, ictr);
@@ -32353,7 +32458,7 @@ void Opt_set_non0coeff(Opt &opt, int *atm, int natm,
     }
 }
 
-int _make_fakebas(int *fakebas, int *bas, int nbas, double *env)
+int _make_fakebas(ivec &fakebas, ivec &bas, int nbas, vec &env)
 {
     int i;
     int max_l = 0;
@@ -32399,13 +32504,13 @@ int *_allocate_index_xyz(Opt &opt, int max_l, int l_allow, int order)
 }
 
 void gen_idx(Opt &opt,
-             void (*finit)(Env *, int *, int *, int *, int, int *, int, double *),
+             void (*finit)(Env *, int *, ivec &, ivec&, int, ivec&, int, vec&),
              void (*findex_xyz)(int *, const Env *),
              int order, int l_allow, int *ng,
-             int *atm, int natm, int *bas, int nbas, double *env)
+             ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int i, j, k, l, ptr;
-    int fakebas[8 * 16];
+    ivec fakebas(8 * 16,0);
     int max_l = _make_fakebas(fakebas, bas, nbas, env);
     int fakenbas = max_l + 1;
     // index_xyz bufsize may blow up for large max_l
@@ -32413,9 +32518,7 @@ void gen_idx(Opt &opt,
     int *buf = _allocate_index_xyz(opt, max_l, l_allow, order);
 
     Env envs;
-    int shls[4] = {
-        0,
-    };
+    ivec shls(4, 0);
     if (order == 2)
     {
         for (i = 0; i <= l_allow; i++)
@@ -32478,7 +32581,7 @@ void gen_idx(Opt &opt,
     }
 }
 
-Opt int3c2e_optimizer(int *atm, int natm, int *bas, int nbas, double *env)
+Opt int3c2e_optimizer(ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Opt o;
@@ -32491,7 +32594,7 @@ Opt int3c2e_optimizer(int *atm, int natm, int *bas, int nbas, double *env)
     return o;
 }
 
-Opt int2c2e_optimizer(int *atm, int natm, int *bas, int nbas, double *env)
+Opt int2c2e_optimizer(ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Opt o;

@@ -50,13 +50,17 @@ public:
 	int* get_ptr_bas() { return _bas.data(); };
 	double* get_ptr_env() { return _env.data(); };
 
+	ivec get_atm() { return _atm; };
+	ivec get_bas() { return _bas; };
+	vec get_env() { return _env; };
+
     int get_nbas() { return nbas; };  // Number of basis segments
 	int get_nao() { return nao; };    // Number of atomic orbitals  
     int get_natoms() { return ncen; };
 };
 
 typedef struct {
-    double rij[3];
+    std::array<double, 3> rij;
     double eij;
     double cceij;
 } PairData;
@@ -83,10 +87,10 @@ typedef struct {
 } Rys2eT;
 
 struct Env {
-    int* atm;
-    int* bas;
-    double* env;
-    int* shls;
+    ivec atm;
+    ivec bas;
+    vec env;
+    ivec shls;
     int natm;
     int nbas;
 
@@ -126,17 +130,18 @@ struct Env {
     double expcutoff;
     double rirj[3]; // diff by sign in different g0_2d4d algorithm
     double rkrl[3];
-    double* rx_in_rijrx;
-    double* rx_in_rklrx;
+    vec rx_in_rijrx;
+    vec rx_in_rklrx;
 
-    double* ri;
-    double* rj;
-    double* rk;
+    //double* ri;
+    vec ri = vec(3);
+    vec rj = vec(3);
+    vec rk = vec(3);
     // in int2e or int3c2e, the coordinates of the fourth shell
     // in int1e_grids, the pointer for the grids coordinates
     union { double* rl; double* grids; };
 
-    int(*f_g0_2e)(double*, double*, double*, double, Env*);
+    int(*f_g0_2e)(double *, vec &, vec &, double, Env*);
     void (*f_g0_2d4d)(double*, Rys2eT*, Env*);
     void (*f_gout)(double*, double*, int*, Env*, int);
     Opt* opt;
@@ -149,30 +154,30 @@ struct Env {
     double al[1];
     double fac[1];
     double rij[3];
-    double rkl[3];
+    vec rkl = vec(3);
 };
 
-int int2c2e_sph(double* out, int* dims, int* shls, int* atms,
-    int natms, int* bas, int nbas, double* env, 
+int int2c2e_sph(double* out, ivec &dims, ivec &shls, ivec &atm,
+    int natm, ivec &bas, int nbas, vec &env,
     Opt* opt, double* cache);
-int int3c2e_sph(double* out, int* dims, int* shls, int* atm,
-    int natm, int* bas, int nbas, double* env,
+int int3c2e_sph(double* out, ivec &dims, ivec &shls, ivec &atm,
+    int natm, ivec &bas, int nbas, vec &env,
     Opt* opt, double* cache);
-void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
+void GTOint2c(int (*intor)(double*, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*),
     double* mat, int comp, int hermi,
-    int* shls_slice, int* ao_loc, Opt* opt,
-    int* atm, int natm, int* bas, int nbas, double* env);
-void GTOnr3c_fill_s1(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*), double* out, double* buf,
+    ivec& shls_slice, ivec& ao_loc, Opt* opt,
+    ivec& atm, int natm, ivec& bas, int nbas, vec& env);
+void GTOnr3c_fill_s1(int (*intor)(double*, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*), double* out, double* buf,
     int comp, int jobid,
-    int* shls_slice, int* ao_loc, Opt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env);
-void GTOnr3c_drv(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
-    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, Opt*, double*),
-        double*, double*, int, int, int*, int*, Opt*, int*, int, int*, int, double*),
+    ivec& shls_slice, ivec &ao_loc, Opt* cintopt,
+    ivec &atm, int natm, ivec &bas, int nbas, vec &env);
+void GTOnr3c_drv(int (*intor)(double*, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
+    void (*fill)(int (*intor)(double*, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
+        double*, double*, int, int, ivec &, ivec &, Opt*, ivec&, int, ivec&, int, vec&),
     double* eri, int comp,
-    int* shls_slice, int* ao_loc, Opt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env);
+   ivec &shls_slice, ivec &ao_loc, Opt* cintopt,
+    ivec &atm, int natm, ivec &bas, int nbas, vec &env);
 
-Opt int3c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);
-Opt int2c2e_optimizer(int* atm, int natm, int* bas, int nbas, double* env);
+Opt int3c2e_optimizer(ivec &atm, int natm, ivec  &bas, int nbas, vec &env);
+Opt int2c2e_optimizer(ivec &atm, int natm, ivec &bas, int nbas, vec &env);
 int fixed_density_fit_test();
