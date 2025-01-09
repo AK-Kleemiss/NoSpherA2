@@ -342,6 +342,35 @@ std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std:
     };
 }
 
+std::array<double, 3> get_colour(const Triangle t, const cube& volumeData, std::array<std::array<double, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
+    std::array<double, 3> colour;
+    std::array<double, 3> p1 = t.v1;
+    std::array<double, 3> p2 = t.v2;
+    std::array<double, 3> p3 = t.v3;
+    std::array<double, 3> p = { (p1[0] + p2[0] + p3[0]) / 3, (p1[1] + p2[1] + p3[1]) / 3, (p1[2] + p2[2] + p3[2]) / 3 };
+    double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
+    if (val < low_lim) {
+        colour = Colourcode[0];
+    }
+    else if (val > high_lim) {
+        colour = Colourcode[2];
+    }
+    else {
+        //Mix colours
+        if (val < 0)
+            colour = { val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0],
+            val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1],
+            val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2] };
+        else if (val > 0)
+            colour = { val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0],
+            val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1],
+            val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2] };
+        else
+            colour = Colourcode[1];
+    }
+    return colour;
+};
+
 // --------------------------------------------------------------------------
 // Marching Cubes on a 3D array of double values to find isosurface = 0.5
 //
