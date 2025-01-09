@@ -342,8 +342,8 @@ std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std:
     };
 }
 
-std::array<double, 3> get_colour(const Triangle t, const cube& volumeData, std::array<std::array<double, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
-    std::array<double, 3> colour;
+RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
+    RGB colour;
     std::array<double, 3> p1 = t.v1;
     std::array<double, 3> p2 = t.v2;
     std::array<double, 3> p3 = t.v3;
@@ -358,16 +358,69 @@ std::array<double, 3> get_colour(const Triangle t, const cube& volumeData, std::
     else {
         //Mix colours
         if (val < 0)
-            colour = { val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0],
-            val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1],
-            val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2] };
+            colour = { int(val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0]),
+                       int(val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1]),
+                       int(val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2])};
         else if (val > 0)
-            colour = { val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0],
-            val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1],
-            val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2] };
+            colour = { int(val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0]),
+                       int(val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1]),
+                       int(val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2])};
         else
             colour = Colourcode[1];
     }
+    for (int i = 0; i < 3; i++)
+        if (colour[i] > 255)
+            colour[i] = 255;
+        else if (colour[i] < 0)
+            colour[i] = 0;
+    return colour;
+};
+
+double calc_d_i(const double& x, const double& y, const double& z, const WFN& wavy) {
+    double d_i = 1E100;
+    const std::array<double, 3> p_t = { x, y, z };
+    std::array<double, 3> p_a = { 0, 0, 0 };
+    for (int i = 0; i < wavy.get_ncen(); i++) {
+        p_a = { p_t[0] - wavy.atoms[i].x, p_t[1] - wavy.atoms[i].y, p_t[2] - wavy.atoms[i].z };
+        double d = array_length(p_a);
+        if (d < d_i)
+            d_i = d;
+    }
+    return d_i;
+}
+
+RGB get_colour(const Triangle& t, double(*func)(const double&, const double&, const double&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
+    double mid_point = (low_lim + high_lim) / 2.0;
+    RGB colour;
+    std::array<double, 3> p1 = t.v1;
+    std::array<double, 3> p2 = t.v2;
+    std::array<double, 3> p3 = t.v3;
+    std::array<double, 3> p = { (p1[0] + p2[0] + p3[0]) / 3, (p1[1] + p2[1] + p3[1]) / 3, (p1[2] + p2[2] + p3[2]) / 3 };
+    double val = func(p[0], p[1], p[2], wavy);
+    if (val < low_lim) {
+        colour = Colourcode[0];
+    }
+    else if (val > high_lim) {
+        colour = Colourcode[2];
+    }
+    else {
+        //Mix colours
+        if (val < mid_point)
+            colour = { int(val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0]),
+                       int(val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1]),
+                       int(val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2]) };
+        else if (val > mid_point)
+            colour = { int(val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0]),
+                       int(val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1]),
+                       int(val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2]) };
+        else
+            colour = Colourcode[1];
+    }
+    for (int i = 0; i < 3; i++)
+        if (colour[i] > 255)
+            colour[i] = 255;
+        else if (colour[i] < 0)
+            colour[i] = 0;
     return colour;
 };
 
@@ -512,7 +565,7 @@ bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>
 }
 
 // Writes a mesh (list of triangles) to an .obj file:
-bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles)
+bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>& triangles)
 {
     std::ofstream file(filename);
     if (!file.is_open()) {
@@ -520,7 +573,9 @@ bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Tri
         return false;
     }
 
-    file << "mtllib " << filename.stem() << ".mtl\n";
+    std::string mtl_filename = filename.stem().string() + ".mtl";
+
+    file << "mtllib " << mtl_filename << std::endl;
 
     // 1) Write each triangle’s vertices
     //    Keep track of how many vertices we’ve written so far
@@ -532,6 +587,7 @@ bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Tri
         file << "v " << tri.v2[0] << " " << tri.v2[1] << " " << tri.v2[2] << "\n";
         file << "v " << tri.v3[0] << " " << tri.v3[1] << " " << tri.v3[2] << "\n";
     }
+    writeMTL(mtl_filename, triangles);
 
     // 2) Write faces
     //    Each triangle is 3 vertices, so the i-th triangle’s vertices
@@ -541,7 +597,7 @@ bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Tri
         size_t i2 = 3 * i + 2;
         size_t i3 = 3 * i + 3;
         // "f index1 index2 index3"
-        file << "usemtl FaceMaterial_" << i << "\n";
+        file << "usemtl FaceMaterial_" << triangles[i].colour_index << "\n";
         file << "f " << i1 << " " << i2 << " " << i3 << "\n";
     }
 
@@ -552,22 +608,35 @@ bool writeColoutObj(const std::filesystem::path& filename, const std::vector<Tri
 
 // We'll assume faces[i] has color faceColors[i]
 bool writeMTL(const std::string& mtlFilename,
-    const std::vector<RGB>& faceColors)
+    std::vector<Triangle>& triangles)
 {
     std::ofstream out(mtlFilename);
     if (!out.is_open()) {
         return false;
     }
+    std::vector<RGB> faceColors;
 
     out << "# Materials\n\n";
 
     // Write one "newmtl" block per face
-    for (size_t i = 0; i < faceColors.size(); i++) {
-        out << "newmtl FaceMaterial_" << i << "\n";
-        out << "Ka 1.0 1.0 1.0\n";  // ambient is often set to white
-        out << "Kd " << faceColors[i].r << " "
-            << faceColors[i].g << " "
-            << faceColors[i].b << "\n";  // diffuse
+    for (size_t i = 0; i < triangles.size(); i++) {
+        //look if we already have this colour
+        bool found = false;
+        for (size_t j = 0; j < faceColors.size(); j++) {
+            if (faceColors[j] == triangles[i].colour) {
+                found = true;
+                triangles[i].colour_index = j;
+                break;
+            }
+        }
+        if (found) continue;
+        faceColors.push_back(triangles[i].colour);
+        triangles[i].colour_index = faceColors.size() - 1;
+        out << "newmtl FaceMaterial_" << faceColors.size() - 1 << "\n";
+        out << "Ka 1 1 1 \n";  // ambient is often set to white
+        out << "Kd " << triangles[i].colour[0] / 255.0 << " "
+            << triangles[i].colour[1] / 255.0 << " "
+            << triangles[i].colour[2] / 255.0 << "\n";  // diffuse
         out << "Ks 0.0 0.0 0.0\n";
         out << "Ns 0.0\n";
         out << "d 1.0\n";
@@ -575,5 +644,6 @@ bool writeMTL(const std::string& mtlFilename,
     }
 
     out.close();
+    std::cout << "MTL file written to " << mtlFilename << std::endl;
     return true;
 }

@@ -59,6 +59,12 @@ const double array_length(const array& in) {
     return sqrt(sum);
 }
 
+// Function to compute cross product
+std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b);
+
+// Function to compute dot product
+double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b);
+
 constexpr const std::complex<double> c_one(0, 1.0);
 
 extern std::string help_message;

@@ -18,8 +18,10 @@ void Calc_Spherical_Dens(
     ProgressBar *progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
 
     vector<Thakkar> atoms;
-    for (int a = 0; a < wavy.get_ncen(); a++)
-        atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
+    for (int a = 0; a < 92; a++) {
+        atoms.push_back(Thakkar(a));
+        atoms[a].make_interpolator(1.005*1.005*1.005, 1E-7);
+    }
 
     const int low_i = wrap ? -CubeSpher.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeSpher.get_size(0) : CubeSpher.get_size(0);
@@ -53,7 +55,7 @@ void Calc_Spherical_Dens(
                 double dens_all = 0.0;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dens_all += atoms[a].get_radial_density(dists[a]);
+                    dens_all += atoms[wavy.atoms[a].charge - 1].get_interpolated_density(dists[a]);
                 }
 
                 int temp_i, temp_j, temp_k;

@@ -1454,7 +1454,7 @@ __host__ int cu_make_hirshfeld_grids(
         for (int i = 0; i < wave.get_nmo(false); i++)
         {
             occ.push_back(wave.get_MO_occ(i));
-            if (occ[occ.size() - 1] == 0)
+            if (occ.back() == 0)
                 occ.pop_back();
         }
         gpuErrchk(cudaMalloc((void**)&gpu_occ[0], sizeof(float) * nmo_temp));

@@ -71,3 +71,4 @@ NoSpherA2_rascaline
 tests/SALTED/sfacs.dat
 *.exp
 *.lib
+*.mtl

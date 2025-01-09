@@ -718,7 +718,7 @@ inline bool merge_tscs_without_checks(
         form_fact[offset + nr_in_new_scats].push_back(std::complex<double>(stod(re_im[0]), stod(re_im[1])));
       }
     }
-    std::cout << "Data for " << form_fact[form_fact.size() - 1].size() << " indices read." << std::endl;
+    std::cout << "Data for " << form_fact.back().size() << " indices read." << std::endl;
     offset = labels.size();
     inf.close();
   }

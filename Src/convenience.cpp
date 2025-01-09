@@ -156,6 +156,19 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to)
     dest.close();
 };
 
+std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b) {
+    return {
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]
+    };
+}
+
+double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b) {
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+};
+
+
 //---------------------------Configuration files ---------------------------------------------------
 
 std::filesystem::path get_home_path(void)
@@ -2479,14 +2492,14 @@ void options::digest_options()
         else if (temp == "-twin")
         {
             twin_law.resize(twin_law.size() + 1);
-            twin_law[twin_law.size() - 1].resize(9);
+            twin_law.back().resize(9);
             for (int twl = 0; twl < 9; twl++)
-                twin_law[twin_law.size() - 1][twl] = stod(arguments[i + 1 + twl]);
+                twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
             if (debug)
             {
                 cout << "twin_law: ";
                 for (int twl = 0; twl < 9; twl++)
-                    cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
+                    cout << setw(7) << setprecision(2) << twin_law.back()[twl];
                 cout << endl;
             }
             i += 9;

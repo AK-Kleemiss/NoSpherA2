@@ -43,6 +43,8 @@ protected:
 	const double *z, *c;
 	int charge;
 	int _prev_coef, _offset, _first_ex;
+    vec radial_density, radial_dist;
+    double lincr, start;
 	virtual void calc_orbs(int &nr_ex,
 						   int &nr_coef,
 						   const double &dist,
@@ -141,8 +143,19 @@ public:
         (void)min_f;
 		return -1;
 	};
+	virtual void make_interpolator(const double& incr, const double& min_dist) {
+        err_not_impl_SA();
+        (void)incr;
+		(void)min_dist;
+	};
+	virtual double get_interpolated_density(const double& dist) {
+        err_not_impl_SA();
+        (void)dist;
+		return -1.0;
+	};
 	const int get_atomic_number() const { return atomic_number; };
 	const int get_charge() const { return charge; };
+	
 };
 
 class Thakkar : public Spherical_Atom
@@ -204,6 +217,8 @@ public:
 		const int &min_p,
 		const int &min_d,
 		const int &min_f) override;
+    void make_interpolator(const double& incr, const double& min_dist) override;
+    double get_interpolated_density(const double& dist) override;
 };
 
 class Thakkar_Anion : public Thakkar

@@ -97,9 +97,29 @@ int main(int argc, char **argv)
         Total_Dens.give_parent_wfn(wavy[0]);
         cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
         Hirshfeld_weight.give_parent_wfn(wavy[0]);
+        std::array<std::array<int, 3>, 3> Colourcode;
+        double low_lim = 0.2;
+        double high_lim = 5.0;
+        Colourcode[0] = { 255, 0, 0 };
+        Colourcode[1] = { 255, 255, 255 };
+        Colourcode[2] = { 0, 0, 255 };
 
-        auto triangles = marchingCubes(Hirshfeld_weight, 0.5);
-        writeObj("Hirshfeld_surface.obj", triangles);
+        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);
+        std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
+        auto triangles_e = triangles_i;
+        double area = 0.0;
+        double volume = 0.0;
+        for (int i=0; i<triangles_i.size(); i++)
+        {
+            area += triangles_i[i].calc_area();
+            volume += triangles_i[i].calc_inner_volume();
+            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim, high_lim);
+            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim, high_lim);
+        }
+        std::cout << "Total area: " << area << endl;
+        std::cout << "Total volume: " << volume << endl;
+        writeColourObj("Hirshfeld_surface_i.obj", triangles_i);
+        writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;

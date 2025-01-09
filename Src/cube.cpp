@@ -551,15 +551,6 @@ void cube::calc_dv() {
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
 
-// Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b) {
-    return {
-        a[1] * b[2] - a[2] * b[1],
-        a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]
-    };
-}
-
 // Function to compute dot product
 template <typename T>
 inline const double dot(const T& a, const T& b) {

@@ -6,7 +6,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
-    <LocalDebuggerCommandArguments>-hirshfeld_surface asu.xyz pack.xyz -resolution 0.1 -radius 3.0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-hirshfeld_surface asu.xyz pack.xyz -resolution 0.075 -radius 2.5</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\isosurface</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
