@@ -4,10 +4,10 @@
 
 int density_fit(const WFN& wavy, const std::string auxname);
 
-int lrys_schmidt(int nroots, double x, double lower, double* roots, double* weights);
+int lrys_schmidt(int nroots, double x, double lower, vec &roots, vec &weights);
 int R_lsmit(long double* cs, long double* fmt_ints, int n);
-int lrys_jacobi(int n, double x, double lower, double* roots, double* weights);
-int lrys_laguerre(int n, double x, double lower, double* roots, double* weights);
+int lrys_jacobi(int n, double x, double lower, vec& roots, vec& weights);
+int lrys_laguerre(int n, double x, double lower, vec& roots, vec& weights);
 void lnaive_jacobi_moments(int n, double t, double lower, long double* mus);
 
 
@@ -157,24 +157,24 @@ struct Env {
     vec rkl = vec(3);
 };
 
-int int2c2e_sph(double* out, ivec &dims, ivec &shls, ivec &atm,
+int int2c2e_sph(vec &out, ivec &dims, ivec &shls, ivec &atm,
     int natm, ivec &bas, int nbas, vec &env,
     Opt* opt, double* cache);
-int int3c2e_sph(double* out, ivec &dims, ivec &shls, ivec &atm,
+int int3c2e_sph(vec &out, ivec &dims, ivec &shls, ivec &atm,
     int natm, ivec &bas, int nbas, vec &env,
     Opt* opt, double* cache);
-void GTOint2c(int (*intor)(double*, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*),
-    double* mat, int comp, int hermi,
+void GTOint2c(int (*intor)(vec &, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*),
+    vec &mat, int comp, int hermi,
     ivec& shls_slice, ivec& ao_loc, Opt* opt,
     ivec& atm, int natm, ivec& bas, int nbas, vec& env);
-void GTOnr3c_fill_s1(int (*intor)(double*, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*), double* out, double* buf,
+void GTOnr3c_fill_s1(int (*intor)(vec &, ivec&, ivec&, ivec&, int, ivec&, int, vec&, Opt*, double*), vec &out, double* buf,
     int comp, int jobid,
     ivec& shls_slice, ivec &ao_loc, Opt* cintopt,
     ivec &atm, int natm, ivec &bas, int nbas, vec &env);
-void GTOnr3c_drv(int (*intor)(double*, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
-    void (*fill)(int (*intor)(double*, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
-        double*, double*, int, int, ivec &, ivec &, Opt*, ivec&, int, ivec&, int, vec&),
-    double* eri, int comp,
+void GTOnr3c_drv(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
+    void (*fill)(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec&, int, vec &, Opt*, double*),
+        vec &, double*, int, int, ivec &, ivec &, Opt*, ivec&, int, ivec&, int, vec&),
+    vec &eri, int comp,
    ivec &shls_slice, ivec &ao_loc, Opt* cintopt,
     ivec &atm, int natm, ivec &bas, int nbas, vec &env);
 

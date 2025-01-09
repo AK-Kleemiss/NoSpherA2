@@ -303,7 +303,7 @@ void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
     vec res(naoi * naoj, 0.0);
     eri2c.resize(naoi * naoj, 0.0);
 	//GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
-    GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice, aoloc, NULL, atm, nat, bas, nbas, env);
+    GTOint2c(int2c2e_sph, res, 1, 0, shl_slice, aoloc, NULL, atm, nat, bas, nbas, env);
 
     
 
@@ -352,7 +352,7 @@ void computeEri3c(Int_Params &param1,
     // Compute integrals
     //vec res(naoi * naoj * naok, 0.0);
     eri3c.resize(naoi * naoj * naok, 0.0);
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, eri3c.data(), 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, eri3c, 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
 
  //   //res is in fortran order, write the result in regular ordering
 	//
@@ -539,13 +539,13 @@ int fixed_density_fit_test()
 		}
 		file.close();
 	}
+    //11 0.020481708907654498
+ //   computeEri3c(normal_basis, aux_basis, eri3c_test_test);
 
-    computeEri3c(normal_basis, aux_basis, eri3c_test_test);
-
-    vec dm_test = flatten(wavy_gbw.get_dm());
-	vec rho_test = einsum_ijp_ij_p(eri3c_test_test, dm_test, normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao());
-    vec2 intermediate = reshape(eri2c_test_test, { aux_basis.get_nao(), aux_basis.get_nao() });
-    solve_linear_system(intermediate, rho_test);
+ //   vec dm_test = flatten(wavy_gbw.get_dm());
+	//vec rho_test = einsum_ijp_ij_p(eri3c_test_test, dm_test, normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao());
+ //   vec2 intermediate = reshape(eri2c_test_test, { aux_basis.get_nao(), aux_basis.get_nao() });
+ //   solve_linear_system(intermediate, rho_test);
 
 #ifdef _WIN32
     math_unload_BLAS(blas);
@@ -4441,7 +4441,7 @@ void g0_2e_2d(double *g, Rys2eT *bc, Env *envs)
     }
 }
 
-int rys_root1(double X, double *roots, double *weights)
+int rys_root1(double X, vec &roots, vec &weights)
 {
     double Y, F1;
 
@@ -4573,7 +4573,7 @@ int rys_root1(double X, double *roots, double *weights)
     return 0;
 }
 
-int rys_root2(double X, double *roots, double *weights)
+int rys_root2(double X, vec& roots, vec& weights)
 {
 
     double R12, R22, W22;
@@ -4928,7 +4928,7 @@ int rys_root2(double X, double *roots, double *weights)
     return 0;
 }
 
-int rys_root3(double X, double *roots, double *weights)
+int rys_root3(double X, vec& roots, vec& weights)
 {
 
     double R13, R23, W23, R33, W33;
@@ -5498,7 +5498,7 @@ int rys_root3(double X, double *roots, double *weights)
     return 0;
 }
 
-int rys_root4(double X, double *roots, double *weights)
+int rys_root4(double X, vec& roots, vec& weights)
 {
     double R14, R24, W24, R34, W34, R44, W44;
     double RT1, RT2, RT3, RT4, WW1, WW2, WW3, WW4;
@@ -6504,7 +6504,7 @@ int rys_root4(double X, double *roots, double *weights)
     return 0;
 }
 
-int rys_root5(double X, double *roots, double *weights)
+int rys_root5(double X, vec &roots, vec &weights)
 {
     double R15, R25, W25, R35, W35, R45, W45, R55, W55;
     double RT1, RT2, RT3, RT4, RT5, WW1, WW2, WW3, WW4, WW5;
@@ -7965,8 +7965,8 @@ int rys_root5(double X, double *roots, double *weights)
     return 0;
 }
 
-typedef int QuadratureFunction(int n, double x, double lower, double *roots, double *weights);
-int segment_solve(int n, double x, double lower, double *u, double *w,
+typedef int QuadratureFunction(int n, double x, double lower, vec& roots, vec& weights);
+int segment_solve(int n, double x, double lower, vec &u, vec &w,
                   double breakpoint, QuadratureFunction fn1, QuadratureFunction fn2)
 {
     int error;
@@ -8456,7 +8456,7 @@ void fmt_lerfc_like(long double *f, long double t, long double lower, int m)
     }
 }
 
-int lrys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
+int lrys_schmidt(int nroots, double x, double lower, vec& roots, vec& weights)
 {
     int i, k, j, order, error;
     int nroots1 = nroots + 1;
@@ -8600,7 +8600,7 @@ int R_dsmit(double *cs, double *fmt_ints, int n)
 }
 
 int _rdk_rys_roots(int nroots, double *fmt_ints,
-                   double *roots, double *weights)
+                vec& roots, vec& weights)
 {
     int i, k, j, order;
     int nroots1 = nroots + 1;
@@ -8847,7 +8847,7 @@ void fmt_erfc_like(double *f, double t, double lower, int m)
     }
 }
 
-int rys_schmidt(int nroots, double x, double lower, double *roots, double *weights)
+int rys_schmidt(int nroots, double x, double lower, vec &roots, vec &weights)
 {
     double fmt_ints[32 * 2];
     if (lower == 0)
@@ -8986,7 +8986,7 @@ int _dlaev2(double *eig, double *vec, double *diag, double *diag_off1)
 
 
 //FOR LUKAS: MIGHT BE DODGY?! WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
-int diagonalize(int n, double *diag, double *diag_off1, double *eig, double *vec)
+int diagonalize(int n, double *diag, double *diag_off1, vec &eig, double *vec)
 {
     int M = 0;
     int ISUPPZ[32 * 2];
@@ -9001,14 +9001,14 @@ int diagonalize(int n, double *diag, double *diag_off1, double *eig, double *vec
         */
 #if has_RAS == 1
     int INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, // WE HAVE TO CHECK IF IT IS ACTUALLY ROW MAJOR!!!!
-                              eig, vec, n, n, ISUPPZ, &TRYRAC);
+                              eig.data(), vec, n, n, ISUPPZ, &TRYRAC);
     return INFO;
 #endif
     return 1;
 }
 
 int rys_wheeler_partial(int n, const double *alpha, const double *beta, double *moments,
-                        double *roots, double *weights)
+                        vec &roots, vec &weights)
 {
     double a[32 + 32 + 32 * 32]; // scartch array for LAPACKE
     double *b = a + n;           // Offset by maximum number of roots in scratch
@@ -9152,7 +9152,7 @@ void lflocke_jacobi_moments(int n, double t, long double *mus)
     }
 }
 
-int rys_jacobi(int n, double x, double lower, double *roots, double *weights)
+int rys_jacobi(int n, double x, double lower, vec &roots, vec &weights)
 {
     double moments[32 * 2];
     const double *alpha = constants::JACOBI_ALPHA;
@@ -9169,7 +9169,7 @@ int rys_jacobi(int n, double x, double lower, double *roots, double *weights)
     return rys_wheeler_partial(n, alpha, beta, moments, roots, weights);
 }
 
-void rys_roots(int nroots, double x, double *u, double *w)
+void rys_roots(int nroots, double x, vec &u, vec &w)
 {
     if (x <= 3e-7)
     {
@@ -9240,7 +9240,7 @@ void rys_roots(int nroots, double x, double *u, double *w)
     err_checkf(err == 0, "rys_roots: nroots problem!", std::cout);
 }
 
-int segment_solve1(int n, double x, double lower, double *u, double *w,
+int segment_solve1(int n, double x, double lower, vec &u, vec &w,
                    double lower_bp1, double lower_bp2, double breakpoint,
                    QuadratureFunction fn1, QuadratureFunction fn2, QuadratureFunction fn3)
 {
@@ -9311,7 +9311,7 @@ void lwheeler_recursion(int n, const long double *alpha, const long double *beta
 }
 
 int lrys_wheeler_partial(int n, const long double *alpha, const long double *beta, long double *moments,
-                         double *roots, double *weights)
+                        vec& roots, vec& weights)
 {
     long double a[32 + 32];
     long double *b = a + n;
@@ -9381,7 +9381,7 @@ void lnaive_jacobi_moments(int n, double t, double lower, long double *mus)
     }
 }
 
-int lrys_jacobi(int n, double x, double lower, double *roots, double *weights)
+int lrys_jacobi(int n, double x, double lower, vec& roots, vec& weights)
 {
     long double moments[32 * 2];
     const long double *alpha = constants::lJACOBI_ALPHA;
@@ -9454,7 +9454,7 @@ void llaguerre_moments(int n, double t, double lower,
     }
 }
 
-int lrys_laguerre(int n, double x, double lower, double *roots, double *weights)
+int lrys_laguerre(int n, double x, double lower, vec& roots, vec& weights)
 {
     long double moments[32 * 6];
     long double *alpha = moments + n * 2;
@@ -9465,7 +9465,7 @@ int lrys_laguerre(int n, double x, double lower, double *roots, double *weights)
     return lrys_wheeler_partial(n, alpha, beta, moments, roots, weights);
 }
 
-void sr_rys_roots(int nroots, double x, double lower, double *u, double *w)
+void sr_rys_roots(int nroots, double x, double lower, vec &u, vec &w)
 {
     int err = 1;
     switch (nroots)
@@ -9595,8 +9595,10 @@ int g0_2e(double *g, vec &rij, vec &rkl, double cutoff, Env *envs)
     double aij = envs->ai[0] + envs->aj[0];
     double akl = envs->ak[0] + envs->al[0];
     double a0, a1, fac1, x;
-    double u[32];
-    double *w = g + envs->g_size * 2; // ~ gz
+    //double u[32];
+    vec u(32, 0.0), w(32, 0.0);
+    //double *w = g + envs->g_size * 2; // ~ gz
+	//vec w(g.begin() + envs->g_size * 2, g.end());
     double xij_kl = rij[0] - rkl[0];
     double yij_kl = rij[1] - rkl[1];
     double zij_kl = rij[2] - rkl[2];
@@ -9631,7 +9633,12 @@ int g0_2e(double *g, vec &rij, vec &rkl, double cutoff, Env *envs)
         {
             double sqrt_theta = -sqrt(theta);
             rys_roots(rorder, x, u, w);
-            rys_roots(rorder, theta * x, u + rorder, w + rorder);
+			vec temp_u(u.begin() + rorder, u.end());
+			vec temp_w(w.begin() + rorder, w.end());
+            rys_roots(rorder, theta * x, temp_u, temp_w);
+			std::copy(temp_u.begin(), temp_u.end(), u.begin() + rorder);
+			std::copy(temp_w.begin(), temp_w.end(), w.begin() + rorder);
+
             if (envs->g_size == 2)
             {
                 g[0] = 1;
@@ -9719,7 +9726,9 @@ int g0_2e(double *g, vec &rij, vec &rkl, double cutoff, Env *envs)
         w[irys] *= fac1;
     }
 
+	std::copy(w.begin(), w.end(), g + envs->g_size * 2);
     (*envs->f_g0_2d4d)(g, &bc, envs);
+
 
     return 1;
 }
@@ -10067,7 +10076,7 @@ int int1e_cache_size(Env *envs)
         g1 += len##x;             \
     }
 
-void prim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
+void prim_to_ctr_0(double *gc, double *gp, const double *coeff, size_t nf,
                    int nprim, int nctr, int non0ctr, int *sortedidx)
 {
     int i;
@@ -10084,7 +10093,7 @@ void prim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
     }
 }
 
-void prim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
+void prim_to_ctr_1(double *gc, double *gp, const double *coeff, size_t nf,
                    int nprim, int nctr, int non0ctr, int *sortedidx)
 {
     int i, j;
@@ -10121,6 +10130,27 @@ void prim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
         }                                                                 \
     }                                                                     \
     *ctrsymb##empty = 0
+
+#define PRIM2CTR_NEW(ctrsymb, gp, ngp)                                        \
+    if (ctrsymb##_ctr > 1)                                                \
+    {                                                                     \
+        if (ctrsymb##empty)                                              \
+        {                                                                 \
+            prim_to_ctr_0(gctr##ctrsymb##Ptr, gp, &env[off_c##ctrsymb + ctrsymb##p],     \
+                          ngp, ctrsymb##_prim, ctrsymb##_ctr,             \
+                          non0ctr##ctrsymb[ctrsymb##p],                   \
+                          non0idx##ctrsymb + ctrsymb##p * ctrsymb##_ctr); \
+        }                                                                 \
+        else                                                              \
+        {                                                                 \
+            prim_to_ctr_1(gctr##ctrsymb##Ptr, gp, &env[off_c##ctrsymb + ctrsymb##p],     \
+                          ngp, ctrsymb##_prim, ctrsymb##_ctr,             \
+                          non0ctr##ctrsymb[ctrsymb##p],                   \
+                          non0idx##ctrsymb + ctrsymb##p * ctrsymb##_ctr); \
+        }                                                                 \
+    }                                                                     \
+    ctrsymb##empty = 0
+
 
 void dmat_transpose(double *a_t, double *a, int m, int n)
 {
@@ -10216,7 +10246,7 @@ void dplus_transpose(double *a_t, double *a, int m, int n)
 }
 
 #define TRANSPOSE(a)                              \
-    if (*empty)                                   \
+    if (empty)                                   \
     {                                             \
         dmat_transpose(gctr, a, nf *nc, n_comp);  \
     }                                             \
@@ -10224,7 +10254,18 @@ void dplus_transpose(double *a_t, double *a, int m, int n)
     {                                             \
         dplus_transpose(gctr, a, nf *nc, n_comp); \
     }                                             \
-    *empty = 0;
+    empty = 0;
+
+#define TRANSPOSE_NEW(a)                              \
+    if (empty)                                   \
+    {                                             \
+        dmat_transpose(gctr.data(), a, nf *nc, n_comp);  \
+    }                                             \
+    else                                          \
+    {                                             \
+        dplus_transpose(gctr.data(), a, nf *nc, n_comp); \
+    }                                             \
+    empty = 0;
 
 /*
  * GTO = x^{nx}y^{ny}z^{nz}e^{-ar^2}
@@ -10284,7 +10325,7 @@ void g1e_index_xyz(int *idx, const Env *envs)
     }
 }
 
-void Opt_non0coeff_byshell(int *sortedidx, int *non0ctr, double *ci,
+void Opt_non0coeff_byshell(int *sortedidx, int *non0ctr,const double *ci,
                            int iprim, int ictr)
 {
     int ip, j, k, kp;
@@ -10315,7 +10356,7 @@ void Opt_non0coeff_byshell(int *sortedidx, int *non0ctr, double *ci,
     free(zeroidx);
 }
 
-int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
+int _2c2e_loop_nopt(vec &gctr, Env *envs, double *cache, bool &empty)
 {
     ivec shls = envs->shls;
     ivec bas = envs->bas;
@@ -10342,16 +10383,15 @@ int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
 
     //double *ri = envs->ri;
 	vec ri = envs->ri;
-
-
     vec rk = envs->rk;
+
     int n_comp = envs->ncomp_tensor;
     double fac1i, fac1k;
     int ip, kp;
-    int _empty[3] = {1, 1, 1};
-    int *iempty = _empty + 0;
-    int *kempty = _empty + 1;
-    int *gempty = _empty + 2;
+    bool _empty[3] = { 1, 1, 1 };
+    bool* iempty = _empty + 0;
+    bool* kempty = _empty + 1;
+    bool* gempty = _empty + 2;
     int nf = envs->nf;
     const int nc = i_ctr * k_ctr;
     const int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
@@ -10361,10 +10401,17 @@ int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     const int len = leng + lenk + leni + len0;
     double *g = NULL;
     MALLOC_INSTACK(g, len, cache);
+    //vec g(len, 0);
+
     double *g1 = g + leng;
     double *gout, *gctri, *gctrk;
 
-    ALIAS_ADDR_IF_EQUAL(k, m);
+    if (n_comp == 1) {
+        gctrk = gctr.data(); kempty = &empty;
+    }
+    else {
+        gctrk = g1; g1 += lenk;
+    };
     ALIAS_ADDR_IF_EQUAL(i, k);
     ALIAS_ADDR_IF_EQUAL(g, i);
 
@@ -10398,7 +10445,7 @@ int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
         else
         {
             fac1k = envs->common_factor;
-            *iempty = 1;
+            *iempty = true;
         }
         for (ip = 0; ip < i_prim; ip++)
         {
@@ -10427,12 +10474,12 @@ int _2c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
 
     if (n_comp > 1 && !*kempty)
     {
-        TRANSPOSE(gctrk);
+        TRANSPOSE_NEW(gctrk);
     }
-    return !*empty;
+    return !empty;
 }
 
-int _2c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
+int _2c2e_loop(double *gctr, Env *envs, double *cache, bool &empty)
 {
     ivec shls = envs->shls;
     ivec bas = envs->bas;
@@ -10462,10 +10509,10 @@ int _2c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
     int n_comp = envs->ncomp_tensor;
     double fac1i, fac1k;
     int ip, kp;
-    int _empty[3] = {1, 1, 1};
-    int *iempty = _empty + 0;
-    int *kempty = _empty + 1;
-    int *gempty = _empty + 2;
+    bool _empty[3] = {1, 1, 1};
+    bool *iempty = _empty + 0;
+    bool *kempty = _empty + 1;
+    bool *gempty = _empty + 2;
     int *non0ctri = NULL, *non0ctrk = NULL;
     int *non0idxi = NULL, *non0idxk = NULL;
     MALLOC_INSTACK(non0ctri, i_prim + k_prim + i_prim * i_ctr + k_prim * k_ctr, cache);
@@ -10495,51 +10542,56 @@ int _2c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
     double *g1 = g + leng;
     double *gout, *gctri, *gctrk;
 
-    ALIAS_ADDR_IF_EQUAL(k, m);
-    ALIAS_ADDR_IF_EQUAL(i, k);
-    ALIAS_ADDR_IF_EQUAL(g, i);
+    //if (n_comp == 1) {
+    //    gctrk = gctr; kempty = &empty;
+    //}
+    //else {
+    //    gctrk = g1; g1 += lenk;
+    //};
+    //ALIAS_ADDR_IF_EQUAL(i, k);
+    //ALIAS_ADDR_IF_EQUAL(g, i);
 
-    for (kp = 0; kp < k_prim; kp++)
-    {
-        envs->ak[0] = ak[kp];
-        if (k_ctr == 1)
-        {
-            fac1k = envs->common_factor * ck[kp];
-        }
-        else
-        {
-            fac1k = envs->common_factor;
-            *iempty = 1;
-        }
-        for (ip = 0; ip < i_prim; ip++)
-        {
-            envs->ai[0] = ai[ip];
-            if (i_ctr == 1)
-            {
-                fac1i = fac1k * ci[ip];
-            }
-            else
-            {
-                fac1i = fac1k;
-            }
-            envs->fac[0] = fac1i;
-            if ((*envs->f_g0_2e)(g, ri, rk, expcutoff, envs))
-            {
-                (*envs->f_gout)(gout, g, idx, envs, *gempty);
-                PRIM2CTR(i, gout, len0);
-            }
-        } // end loop i_prim
-        if (!*iempty)
-        {
-            PRIM2CTR(k, gctri, leni);
-        }
-    } // end loop k_prim
+    //for (kp = 0; kp < k_prim; kp++)
+    //{
+    //    envs->ak[0] = ak[kp];
+    //    if (k_ctr == 1)
+    //    {
+    //        fac1k = envs->common_factor * ck[kp];
+    //    }
+    //    else
+    //    {
+    //        fac1k = envs->common_factor;
+    //        *iempty = 1;
+    //    }
+    //    for (ip = 0; ip < i_prim; ip++)
+    //    {
+    //        envs->ai[0] = ai[ip];
+    //        if (i_ctr == 1)
+    //        {
+    //            fac1i = fac1k * ci[ip];
+    //        }
+    //        else
+    //        {
+    //            fac1i = fac1k;
+    //        }
+    //        envs->fac[0] = fac1i;
+    //        if ((*envs->f_g0_2e)(g, ri, rk, expcutoff, envs))
+    //        {
+    //            (*envs->f_gout)(gout, g, idx, envs, *gempty);
+    //            PRIM2CTR(i, gout, len0);
+    //        }
+    //    } // end loop i_prim
+    //    if (!*iempty)
+    //    {
+    //        PRIM2CTR(k, gctri, leni);
+    //    }
+    //} // end loop k_prim
 
-    if (n_comp > 1 && !*kempty)
-    {
-        TRANSPOSE(gctrk);
-    }
-    return !*empty;
+    //if (n_comp > 1 && !*kempty)
+    //{
+    //    TRANSPOSE(gctrk);
+    //}
+    return !empty;
 }
 
 static int _len_cart[] = {
@@ -29997,7 +30049,7 @@ static struct cart2sp_t g_c2s[] = {
 };
 
 void dgemm_NN1(int m, int n, int k,
-               double* a, vec& b, double *c, int ldc)
+               vec &a, vec& b, vec &c, int ldc)
 {
     int i, j, kp;
     double bi;
@@ -30020,13 +30072,13 @@ void dgemm_NN1(int m, int n, int k,
 }
 
 void dgemm_NN(int m, int n, int k,
-              double *a, vec& b, double *c)
+              vec &a, vec& b, vec &c)
 {
     dgemm_NN1(m, n, k, a, b, c, m);
 }
 
 void dgemm_TN(int m, int n, int k,
-              const vec& a, double *b, double *c)
+              const vec& a, vec &b, vec &c)
 {
     int i, j, kp;
     double ci;
@@ -30069,7 +30121,7 @@ void dgemm_NT(int m, int n, int k,
 }
 
 // transform integrals from cartesian to spheric
-double *a_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
+vec a_bra_cart2spheric(vec &gsph, int nket, vec &gcart, int l)
 {
     int nf = _len_cart[l];
     int nd = l * 2 + 1;
@@ -30077,7 +30129,7 @@ double *a_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
     return gsph;
 }
 
-double *a_ket_cart2spheric(double *&gsph, double *gcart,
+vec a_ket_cart2spheric(vec &gsph, vec &gcart,
                            int lds, int nbra, int l)
 {
     int nf = _len_cart[l];
@@ -30087,15 +30139,15 @@ double *a_ket_cart2spheric(double *&gsph, double *gcart,
 }
 
 // transform s function from cartesian to spheric
-double *s_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
+vec s_bra_cart2spheric(vec &gsph, int nket, vec &gcart, int l)
 {
     return gcart;
 }
-double *s_ket_cart2spheric(double *&gsph, double *gcart, int lds, int nbra, int l)
+vec s_ket_cart2spheric(vec& gsph, vec &gcart, int lds, int nbra, int l)
 {
     return gcart;
 }
-double *s_ket_cart2spheric_copy(double *&gsph, double *gcart,
+vec s_ket_cart2spheric_copy(vec& gsph, vec &gcart,
                                 int lds, int nbra, int l)
 {
     int i;
@@ -30107,7 +30159,7 @@ double *s_ket_cart2spheric_copy(double *&gsph, double *gcart,
 }
 
 // transform p function from cartesian to spheric
-double *p_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
+vec p_bra_cart2spheric(vec& gsph, int nket, vec &gcart, int l)
 {
 #ifdef PYPZPX
     int i;
@@ -30122,7 +30174,7 @@ double *p_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
     return gcart;
 #endif
 }
-double *p_ket_cart2spheric(double *&gsph, double *gcart,
+vec p_ket_cart2spheric(vec& gsph, vec &gcart,
                            int lds, int nbra, int l)
 {
 #ifdef PYPZPX
@@ -30138,7 +30190,7 @@ double *p_ket_cart2spheric(double *&gsph, double *gcart,
     return gcart;
 #endif
 }
-double *p_ket_cart2spheric_copy(double *&gsph, double *gcart,
+vec p_ket_cart2spheric_copy(vec& gsph, vec &gcart,
                                 int lds, int nbra, int l)
 {
     int i;
@@ -30161,28 +30213,28 @@ double *p_ket_cart2spheric_copy(double *&gsph, double *gcart,
 }
 
 // transform d function from cartesian to spheric
-double *d_bra_cart2spheric(double*& gsph, int nket, double *gcart, int l)
+vec d_bra_cart2spheric(vec& gsph, int nket, vec &gcart, int l)
 {
     vec coeff_c2s = g_c2s[2].cart2sph;
-    double *pgsph = gsph;
+    double *gsph_ptr = gsph.data();
+	double* gcart_ptr = gcart.data();
     int i;
     for (i = 0; i < nket; i++)
     {
-        gsph[0] = coeff_c2s[1] * gcart[1];
-        gsph[1] = coeff_c2s[10] * gcart[4];
-        gsph[2] = coeff_c2s[12] * gcart[0] + coeff_c2s[15] * gcart[3] + coeff_c2s[17] * gcart[5];
-        gsph[3] = coeff_c2s[20] * gcart[2];
-        gsph[4] = coeff_c2s[24] * gcart[0] + coeff_c2s[27] * gcart[3];
-        gsph += 5;
-        gcart += 6;
+        gsph_ptr[0] = coeff_c2s[1] * gcart_ptr[1];
+        gsph_ptr[1] = coeff_c2s[10] * gcart_ptr[4];
+        gsph_ptr[2] = coeff_c2s[12] * gcart_ptr[0] + coeff_c2s[15] * gcart_ptr[3] + coeff_c2s[17] * gcart_ptr[5];
+        gsph_ptr[3] = coeff_c2s[20] * gcart_ptr[2];
+        gsph_ptr[4] = coeff_c2s[24] * gcart_ptr[0] + coeff_c2s[27] * gcart_ptr[3];
+        gsph_ptr += 5;
+        gcart_ptr += 6;
     }
-    return pgsph;
+    return gsph;
 }
-double *d_ket_cart2spheric(double*& gsph, double *gcart,
+vec d_ket_cart2spheric(vec& gsph, vec &gcart,
                            int lds, int nbra, int l)
 {
     vec coeff_c2s = g_c2s[2].cart2sph;
-    double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
     {
@@ -30204,34 +30256,34 @@ double *d_ket_cart2spheric(double*& gsph, double *gcart,
     {
         gsph[4 * lds + i] = coeff_c2s[24] * gcart[0 * nbra + i] + coeff_c2s[27] * gcart[3 * nbra + i];
     }
-    return pgsph;
+    return gsph;
 }
 
 // transform f function from cartesian to spheric
-double *f_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
+vec f_bra_cart2spheric(vec &gsph, int nket, vec &gcart, int l)
 {
     vec coeff_c2s = g_c2s[3].cart2sph;
-    double *pgsph = gsph;
+    double *gsph_ptr = gsph.data();
+    double* gcart_ptr = gcart.data();
     int i;
     for (i = 0; i < nket; i++)
     {
-        gsph[0] = coeff_c2s[1] * gcart[1] + coeff_c2s[6] * gcart[6];
-        gsph[1] = coeff_c2s[14] * gcart[4];
-        gsph[2] = coeff_c2s[21] * gcart[1] + coeff_c2s[26] * gcart[6] + coeff_c2s[28] * gcart[8];
-        gsph[3] = coeff_c2s[32] * gcart[2] + coeff_c2s[37] * gcart[7] + coeff_c2s[39] * gcart[9];
-        gsph[4] = coeff_c2s[40] * gcart[0] + coeff_c2s[43] * gcart[3] + coeff_c2s[45] * gcart[5];
-        gsph[5] = coeff_c2s[52] * gcart[2] + coeff_c2s[57] * gcart[7];
-        gsph[6] = coeff_c2s[60] * gcart[0] + coeff_c2s[63] * gcart[3];
-        gsph += 7;
-        gcart += 10;
+        gsph_ptr[0] = coeff_c2s[1] * gcart_ptr[1] + coeff_c2s[6] * gcart_ptr[6];
+        gsph_ptr[1] = coeff_c2s[14] * gcart_ptr[4];
+        gsph_ptr[2] = coeff_c2s[21] * gcart_ptr[1] + coeff_c2s[26] * gcart_ptr[6] + coeff_c2s[28] * gcart_ptr[8];
+        gsph_ptr[3] = coeff_c2s[32] * gcart_ptr[2] + coeff_c2s[37] * gcart_ptr[7] + coeff_c2s[39] * gcart_ptr[9];
+        gsph_ptr[4] = coeff_c2s[40] * gcart_ptr[0] + coeff_c2s[43] * gcart_ptr[3] + coeff_c2s[45] * gcart_ptr[5];
+        gsph_ptr[5] = coeff_c2s[52] * gcart_ptr[2] + coeff_c2s[57] * gcart_ptr[7];
+        gsph_ptr[6] = coeff_c2s[60] * gcart_ptr[0] + coeff_c2s[63] * gcart_ptr[3];
+        gsph_ptr += 7;
+        gcart_ptr += 10;
     }
-    return pgsph;
+    return gsph;
 }
-double *f_ket_cart2spheric(double *&gsph, double *gcart,
+vec f_ket_cart2spheric(vec &gsph, vec &gcart,
                            int lds, int nbra, int l)
 {
     vec coeff_c2s = g_c2s[3].cart2sph;
-    double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
     {
@@ -30261,36 +30313,36 @@ double *f_ket_cart2spheric(double *&gsph, double *gcart,
     {
         gsph[6 * lds + i] = coeff_c2s[60] * gcart[0 * nbra + i] + coeff_c2s[63] * gcart[3 * nbra + i];
     }
-    return pgsph;
+    return gsph;
 }
 
 // transform g function from cartesian to spheric
-double *g_bra_cart2spheric(double *&gsph, int nket, double *gcart, int l)
+vec g_bra_cart2spheric(vec &gsph, int nket, vec &gcart, int l)
 {
     vec coeff_c2s = g_c2s[4].cart2sph;
-    double *pgsph = gsph;
+    double* gsph_ptr = gsph.data();
+	double* gcart_ptr = gcart.data();
     int i;
     for (i = 0; i < nket; i++)
     {
-        gsph[0] = coeff_c2s[1] * gcart[1] + coeff_c2s[6] * gcart[6];
-        gsph[1] = coeff_c2s[19] * gcart[4] + coeff_c2s[26] * gcart[11];
-        gsph[2] = coeff_c2s[31] * gcart[1] + coeff_c2s[36] * gcart[6] + coeff_c2s[38] * gcart[8];
-        gsph[3] = coeff_c2s[49] * gcart[4] + coeff_c2s[56] * gcart[11] + coeff_c2s[58] * gcart[13];
-        gsph[4] = coeff_c2s[60] * gcart[0] + coeff_c2s[63] * gcart[3] + coeff_c2s[65] * gcart[5] + coeff_c2s[70] * gcart[10] + coeff_c2s[72] * gcart[12] + coeff_c2s[74] * gcart[14];
-        gsph[5] = coeff_c2s[77] * gcart[2] + coeff_c2s[82] * gcart[7] + coeff_c2s[84] * gcart[9];
-        gsph[6] = coeff_c2s[90] * gcart[0] + coeff_c2s[95] * gcart[5] + coeff_c2s[100] * gcart[10] + coeff_c2s[102] * gcart[12];
-        gsph[7] = coeff_c2s[107] * gcart[2] + coeff_c2s[112] * gcart[7];
-        gsph[8] = coeff_c2s[120] * gcart[0] + coeff_c2s[123] * gcart[3] + coeff_c2s[130] * gcart[10];
-        gsph += 9;
-        gcart += 15;
+        gsph_ptr[0] = coeff_c2s[1] * gcart[1] + coeff_c2s[6] * gcart_ptr[6];
+        gsph_ptr[1] = coeff_c2s[19] * gcart_ptr[4] + coeff_c2s[26] * gcart_ptr[11];
+        gsph_ptr[2] = coeff_c2s[31] * gcart_ptr[1] + coeff_c2s[36] * gcart_ptr[6] + coeff_c2s[38] * gcart_ptr[8];
+        gsph_ptr[3] = coeff_c2s[49] * gcart_ptr[4] + coeff_c2s[56] * gcart_ptr[11] + coeff_c2s[58] * gcart_ptr[13];
+        gsph_ptr[4] = coeff_c2s[60] * gcart_ptr[0] + coeff_c2s[63] * gcart_ptr[3] + coeff_c2s[65] * gcart_ptr[5] + coeff_c2s[70] * gcart_ptr[10] + coeff_c2s[72] * gcart_ptr[12] + coeff_c2s[74] * gcart_ptr[14];
+        gsph_ptr[5] = coeff_c2s[77] * gcart_ptr[2] + coeff_c2s[82] * gcart_ptr[7] + coeff_c2s[84] * gcart_ptr[9];
+        gsph_ptr[6] = coeff_c2s[90] * gcart_ptr[0] + coeff_c2s[95] * gcart_ptr[5] + coeff_c2s[100] * gcart_ptr[10] + coeff_c2s[102] * gcart_ptr[12];
+        gsph_ptr[7] = coeff_c2s[107] * gcart_ptr[2] + coeff_c2s[112] * gcart_ptr[7];
+        gsph_ptr[8] = coeff_c2s[120] * gcart_ptr[0] + coeff_c2s[123] * gcart_ptr[3] + coeff_c2s[130] * gcart_ptr[10];
+        gsph_ptr += 9;
+        gcart_ptr += 15;
     }
-    return pgsph;
+    return gsph;
 }
-double *g_ket_cart2spheric(double *&gsph, double *gcart,
+vec g_ket_cart2spheric(vec &gsph, vec &gcart,
                            int lds, int nbra, int l)
 {
     vec coeff_c2s = g_c2s[4].cart2sph;
-    double *pgsph = gsph;
     int i;
     for (i = 0; i < nbra; i++)
     {
@@ -30328,10 +30380,10 @@ double *g_ket_cart2spheric(double *&gsph, double *gcart,
     {
         gsph[8 * lds + i] = coeff_c2s[120] * gcart[0 * nbra + i] + coeff_c2s[123] * gcart[3 * nbra + i] + coeff_c2s[130] * gcart[10 * nbra + i];
     }
-    return pgsph;
+    return gsph;
 }
 
-double *(*c2s_bra_sph[])(double *&, int, double *, int) = {
+vec (*c2s_bra_sph[])(vec &, int, vec &, int) = {
     s_bra_cart2spheric,
     p_bra_cart2spheric,
     d_bra_cart2spheric,
@@ -30350,7 +30402,7 @@ double *(*c2s_bra_sph[])(double *&, int, double *, int) = {
     a_bra_cart2spheric,
 };
 
-double *(*c2s_ket_sph[])(double *&, double *, int, int, int) = {
+vec (*c2s_ket_sph[])(vec &, vec &, int, int, int) = {
     s_ket_cart2spheric,
     p_ket_cart2spheric,
     d_ket_cart2spheric,
@@ -30369,7 +30421,7 @@ double *(*c2s_ket_sph[])(double *&, double *, int, int, int) = {
     a_ket_cart2spheric,
 };
 
-static void dcopy_ij(double *out, double *gctr,
+static void dcopy_ij(double *out, vec &gctr,
                      const int ni, const int nj, const int mi, const int mj)
 {
     int i, j;
@@ -30383,7 +30435,7 @@ static void dcopy_ij(double *out, double *gctr,
     }
 }
 
-void c2s_sph_1e(double *opij, double *gctr, ivec &dims,
+void c2s_sph_1e(vec &opij, vec &gctr, ivec &dims,
                 Env *envs, double *cache)
 {
     int i_l = envs->i_l;
@@ -30399,21 +30451,25 @@ void c2s_sph_1e(double *opij, double *gctr, ivec &dims,
     int nf = envs->nf;
     int ic, jc;
     int buflen = nfi * dj;
-    double *buf1 = NULL, *buf2 = NULL;
-    MALLOC_INSTACK(buf1, buflen, cache);
-    MALLOC_INSTACK(buf2, buflen, cache);
+    //double *buf1 = NULL, *buf2 = NULL;
+    //MALLOC_INSTACK(buf1, buflen, cache);
+    //MALLOC_INSTACK(buf2, buflen, cache);
+
+    vec buf1(buflen, 0), buf2(buflen, 0);
     double *pij = NULL;
-    double *tmp1 = NULL;
+	int gctr_ptr = 0;   
 
     for (jc = 0; jc < j_ctr; jc++)
     {
         for (ic = 0; ic < i_ctr; ic++)
         {
-            tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfi, nfi, j_l);
-            tmp1 = (c2s_bra_sph[i_l])(buf2, dj, tmp1, i_l);
-            pij = opij + ofj * jc + di * ic;
-            dcopy_ij(pij, tmp1, ni, nj, di, dj);
-            gctr += nf;
+			vec temp_gctr(gctr.data() + gctr_ptr, gctr.data() + gctr_ptr + nf);
+            (c2s_ket_sph[j_l])(buf1, temp_gctr, nfi, nfi, j_l);
+            (c2s_bra_sph[i_l])(buf2, dj, buf1, i_l);
+
+            pij = opij.data() + ofj * jc + di * ic;
+            dcopy_ij(pij, buf2, ni, nj, di, dj);
+            gctr_ptr += nf;
         }
     }
 }
@@ -30456,12 +30512,12 @@ void c2s_dset0(double *out, ivec &dims, int *counts)
     }
 }
 
-int _2c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt, double *cache, void (*f_c2s)(double *, double *, ivec &, Env *, double *))
+int _2c2e_drv(vec &out, ivec &dims, Env *envs, Opt *opt, double *cache, void (*f_c2s)(vec &, vec &, ivec &, Env *, double *))
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1];
     int n_comp = envs->ncomp_e1 * envs->ncomp_e2 * envs->ncomp_tensor;
-    if (out == NULL)
+    if (&out == NULL)
     {
         return int1e_cache_size(envs);
     }
@@ -30472,19 +30528,19 @@ int _2c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt, double *cache, void 
         stack = (double *)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
-    double *gctr = NULL;
-    MALLOC_INSTACK(gctr, nc * n_comp, cache);
+
+    vec gctr(nc * n_comp, 0.0);
 
     int n;
-    int empty = 1;
+    bool empty = true;
     if (opt != NULL)
     {
         envs->opt = opt;
-        _2c2e_loop(gctr, envs, cache, &empty);
+        _2c2e_loop(gctr.data(), envs, cache, empty);
     }
     else
     {
-        _2c2e_loop_nopt(gctr, envs, cache, &empty);
+        _2c2e_loop_nopt(gctr, envs, cache, empty);
     }
 
     int counts[4];
@@ -30510,14 +30566,17 @@ int _2c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt, double *cache, void 
     {
         for (n = 0; n < n_comp; n++)
         {
-            (*f_c2s)(out + nout * n, gctr + nc * n, dims, envs, cache);
+			vec temp_gctr(gctr.begin() + nc * n, gctr.end());
+			vec temp_out(out.begin() + nout * n, out.end());
+            (*f_c2s)(temp_out, temp_gctr, dims, envs, cache);
+			std::copy(temp_out.begin(), temp_out.end(), out.begin() + nout * n);
         }
     }
     else
     {
         for (n = 0; n < n_comp; n++)
         {
-            c2s_dset0(out + nout * n, dims, counts);
+            c2s_dset0(&(out.begin()[nout * n]), dims, counts);
         }
     }
     if (stack != NULL)
@@ -30527,7 +30586,7 @@ int _2c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt, double *cache, void 
     return !empty;
 }
 
-int int2c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natms, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
+int int2c2e_sph(vec &out, ivec &dims, ivec &shls, ivec &atm, int natms, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Env envs;
@@ -30536,7 +30595,7 @@ int int2c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natms, ivec 
     return _2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
 };
 
-int GTOmax_cache_size(int (*intor)(double *, ivec &,ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), ivec &shls_slice, int ncenter,
+int GTOmax_cache_size(int (*intor)(vec &, ivec &,ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), ivec &shls_slice, int ncenter,
                       ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     int i;
@@ -30563,8 +30622,8 @@ int GTOmax_cache_size(int (*intor)(double *, ivec &,ivec &, ivec&, int, ivec&, i
     return cache_size;
 }
 
-void GTOint2c(int (*intor)(double *, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
-              double *mat, int comp, int hermi,
+void GTOint2c(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
+              vec &mat, int comp, int hermi,
               ivec &shls_slice, ivec &ao_loc, Opt *opt,
               ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
@@ -30595,8 +30654,10 @@ void GTOint2c(int (*intor)(double *, ivec &, ivec &, ivec &, int, ivec &, int, v
             shls[1] = jsh;
             i0 = ao_loc[ish] - ao_loc[ish0];
             j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(mat + j0 * naoi + i0, dims, shls,
+            vec temp_mat(mat.begin() + j0 * naoi + i0, mat.end());
+            (*intor)(temp_mat, dims, shls,
                      atm, natm, bas, nbas, env, opt, cache);
+			std::copy(temp_mat.begin(), temp_mat.end(), mat.begin() + j0 * naoi + i0);
         }
         free(cache);
     }
@@ -31044,11 +31105,11 @@ void dcopy_iklj(double *fijkl, const double *gctr,
     }
 }
 
-double *sph2e_inner(double *gsph, double *gcart,
+vec sph2e_inner(vec &gsph, vec &gcart,
                     int l, int nbra, int ncall, int sizsph, int sizcart)
 {
     int n;
-    double* temp;
+    vec temp(gsph.size(), 0);
     switch (l)
     {
 #ifdef PYPZPX
@@ -31068,35 +31129,43 @@ double *sph2e_inner(double *gsph, double *gcart,
     case 2:
         for (n = 0; n < ncall; n++)
         {
-            temp = gsph + n * sizsph;
-            d_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
+			std::copy(gsph.begin() + n * sizsph, gsph.end(), temp.begin());
+			vec g_cart_temp(gcart.begin() + n * sizcart, gcart.end());
+            d_ket_cart2spheric(temp, g_cart_temp, nbra, nbra, l);
+			std::copy(temp.begin(), temp.end(), gsph.begin() + n * sizsph);
         }
         break;
     case 3:
         for (n = 0; n < ncall; n++)
         {
-            temp = gsph + n * sizsph;
-            f_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
+            std::copy(gsph.begin() + n * sizsph, gsph.end(), temp.begin());
+            vec g_cart_temp(gcart.begin() + n * sizcart, gcart.end());
+            f_ket_cart2spheric(temp, g_cart_temp, nbra, nbra, l);
+            std::copy(temp.begin(), temp.end(), gsph.begin() + n * sizsph);
         }
         break;
     case 4:
         for (n = 0; n < ncall; n++)
         {
-            temp = gsph + n * sizsph;
-            g_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
+            std::copy(gsph.begin() + n * sizsph, gsph.end(), temp.begin());
+            vec g_cart_temp(gcart.begin() + n * sizcart, gcart.end());
+            g_ket_cart2spheric(temp, g_cart_temp, nbra, nbra, l);
+            std::copy(temp.begin(), temp.end(), gsph.begin() + n * sizsph);
         }
         break;
     default:
         for (n = 0; n < ncall; n++)
         {
-            temp = gsph + n * sizsph;
-            a_ket_cart2spheric(temp, gcart + n * sizcart, nbra, nbra, l);
+            std::copy(gsph.begin() + n * sizsph, gsph.end(), temp.begin());
+            vec g_cart_temp(gcart.begin() + n * sizcart, gcart.end());
+            a_ket_cart2spheric(temp, g_cart_temp, nbra, nbra, l);
+            std::copy(temp.begin(), temp.end(), gsph.begin() + n * sizsph);
         }
     }
     return gsph;
 }
 
-void c2s_sph_3c2e1(double *bufijk, double *gctr, ivec &dims,
+void c2s_sph_3c2e1(double *bufijk, vec &gctr, ivec &dims,
                    Env *envs, double *cache)
 {
     int i_l = envs->i_l;
@@ -31119,12 +31188,16 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, ivec &dims,
     int ofk = ni * nj * dk;
     int ic, jc, kc;
     int buflen = nfi * nfk * dj;
-    double *buf1 = NULL;
-    MALLOC_INSTACK(buf1, buflen * 3, cache);
-    double *buf2 = buf1 + buflen;
-    double *buf3 = buf2 + buflen;
+    //double *buf1 = NULL;
+    //MALLOC_INSTACK(buf1, buflen * 3, cache);
+    //double *buf2 = buf1 + buflen;
+    //double *buf3 = buf2 + buflen;
+	vec buf1(buflen, 0), buf2(buflen, 0), buf3(buflen, 0);
+
+
     double *pijk;
-    double *tmp1;
+    vec tmp1;
+	int gctr_ptr = 0;
 
     for (kc = 0; kc < k_ctr; kc++)
     {
@@ -31132,12 +31205,13 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, ivec &dims,
         {
             for (ic = 0; ic < i_ctr; ic++)
             {
-                tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
+				vec temp_gctr(gctr.begin() + gctr_ptr, gctr.begin() + gctr_ptr + nf);
+                tmp1 = (c2s_ket_sph[j_l])(buf1, temp_gctr, nfik, nfik, j_l);
                 tmp1 = sph2e_inner(buf2, tmp1, k_l, nfi, dj, nfi * dk, nfik);
                 tmp1 = (c2s_bra_sph[i_l])(buf3, dk * dj, tmp1, i_l);
                 pijk = bufijk + ofk * kc + ofj * jc + di * ic;
-                dcopy_iklj(pijk, tmp1, ni, nj, nk, 1, di, dj, dk, 1);
-                gctr += nf;
+                dcopy_iklj(pijk, tmp1.data(), ni, nj, nk, 1, di, dj, dk, 1);
+                gctr_ptr += nf;
             }
         }
     }
@@ -31326,9 +31400,11 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
     int leni = nf * i_ctr * n_comp;         // gctri
     int len0 = nf * n_comp;                 // gout
     int len = leng + lenk + lenj + leni + len0;
-    double *g = NULL;
-    MALLOC_INSTACK(g, len, cache);
-    double *g1 = g + leng;
+    //double *g = NULL;
+    //MALLOC_INSTACK(g, len, cache);
+	vec g(len, 0.0);
+
+    double *g1 = g.data() + leng;
     double *gout, *gctri, *gctrj, *gctrk;
 
     ALIAS_ADDR_IF_EQUAL(k, m);
@@ -31380,9 +31456,9 @@ int _3c2e_loop(double *gctr, Env *envs, double *cache, int *empty)
                     fac1i = fac1j * expij;
                 }
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    (*envs->f_gout)(gout, g.data(), idx, envs, *gempty);
                     PRIM2CTR(i, gout, len0);
                 }
             } // end loop i_prim
@@ -31506,9 +31582,12 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
     int leni = nf * i_ctr * n_comp; // gctri
     int len0 = nf * n_comp;         // gout
     int len = leng + leni + len0;
-    double *g = NULL;
-    MALLOC_INSTACK(g, len, cache);
-    double *g1 = g + leng;
+    //double *g = NULL;
+    //MALLOC_INSTACK(g, len, cache);
+
+	vec g(len, 0.0);
+
+    double *g1 = g.data() + leng;
     double *gout, *gctri;
     ALIAS_ADDR_IF_EQUAL(i, m);
     gout = g1;
@@ -31535,9 +31614,9 @@ int _3c2e_n11_loop(double *gctr, Env *envs, double *cache, int *empty)
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * expij;
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g, idx, envs, 1);
+                    (*envs->f_gout)(gout, g.data(), idx, envs, 1);
                     PRIM2CTR(i, gout, len0);
                 }
             } // end loop i_prim
@@ -31654,9 +31733,11 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
     int lenj = nf * j_ctr * n_comp; // gctrj
     int len0 = nf * n_comp;         // gout
     int len = leng + lenj + len0;
-    double *g = NULL;
-    MALLOC_INSTACK(g, len, cache);
-    double *g1 = g + leng;
+    //double *g = NULL;
+    //MALLOC_INSTACK(g, len, cache);
+	vec g(len, 0.0);
+
+    double *g1 = g.data() + leng;
     double *gout, *gctrj;
     ALIAS_ADDR_IF_EQUAL(j, m);
     gout = g1;
@@ -31683,9 +31764,9 @@ int _3c2e_1n1_loop(double *gctr, Env *envs, double *cache, int *empty)
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g, idx, envs, *iempty);
+                    (*envs->f_gout)(gout, g.data(), idx, envs, *iempty);
                     *iempty = 0;
                 }
             } // end loop i_prim
@@ -31803,8 +31884,10 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     int len0 = envs->nf * n_comp;
     int len = leng + len0;
-    double *g = NULL;
-    MALLOC_INSTACK(g, len, cache);
+    //double *g = NULL;
+    //MALLOC_INSTACK(g, len, cache);
+
+	vec g(len, 0.0);
     double *gout;
     if (n_comp == 1)
     {
@@ -31813,7 +31896,7 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     }
     else
     {
-        gout = g + leng;
+        gout = g.data() + leng;
     }
 
     for (kp = 0; kp < k_prim; kp++)
@@ -31838,9 +31921,9 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    (*envs->f_gout)(gout, g.data(), idx, envs, *gempty);
                     *gempty = 0;
                 }
             } // end loop i_prim
@@ -31986,9 +32069,11 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     int leni = nf * i_ctr * n_comp;         // gctri
     int len0 = nf * n_comp;                 // gout
     int len = leng + lenk + lenj + leni + len0;
-    double *g = NULL;
-    MALLOC_INSTACK(g, len, cache); // must be allocated last in this function
-    double *g1 = g + leng;
+    //double *g = NULL;
+    //MALLOC_INSTACK(g, len, cache); // must be allocated last in this function
+
+	vec g(len, 0.0);
+    double *g1 = g.data() + leng;
     double *gout, *gctri, *gctrj, *gctrk;
 
     ALIAS_ADDR_IF_EQUAL(k, m);
@@ -32043,9 +32128,9 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
                     fac1i = fac1j * expij;
                 }
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                    (*envs->f_gout)(gout, g.data(), idx, envs, *gempty);
                     PRIM2CTR(i, gout, len0);
                 }
             i_contracted:;
@@ -32068,13 +32153,13 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     return !*empty;
 }
 
-int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
-              double *cache, void (*f_e1_c2s)(double *, double *, ivec &, Env *, double *), int is_ssc)
+int _3c2e_drv(vec &out, ivec &dims, Env *envs, Opt *opt,
+              double *cache, void (*f_e1_c2s)(double *, vec &, ivec &, Env *, double *), int is_ssc)
 {
     int *x_ctr = envs->x_ctr;
     int nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
     int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
-    if (out == NULL)
+    if (&out == NULL)
     {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
         int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
@@ -32094,8 +32179,7 @@ int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
         stack = (double *)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
-    double *gctr = NULL;
-    MALLOC_INSTACK(gctr, nc * n_comp, cache);
+	vec gctr(nc * n_comp, 0.0);
 
     int n;
     int empty = 1;
@@ -32103,11 +32187,11 @@ int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
     {
         envs->opt = opt;
         n = ((envs->x_ctr[0] == 1) << 2) + ((envs->x_ctr[1] == 1) << 1) + (envs->x_ctr[2] == 1);
-        f_3c2e_loop[n](gctr, envs, cache, &empty);
+        f_3c2e_loop[n](gctr.data(), envs, cache, &empty);
     }
     else
     {
-        _3c2e_loop_nopt(gctr, envs, cache, &empty);
+        _3c2e_loop_nopt(gctr.data(), envs, cache, &empty);
     }
 
     int counts[4];
@@ -32141,14 +32225,15 @@ int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
     {
         for (n = 0; n < n_comp; n++)
         {
-            (*f_e1_c2s)(out + nout * n, gctr + nc * n, dims, envs, cache);
+			vec temp_gctr(gctr.begin() + nc * n, gctr.end());
+            (*f_e1_c2s)(&(out.begin()[nout * n]), temp_gctr, dims, envs, cache);
         }
     }
     else
     {
         for (n = 0; n < n_comp; n++)
         {
-            c2s_dset0(out + nout * n, dims, counts);
+            c2s_dset0(&(out.begin()[nout * n]), dims, counts);
         }
     }
     if (stack != NULL)
@@ -32158,7 +32243,7 @@ int _3c2e_drv(double *out, ivec &dims, Env *envs, Opt *opt,
     return !empty;
 }
 
-int int3c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natm, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
+int int3c2e_sph(vec &out, ivec &dims, ivec &shls, ivec &atm, int natm, ivec &bas, int nbas, vec &env, Opt *opt, double *cache)
 {
     int ng[] = {0, 0, 0, 0, 0, 1, 1, 1};
     Env envs;
@@ -32167,7 +32252,7 @@ int int3c2e_sph(double *out, ivec &dims, ivec &shls, ivec &atm, int natm, ivec &
     return _3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
 };
 
-void GTOnr3c_fill_s1(int (*intor)(double *, ivec &, ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), double *out, double *buf,
+void GTOnr3c_fill_s1(int (*intor)(vec &, ivec &, ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), vec &out, double *buf,
                      int comp, int jobid,
                      ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
                      ivec &atm, int natm, ivec &bas, int nbas, vec &env)
@@ -32194,7 +32279,7 @@ void GTOnr3c_fill_s1(int (*intor)(double *, ivec &, ivec &, ivec&, int, ivec&, i
     ivec dims = {naoi, naoj, naok};
 
     const int k0 = ao_loc[ksh] - ao_loc[ksh0];
-    out += naoi * naoj * k0;
+    //out += naoi * naoj * k0;  //HAVE TO INCLUDE THIS!!!
 
     int ish, jsh, i0, j0;
     ivec shls = {0, 0, ksh};
@@ -32207,8 +32292,10 @@ void GTOnr3c_fill_s1(int (*intor)(double *, ivec &, ivec &, ivec&, int, ivec&, i
             shls[1] = jsh;
             i0 = ao_loc[ish] - ao_loc[ish0];
             j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(out + j0 * naoi + i0, dims, shls, atm, natm, bas, nbas, env,
+			vec temp_out(out.begin() + j0 * naoi + i0, out.end());
+            (*intor)(temp_out, dims, shls, atm, natm, bas, nbas, env,
                      cintopt, buf);
+			std::copy(temp_out.begin(), temp_out.end(), out.begin() + j0 * naoi + i0);
         }
     }
 }
@@ -32231,10 +32318,10 @@ int GTOmax_shell_dim(const ivec &ao_loc, const ivec &shls_slice, int ncenter)
     return di;
 }
 
-void GTOnr3c_drv(int (*intor)(double *,ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
-                 void (*fill)(int (*intor)(double *, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
-                              double *, double *, int, int, ivec &, ivec &, Opt *, ivec&, int, ivec&, int, vec&),
-                 double *eri, int comp,
+void GTOnr3c_drv(int (*intor)(vec &,ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
+                 void (*fill)(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
+                              vec &, double *, int, int, ivec &, ivec &, Opt *, ivec&, int, ivec&, int, vec&),
+                 vec &eri, int comp,
                  ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
                  ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
