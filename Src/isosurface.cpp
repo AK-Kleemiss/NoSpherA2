@@ -328,7 +328,7 @@ static const int cornerIndexB[12] = {
 // A tiny helper to linearly interpolate a point along an edge between two corners
 // based on the isosurface value. 
 //
-std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std::array<double, 3>& p2, double valP1, double valP2, double isoVal)
+std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std::array<double, 3>& p2, const double valP1, const double valP2, const double isoVal)
 {
     // If valP1 == valP2, avoid divide-by-zero; just return midpoint
     if (std::fabs(valP2 - valP1) < 1e-12) {
@@ -342,12 +342,9 @@ std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std:
     };
 }
 
-RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
+RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     RGB colour;
-    std::array<double, 3> p1 = t.v1;
-    std::array<double, 3> p2 = t.v2;
-    std::array<double, 3> p3 = t.v3;
-    std::array<double, 3> p = { (p1[0] + p2[0] + p3[0]) / 3, (p1[1] + p2[1] + p3[1]) / 3, (p1[2] + p2[2] + p3[2]) / 3 };
+    std::array<double, 3> p = t.calc_center();
     double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
     if (val < low_lim) {
         colour = Colourcode[0];
@@ -376,9 +373,8 @@ RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<
     return colour;
 };
 
-double calc_d_i(const double& x, const double& y, const double& z, const WFN& wavy) {
+double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
     double d_i = 1E100;
-    const std::array<double, 3> p_t = { x, y, z };
     std::array<double, 3> p_a = { 0, 0, 0 };
     for (int i = 0; i < wavy.get_ncen(); i++) {
         p_a = { p_t[0] - wavy.atoms[i].x, p_t[1] - wavy.atoms[i].y, p_t[2] - wavy.atoms[i].z };
@@ -389,14 +385,12 @@ double calc_d_i(const double& x, const double& y, const double& z, const WFN& wa
     return d_i;
 }
 
-RGB get_colour(const Triangle& t, double(*func)(const double&, const double&, const double&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim) {
-    double mid_point = (low_lim + high_lim) / 2.0;
+RGB get_colour(const Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+    const double mid_point = (low_lim + high_lim) / 2.0;
+    const double range = high_lim - low_lim;
     RGB colour;
-    std::array<double, 3> p1 = t.v1;
-    std::array<double, 3> p2 = t.v2;
-    std::array<double, 3> p3 = t.v3;
-    std::array<double, 3> p = { (p1[0] + p2[0] + p3[0]) / 3, (p1[1] + p2[1] + p3[1]) / 3, (p1[2] + p2[2] + p3[2]) / 3 };
-    double val = func(p[0], p[1], p[2], wavy);
+    const std::array<double, 3> p = t.calc_center();
+    double val = func(p, wavy);
     if (val < low_lim) {
         colour = Colourcode[0];
     }
@@ -405,14 +399,18 @@ RGB get_colour(const Triangle& t, double(*func)(const double&, const double&, co
     }
     else {
         //Mix colours
-        if (val < mid_point)
-            colour = { int(val / low_lim * Colourcode[0][0] + (1 - val / low_lim) * Colourcode[1][0]),
-                       int(val / low_lim * Colourcode[0][1] + (1 - val / low_lim) * Colourcode[1][1]),
-                       int(val / low_lim * Colourcode[0][2] + (1 - val / low_lim) * Colourcode[1][2]) };
-        else if (val > mid_point)
-            colour = { int(val / high_lim * Colourcode[2][0] + (1 - val / high_lim) * Colourcode[1][0]),
-                       int(val / high_lim * Colourcode[2][1] + (1 - val / high_lim) * Colourcode[1][1]),
-                       int(val / high_lim * Colourcode[2][2] + (1 - val / high_lim) * Colourcode[1][2]) };
+        if (val < mid_point) {
+            double factor = (val - low_lim) / (mid_point - low_lim);
+            colour = { int((1 - factor) * Colourcode[0][0] + factor * Colourcode[1][0]),
+                       int((1 - factor) * Colourcode[0][1] + factor * Colourcode[1][1]),
+                       int((1 - factor) * Colourcode[0][2] + factor * Colourcode[1][2]) };
+        }
+        else if (val > mid_point) {
+            double factor = (val - mid_point) / (high_lim - mid_point);
+            colour = { int((1 - factor) * Colourcode[1][0] + factor * Colourcode[2][0]),
+                       int((1 - factor) * Colourcode[1][1] + factor * Colourcode[2][1]),
+                       int((1 - factor) * Colourcode[1][2] + factor * Colourcode[2][2]) };
+        }
         else
             colour = Colourcode[1];
     }
@@ -424,10 +422,28 @@ RGB get_colour(const Triangle& t, double(*func)(const double&, const double&, co
     return colour;
 };
 
+// Function to subdivide a cube into smaller cubes
+std::vector<std::array<double, 3>> subdivideCube(const std::array<double, 3>& p1, const std::array<double, 3>& p2, int level) {
+    std::vector<std::array<double, 3>> points;
+    double step = 1.0 / level;
+    for (int i = 0; i <= level; ++i) {
+        for (int j = 0; j <= level; ++j) {
+            for (int k = 0; k <= level; ++k) {
+                points.push_back({
+                    p1[0] + i * step * (p2[0] - p1[0]),
+                    p1[1] + j * step * (p2[1] - p1[1]),
+                    p1[2] + k * step * (p2[2] - p1[2])
+                    });
+            }
+        }
+    }
+    return points;
+}
+
 // --------------------------------------------------------------------------
 // Marching Cubes on a 3D array of double values to find isosurface = 0.5
 //
-std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
+std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal, const int subdivisionLevel)
 {
     std::vector<Triangle> triangles;
 
@@ -440,11 +456,12 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
 
 
     // We will iterate through each "voxel" (cube) in the volume
+#pragma omp parallel for
     for (int x = 0; x < nx - 1; x++) {
         for (int y = 0; y < ny - 1; y++) {
             for (int z = 0; z < nz - 1; z++) {
 
-                // 1) Collect corner positions and values
+                //  Collect corner positions and values
                 //    corners: (x,   y,   z)
                 //             (x+1, y,   z)
                 //             (x+1, y+1, z)
@@ -475,11 +492,12 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                     volumeData.get_value(x,y + 1,z + 1)
                 };
 
-                // 2) Build the "cubeIndex" from which corners are >= isoVal
+
+                // Build the "cubeIndex" from which corners are >= isoVal
                 int cubeIndex = 0;
-                for (int i = 0; i < 8; i++) {
-                    if (cornerVal[i] >= isoVal) {
-                        cubeIndex |= (1 << i);
+                for (int j = 0; j < 8; j++) {
+                    if (cornerVal[j] >= isoVal) {
+                        cubeIndex |= (1 << j);
                     }
                 }
 
@@ -488,15 +506,14 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                     continue;
                 }
 
-                // 3) Find the points where the isosurface intersects the edges of this cube
+                // Find the points where the isosurface intersects the edges of this cube
                 std::array<double, 3> vertList[12];
-                // For each of the 12 edges, check if it is intersected
                 int edges = edgeTable[cubeIndex]; // bitmask of edges
-                for (int i = 0; i < 12; i++) {
-                    if (edges & (1 << i)) {
-                        int cA = cornerIndexA[i];
-                        int cB = cornerIndexB[i];
-                        vertList[i] = interpolateIso(
+                for (int j = 0; j < 12; j++) {
+                    if (edges & (1 << j)) {
+                        int cA = cornerIndexA[j];
+                        int cB = cornerIndexB[j];
+                        vertList[j] = interpolateIso(
                             cornerPos[cA], cornerPos[cB],
                             cornerVal[cA], cornerVal[cB],
                             isoVal
@@ -504,26 +521,24 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)
                     }
                 }
 
-                // 4) Create triangles from the vertList using the triTable
-                //    Each set of three edge indices forms one triangle
-                for (int i = 0; i < 16; i += 3) {
-                    int e0 = triTable[cubeIndex][i + 0];
-                    int e1 = triTable[cubeIndex][i + 1];
-                    int e2 = triTable[cubeIndex][i + 2];
+                // Create triangles from the vertList using the triTable
+                for (int j = 0; j < 16; j += 3) {
+                    int e0 = triTable[cubeIndex][j + 0];
+                    int e1 = triTable[cubeIndex][j + 1];
+                    int e2 = triTable[cubeIndex][j + 2];
 
                     if (e0 == -1 || e1 == -1 || e2 == -1) {
                         break; // no more triangles for this cubeIndex
                     }
 
-                    Triangle tri;
-                    tri.v1 = vertList[e0];
-                    tri.v2 = vertList[e1];
-                    tri.v3 = vertList[e2];
+                    Triangle tri{ vertList[e0], vertList[e1], vertList[e2] , {0,0,0}, 0 };
+#pragma omp critical
                     triangles.push_back(tri);
                 }
             }
         }
     }
+
 
     return triangles;
 }

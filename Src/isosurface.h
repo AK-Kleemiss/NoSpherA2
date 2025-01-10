@@ -19,11 +19,14 @@ struct Triangle {
         std::array<double, 3> b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
         return a_dot(cross(b,a), v1) / 6.;
     }
+    std::array<double, 3> calc_center() const {
+        return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };
+    };
 };
-std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal);
+std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal, const int subdivisionLevel = 2);
 bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles);
 bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>& triangles);
 bool writeMTL(const std::string& mtlFilename, std::vector<Triangle>& triangles);
-RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim);
-RGB get_colour(const Triangle& t, double(*func)(const double&, const double&, const double&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double& low_lim, double& high_lim);
-double calc_d_i(const double& x, const double& y, const double& z, const WFN& wavy);
+RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
+RGB get_colour(const Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
+double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy);

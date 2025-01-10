@@ -98,23 +98,51 @@ int main(int argc, char **argv)
         cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
         Hirshfeld_weight.give_parent_wfn(wavy[0]);
         std::array<std::array<int, 3>, 3> Colourcode;
-        double low_lim = 0.2;
-        double high_lim = 5.0;
+        
         Colourcode[0] = { 255, 0, 0 };
         Colourcode[1] = { 255, 255, 255 };
         Colourcode[2] = { 0, 0, 255 };
 
-        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);
+        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5, 1);
         std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
         auto triangles_e = triangles_i;
         double area = 0.0;
         double volume = 0.0;
-        for (int i=0; i<triangles_i.size(); i++)
-        {
+        double low_lim_di = 1E7;
+        double high_lim_di = 0.0;
+        double low_lim_de = 1E7;
+        double high_lim_de = 0.0;
+        ofstream fingerprint_file("Hirshfeld_fingerprint.dat");
+        fingerprint_file << "d_i\td_e" << endl;
+#pragma omp parallel for reduction(+:area, volume)
+        for (int i = 0; i < triangles_i.size(); i++) {
             area += triangles_i[i].calc_area();
             volume += triangles_i[i].calc_inner_volume();
-            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim, high_lim);
-            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim, high_lim);
+            std::array<double, 3> pos = triangles_i[i].calc_center();
+            double d_i = calc_d_i(pos, wavy[0]);
+            double d_e = calc_d_i(pos, wavy[1]);
+#pragma omp critical
+            {
+                if (d_i < low_lim_di)
+                    low_lim_di = d_i;
+                if (d_i > high_lim_di)
+                    high_lim_di = d_i;
+                if (d_e < low_lim_de)
+                    low_lim_de = d_e;
+                if (d_e > high_lim_de)
+                    high_lim_de = d_e;
+            }
+            fingerprint_file << d_i << "\t" << d_e << "\n";
+        }
+        fingerprint_file.flush();
+        fingerprint_file.close();
+        std::cout << "d_i is scaled from " << low_lim_di << " to " << high_lim_di * 0.9 << endl;
+        std::cout << "d_e is scaled from " << low_lim_de << " to " << high_lim_de * 0.9 << endl;
+#pragma omp parallel for
+        for (int i=0; i<triangles_i.size(); i++)
+        {
+            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di*0.9);
+            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de*0.9);
         }
         std::cout << "Total area: " << area << endl;
         std::cout << "Total volume: " << volume << endl;
