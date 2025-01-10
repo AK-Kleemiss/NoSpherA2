@@ -1988,7 +1988,7 @@ int make_hirshfeld_grids(
                 {
                     dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
                     densy = spherical_temp.get_core_density(dist, wave.atoms[cif2wfn_list[i]].ECP_electrons) * total_grid[3][p];
-                    if (wave.get_ECP_mode())
+                    if (wave.get_ECP_mode() != 0)
                         densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
                     diff += densy;
                 }

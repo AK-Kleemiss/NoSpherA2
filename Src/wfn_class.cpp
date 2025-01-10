@@ -73,7 +73,7 @@ WFN::WFN(int given_origin)
     fill_Afac_pre();
 };
 
-WFN::WFN(const std::filesystem::path & filename)
+WFN::WFN(const std::filesystem::path & filename, const bool& debug)
 {
     ncen = 0;
     nfunc = 0;
@@ -92,10 +92,10 @@ WFN::WFN(const std::filesystem::path & filename)
     basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
-    read_known_wavefunction_format(filename, std::cout, false);
+    read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult) {
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) {
     ncen = 0;
     nfunc = 0;
     nmo = 0;
@@ -113,7 +113,7 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
-    read_known_wavefunction_format(filename, std::cout, false);
+    read_known_wavefunction_format(filename, std::cout, debug);
 };
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)

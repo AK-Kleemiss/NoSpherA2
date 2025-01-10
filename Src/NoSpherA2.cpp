@@ -68,8 +68,8 @@ int main(int argc, char **argv)
             std::cout << "Resetting Radius to at least 2.5!" << endl;
             opt.radius = 2.5;
         }
-        wavy.push_back(WFN(opt.hirshfeld_surface));
-        wavy.push_back(WFN(opt.hirshfeld_surface2));
+        wavy.push_back(WFN(opt.hirshfeld_surface, opt.debug));
+        wavy.push_back(WFN(opt.hirshfeld_surface2, opt.debug));
         readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
         cube Hirshfeld_grid(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
         cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
@@ -155,8 +155,8 @@ int main(int argc, char **argv)
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (!opt.wfn2.empty())
     {
-        wavy.push_back(WFN(opt.wfn));
-        wavy.push_back(WFN(opt.wfn2));
+        wavy.push_back(WFN(opt.wfn, opt.debug));
+        wavy.push_back(WFN(opt.wfn2, opt.debug));
         if (opt.debug)
             cout << opt.wfn << opt.wfn2 << endl;
         wavy[0].delete_unoccupied_MOs();
@@ -250,7 +250,7 @@ int main(int argc, char **argv)
             }
             wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
             wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
-            wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file);
+            wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file, opt.debug);
             if (opt.ECP)
             {
                 wavy[i].set_has_ECPs(true, true, opt.ECP_mode);
@@ -356,7 +356,7 @@ int main(int argc, char **argv)
         }
         err_checkf(opt.xyz_file != "", "No xyz specified", log_file);
         err_checkf(exists(opt.xyz_file), "xyz doesn't exist", log_file);
-        wavy.emplace_back(opt.xyz_file);
+        wavy.emplace_back(opt.xyz_file, opt.debug);
 
         if (opt.electron_diffraction && opt.debug)
             log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
@@ -372,7 +372,7 @@ int main(int argc, char **argv)
     if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
         log_file << "Reading: " << setw(44) << opt.wfn << flush;
-        wavy.emplace_back(opt.wfn);
+        wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
         wavy[0].set_method(opt.method);
         wavy[0].set_multi(opt.mult);
         wavy[0].set_charge(opt.charge);
@@ -487,7 +487,7 @@ int main(int argc, char **argv)
     if (opt.gbw2wfn)
     {
         err_checkf(opt.wfn != "", "No Wavefunction given!", log_file);
-        wavy.emplace_back(opt.wfn);
+        wavy.emplace_back(opt.wfn, opt.debug);
         wavy[0].write_wfn("converted.wfn", false, false);
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
