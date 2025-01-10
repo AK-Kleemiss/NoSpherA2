@@ -131,8 +131,8 @@ int main(int argc, char **argv)
                     low_lim_de = d_e;
                 if (d_e > high_lim_de)
                     high_lim_de = d_e;
+                fingerprint_file << d_i << "\t" << d_e << "\n";
             }
-            fingerprint_file << d_i << "\t" << d_e << "\n";
         }
         fingerprint_file.flush();
         fingerprint_file.close();
