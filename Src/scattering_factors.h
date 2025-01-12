@@ -291,7 +291,8 @@ void calc_SF(const int &points,
              std::ostream &file,
              time_point &start,
              time_point &end1,
-             bool debug = false);
+             bool debug,
+             bool no_date = false);
 
 double fourier_bessel_integral(
     const primitive &p,

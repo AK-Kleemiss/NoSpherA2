@@ -208,6 +208,7 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ESP|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_gbw_SF|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_isosurface|x64.ActiveCfg = D_isosurface|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_isosurface|x64.Build.0 = D_isosurface|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ML|x64.ActiveCfg = D_ML|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_polarizability|x64.ActiveCfg = D_polarizability|x64

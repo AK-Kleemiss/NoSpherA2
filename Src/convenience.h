@@ -1,5 +1,4 @@
 ﻿#pragma once
-#define WIN32_LEAN_AND_MEAN
 #include "pch.h"
 
 extern bool myGlobalBool;
@@ -243,7 +242,7 @@ public:
     }
 
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_(std::max(worksize / 100, 1))
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize/100 : 1)
     {
         int bw = bar_width_ + 2;
         // Write status text
@@ -295,11 +294,8 @@ public:
             os << fill_;
         }
 
-        // Write progress percentage
-        //os << " " << std::min(static_cast<size_t>(progress_), size_t(100)) << "%";
-
         // End bar
-        if (std::min(static_cast<size_t>(progress_), size_t(100)) == 100.0f)
+        if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
         {
             os << "] 100% " << std::flush;
             return;

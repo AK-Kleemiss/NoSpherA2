@@ -667,7 +667,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 {
                     if (fields[label_field] == known_atoms[run])
                     {
-                        if (SALTED & fields[group_field].c_str()[0] == '.') continue;
+                        if (SALTED && fields[group_field].c_str()[0] == '.') continue;
                         old_atom = true;
                         if (debug)
                             file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
@@ -2593,7 +2593,7 @@ void calc_SF(const int &points,
              time_point &start,
              time_point &end1,
              bool debug,
-             bool no_date = false)
+             bool no_date)
 {
     const long long int imax = static_cast<long long int>(dens.size());
     const long long int smax = static_cast<long long int>(k_pt[0].size());
