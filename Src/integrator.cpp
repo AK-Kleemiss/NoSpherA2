@@ -21,6 +21,10 @@
 #define bas(SLOT, I) bas[8 * (I) + (SLOT)] // Basis set data for atom I
 #define atm(SLOT, I) atm[6 * (I) + (SLOT)] // Atom data for atom I
 
+#define DEF_GXYZ(type, G, GX, GY, GZ) \
+        type *GX = G; \
+        type *GY = G + envs->g_size; \
+        type *GZ = G + envs->g_size * 2
 
 Int_Params::Int_Params() {
     wfn_origin = 0;
@@ -4289,9 +4293,7 @@ void g0_2e_2d(double *g, Rys2eT *bc, Env *envs)
     const int dm = envs->g2d_klmax;
     const int dn = envs->g2d_ijmax;
     int i, j, m, n, off;
-    double *gx = g;
-    double *gy = gx + envs->g_size;
-    double *gz = gy + 2 * envs->g_size;
+    DEF_GXYZ(double, g, gx, gy, gz);
 
     for (i = 0; i < nroots; i++)
     {
@@ -30683,9 +30685,7 @@ void g0_il2d_4d(double *g, Env *envs)
     int dj = envs->g_stride_j;
     double *rirj = envs->rirj;
     double *rkrl = envs->rkrl;
-    double *gx = g;
-    double *gy = gx + envs->g_size;
-    double *gz = gy + 2 * envs->g_size;
+    DEF_GXYZ(double, g, gx, gy, gz);
     double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
     double rx, ry, rz;
 
@@ -30764,9 +30764,7 @@ void g0_lj2d_4d(double *g, Env *envs)
     int dj = envs->g_stride_j;
     double *rirj = envs->rirj;
     double *rkrl = envs->rkrl;
-    double *gx = g;
-    double *gy = gx + envs->g_size;
-    double *gz = gy + 2 * envs->g_size;
+    DEF_GXYZ(double, g, gx, gy, gz);
     double *p1x, *p1y, *p1z, *p2x, *p2y, *p2z;
     double rx, ry, rz;
 
