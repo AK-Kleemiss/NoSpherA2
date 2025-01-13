@@ -2891,23 +2891,23 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
-void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
+void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
 {
     if (!condition)
     {
-        log_file << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
+        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << std::endl;
+        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
         exit(-1);
     }
 };
-void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file)
+void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
 {
-    log_file << function << " at: " << file << ":" << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Error in " << function << " at: " << file << " : " << line << " " << error_mesasge << " not yet implemented!" << std::endl;
+    std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
     exit(-1);
 };
 

@@ -31,6 +31,7 @@
 #include <atomic>
 #include <deque>
 #include <filesystem>
+#include <source_location>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif

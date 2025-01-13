@@ -8,13 +8,13 @@ class atom;
 class BasisSet;
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
-void error_check(const bool condition, const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file = std::cout);
-void not_implemented(const std::string &file, const int &line, const std::string &function, const std::string &error_mesasge, std::ostream &log_file);
-#define err_checkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err(error_message, file) error_check(false, __FILE__, __LINE__, __func__, error_message, file)
-#define err_chkf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err_chekf(condition, error_message, file) error_check(condition, __FILE__, __LINE__, __func__, error_message, file)
-#define err_not_impl_f(error_message, file) not_implemented(__FILE__, __LINE__, __func__, error_message, file)
+void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
+void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file);
+#define err_checkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
+#define err(error_message, file) error_check(false, std::source_location::current(), error_message, file)
+#define err_chkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
+#define err_chekf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
+#define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
 #if defined(_WIN32) || defined(__RASCALINE__)
 #define has_RAS 1
 #else
