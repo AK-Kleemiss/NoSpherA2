@@ -21,6 +21,9 @@
     <ClInclude Include="pch_dll.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -29,5 +32,16 @@
     <ClCompile Include="pch_dll.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="NoSpherA2_DLL.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="..\Src\OpenBLAS.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll" />
   </ItemGroup>
 </Project>

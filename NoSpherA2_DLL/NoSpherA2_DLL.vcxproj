@@ -1222,6 +1222,7 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch_dll.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -1313,6 +1314,16 @@
     <ProjectReference Include="..\Windows\NoSpherA2.vcxproj">
       <Project>{2ab57786-36d2-4490-82e3-032f9a65cf10}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\Src\OpenBLAS.rc" />
+    <ResourceCompile Include="NoSpherA2_DLL.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll">
+      <DeploymentContent>true</DeploymentContent>
+      <FileType>Document</FileType>
+    </_EmbedManagedResourceFile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
