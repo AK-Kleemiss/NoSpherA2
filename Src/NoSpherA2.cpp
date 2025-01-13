@@ -8,14 +8,6 @@
 #include "properties.h"
 #include "isosurface.h"
 
-bool myGlobalBool = false;
-#ifdef _WIN32
-bool has_BLAS = false;
-#else
-bool has_BLAS = true;
-#endif
-void* BLAS_pointer = nullptr;
-
 int main(int argc, char **argv)
 {
     using namespace std;
@@ -38,7 +30,7 @@ int main(int argc, char **argv)
     options opt(argc, argv, log_file);
     opt.digest_options();
     vector<WFN> wavy;
-    
+
     if (opt.threads != -1)
     {
 #ifdef _OPENMP
@@ -62,9 +54,11 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         return 0;
     }
-    //Perform Hirshfeld surface based on input and quit
-    if (opt.hirshfeld_surface != "") {
-        if (opt.radius < 2.5) {
+    // Perform Hirshfeld surface based on input and quit
+    if (opt.hirshfeld_surface != "")
+    {
+        if (opt.radius < 2.5)
+        {
             std::cout << "Resetting Radius to at least 2.5!" << endl;
             opt.radius = 2.5;
         }
@@ -75,7 +69,7 @@ int main(int argc, char **argv)
         cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
         Hirshfeld_grid.give_parent_wfn(wavy[0]);
         Hirshfeld_grid2.give_parent_wfn(wavy[1]);
-        double len[3]{ 0, 0, 0 };
+        double len[3]{0, 0, 0};
         for (int i = 0; i < 3; i++)
         {
             len[i] = (opt.MinMax[3 + i] - opt.MinMax[i]) / opt.NbSteps[i];
@@ -98,10 +92,10 @@ int main(int argc, char **argv)
         cube Hirshfeld_weight = Hirshfeld_grid / Total_Dens;
         Hirshfeld_weight.give_parent_wfn(wavy[0]);
         std::array<std::array<int, 3>, 3> Colourcode;
-        
-        Colourcode[0] = { 255, 0, 0 };
-        Colourcode[1] = { 255, 255, 255 };
-        Colourcode[2] = { 0, 0, 255 };
+
+        Colourcode[0] = {255, 0, 0};
+        Colourcode[1] = {255, 255, 255};
+        Colourcode[2] = {0, 0, 255};
 
         std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5, 1);
         std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
@@ -114,8 +108,9 @@ int main(int argc, char **argv)
         double high_lim_de = 0.0;
         ofstream fingerprint_file("Hirshfeld_fingerprint.dat");
         fingerprint_file << "d_i\td_e" << endl;
-#pragma omp parallel for reduction(+:area, volume)
-        for (int i = 0; i < triangles_i.size(); i++) {
+#pragma omp parallel for reduction(+ : area, volume)
+        for (int i = 0; i < triangles_i.size(); i++)
+        {
             area += triangles_i[i].calc_area();
             volume += triangles_i[i].calc_inner_volume();
             std::array<double, 3> pos = triangles_i[i].calc_center();
@@ -139,10 +134,10 @@ int main(int argc, char **argv)
         std::cout << "d_i is scaled from " << low_lim_di << " to " << high_lim_di * 0.9 << endl;
         std::cout << "d_e is scaled from " << low_lim_de << " to " << high_lim_de * 0.9 << endl;
 #pragma omp parallel for
-        for (int i=0; i<triangles_i.size(); i++)
+        for (int i = 0; i < triangles_i.size(); i++)
         {
-            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di*0.9);
-            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de*0.9);
+            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di * 0.9);
+            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de * 0.9);
         }
         std::cout << "Total area: " << area << endl;
         std::cout << "Total volume: " << volume << endl;
@@ -215,7 +210,8 @@ int main(int argc, char **argv)
         cout << "Bye Bye!" << endl;
         return 0;
     }
-    if (opt.pol_wfns.size() != 0) {
+    if (opt.pol_wfns.size() != 0)
+    {
         polarizabilities(opt, log_file);
         exit(0);
     }
@@ -279,7 +275,8 @@ int main(int argc, char **argv)
                                   &known_kpts),
                               log_file);
             }
-            else if (opt.SALTED) {
+            else if (opt.SALTED)
+            {
 #if has_RAS == 1
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
@@ -287,7 +284,7 @@ int main(int argc, char **argv)
                 check_OpenBLAS_DLL(opt.debug);
 #endif
                 BasisSetLibrary basis_library;
-                SALTEDPredictor* temp_pred = new SALTEDPredictor(wavy[i], opt);
+                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[i], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path h5file = temp_pred->get_h5_filename();
                 log_file << "Using " << h5file << " for the prediction" << endl;
@@ -296,12 +293,13 @@ int main(int argc, char **argv)
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
                 result.append(calculate_scattering_factors_MTC_SALTED(
-                    opt,
-					*temp_pred,
-                    log_file,
-                    known_scatterer,
-                    i,
-                    &known_kpts), log_file);
+                                  opt,
+                                  *temp_pred,
+                                  log_file,
+                                  known_scatterer,
+                                  i,
+                                  &known_kpts),
+                              log_file);
                 delete temp_pred;
 #else
                 log_file << "SALTED is not available in this build!" << endl;
@@ -378,7 +376,7 @@ int main(int argc, char **argv)
         wavy[0].set_charge(opt.charge);
         if (opt.debug)
             log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
-        
+
         if (opt.ECP)
         {
             wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
@@ -446,7 +444,7 @@ int main(int argc, char **argv)
                 check_OpenBLAS_DLL(opt.debug);
 #endif
                 BasisSetLibrary basis_library;
-                SALTEDPredictor* temp_pred = new SALTEDPredictor(wavy[0], opt);
+                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path h5file = temp_pred->get_h5_filename();
                 log_file << "Using " << h5file << " for the prediction" << endl;
@@ -455,14 +453,14 @@ int main(int argc, char **argv)
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
                 err_checkf(calculate_scattering_factors_ML(
-                    opt,
-                    *temp_pred,
-                    log_file),
-                    "Error during ML-SF Calcualtion", log_file);
+                               opt,
+                               *temp_pred,
+                               log_file),
+                           "Error during ML-SF Calcualtion", log_file);
                 delete temp_pred;
 #else
-							log_file << "SALTED is not available in this build!" << endl;
-              exit(-1);
+                log_file << "SALTED is not available in this build!" << endl;
+                exit(-1);
 #endif
             }
         }

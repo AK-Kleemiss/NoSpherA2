@@ -58,12 +58,12 @@ tests/Coeffs_From_ML/*
 *.densities
 *_property.txt
 tests/ECP_SF/Atomic_densities/*.gbw
-/tests/reading_ML_Coeffs
+tests/reading_ML_Coeffs
 *NoSpherA2.lib
 *NoSpherA2.exp
 Linux/NoSpherA2_rascaline
 NoSpherA2_rascaline
-/Windows/*/*/libopenblas.dll
+Windows/*/*/libopenblas.dll
 *.exp
 *.o_RASC
 *.o_RASC_d
@@ -72,3 +72,4 @@ tests/SALTED/sfacs.dat
 *.exp
 *.lib
 *.mtl
+*NoSpherA2_DLL.dll

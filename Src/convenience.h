@@ -1,8 +1,6 @@
 ﻿#pragma once
 #include "pch.h"
 
-extern bool myGlobalBool;
-
 // Pre-definition of classes included later
 class WFN;
 class cell;
@@ -47,9 +45,10 @@ int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);
 double vec_sum(const vec &in);
 cdouble vec_sum(const cvec &in);
-double vec_length(const vec& in);
+double vec_length(const vec &in);
 template <typename array>
-const double array_length(const array& in) {
+const double array_length(const array &in)
+{
     double sum = 0.0;
     for (double val : in)
     {
@@ -59,10 +58,10 @@ const double array_length(const array& in) {
 }
 
 // Function to compute cross product
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b);
+std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b);
 
 // Function to compute dot product
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b);
+double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b);
 
 constexpr const std::complex<double> c_one(0, 1.0);
 
@@ -197,9 +196,9 @@ void write_timing_to_file(std::ostream &file, std::vector<time_point> time_point
 
 int CountWords(const char *str);
 
-//inline bool exists(const std::filesystem::path& name) {
-//    return std::filesystem::exists(name);
-//};
+// inline bool exists(const std::filesystem::path& name) {
+//     return std::filesystem::exists(name);
+// };
 
 void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
@@ -216,17 +215,18 @@ bool unsaved_files(std::vector<WFN> &wavy);
 
 std::string trim(const std::string &s);
 
-inline void print_centered_text(const std::string& text, int& bar_width) {
+inline void print_centered_text(const std::string &text, int &bar_width)
+{
     const int text_length = static_cast<int>(text.length());
     const int total_padding = bar_width - text_length;
     const int padding_left = total_padding / 2;
     const int padding_right = total_padding - padding_left;
 
     std::cout << "["
-        << std::setw(padding_left) << std::setfill(' ') << ""
-        << text
-        << std::setw(padding_right) << std::setfill(' ') << ""
-        << "]" << std::endl;
+              << std::setw(padding_left) << std::setfill(' ') << ""
+              << text
+              << std::setw(padding_right) << std::setfill(' ') << ""
+              << "]" << std::endl;
 }
 
 //-------------------------Progress_bar--------------------------------------------------
@@ -242,7 +242,7 @@ public:
     }
 
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
-        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize/100 : 1)
+        : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
     {
         int bw = bar_width_ + 2;
         // Write status text
@@ -282,9 +282,9 @@ public:
         }
         else
         {
-            os << "\r" << std::flush;// Is not a file stream
-        } 
-        
+            os << "\r" << std::flush; // Is not a file stream
+        }
+
         // Start bar
         os << "[";
 
@@ -332,7 +332,7 @@ void readxyzMinMax_fromCIF(
     vec2 &cm,
     double Resolution);
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
+bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug);
 
 double double_from_string_with_esd(std::string in);
 
@@ -423,7 +423,8 @@ constexpr unsigned int doublefactorial(int n)
 }
 
 template <typename T>
-void removeElement(std::vector<T>& vec, const T& x) {
+void removeElement(std::vector<T> &vec, const T &x)
+{
     // Use std::remove to shift elements and get the new end iterator
     auto new_end = std::remove(vec.begin(), vec.end(), x);
     // Erase the elements from the new end to the actual end
@@ -642,7 +643,7 @@ bool is_nan(float &in);
 bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 
-bool read_block_from_fortran_binary(std::ifstream& file, void* Target);
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
 
 #ifdef _WIN32
 bool ExtractDLL(const std::filesystem::path &dllName);

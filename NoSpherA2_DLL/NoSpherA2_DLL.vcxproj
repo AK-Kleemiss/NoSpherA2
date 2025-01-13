@@ -539,7 +539,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>D:\git\wfn2fchk\Windows\x64\Release;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)\x64\Release;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -1206,7 +1206,7 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalIncludeDirectories>..\Lib;..\Lib\cerf;..\Lib\OpenBlas\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -1215,7 +1215,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>D:\git\wfn2fchk\Windows\x64\Release\AtomGrid.obj;D:\git\wfn2fchk\Windows\x64\Release\basis_set.obj;D:\git\wfn2fchk\Windows\x64\Release\convenience.obj;D:\git\wfn2fchk\Windows\x64\Release\cube.obj;D:\git\wfn2fchk\Windows\x64\Release\fchk.obj;D:\git\wfn2fchk\Windows\x64\Release\properties.obj;D:\git\wfn2fchk\Windows\x64\Release\sphere_lebedev_rule.obj;D:\git\wfn2fchk\Windows\x64\Release\spherical_density.obj;D:\git\wfn2fchk\Windows\x64\Release\scattering_factors.obj;D:\git\wfn2fchk\Windows\x64\Release\wfn_class.obj;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(SolutionDir)NoSpherA2\x64\Release\convenience.obj;$(SolutionDir)NoSpherA2\x64\Release\Atomgrid.obj;$(SolutionDir)NoSpherA2\x64\Release\atoms.obj;$(SolutionDir)NoSpherA2\x64\Release\basis_set.obj;$(SolutionDir)NoSpherA2\x64\Release\constants.obj;$(SolutionDir)NoSpherA2\x64\Release\cube.obj;$(SolutionDir)NoSpherA2\x64\Release\ECPs_corrections.obj;$(SolutionDir)NoSpherA2\x64\Release\fchk.obj;$(SolutionDir)NoSpherA2\x64\Release\integrator.obj;$(SolutionDir)NoSpherA2\x64\Release\isosurface.obj;$(SolutionDir)NoSpherA2\x64\Release\JKFit.obj;$(SolutionDir)NoSpherA2\x64\Release\math.obj;$(SolutionDir)NoSpherA2\x64\Release\properties.obj;$(SolutionDir)NoSpherA2\x64\Release\scattering_factors.obj;$(SolutionDir)NoSpherA2\x64\Release\sphere_lebedev_rule.obj;$(SolutionDir)NoSpherA2\x64\Release\spherical_density.obj;$(SolutionDir)NoSpherA2\x64\Release\wfn_class.obj;$(SolutionDir)NoSpherA2\x64\Release\SALTED_equicomb.obj;$(SolutionDir)NoSpherA2\x64\Release\SALTED_io.obj;$(SolutionDir)NoSpherA2\x64\Release\SALTED_predictor.obj;$(SolutionDir)NoSpherA2\x64\Release\SALTED_utilities.obj;$(SolutionDir)NoSpherA2\x64\Release\H5AbstractDs.obj;$(SolutionDir)NoSpherA2\x64\Release\H5ArrayType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5AtomType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Attribute.obj;$(SolutionDir)NoSpherA2\x64\Release\H5CommonFG.obj;$(SolutionDir)NoSpherA2\x64\Release\H5CompType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DaccProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DataSet.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DataSpace.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DataType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DcreatProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5DxferProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5EnumType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Exception.obj;$(SolutionDir)NoSpherA2\x64\Release\H5FaccProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5FcreatProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5File.obj;$(SolutionDir)NoSpherA2\x64\Release\H5FloatType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Group.obj;$(SolutionDir)NoSpherA2\x64\Release\H5IdComponent.obj;$(SolutionDir)NoSpherA2\x64\Release\H5IntType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5LaccProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5LcreatProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Library.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Location.obj;$(SolutionDir)NoSpherA2\x64\Release\H5Object.obj;$(SolutionDir)NoSpherA2\x64\Release\H5OcreatProp.obj;$(SolutionDir)NoSpherA2\x64\Release\H5PredType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5PropList.obj;$(SolutionDir)NoSpherA2\x64\Release\H5StrType.obj;$(SolutionDir)NoSpherA2\x64\Release\H5VarLenType.obj;../Lib/rascaline.lib;../Lib/metatensor.lib;..\Lib\OpenBlas\lib\libopenblas.lib;../Lib/libhdf5.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <DelayLoadDLLs>libopenblas.dll</DelayLoadDLLs>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -1225,6 +1226,25 @@
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='GenCube|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_Rascaline|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch_dll.h</PrecompiledHeaderFile>
     </ClCompile>
     <ClCompile Include="pch_dll.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
@@ -1268,10 +1288,29 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='GenCube|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_Rascaline|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">pch_dll.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch_dll.h</PrecompiledHeaderFile>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Windows\wfn2fchk.vcxproj">
+    <ProjectReference Include="..\Windows\NoSpherA2.vcxproj">
       <Project>{2ab57786-36d2-4490-82e3-032f9a65cf10}</Project>
     </ProjectReference>
   </ItemGroup>

@@ -6,57 +6,59 @@
 #include "properties.h"
 #ifdef _WIN32
 #include <windows.h>
+bool has_BLAS = false;
+#else
+bool has_BLAS = true;
 #endif
+void *BLAS_pointer = nullptr;
 
 std::string help_message =
-(
-    "\n----------------------------------------------------------------------------\n"
-    "          These commands and arguments are known by NoSpherA2:\n"
-    "----------------------------------------------------------------------------\n\n"
-    ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
-    "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
-    "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n"
-    "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n"
-    "   -b              <FILENAME>               Read this basis set\n"
-    "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-    "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
-    "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
-    "                                            [1]: def2-ECP\n"
-    "                                            [2]: xTB\n"
-    "                                            [3]: pTB\n"
-    "   --help/-help/--h                         print this help\n"
-    "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
-    "   -v2                                      Even more stuff\n"
-    "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
-    "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
-    "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
-    "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
-    "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
-    "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
-    "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
-    "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
-    "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
-    "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
-    "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
-    "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
-    "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
-    "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
-    "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
-    "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
-    "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
-    "                                            without spaces.\n   Typical use Examples:\n"
-    "   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
-    "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
-    "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
-    "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
-    "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n"
-    "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
-    "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n"
-    "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
-    "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
-    "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
-    "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n"
-    );
+    ("\n----------------------------------------------------------------------------\n"
+     "          These commands and arguments are known by NoSpherA2:\n"
+     "----------------------------------------------------------------------------\n\n"
+     ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
+     "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
+     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n"
+     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n"
+     "   -b              <FILENAME>               Read this basis set\n"
+     "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
+     "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
+     "                                            [1]: def2-ECP\n"
+     "                                            [2]: xTB\n"
+     "                                            [3]: pTB\n"
+     "   --help/-help/--h                         print this help\n"
+     "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
+     "   -v2                                      Even more stuff\n"
+     "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
+     "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
+     "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
+     "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
+     "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
+     "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
+     "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
+     "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
+     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
+     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
+     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
+     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
+     "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
+     "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
+     "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
+     "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
+     "                                            without spaces.\n   Typical use Examples:\n"
+     "   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
+     "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+     "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
+     "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
+     "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n"
+     "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
+     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n"
+     "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
+     "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
+     "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
+     "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
 std::string NoSpherA2_message(bool no_date)
 {
     std::string t = "    _   __     _____       __              ___   ___\n";
@@ -156,18 +158,18 @@ void copy_file(std::filesystem::path &from, std::filesystem::path &to)
     dest.close();
 };
 
-std::array<double, 3> cross(const std::array<double, 3>& a, const std::array<double, 3>& b) {
+std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b)
+{
     return {
         a[1] * b[2] - a[2] * b[1],
         a[2] * b[0] - a[0] * b[2],
-        a[0] * b[1] - a[1] * b[0]
-    };
+        a[0] * b[1] - a[1] * b[0]};
 }
 
-double a_dot(const std::array<double, 3>& a, const std::array<double, 3>& b) {
+double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b)
+{
     return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 };
-
 
 //---------------------------Configuration files ---------------------------------------------------
 
@@ -506,12 +508,12 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number)
     return input;
 };
 
-bool read_block_from_fortran_binary(std::ifstream& file, void* Target)
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
 {
     int size_begin = 0, size_end = 0;
-    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
-    file.read(reinterpret_cast<char*>(Target), size_begin);
-    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char *>(Target), size_begin);
+    file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
     if (size_begin != size_end)
     {
         std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
@@ -918,11 +920,10 @@ bool unsaved_files(std::vector<WFN> &wavy)
     return false;
 };
 
-
 void readxyzMinMax_fromWFN(
-    WFN& wavy,
-    double* CoordMinMax,
-    int* NbSteps,
+    WFN &wavy,
+    double *CoordMinMax,
+    int *NbSteps,
     double Radius,
     double Increments,
     bool no_bohr)
@@ -944,14 +945,14 @@ void readxyzMinMax_fromWFN(
         {
             for (int i = 0; i < 3; i++)
                 PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
-        } 
+        }
     }
-	CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
-	CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
-	CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
-	CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
-	CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
-	CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
+    CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
+    CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
 
     const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
@@ -965,7 +966,6 @@ void readxyzMinMax_fromWFN(
     NbSteps[1] = (int)ceil(constants::bohr2ang(CoordMinMax[4] - CoordMinMax[1]) / Increments);
     NbSteps[2] = (int)ceil(constants::bohr2ang(CoordMinMax[5] - CoordMinMax[2]) / Increments);
 }
-
 
 void readxyzMinMax_fromCIF(
     std::filesystem::path cif,
@@ -1313,7 +1313,7 @@ bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
     return true;
 }
 
-bool read_fracs_ADPs_from_CIF(std::filesystem::path& cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
     using namespace std;
     vec2 Uij, Cijk, Dijkl;
@@ -2020,7 +2020,8 @@ void options::digest_options()
                 n++;
             }
         }
-        else if (temp == "-laplacian_bonds") {
+        else if (temp == "-laplacian_bonds")
+        {
             wfn = arguments[i + 1];
             bondwise_laplacian_plots(wfn);
             exit(0);
@@ -2090,7 +2091,8 @@ void options::digest_options()
             cif = arguments[i + 1];
             err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", cout);
         }
-        else if (temp == "-cpus") {
+        else if (temp == "-cpus")
+        {
             threads = stoi(arguments[i + 1]);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
@@ -2230,9 +2232,10 @@ void options::digest_options()
             calc = elf = true;
         else if (temp == "-esp")
             calc = esp = true;
-        else if (temp == "-ewal_sum") {
-            //bool read, WFN& wave, std::ostream& file,
-            WFN* temp = new WFN(9);
+        else if (temp == "-ewal_sum")
+        {
+            // bool read, WFN& wave, std::ostream& file,
+            WFN *temp = new WFN(9);
             cube residual(arguments[i + 1], true, *temp, std::cout);
             if (argc >= i + 3)
             {
@@ -2244,7 +2247,7 @@ void options::digest_options()
             }
             else
                 residual.ewald_sum();
-            delete(temp);
+            delete (temp);
             exit(0);
         }
         else if (temp == "-fchk")
@@ -2271,7 +2274,8 @@ void options::digest_options()
             hdef = calc = true;
         else if (temp == "-hirsh")
             calc = hirsh = true, hirsh_number = stoi(arguments[i + 1]);
-        else if (temp == "-hirshfeld_surface") {
+        else if (temp == "-hirshfeld_surface")
+        {
             hirshfeld_surface = arguments[i + 1];
             hirshfeld_surface2 = arguments[i + 2];
         }
@@ -2389,13 +2393,13 @@ void options::digest_options()
         {
             string wfn_name = arguments[i + 1];
             cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN* wavy = new WFN(wfn_name);
+            WFN *wavy = new WFN(wfn_name);
             cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
             cout << "Starting cube calculation" << endl;
             calc_rho_cube(*wavy);
-            delete(wavy);
+            delete (wavy);
             exit(0);
         }
         else if (temp.find("-s_rho") < 1)
@@ -2429,53 +2433,55 @@ void options::digest_options()
         }
         else if (temp == "-atom_dens_diff")
         {
-			filesystem::path name_wfn_1 = arguments[i + 1];
-			filesystem::path name_wfn_2 = arguments[i + 2];
+            filesystem::path name_wfn_1 = arguments[i + 1];
+            filesystem::path name_wfn_2 = arguments[i + 2];
 
-			subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05); 
-			exit(0);
+            subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
+            exit(0);
         }
         else if (temp == "-spherical_aver_fukui")
         {
             filesystem::path wfn1_name = arguments[i + 1];
             filesystem::path wfn2_name = arguments[i + 2];
-            WFN* wavy1 = new WFN(wfn1_name);
-            WFN* wavy2 = new WFN(wfn2_name);
+            WFN *wavy1 = new WFN(wfn1_name);
+            WFN *wavy2 = new WFN(wfn2_name);
             ofstream outputFile("fukui_averaged_density_wfn.dat");
-            for (double r = 0.001; r < 10.0; r += 0.001) {
-                //double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
+            for (double r = 0.001; r < 10.0; r += 0.001)
+            {
+                // double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
                 double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
                 outputFile << r << " " << dens << "\n";
             }
             outputFile.close();
             cout << "Data written to output.dat" << endl;
-            delete(wavy1);
-            delete(wavy2);
+            delete (wavy1);
+            delete (wavy2);
             exit(0);
         }
         else if (temp == "-spherical_aver_hirsh")
         {
-			string wfn_name = arguments[i + 1];
-			cout << "Reading wavefunction: " << wfn_name << endl;
-			WFN* wavy = new WFN(wfn_name);
-			cout << "Assigning ECPs" << endl;
-			if (ECP)
-				wavy->set_has_ECPs(true);
-			cout << "Starting spherical averaging" << endl; 
-			double dens;
+            string wfn_name = arguments[i + 1];
+            cout << "Reading wavefunction: " << wfn_name << endl;
+            WFN *wavy = new WFN(wfn_name);
+            cout << "Assigning ECPs" << endl;
+            if (ECP)
+                wavy->set_has_ECPs(true);
+            cout << "Starting spherical averaging" << endl;
+            double dens;
 
-  
-            for (int index_atom = 0; index_atom < wavy->atoms.size(); index_atom += 1) {
+            for (int index_atom = 0; index_atom < wavy->atoms.size(); index_atom += 1)
+            {
                 ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
-                for (double r = 0.001; r < 5.0; r += 0.002) {
-                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800); 
+                for (double r = 0.001; r < 5.0; r += 0.002)
+                {
+                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800);
                     outputFile << r << " " << dens << "\n";
                 }
                 outputFile.close();
             }
             cout << "Data written to output.dat" << endl;
-            delete(wavy);
-			exit(0);
+            delete (wavy);
+            exit(0);
         }
         else if (temp == "-spherical_harmonic")
         {
@@ -2526,7 +2532,8 @@ void options::digest_options()
             test_analytical_fourier();
             exit(0);
         }
-        else if (temp == "-test_RI") {
+        else if (temp == "-test_RI")
+        {
             fixed_density_fit_test();
             exit(0);
         }
@@ -2548,7 +2555,8 @@ void options::digest_options()
         {
             xyz_file = arguments[i + 1];
         }
-        else if (temp == "-partitioning_test") {
+        else if (temp == "-partitioning_test")
+        {
             calc_partition_densities();
         }
     }
@@ -2702,7 +2710,7 @@ void print_duration(std::ostream &file, const std::string &description, const st
         std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
     };
     file << std::endl;
-    //Disable setfill 0 again
+    // Disable setfill 0 again
     file << std::setfill(' ');
 }
 
@@ -2873,7 +2881,8 @@ cdouble vec_sum(const cvec &in)
     return res;
 }
 
-double vec_length(const vec& in) {
+double vec_length(const vec &in)
+{
     double sum = 0.0;
     for (double val : in)
     {
