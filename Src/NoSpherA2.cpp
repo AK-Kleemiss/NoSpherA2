@@ -320,7 +320,7 @@ int main(int argc, char **argv)
 
         known_scatterer = result.get_scatterers();
         log_file << "Final number of atoms in .tsc file: " << known_scatterer.size() << endl;
-        time_point start = get_time();
+        _time_point start = get_time();
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             result.write_tscb_file();
@@ -331,7 +331,7 @@ int main(int argc, char **argv)
         log_file << " ... done!" << endl;
         if (!opt.no_date)
         {
-            time_point end_write = get_time();
+            _time_point end_write = get_time();
             if (get_sec(start, end_write) < 60)
                 log_file << "Writing Time: " << fixed << setprecision(0) << get_sec(start, end_write) << " s\n";
             else if (get_sec(start, end_write) < 3600)

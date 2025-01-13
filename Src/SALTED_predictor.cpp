@@ -583,7 +583,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
     }
 
     // Run generation of tsc file
-    time_point start;
+    _time_point start;
     if (_opt.debug)
         start = get_time();
 

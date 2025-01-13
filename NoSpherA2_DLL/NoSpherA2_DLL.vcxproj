@@ -1220,6 +1220,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\Windows\dll.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch_dll.h" />
     <ClInclude Include="resource.h" />

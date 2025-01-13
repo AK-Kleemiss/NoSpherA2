@@ -14,7 +14,7 @@ void Calc_Spherical_Dens(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
 
     vector<Thakkar> atoms;
@@ -86,7 +86,7 @@ void Calc_Spherical_Dens(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -104,7 +104,7 @@ void Calc_Static_Def(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     vector<Thakkar> atoms;
@@ -173,7 +173,7 @@ void Calc_Static_Def(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -192,7 +192,7 @@ void Calc_Static_Def(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
@@ -251,7 +251,7 @@ void Calc_Static_Def(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -270,7 +270,7 @@ void Calc_Hirshfeld(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
@@ -340,7 +340,7 @@ void Calc_Hirshfeld(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -360,7 +360,7 @@ void Calc_Hirshfeld(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
@@ -415,7 +415,7 @@ void Calc_Hirshfeld(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -435,7 +435,7 @@ void Calc_Hirshfeld_atom(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeHirsh.get_size(0), 50, "=", " ", "Calculating Values");
     Thakkar atom(wavy.get_atom_charge(ignore_atom));
 
@@ -490,7 +490,7 @@ void Calc_Hirshfeld_atom(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -507,7 +507,7 @@ void Calc_Rho(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
 
     const int low_i = wrap ? -CubeRho.get_size(0) : 0;
@@ -564,7 +564,7 @@ void Calc_Rho(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -579,7 +579,7 @@ void Calc_Rho_spherical_harmonics(
     std::ostream &file)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
 
     ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Rho");
 
@@ -605,7 +605,7 @@ void Calc_Rho_spherical_harmonics(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -622,7 +622,7 @@ void Calc_MO_spherical_harmonics(
     bool nodate)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating Values");
@@ -644,7 +644,7 @@ void Calc_MO_spherical_harmonics(
     {
         delete (progress);
 
-        time_point end = get_time();
+        _time_point end = get_time();
         if (get_sec(start, end) < 60)
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
         else if (get_sec(start, end) < 3600)
@@ -661,7 +661,7 @@ void Calc_S_Rho(
     bool &nodate)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(Cube_S_Rho.get_size(0), 50, "=", " ", "Calculating Values");
@@ -687,7 +687,7 @@ void Calc_S_Rho(
     {
         delete (progress);
 
-        time_point end = get_time();
+        _time_point end = get_time();
         if (get_sec(start, end) < 60)
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
         else if (get_sec(start, end) < 3600)
@@ -711,7 +711,7 @@ void Calc_Prop(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = NULL;
     if (!test)
         progress = new ProgressBar(CubeRho.get_size(0), 50, "=", " ", "Calculating Values");
@@ -857,7 +857,7 @@ void Calc_Prop(
     if (!test)
     {
         delete (progress);
-        time_point end = get_time();
+        _time_point end = get_time();
         if (get_sec(start, end) < 60)
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
         else if (get_sec(start, end) < 3600)
@@ -876,7 +876,7 @@ void Calc_ESP(
     bool wrap)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
 
     vec2 d2;
     d2.resize(wavy.get_ncen());
@@ -954,7 +954,7 @@ void Calc_ESP(
     {
         delete (progress);
 
-        time_point end = get_time();
+        _time_point end = get_time();
         if (get_sec(start, end) < 60)
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
         else if (get_sec(start, end) < 3600)
@@ -974,7 +974,7 @@ void Calc_MO(
 {
     using namespace std;
     err_checkf(mo <= wavy.get_nmo(), to_string(mo) + " bigger MO selected than " + to_string(wavy.get_nmo()) + " contained in the wavefunctions!", file);
-    time_point start = get_time();
+    _time_point start = get_time();
 
     ProgressBar *progress = new ProgressBar(CubeMO.get_size(0), 50, "=", " ", "Calculating MO");
 
@@ -1034,7 +1034,7 @@ void Calc_MO(
     }
     delete (progress);
 
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)

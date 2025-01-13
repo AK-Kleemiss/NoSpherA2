@@ -241,7 +241,7 @@ int make_hirshfeld_grids(
     vec2 &dens,
     const svec &labels,
     std::ostream &file,
-    std::vector<time_point> &time_points,
+    std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug = false,
     bool no_date = false);
@@ -289,8 +289,8 @@ void calc_SF(const int &points,
              vec2 &dens,
              cvec2 &sf,
              std::ostream &file,
-             time_point &start,
-             time_point &end1,
+             _time_point &start,
+             _time_point &end1,
              bool debug,
              bool no_date = false);
 

@@ -324,6 +324,20 @@ static const int cornerIndexB[12] = {
     1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7
 };
 
+double Triangle::calc_area() const {
+    std::array<double, 3> a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
+    std::array<double, 3> b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
+    return 0.5 * array_length(cross(a, b));
+};
+double Triangle::calc_inner_volume() const {
+    std::array<double, 3> a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
+    std::array<double, 3> b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
+    return a_dot(cross(b, a), v1) / 6.;
+};
+std::array<double, 3> Triangle::calc_center() const {
+    return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };
+};
+
 // --------------------------------------------------------------------------
 // A tiny helper to linearly interpolate a point along an edge between two corners
 // based on the isosurface value. 

@@ -427,7 +427,7 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
     CubeRho.set_comment2("from " + dummy.get_path().string());
     CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
 
-    time_point start = get_time();
+    _time_point start = get_time();
 
     ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
     if (atom != -1)
@@ -455,7 +455,7 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
     delete (progress);
 
     using namespace std;
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)

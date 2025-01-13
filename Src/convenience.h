@@ -39,7 +39,7 @@ typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
-typedef std::chrono::high_resolution_clock::time_point time_point;
+typedef std::chrono::high_resolution_clock::time_point _time_point;
 
 int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);
@@ -192,7 +192,7 @@ long long int get_musec(std::chrono::high_resolution_clock::time_point start, st
 long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end);
 
-void write_timing_to_file(std::ostream &file, std::vector<time_point> time_points, std::vector<std::string> descriptions);
+void write_timing_to_file(std::ostream &file, std::vector<_time_point> time_points, std::vector<std::string> descriptions);
 
 int CountWords(const char *str);
 

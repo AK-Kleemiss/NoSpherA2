@@ -116,7 +116,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     err_checkf(exists(opt.cif), "CIF does not exists!", std::cout);
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    std::vector<time_point> time_points;
+    std::vector<_time_point> time_points;
     std::vector<std::string> time_descriptions;
 
     cell unit_cell(opt.cif, std::cout, opt.debug);
@@ -1115,7 +1115,7 @@ void Calc_MO_spherical_harmonics(
     bool nodate)
 {
     using namespace std;
-    time_point start = get_time();
+    _time_point start = get_time();
     ProgressBar *progress = NULL;
     if (!nodate)
         progress = new ProgressBar(CubeMO.get_size(0), 60, "=", " ", "Calculating MOs");
@@ -1141,7 +1141,7 @@ void Calc_MO_spherical_harmonics(
     {
         delete (progress);
 
-        time_point end = get_time();
+        _time_point end = get_time();
         if (get_sec(start, end) < 60)
             file << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
         else if (get_sec(start, end) < 3600)
@@ -1172,7 +1172,7 @@ void calc_rho_cube(WFN &dummy)
     CubeRho.set_comment2("from " + dummy.get_path().string());
     CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
 
-    time_point start = get_time();
+    _time_point start = get_time();
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
     ;
     cout << "Lets go into the loop! There is " << total_size << " points" << endl;
@@ -1221,7 +1221,7 @@ void calc_rho_cube(WFN &dummy)
     delete (progress);
 
     using namespace std;
-    time_point end = get_time();
+    _time_point end = get_time();
     if (get_sec(start, end) < 60)
         std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
     else if (get_sec(start, end) < 3600)
@@ -1336,7 +1336,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
         cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
-    time_point start = get_time();
+    _time_point start = get_time();
 
     const int upper = static_cast<int>(res[0].size());
     ProgressBar* progress = new ProgressBar(upper, 60, "=", " ", "Calculating Densities");
@@ -1354,7 +1354,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
         progress->update();
     }
     delete (progress);
-    time_point end = get_time();
+    _time_point end = get_time();
     cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
     ofstream dat_out(dat, ios::out);
     dat_out << scientific << setprecision(12) << setw(20);
@@ -1430,7 +1430,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
         cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
-    std::vector<time_point> time_points;
+    std::vector<_time_point> time_points;
     std::vector<std::string> time_descriptions;
 
     ivec atom_type_list({el_nr});
@@ -1497,7 +1497,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     delete (progress);
 
     ofstream dat_out("core_sfac_" + ele + ".dat", ios::out);
-    time_point end = get_time();
+    _time_point end = get_time();
     cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
     dat_out << scientific << setprecision(12) << setw(20);
     double t = 0;

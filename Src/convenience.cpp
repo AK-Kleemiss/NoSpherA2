@@ -2715,7 +2715,7 @@ void print_duration(std::ostream &file, const std::string &description, const st
 }
 
 void write_timing_to_file(std::ostream &file,
-                          std::vector<time_point> time_points,
+                          std::vector<_time_point> time_points,
                           std::vector<std::string> descriptions)
 {
     using namespace std;

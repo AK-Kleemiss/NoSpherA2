@@ -1559,7 +1559,7 @@ int make_hirshfeld_grids(
     vec2 &dens,
     const svec &labels,
     std::ostream &file,
-    std::vector<time_point> &time_points,
+    std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
@@ -2064,7 +2064,7 @@ static int make_hirshfeld_grids_ML(
     vec2 &dens,
     const svec &labels,
     std::ostream &file,
-    std::vector<time_point> &time_points,
+    std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
     bool no_date)
@@ -2590,8 +2590,8 @@ void calc_SF(const int &points,
              vec2 &dens,
              cvec2 &sf,
              std::ostream &file,
-             time_point &start,
-             time_point &end1,
+             _time_point &start,
+             _time_point &end1,
              bool debug,
              bool no_date)
 {
@@ -3202,7 +3202,7 @@ bool calculate_scattering_factors_HF(
         file << "Number of ECP electrons: " << wave.get_nr_ECP_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    vector<time_point> time_points;
+    vector<_time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
@@ -3286,7 +3286,7 @@ bool calculate_scattering_factors_HF(
     time_descriptions.push_back("k-points preparation");
 
     cvec2 sf;
-    time_point end1;
+    _time_point end1;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
@@ -3373,7 +3373,7 @@ bool calculate_scattering_factors_ML(
     file << "Number of protons: " << SP.wavy.get_nr_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
 
-    vector<time_point> time_points;
+    vector<_time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
@@ -3574,7 +3574,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     if (opt.debug)
         file << "Working with: " << SP.wavy.get_path() << endl;
 
-    vector<time_point> time_points;
+    vector<_time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
@@ -3819,7 +3819,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     if (opt.debug)
         file << "Working with: " << wave[nr].get_path() << endl;
 
-    vector<time_point> time_points;
+    vector<_time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
@@ -3921,7 +3921,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     time_descriptions.push_back("k-points preparation");
 
     vector<vector<complex<double>>> sf;
-    time_point end1;
+    _time_point end1;
     calc_SF(points,
             k_pt,
             d1, d2, d3, dens,
@@ -3998,7 +3998,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 
     // time_point start = get_time();
     // time_point end_becke, end_prototypes, end_spherical, end_prune, end_aspherical;
-    vector<time_point> time_points;
+    vector<_time_point> time_points;
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 

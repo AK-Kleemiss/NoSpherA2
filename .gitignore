@@ -73,5 +73,5 @@ tests/SALTED/sfacs.dat
 *.lib
 *.mtl
 *NoSpherA2_DLL.dll
-NoSpherA2_DLL/x64/Release/OpenBLAS.res
-NoSpherA2_DLL/x64/Release/NoSpherA2_DLL.res
+*OpenBLAS.res
+*NoSpherA2_DLL.res
