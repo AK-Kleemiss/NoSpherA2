@@ -281,7 +281,7 @@ ivec make_loc(ivec &bas, int nbas) {
 }
 
 // Function to compute two-center two-electron integrals (eri2c)
-void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
+void computeEri2c(Int_Params &params, vec &eri2c)
 {
  //   int* bas = params.get_ptr_bas();
 	//int* atm = params.get_ptr_atm();
@@ -307,7 +307,7 @@ void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
     vec res(naoi * naoj, 0.0);
     eri2c.resize(naoi * naoj, 0.0);
 	//GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
-    GTOint2c(int2c2e_sph, res, 1, 0, shl_slice, aoloc, NULL, atm, nat, bas, nbas, env);
+    GTOint2c(int2c2e_sph, res, 1, 0, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
 
     
 
@@ -322,7 +322,7 @@ void computeEri2c(Int_Params &params, std::vector<double> &eri2c)
 // Function to compute three-center two-electron integrals (eri3c)
 void computeEri3c(Int_Params &param1,
                   Int_Params &param2,
-                  std::vector<double> &eri3c)
+                  vec &eri3c)
 {   
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
@@ -354,22 +354,18 @@ void computeEri3c(Int_Params &param1,
     Opt opty = int3c2e_optimizer(atm, nat, bas, nbas, env);
 
     // Compute integrals
-    //vec res(naoi * naoj * naok, 0.0);
+    vec res(naoi * naoj * naok, 0.0);
     eri3c.resize(naoi * naoj * naok, 0.0);
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, eri3c, 1, shl_slice, aoloc, &opty, atm, nat, bas, nbas, env);
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res, 1, shl_slice, aoloc, NULL, atm, nat, bas, nbas, env);
 
  //   //res is in fortran order, write the result in regular ordering
-	//
-	//for (int i = 0; i < naoi; i++)
-	//{
-	//	for (int j = 0; j < naoj; j++)
-	//	{
-	//		for (int k = 0; k < naok; k++)
-	//		{
-	//			eri3c[k * naoi * naoj + j * naoi + i] = res[i * naoj * naok + j * naok + k];
-	//		}
-	//	}
-	//}
+	for (int i = 0; i < naoi; i++) {
+		for (int j = 0; j < naoj; j++) {
+			for (int k = 0; k < naok; k++) {
+				eri3c[k * naoi * naoj + j * naoi + i] = res[i * naoj * naok + j * naok + k];
+			}
+		}
+	}
 }
 
 vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
@@ -534,17 +530,28 @@ int fixed_density_fit_test()
 	computeEri2c(aux_basis, eri2c_test_test);
 
 
-	std::ofstream file("eri2c_nospherA2.txt");
+	//std::ofstream file("eri2c_nospherA2.txt");
+	//if (file.is_open())
+	//{
+	//	for (int i = 0; i < eri2c_test_test.size(); i++)
+	//	{
+	//		file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c_test_test[i] << std::endl;
+	//	}
+	//	file.close();
+	//}
+
+    computeEri3c(aux_basis, aux_basis, eri3c_test_test);
+	std::ofstream file("eri3c_nospherA2.txt");
 	if (file.is_open())
 	{
-		for (int i = 0; i < eri2c_test_test.size(); i++)
+		for (int i = 0; i < eri3c_test_test.size(); i++)
 		{
-			file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c_test_test[i] << std::endl;
+			file << std::fixed << std::showpoint << std::setprecision(12) << eri3c_test_test[i] << std::endl;
 		}
 		file.close();
 	}
-    //11 0.020481708907654498
- //   computeEri3c(normal_basis, aux_basis, eri3c_test_test);
+
+
 
  //   vec dm_test = flatten(wavy_gbw.get_dm());
 	//vec rho_test = einsum_ijp_ij_p(eri3c_test_test, dm_test, normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao());
@@ -10481,7 +10488,7 @@ int _2c2e_loop_nopt(vec &gctr, Env *envs, double *cache, bool &empty)
     return !empty;
 }
 
-int _2c2e_loop(double *gctr, Env *envs, double *cache, bool &empty)
+int _2c2e_loop(vec &gctr, Env *envs, double *cache, bool &empty)
 {
     ivec shls = envs->shls;
     ivec bas = envs->bas;
@@ -10544,55 +10551,55 @@ int _2c2e_loop(double *gctr, Env *envs, double *cache, bool &empty)
     double *g1 = g + leng;
     double *gout, *gctri, *gctrk;
 
-    //if (n_comp == 1) {
-    //    gctrk = gctr; kempty = &empty;
-    //}
-    //else {
-    //    gctrk = g1; g1 += lenk;
-    //};
-    //ALIAS_ADDR_IF_EQUAL(i, k);
-    //ALIAS_ADDR_IF_EQUAL(g, i);
+    if (n_comp == 1) {
+        gctrk = gctr.data(); kempty = &empty;
+    }
+    else {
+        gctrk = g1; g1 += lenk;
+    };
+    ALIAS_ADDR_IF_EQUAL(i, k);
+    ALIAS_ADDR_IF_EQUAL(g, i);
 
-    //for (kp = 0; kp < k_prim; kp++)
-    //{
-    //    envs->ak[0] = ak[kp];
-    //    if (k_ctr == 1)
-    //    {
-    //        fac1k = envs->common_factor * ck[kp];
-    //    }
-    //    else
-    //    {
-    //        fac1k = envs->common_factor;
-    //        *iempty = 1;
-    //    }
-    //    for (ip = 0; ip < i_prim; ip++)
-    //    {
-    //        envs->ai[0] = ai[ip];
-    //        if (i_ctr == 1)
-    //        {
-    //            fac1i = fac1k * ci[ip];
-    //        }
-    //        else
-    //        {
-    //            fac1i = fac1k;
-    //        }
-    //        envs->fac[0] = fac1i;
-    //        if ((*envs->f_g0_2e)(g, ri, rk, expcutoff, envs))
-    //        {
-    //            (*envs->f_gout)(gout, g, idx, envs, *gempty);
-    //            PRIM2CTR(i, gout, len0);
-    //        }
-    //    } // end loop i_prim
-    //    if (!*iempty)
-    //    {
-    //        PRIM2CTR(k, gctri, leni);
-    //    }
-    //} // end loop k_prim
+    for (kp = 0; kp < k_prim; kp++)
+    {
+        envs->ak[0] = ak[kp];
+        if (k_ctr == 1)
+        {
+            fac1k = envs->common_factor * ck[kp];
+        }
+        else
+        {
+            fac1k = envs->common_factor;
+            *iempty = 1;
+        }
+        for (ip = 0; ip < i_prim; ip++)
+        {
+            envs->ai[0] = ai[ip];
+            if (i_ctr == 1)
+            {
+                fac1i = fac1k * ci[ip];
+            }
+            else
+            {
+                fac1i = fac1k;
+            }
+            envs->fac[0] = fac1i;
+            if ((*envs->f_g0_2e)(g, ri, rk, expcutoff, envs))
+            {
+                (*envs->f_gout)(gout, g, idx, envs, *gempty);
+                PRIM2CTR(i, gout, len0);
+            }
+        } // end loop i_prim
+        if (!*iempty)
+        {
+            PRIM2CTR(k, gctri, leni);
+        }
+    } // end loop k_prim
 
-    //if (n_comp > 1 && !*kempty)
-    //{
-    //    TRANSPOSE(gctrk);
-    //}
+    if (n_comp > 1 && !*kempty)
+    {
+        TRANSPOSE_NEW(gctrk);
+    }
     return !empty;
 }
 
@@ -30538,7 +30545,7 @@ int _2c2e_drv(vec &out, ivec &dims, Env *envs, Opt *opt, double *cache, void (*f
     if (opt != NULL)
     {
         envs->opt = opt;
-        _2c2e_loop(gctr.data(), envs, cache, empty);
+        _2c2e_loop(gctr, envs, cache, empty);
     }
     else
     {
@@ -30625,8 +30632,7 @@ int GTOmax_cache_size(int (*intor)(vec &, ivec &,ivec &, ivec&, int, ivec&, int,
 }
 
 void GTOint2c(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec &, int, vec &, Opt *, double *),
-              vec &mat, int comp, int hermi,
-              ivec &shls_slice, ivec &ao_loc, Opt *opt,
+              vec &mat, int comp, int hermi, ivec &shls_slice, ivec &ao_loc, Opt *opt,
               ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     const int ish0 = shls_slice[0];
@@ -30639,13 +30645,13 @@ void GTOint2c(int (*intor)(vec &, ivec &, ivec &, ivec &, int, ivec &, int, vec 
     const int naoj = ao_loc[jsh1] - ao_loc[jsh0];
     const int cache_size = GTOmax_cache_size(intor, shls_slice, 2,
                                              atm, natm, bas, nbas, env);
-//#pragma omp parallel
+#pragma omp parallel
     {
         ivec dims = {naoi, naoj};
         int ish, jsh, ij, i0, j0;
         ivec shls(2,0);
         double *cache = (double *)malloc(sizeof(double) * cache_size);
-//#pragma omp for schedule(dynamic, 4)
+#pragma omp for schedule(dynamic, 4)
         for (ij = 0; ij < nish * njsh; ij++)
         {
             ish = ij / njsh;
@@ -31882,10 +31888,10 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
     int len0 = envs->nf * n_comp;
     int len = leng + len0;
-    //double *g = NULL;
-    //MALLOC_INSTACK(g, len, cache);
+    double *g = NULL;
+    MALLOC_INSTACK(g, len, cache);
 
-	vec g(len, 0.0);
+	//vec g(len, 0.0);
     double *gout;
     if (n_comp == 1)
     {
@@ -31894,7 +31900,7 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
     }
     else
     {
-        gout = g.data() + leng;
+        gout = g + leng;
     }
 
     for (kp = 0; kp < k_prim; kp++)
@@ -31919,9 +31925,9 @@ int _3c2e_111_loop(double *gctr, Env *envs, double *cache, int *empty)
                 cutoff = expcutoff - pdata_ij->cceij;
                 fac1i = fac1j * ci[ip] * expij;
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g.data(), idx, envs, *gempty);
+                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
                     *gempty = 0;
                 }
             } // end loop i_prim
@@ -32067,11 +32073,11 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
     int leni = nf * i_ctr * n_comp;         // gctri
     int len0 = nf * n_comp;                 // gout
     int len = leng + lenk + lenj + leni + len0;
-    //double *g = NULL;
-    //MALLOC_INSTACK(g, len, cache); // must be allocated last in this function
+    double *g = NULL;
+    MALLOC_INSTACK(g, len, cache); // must be allocated last in this function
 
-	vec g(len, 0.0);
-    double *g1 = g.data() + leng;
+	//vec g(len, 0.0);
+    double *g1 = g + leng;
     double *gout, *gctri, *gctrj, *gctrk;
 
     ALIAS_ADDR_IF_EQUAL(k, m);
@@ -32126,9 +32132,9 @@ int _3c2e_loop_nopt(double *gctr, Env *envs, double *cache, int *empty)
                     fac1i = fac1j * expij;
                 }
                 envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g.data(), rij, rkl, cutoff, envs))
+                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs))
                 {
-                    (*envs->f_gout)(gout, g.data(), idx, envs, *gempty);
+                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
                     PRIM2CTR(i, gout, len0);
                 }
             i_contracted:;
@@ -32250,9 +32256,8 @@ int int3c2e_sph(vec &out, ivec &dims, ivec &shls, ivec &atm, int natm, ivec &bas
     return _3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
 };
 
-void GTOnr3c_fill_s1(int (*intor)(vec &, ivec &, ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *), vec &out, double *buf,
-                     int comp, int jobid,
-                     ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
+void GTOnr3c_fill_s1(int (*intor)(vec &, ivec &, ivec &, ivec&, int, ivec&, int, vec&, Opt *, double *),
+                     vec &out, double *buf, int comp, int jobid, ivec &shls_slice, ivec &ao_loc, Opt *cintopt,
                      ivec &atm, int natm, ivec &bas, int nbas, vec &env)
 {
     const int ish0 = shls_slice[0];
@@ -32277,7 +32282,7 @@ void GTOnr3c_fill_s1(int (*intor)(vec &, ivec &, ivec &, ivec&, int, ivec&, int,
     ivec dims = {naoi, naoj, naok};
 
     const int k0 = ao_loc[ksh] - ao_loc[ksh0];
-    //out += naoi * naoj * k0;  //HAVE TO INCLUDE THIS!!!
+    int offset = naoi * naoj * k0;
 
     int ish, jsh, i0, j0;
     ivec shls = {0, 0, ksh};
@@ -32290,10 +32295,10 @@ void GTOnr3c_fill_s1(int (*intor)(vec &, ivec &, ivec &, ivec&, int, ivec&, int,
             shls[1] = jsh;
             i0 = ao_loc[ish] - ao_loc[ish0];
             j0 = ao_loc[jsh] - ao_loc[jsh0];
-			vec temp_out(out.begin() + j0 * naoi + i0, out.end());
+			vec temp_out(out.begin() + j0 * naoi + i0 + offset, out.end());
             (*intor)(temp_out, dims, shls, atm, natm, bas, nbas, env,
                      cintopt, buf);
-			std::copy(temp_out.begin(), temp_out.end(), out.begin() + j0 * naoi + i0);
+			std::copy(temp_out.begin(), temp_out.end(), out.begin() + j0 * naoi + i0+ offset);
         }
     }
 }
@@ -32335,13 +32340,15 @@ void GTOnr3c_drv(int (*intor)(vec &,ivec &, ivec &, ivec &, int, ivec &, int, ve
     const int di = GTOmax_shell_dim(ao_loc, shls_slice, 3);
     const int cache_size = GTOmax_cache_size(intor, shls_slice, 3,
                                              atm, natm, bas, nbas, env);
+
+
     const int njobs = (std::max(nish, njsh) / 8 + 1) * nksh;
 
-#pragma omp parallel
+//#pragma omp parallel
     {
         int jobid;
         double *buf = (double *)malloc(sizeof(double) * (di * di * di * comp + cache_size));
-#pragma omp for nowait schedule(dynamic)
+//#pragma omp for nowait schedule(dynamic)
         for (jobid = 0; jobid < njobs; jobid++)
         {
             (*fill)(intor, eri, buf, comp, jobid, shls_slice, ao_loc,
