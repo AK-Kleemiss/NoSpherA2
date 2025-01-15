@@ -28,8 +28,7 @@ atom::atom() {
 	charge = 0;
 	basis_set_id = 0;
 	ECP_electrons = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
+	frac_coords = { 0.,0.,0. };
 };
 
 atom::atom(const std::string& l, 
@@ -167,6 +166,23 @@ void atom::set_ID(const std::string& id) {
 
 std::string atom::get_ID() const {
 	return ID;
+};
+
+double atom::get_coordinate(const unsigned int& axis) const {
+    if (axis == 0) return x;
+    else if (axis == 1) return y;
+    else if (axis == 2) return z;
+    else return 0.0;
+};
+
+void atom::set_coordinate(const unsigned int& axis, const double& value) {
+    if (axis == 0) x = value;
+    else if (axis == 1) y = value;
+    else if (axis == 2) z = value;
+};
+
+void atom::set_frac_coords(const std::array<double, 3>& frac) {
+    frac_coords = frac;
 };
 
 bool atom::operator==(const atom& other) const {

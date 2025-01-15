@@ -33,7 +33,7 @@ Int_Params::Int_Params() {
 
 Int_Params::Int_Params(const WFN& wavy) {
 	//Constructor, copying the atoms and basis set from the WFN object
-    atoms = wavy.atoms;
+    atoms = wavy.get_atoms();
 	wfn_origin = wavy.get_origin();
 	ncen = wavy.get_ncen();
 	calc_integration_parameters();
@@ -42,7 +42,7 @@ Int_Params::Int_Params(const WFN& wavy) {
 Int_Params::Int_Params(WFN& wavy, const std::string auxname) {
 	//Constructor, copying the atoms, but replacing the basis set with the aux basis set
     load_basis_into_WFN(wavy, BasisSetLibrary().get_basis_set(auxname));
-    atoms = wavy.atoms;
+    atoms = wavy.get_atoms();
     wfn_origin = wavy.get_origin();
     ncen = wavy.get_ncen();
     calc_integration_parameters();
@@ -88,13 +88,13 @@ vec Int_Params::normalize_gto(vec coef, vec exp, int l) {
 void Int_Params::collect_basis_data() {
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
 		//Collect number of basis functions per atom
-        nbas += atoms[atom_idx].shellcount.size();
+        nbas += atoms[atom_idx].get_shellcount_size();
 		//Skip if the basis set for this element has already been collected
-        if (basis_sets.find(atoms[atom_idx].charge) != basis_sets.end()) {
+        if (basis_sets.find(atoms[atom_idx].get_charge()) != basis_sets.end()) {
             continue;
         }
 
-        std::vector<basis_set_entry> basis = atoms[atom_idx].basis_set;
+        std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
 		//Populate coefficients and exponents vectors
         vec coefficients, exponents;
         for (int shell = 0; shell < basis.size(); shell++){
@@ -110,9 +110,9 @@ void Int_Params::collect_basis_data() {
         }
         else if (wfn_origin == 0) {
             int coef_idx = 0;
-            for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
-				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
-				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].shellcount[shell] + coef_idx);
+            for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
+				vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
+				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
 				
 
                 shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].type);
@@ -120,7 +120,7 @@ void Int_Params::collect_basis_data() {
 
 				//Place the new coefs at the correct place in the coefficients vector
 				std::copy(shell_coefs.begin(), shell_coefs.end(), coefficients.begin() + coef_idx);
-                coef_idx += atoms[atom_idx].shellcount[shell];
+                coef_idx += atoms[atom_idx].get_shellcount(shell);
             }
         }
         else
@@ -128,7 +128,7 @@ void Int_Params::collect_basis_data() {
 			std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
 		//Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector])
-        basis_sets.insert({ atoms[atom_idx].charge, {coefficients, exponents, {0.0}} });
+        basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients, exponents, {0.0}}});
     }
 }
 
@@ -139,7 +139,7 @@ void Int_Params::populate_atm() {
 	for (int atom_idx = 0; atom_idx < ncen; atom_idx++)
 	{
 		//Assign_atoms
-		_atm[atom_idx * 6 + 0] = atoms[atom_idx].charge; // Z
+		_atm[atom_idx * 6 + 0] = atoms[atom_idx].get_charge(); // Z
 		_atm[atom_idx * 6 + 1] = ptr; // ptr
 		_atm[atom_idx * 6 + 2] = 1; // nuclear_model
 		ptr += 3;
@@ -153,26 +153,26 @@ void Int_Params::populate_env() {
     _env.resize(20 + ncen * 4, 0);
 	int env_offset = 20;  //Do not know if this is needed
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-        _env[env_offset + atom_idx * 4] = atoms[atom_idx].x;
-        _env[env_offset + atom_idx * 4 + 1] = atoms[atom_idx].y;
-        _env[env_offset + atom_idx * 4 + 2] = atoms[atom_idx].z;
+        _env[env_offset + atom_idx * 4] = atoms[atom_idx].get_coordinate(0);
+        _env[env_offset + atom_idx * 4 + 1] = atoms[atom_idx].get_coordinate(1);
+        _env[env_offset + atom_idx * 4 + 2] = atoms[atom_idx].get_coordinate(2);
 		_env[env_offset + atom_idx * 4 + 3] = 0;  //zeta
     }
 	ivec seen_elements;
     int bas_ptr = _env.size();
 	for (int atom_idx = 0; atom_idx < ncen; atom_idx++) {
-		if (std::find(seen_elements.begin(), seen_elements.end(), atoms[atom_idx].charge) != seen_elements.end()) {continue;}
-		seen_elements.push_back(atoms[atom_idx].charge);
+		if (std::find(seen_elements.begin(), seen_elements.end(), atoms[atom_idx].get_charge()) != seen_elements.end()) {continue;}
+		seen_elements.push_back(atoms[atom_idx].get_charge());
 
-        basis_sets[atoms[atom_idx].charge][2][0] = (double)bas_ptr;
+        basis_sets[atoms[atom_idx].get_charge()][2][0] = (double)bas_ptr;
 
-		vec2 basis_data = basis_sets[atoms[atom_idx].charge];
+		vec2 basis_data = basis_sets[atoms[atom_idx].get_charge()];
 		vec coefficients = basis_data[0];
 		vec exponents = basis_data[1];
 
 		int func_count = 0;
-        for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell++) {
-            int n_funcs = atoms[atom_idx].shellcount[shell];
+        for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
+            int n_funcs = atoms[atom_idx].get_shellcount(shell);
             for (int func = 0; func < n_funcs; func++){
 				_env.push_back(exponents[func + func_count]);
 			}
@@ -192,16 +192,16 @@ void Int_Params::populate_bas() {
     _bas.resize(8 * nbas, 0);
     int index = 0;
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++){
-		int bas_ptr = basis_sets[atoms[atom_idx].charge][2][0];
-        for (int shell = 0; shell < atoms[atom_idx].shellcount.size(); shell += 1) {
+		int bas_ptr = basis_sets[atoms[atom_idx].get_charge()][2][0];
+        for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell += 1) {
 			_bas[index * 8 + 0] = atom_idx; // atom_id
             if (wfn_origin == 0) {
-                _bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type; // l s=0, p=1, d=2 ...
+                _bas[index * 8 + 1] = atoms[atom_idx].get_basis_set_type(shell); // l s=0, p=1, d=2 ...
 			}
 			else {
-				_bas[index * 8 + 1] = atoms[atom_idx].basis_set[shell].type - 1; // l s=0, p=1, d=2 ...
+				_bas[index * 8 + 1] = atoms[atom_idx].get_basis_set_type(shell) - 1; // l s=0, p=1, d=2 ...
 			}		
-			_bas[index * 8 + 2] = atoms[atom_idx].shellcount[shell];  // nprim
+			_bas[index * 8 + 2] = atoms[atom_idx].get_shellcount(shell);  // nprim
 			_bas[index * 8 + 3] = 1; // ncentr    Not sure
 			_bas[index * 8 + 5] = bas_ptr;  //Pointer to the end of the _env vector
 			bas_ptr += _bas[index * 8 + 2];
@@ -519,7 +519,7 @@ int fixed_density_fit_test()
 	Int_Params normal_basis(wavy_gbw);
 
     WFN wavy_aux(0);
-	wavy_aux.atoms = wavy_gbw.atoms;
+	wavy_aux.set_atoms(wavy_gbw.get_atoms());
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
 	//Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");

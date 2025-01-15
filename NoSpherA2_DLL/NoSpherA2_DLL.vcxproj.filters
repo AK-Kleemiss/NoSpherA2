@@ -45,6 +45,8 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll" />
+    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll">
+      <Filter>Resource Files</Filter>
+    </_EmbedManagedResourceFile>
   </ItemGroup>
 </Project>

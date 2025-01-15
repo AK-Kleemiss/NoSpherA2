@@ -48,23 +48,23 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
     for (int a = 0; a < wavy_in.get_ncen(); a++)
-        if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+        if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
             i_know_all = false;
     if (!i_know_all)
     {
         std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
         for (int a = 0; a < wavy_in.get_ncen(); a++)
         {
-            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
             {
-                std::cout << constants::atnr2letter(wavy_in.atoms[a].charge) << " ";
+                std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
             }
         }
         std::cout << "\nI will fill out these atoms using spherical Thakkar densities!\n";
         wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
         for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
         {
-            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.atoms[a].charge))) == config.neighspe1.end())
+            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
             {
                 wavy.erase_atom(a);
             }
@@ -72,7 +72,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         // remove all known basis sets, to not get problems with newly loaded ones
         for (int a = 0; a < wavy.get_ncen(); a++)
         {
-            wavy.atoms[a].basis_set.clear();
+            wavy.clear_atom_basis_set(a);
         }
         std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz";
         wavy.write_xyz(new_fn);
@@ -148,9 +148,9 @@ void SALTEDPredictor::setup_atomic_environment()
     const std::array<std::vector<primitive>, 118> *bs = wavy.get_basis_set_ptr();
     SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
-    for (int i = 0; i < wavy.atoms.size(); i++)
+    for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        atomic_symbols.push_back(wavy.atoms[i].label);
+        atomic_symbols.push_back(wavy.get_atom_label(i));
     }
     // # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);

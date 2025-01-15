@@ -211,22 +211,22 @@ const std::string WFN::get_centers(const bool &bohr) const
     std::string temp;
     for (int i = 0; i < ncen; i++)
     {
-        temp.append(atoms[i].label);
+        temp.append(atoms[i].get_label());
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(atoms[i].x));
+            temp.append(std::to_string(get_atom_coordinate(i,0)));
         else
-            temp.append(std::to_string(constants::bohr2ang(atoms[i].x)));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,0))));
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(atoms[i].y));
+            temp.append(std::to_string(get_atom_coordinate(i,1)));
         else
-            temp.append(std::to_string(constants::bohr2ang(atoms[i].y)));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,1))));
         temp.append(" ");
         if (bohr)
-            temp.append(std::to_string(atoms[i].z));
+            temp.append(std::to_string(get_atom_coordinate(i,2)));
         else
-            temp.append(std::to_string(constants::bohr2ang(atoms[i].z)));
+            temp.append(std::to_string(constants::bohr2ang(get_atom_coordinate(i,2))));
         temp.append("\n");
     }
     return temp;
@@ -236,9 +236,9 @@ const void WFN::list_centers() const
 {
     for (int i = 0; i < ncen; i++)
     {
-        std::cout << atoms[i].nr << " " << atoms[i].label << " "
-             << atoms[i].x << " " << atoms[i].y << " "
-             << atoms[i].z << " " << atoms[i].charge << std::endl;
+        std::cout << atoms[i].get_nr() << " " << atoms[i].get_label() << " "
+             << get_atom_coordinate(i,0) << " " << get_atom_coordinate(i,1) << " "
+             << get_atom_coordinate(i,2) << " " << get_atom_charge(i) << std::endl;
     }
 };
 
@@ -1402,37 +1402,37 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].basis_set.size(); s++)
+            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
-                if ((int)atoms[a].basis_set[s].shell != current_shell)
+                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].basis_set[s].type == 1)
+                    if (atoms[a].get_basis_set_type(s) == 1)
                     {
                         expected_coefs++;
                     }
-                    else if (atoms[a].basis_set[s].type == 2)
+                    else if (atoms[a].get_basis_set_type(s) == 2)
                     {
                         expected_coefs += 3;
                     }
-                    else if (atoms[a].basis_set[s].type == 3)
+                    else if (atoms[a].get_basis_set_type(s) == 3)
                     {
                         expected_coefs += 5;
                     }
-                    else if (atoms[a].basis_set[s].type == 4)
+                    else if (atoms[a].get_basis_set_type(s) == 4)
                     {
                         expected_coefs += 7;
                     }
-                    else if (atoms[a].basis_set[s].type == 5)
+                    else if (atoms[a].get_basis_set_type(s) == 5)
                     {
                         expected_coefs += 9;
                     }
                     current_shell++;
                 }
-                temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
                 prims.push_back(primitive(a + 1,
-                                          atoms[a].basis_set[s].type,
-                                          atoms[a].basis_set[s].exponent,
-                                          atoms[a].basis_set[s].coefficient));
+                    atoms[a].get_basis_set_type(s),
+                    atoms[a].get_basis_set_exponent(s),
+                    atoms[a].get_basis_set_coefficient(s)));
             }
         }
         getline(rf, line);
@@ -1697,37 +1697,37 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].basis_set.size(); s++)
+            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
-                if ((int)atoms[a].basis_set[s].shell != current_shell)
+                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].basis_set[s].type == 1)
+                    if (atoms[a].get_basis_set_type(s) == 1)
                     {
                         expected_coefs++;
                     }
-                    else if (atoms[a].basis_set[s].type == 2)
+                    else if (atoms[a].get_basis_set_type(s) == 2)
                     {
                         expected_coefs += 3;
                     }
-                    else if (atoms[a].basis_set[s].type == 3)
+                    else if (atoms[a].get_basis_set_type(s) == 3)
                     {
                         expected_coefs += 6;
                     }
-                    else if (atoms[a].basis_set[s].type == 4)
+                    else if (atoms[a].get_basis_set_type(s) == 4)
                     {
                         expected_coefs += 10;
                     }
-                    else if (atoms[a].basis_set[s].type == 5)
+                    else if (atoms[a].get_basis_set_type(s) == 5)
                     {
                         expected_coefs += 15;
                     }
                     current_shell++;
                 }
-                temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
                 prims.push_back(primitive(a + 1,
-                                          atoms[a].basis_set[s].type,
-                                          atoms[a].basis_set[s].exponent,
-                                          atoms[a].basis_set[s].coefficient));
+                    atoms[a].get_basis_set_type(s),
+                    atoms[a].get_basis_set_exponent(s),
+                    atoms[a].get_basis_set_coefficient(s)));
             }
         }
         getline(rf, line);
@@ -2094,37 +2094,37 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (int a = 0; a < ncen; a++)
         {
             int current_shell = -1;
-            for (int s = 0; s < atoms[a].basis_set.size(); s++)
+            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
-                if ((int)atoms[a].basis_set[s].shell != current_shell)
+                if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
-                    if (atoms[a].basis_set[s].type == 1)
+                    if (atoms[a].get_basis_set_type(s) == 1)
                     {
                         expected_coefs++;
                     }
-                    else if (atoms[a].basis_set[s].type == 2)
+                    else if (atoms[a].get_basis_set_type(s) == 2)
                     {
                         expected_coefs += 3;
                     }
-                    else if (atoms[a].basis_set[s].type == 3)
+                    else if (atoms[a].get_basis_set_type(s) == 3)
                     {
                         expected_coefs += 5;
                     }
-                    else if (atoms[a].basis_set[s].type == 4)
+                    else if (atoms[a].get_basis_set_type(s) == 4)
                     {
                         expected_coefs += 7;
                     }
-                    else if (atoms[a].basis_set[s].type == 5)
+                    else if (atoms[a].get_basis_set_type(s) == 5)
                     {
                         expected_coefs += 9;
                     }
                     current_shell++;
                 }
-                temp_shellsizes.push_back(atoms[a].shellcount[current_shell]);
+                temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
                 prims.push_back(primitive(a + 1,
-                                          atoms[a].basis_set[s].type,
-                                          atoms[a].basis_set[s].exponent,
-                                          atoms[a].basis_set[s].coefficient));
+                    atoms[a].get_basis_set_type(s),
+                    atoms[a].get_basis_set_exponent(s),
+                    atoms[a].get_basis_set_coefficient(s)));
             }
         }
         // int norm_const_run = 0;
@@ -2460,7 +2460,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 char *temp_c = new char[temp_0];
                 rf.read(temp_c, temp_0);
                 rf.read((char *)&nr_core, soi);
-                atoms[i].ECP_electrons = nr_core;
+                atoms[i].set_ECP_electrons(nr_core);
                 rf.read((char *)&max_contract, soi);
                 rf.read((char *)&max_angular, soi);
                 rf.read((char *)&center, soi);
@@ -2483,8 +2483,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     }
                 }
                 for (int _i = 0; _i < ncen; _i++)
-                    if (atoms[_i].charge == Z)
-                        atoms[_i].ECP_electrons = nr_core;
+                    if (atoms[_i].get_charge() == Z)
+                        atoms[_i].set_ECP_electrons(nr_core);
             }
             if (debug)
             {
@@ -2697,13 +2697,9 @@ const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int
     switch (axis)
     {
     case 0:
-        return atoms[nr].x;
-        break;
     case 1:
-        return atoms[nr].y;
-        break;
     case 2:
-        return atoms[nr].z;
+        return atoms[nr].get_coordinate(axis);
         break;
     default:
         return -2;
@@ -2747,7 +2743,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     rf.flush();
     for (int i = 0; i < ncen; i++)
     {
-        rf << atoms[i].label;
+        rf << atoms[i].get_label();
         if (i < 9)
             rf << "     ";
         else
@@ -2757,11 +2753,11 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << ' ';
         rf << i + 1 << ") ";
         rf << fixed << showpoint << setprecision(8);
-        rf << setw(12) << atoms[i].x;
-        rf << setw(12) << atoms[i].y;
-        rf << setw(12) << atoms[i].z;
+        rf << setw(12) << get_atom_coordinate(i,0);
+        rf << setw(12) << get_atom_coordinate(i,1);
+        rf << setw(12) << get_atom_coordinate(i,2);
         rf << "  CHARGE = ";
-        rf << fixed << showpoint << setprecision(1) << setw(2) << atoms[i].charge;
+        rf << fixed << showpoint << setprecision(1) << setw(2) << get_atom_charge(i);
         rf << ".0";
         rf << '\n';
     }
@@ -2979,14 +2975,14 @@ bool WFN::write_xyz(const std::filesystem::path& fileName, const bool& debug)
         f << ncen << endl;
         f << "XYZ File written by NoSpherA2 based on " << path << endl;
         for (int i = 0; i < ncen; i++)
-            if (atoms[i].label == "")
-                f << constants::atnr2letter(atoms[i].charge) << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+            if (atoms[i].get_label() == "")
+                f << constants::atnr2letter(get_atom_charge(i)) << setw(14) << setprecision(8) << get_atom_coordinate(i,0) << setw(14) << setprecision(8) << get_atom_coordinate(i,1) << setw(14) << setprecision(8) << get_atom_coordinate(i,2) << endl;
             else{
                 if (isBohr) {
-                    f << atoms[i].label << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].x) << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].y) << setw(14) << setprecision(8) << constants::bohr2ang(atoms[i].z) << endl;
+                    f << atoms[i].get_label() << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,0)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,1)) << setw(14) << setprecision(8) << constants::bohr2ang(get_atom_coordinate(i,2)) << endl;
                 }else
                 {
-                    f << atoms[i].label << setw(14) << setprecision(8) << atoms[i].x << setw(14) << setprecision(8) << atoms[i].y << setw(14) << setprecision(8) << atoms[i].z << endl;
+                    f << atoms[i].get_label() << setw(14) << setprecision(8) << get_atom_coordinate(i,0) << setw(14) << setprecision(8) << get_atom_coordinate(i,1) << setw(14) << setprecision(8) << get_atom_coordinate(i,2) << endl;
                 }
             }
         f.flush();
@@ -3035,7 +3031,7 @@ const unsigned int WFN::get_nr_electrons() const
 {
     unsigned int count = 0;
     for (int i = 0; i < ncen; i++)
-        count += atoms[i].charge;
+        count += get_atom_charge(i);
     count -= charge;
     return count;
 };
@@ -3044,7 +3040,7 @@ const unsigned int WFN::get_nr_ECP_electrons() const
 {
     unsigned int count = 0;
     for (int i = 0; i < ncen; i++)
-        count += atoms[i].ECP_electrons;
+        count += atoms[i].get_ECP_electrons();
     return count;
 }
 
@@ -3058,25 +3054,25 @@ double WFN::count_nr_electrons(void) const
 
 const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
-        return atoms[nr_atom].basis_set[nr_prim].exponent;
+    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+        return atoms[nr_atom].get_basis_set_exponent(nr_prim);
     else
         return -1;
 };
 
 const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
-        return atoms[nr_atom].basis_set[nr_prim].coefficient;
+    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+        return atoms[nr_atom].get_basis_set_coefficient(nr_prim);
     else
         return -1;
 };
 
 bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
     {
-        atoms[nr_atom].basis_set[nr_prim].exponent = value;
+        atoms[nr_atom].set_basis_set_exponent(nr_prim, value);
         set_modified();
         return true;
     }
@@ -3086,8 +3082,8 @@ bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim,
 
 bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].basis_set.size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
-    atoms[nr_atom].basis_set[nr_prim].coefficient = value;
+    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
+    atoms[nr_atom].set_basis_set_coefficient(nr_prim, value);
     set_modified();
     return true;
 };
@@ -3095,28 +3091,25 @@ bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_pr
 const int WFN::get_atom_primitive_count(const int &nr) const
 {
     if (nr <= ncen && nr >= 0)
-        return (int)atoms[nr].basis_set.size();
+        return (int)atoms[nr].get_basis_set_size();
     else
         return -1;
 };
 
-bool WFN::erase_atom_primitive(const unsigned int &nr, const unsigned int &nr_prim)
-{
-    if ((int)nr <= ncen && (int)nr_prim < atoms[nr].basis_set.size())
-    {
-        atoms[nr].basis_set.erase(atoms[nr].basis_set.begin() + nr_prim);
-        return true;
-    }
-    else
-        return false;
-};
-
 const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned int &nr_prim) const
 {
-    if ((int)nr_atom <= ncen && atoms[nr_atom].basis_set.size() >= (int)nr_prim)
+    if ((int)nr_atom <= ncen && atoms[nr_atom].get_basis_set_size() >= (int)nr_prim)
     {
-        return atoms[nr_atom].basis_set[nr_prim].shell;
+        return atoms[nr_atom].get_basis_set_shell(nr_prim);
     }
+    else
+        return -1;
+};
+
+const int WFN::get_atom_primitive_type(const int& nr_atom, const int& nr_prim) const
+{
+    if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].get_basis_set_size() && nr_prim >= 0)
+        return atoms[nr_atom].get_basis_set_type(nr_prim);
     else
         return -1;
 };
@@ -3124,27 +3117,27 @@ const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned i
 const int WFN::get_atom_shell_count(const unsigned int &nr) const
 {
     if ((int)nr <= ncen)
-        return (int)atoms[nr].shellcount.size();
+        return (int)atoms[nr].get_shellcount_size();
     else
         return -1;
 };
 
 const int WFN::get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if ((int)nr_atom <= ncen && (int)nr_shell < atoms[nr_atom].shellcount.size())
-        return atoms[nr_atom].shellcount[nr_shell];
+    if ((int)nr_atom <= ncen && (int)nr_shell < atoms[nr_atom].get_shellcount_size())
+        return atoms[nr_atom].get_shellcount(nr_shell);
     else
         return -1;
 };
 
 const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size())
     {
         int primitive_counter = 0;
-        while (atoms[nr_atom].basis_set[primitive_counter].shell != nr_shell)
+        while (atoms[nr_atom].get_basis_set_shell(primitive_counter) != nr_shell)
             primitive_counter++;
-        return atoms[nr_atom].basis_set[primitive_counter].type;
+        return atoms[nr_atom].get_basis_set_type(primitive_counter);
     }
     else
         return -1;
@@ -3152,7 +3145,7 @@ const int WFN::get_shell_type(const unsigned int &nr_atom, const unsigned int &n
 
 const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size())
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size())
         return centers[get_shell_start_in_primitives(nr_atom, nr_shell)];
     else
         return -1;
@@ -3160,12 +3153,12 @@ const int WFN::get_shell_center(const unsigned int &nr_atom, const unsigned int 
 
 const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
         int primitive_counter = 0;
 #pragma loop(no_vector)
         for (int s = 0; s < static_cast<int>(nr_shell); s++)
-            primitive_counter += atoms[nr_atom].shellcount[s];
+            primitive_counter += atoms[nr_atom].get_shellcount(s);
         return primitive_counter;
     }
     else
@@ -3174,24 +3167,24 @@ const int WFN::get_shell_start(const unsigned int &nr_atom, const unsigned int &
 
 const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].shellcount.size() - 1)
+    if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
         int primitive_counter = 0;
         for (int a = 0; a < static_cast<int>(nr_atom); a++)
-            for (int s = 0; s < atoms[a].shellcount.size(); s++)
+            for (int s = 0; s < atoms[a].get_shellcount_size(); s++)
                 switch (get_shell_type(a, s))
                 {
                 case 1:
-                    primitive_counter += atoms[a].shellcount[s];
+                    primitive_counter += atoms[a].get_shellcount(s);
                     break;
                 case 2:
-                    primitive_counter += (3 * atoms[a].shellcount[s]);
+                    primitive_counter += (3 * atoms[a].get_shellcount(s));
                     break;
                 case 3:
-                    primitive_counter += (6 * atoms[a].shellcount[s]);
+                    primitive_counter += (6 * atoms[a].get_shellcount(s));
                     break;
                 case 4:
-                    primitive_counter += (10 * atoms[a].shellcount[s]);
+                    primitive_counter += (10 * atoms[a].get_shellcount(s));
                     break;
                 }
         for (int s = 0; s < static_cast<int>(nr_shell); s++)
@@ -3199,16 +3192,16 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
             switch (get_shell_type(nr_atom, s))
             {
             case 1:
-                primitive_counter += atoms[nr_atom].shellcount[s];
+                primitive_counter += atoms[nr_atom].get_shellcount(s);
                 break;
             case 2:
-                primitive_counter += (3 * atoms[nr_atom].shellcount[s]);
+                primitive_counter += (3 * atoms[nr_atom].get_shellcount(s));
                 break;
             case 3:
-                primitive_counter += (6 * atoms[nr_atom].shellcount[s]);
+                primitive_counter += (6 * atoms[nr_atom].get_shellcount(s));
                 break;
             case 4:
-                primitive_counter += (10 * atoms[nr_atom].shellcount[s]);
+                primitive_counter += (10 * atoms[nr_atom].get_shellcount(s));
                 break;
             }
         }
@@ -3220,12 +3213,12 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
 
 const int WFN::get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const
 {
-    if (static_cast<int>(nr_atom) <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].shellcount.size() && static_cast<int>(nr_atom) >= 0)
+    if (static_cast<int>(nr_atom) <= ncen && nr_atom >= 0 && nr_shell <= atoms[nr_atom].get_shellcount_size() && static_cast<int>(nr_atom) >= 0)
     {
-        if (nr_shell == atoms[nr_atom].shellcount.size() - 1)
-            return (int)atoms[nr_atom].basis_set.size() - 1;
+        if (nr_shell == atoms[nr_atom].get_shellcount_size() - 1)
+            return (int)atoms[nr_atom].get_basis_set_size() - 1;
         int primitive_counter = 0;
-        while (atoms[nr_atom].basis_set[primitive_counter].shell != (nr_shell + 1))
+        while (atoms[nr_atom].get_basis_set_shell(primitive_counter) != (nr_shell + 1))
             primitive_counter++;
         return primitive_counter - 1;
     }
@@ -3237,7 +3230,7 @@ const std::string WFN::get_atom_label(const unsigned int &nr) const
 {
     std::string error_return{ '?' };
     if (nr < static_cast<unsigned int>(ncen))
-        return atoms[nr].label;
+        return atoms[nr].get_label();
     else
         return error_return;
 };
@@ -3265,7 +3258,7 @@ const bool WFN::get_atom_basis_set_loaded(const int &nr) const
 const int WFN::get_atom_charge(const int &nr) const
 {
     if (nr <= ncen && nr >= 0)
-        return atoms[nr].charge;
+        return atoms[nr].get_charge();
     else
     {
         std::cout << "invalid atom choice in atom_basis_set_loaded!" << std::endl;
@@ -4498,9 +4491,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (constants::ECP_electrons[atoms[i].charge] != 0)
+            if (constants::ECP_electrons[get_atom_charge(i)] != 0)
             {
-                atoms[i].ECP_electrons = constants::ECP_electrons[atoms[i].charge];
+                atoms[i].set_ECP_electrons(constants::ECP_electrons[get_atom_charge(i)]);
             }
         }
     }
@@ -4509,9 +4502,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (constants::ECP_electrons_xTB[atoms[i].charge] != 0)
+            if (constants::ECP_electrons_xTB[get_atom_charge(i)] != 0)
             {
-                atoms[i].ECP_electrons = constants::ECP_electrons_xTB[atoms[i].charge];
+                atoms[i].set_ECP_electrons(constants::ECP_electrons_xTB[get_atom_charge(i)]);
             }
         }
     }
@@ -4520,9 +4513,9 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
         {
-            if (constants::ECP_electrons_pTB[atoms[i].charge] != 0)
+            if (constants::ECP_electrons_pTB[get_atom_charge(i)] != 0)
             {
-                atoms[i].ECP_electrons = constants::ECP_electrons_pTB[atoms[i].charge];
+                atoms[i].set_ECP_electrons(constants::ECP_electrons_pTB[get_atom_charge(i)]);
             }
         }
     }
@@ -4537,11 +4530,11 @@ void WFN::set_ECPs(ivec &nr, ivec &elcount)
     {
         for (int j = 0; j < nr.size(); j++)
         {
-            std::cout << "checking " << atoms[i].charge << " against " << nr[j] << std::endl;
-            if (atoms[i].charge == nr[j])
+            std::cout << "checking " << get_atom_charge(i) << " against " << nr[j] << std::endl;
+            if (get_atom_charge(i) == nr[j])
             {
-                std::cout << "Adding " << elcount[j] << " electron to atom " << i << "with charge " << atoms[i].charge << std::endl;
-                atoms[i].ECP_electrons = elcount[j];
+                std::cout << "Adding " << elcount[j] << " electron to atom " << i << "with charge " << get_atom_charge(i) << std::endl;
+                atoms[i].set_ECP_electrons(elcount[j]);
                 break;
             }
         }
@@ -4600,7 +4593,7 @@ int WFN::calculate_charge()
     double mo_charges = 0;
     for (int a = 0; a < ncen; a++)
     {
-        int nr = atoms[a].charge;
+        int nr = get_atom_charge(a);
         if (nr == 0)
         {
             std::cout << "ERROR: Atomtype misunderstanding!" << std::endl;
@@ -4621,7 +4614,7 @@ int WFN::calculate_charge(std::ostream &file)
     double mo_charges = 0;
     for (int a = 0; a < ncen; a++)
     {
-        int nr = atoms[a].charge;
+        int nr = get_atom_charge(a);
         if (nr == 0)
         {
             file << "ERROR: Atomtype misunderstanding!" << std::endl;
@@ -4700,12 +4693,6 @@ const double WFN::get_atom_real_mass(const int &atomnr) const
         return 0;
     }
     return constants::real_masses[get_atom_charge(atomnr) - 1];
-}
-
-atom WFN::get_atom(const int &nr) const
-{
-    err_checkf(nr <= ncen && nr > 0, "Error, selected atom index higehr than wavefunction!", std::cout);
-    return atoms[nr];
 }
 
 const double WFN::get_MO_occ(const int &nr) const
@@ -4794,7 +4781,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     ncen = (int)atnbrs.size();
     atoms.resize(ncen);
     for (int i = 0; i < ncen; i++)
-        atoms[i].label = constants::atnr2letter(atnbrs[i]);
+        atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
     vec charges;
     if (!read_fchk_double_block(fchk, "Nuclear charges", charges))
     {
@@ -4802,7 +4789,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     for (int i = 0; i < charges.size(); i++)
-        atoms[i].charge = (int)charges[i];
+        atoms[i].set_charge(charges[i]);
     vec coords;
     if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords))
     {
@@ -4816,9 +4803,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     }
     for (int i = 0; i < ncen; i++)
     {
-        atoms[i].x = coords[3 * i];
-        atoms[i].y = coords[3 * i + 1];
-        atoms[i].z = coords[3 * i + 2];
+        atoms[i].set_coordinate(0, coords[3 * i]);
+        atoms[i].set_coordinate(1, coords[3 * i + 1]);
+        atoms[i].set_coordinate(2, coords[3 * i + 2]);
     }
     ivec shell_types;
     if (!read_fchk_integer_block(fchk, "Shell types", shell_types, false))
@@ -5433,9 +5420,9 @@ const double WFN::compute_dens_cartesian(
     // precalculate some distances and powers of distances for faster computation
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].x;
-        d[1][iat] = Pos2 - atoms[iat].y;
-        d[2][iat] = Pos3 - atoms[iat].z;
+        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
+        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
+        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
         d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
         d[4][iat] = d[0][iat] * d[0][iat];
         d[5][iat] = d[1][iat] * d[1][iat];
@@ -5512,9 +5499,9 @@ const double WFN::compute_spin_dens_cartesian(
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = Pos1 - atoms[iat].x;
-        d[1][iat] = Pos2 - atoms[iat].y;
-        d[2][iat] = Pos3 - atoms[iat].z;
+        d[0][iat] = Pos1 - atoms[iat].get_coordinate(0);
+        d[1][iat] = Pos2 - atoms[iat].get_coordinate(1);
+        d[2][iat] = Pos3 - atoms[iat].get_coordinate(2);
         d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
         d[4][iat] = d[0][iat] * d[0][iat];
         d[5][iat] = d[1][iat] * d[1][iat];
@@ -5947,9 +5934,9 @@ const void WFN::computeValues(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         d[3] = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
         double temp = -get_exponent(j) * (d[3]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
@@ -6069,9 +6056,9 @@ const void WFN::computeELIELF(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6174,9 +6161,9 @@ const void WFN::computeELI(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6275,9 +6262,9 @@ const void WFN::computeELF(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6378,9 +6365,9 @@ const void WFN::computeLapELIELF(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6492,9 +6479,9 @@ const void WFN::computeLapELI(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6601,9 +6588,9 @@ const double WFN::computeLap(
         iat = get_center(j) - 1;
 
         constants::type2vector(get_type(j), l);
-        d[0] = PosGrid[0] - atoms[iat].x;
-        d[1] = PosGrid[1] - atoms[iat].y;
-        d[2] = PosGrid[2] - atoms[iat].z;
+        d[0] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
             continue;
@@ -6698,9 +6685,9 @@ const double WFN::computeMO(
 
     for (iat = 0; iat < ncen; iat++)
     {
-        d[0][iat] = PosGrid[0] - atoms[iat].x;
-        d[1][iat] = PosGrid[1] - atoms[iat].y;
-        d[2][iat] = PosGrid[2] - atoms[iat].z;
+        d[0][iat] = PosGrid[0] - atoms[iat].get_coordinate(0);
+        d[1][iat] = PosGrid[1] - atoms[iat].get_coordinate(1);
+        d[2][iat] = PosGrid[2] - atoms[iat].get_coordinate(2);
         d[3][iat] = d[0][iat] * d[0][iat] + d[1][iat] * d[1][iat] + d[2][iat] * d[2][iat];
     }
 
@@ -6973,9 +6960,9 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
     ivec atoms_with_type;
     for (int i = 0; i < ncen; i++)
     {
-        if (find(atom_types.begin(), atom_types.end(), atoms[i].charge) == atom_types.end())
+        if (find(atom_types.begin(), atom_types.end(), get_atom_charge(i)) == atom_types.end())
         {
-            atom_types.push_back(atoms[i].charge);
+            atom_types.push_back(get_atom_charge(i));
             atoms_with_type.push_back(i);
         }
     }
@@ -6989,7 +6976,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
     for (int i = 0; i < atom_types.size(); i++)
     {
         ss << "  {\n";
-        ss << "    'atom_site_label': '" << atoms[i].label << "'\n";
+        ss << "    'atom_site_label': '" << atoms[i].get_label() << "'\n";
         ss << "    'Z': " << atom_types[i] << "\n";
         ss << "    'atom_type': " << constants::atnr2letter(atom_types[i]) << "\n";
         ss << "    'nr_shells': " << get_atom_shell_count(atoms_with_type[i]) << "\n";
@@ -7007,20 +6994,20 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         ss << "]\n";
         ss << "    'exponent_unit': 'a.u.'\n";
         ss << "    'primitive_exponents': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].basis_set.size(); j++)
+        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
-            ss << atoms[atoms_with_type[i]].basis_set[j].exponent;
-            if (j < atoms[atoms_with_type[i]].basis_set.size() - 1)
+            ss << atoms[atoms_with_type[i]].get_basis_set_exponent(j);
+            if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)
             {
                 ss << " ";
             }
         }
         ss << "]\n";
         ss << "    'primitive_coefficients': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].basis_set.size(); j++)
+        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
-            ss << atoms[atoms_with_type[i]].basis_set[j].coefficient;
-            if (j < atoms[atoms_with_type[i]].basis_set.size() - 1)
+            ss << atoms[atoms_with_type[i]].get_basis_set_coefficient(j);
+            if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)
             {
                 ss << " ";
             }
@@ -7047,11 +7034,11 @@ const std::string WFN::get_CIF_table(const int nr) const
     {
         ss << "    {\n";
         ss << "      'id': " << i << "\n";
-        ss << "      'atom_site_label': '" << atoms[i].label << "'\n";
-        ss << "      'cartesian_position': [" << atoms[i].x << " " << atoms[i].y << " " << atoms[i].z << "]\n";
+        ss << "      'atom_site_label': '" << atoms[i].get_label() << "'\n";
+        ss << "      'cartesian_position': [" << atoms[i].get_coordinate(0) << " " << atoms[i].get_coordinate(1) << " " << atoms[i].get_coordinate(2) << "]\n";
         ss << "      'sym_code': '.'\n";
-        ss << "      'Z': " << atoms[i].charge << "\n";
-        ss << "      'basis_set_id': " << atoms[i].basis_set_id << "\n";
+        ss << "      'Z': " << atoms[i].get_charge() << "\n";
+        ss << "      'basis_set_id': " << atoms[i].get_basis_set_id() << "\n";
         ss << "    }\n";
     }
     ss << "  ]\n";
@@ -7173,9 +7160,9 @@ const double WFN::computeESP(const std::array<double, 3>& PosGrid, const vec2 &d
 
     for (iat = 0; iat < get_ncen(); iat++)
     {
-        pos[0][iat] = atoms[iat].x;
-        pos[1][iat] = atoms[iat].y;
-        pos[2][iat] = atoms[iat].z;
+        pos[0][iat] = atoms[iat].get_coordinate(0);
+        pos[1][iat] = atoms[iat].get_coordinate(1);
+        pos[2][iat] = atoms[iat].get_coordinate(2);
         ESP += get_atom_charge(iat) * pow(sqrt(pow(PosGrid[0] - pos[0][iat], 2) + pow(PosGrid[1] - pos[1][iat], 2) + pow(PosGrid[2] - pos[2][iat], 2)), -1);
     }
 
@@ -7457,7 +7444,7 @@ bool WFN::delete_basis_set()
 {
     for (int a = 0; a < get_ncen(); a++)
     {
-        atoms[a].shellcount.resize(0);
+        atoms[a].clear_shellcount();
         int nr_prim = get_atom_primitive_count(a);
         for (int p = 0; p < nr_prim; p++)
         {
@@ -7469,3 +7456,33 @@ bool WFN::delete_basis_set()
     return true;
 };
 
+std::string WFN::get_atom_label(const int& nr) const
+{
+    return atoms[nr].get_label();
+};
+
+int WFN::get_atom_ECP_electrons(const int& nr) const
+{
+    return atoms[nr].get_ECP_electrons();
+};
+
+basis_set_entry WFN::get_atom_basis_set_entry(const int& nr, const int& bs) const
+{
+    return atoms[nr].get_basis_set_entry(bs);
+};
+
+bool WFN::erase_atom_primitive(const unsigned int& nr, const unsigned int& nr_prim)
+{
+    if ((int)nr <= ncen && (int)nr_prim < atoms[nr].get_basis_set_size())
+    {
+        atoms[nr].erase_basis_set(nr_prim);
+        return true;
+    }
+    else
+        return false;
+};
+
+std::filesystem::path WFN::get_cube_path(const int& nr) const
+{
+    return cub[nr].get_path();
+};

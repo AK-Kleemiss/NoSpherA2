@@ -391,7 +391,7 @@ double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
     double d_i = 1E100;
     std::array<double, 3> p_a = { 0, 0, 0 };
     for (int i = 0; i < wavy.get_ncen(); i++) {
-        p_a = { p_t[0] - wavy.atoms[i].x, p_t[1] - wavy.atoms[i].y, p_t[2] - wavy.atoms[i].z };
+        p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
         double d = array_length(p_a);
         if (d < d_i)
             d_i = d;

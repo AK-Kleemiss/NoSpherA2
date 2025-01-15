@@ -45,7 +45,7 @@ void Calc_Spherical_Dens(
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dists[a] = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
+                    dists[a] = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(i, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(i, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(i, 2), 2));
                     if (dists[a] < constants::ang2bohr(radius))
                         skip = false;
                 }
@@ -55,7 +55,7 @@ void Calc_Spherical_Dens(
                 double dens_all = 0.0;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dens_all += atoms[wavy.atoms[a].charge - 1].get_interpolated_density(dists[a]);
+                    dens_all += atoms[wavy.get_atom_charge(a) - 1].get_interpolated_density(dists[a]);
                 }
 
                 int temp_i, temp_j, temp_k;
@@ -131,7 +131,7 @@ void Calc_Static_Def(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -140,7 +140,7 @@ void Calc_Static_Def(
                 double dist;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dist = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
+                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2));
                     dens_all += atoms[a].get_radial_density(dist);
                 }
 
@@ -215,7 +215,7 @@ void Calc_Static_Def(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -294,17 +294,18 @@ void Calc_Hirshfeld(
                 std::array<double, 3> PosGrid = CubeRho.get_pos(i, j, k);
 
                 bool skip = true;
-                if (sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2)) < constants::ang2bohr(radius))
+                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(ignore_atom, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(ignore_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(ignore_atom, 2), 2));
+                if (dist < constants::ang2bohr(radius))
                     skip = false;
                 if (skip)
                     continue;
 
                 double dens_choice = 0.0;
                 double dens_all = 0.0;
-                double dist, temp;
+                double temp;
                 for (int a = 0; a < wavy.get_ncen(); a++)
                 {
-                    dist = sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2));
+                    dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2));
                     temp = atoms[a].get_radial_density(dist);
                     if (ignore_atom == a)
                         dens_choice = temp;
@@ -381,7 +382,7 @@ void Calc_Hirshfeld(
                 std::array<double, 3> PosGrid = CubeRho.get_pos(i, j, k);
 
                 bool skip = true;
-                double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2));
+                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(ignore_atom,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(ignore_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(ignore_atom, 2), 2));
                 if (dist < constants::ang2bohr(radius))
                     skip = false;
                 if (skip)
@@ -456,7 +457,7 @@ void Calc_Hirshfeld_atom(
                 std::array<double, 3> PosGrid = CubeRho.get_pos(i, j, k);
 
                 bool skip = true;
-                double dist = sqrt(pow(PosGrid[0] - wavy.atoms[ignore_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[ignore_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[ignore_atom].z, 2));
+                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(ignore_atom, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(ignore_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(ignore_atom, 2), 2));
                 if (dist < constants::ang2bohr(radius))
                     skip = false;
                 if (skip)
@@ -529,7 +530,7 @@ void Calc_Rho(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -740,7 +741,7 @@ void Calc_Prop(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -890,7 +891,7 @@ void Calc_ESP(
                 d2[i][j] = 0;
                 continue;
             }
-            d2[i][j] = pow(wavy.atoms[i].x - wavy.atoms[j].x, 2) + pow(wavy.atoms[i].y - wavy.atoms[j].y, 2) + pow(wavy.atoms[i].z - wavy.atoms[j].z, 2);
+            d2[i][j] = pow(wavy.get_atom_coordinate(i,0) - wavy.get_atom_coordinate(j,0), 2) + pow(wavy.get_atom_coordinate(i,1) - wavy.get_atom_coordinate(j,1), 2) + pow(wavy.get_atom_coordinate(i,2) - wavy.get_atom_coordinate(j,2), 2);
         }
     }
 
@@ -917,7 +918,7 @@ void Calc_ESP(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -997,7 +998,7 @@ void Calc_MO(
 
                 bool skip = true;
                 for (int a = 0; a < wavy.get_ncen(); a++)
-                    if (sqrt(pow(PosGrid[0] - wavy.atoms[a].x, 2) + pow(PosGrid[1] - wavy.atoms[a].y, 2) + pow(PosGrid[2] - wavy.atoms[a].z, 2)) < constants::ang2bohr(radius))
+                    if (sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(a,0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(a,1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(a,2), 2)) < constants::ang2bohr(radius))
                         skip = false;
                 if (skip)
                     continue;
@@ -1073,7 +1074,7 @@ void properties_calculation(options &opt)
     {
         log2 << "cif|resolution|res(bohr)|radius|rad(bohr): " << opt.cif << "|" << opt.resolution << "|" << constants::ang2bohr(opt.resolution) << "|" << opt.radius << "|" << constants::ang2bohr(opt.radius) << endl;
         for (int a = 0; a < wavy.get_ncen(); a++)
-            log2 << "Atom " << a << " at " << wavy.atoms[a].x << " " << wavy.atoms[a].y << " " << wavy.atoms[a].z << endl;
+            log2 << "Atom " << a << " at " << wavy.get_atom_coordinate(a,0) << " " << wavy.get_atom_coordinate(a,1) << " " << wavy.get_atom_coordinate(a,2) << endl;
     }
     if (opt.cif != "")
         readxyzMinMax_fromCIF(opt.cif, opt.MinMax, opt.NbSteps, cell_matrix, opt.resolution);
@@ -1473,7 +1474,7 @@ static void Calc_Hirshfeld_atom_2(
                                         i * CubeHirsh.get_vector(2, 0) + j * CubeHirsh.get_vector(2, 1) + k * CubeHirsh.get_vector(2, 2) + CubeHirsh.get_origin(2)};
 
                 // bool skip = true;
-                double dist = sqrt(pow(PosGrid[0] - wavy.atoms[_atom].x, 2) + pow(PosGrid[1] - wavy.atoms[_atom].y, 2) + pow(PosGrid[2] - wavy.atoms[_atom].z, 2));
+                double dist = sqrt(pow(PosGrid[0] - wavy.get_atom_coordinate(_atom, 0), 2) + pow(PosGrid[1] - wavy.get_atom_coordinate(_atom, 1), 2) + pow(PosGrid[2] - wavy.get_atom_coordinate(_atom, 2), 2));
 
                 double dens_choice = atom.get_radial_density(dist);
                 double temp_val = CubeSpherical.get_value(i, j, k);
@@ -1525,7 +1526,7 @@ vec calc_dipole_for_atom(WFN &wavy, const int &i, cube &Hirshfeld_atom, vec &cha
         if (i == j)
             continue;
         double dist = sqrt(pow(ax - wavy.get_atom_coordinate(j, 0), 2) + pow(ay - wavy.get_atom_coordinate(j, 1), 2) + pow(az - wavy.get_atom_coordinate(j, 2), 2));
-        double svdW = constants::covalent_radii[wavy.atoms[i].charge] + constants::covalent_radii[wavy.atoms[j].charge];
+        double svdW = constants::covalent_radii[wavy.get_atom_charge(i)] + constants::covalent_radii[wavy.get_atom_charge(j)];
         if (dist < 1.1 * svdW)
         {
             bound_atoms.push_back(j);
@@ -1707,7 +1708,7 @@ vec2 dipole_moments(WFN &wavy, cube &SPHER, double *MinMax, int *NbSteps, int th
          << "===================================================" << endl;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3] - wavy.atoms[i].charge << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
+        log2 << setw(3) << i << " (" << constants::atnr2letter(wavy.get_atom_charge(i)) << ") |" << scientific << setprecision(6) << setw(13) << dipole_moments[i][3] - wavy.get_atom_charge(i) << " | " << scientific << setprecision(6) << setw(14) << dipole_moments[i][0] << ", " << setw(14) << dipole_moments[i][1] << ", " << setw(14) << dipole_moments[i][2] << endl;
     }
     return dipole_moments;
 }
@@ -1799,7 +1800,7 @@ void polarizabilities(options &opt, std::ostream &log2)
     for (int i = 0; i < wavy[0].get_ncen(); i++)
     {
         log2 << setw(3) << i << " (" << constants::atnr2letter(wavy[0].get_atom_charge(i)) << ") |"
-             << scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].atoms[i].charge << " |"
+             << scientific << setprecision(6) << setw(13) << dipoles[0][i][3] - wavy[0].get_atom_charge(i) << " |"
              << setw(14) << polarizabilities[i][0][0] << ","
              << setw(14) << polarizabilities[i][0][1] << ","
              << setw(14) << polarizabilities[i][0][2] << ","

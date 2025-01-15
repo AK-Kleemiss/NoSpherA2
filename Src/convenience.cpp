@@ -820,7 +820,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         stream << setw(2) << w;
         cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
         stream.str("");
-        for (int c = 0; c < wavy[w].cub.size(); c++)
+        for (int c = 0; c < wavy[w].get_cube_count(); c++)
         {
             if (c == 0)
                 cout << "        |" << endl
@@ -835,8 +835,8 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
             }
             else
                 cout << "     ";
-            cout << "   |_ " << wavy[w].cub[c].get_path().stem();
-            if (!exists(wavy[w].cub[c].get_path()))
+            cout << "   |_ " << wavy[w].get_cube_path(c).stem();
+            if (!exists(wavy[w].get_cube_path(c)))
                 cout << " (MEM ONLY)";
             cout << endl;
         }
@@ -894,7 +894,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         unsigned int nr_cube = fromString<unsigned int>(cube);
         if (debug)
             cout << "Translated: " << nr_wave << " " << nr_cube << endl;
-        if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].cub.size())
+        if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].get_cube_count())
         {
             cout << "Invalid choice!" << endl;
             continue;
@@ -914,8 +914,8 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
 bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
-        for (int c = 0; c < wavy[w].cub.size(); c++)
-            if (!exists(wavy[w].cub[c].get_path()))
+        for (int c = 0; c < wavy[w].get_cube_count(); c++)
+            if (!exists(wavy[w].get_cube_path(c)))
                 return true;
     return false;
 };
@@ -938,9 +938,9 @@ void readxyzMinMax_fromWFN(
 
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-        PosAtoms[0][j] = wavy.atoms[j].x;
-        PosAtoms[1][j] = wavy.atoms[j].y;
-        PosAtoms[2][j] = wavy.atoms[j].z;
+        PosAtoms[0][j] = wavy.get_atom_coordinate(j, 0);
+        PosAtoms[1][j] = wavy.get_atom_coordinate(j, 1);
+        PosAtoms[2][j] = wavy.get_atom_coordinate(j, 2);
         if (!bohrang)
         {
             for (int i = 0; i < 3; i++)
@@ -1376,13 +1376,13 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                     log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (is_similar(positions[labels.size()][0], wavy.atoms[i].x, -1) && is_similar(positions[labels.size()][1], wavy.atoms[i].y, -1) && is_similar(positions[labels.size()][2], wavy.atoms[i].z, -1))
+                    if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i,0), -1) && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1) && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
                     {
                         if (debug)
-                            log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
-                                 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
-                        wavy.atoms[i].label = fields[label_field];
-                        wavy.atoms[i].frac_coords = {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])};
+                            log3 << "WFN position: " << wavy.get_atom_coordinate(i, 0) << " " << wavy.get_atom_coordinate(i, 1) << " " << wavy.get_atom_coordinate(i, 2) << endl
+                                 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
+                        wavy.set_atom_label(i,fields[label_field]);
+                        wavy.set_atom_frac_coords(i, {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])});
                         found_this_one = true;
                         break;
                     }
@@ -1447,7 +1447,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Uij[i].resize(6);
                         for (int j = 0; j < 6; j++)
@@ -1522,7 +1522,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Cijk[i].resize(10);
                         for (int j = 0; j < 6; j++)
@@ -1607,7 +1607,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Dijkl[i].resize(15);
                         for (int j = 0; j < 6; j++)
@@ -1624,7 +1624,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     }
 
     for (int i = 0; i < wavy.get_ncen(); i++)
-        wavy.atoms[i].assign_ADPs(Uij[i], Cijk[i], Dijkl[i]);
+        wavy.set_atom_ADPs(i, { Uij[i], Cijk[i], Dijkl[i] });
 
     return true;
 };
@@ -1895,14 +1895,14 @@ int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118>
 {
     wavy.set_basis_set_ptr(b);
     int nr_coefs = 0;
-    for (int i = 0; i < wavy.atoms.size(); i++)
+    for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        int current_charge = wavy.atoms[i].charge - 1;
+        int current_charge = wavy.get_atom_charge(i) - 1;
         const primitive *basis = b[current_charge].data();
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
-            wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
+            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
             nr_coefs += 2 * basis[e].type + 1;
         }
     }
@@ -1913,14 +1913,14 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
 {
     wavy.set_basis_set_ptr(b.get_data());
     int nr_coefs = 0;
-    for (int i = 0; i < wavy.atoms.size(); i++)
+    for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        int current_charge = wavy.atoms[i].charge - 1;
+        int current_charge = wavy.get_atom_charge(i) - 1;
         const std::vector<primitive> &basis = b[current_charge];
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
-            wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
+            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
             nr_coefs += 2 * basis[e].type + 1;
         }
     }
@@ -2469,7 +2469,7 @@ void options::digest_options()
             cout << "Starting spherical averaging" << endl;
             double dens;
 
-            for (int index_atom = 0; index_atom < wavy->atoms.size(); index_atom += 1)
+            for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
             {
                 ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
                 for (double r = 0.001; r < 5.0; r += 0.002)

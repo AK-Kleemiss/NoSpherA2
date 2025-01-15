@@ -279,20 +279,20 @@ const double calc_density_ML(const double& x,
     if (atom_nr == -1) {
         for (int a = 0; a < atoms.size(); a++)
         {
-            size = (int)atoms[a].basis_set.size();
-            const basis_set_entry* bf;
+            size = (int)atoms[a].get_basis_set_size();
+            basis_set_entry bf;
             double d[4]{
-                x - atoms[a].x,
-                y - atoms[a].y,
-                z - atoms[a].z, 0.0 };
+                x - atoms[a].get_coordinate(0),
+                y - atoms[a].get_coordinate(1),
+                z - atoms[a].get_coordinate(2), 0.0 };
             // store r in last element
             d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             if (d[3] < -46.0517)
             { // corresponds to cutoff of ex ~< 1E-20
                 for (e = 0; e < size; e++)
                 {
-                    bf = &atoms[a].basis_set[e];
-                    coef_counter += (2 * bf->type + 1);
+                    bf = atoms[a].get_basis_set_entry(e);
+                    coef_counter += (2 * bf.type + 1);
                 }
                 continue;
             }
@@ -301,8 +301,8 @@ const double calc_density_ML(const double& x,
                 d[e] /= d[3];
             for (e = 0; e < size; e++)
             {
-                bf = &atoms[a].basis_set[e];
-                primitive p(a, bf->type, bf->exponent, bf->coefficient);
+                bf = atoms[a].get_basis_set_entry(e);
+                primitive p(a, bf.type, bf.exponent, bf.coefficient);
                 radial = gaussian_radial(p, d[3]);
                 if (radial < 1E-10)
                 {
@@ -321,15 +321,15 @@ const double calc_density_ML(const double& x,
     else {
         for (int a = 0; a < atoms.size(); a++)
         {
-            size = (int)atoms[a].basis_set.size();
+            size = (int)atoms[a].get_basis_set_size();
             if (a == atom_nr)
             {
 
-                const basis_set_entry* bf;
+                basis_set_entry bf;
                 double d[4]{
-                    x - atoms[a].x,
-                    y - atoms[a].y,
-                    z - atoms[a].z, 0.0 };
+                    x - atoms[a].get_coordinate(0),
+                    y - atoms[a].get_coordinate(1),
+                    z - atoms[a].get_coordinate(2), 0.0 };
                 // store r in last element
                 d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
                 // normalize distances for spherical harmonic
@@ -337,8 +337,8 @@ const double calc_density_ML(const double& x,
                     d[e] /= d[3];
                 for (e = 0; e < size; e++)
                 {
-                    bf = &atoms[a].basis_set[e];
-                    primitive p(a, bf->type, bf->exponent, bf->coefficient);
+                    bf = atoms[a].get_basis_set_entry(e);
+                    primitive p(a, bf.type, bf.exponent, bf.coefficient);
 
                     radial = gaussian_radial(p, d[3]);
                     for (int m = -p.type; m <= p.type; m++)
@@ -354,7 +354,7 @@ const double calc_density_ML(const double& x,
             {
                 for (e = 0; e < size; e++)
                 {
-                    coef_counter += (2 * atoms[a].basis_set[e].type + 1);
+                    coef_counter += (2 * atoms[a].get_basis_set_type(e) + 1);
                 }
             }
         }
@@ -374,20 +374,20 @@ const double calc_density_ML(const double& x,
 vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
     int  e = 0, size;
     double radial;
-    const basis_set_entry* bf;
+    basis_set_entry bf;
 
     vec atom_elecs(atoms.size(), 0.0);
 
     int coef_counter = 0;
     for (int i = 0; i < atoms.size(); i++) {
 
-        size = (int)atoms[i].basis_set.size();
+        size = (int)atoms[i].get_basis_set_size();
 
         double temp_dens = 0;
         for (e = 0; e < size; e++)
         {
-            bf = &atoms[i].basis_set[e];
-            primitive p(i, bf->type, bf->exponent, bf->coefficient);
+            bf = atoms[i].get_basis_set_entry(e);
+            primitive p(i, bf.type, bf.exponent, bf.coefficient);
             if (p.type > 0) {
                 break;
             }
@@ -401,8 +401,8 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
 
         for (e = 0; e < size; e++)
         {
-            bf = &atoms[i].basis_set[e];
-            coef_counter += (2 * bf->type + 1);
+            bf = atoms[i].get_basis_set_entry(e);
+            coef_counter += (2 * bf.type + 1);
         }
     }
     return atom_elecs;
@@ -446,9 +446,9 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
                     i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) };
 
                 if (atom == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms));
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms()));
                 else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.atoms, atom));
+                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom));
             }
         progress->update();
     }
