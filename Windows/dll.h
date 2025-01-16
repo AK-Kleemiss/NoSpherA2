@@ -360,14 +360,14 @@ void DLL_EXPORT get_colour(Triangle &t, const cube &volumeData, std::array<std::
 void DLL_EXPORT get_colour(Triangle &t, double (*func)(const std::array<double, 3> &, const WFN &), const WFN &wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim);
 
 double DLL_EXPORT calc_d_i(const std::array<double, 3> &p_t, const WFN &wavy);
-bool DLL_EXPORT Calc_Spherical_Dens(cube &CubeSpher, WFN &wavy, double radius, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Static_Def(cube &CubeDEF, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Static_Def(cube &CubeDEF, cube &CubeRho, WFN &wavy, double radius, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Rho(cube &CubeRho, WFN &wavy, double radius, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Prop(cube &CubeRho, cube &CubeRDG, cube &CubeElf, cube &CubeEli, cube &CubeLap, cube &CubeESP, WFN &wavy, double radius, std::ostream &file, bool test, bool wrap);
-bool DLL_EXPORT Calc_ESP(cube &CubeESP, WFN &wavy, double radius, bool no_date, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Hirshfeld_atom(cube &CubeHirsh, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, int atom, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_Hirshfeld(cube &CubeHirsh, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, int atom, std::ostream &file, bool wrap);
-bool DLL_EXPORT Calc_MO(cube &MO, int MO_number, WFN &wavy, double radius, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Spherical_Dens(cube &CubeSpher, WFN &wavy, double radius, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Static_Def(cube &CubeDEF, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Static_Def(cube &CubeDEF, cube &CubeRho, WFN &wavy, double radius, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Rho(cube &CubeRho, WFN &wavy, double radius, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Prop(cube &CubeRho, cube &CubeRDG, cube &CubeElf, cube &CubeEli, cube &CubeLap, cube &CubeESP, WFN &wavy, double radius, std::ostream &file, bool test, bool wrap);
+void DLL_EXPORT Calc_ESP(cube &CubeESP, WFN &wavy, double radius, bool no_date, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Hirshfeld_atom(cube &CubeHirsh, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, int atom, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_Hirshfeld(cube &CubeHirsh, cube &CubeRho, cube &CubeSpher, WFN &wavy, double radius, int atom, std::ostream &file, bool wrap);
+void DLL_EXPORT Calc_MO(cube &MO, int MO_number, WFN &wavy, double radius, std::ostream &file, bool wrap);
 
 void DLL_EXPORT readxyzMinMax_fromWFN(WFN &wavy, double *CoordMinMax, int *NbSteps, double radius, double Increments, bool no_bohr);
