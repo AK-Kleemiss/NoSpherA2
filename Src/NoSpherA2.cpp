@@ -136,8 +136,8 @@ int main(int argc, char **argv)
 #pragma omp parallel for
         for (int i = 0; i < triangles_i.size(); i++)
         {
-            triangles_i[i].colour = get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di * 0.9);
-            triangles_e[i].colour = get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de * 0.9);
+            get_colour(triangles_i[i], calc_d_i, wavy[0], Colourcode, low_lim_di, high_lim_di * 0.9);
+            get_colour(triangles_e[i], calc_d_i, wavy[1], Colourcode, low_lim_de, high_lim_de * 0.9);
         }
         std::cout << "Total area: " << area << endl;
         std::cout << "Total volume: " << volume << endl;

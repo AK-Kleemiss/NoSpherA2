@@ -194,10 +194,12 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_tsc_merge|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_tscb|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug|x64.ActiveCfg = Debug|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug|x64.Build.0 = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.GenCube|x64.ActiveCfg = GenCube|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Profile_Disorder|x64.ActiveCfg = Profile_Disorder|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Publish|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release + Copy|x64.ActiveCfg = Release|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release + Copy|x64.Build.0 = Release|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release_SALTED|x64.ActiveCfg = Release_SALTED|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Release|x64.ActiveCfg = Release|x64
 	EndGlobalSection
