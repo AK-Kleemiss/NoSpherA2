@@ -10,6 +10,7 @@
  */
 
 #include <iostream>
+#include <float.h>
 #include "rys_roots.h"
 #include "roots_for_x0.dat"
 #if has_RAS == 1
@@ -50,6 +51,8 @@
 #define SMALLX_LIMIT    3e-7
 
 
+#include <cmath>
+
   /*
    * Relative errors of fmt1_erfc_like are of
    *      (2*t)**(m-1) / (2m-3)!! * machine_precision * fmt_val
@@ -59,7 +62,7 @@
    *      (2m-1)!! / (2*t)**(m-1) > (2m-1)**.5
    * t0 = .5 * ((2m-1)!!/(2m-1)**.5)**(1/(m-1))
    */
-static double TURNOVER_POINT[] = {
+double TURNOVER_POINT[] = {
         0.,
         0.,
         0.866025403784,
@@ -203,7 +206,7 @@ static double TURNOVER_POINT[] = {
   * F_m(t), see the Description section.
   *
   */
-static void fmt1_gamma_inc_like(double* f, double t, int m)
+void fmt1_gamma_inc_like(double* f, double t, int m)
 {
     int i;
     double b = m + 0.5;
@@ -241,7 +244,7 @@ void gamma_inc_like(double* f, double t, int m)
     }
 }
 
-static void fmt1_lgamma_inc_like(long double* f, long double t, int m)
+void fmt1_lgamma_inc_like(long double* f, long double t, int m)
 {
     long double b = m + 0.5l;
     long double bi;

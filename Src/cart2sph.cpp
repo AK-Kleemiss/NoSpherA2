@@ -3633,7 +3633,7 @@ void CINTdgemm_NT(int m, int n, int k,
 }
 
 // transform integrals from cartesian to spheric
-static double *a_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *a_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
         int nf = _len_cart[l];
         int nd = l * 2 + 1;
@@ -3641,7 +3641,7 @@ static double *a_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         return gsph;
 }
 
-static double *a_ket_cart2spheric(double *gsph, double *gcart,
+double *a_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
         int nf = _len_cart[l];
@@ -3651,7 +3651,7 @@ static double *a_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform s function from cartesian to spheric
-static double *s_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *s_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
         /*
         int i;
@@ -3660,7 +3660,7 @@ static double *s_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         }*/
         return gcart;
 }
-static double *s_ket_cart2spheric(double *gsph, double *gcart,
+double *s_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
         /*
@@ -3670,18 +3670,9 @@ static double *s_ket_cart2spheric(double *gsph, double *gcart,
         }*/
         return gcart;
 }
-static double *s_ket_cart2spheric_copy(double *gsph, double *gcart,
-                                       int lds, int nbra, int l)
-{
-        int i;
-        for (i = 0; i < nbra; i++) {
-                gsph[i] = gcart[i];
-        }
-        return gsph;
-}
 
 // transform p function from cartesian to spheric
-static double *p_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *p_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
 #ifdef PYPZPX
         int i;
@@ -3695,7 +3686,7 @@ static double *p_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         return gcart;
 #endif
 }
-static double *p_ket_cart2spheric(double *gsph, double *gcart,
+double *p_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
 #ifdef PYPZPX
@@ -3710,28 +3701,9 @@ static double *p_ket_cart2spheric(double *gsph, double *gcart,
         return gcart;
 #endif
 }
-static double *p_ket_cart2spheric_copy(double *gsph, double *gcart,
-                                       int lds, int nbra, int l)
-{
-        int i;
-#ifdef PYPZPX
-        for (i = 0; i < nbra; i++) {
-                gsph[0*nbra+i] = gcart[1*nbra+i];  // py
-                gsph[1*nbra+i] = gcart[2*nbra+i];  // pz
-                gsph[2*nbra+i] = gcart[0*nbra+i];  // px
-        }
-#else
-        for (i = 0; i < nbra; i++) {
-                gsph[0*lds+i] = gcart[0*nbra+i];
-                gsph[1*lds+i] = gcart[1*nbra+i];
-                gsph[2*lds+i] = gcart[2*nbra+i];
-        }
-#endif
-        return gsph;
-}
 
 // transform d function from cartesian to spheric
-static double *d_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *d_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
         double *coeff_c2s = g_c2s[2].cart2sph;
         double *pgsph = gsph;
@@ -3750,7 +3722,7 @@ static double *d_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         }
         return pgsph;
 }
-static double *d_ket_cart2spheric(double *gsph, double *gcart,
+double *d_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
         double *coeff_c2s = g_c2s[2].cart2sph;
@@ -3778,7 +3750,7 @@ static double *d_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform f function from cartesian to spheric
-static double *f_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *f_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
         double *coeff_c2s = g_c2s[3].cart2sph;
         double *pgsph = gsph;
@@ -3805,7 +3777,7 @@ static double *f_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         }
         return pgsph;
 }
-static double *f_ket_cart2spheric(double *gsph, double *gcart,
+double *f_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
         double *coeff_c2s = g_c2s[3].cart2sph;
@@ -3845,7 +3817,7 @@ static double *f_ket_cart2spheric(double *gsph, double *gcart,
 }
 
 // transform g function from cartesian to spheric
-static double *g_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
+double *g_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
 {
         double *coeff_c2s = g_c2s[4].cart2sph;
         double *pgsph = gsph;
@@ -3884,7 +3856,7 @@ static double *g_bra_cart2spheric(double *gsph, int nket, double *gcart, int l)
         }
         return pgsph;
 }
-static double *g_ket_cart2spheric(double *gsph, double *gcart,
+double *g_ket_cart2spheric(double *gsph, double *gcart,
                                   int lds, int nbra, int l)
 {
         double *coeff_c2s = g_c2s[4].cart2sph;
@@ -3939,73 +3911,9 @@ static double *g_ket_cart2spheric(double *gsph, double *gcart,
         return pgsph;
 }
 
-/*
- * return the address of gemm results, for s,p function, results ==
- * input, so return the input address optimize
- */
-double *(*c2s_bra_sph[])(double* gsph, int nket, double* gcart, int l) = {
-        s_bra_cart2spheric,
-        p_bra_cart2spheric,
-        d_bra_cart2spheric,
-        f_bra_cart2spheric,
-        g_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-        a_bra_cart2spheric,
-};
-
-double *(*c2s_ket_sph[])(double *gsph, double *gcart,
-                         int lds, int nbra, int l) = {
-        s_ket_cart2spheric,
-        p_ket_cart2spheric,
-        d_ket_cart2spheric,
-        f_ket_cart2spheric,
-        g_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-};
-
-double *(*c2s_ket_sph1[])(double *gsph, double *gcart,
-                          int lds, int nbra, int l) = {
-        s_ket_cart2spheric_copy,
-        p_ket_cart2spheric_copy,
-        d_ket_cart2spheric,
-        f_ket_cart2spheric,
-        g_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-        a_ket_cart2spheric,
-};
-
-
 // [ca, cb] * [ 1+1j*z, y+1j*x]
 //            [-y+1j*x, 1-1j*z]
-static void a_bra_cart2spinor_si(double *gspR, double *gspI,
+void a_bra_cart2spinor_si(double *gspR, double *gspI,
                                  double *gx, double *gy, double *gz, double *g1,
                                  int nket, int kappa, int l)
 {
@@ -4055,7 +3963,7 @@ static void a_bra_cart2spinor_si(double *gspR, double *gspI,
         } }
 }
 
-static void a_bra_cart2spinor_sf(double *gspR, double *gspI,
+void a_bra_cart2spinor_sf(double *gspR, double *gspI,
                                  double *gx, double *gy, double *gz, double *g1,
                                  int nket, int kappa, int l)
 {
@@ -4102,7 +4010,7 @@ static void a_bra_cart2spinor_sf(double *gspR, double *gspI,
         } }
 }
 
-static void a_bra1_cart2spinor_si(double *gspR, double *gspI,
+void a_bra1_cart2spinor_si(double *gspR, double *gspI,
                                   double *gx, double *gy, double *gz, double *g1,
                                   int ngrids, int nket, int kappa, int l)
 {
@@ -4154,7 +4062,7 @@ static void a_bra1_cart2spinor_si(double *gspR, double *gspI,
         }
 }
 
-static void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
+void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
                                   double *gx, double *gy, double *gz, double *g1,
                                   int ngrids, int nket, int kappa, int l)
 {
@@ -4203,7 +4111,7 @@ static void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
         }
 }
 
-static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
+void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
                                   double *gx, double *gy, double *gz, double *g1,
                                   int ngrids, int nket, int kappa, int l)
 {
@@ -4233,8 +4141,6 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
 
         int i, j, n, m;
         double caR, caI, cbR, cbI;
-        double v1R, vxR, vyR, vzR;
-        double v1I, vxI, vyI, vzI;
         double v11R, v12R, v21R, v22R;
         double v11I, v12I, v21I, v22I;
 
@@ -4273,7 +4179,7 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
         }
 }
 
-static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
+void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
                                   double *gx, double *gy, double *gz, double *g1,
                                   int ngrids, int nket, int kappa, int l)
 {
@@ -4325,7 +4231,7 @@ static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
         }
 }
 
-static void a_ket_cart2spinor(double *gspR, double *gspI,
+void a_ket_cart2spinor(double *gspR, double *gspI,
                               double *gcartR, double *gcartI,
                               int nbra, int kappa, int l)
 {
@@ -4387,7 +4293,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
 }
 
 // with phase "i"
-static void a_iket_cart2spinor(double *gspR, double *gspI,
+void a_iket_cart2spinor(double *gspR, double *gspI,
                                double *gcartR, double *gcartI,
                                int nbra, int kappa, int l)
 {
@@ -4399,7 +4305,7 @@ static void a_iket_cart2spinor(double *gspR, double *gspI,
         }
 }
 
-static void a_ket1_cart2spinor(double *gspR, double *gspI,
+void a_ket1_cart2spinor(double *gspR, double *gspI,
                                double *gcartR, double *gcartI,
                                int nbra, int counts, int kappa, int l)
 {
@@ -4451,7 +4357,7 @@ static void a_ket1_cart2spinor(double *gspR, double *gspI,
 }
 
 // with phase "i"
-static void a_iket1_cart2spinor(double *gspR, double *gspI,
+void a_iket1_cart2spinor(double *gspR, double *gspI,
                                 double *gcartR, double *gcartI,
                                 int nbra, int counts, int kappa, int l)
 {
@@ -6465,10 +6371,6 @@ double *CINTc2s_bra_sph(double *gsph, int nket, double *gcart, int l)
 double *CINTc2s_ket_sph(double *gsph, int nbra, double *gcart, int l)
 {
         return (c2s_ket_sph[l])(gsph, gcart, nbra, nbra, l);
-}
-double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
-{
-        return (c2s_ket_sph1[l])(sph, cart, lds, ldc, l);
 }
 
 //void CINTc2s_bra_spinor_e1sf(double complex *gsp, int nket,

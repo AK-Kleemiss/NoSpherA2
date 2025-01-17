@@ -204,7 +204,7 @@ typedef struct {
 } Rys2eT;
 
 
-typedef struct CINTEnvVars {
+struct CINTEnvVars {
     int* atm;
     int* bas;
     double* env;
