@@ -362,7 +362,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
     of << setw(10) << na << endl;
     for (int i = 0; i < na; i++)
     {
-        of << parent_wavefunction->atoms[i].label;
+        of << parent_wavefunction->get_atom_label(i);
         of << "    ";
         for (int j = 0; j < 3; j++)
             of << setw(10) << setprecision(5) << parent_wavefunction->get_atom_coordinate(i, j);
@@ -1513,7 +1513,7 @@ cube cube::super_cube(int x, int y, int z)
     return (out);
 };
 std::vector<atom> cube::get_parent_wfn_atoms() const {
-	return parent_wavefunction->atoms;
+	return parent_wavefunction->get_atoms();
 };
 
 void cube::set_zero()

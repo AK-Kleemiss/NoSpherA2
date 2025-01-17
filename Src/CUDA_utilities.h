@@ -1038,9 +1038,9 @@ __host__ int cu_make_hirshfeld_grids(
         PosAtoms[i].resize(wave.get_ncen());
     for (int a = 0; a < wave.get_ncen(); a++)
     {
-        PosAtoms[0][a] = wave.atoms[a].x;
-        PosAtoms[1][a] = wave.atoms[a].y;
-        PosAtoms[2][a] = wave.atoms[a].z;
+        PosAtoms[0][a] = wave.get_atom_coordinate(a,0);
+        PosAtoms[1][a] = wave.get_atom_coordinate(a,1);
+        PosAtoms[2][a] = wave.get_atom_coordinate(a,2);
     }
     /*Allocation GPU Pointer*/
     gpu_PosAtomsx = (float**)malloc(sizeof(float*));
@@ -1074,7 +1074,7 @@ __host__ int cu_make_hirshfeld_grids(
     int nmo_temp = wave.get_nmo(true);
     int ncen_temp = wave.get_ncen();
     for (int i = 0; i < wave.get_ncen(); i++)
-        atom_z[i] = wave.atoms[i].charge;
+        atom_z[i] = wave.get_atom_charge(i);
     int MaxGrid = 0;
     for (int i = 0; i < asym_atom_list.size(); i++)
     {

@@ -73,14 +73,14 @@ private:
     const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_spin_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
     const double compute_dens_spherical(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
+    std::vector<cube> cub;
+    std::vector<atom> atoms;
 
 public:
     WFN();
     WFN(int given_origin);
     WFN(const std::filesystem::path& filename, const bool& debug = false);
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
-    std::vector<cube> cub;
-    std::vector<atom> atoms;
 
     //--------------------MO handling--------------------------------------------
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
@@ -200,13 +200,7 @@ public:
     bool change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value);
     bool change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value);
     const int get_atom_primitive_count(const int &nr) const;
-    const int get_atom_primitive_type(const int &nr_atom, const int &nr_prim) const
-    {
-        if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].basis_set.size() && nr_prim >= 0)
-            return atoms[nr_atom].basis_set[nr_prim].type;
-        else
-            return -1;
-    };
+    const int get_atom_primitive_type(const int &nr_atom, const int &nr_prim) const;
     bool erase_atom_primitive(const unsigned int &nr, const unsigned int &nr_prim);
     const int get_atom_shell_count(const unsigned int &nr) const;
     const int get_atom_shell_primitives(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
@@ -218,7 +212,7 @@ public:
     const int get_shell_end(const unsigned int &nr_atom, const unsigned int &nr_shell) const;
     bool push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &charge, const std::string& ID = "0000000000000");
     bool push_back_atom(const atom &given);
-    // atom get_atom(int nr) { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
+    const atom get_atom(const int& nr) const { if(nr >= 0 && nr < ncen) return atoms[nr]; else return atom(); };
     bool push_back_atom_basis_set(const int &nr, const double &exponent, const double &coefficient, const int &type, const int &shell)
     {
         if (nr <= ncen && nr >= 0)
@@ -234,7 +228,16 @@ public:
     const int get_atom_charge(const int &nr) const;
     const unsigned int get_atom_integer_mass(const unsigned int &atomnr) const;
     const double get_atom_real_mass(const int &atomnr) const;
-    atom get_atom(const int &nr) const;
+    std::string get_atom_label(const int& nr) const;
+    void set_atom_label(const int& nr, const std::string& label) { atoms[nr].set_label(label); };
+    std::vector<atom> get_atoms() const { return atoms; };
+    void set_atoms(const std::vector<atom> given) { atoms = given; };
+    int get_atom_ECP_electrons(const int& nr) const;
+    void clear_atom_basis_set(const int& nr) { atoms[nr].clear_basis_set(); };
+    int get_atom_basis_set_size(const int& nr) const { return atoms[nr].get_basis_set_size(); };
+    basis_set_entry get_atom_basis_set_entry(const int& nr, const int& bs) const;
+    void set_atom_ADPs(const int& nr, const vec2& adps) { atoms[nr].set_ADPs(adps); };
+    void set_atom_frac_coords(const int& nr, const std::array<double, 3>& frac) { atoms[nr].set_frac_coords(frac); };
     //----------Calcualtion of Properties-----------------
     // double compute_dens(const double* PosGrid, const int atom = -1);
     // This second version will use phi[nmo] and d[4][ncen] as scratch instead of allocating new ones
@@ -271,6 +274,9 @@ public:
     bool push_back_cube(const std::string &filepath, const bool &full, const bool &expert = false);
     void push_back_cube(cube given) { cub.push_back(given); };
     void pop_back_cube();
+    const cube get_cube(const int& nr) const { return cub[nr]; };
+    const int get_cube_count() const { return (int)cub.size(); };
+    std::filesystem::path get_cube_path(const int& nr) const;
     //-----------Pointer to members---------------------
     const int *get_ptr_types() { return &types[0]; };
     const int *get_ptr_centers() { return &centers[0]; };

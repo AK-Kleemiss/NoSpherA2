@@ -4,7 +4,6 @@
 #include "constants.h"
 
 #ifdef _WIN32
-#define NOMIMAX
 #include <algorithm>
 #include <io.h>
 #endif
@@ -53,16 +52,8 @@ AtomGrid::AtomGrid(const double radial_precision,
       //       << "l= " << l 
       //       << " r_inner: " << r_inner 
       //       << " alpha_min: " << alpha_min[l] << endl;
-      r_outer = std::max(r_outer,
-        get_r_outer(radial_precision,
-          alpha_min[l],
-          l,
-          4.0 * constants::bragg_angstrom[proton_charge])
-      );
-      h = std::min(h, get_h(radial_precision,
-        l,
-        0.1 * (r_outer - r_inner))
-      );
+      r_outer = (((r_outer) > (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge]))) ? (r_outer) : (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge])));
+      h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
     }
   }
 

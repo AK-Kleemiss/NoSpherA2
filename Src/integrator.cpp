@@ -148,7 +148,7 @@ int fixed_density_fit_test()
     Int_Params normal_basis(wavy_gbw);
 
     WFN wavy_aux(0);
-    wavy_aux.atoms = wavy_gbw.atoms;
+	wavy_aux.set_atoms(wavy_gbw.get_atoms());
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
     //Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");

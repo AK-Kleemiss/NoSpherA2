@@ -356,7 +356,7 @@ std::array<double, 3> interpolateIso(const std::array<double, 3>& p1, const std:
     };
 }
 
-RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     RGB colour;
     std::array<double, 3> p = t.calc_center();
     double val = volumeData.get_interpolated_value(p[0], p[1], p[2]);
@@ -384,14 +384,14 @@ RGB get_colour(const Triangle& t, const cube& volumeData, std::array<std::array<
             colour[i] = 255;
         else if (colour[i] < 0)
             colour[i] = 0;
-    return colour;
+    t.colour = colour;
 };
 
 double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
     double d_i = 1E100;
     std::array<double, 3> p_a = { 0, 0, 0 };
     for (int i = 0; i < wavy.get_ncen(); i++) {
-        p_a = { p_t[0] - wavy.atoms[i].x, p_t[1] - wavy.atoms[i].y, p_t[2] - wavy.atoms[i].z };
+        p_a = { p_t[0] - wavy.get_atom_coordinate(i,0), p_t[1] - wavy.get_atom_coordinate(i,1), p_t[2] - wavy.get_atom_coordinate(i,2) };
         double d = array_length(p_a);
         if (d < d_i)
             d_i = d;
@@ -399,7 +399,7 @@ double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
     return d_i;
 }
 
-RGB get_colour(const Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
+void get_colour(Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     const double mid_point = (low_lim + high_lim) / 2.0;
     const double range = high_lim - low_lim;
     RGB colour;
@@ -433,7 +433,7 @@ RGB get_colour(const Triangle& t, double(*func)(const std::array<double, 3>&, co
             colour[i] = 255;
         else if (colour[i] < 0)
             colour[i] = 0;
-    return colour;
+    t.colour = colour;
 };
 
 // Function to subdivide a cube into smaller cubes
@@ -648,10 +648,10 @@ bool writeMTL(const std::string& mtlFilename,
     out << "# Materials\n\n";
 
     // Write one "newmtl" block per face
-    for (size_t i = 0; i < triangles.size(); i++) {
+    for (int i = 0; i < triangles.size(); i++) {
         //look if we already have this colour
         bool found = false;
-        for (size_t j = 0; j < faceColors.size(); j++) {
+        for (int j = 0; j < faceColors.size(); j++) {
             if (faceColors[j] == triangles[i].colour) {
                 found = true;
                 triangles[i].colour_index = j;

@@ -24,6 +24,7 @@
 #include <sstream>
 #include <typeinfo>
 #include <vector>
+#include <array>
 #include <numeric>
 #include <cassert>
 #include <float.h>
