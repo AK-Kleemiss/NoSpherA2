@@ -2,7 +2,10 @@
 #include <array>
 #include "convenience.h"
 
+
+extern const std::array<std::vector<primitive>, 3> TESTING;
 extern const std::array<std::vector<primitive>, 1> _6_31Gdp_rifit;
+
 
 extern const std::array<std::vector<primitive>, 86> def2_universal_JKfit;
 extern const std::array<std::vector<primitive>, 86> def2_SVP_JKfit;
@@ -21,6 +24,7 @@ extern const std::array<std::vector<primitive>, 35> PV5Z_JKfit;
 class BasisSet {
 public:
     BasisSet(const std::array<std::vector<primitive>, 1>& data);
+    BasisSet(const std::array<std::vector<primitive>, 3>& data);
     BasisSet(const std::array<std::vector<primitive>, 35>& data);
     BasisSet(const std::array<std::vector<primitive>, 86>& data);
     BasisSet(const std::array<std::vector<primitive>, 118>& data);

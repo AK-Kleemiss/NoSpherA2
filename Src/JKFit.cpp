@@ -2,15 +2,6 @@
 
 
 // Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
-BasisSet::BasisSet(const std::array<std::vector<primitive>, 35>& data) {
-	for (int i = 0; i < 35; i++) {
-		_data[i] = data[i];
-	}
-	for (int i = 35; i < 118; i++) {
-		_data[i] = {};
-	}
-}
-// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
 BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {
 	for (int i = 0; i < 1; i++) {
 		_data[i] = data[i];
@@ -20,6 +11,25 @@ BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {
 	}
 }
 
+// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 3>& data) {
+	for (int i = 0; i < 3; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 3; i < 118; i++) {
+		_data[i] = {};
+	}
+}
+
+// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 35>& data) {
+	for (int i = 0; i < 35; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 35; i < 118; i++) {
+		_data[i] = {};
+	}
+}
 
 BasisSet::BasisSet(const std::array<std::vector<primitive>, 86>& data) {
 	for (int i = 0; i < 86; i++) {
@@ -47,6 +57,7 @@ const std::vector<primitive>& BasisSet::operator[](int element) const {
 
 
 BasisSetLibrary::BasisSetLibrary() {
+	basisSets["TESTING"] = BasisSet(TESTING);
 	basisSets["6-31G**_rifit"] = BasisSet(_6_31Gdp_rifit);
 	basisSets["combo_basis_fit"] = BasisSet(combo_basis_fit);
 	basisSets["def2_universal_JKfit"] = BasisSet(def2_universal_JKfit);
@@ -71,6 +82,38 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_r
 	return basisSets[found_basis];
 }
 
+
+const std::array<std::vector<primitive>, 3> TESTING =
+{
+	{
+		{
+			{0, 0, 13.087376, 1.0},
+			{0, 0, 1.185515, 1.0},
+			{0, 0, 0.368163, 1.0},
+			{0, 1, 2.288385, 1.0},
+			{0, 1, 1.311828, 1.0},
+			{0, 2, 1.875349, 1.0},
+		}, //H
+		{
+			{0, 0, 19.248269, 1.0},
+			{0, 0, 3.746353 , 1.0},
+			{0, 0, 0.729165, 1.0},
+			{0, 1, 4.523992, 1.0},
+			{0, 1, 1.648567, 1.0},
+			{0, 2, 1.472906, 1.0},
+		}, //He
+		{
+			{0, 0, 1.1, 1.0},
+			{0, 1, 1.2, 1.0},
+			{0, 2, 1.3, 1.0},
+			{0, 3, 1.4, 1.0},
+			{0, 4, 1.5, 1.0},
+			{0, 5, 1.6, 1.0},
+			{0, 6, 1.7, 1.0},
+		}, //Li
+	}
+};
+
 const std::array<std::vector<primitive>, 1> _6_31Gdp_rifit =
 {
 	{
@@ -84,6 +127,8 @@ const std::array<std::vector<primitive>, 1> _6_31Gdp_rifit =
 		}, //H
 	}
 };
+
+
 
 
 const std::array<std::vector<primitive>, 118> combo_basis_fit =
