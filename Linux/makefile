@@ -16,8 +16,8 @@ OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set con
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_RASC_d)
-GCC_OPTS := -std=c++17 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++17 -Og -g -c -fmessage-length=0 -static -MMD -MP
+GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
+GCC_OPTS_DEBUG := -std=c++20 -Og -g -c -fmessage-length=0 -static -MMD -MP
 
 NoSpherA2_old: ${OBJS} ${USER_OBJS}
 	@echo 'Building target: $@'

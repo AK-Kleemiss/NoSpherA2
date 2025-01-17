@@ -3588,7 +3588,7 @@ void CINTdgemm_NN1(int m, int n, int k,
         }
         for (kp = 0; kp < k; kp++) {
             bi = b[kp + k * j];
-#pragma GCC ivdep
+#pragma ivdep
             for (i = 0; i < m; i++) {
                 c[i + ldc * j] += a[i + m * kp] * bi;
             }
@@ -3604,7 +3604,7 @@ void CINTdgemm_TN(int m, int n, int k,
     for (j = 0; j < n; j++) {
         for (i = 0; i < m; i++) {
             ci = 0;
-#pragma GCC ivdep
+#pragma ivdep
             for (kp = 0; kp < k; kp++) {
                 ci += a[kp + k * i] * b[kp + k * j];
             }
@@ -3624,7 +3624,7 @@ void CINTdgemm_NT(int m, int n, int k,
         }
         for (kp = 0; kp < k; kp++) {
             bi = b[j + n * kp];
-#pragma GCC ivdep
+#pragma ivdep
             for (i = 0; i < m; i++) {
                 c[i + m * j] += a[i + m * kp] * bi;
             }
@@ -4033,7 +4033,7 @@ static void a_bra_cart2spinor_si(double *gspR, double *gspI,
                 saI = 0;
                 sbR = 0;
                 sbI = 0;
-#pragma GCC ivdep
+#pragma ivdep
                 for (n = 0; n < nf; n++) {
                         v1 = g1[j*nf+n];
                         vx = gx[j*nf+n];
@@ -4083,7 +4083,7 @@ static void a_bra_cart2spinor_sf(double *gspR, double *gspI,
                 saI = 0;
                 sbR = 0;
                 sbI = 0;
-#pragma GCC ivdep
+#pragma ivdep
                 for (n = 0; n < nf; n++) {
                         v1 = g1[j*nf+n];
                         caR = coeffR[i*nf*2   +n];
@@ -4126,7 +4126,7 @@ static void a_bra1_cart2spinor_si(double *gspR, double *gspI,
         double caR, caI, cbR, cbI, v1, vx, vy, vz;
 
         for (j = 0; j < nket; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (i = 0; i < ndg; i++) {
                         gspaR[j*ndg+i] = 0;
                         gspaI[j*ndg+i] = 0;
@@ -4139,7 +4139,7 @@ static void a_bra1_cart2spinor_si(double *gspR, double *gspI,
                         caI = coeffI[i*nf*2   +n];
                         cbR = coeffR[i*nf*2+nf+n];
                         cbI = coeffI[i*nf*2+nf+n];
-#pragma GCC ivdep
+#pragma ivdep
                         for (m = 0; m < ngrids; m++) {
                                 v1 = g1[(j*nf+n)*ngrids+m];
                                 vx = gx[(j*nf+n)*ngrids+m];
@@ -4178,7 +4178,7 @@ static void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
         double caR, caI, cbR, cbI, v1;
 
         for (j = 0; j < nket; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (i = 0; i < ndg; i++) {
                         gspaR[j*ndg+i] = 0;
                         gspaI[j*ndg+i] = 0;
@@ -4191,7 +4191,7 @@ static void a_bra1_cart2spinor_sf(double *gspR, double *gspI,
                         caI = coeffI[i*nf*2   +n];
                         cbR = coeffR[i*nf*2+nf+n];
                         cbI = coeffI[i*nf*2+nf+n];
-#pragma GCC ivdep
+#pragma ivdep
                         for (m = 0; m < ngrids; m++) {
                                 v1 = g1[(j*nf+n)*ngrids+m];
                                 gspaR[(j*nd+i)*ngrids+m] += caR * v1;
@@ -4239,7 +4239,7 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
         double v11I, v12I, v21I, v22I;
 
         for (j = 0; j < nket; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (i = 0; i < ndg; i++) {
                         gspaR[j*ndg+i] = 0;
                         gspaI[j*ndg+i] = 0;
@@ -4252,7 +4252,7 @@ static void a_bra1_cart2spinor_zi(double *gspR, double *gspI,
                         caI = coeffI[i*nf*2   +n];
                         cbR = coeffR[i*nf*2+nf+n];
                         cbI = coeffI[i*nf*2+nf+n];
-#pragma GCC ivdep
+#pragma ivdep
                         for (m = 0; m < ngrids; m++) {
                                 // [ 1+1j*z, y+1j*x]
                                 // [-y+1j*x, 1-1j*z]
@@ -4299,7 +4299,7 @@ static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
         double caR, caI, cbR, cbI, v1R, v1I;
 
         for (j = 0; j < nket; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (i = 0; i < ndg; i++) {
                         gspaR[j*ndg+i] = 0;
                         gspaI[j*ndg+i] = 0;
@@ -4312,7 +4312,7 @@ static void a_bra1_cart2spinor_zf(double *gspR, double *gspI,
                         caI = coeffI[i*nf*2   +n];
                         cbR = coeffR[i*nf*2+nf+n];
                         cbI = coeffI[i*nf*2+nf+n];
-#pragma GCC ivdep
+#pragma ivdep
                         for (m = 0; m < ngrids; m++) {
                                 v1R = g1R[(j*nf+n)*ngrids+m];
                                 v1I = g1I[(j*nf+n)*ngrids+m];
@@ -4345,7 +4345,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
         double cR, cI, gR, gI;
 
         for (i = 0; i < nd; i++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < nbra; j++) {
                         gspR[j+i*nbra] = 0;
                         gspI[j+i*nbra] = 0;
@@ -4355,7 +4355,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
                         cI = coeffI[i*nf2+n];
                         if (cR != 0) {
                                 if (cI != 0) {
-#pragma GCC ivdep
+#pragma ivdep
                                         for (j = 0; j < nbra; j++) {
                                                 gR = gcartR[j+n*nbra];
                                                 gI = gcartI[j+n*nbra];
@@ -4363,7 +4363,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
                                                 gspI[j+i*nbra] += cI * gR + cR * gI;
                                         }
                                 } else {
-#pragma GCC ivdep
+#pragma ivdep
                                         for (j = 0; j < nbra; j++) {
                                                 gR = gcartR[j+n*nbra];
                                                 gI = gcartI[j+n*nbra];
@@ -4373,7 +4373,7 @@ static void a_ket_cart2spinor(double *gspR, double *gspI,
                                 }
                         } else {
                                 if (cI != 0) {
-#pragma GCC ivdep
+#pragma ivdep
                                         for (j = 0; j < nbra; j++) {
                                                 gR = gcartR[j+n*nbra];
                                                 gI = gcartI[j+n*nbra];
@@ -4426,7 +4426,7 @@ static void a_ket1_cart2spinor(double *gspR, double *gspI,
 
         for (i = 0; i < nd; i++) {
                 for (k = 0; k < counts; k++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (j = 0; j < nbra; j++) {
                         gspR[k*nds+j+i*nbra] = 0;
                         gspI[k*nds+j+i*nbra] = 0;
@@ -4437,7 +4437,7 @@ static void a_ket1_cart2spinor(double *gspR, double *gspI,
                         cbR = coeffR[i*nf2+nf+n];
                         cbI = coeffI[i*nf2+nf+n];
                         for (k = 0; k < counts; k++) {
-#pragma GCC ivdep
+#pragma ivdep
                         for (j = 0; j < nbra; j++) {
                                 gaR = gcartaR[k*nfs+j+n*nbra];
                                 gaI = gcartaI[k*nfs+j+n*nbra];
@@ -4504,7 +4504,7 @@ static void dcopy_grids_ij(double *out, const double *gctr,
 
         for (j = 0; j < mj; j++) {
                 for (i = 0; i < mi; i++) {
-#pragma GCC ivdep
+#pragma ivdep
                 for (m = 0; m < mgrids; m++) {
                         out[i*ngrids+m] = gctr[i*mgrids+m];
                 } }
@@ -4524,7 +4524,7 @@ static void dcopy_grids_ij(double *out, const double *gctr,
 //
 //        for (j = 0; j < mj; j++) {
 //                for (i = 0; i < mi; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (m = 0; m < mgrids; m++) {
 //                        dout[(i*ngrids+m)*OF_CMPLX  ] = gctrR[i*mgrids+m];
 //                        dout[(i*ngrids+m)*OF_CMPLX+1] = gctrI[i*mgrids+m];
@@ -4558,7 +4558,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                         for (k = 0; k < mk; k++) {
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                                 for (j = 0; j < mj; j++) {
                                         pijkl[ni*j] = pgctr[mikl*j];
                                 }
@@ -4572,7 +4572,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                         for (k = 0; k < mk; k++) {
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                                 for (j = 0; j < mj; j++) {
                                         pijkl[ni*j+0] = pgctr[mikl*j+0];
                                         pijkl[ni*j+1] = pgctr[mikl*j+1];
@@ -4588,7 +4588,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                         for (k = 0; k < mk; k++) {
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                                 for (j = 0; j < mj; j++) {
                                         pijkl[ni*j+0] = pgctr[mikl*j+0];
                                         pijkl[ni*j+1] = pgctr[mikl*j+1];
@@ -4606,7 +4606,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                         for (k = 0; k < mk; k++) {
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                                 for (j = 0; j < mj; j++) {
                                         pijkl[ni*j+0] = pgctr[mikl*j+0];
                                         pijkl[ni*j+1] = pgctr[mikl*j+1];
@@ -4625,7 +4625,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                         for (k = 0; k < mk; k++) {
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
-#pragma GCC ivdep
+#pragma ivdep
                                 for (j = 0; j < mj; j++) {
                                         pijkl[ni*j+0] = pgctr[mikl*j+0];
                                         pijkl[ni*j+1] = pgctr[mikl*j+1];
@@ -4646,7 +4646,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                                 pijkl = fijkl + k * nij;
                                 pgctr = gctr + k * mi;
                                 for (j = 0; j < mj; j++) {
-#pragma GCC ivdep
+#pragma ivdep
                                         for (i = 0; i < mi; i++) {
                                                 pijkl[ni*j+i] = pgctr[mikl*j+i];
                                         }
@@ -4676,7 +4676,7 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
 //                        pgctrR = gctrR + k * mi;
 //                        pgctrI = gctrI + k * mi;
 //                        for (j = 0; j < mj; j++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                                for (i = 0; i < mi; i++) {
 //                                        pijkl[(j*ni+i)*OF_CMPLX  ] = pgctrR[j*mikl+i];
 //                                        pijkl[(j*ni+i)*OF_CMPLX+1] = pgctrI[j*mikl+i];
@@ -6496,7 +6496,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                saI = 0;
 //                sbR = 0;
 //                sbI = 0;
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (n = 0; n < nf; n++) {
 //                        v1 = gcart[j*nf+n];
 //                        caR = coeffR[i*nf*2   +n];
@@ -6540,7 +6540,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                saI = 0;
 //                sbR = 0;
 //                sbI = 0;
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (n = 0; n < nf; n++) {
 //                        v1R = creal(gcart[j*nf+n]);
 //                        v1I = cimag(gcart[j*nf+n]);
@@ -6580,7 +6580,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //        double cR, cI, gR, gI;
 //
 //        for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (j = 0; j < nbra; j++) {
 //                        gspz[(j+i*nbra)*OF_CMPLX  ] = 0;
 //                        gspz[(j+i*nbra)*OF_CMPLX+1] = 0;
@@ -6588,7 +6588,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                for (n = 0; n < nf2; n++) {
 //                        cR = coeffR[i*nf2+n];
 //                        cI = coeffI[i*nf2+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < nbra; j++) {
 //                                gR = creal(gcart[j+n*nbra]);
 //                                gI = cimag(gcart[j+n*nbra]);
@@ -6619,7 +6619,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //        double cR, cI, gR, gI;
 //
 //        for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (j = 0; j < nbra; j++) {
 //                        gspz[(j+i*nbra)*OF_CMPLX  ] = 0;
 //                        gspz[(j+i*nbra)*OF_CMPLX+1] = 0;
@@ -6627,7 +6627,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                for (n = 0; n < nf2; n++) {
 //                        cR = coeffR[i*nf2+n];
 //                        cI = coeffI[i*nf2+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < nbra; j++) {
 //                                gR = creal(gcart[j+n*nbra]);
 //                                gI = cimag(gcart[j+n*nbra]);
@@ -6661,7 +6661,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //        for (i = 0; i < nd; i++) {
 //                sR = 0;
 //                sI = 0;
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (n = 0; n < nf2; n++) {
 //                        gR = creal(gcart[j*nf2+n]);
 //                        gI = cimag(gcart[j*nf2+n]);
@@ -6700,7 +6700,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //        for (i = 0; i < nd; i++) {
 //                sR = 0;
 //                sI = 0;
-//#pragma GCC ivdep
+//#pragma ivdep
 //                for (n = 0; n < nf; n++) {
 //                        caR = coeffR[i*nf*2   +n];
 //                        caI = coeffI[i*nf*2   +n];
@@ -6744,7 +6744,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //
 //        for (k = 0; k < nctr; k++) {
 //                for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < ldc; j++) {
 //                                gspaz[(j+i*lds)*OF_CMPLX  ] = 0;
 //                                gspaz[(j+i*lds)*OF_CMPLX+1] = 0;
@@ -6756,7 +6756,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                                caI = coeffI[i*nf*2   +n];
 //                                cbR = coeffR[i*nf*2+nf+n];
 //                                cbI = coeffI[i*nf*2+nf+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                                for (j = 0; j < ldc; j++) {
 //                                        v1 = gcart[j+n*ldc];
 //                                        gspaz[(j+i*lds)*OF_CMPLX  ] += caR * v1;
@@ -6793,7 +6793,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //
 //        for (k = 0; k < nctr; k++) {
 //                for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < ldc; j++) {
 //                                gspaz[(j+i*lds)*OF_CMPLX  ] = 0;
 //                                gspaz[(j+i*lds)*OF_CMPLX+1] = 0;
@@ -6805,7 +6805,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                                caI = coeffI[i*nf*2   +n];
 //                                cbR = coeffR[i*nf*2+nf+n];
 //                                cbI = coeffI[i*nf*2+nf+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                                for (j = 0; j < ldc; j++) {
 //                                        v1 = gcart[j+n*ldc];
 //                                        gspaz[(j+i*lds)*OF_CMPLX  ] -= caI * v1;
@@ -6847,7 +6847,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //
 //        for (k = 0; k < nctr; k++) {
 //                for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < ldc; j++) {
 //                                gspaz[(j+i*lds)*OF_CMPLX  ] = 0;
 //                                gspaz[(j+i*lds)*OF_CMPLX+1] = 0;
@@ -6859,7 +6859,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                                caI = coeffI[i*nf*2   +n];
 //                                cbR = coeffR[i*nf*2+nf+n];
 //                                cbI = coeffI[i*nf*2+nf+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                                for (j = 0; j < ldc; j++) {
 //                                        v1 = gc_1[j+n*ldc];
 //                                        vx = gc_x[j+n*ldc];
@@ -6907,7 +6907,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //
 //        for (k = 0; k < nctr; k++) {
 //                for (i = 0; i < nd; i++) {
-//#pragma GCC ivdep
+//#pragma ivdep
 //                        for (j = 0; j < ldc; j++) {
 //                                gspaz[(j+i*lds)*OF_CMPLX  ] = 0;
 //                                gspaz[(j+i*lds)*OF_CMPLX+1] = 0;
@@ -6919,7 +6919,7 @@ double *CINTc2s_ket_sph1(double *sph, double *cart, int lds, int ldc, int l)
 //                                caI = coeffI[i*nf*2   +n];
 //                                cbR = coeffR[i*nf*2+nf+n];
 //                                cbI = coeffI[i*nf*2+nf+n];
-//#pragma GCC ivdep
+//#pragma ivdep
 //                                for (j = 0; j < ldc; j++) {
 //                                        v1 = gc_1[j+n*ldc];
 //                                        vx = gc_x[j+n*ldc];

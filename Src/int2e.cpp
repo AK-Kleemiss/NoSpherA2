@@ -95,7 +95,7 @@ void CINTdmat_transpose(double* a_t, double* a, int m, int n)
     int i, j, k;
 
     for (j = 0; j < n - 3; j += 4) {
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
@@ -106,20 +106,20 @@ void CINTdmat_transpose(double* a_t, double* a, int m, int n)
 
     switch (n - j) {
     case 1:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[j * m + i] = a[i * n + j];
         }
         break;
     case 2:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
         }
         break;
     case 3:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] = a[i * n + j + 0];
             a_t[(j + 1) * m + i] = a[i * n + j + 1];
@@ -137,7 +137,7 @@ void CINTdplus_transpose(double* a_t, double* a, int m, int n)
     int i, j, k;
 
     for (j = 0; j < n - 3; j += 4) {
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];
@@ -148,20 +148,20 @@ void CINTdplus_transpose(double* a_t, double* a, int m, int n)
 
     switch (n - j) {
     case 1:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[j * m + i] += a[i * n + j];
         }
         break;
     case 2:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];
         }
         break;
     case 3:
-#pragma GCC ivdep
+#pragma ivdep
         for (i = 0; i < m; i++) {
             a_t[(j + 0) * m + i] += a[i * n + j + 0];
             a_t[(j + 1) * m + i] += a[i * n + j + 1];

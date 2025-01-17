@@ -114,15 +114,15 @@
         type *GZ = G + envs->g_size * 2
 
 #define MALLOC_INSTACK(var, n) \
-        var = (double *)(((uintptr_t)cache + 7) & (-(uintptr_t)8)); \
+        var = (double *)(((uintptr_t)cache + 7) & (~(uintptr_t)7)); \
         cache = (double *)(var + (n));
 
 #define MALLOC_INSTACK_INT(var, n) \
-        var = (int *)(((uintptr_t)cache + 7) & (-(uintptr_t)8)); \
+        var = (int *)(((uintptr_t)cache + 7) & (~(uintptr_t)7)); \
         cache = (double *)(var + (n));
 
 #define MALLOC_INSTACK_PAIRDATA(var, n) \
-        var = (PairData *)(((uintptr_t)cache + 7) & (-(uintptr_t)8)); \
+        var = (PairData *)(((uintptr_t)cache + 7) & (~(uintptr_t)7)); \
         cache = (double *)(var + (n));
 
 
