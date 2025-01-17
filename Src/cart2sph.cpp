@@ -15,7 +15,7 @@
 #include "cart2sph.h"
 
 #define MALLOC_ALIGN8_INSTACK(var, n) \
-        var = (double *)(((uintptr_t)cache + 63) & (-(uintptr_t)64)); \
+        var = (double *)(((uintptr_t)cache + 63) & (~(uintptr_t)63)); \
         cache = (double *)(var + (n));
 
 static double g_trans_cart2sph[] = {
