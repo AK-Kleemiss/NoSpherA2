@@ -38,7 +38,7 @@ namespace constants
     constexpr double INV_SQRT5 = 1.0 / SQRT5;
     constexpr int hardness = 3;
     constexpr double cutoff = 1.0e-20;
-    constexpr double PI = 3.14159265358979323846;
+    constexpr double PI = 3.1415926535897932384626433832795028;
     constexpr double PI_4 = PI / 4.0;
     constexpr long double SQRTPI_4L = .8862269254527580136490837416705725913987747280611935641069038949264l;
     constexpr double INV_PI = 1.0 / PI;

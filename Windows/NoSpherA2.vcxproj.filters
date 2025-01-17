@@ -31,6 +31,12 @@
     <Filter Include="Quelldateien\SALTED">
       <UniqueIdentifier>{411a5573-0e6b-43bd-8cf5-f94a2d53f41a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headerdateien\libCint">
+      <UniqueIdentifier>{1fb1f3f3-df03-481e-9334-54667fc4e5a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\libCint">
+      <UniqueIdentifier>{9a89d622-da09-4a7d-aeb8-e84c75fa0c4f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -186,14 +192,26 @@
     <ClCompile Include="..\Src\ECPs_corrections.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\integrator.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\math.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\isosurface.cpp">
       <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\integrator.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\cart2sph.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\int2e.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\integration_params.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\rys_roots.cpp">
+      <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -986,14 +1004,26 @@
     <ClInclude Include="..\Src\pch.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\integrator.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\math.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\isosurface.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\integrator.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\cart2sph.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\int2e.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\integration_params.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\rys_roots.h">
+      <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -1011,6 +1041,9 @@
     </None>
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\Src\roots_for_x0.dat">
+      <Filter>Quelldateien\libCint</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

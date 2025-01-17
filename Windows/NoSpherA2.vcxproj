@@ -2911,12 +2911,16 @@
     <ClCompile Include="..\Lib\H5StrType.cpp" />
     <ClCompile Include="..\Lib\H5VarLenType.cpp" />
     <ClCompile Include="..\Src\atoms.cpp" />
+    <ClCompile Include="..\Src\cart2sph.cpp" />
     <ClCompile Include="..\Src\constants.cpp" />
     <ClCompile Include="..\Src\DLL_Helper.cpp" />
     <ClCompile Include="..\Src\ECPs_corrections.cpp" />
+    <ClCompile Include="..\Src\int2e.cpp" />
+    <ClCompile Include="..\Src\integration_params.cpp" />
     <ClCompile Include="..\Src\integrator.cpp" />
     <ClCompile Include="..\Src\isosurface.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
+    <ClCompile Include="..\Src\rys_roots.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\math.cpp" />
@@ -2937,6 +2941,7 @@
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />
     <ClInclude Include="../Src/def2-ECPs_GA.h" />
+    <ClInclude Include="..\Src\cart2sph.h" />
     <ClInclude Include="..\Src\constants.h" />
     <ClInclude Include="..\Src\ECPs_corrections.h" />
     <ClInclude Include="../Src/npy.h" />
@@ -3175,6 +3180,8 @@
     <ClInclude Include="..\Lib\hdf5.h" />
     <ClInclude Include="..\Lib\uthash.h" />
     <ClInclude Include="..\Src\DLL_Helper.h" />
+    <ClInclude Include="..\Src\int2e.h" />
+    <ClInclude Include="..\Src\integration_params.h" />
     <ClInclude Include="..\Src\integrator.h" />
     <ClInclude Include="..\Src\isosurface.h" />
     <ClInclude Include="..\Src\JKFit.h" />
@@ -3184,6 +3191,7 @@
     <ClInclude Include="..\Src\pch.h" />
     <ClInclude Include="..\Src\rascaline.h" />
     <ClInclude Include="..\Src\rascaline.hpp" />
+    <ClInclude Include="..\Src\rys_roots.h" />
     <ClInclude Include="..\Src\SALTED_equicomb.h" />
     <ClInclude Include="..\Src\SALTED_io.h" />
     <ClInclude Include="..\Src\math.h" />
@@ -3200,6 +3208,7 @@
     </_EmbedManagedResourceFile>
     <None Include="..\Linux\makefile" />
     <None Include="..\Mac\makefile" />
+    <None Include="..\Src\roots_for_x0.dat" />
     <None Include="..\tests\makefile" />
   </ItemGroup>
   <ItemGroup>
