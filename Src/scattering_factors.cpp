@@ -2287,7 +2287,7 @@ static int make_hirshfeld_grids_ML(
         for (e = 0; e < size; e++)
         {
             bf = wave.get_atom_basis_set_entry(i,e);
-            primitive p(i, bf.type, bf.exponent, bf.coefficient);
+            primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
             if (p.type > 0)
             {
                 break;
@@ -2301,8 +2301,8 @@ static int make_hirshfeld_grids_ML(
                  << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0)
                  << " | Coef Counter: " << coef_counter + e
                  << " | Size: " << size << setprecision(2)
-                 << " | Exponent: " << bf.exponent
-                 << " | Coefficient: " << bf.coefficient
+                 << " | Exponent: " << bf.get_exponent()
+                 << " | Coefficient: " << bf.get_coefficient()
                  << " | Norm Const: " << p.norm_const
                  << " | Temp Dens: " << temp_dens
                  << " | New Dens: " << n << endl;
@@ -2312,7 +2312,7 @@ static int make_hirshfeld_grids_ML(
         for (e = 0; e < size; e++)
         {
             bf = wave.get_atom_basis_set_entry(i,e);
-            coef_counter += (2 * bf.type + 1);
+            coef_counter += (2 * bf.get_type() + 1);
         }
         file << "---------------------------------" << endl;
         // atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
@@ -2556,7 +2556,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                 const int lim = (int)atom_list[iat].get_basis_set_size();
                 for (int i_basis = 0; i_basis < lim; i_basis++)
                 {
-                    basis = atom_list[iat].get_basis_set_entry(i_basis).p;
+                    basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
                     vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
                     coef_count += 2 * basis.type + 1;
@@ -3688,7 +3688,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
 			int coef_count = 0;
             for (int i_basis = 0; i_basis < lim; i_basis++)
             {
-                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i,i_basis).p.type + 1;
+                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i,i_basis).get_primitive().type + 1;
             }
 
             //Remove atoms and coeffs from list if they are constant atoms

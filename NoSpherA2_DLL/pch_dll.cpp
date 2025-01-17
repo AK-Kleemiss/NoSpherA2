@@ -5,7 +5,7 @@
 // When you are using pre-compiled headers, this source file is necessary for compilation to succeed.
 // This is the only source file that includes pch_dll.h
 
-std::vector<Triangle> compute_Hirshfeld_suface_i(std::filesystem::path& fn1, std::filesystem::path& fn2, double& resolution, double& radius) {
+std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(std::filesystem::path& fn1, std::filesystem::path& fn2, double& resolution, double& radius) {
 
     if (radius < 2.5)
     {

@@ -1,6 +1,6 @@
 #include "basis_set.h"
 #include "convenience.h"
-struct basis_set_entry;
+class basis_set_entry;
 class WFN;
 
 //-------------Reading basis sets and determining the density matrix from the wfn coefficients -----------------------

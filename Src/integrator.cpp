@@ -98,8 +98,8 @@ void Int_Params::collect_basis_data() {
 		//Populate coefficients and exponents vectors
         vec coefficients, exponents;
         for (int shell = 0; shell < basis.size(); shell++){
-            coefficients.push_back(basis[shell].coefficient);
-			exponents.push_back(basis[shell].exponent);
+            coefficients.push_back(basis[shell].get_coefficient());
+			exponents.push_back(basis[shell].get_exponent());
 		}
 
         //Normalize the GTOs depending on the context
@@ -115,7 +115,7 @@ void Int_Params::collect_basis_data() {
 				vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
 				
 
-                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].type);
+                shell_coefs = normalize_gto(shell_coefs, shell_exp, basis[shell].get_type());
                 
 
 				//Place the new coefs at the correct place in the coefficients vector

@@ -292,7 +292,7 @@ const double calc_density_ML(const double& x,
                 for (e = 0; e < size; e++)
                 {
                     bf = atoms[a].get_basis_set_entry(e);
-                    coef_counter += (2 * bf.type + 1);
+                    coef_counter += (2 * bf.get_type() + 1);
                 }
                 continue;
             }
@@ -302,7 +302,7 @@ const double calc_density_ML(const double& x,
             for (e = 0; e < size; e++)
             {
                 bf = atoms[a].get_basis_set_entry(e);
-                primitive p(a, bf.type, bf.exponent, bf.coefficient);
+                primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
                 radial = gaussian_radial(p, d[3]);
                 if (radial < 1E-10)
                 {
@@ -338,7 +338,7 @@ const double calc_density_ML(const double& x,
                 for (e = 0; e < size; e++)
                 {
                     bf = atoms[a].get_basis_set_entry(e);
-                    primitive p(a, bf.type, bf.exponent, bf.coefficient);
+                    primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
 
                     radial = gaussian_radial(p, d[3]);
                     for (int m = -p.type; m <= p.type; m++)
@@ -387,7 +387,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
         for (e = 0; e < size; e++)
         {
             bf = atoms[i].get_basis_set_entry(e);
-            primitive p(i, bf.type, bf.exponent, bf.coefficient);
+            primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
             if (p.type > 0) {
                 break;
             }
@@ -402,7 +402,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
         for (e = 0; e < size; e++)
         {
             bf = atoms[i].get_basis_set_entry(e);
-            coef_counter += (2 * bf.type + 1);
+            coef_counter += (2 * bf.get_type() + 1);
         }
     }
     return atom_elecs;

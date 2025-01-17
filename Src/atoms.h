@@ -3,24 +3,41 @@
 
 //-----------------Definition of atoms and basis sets--------------------
 
-struct basis_set_entry{
+class basis_set_entry{
+private:
 	double coefficient;
 	double exponent;
 	unsigned int type; //1=S; 2=P; 3=D; 4=F; 5=G
 	unsigned int shell;
+	primitive p;
+public:
 	// Default assignment operator
 	basis_set_entry& operator=(const basis_set_entry& rhs) = default;
 	basis_set_entry();
 	basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
+    // Getter functions
+	
+    double get_coefficient() const { return coefficient; };
+    double get_exponent() const { return exponent; };
+    unsigned int get_type() const { return type; };
+    unsigned int get_shell() const { return shell; };
+    primitive get_primitive() const { return p; };
+    // Setter functions
+	 
+    void set_coefficient(const double& value) { coefficient = value; };
+    void set_exponent(const double& value) { exponent = value; };
+    void set_type(const unsigned int& value) { type = value; };
+    void set_shell(const unsigned int& value) { shell = value; };
+    void set_primitive(const primitive& value) { p = value; };
+
 	// Equality operator
 	bool operator==(const basis_set_entry& other) const {
-		return coefficient == other.coefficient &&
-			exponent == other.exponent &&
-			type == other.type &&
-			shell == other.shell &&
-			p == other.p;
+		return coefficient == other.get_coefficient() &&
+			exponent == other.get_exponent() &&
+			type == other.get_type() &&
+			shell == other.get_shell() &&
+			p == other.get_primitive();
 	}
-	primitive p;
 };
 
 class atom {
@@ -66,23 +83,18 @@ public:
     int get_nr() const { return nr; };
     void set_label(const std::string& l) { label = l; };
     void set_nr(const int& n) { nr = n; };
-
-
     void clear_basis_set() { basis_set.clear(); };
     int get_basis_set_size() const { return (int)basis_set.size(); };
-    double get_basis_set_exponent(const int& nr) const { return basis_set[nr].exponent; };
-    double get_basis_set_coefficient(const int& nr) const { return basis_set[nr].coefficient; };
-    void set_basis_set_exponent(const int& nr, const double& value) { basis_set[nr].exponent = value; };
-    void set_basis_set_coefficient(const int& nr, const double& value) { basis_set[nr].coefficient = value; };
-    void set_basis_set_type(const int& nr, const int& value) { basis_set[nr].type = value; };
-    void set_basis_set_shell(const int& nr, const int& value) { basis_set[nr].shell = value; };
+    double get_basis_set_exponent(const int& nr) const { return basis_set[nr].get_exponent(); };
+    double get_basis_set_coefficient(const int& nr) const { return basis_set[nr].get_coefficient(); };
+    void set_basis_set_exponent(const int& nr, const double& value) { basis_set[nr].set_exponent(value); };
+    void set_basis_set_coefficient(const int& nr, const double& value) { basis_set[nr].set_coefficient(value); };
+    void set_basis_set_type(const int& nr, const int& value) { basis_set[nr].set_type(value); };
+    void set_basis_set_shell(const int& nr, const int& value) { basis_set[nr].set_shell(value); };
     std::vector<basis_set_entry> get_basis_set() const { return basis_set; };
     void erase_basis_set(const unsigned int& nr) { basis_set.erase(basis_set.begin() + nr); };
-
-
-
-    int get_basis_set_type(const int& nr) const { return basis_set[nr].type; };
-    int get_basis_set_shell(const int& nr) const { return basis_set[nr].shell; };
+    int get_basis_set_type(const int& nr) const { return basis_set[nr].get_type(); };
+    int get_basis_set_shell(const int& nr) const { return basis_set[nr].get_shell(); };
     void set_basis_set_id(const int& id) { basis_set_id = id; };
     int get_basis_set_id() const { return basis_set_id; };
     void set_shellcount(const std::vector<unsigned int>& sc) { shellcount = sc; };

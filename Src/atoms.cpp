@@ -77,7 +77,7 @@ void atom::print_values_long() const {
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 	if (basis_set.size() > 0) {
 		for (unsigned int i = 0; i < basis_set.size(); i++) {
-			std::cout << "basis set entry " << i << ": expo: " << basis_set[i].exponent << " coef: " << basis_set[i].coefficient << " type: " << basis_set[i].type << " shell: " << basis_set[i].shell << std::endl;
+			std::cout << "basis set entry " << i << ": expo: " << basis_set[i].get_exponent() << " coef: " << basis_set[i].get_coefficient() << " type: " << basis_set[i].get_type() << " shell: " << basis_set[i].get_shell() << std::endl;
 		}
 	}
 	if (shellcount.size() > 0) {

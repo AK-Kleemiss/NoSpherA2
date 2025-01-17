@@ -47,13 +47,33 @@ struct DLL_EXPORT primitive
     bool operator==(const primitive &other) const;
 };
 
-struct DLL_EXPORT basis_set_entry
+class DLL_EXPORT basis_set_entry
 {
+public:
+    
     basis_set_entry &operator=(const basis_set_entry &rhs);
+    bool operator==(const basis_set_entry& other) const;
+    basis_set_entry();
+    basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
+    // Getter functions
+
+    double get_coefficient() const;
+    double get_exponent() const;
+    unsigned int get_type() const;
+    unsigned int get_shell() const;
+    primitive get_primitive() const;
+    // Setter functions
+
+    void set_coefficient(const double& value);
+    void set_exponent(const double& value);
+    void set_type(const unsigned int& value);
+    void set_shell(const unsigned int& value);
+    void set_primitive(const primitive& value);
 };
 
 class DLL_EXPORT atom
 {
+public:
     atom();
     atom(const std::string &l, const std::string &id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
     atom(const std::string &l, const std::string &id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch, const int &ECP_els);
@@ -294,6 +314,8 @@ public:
     const double *get_ptr_exponents();
     const double *get_ptr_mo_coefficients(const int &mo);
 };
+
+
 class DLL_EXPORT cube
 {
 public:
