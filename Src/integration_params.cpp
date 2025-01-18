@@ -120,9 +120,9 @@ void Int_Params::collect_basis_data()
             std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
 
-        vec shellcount_to_go(shellcount.size(), 0);
-		for (int shell = 0; shell < shellcount.size(); shell++) {
-			shellcount_to_go[shell] = (double)shellcount[shell];
+        vec shellcount_to_go(atoms[atom_idx].get_shellcount_size() , 0);
+		for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
+			shellcount_to_go[shell] = (double)atoms[atom_idx].get_shellcount(shell);
 		}
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
         basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients, exponents, {0.0}, shellcount_to_go}});
