@@ -2,7 +2,6 @@
 #include "properties.h"
 #include "convenience.h"
 #include "spherical_density.h"
-#include "cell.h"
 #include "cube.h"
 #include "constants.h"
 

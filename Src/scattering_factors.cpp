@@ -2288,11 +2288,11 @@ static int make_hirshfeld_grids_ML(
         {
             bf = wave.get_atom_basis_set_entry(i,e);
             primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-            if (p.type > 0)
+            if (p.get_type() > 0)
             {
                 break;
             }
-            radial = constants::PI / (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const; // gaussian_radial(p, d[3]) * p.coefficient;
+            radial = constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.get_coef() * p.normalization_constant(); // gaussian_radial(p, d[3]) * p.coefficient;
 
             n = coefs_temp[coef_counter + e] * radial;
 
@@ -2303,7 +2303,7 @@ static int make_hirshfeld_grids_ML(
                  << " | Size: " << size << setprecision(2)
                  << " | Exponent: " << bf.get_exponent()
                  << " | Coefficient: " << bf.get_coefficient()
-                 << " | Norm Const: " << p.norm_const
+                 << " | Norm Const: " << p.normalization_constant()
                  << " | Temp Dens: " << temp_dens
                  << " | New Dens: " << n << endl;
         }
@@ -2504,9 +2504,9 @@ double fourier_bessel_integral(
     const primitive &p,
     const double &H)
 {
-    const int l = p.type;
-    const double b = p.exp;
-    return p.norm_const * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
+    const int l = p.get_type();
+    const double b = p.get_exp();
+    return p.normalization_constant() * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
 cdouble sfac_bessel(
@@ -2522,11 +2522,13 @@ cdouble sfac_bessel(
         // normalize the spherical harmonics k_point
         spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
 
-    const cdouble radial = constants::FOUR_PI_i_pows[p.type] * fourier_bessel_integral(p, leng) * p.coefficient;
+    const int t = p.get_type();
+
+    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, leng) * p.get_coef();
     cdouble result(0.0, 0.0);
-    for (int m = -p.type; m <= p.type; m++)
+    for (int m = -t; m <= t; m++)
     {
-        result += radial * constants::real_spherical(p.type, m, spherical.first, spherical.second) * coefs[m + p.type];
+        result += radial * constants::real_spherical(t, m, spherical.first, spherical.second) * coefs[m + t];
     }
     return result;
 }
@@ -2557,9 +2559,9 @@ void calc_SF_SALTED(const vec2 &k_pt,
                 for (int i_basis = 0; i_basis < lim; i_basis++)
                 {
                     basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
-                    vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.type + 1);
+                    vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.get_type() + 1);
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
-                    coef_count += 2 * basis.type + 1;
+                    coef_count += 2 * basis.get_type() + 1;
                 }
             }
             pb.update();
@@ -3688,7 +3690,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
 			int coef_count = 0;
             for (int i_basis = 0; i_basis < lim; i_basis++)
             {
-                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i,i_basis).get_primitive().type + 1;
+                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i,i_basis).get_primitive().get_type() + 1;
             }
 
             //Remove atoms and coeffs from list if they are constant atoms

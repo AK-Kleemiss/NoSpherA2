@@ -99,7 +99,7 @@ public:
     int get_basis_set_id() const { return basis_set_id; };
     void set_shellcount(const std::vector<unsigned int>& sc) { shellcount = sc; };
     std::vector<unsigned int> get_shellcount() const { return shellcount; };
-    int get_shellcount_size() const { return (int)shellcount.size(); };
+    unsigned int get_shellcount_size() const { return (unsigned int)shellcount.size(); };
     void set_shellcount(const unsigned int& nr, const unsigned int& value) { shellcount[nr] = value; };
     unsigned int get_shellcount(const unsigned int& nr) const { return shellcount[nr]; };
     void clear_shellcount() { shellcount.clear(); };

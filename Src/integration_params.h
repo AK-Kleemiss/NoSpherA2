@@ -1,6 +1,7 @@
 #pragma once
 #include "convenience.h"
 #include "constants.h"
+#include "wfn_class.h"
 
 
 // global parameters in env

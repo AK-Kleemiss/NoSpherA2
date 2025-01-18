@@ -1,5 +1,6 @@
 #include "SALTED_predictor.h"
 #include "constants.h"
+#include "wfn_class.h"
 #include "pch.h"
 #include <filesystem>
 

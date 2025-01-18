@@ -324,19 +324,6 @@ static const int cornerIndexB[12] = {
     1, 2, 3, 0, 5, 6, 7, 4, 4, 5, 6, 7
 };
 
-double Triangle::calc_area() const {
-    std::array<double, 3> a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
-    std::array<double, 3> b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-    return 0.5 * array_length(cross(a, b));
-};
-double Triangle::calc_inner_volume() const {
-    std::array<double, 3> a = { v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2] };
-    std::array<double, 3> b = { v3[0] - v1[0], v3[1] - v1[1], v3[2] - v1[2] };
-    return a_dot(cross(b, a), v1) / 6.;
-};
-std::array<double, 3> Triangle::calc_center() const {
-    return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };
-};
 
 // --------------------------------------------------------------------------
 // A tiny helper to linearly interpolate a point along an edge between two corners
@@ -384,7 +371,7 @@ void get_colour(Triangle& t, const cube& volumeData, std::array<std::array<int, 
             colour[i] = 255;
         else if (colour[i] < 0)
             colour[i] = 0;
-    t.colour = colour;
+    t.set_colour(colour);
 };
 
 double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
@@ -433,7 +420,7 @@ void get_colour(Triangle& t, double(*func)(const std::array<double, 3>&, const W
             colour[i] = 255;
         else if (colour[i] < 0)
             colour[i] = 0;
-    t.colour = colour;
+    t.set_colour(colour);
 };
 
 // Function to subdivide a cube into smaller cubes
@@ -545,7 +532,7 @@ std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal,
                         break; // no more triangles for this cubeIndex
                     }
 
-                    Triangle tri{ vertList[e0], vertList[e1], vertList[e2] , {0,0,0}, 0 };
+                    Triangle tri(vertList[e0], vertList[e1], vertList[e2]);
 #pragma omp critical
                     triangles.push_back(tri);
                 }
@@ -572,9 +559,9 @@ bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>
     size_t vertexCount = 0;
     for (const auto& tri : triangles) {
         // "v x y z"
-        file << "v " << tri.v1[0] << " " << tri.v1[1] << " " << tri.v1[2] << "\n";
-        file << "v " << tri.v2[0] << " " << tri.v2[1] << " " << tri.v2[2] << "\n";
-        file << "v " << tri.v3[0] << " " << tri.v3[1] << " " << tri.v3[2] << "\n";
+        file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
+        file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
+        file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
     }
 
     // 2) Write faces
@@ -612,9 +599,9 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
     size_t vertexCount = 0;
     for (const auto& tri : triangles) {
         // "v x y z"
-        file << "v " << tri.v1[0] << " " << tri.v1[1] << " " << tri.v1[2] << "\n";
-        file << "v " << tri.v2[0] << " " << tri.v2[1] << " " << tri.v2[2] << "\n";
-        file << "v " << tri.v3[0] << " " << tri.v3[1] << " " << tri.v3[2] << "\n";
+        file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
+        file << "v " << tri.get_v(2)[0] << " " << tri.get_v(2)[1] << " " << tri.get_v(2)[2] << "\n";
+        file << "v " << tri.get_v(3)[0] << " " << tri.get_v(3)[1] << " " << tri.get_v(3)[2] << "\n";
     }
     writeMTL(mtl_filename, triangles);
 
@@ -626,7 +613,7 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
         size_t i2 = 3 * i + 2;
         size_t i3 = 3 * i + 3;
         // "f index1 index2 index3"
-        file << "usemtl FaceMaterial_" << triangles[i].colour_index << "\n";
+        file << "usemtl FaceMaterial_" << triangles[i].get_colour_index() << "\n";
         file << "f " << i1 << " " << i2 << " " << i3 << "\n";
     }
 
@@ -652,20 +639,20 @@ bool writeMTL(const std::string& mtlFilename,
         //look if we already have this colour
         bool found = false;
         for (int j = 0; j < faceColors.size(); j++) {
-            if (faceColors[j] == triangles[i].colour) {
+            if (faceColors[j] == triangles[i].get_colour()) {
                 found = true;
-                triangles[i].colour_index = j;
+                triangles[i].set_colour_index(j);
                 break;
             }
         }
         if (found) continue;
-        faceColors.push_back(triangles[i].colour);
-        triangles[i].colour_index = faceColors.size() - 1;
+        faceColors.push_back(triangles[i].get_colour());
+        triangles[i].set_colour_index(faceColors.size() - 1);
         out << "newmtl FaceMaterial_" << faceColors.size() - 1 << "\n";
         out << "Ka 1 1 1 \n";  // ambient is often set to white
-        out << "Kd " << triangles[i].colour[0] / 255.0 << " "
-            << triangles[i].colour[1] / 255.0 << " "
-            << triangles[i].colour[2] / 255.0 << "\n";  // diffuse
+        out << "Kd " << triangles[i].get_colour()[0] / 255.0 << " "
+            << triangles[i].get_colour()[1] / 255.0 << " "
+            << triangles[i].get_colour()[2] / 255.0 << "\n";  // diffuse
         out << "Ks 0.0 0.0 0.0\n";
         out << "Ns 0.0\n";
         out << "d 1.0\n";

@@ -1,4 +1,5 @@
 #include "integration_params.h"
+#include "JKFit.h"
 
 Int_Params::Int_Params()
 {

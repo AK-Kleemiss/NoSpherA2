@@ -3,6 +3,7 @@
 
 #include "convenience.h"
 #include "JKFit.h"
+#include "wfn_class.h"
 
 #include "math.h"
 #include "SALTED_io.h"

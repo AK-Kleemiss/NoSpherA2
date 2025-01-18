@@ -1,5 +1,7 @@
 #include "SALTED_utilities.h"
 #include "constants.h"
+#include "atoms.h"
+#include "cube.h"
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
@@ -55,16 +57,16 @@ void SALTED_Utils::set_lmax_nmax(std::unordered_map<std::string, int> &lmax, std
     {
         int atom_index = constants::get_Z_from_label(spe.c_str());
         // get the last element of the basis set for the given atom
-        lmax[spe] = basis_set[atom_index].back().type;
+        lmax[spe] = basis_set[atom_index].back().get_type();
         // initialize nmax with symbol + type
-        for (int i = 0; i < basis_set[atom_index].back().type + 1; i++)
+        for (int i = 0; i < basis_set[atom_index].back().get_type() + 1; i++)
         {
             nmax[spe + std::to_string(i)] = 0;
         }
         // count the number of primitives for the given atom and type
         for (int i = 0; i < basis_set[atom_index].size(); i++)
         {
-            nmax[spe + std::to_string(basis_set[atom_index][i].type)] += 1;
+            nmax[spe + std::to_string(basis_set[atom_index][i].get_type())] += 1;
         }
     }
 }
@@ -306,15 +308,15 @@ const double calc_density_ML(const double& x,
                 radial = gaussian_radial(p, d[3]);
                 if (radial < 1E-10)
                 {
-                    coef_counter += (2 * p.type + 1);
+                    coef_counter += (2 * p.get_type() + 1);
                     continue;
                 }
-                for (int m = -p.type; m <= p.type; m++)
+                for (int m = -p.get_type(); m <= p.get_type(); m++)
                 {
                     // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                    dens += coefficients[coef_counter + m + p.type] * radial * constants::spherical_harmonic(p.type, m, d);
+                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
                 }
-                coef_counter += (2 * p.type + 1);
+                coef_counter += (2 * p.get_type() + 1);
             }
         }
     }
@@ -341,12 +343,12 @@ const double calc_density_ML(const double& x,
                     primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
 
                     radial = gaussian_radial(p, d[3]);
-                    for (int m = -p.type; m <= p.type; m++)
+                    for (int m = -p.get_type(); m <= p.get_type(); m++)
                     {
                         // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                        dens += coefficients[coef_counter + m + p.type] * radial * constants::spherical_harmonic(p.type, m, d);
+                        dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
                     }
-                    coef_counter += (2 * p.type + 1);
+                    coef_counter += (2 * p.get_type() + 1);
                 }
                 return dens;
             }
@@ -388,10 +390,10 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
         {
             bf = atoms[i].get_basis_set_entry(e);
             primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-            if (p.type > 0) {
+            if (p.get_type() > 0) {
                 break;
             }
-            radial = constants::PI / (2.0 * std::pow(p.exp, 1.5)) * p.coefficient * p.norm_const;
+            radial = constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.get_coef() * p.normalization_constant();
 
             temp_dens += coefs[coef_counter + e] * radial;
         }

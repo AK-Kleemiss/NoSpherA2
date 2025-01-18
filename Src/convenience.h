@@ -431,11 +431,13 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
-struct primitive
+class primitive
 {
+private:
     int center, type;
     double exp, coefficient;
     double norm_const = -10;
+public:
     void normalize()
     {
         coefficient *= normalization_constant();
@@ -458,6 +460,38 @@ struct primitive
                exp == other.exp &&
                coefficient == other.coefficient;
     };
+    int get_center() const
+    {
+        return center;
+    };
+    int get_type() const
+    {
+        return type;
+    };
+    double get_exp() const
+    {
+        return exp;
+    };
+    double get_coef() const
+    {
+        return coefficient;
+    };
+    void set_center(const int& c)
+    {
+        center = c;
+    };
+    void set_type(const int& t)
+    {
+        type = t;
+    };
+    void set_exp(const double& e)
+    {
+        exp = e;
+    };
+    void set_coef(const double& c)
+    {
+        coefficient = c;
+    };
 };
 
 struct ECP_primitive : primitive
@@ -467,27 +501,6 @@ struct ECP_primitive : primitive
     ECP_primitive(int c, int t, double e, double coef, int n) : primitive(c, t, e, coef), n(n) {}
 };
 
-struct tonto_primitive
-{
-    int center, type;
-    double exp, coefficient;
-    double norm_const = -10;
-    void normalize()
-    {
-        coefficient *= normalization_constant();
-    };
-    void unnormalize()
-    {
-        coefficient /= normalization_constant();
-    };
-    double normalization_constant() const
-    {
-        // assuming type is equal to angular momentum
-        return norm_const;
-    }
-    tonto_primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {}
-    tonto_primitive(int c, int t, double e, double coef);
-};
 typedef std::array<int, 3> hkl_t;
 typedef std::set<hkl_t> hkl_list;
 typedef std::set<hkl_t>::const_iterator hkl_list_it;
@@ -649,7 +662,3 @@ bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
 bool ExtractDLL(const std::filesystem::path &dllName);
 bool check_OpenBLAS_DLL(const bool &debug = false);
 #endif
-
-#include "wfn_class.h"
-#include "atoms.h"
-#include "JKFit.h"

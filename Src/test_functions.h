@@ -1239,7 +1239,7 @@ double s_value(double *d)
 {
     primitive p_0(0, 0, 3.5, 1.0);
     int m = 0;
-    return pow(gaussian_radial(p_0, d[3]) * constants::spherical_harmonic(p_0.type, m, d), 2);
+    return pow(gaussian_radial(p_0, d[3]) * constants::spherical_harmonic(p_0.get_type(), m, d), 2);
 }
 
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)

@@ -4,6 +4,10 @@
 #include "test_functions.h"
 #include "integrator.h"
 #include "properties.h"
+#include "wfn_class.h"
+#include "atoms.h"
+#include "JKFit.h"
+
 #ifdef _WIN32
 #include <windows.h>
 bool has_BLAS = false;
@@ -527,11 +531,6 @@ primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), 
     norm_const = pow(
         pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
         0.25);
-};
-
-tonto_primitive::tonto_primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
-{
-    norm_const = pow(constants::PI, -0.75) * pow(2.0, type + 0.75) * pow(exp, type * 0.5 + 0.75) / sqrt(doublefactorial(type));
 };
 
 /*bool open_file_dialog(string &path, bool debug, vector <string> filter){
@@ -1742,7 +1741,7 @@ double get_lambda_1(double *a)
 
 const double gaussian_radial(primitive &p, double &r)
 {
-    return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
+    return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
 
 double get_bessel_ratio(const double nu, const double x)
@@ -1902,8 +1901,8 @@ int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118>
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
-            nr_coefs += 2 * basis[e].type + 1;
+            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
+            nr_coefs += 2 * basis[e].get_type() + 1;
         }
     }
     return nr_coefs;
@@ -1920,8 +1919,8 @@ int load_basis_into_WFN(WFN &wavy, BasisSet &b)
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
-            nr_coefs += 2 * basis[e].type + 1;
+            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
+            nr_coefs += 2 * basis[e].get_type() + 1;
         }
     }
     return nr_coefs;

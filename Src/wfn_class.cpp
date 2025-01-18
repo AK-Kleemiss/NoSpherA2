@@ -1484,21 +1484,21 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
                 // err_checkf(temp_shellsizes[basis_run] == 1, "Please do not feed me contracted basis sets yet...", file);
-                switch (prims[basis_run].type)
+                switch (prims[basis_run].get_type())
                 {
                 case 1:
                 {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        double t = stod(temp[1]) * prims[basis_run + s].get_coef();
                         if (abs(t) < 1E-10)
                             t = 0;
                         push_back_MO_coef(MO_run, t);
                         if (MO_run == 0)
                         {
-                            push_back_exponent(prims[basis_run + s].exp);
-                            push_back_center(prims[basis_run].center);
-                            push_back_type(prims[basis_run].type);
+                            push_back_exponent(prims[basis_run + s].get_exp());
+                            push_back_center(prims[basis_run].get_center());
+                            push_back_type(prims[basis_run].get_type());
                             nex++;
                         }
                     }
@@ -1516,7 +1516,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     p_run++;
                     if (p_run == 3)
@@ -1532,14 +1532,14 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, temp_coef);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     if (cart == 0)
-                                        push_back_type(prims[basis_run].type + 2);
+                                        push_back_type(prims[basis_run].get_type() + 2);
                                     else if (cart == 1)
-                                        push_back_type(prims[basis_run].type);
+                                        push_back_type(prims[basis_run].get_type());
                                     else if (cart == 2)
-                                        push_back_type(prims[basis_run].type + 1);
+                                        push_back_type(prims[basis_run].get_type() + 1);
                                     nex++;
                                 }
                             }
@@ -1560,7 +1560,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     d_run++;
                     if (d_run == 5)
@@ -1580,8 +1580,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, temp_coef);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(5 + cart);
                                     nex++;
                                 }
@@ -1603,7 +1603,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     f_run++;
                     if (f_run == 7)
@@ -1623,8 +1623,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, temp_coef);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(11 + cart);
                                     nex++;
                                 }
@@ -1646,7 +1646,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     g_run++;
                     if (g_run == 9)
@@ -1666,8 +1666,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, temp_coef);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(21 + cart);
                                     nex++;
                                 }
@@ -1773,21 +1773,21 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                 temp = split_string<string>(line, " ");
                 remove_empty_elements(temp);
                 coefficients[spin][MO_run].push_back(stod(temp[1]));
-                switch (prims[basis_run].type)
+                switch (prims[basis_run].get_type())
                 {
                 case 1:
                 {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        double t = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        double t = stod(temp[1]) * prims[basis_run + s].get_coef();
                         if (abs(t) < 1E-10)
                             t = 0;
                         push_back_MO_coef(MO_run, t);
                         if (MO_run == 0)
                         {
-                            push_back_exponent(prims[basis_run + s].exp);
-                            push_back_center(prims[basis_run].center);
-                            push_back_type(prims[basis_run].type);
+                            push_back_exponent(prims[basis_run + s].get_exp());
+                            push_back_center(prims[basis_run].get_center());
+                            push_back_type(prims[basis_run].get_type());
                             nex++;
                         }
                     }
@@ -1805,7 +1805,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        p_temp[p_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     p_run++;
                     if (p_run == 3)
@@ -1821,9 +1821,9 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, temp_coef);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
-                                    push_back_type(prims[basis_run].type + cart);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(prims[basis_run].get_type() + cart);
                                     nex++;
                                 }
                             }
@@ -1844,7 +1844,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        d_temp[d_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     d_run++;
                     if (d_run == 6)
@@ -1859,8 +1859,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                             {
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(5 + cart);
                                     nex++;
                                 }
@@ -1882,7 +1882,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        f_temp[f_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     f_run++;
                     if (f_run == 10)
@@ -1911,8 +1911,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                     push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(15));
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run + s].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(11 + cart);
                                     nex++;
                                 }
@@ -1934,7 +1934,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                     }
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].coefficient;
+                        g_temp[g_run][s] = stod(temp[1]) * prims[basis_run + s].get_coef();
                     }
                     g_run++;
                     if (g_run == 15)
@@ -1946,8 +1946,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
                                 push_back_MO_coef(MO_run, g_temp[cart][s]);
                                 if (MO_run == 0)
                                 {
-                                    push_back_exponent(prims[basis_run].exp);
-                                    push_back_center(prims[basis_run].center);
+                                    push_back_exponent(prims[basis_run].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
                                     push_back_type(21 + cart);
                                     nex++;
                                 }
@@ -2206,21 +2206,21 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 // }
                 for (int p = 0; p < expected_coefs; p++)
                 {
-                    switch (prims[basis_run].type)
+                    switch (prims[basis_run].get_type())
                     {
                     case 1:
                     {
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            double t = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+                            double t = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                             if (abs(t) < 1E-10)
                                 t = 0;
                             push_back_MO_coef(MO_run, t);
                             if (MO_run == 0)
                             {
-                                push_back_exponent(prims[basis_run + s].exp);
-                                push_back_center(prims[basis_run].center);
-                                push_back_type(prims[basis_run].type);
+                                push_back_exponent(prims[basis_run + s].get_exp());
+                                push_back_center(prims[basis_run].get_center());
+                                push_back_type(prims[basis_run].get_type());
                                 nex++;
                             }
                         }
@@ -2238,7 +2238,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         }
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            p_temp[p_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+                            p_temp[p_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                         }
                         p_run++;
                         if (p_run == 3)
@@ -2254,14 +2254,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                                     push_back_MO_coef(MO_run, temp_coef);
                                     if (MO_run == 0)
                                     {
-                                        push_back_exponent(prims[basis_run + s].exp);
-                                        push_back_center(prims[basis_run].center);
+                                        push_back_exponent(prims[basis_run + s].get_exp());
+                                        push_back_center(prims[basis_run].get_center());
                                         if (cart == 0)
-                                            push_back_type(prims[basis_run].type + 2);
+                                            push_back_type(prims[basis_run].get_type() + 2);
                                         else if (cart == 1)
-                                            push_back_type(prims[basis_run].type);
+                                            push_back_type(prims[basis_run].get_type());
                                         else if (cart == 2)
-                                            push_back_type(prims[basis_run].type + 1);
+                                            push_back_type(prims[basis_run].get_type() + 1);
                                         nex++;
                                     }
                                 }
@@ -2282,7 +2282,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         }
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            d_temp[d_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+                            d_temp[d_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                         }
                         d_run++;
                         if (d_run == 5)
@@ -2302,8 +2302,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                                     push_back_MO_coef(MO_run, temp_coef);
                                     if (MO_run == 0)
                                     {
-                                        push_back_exponent(prims[basis_run + s].exp);
-                                        push_back_center(prims[basis_run].center);
+                                        push_back_exponent(prims[basis_run + s].get_exp());
+                                        push_back_center(prims[basis_run].get_center());
                                         push_back_type(5 + cart);
                                         nex++;
                                     }
@@ -2325,7 +2325,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         }
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            f_temp[f_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+                            f_temp[f_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                         }
                         f_run++;
                         if (f_run == 7)
@@ -2345,8 +2345,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                                     push_back_MO_coef(MO_run, temp_coef);
                                     if (MO_run == 0)
                                     {
-                                        push_back_exponent(prims[basis_run + s].exp);
-                                        push_back_center(prims[basis_run].center);
+                                        push_back_exponent(prims[basis_run + s].get_exp());
+                                        push_back_center(prims[basis_run].get_center());
                                         push_back_type(11 + cart);
                                         nex++;
                                     }
@@ -2368,7 +2368,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         }
                         for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            g_temp[g_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].coefficient;
+                            g_temp[g_run][s] = coefficients[i][j + p * dimension] * prims[basis_run + s].get_coef();
                         }
                         g_run++;
                         if (g_run == 9)
@@ -2388,8 +2388,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                                     push_back_MO_coef(MO_run, temp_coef);
                                     if (MO_run == 0)
                                     {
-                                        push_back_exponent(prims[basis_run].exp);
-                                        push_back_center(prims[basis_run].center);
+                                        push_back_exponent(prims[basis_run].get_exp());
+                                        push_back_center(prims[basis_run].get_center());
                                         push_back_type(21 + cart);
                                         nex++;
                                     }

@@ -1,6 +1,8 @@
 // pch_dll.cpp: source file corresponding to the pre-compiled header
 
 #include "pch_dll.h"
+#include "../Src/cube.h"
+#include "../Src/properties.h"
 
 // When you are using pre-compiled headers, this source file is necessary for compilation to succeed.
 // This is the only source file that includes pch_dll.h
