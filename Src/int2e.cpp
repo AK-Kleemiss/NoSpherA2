@@ -5656,6 +5656,7 @@ void computeEri3c(Int_Params& param1,
     int nAux = param2.get_nbas();
 
     Int_Params combined = param1 + param2;
+	combined.print_data("combined");
 
     //int* bas = combined.get_ptr_bas();
     //int* atm = combined.get_ptr_atm();

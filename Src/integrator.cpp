@@ -144,15 +144,19 @@ int fixed_density_fit_test()
     err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
 #endif // __WIN32
 
-    WFN wavy_gbw("H2.gbw");
+    WFN wavy_gbw("TESTMOL.gbw");
     Int_Params normal_basis(wavy_gbw);
+	normal_basis.print_data("normal_basis");
+
 
     WFN wavy_aux(0);
 	wavy_aux.set_atoms(wavy_gbw.get_atoms());
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
-    //Int_Params aux_basis(wavy_aux, "cc-pvqz-jkfit");
-    Int_Params aux_basis(wavy_aux, "6-31G**_rifit");
+
+    Int_Params aux_basis(wavy_aux, "TESTING");
+	aux_basis.print_data("aux_basis");
+
 
     vec eri2c_test_test;
     vec eri3c_test_test;

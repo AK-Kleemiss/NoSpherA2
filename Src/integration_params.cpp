@@ -119,8 +119,13 @@ void Int_Params::collect_basis_data()
         {
             std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
-        // Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector])
-        basis_sets.insert({atoms[atom_idx].get_charge(), {coefficients, exponents, {0.0}}});
+
+        vec shellcount_to_go(shellcount.size(), 0);
+		for (int shell = 0; shell < shellcount.size(); shell++) {
+			shellcount_to_go[shell] = (double)shellcount[shell];
+		}
+        //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
+        basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients, exponents, {0.0}, shellcount_to_go}});
     }
 }
 
@@ -153,28 +158,23 @@ void Int_Params::populate_env()
         _env[env_offset + atom_idx * 4 + 2] = atoms[atom_idx].get_coordinate(2);
         _env[env_offset + atom_idx * 4 + 3] = 0; // zeta
     }
-    ivec seen_elements;
     int bas_ptr = _env.size();
-    for (int atom_idx = 0; atom_idx < ncen; atom_idx++)
-    {
-        if (std::find(seen_elements.begin(), seen_elements.end(), atoms[atom_idx].get_charge()) != seen_elements.end())
-        {
-            continue;
-        }
-        seen_elements.push_back(atoms[atom_idx].get_charge());
+    for (int charge = 1; charge < 118; charge++) {
+        //Check if charge is key in basis_sets
+		if (basis_sets.find(charge) == basis_sets.end()) {
+			continue;
+		}
 
-        basis_sets[atoms[atom_idx].get_charge()][2][0] = (double)bas_ptr;
+        basis_sets[charge][2][0] = (double)bas_ptr;
 
-        vec2 basis_data = basis_sets[atoms[atom_idx].get_charge()];
+        vec2 basis_data = basis_sets[charge];
         vec coefficients = basis_data[0];
         vec exponents = basis_data[1];
 
         int func_count = 0;
-        for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
-        {
-            int n_funcs = atoms[atom_idx].get_shellcount(shell);
-            for (int func = 0; func < n_funcs; func++)
-            {
+        for (int shell = 0; shell < basis_sets[charge][3].size(); shell++) {
+            int n_funcs = basis_sets[charge][3][shell];
+            for (int func = 0; func < n_funcs; func++) {
                 _env.push_back(exponents[func + func_count]);
             }
             for (int func = 0; func < n_funcs; func++)
@@ -270,8 +270,32 @@ Int_Params Int_Params::operator+(const Int_Params &other)
     return combined;
 }
 
-ivec make_loc(ivec &bas, int nbas)
-{
+void Int_Params::print_data(std::string name) {
+	std::cout << "Printing data for " << name << std::endl;
+	std::ofstream file(name + ".txt");
+	file << "ATM:" << std::endl;
+	for (int a = 0; a < _atm.size()/6; a++) {
+		for (int i = 0; i < 6; i++) {
+            file << _atm[a * 6 + i] << " ";
+		}
+		file << std::endl;
+	}
+	file << "\n\nBAS:" << std::endl;
+	for (int b = 0; b < _bas.size() / 8; b++) {
+		for (int i = 0; i < 8; i++) {
+			file << _bas[b * 8 + i] << " ";
+		}
+		file << std::endl;
+	}
+	file << "\n\nENV:" << std::endl;
+	for (int e = 0; e < _env.size(); e++) {
+		file << _env[e] << " ";
+	}
+	file.close();
+}
+
+
+ivec make_loc(ivec& bas, int nbas) {
     ivec dims(nbas, 0);
     // Calculate (2*l + 1) * nctr for spherical harmonics
     for (size_t i = 0; i < nbas; i++)

@@ -174,6 +174,8 @@ public:
     int get_nbas() { return nbas; };  // Number of basis segments
     int get_nao() { return nao; };    // Number of atomic orbitals  
     int get_natoms() { return ncen; };
+
+    void print_data(std::string name); //FOR DEBUG PURPOSES
 };
 
 typedef struct {
