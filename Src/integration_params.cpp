@@ -79,10 +79,8 @@ void Int_Params::collect_basis_data()
         // Collect number of basis functions per atom
         nbas += atoms[atom_idx].get_shellcount_size();
         // Skip if the basis set for this element has already been collected
-        if (basis_sets.find(atoms[atom_idx].get_charge()) != basis_sets.end())
-        {
-            continue;
-        }
+        if (basis_sets.find(atoms[atom_idx].get_charge()) != basis_sets.end())  continue;
+
 
         std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
         // Populate coefficients and exponents vectors
@@ -92,13 +90,13 @@ void Int_Params::collect_basis_data()
             coefficients.push_back(basis[shell].get_coefficient());
             exponents.push_back(basis[shell].get_exponent());
         }
-
         // Normalize the GTOs depending on the context
         if (wfn_origin == 9)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
-                coefficients[i] *= constants::sqr_pi * 2; // Conversion factor from GBW to libcint
+                int l = basis[i].get_type() - 1;
+                coefficients[i] *= std::sqrt(constants::PI * 4 / constants::double_ft[2*l+1]); // Conversion factor from GBW to libcint  ... something something, spherical harmonics...
             }
         }
         else if (wfn_origin == 0)
@@ -121,12 +119,44 @@ void Int_Params::collect_basis_data()
             std::cout << "WFN Origin not recognized, thread carefully! No normalisation was performed!" << std::endl;
         }
 
-        vec shellcount_to_go(atoms[atom_idx].get_shellcount_size() , 0);
-		for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
-			shellcount_to_go[shell] = (double)atoms[atom_idx].get_shellcount(shell);
-		}
+        int max_l = 1;
+        for (int func = 0; func < basis.size(); func++)
+        {
+            int new_l = 0;
+            if (wfn_origin == 0)      new_l = basis[func].get_type();
+            else if (wfn_origin == 9) new_l = basis[func].get_type() -1;
+            else {
+                std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                new_l = basis[func].get_type() -1;
+            }
+
+            if (new_l > max_l) max_l = new_l;
+        }
+
+        vec coefficients_new(coefficients.size(), 0.0), exponents_new(exponents.size(), 0.0);
+        vec shellcount_new, shelltype;
+        size_t pos_in_new_coeffs = 0;
+        for (int l = 0; l <= max_l; l++) {
+			int n_funcs = 0;
+            for (int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
+                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) {
+                    if (wfn_origin != 0 && wfn_origin != 9) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                    n_funcs += atoms[atom_idx].get_shellcount()[shell_idx];
+                    continue;
+                }
+
+				std::copy(coefficients.begin() + n_funcs, coefficients.begin() + n_funcs + atoms[atom_idx].get_shellcount()[shell_idx], coefficients_new.begin() + pos_in_new_coeffs);
+				std::copy(exponents.begin() + n_funcs, exponents.begin() + n_funcs + atoms[atom_idx].get_shellcount()[shell_idx], exponents_new.begin() + pos_in_new_coeffs);
+				shellcount_new.push_back(atoms[atom_idx].get_shellcount()[shell_idx]);
+				shelltype.push_back(l);
+				pos_in_new_coeffs += atoms[atom_idx].get_shellcount()[shell_idx];
+                n_funcs += atoms[atom_idx].get_shellcount()[shell_idx];
+
+
+            }
+        }
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
-        basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients, exponents, {0.0}, shellcount_to_go}});
+        basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients_new, exponents_new, {0.0}, shellcount_new, shelltype}});
     }
 }
 
@@ -184,7 +214,7 @@ void Int_Params::populate_env()
             }
             func_count += n_funcs;
         }
-        bas_ptr += func_count;
+        bas_ptr += func_count*2;
     }
 }
 
@@ -195,19 +225,13 @@ void Int_Params::populate_bas()
     int index = 0;
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++)
     {
-        int bas_ptr = basis_sets[atoms[atom_idx].get_charge()][2][0];
-        for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell += 1)
+        vec2 basis = basis_sets[atoms[atom_idx].get_charge()];
+        int bas_ptr = basis[2][0];
+        for (int shell = 0; shell < basis[3].size(); shell++)
         {
             _bas[index * 8 + 0] = atom_idx; // atom_id
-            if (wfn_origin == 0)
-            {
-                _bas[index * 8 + 1] = atoms[atom_idx].get_basis_set()[shell].get_type(); // l s=0, p=1, d=2 ...
-            }
-            else
-            {
-                _bas[index * 8 + 1] = atoms[atom_idx].get_basis_set()[shell].get_type() - 1; // l s=0, p=1, d=2 ...
-            }
-            _bas[index * 8 + 2] = atoms[atom_idx].get_shellcount(shell); // nprim
+            _bas[index * 8 + 1] = (int)basis[4][shell];  // l s=0, p=1, d=2 ...
+            _bas[index * 8 + 2] = (int)basis[3][shell];                  // nprim
             _bas[index * 8 + 3] = 1;                                     // ncentr    Not sure
             _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the end of the _env vector
             bas_ptr += _bas[index * 8 + 2];

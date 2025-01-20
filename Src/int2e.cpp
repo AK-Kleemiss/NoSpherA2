@@ -5658,9 +5658,6 @@ void computeEri3c(Int_Params& param1,
     Int_Params combined = param1 + param2;
 	combined.print_data("combined");
 
-    //int* bas = combined.get_ptr_bas();
-    //int* atm = combined.get_ptr_atm();
-    //double* env = combined.get_ptr_env();
     ivec bas = combined.get_bas();
     ivec atm = combined.get_atm();
     vec env = combined.get_env();
@@ -5686,6 +5683,7 @@ void computeEri3c(Int_Params& param1,
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+
 
     //CINTOpt opty = int3c2e_optimizer(atm, nat, bas, nbas, env);
 
