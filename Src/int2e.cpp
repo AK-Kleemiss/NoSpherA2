@@ -287,11 +287,11 @@ void GTOnr3c_drv(
         atm, natm, bas, nbas, env);
     const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
 
-//#pragma omp parallel
+#pragma omp parallel
     {
         int jobid;
         double* buf = (double*)malloc(sizeof(double) * (di * di * di * comp + cache_size));
-//#pragma omp for nowait schedule(dynamic)
+#pragma omp for nowait schedule(dynamic)
         for (jobid = 0; jobid < njobs; jobid++) {
             (*fill)(intor, eri, buf, comp, jobid, shls_slice, ao_loc,
                 cintopt, atm, natm, bas, nbas, env);
@@ -5656,7 +5656,7 @@ void computeEri3c(Int_Params& param1,
     int nAux = param2.get_nbas();
 
     Int_Params combined = param1 + param2;
-	combined.print_data("combined");
+	//combined.print_data("combined");
 
     ivec bas = combined.get_bas();
     ivec atm = combined.get_atm();

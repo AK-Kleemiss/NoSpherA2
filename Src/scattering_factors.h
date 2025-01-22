@@ -65,6 +65,20 @@ itsc_block MTC_thakkar_sfac(
  */
 bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::ostream &file);
 
+
+/**
+ * Calculates the scattering factors for the given options, wave, and expansion coefficients.
+ *
+ * @param opt The options for the calculation.
+ * @param wave The WFN object representing the wave.
+ * @param file The output stream to write the results to.
+ * @return True if the scattering factors were calculated successfully, false otherwise.
+ */
+bool calculate_scattering_factors_RI_fit(
+    options& opt,
+    const WFN& wavy,
+    std::ostream& file);
+
 /**
  * @brief Calculates the scattering factors for ML method.
  * @param opt The options for scattering factors calculations.

@@ -2413,10 +2413,53 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 MO_run++;
             }
         }
-        // build denisty matrix
-        vec2 coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
-        vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
-        DM = dot(temp_co, coeff_temp, false, true);
+
+
+        vec2 reordered_coefs(dimension, vec(dimension, 0.0));
+        vec2 coefs_2D = reshape(coefficients[0], { dimension, dimension });
+        int index = 0;
+        for (int atom_idx = 0; atom_idx < atoms.size(); atom_idx++) {
+            std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
+            int temp_bas_idx = 0;
+            for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
+                int type = basis[temp_bas_idx].get_type() -1;
+                temp_bas_idx += atoms[atom_idx].get_shellcount(shell);
+                if (type == 0) { //Skip s-type
+                    reordered_coefs[index] = coefs_2D[index];
+                    index += 2 * type + 1;
+                    continue;
+                };
+                for (int m = -type; m <= type; m++) {
+					reordered_coefs[index + constants::orca_2_pySCF[type][m]] = coefs_2D[index + m+type];
+                }
+                index += 2 * type + 1;
+            }
+        }
+
+
+		int n_occ = 0;
+		for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
+        
+        vec coeff_mo(n_occ * dimension, 0.0);
+        vec coeff_small(n_occ * dimension, 0.0);
+        for (int i = 0; i < dimension; i++) {
+            for (int oc = 0; oc < occupations[0].size(); oc++) {
+                if (occupations[0][oc] <= 0.0) continue;
+                //coeff_mo[i * n_occ + oc] = coefficients[0][i * dimension + oc] * occupations[0][oc];
+                //coeff_small[i * n_occ + oc] = coefficients[0][i * dimension + oc];
+                coeff_mo[i * n_occ + oc] = reordered_coefs[i][oc] * occupations[0][oc];
+                coeff_small[i * n_occ + oc] = reordered_coefs[i][oc];
+            }
+        }
+        //vec2 coeff_mo_2D = reshape(coeff_mo, {dimension, n_occ});
+        //vec2 coeff_small_2D = reshape(coeff_small, { dimension, n_occ });
+        //DM = dot(coeff_mo_2D, coeff_small_2D, false, true);
+        DM = dot(coeff_mo, coeff_small, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
+
+         //build denisty matrix
+        //vec2 coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
+        //vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
+        //DM = dot(temp_co, coeff_temp, false, true);
 
 
         if (debug)

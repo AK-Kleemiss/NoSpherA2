@@ -303,8 +303,7 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T> &flatMat1, const std::
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
 
-    Shape2D sizes = {m, n};
-    return reshape(result_flat, sizes);
+    return reshape(result_flat, { m, n });
 }
 template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template vec2 dot_BLAS(const std::vector<double> &mat1, const std::vector<double> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);

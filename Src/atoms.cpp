@@ -89,7 +89,7 @@ void atom::print_values_long() const {
 
 bool atom::push_back_basis_set(const double& exponent, const double& coefficient, const int& type, const int& shell) {
 	if (shell == shellcount.size())
-		shellcount.push_back(1);
+		shellcount.push_back((unsigned int)1);
 	else
 		shellcount[shell]++;
 	if (type >= 0 && type < 7 && shell >= 0) {

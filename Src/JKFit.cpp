@@ -12,11 +12,11 @@ BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {
 }
 
 // Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
-BasisSet::BasisSet(const std::array<std::vector<primitive>, 3>& data) {
-	for (int i = 0; i < 3; i++) {
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 6>& data) {
+	for (int i = 0; i < 6; i++) {
 		_data[i] = data[i];
 	}
-	for (int i = 3; i < 118; i++) {
+	for (int i = 6; i < 118; i++) {
 		_data[i] = {};
 	}
 }
@@ -83,7 +83,7 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_r
 }
 
 
-const std::array<std::vector<primitive>, 3> TESTING =
+const std::array<std::vector<primitive>, 6> TESTING =
 {
 	{
 		{
@@ -111,6 +111,27 @@ const std::array<std::vector<primitive>, 3> TESTING =
 			{0, 5, 1.6, 1.0},
 			{0, 6, 1.7, 1.0},
 		}, //Li
+		{}, //Be
+		{}, //B
+		{
+			{0, 0, 120.498651, 1.0},
+			{0, 0, 45.116782, 1.0},
+			{0, 0, 16.892505, 1.0},
+			{0, 0, 6.324846, 1.0},
+			{0, 0, 2.368132, 1.0},
+			{0, 0, 0.886670, 1.0},
+			{0, 1, 13.216186, 1.0},
+			{0, 1, 3.884909, 1.0},
+			{0, 1, 1.141972, 1.0},
+			{0, 1, 0.335684, 1.0},
+			{0, 2, 3.750089, 1.0},
+			{0, 2, 1.207332, 1.0},
+			{0, 2, 0.388698, 1.0},
+			{0, 3, 1.344106, 1.0},
+			{0, 4, 0.769479, 1.0},
+		},
+
+
 	}
 };
 

@@ -139,18 +139,20 @@ void Int_Params::collect_basis_data()
         for (int l = 0; l <= max_l; l++) {
 			int n_funcs = 0;
             for (int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
+                int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
+
                 if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) {
                     if (wfn_origin != 0 && wfn_origin != 9) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
-                    n_funcs += atoms[atom_idx].get_shellcount()[shell_idx];
+                    n_funcs += curr_funcs;
                     continue;
                 }
 
-				std::copy(coefficients.begin() + n_funcs, coefficients.begin() + n_funcs + atoms[atom_idx].get_shellcount()[shell_idx], coefficients_new.begin() + pos_in_new_coeffs);
-				std::copy(exponents.begin() + n_funcs, exponents.begin() + n_funcs + atoms[atom_idx].get_shellcount()[shell_idx], exponents_new.begin() + pos_in_new_coeffs);
-				shellcount_new.push_back(atoms[atom_idx].get_shellcount()[shell_idx]);
+				std::copy(coefficients.begin() + n_funcs, coefficients.begin() + n_funcs + curr_funcs, coefficients_new.begin() + pos_in_new_coeffs);
+				std::copy(exponents.begin() + n_funcs, exponents.begin() + n_funcs + curr_funcs, exponents_new.begin() + pos_in_new_coeffs);
+				shellcount_new.push_back(curr_funcs);
 				shelltype.push_back(l);
-				pos_in_new_coeffs += atoms[atom_idx].get_shellcount()[shell_idx];
-                n_funcs += atoms[atom_idx].get_shellcount()[shell_idx];
+				pos_in_new_coeffs += curr_funcs;
+                n_funcs += curr_funcs;
 
 
             }

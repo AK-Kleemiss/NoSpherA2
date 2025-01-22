@@ -422,12 +422,18 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                if (wavy[0].get_origin() != 7)
+                if (wavy[0].get_origin() != 7 && !opt.RI_FIT)
                     err_checkf(calculate_scattering_factors_HF(
                                    opt,
                                    wavy[0],
                                    log_file),
                                "Error during SF Calcualtion", log_file);
+                else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
+                    err_checkf(calculate_scattering_factors_RI_fit(
+                        opt,
+                        wavy[0],
+                        log_file),
+                        "Error during SF Calcualtion", log_file);
                 else
                     err_checkf(thakkar_sfac(
                                    opt,

@@ -108,28 +108,75 @@ void solve_linear_system(const vec& A, const int& size_A, vec& b)
 #endif
 }
 
-int density_fit(WFN& wavy, const std::string auxname)
+//Reorder p-Orbitals to the SALTED convention of:
+// L = 1 components following the - 1, 0, +1 convention
+//Meaning for every p-Orbital we swap the first and last component
+vec reorder_p(vec coefs_in, WFN aux_basis) {
+    vec coefs_out = coefs_in;
+    int coef_idx = 0;
+    for (int atm_idx = 0; atm_idx < aux_basis.get_ncen(); atm_idx++) {
+        for (int shell = 0; shell < aux_basis.get_atom_shell_count(atm_idx); shell++) {
+            int type = aux_basis.get_shell_type(atm_idx, shell); //Guessing only NoSpherA2 basis sets are used! l starts at 0!!!!!
+            if (type != 1) {
+                coef_idx += 2 * type + 1;
+                continue;
+            }
+            coefs_out[coef_idx] = coefs_in[coef_idx +1];
+            coefs_out[coef_idx + 1] = coefs_in[coef_idx + 2];
+            coefs_out[coef_idx + 2] = coefs_in[coef_idx];
+            coef_idx += 3;   
+        }
+    }
+
+
+	return coefs_out;
+}
+
+
+vec density_fit(const WFN& wavy, const std::string auxname)
 {
-    WFN wavy_aux;
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(auxname));
     std::vector<double> eri2c;
     std::vector<double> eri3c;
 
     // Initialize basis functions (qmBasis and auxBasis)
 
-    wavy.get_DensityMatrix();
-
     Int_Params normal_basis(wavy);
-    Int_Params aux_basis(wavy);
+
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(wavy.get_atoms());
+    wavy_aux.set_ncen(wavy.get_ncen());
+    wavy_aux.delete_basis_set();
+    Int_Params aux_basis(wavy_aux, auxname);
+
+
+#ifdef _WIN32
+    void* blas = math_load_BLAS(4);
+    if (blas == NULL)
+    {
+        ExtractDLL("libopenblas.dll");
+        blas = math_load_BLAS(4);
+    }
+    err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
+#endif // __WIN32
 
     // Compute integrals
     computeEri2c(aux_basis, eri2c);
     computeEri3c(normal_basis, aux_basis, eri3c);
 
-    // Convert eri3c to matrix form and perform contractions using BLAS
 
-    std::cout << "Done!" << std::endl;
-    return 0;
+    vec2 dm = wavy.get_dm();
+    vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
+
+    // Perform contractions using BLAS
+    vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
+    solve_linear_system(eri2c, aux_basis.get_nao(), rho);
+
+#ifdef _WIN32
+    math_unload_BLAS(blas);
+#endif
+
+    vec coefs = reorder_p(rho, wavy_aux);
+    return coefs;
 }
 
 int fixed_density_fit_test()
@@ -146,7 +193,7 @@ int fixed_density_fit_test()
 
     WFN wavy_gbw("TESTMOL.gbw");
     Int_Params normal_basis(wavy_gbw);
-	normal_basis.print_data("normal_basis");
+	
 
 
     WFN wavy_aux(0);
@@ -155,39 +202,61 @@ int fixed_density_fit_test()
     wavy_aux.delete_basis_set();
 
     Int_Params aux_basis(wavy_aux, "TESTING");
-	aux_basis.print_data("aux_basis");
 
 
-    vec eri2c_test_test;
-    vec eri3c_test_test;
-    computeEri2c(aux_basis, eri2c_test_test);
+ //   normal_basis.print_data("normal_basis");
+	//aux_basis.print_data("aux_basis");
 
 
-    std::ofstream file("eri2c_nospherA2.txt");
-    if (file.is_open())
+    vec eri2c;
+    vec eri3c;
+    computeEri2c(aux_basis, eri2c);
+    computeEri3c(normal_basis, aux_basis, eri3c);
+
+    //std::ofstream file("eri2c_nospherA2.txt");
+    //if (file.is_open())
+    //{
+    //	for (int i = 0; i < eri2c.size(); i++)
+    //	{
+    //		file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c[i] << std::endl;
+    //	}
+    //	file.close();
+    //}
+    //std::ofstream file2("eri3c_nospherA2.txt");
+    //if (file2.is_open())
+    //{
+    //    for (int i = 0; i < eri3c.size(); i++)
+    //    {
+    //        file2 << std::fixed << std::showpoint << std::setprecision(12) << eri3c[i] << std::endl;
+    //    }
+    //    file2.close();
+    //}
+
+    vec2 dm = wavy_gbw.get_dm();
+    vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
+    // Perform contractions using BLAS
+    vec rho_test = einsum_ijk_ij_p(eri3c_3d, dm);
+
+    solve_linear_system(eri2c, aux_basis.get_nao(), rho_test);
+
+    vec coefs = reorder_p(rho_test, wavy_aux);
+//
+//    std::ofstream file2("coeffs_nospherA2.txt");
+//    if (file2.is_open())
+//{
+//    for (int i = 0; i < coefs.size(); i++)
+//    {
+//        file2 << std::fixed << std::showpoint << std::setprecision(12) << coefs[i] << std::endl;
+//    }
+//    file2.close();
+//}
+
+    for (int i = 0; i < rho_test.size(); i++)
     {
-    	for (int i = 0; i < eri2c_test_test.size(); i++)
-    	{
-    		file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c_test_test[i] << std::endl;
-    	}
-    	file.close();
+        std::cout << std::fixed << std::showpoint << std::setprecision(12) << coefs[i] << "\t";
+        //New line every 10 vals
+		if ((i + 1) % 10 == 0) std::cout << std::endl;
     }
-
-    computeEri3c(normal_basis, aux_basis, eri3c_test_test);
-    std::ofstream file2("eri3c_nospherA2.txt");
-    if (file2.is_open())
-    {
-        for (int i = 0; i < eri3c_test_test.size(); i++)
-        {
-            file2 << std::fixed << std::showpoint << std::setprecision(12) << eri3c_test_test[i] << std::endl;
-        }
-        file2.close();
-    }
-
-    //   vec dm_test = flatten(wavy_gbw.get_dm());
-       //vec rho_test = einsum_ijp_ij_p(eri3c_test_test, dm_test, normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao());
-    //   vec2 intermediate = reshape(eri2c_test_test, { aux_basis.get_nao(), aux_basis.get_nao() });
-    //   solve_linear_system(intermediate, rho_test);
 
 #ifdef _WIN32
     math_unload_BLAS(blas);

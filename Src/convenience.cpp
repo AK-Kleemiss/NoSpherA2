@@ -2401,6 +2401,9 @@ void options::digest_options()
             delete (wavy);
             exit(0);
         }
+        else if (temp == "-RI_FIT" || temp == "-ri_fit") {
+			RI_FIT = true;
+        }
         else if (temp.find("-s_rho") < 1)
             s_rho = true;
         else if (temp == "-SALTED" || temp == "-salted")

@@ -3551,6 +3551,210 @@ bool calculate_scattering_factors_ML(
 #endif
 }
 
+
+/**
+ * Calculates the scattering factors for the given options, wave, and expansion coefficients.
+ *
+ * @param opt The options for the calculation.
+ * @param wave The WFN object representing the wave.
+ * @param file The output stream to write the results to.
+ * @param exp_coefs The expected coefficients to use.
+ * @param coefs The coefficients to use.
+ * @return True if the scattering factors were calculated successfully, false otherwise.
+ */
+bool calculate_scattering_factors_RI_fit(
+    options& opt,
+    const WFN& wavy,
+    std::ostream& file)
+{
+#if has_RAS == 1
+    using namespace std;
+    err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
+    err_checkf(exists(opt.cif), "CIF does not exists!", file);
+    file << "Number of protons: " << wavy.get_nr_electrons() << endl;
+    // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+
+    vector<_time_point> time_points;
+    vector<string> time_descriptions;
+    time_points.push_back(get_time());
+
+    cell unit_cell(opt.cif, file, opt.debug);
+    ifstream cif_input(opt.cif.c_str(), std::ios::in);
+    ivec atom_type_list;
+    ivec asym_atom_to_type_list;
+    ivec asym_atom_list;
+    bvec constant_atoms;
+    bvec needs_grid(wavy.get_ncen(), false);
+    svec known_atoms;
+
+    auto labels = read_atoms_from_CIF(cif_input,
+        opt.groups[0],
+        unit_cell,
+        wavy,
+        known_atoms,
+        atom_type_list,
+        asym_atom_to_type_list,
+        asym_atom_list,
+        needs_grid,
+        file,
+        constant_atoms,
+        opt.debug);
+
+    cif_input.close();
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("CIF reading");
+
+    if (opt.debug)
+        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+
+    hkl_list hkl;
+    if (!opt.read_k_pts)
+    {
+        if (opt.dmin != 99.0)
+            if (opt.electron_diffraction)
+                generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
+            else
+                generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
+        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
+            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
+        else
+            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
+    }
+
+    if (opt.debug)
+        file << "made it post CIF, now make grids!" << endl;
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Generating hkl");
+
+
+    // Generation of SALTED density coefficients
+    file << "\nGenerating densities... " << endl;
+	vec coefs = density_fit(wavy, "combo_basis_fit");
+    file << setw(12 * 4 + 2) << "... done!\n"
+        << flush;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("SALTED prediction");
+
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(wavy.get_atoms());
+    wavy_aux.set_ncen(wavy.get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("combo_basis_fit"));
+
+    file << "\nGenerating k-points...  " << flush;
+    vec2 k_pt;
+    make_k_pts(
+        opt.read_k_pts,
+        opt.save_k_pts,
+        0,
+        unit_cell,
+        hkl,
+        k_pt,
+        file,
+        opt.debug);
+    file << "                          ... done!\n"
+        << flush;
+    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
+
+    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
+    file << "Table of Charges in electrons\n"
+        << "       Atom      ML" << endl;
+
+    for (int i = 0; i < asym_atom_list.size(); i++)
+    {
+        int a = asym_atom_list[i];
+        file << setw(10) << labels[i]
+            << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+        if (opt.debug)
+            file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+        file << endl;
+    }
+
+    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Calculation of Charges");
+
+    cvec2 sf;
+    calc_SF_SALTED(
+        k_pt,
+        coefs,
+        wavy_aux.get_atoms(),
+        sf);
+    file << setw(12 * 4 + 2) << "... done!" << endl;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Fourier transform");
+
+    if (wavy_aux.get_has_ECPs())
+    {
+        add_ECP_contribution(
+            asym_atom_list,
+            wavy_aux,
+            sf,
+            unit_cell,
+            hkl,
+            file,
+            opt.ECP_mode,
+            opt.debug);
+    }
+
+    if (opt.electron_diffraction)
+    {
+        convert_to_ED(asym_atom_list,
+            wavy_aux,
+            sf,
+            unit_cell,
+            hkl);
+    }
+
+    tsc_block<int, cdouble> blocky(
+        sf,
+        labels,
+        hkl);
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("last corrections");
+
+    if (opt.needs_Thakkar_fill)
+    {
+        file << "Performing the remaining calculation of spherical atoms...\n";
+        vector<WFN> tempy;
+        tempy.push_back(WFN(opt.wfn));
+        opt.m_hkl_list = hkl;
+        tsc_block<int, cdouble> blocky_thakkar = MTC_thakkar_sfac(opt, file, labels, tempy, 0);
+        blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Spherical Atoms");
+    }
+
+    if (!opt.no_date)
+    {
+        write_timing_to_file(file,
+            time_points,
+            time_descriptions);
+    }
+
+    file << "Writing tsc file... " << flush;
+    blocky.write_tscb_file();
+    if (opt.old_tsc)
+    {
+        blocky.write_tsc_file("test");
+    }
+    file << " ... done!" << endl;
+
+    return true;
+#else
+    err_not_impl_f("RASCALINE is not supported by this build", file);
+    return false;
+#endif
+}
+
+
 /**
  * Calculates the scattering factors for the MulTi Cif mode (MTC).
  *

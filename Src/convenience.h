@@ -597,6 +597,7 @@ struct options
     bool becke = false;
     bool electron_diffraction = false;
     bool ECP = false;
+    bool RI_FIT = false;
     bool set_ECPs = false;
     bool needs_Thakkar_fill = false;
     int hirsh_number = 0;
