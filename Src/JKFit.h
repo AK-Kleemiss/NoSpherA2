@@ -47,6 +47,7 @@ public:
 
     //Access basis set
     BasisSet& get_basis_set(std::string basis_name);
+	bool check_basis_set_exists(std::string basis_name);
 
 private:
     std::unordered_map<std::string, BasisSet> basisSets;

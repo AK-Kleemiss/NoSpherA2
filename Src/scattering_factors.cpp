@@ -3631,7 +3631,7 @@ bool calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-	vec coefs = density_fit(wavy, "combo_basis_fit");
+	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.max_RAM);
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
     time_points.push_back(get_time());
@@ -3641,7 +3641,7 @@ bool calculate_scattering_factors_RI_fit(
     wavy_aux.set_atoms(wavy.get_atoms());
     wavy_aux.set_ncen(wavy.get_ncen());
     wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("combo_basis_fit"));
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(opt.SALTED_DFBASIS));
 
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;

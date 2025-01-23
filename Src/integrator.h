@@ -4,4 +4,4 @@
 
 int fixed_density_fit_test();
 
-vec density_fit(const WFN& wavy, const std::string auxname);
+vec density_fit(const WFN& wavy, const std::string auxname, int max_RAM);

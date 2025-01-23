@@ -2915,11 +2915,13 @@
     <ClCompile Include="..\Src\constants.cpp" />
     <ClCompile Include="..\Src\DLL_Helper.cpp" />
     <ClCompile Include="..\Src\ECPs_corrections.cpp" />
-    <ClCompile Include="..\Src\int2e.cpp" />
     <ClCompile Include="..\Src\integration_params.cpp" />
     <ClCompile Include="..\Src\integrator.cpp" />
+    <ClCompile Include="..\Src\int_g2e.cpp" />
+    <ClCompile Include="..\Src\int_optimizer.cpp" />
     <ClCompile Include="..\Src\isosurface.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
+    <ClCompile Include="..\Src\libCintMain.cpp" />
     <ClCompile Include="..\Src\rys_roots.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
@@ -3180,11 +3182,13 @@
     <ClInclude Include="..\Lib\hdf5.h" />
     <ClInclude Include="..\Lib\uthash.h" />
     <ClInclude Include="..\Src\DLL_Helper.h" />
-    <ClInclude Include="..\Src\int2e.h" />
     <ClInclude Include="..\Src\integration_params.h" />
     <ClInclude Include="..\Src\integrator.h" />
+    <ClInclude Include="..\Src\int_g2e.h" />
+    <ClInclude Include="..\Src\int_optimizer.h" />
     <ClInclude Include="..\Src\isosurface.h" />
     <ClInclude Include="..\Src\JKFit.h" />
+    <ClInclude Include="..\Src\libCintMain.h" />
     <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\metatensor.hpp" />
     <ClInclude Include="..\Src\OpenBLAS.h" />
@@ -3208,7 +3212,6 @@
     </_EmbedManagedResourceFile>
     <None Include="..\Linux\makefile" />
     <None Include="..\Mac\makefile" />
-    <None Include="..\Src\roots_for_x0.dat" />
     <None Include="..\tests\makefile" />
   </ItemGroup>
   <ItemGroup>

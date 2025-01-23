@@ -2297,6 +2297,19 @@ void options::digest_options()
             iam_switch = true;
         else if (temp == "-lap")
             calc = lap = true;
+        else if (temp == "-max_mem")
+        {
+            max_RAM = stoi(arguments[i + 1]); //In MB
+            vec a;
+            size_t vec_max_size = a.max_size();
+            double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
+			if (max_RAM > doubel_max_size)
+			{
+				cout << "Max memory set to " << max_RAM << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << doubel_max_size - 10 << " MB." << endl;
+				max_RAM = static_cast<int>(doubel_max_size)-10;
+			}
+
+        }
         else if (temp == "-method")
             method = arguments[i + 1];
         else if (temp == "-merge")
@@ -2403,7 +2416,16 @@ void options::digest_options()
         }
         else if (temp == "-RI_FIT" || temp == "-ri_fit") {
 			RI_FIT = true;
+            //Check if next argument is a valid basis set name or a new argument starting with "-"
+            if (i + 1 < argc && arguments[i + 1].find("-") != 0) {
+                SALTED_DFBASIS = arguments[i + 1];
+                if (!BasisSetLibrary().check_basis_set_exists(SALTED_DFBASIS)) {
+					cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
+                    exit(0);
+                }
+            }     
         }
+
         else if (temp.find("-s_rho") < 1)
             s_rho = true;
         else if (temp == "-SALTED" || temp == "-salted")

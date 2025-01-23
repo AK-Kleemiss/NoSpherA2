@@ -82,6 +82,10 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_r
 	return basisSets[found_basis];
 }
 
+bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
+	//Check if the supplied basis name is in the basisSets map
+	return basisSets.find(basis_name) != basisSets.end();
+}
 
 const std::array<std::vector<primitive>, 6> TESTING =
 {

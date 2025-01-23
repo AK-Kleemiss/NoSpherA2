@@ -607,6 +607,7 @@ struct options
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
+    int max_RAM = 2000; //2GB
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

@@ -1,351 +1,151 @@
-#include "int2e.h"
-
+#include "int_g2e.h"
 #include "rys_roots.h"
-#include "cart2sph.h"
 
-#define gctrg   gout
-#define gctrm   gctr
-#define mempty  empty
-#define m_ctr   n_comp
-
-#define PAIRDATA_NON0IDX_SIZE(ps) \
-                int *bas = envs->bas; \
-                int *shls  = envs->shls; \
-                int i_prim = bas(NPRIM_OF, shls[0]); \
-                int j_prim = bas(NPRIM_OF, shls[1]); \
-                int k_prim = bas(NPRIM_OF, shls[2]); \
-                int ps = (i_prim*j_prim * 5 \
-                           + i_prim * x_ctr[0] \
-                           + j_prim * x_ctr[1] \
-                           + k_prim * x_ctr[2] \
-                           +(i_prim+j_prim)*2 + k_prim + envs->nf*3 + 16);
-
-#define SQUARE(r)       ((r)[0]*(r)[0] + (r)[1]*(r)[1] + (r)[2]*(r)[2])
-
-#define ALIAS_ADDR_IF_EQUAL(x, y) \
-        if (y##_ctr == 1) { \
-                gctr##x = gctr##y; \
-                x##empty = y##empty; \
-        } else { \
-                gctr##x = g1; \
-                g1 += len##x; \
-        }
-
-#define PRIM2CTR0(ctrsymb, gp, ngp) \
-        if (ctrsymb##_ctr > 1) {\
-                if (*ctrsymb##empty) { \
-                        CINTprim_to_ctr_0(gctr##ctrsymb, gp, c##ctrsymb+ctrsymb##p, \
-                                          ngp, ctrsymb##_prim, ctrsymb##_ctr, \
-                                          non0ctr##ctrsymb[ctrsymb##p], \
-                                          non0idx##ctrsymb+ctrsymb##p*ctrsymb##_ctr); \
-                } else { \
-                        CINTprim_to_ctr_1(gctr##ctrsymb, gp, c##ctrsymb+ctrsymb##p, \
-                                          ngp, ctrsymb##_prim, ctrsymb##_ctr, \
-                                          non0ctr##ctrsymb[ctrsymb##p], \
-                                          non0idx##ctrsymb+ctrsymb##p*ctrsymb##_ctr); \
-                } \
-        } \
-        *ctrsymb##empty = 0
-
-
-#define TRANSPOSE(a) \
-        if (*empty) { \
-                CINTdmat_transpose(gctr, a, nf*nc, n_comp); \
-        } else { \
-                CINTdplus_transpose(gctr, a, nf*nc, n_comp); \
-        } \
-        *empty = 0;
-
-void CINTprim_to_ctr_0(double* gc, double* gp, double* coeff, size_t nf,
-    int nprim, int nctr, int non0ctr, int * sortedidx)
+void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
 {
-    int i;
-    size_t n;
-    double c0;
+    int inc = 0;
+    int lx, ly, lz;
 
-    for (i = 0; i < nctr; i++) {
-        c0 = coeff[nprim * i];
-        for (n = 0; n < nf; n++) {
-            gc[nf * i + n] = c0 * gp[n];
+    for (lx = lmax; lx >= 0; lx--) {
+        for (ly = lmax - lx; ly >= 0; ly--) {
+            lz = lmax - lx - ly;
+            nx[inc] = lx;
+            ny[inc] = ly;
+            nz[inc] = lz;
+            inc++;
         }
     }
 }
 
-void CINTprim_to_ctr_1(double* gc, double* gp, double* coeff, size_t nf,
-    int nprim, int nctr, int non0ctr, int * sortedidx)
+void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
 {
-    int i, j;
-    size_t n;
-    double c0;
+    const int i_l = envs->i_l;
+    const int j_l = envs->j_l;
+    const int k_l = envs->k_l;
+    const int l_l = envs->l_l;
+    const int nfi = envs->nfi;
+    const int nfj = envs->nfj;
+    const int nfk = envs->nfk;
+    const int nfl = envs->nfl;
+    const int di = envs->g_stride_i;
+    const int dk = envs->g_stride_k;
+    const int dl = envs->g_stride_l;
+    const int dj = envs->g_stride_j;
+    int i, j, k, l, n;
+    int ofx, ofkx, oflx;
+    int ofy, ofky, ofly;
+    int ofz, ofkz, oflz;
+    int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
+    int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
+    int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
+    int l_nx[CART_MAX], l_ny[CART_MAX], l_nz[CART_MAX];
 
-    for (i = 0; i < non0ctr; i++) {
-        c0 = coeff[nprim * sortedidx[i]];
-        j = sortedidx[i];
-        for (n = 0; n < nf; n++) {
-            gc[nf * j + n] += c0 * gp[n];
-        }
-    }
-}
+    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+    CINTcart_comp(l_nx, l_ny, l_nz, l_l);
 
-/*
- * a[m,n] -> a_t[n,m]
- */
-void CINTdmat_transpose(double* a_t, double* a, int m, int n)
-{
-    int i, j, k;
-
-    for (j = 0; j < n - 3; j += 4) {
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] = a[i * n + j + 0];
-            a_t[(j + 1) * m + i] = a[i * n + j + 1];
-            a_t[(j + 2) * m + i] = a[i * n + j + 2];
-            a_t[(j + 3) * m + i] = a[i * n + j + 3];
-        }
-    }
-
-    switch (n - j) {
-    case 1:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[j * m + i] = a[i * n + j];
-        }
-        break;
-    case 2:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] = a[i * n + j + 0];
-            a_t[(j + 1) * m + i] = a[i * n + j + 1];
-        }
-        break;
-    case 3:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] = a[i * n + j + 0];
-            a_t[(j + 1) * m + i] = a[i * n + j + 1];
-            a_t[(j + 2) * m + i] = a[i * n + j + 2];
-        }
-        break;
-    }
-}
-
-/*
- * a_t[n,m] += a[m,n]
- */
-void CINTdplus_transpose(double* a_t, double* a, int m, int n)
-{
-    int i, j, k;
-
-    for (j = 0; j < n - 3; j += 4) {
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] += a[i * n + j + 0];
-            a_t[(j + 1) * m + i] += a[i * n + j + 1];
-            a_t[(j + 2) * m + i] += a[i * n + j + 2];
-            a_t[(j + 3) * m + i] += a[i * n + j + 3];
-        }
-    }
-
-    switch (n - j) {
-    case 1:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[j * m + i] += a[i * n + j];
-        }
-        break;
-    case 2:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] += a[i * n + j + 0];
-            a_t[(j + 1) * m + i] += a[i * n + j + 1];
-        }
-        break;
-    case 3:
-#pragma ivdep
-        for (i = 0; i < m; i++) {
-            a_t[(j + 0) * m + i] += a[i * n + j + 0];
-            a_t[(j + 1) * m + i] += a[i * n + j + 1];
-            a_t[(j + 2) * m + i] += a[i * n + j + 2];
-        }
-        break;
-    }
-}
-
-
-
-int GTOmax_shell_dim(const int *ao_loc, const int *shls_slice, int ncenter)
-{
-        int i;
-        int i0 = shls_slice[0];
-        int i1 = shls_slice[1];
-        int di = 0;
-        for (i = 1; i < ncenter; i++) {
-                i0 = std::min(i0, shls_slice[i*2  ]);
-                i1 = std::max(i1, shls_slice[i*2+1]);
-        }
-        for (i = i0; i < i1; i++) {
-                di = std::max(di, ao_loc[i+1]-ao_loc[i]);
-        }
-        return di;
-}
-size_t GTOmax_cache_size(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), 
-    int *shls_slice, int ncenter,
-    int *atm, int natm, int *bas, int nbas, double *env)
-{
-    int i;
-    int i0 = shls_slice[0];
-    int i1 = shls_slice[1];
-    for (i = 1; i < ncenter; i++)
-    {
-        i0 = std::min(i0, shls_slice[i * 2]);
-        i1 = std::max(i1, shls_slice[i * 2 + 1]);
-    }
-    int (*f)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*) = (int (*)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*))intor;
-    int cache_size = 0;
-    int n;
-    int shls[4];
-    for (i = i0; i < i1; i++)
-    {
-        shls[0] = i;
-        shls[1] = i;
-        shls[2] = i;
-        shls[3] = i;
-        n = (*f)(NULL, NULL, shls, atm, natm, bas, nbas, env, NULL, NULL);
-        cache_size = std::max(cache_size, n);
-    }
-    return cache_size;
-}
-
-void GTOnr3c_drv(
-    int (*intor)(double*,  int*, int*, int*, int, int*, int, double*, CINTOpt*, double*),
-    double* out, int comp, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int ksh0 = shls_slice[4];
-    const int ksh1 = shls_slice[5];
-    const int nish = ish1 - ish0;
-    const int njsh = jsh1 - jsh0;
-    const int nksh = ksh1 - ksh0;
-    const int naoi = ao_loc[ish1] - ao_loc[ish0];
-    const int naoj = ao_loc[jsh1] - ao_loc[jsh0];
-	const int naok = ao_loc[ksh1] - ao_loc[ksh0];
-
-
-    const int di = GTOmax_shell_dim(ao_loc, shls_slice, 3);
-    const int cache_size = GTOmax_cache_size(intor, shls_slice, 3,
-        atm, natm, bas, nbas, env);
-    const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
-
-    //#pragma omp parallel
-    {
-		int dims[3] = { naoi, naoj, naok };
-		int shls[3] = { 0, 0, 0 };
-        int ish, jsh, ksh, i0, j0, k0;
-        double* cache = (double*)malloc(sizeof(double) * cache_size *di *di *di);
-        //#pragma omp for nowait schedule(dynamic)
-        for (ksh = ksh0; ksh < ksh1; ksh++) {
-            for (jsh = jsh0; jsh < jsh1; jsh++) {
-                for (ish = ish0; ish < ish1; ish++) {
-                    shls[0] = ish;
-                    shls[1] = jsh;
-					shls[2] = ksh;
-                    i0 = ao_loc[ish] - ao_loc[ish0];
-                    j0 = ao_loc[jsh] - ao_loc[jsh0];
-					k0 = ao_loc[ksh] - ao_loc[ksh0];
-					int offset = k0 * naoi * naoj + j0 * naoi + i0;
-                    (*intor)(out + offset, dims, shls, atm, natm, bas, nbas, env,
-                        cintopt, cache);
+    ofx = 0;
+    ofy = envs->g_size;
+    ofz = envs->g_size * 2;
+    n = 0;
+    for (j = 0; j < nfj; j++) {
+        for (l = 0; l < nfl; l++) {
+            oflx = ofx + dj * j_nx[j] + dl * l_nx[l];
+            ofly = ofy + dj * j_ny[j] + dl * l_ny[l];
+            oflz = ofz + dj * j_nz[j] + dl * l_nz[l];
+            for (k = 0; k < nfk; k++) {
+                ofkx = oflx + dk * k_nx[k];
+                ofky = ofly + dk * k_ny[k];
+                ofkz = oflz + dk * k_nz[k];
+                switch (i_l) {
+                case 0:
+                    idx[n + 0] = ofkx;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    n += 3;
+                    break;
+                case 1:
+                    idx[n + 0] = ofkx + di;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    idx[n + 3] = ofkx;
+                    idx[n + 4] = ofky + di;
+                    idx[n + 5] = ofkz;
+                    idx[n + 6] = ofkx;
+                    idx[n + 7] = ofky;
+                    idx[n + 8] = ofkz + di;
+                    n += 9;
+                    break;
+                case 2:
+                    idx[n + 0] = ofkx + di * 2;
+                    idx[n + 1] = ofky;
+                    idx[n + 2] = ofkz;
+                    idx[n + 3] = ofkx + di;
+                    idx[n + 4] = ofky + di;
+                    idx[n + 5] = ofkz;
+                    idx[n + 6] = ofkx + di;
+                    idx[n + 7] = ofky;
+                    idx[n + 8] = ofkz + di;
+                    idx[n + 9] = ofkx;
+                    idx[n + 10] = ofky + di * 2;
+                    idx[n + 11] = ofkz;
+                    idx[n + 12] = ofkx;
+                    idx[n + 13] = ofky + di;
+                    idx[n + 14] = ofkz + di;
+                    idx[n + 15] = ofkx;
+                    idx[n + 16] = ofky;
+                    idx[n + 17] = ofkz + di * 2;
+                    n += 18;
+                    break;
+                default:
+                    for (i = 0; i < nfi; i++) {
+                        idx[n + 0] = ofkx + di * i_nx[i]; //(:,ix,kx,lx,jx,1)
+                        idx[n + 1] = ofky + di * i_ny[i]; //(:,iy,ky,ly,jy,2)
+                        idx[n + 2] = ofkz + di * i_nz[i]; //(:,iz,kz,lz,jz,3)
+                        n += 3;
+                    } // i
                 }
-            }
-        }
-        free(cache);
-    }
+            } // k
+        } // l
+    } // j
 }
 
-void GTOnr3c_drv(
-    int (*intor)(double* , int* , int* , int* , int , int* , int , double* , CINTOpt* , double* ),
-    void (*fill)(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double* , double* , int , int , int* , int* , CINTOpt* , int* , int , int* , int , double* ),
-    double* eri, int comp, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
+
+void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
 {
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int ksh0 = shls_slice[4];
-    const int ksh1 = shls_slice[5];
-    const int nish = ish1 - ish0;
-    const int njsh = jsh1 - jsh0;
-    const int nksh = ksh1 - ksh0;
-    const int di = GTOmax_shell_dim(ao_loc, shls_slice, 3);
-    const int cache_size = GTOmax_cache_size(intor, shls_slice, 3,
-        atm, natm, bas, nbas, env);
-    const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
+    const int i_l = envs->i_l;
+    const int j_l = envs->j_l;
+    const int nfi = envs->nfi;
+    const int nfj = envs->nfj;
+    const int di = envs->g_stride_i;
+    const int dj = envs->g_stride_j;
+    int i, j, n;
+    int ofx, ofjx;
+    int ofy, ofjy;
+    int ofz, ofjz;
+    int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
+    int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
 
-#pragma omp parallel
-    {
-        int jobid;
-        double* buf = (double*)malloc(sizeof(double) * (di * di * di * comp + cache_size));
-#pragma omp for nowait schedule(dynamic)
-        for (jobid = 0; jobid < njobs; jobid++) {
-            (*fill)(intor, eri, buf, comp, jobid, shls_slice, ao_loc,
-                cintopt, atm, natm, bas, nbas, env);
-        }
-        free(buf);
-    }
-}
+    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
 
-/*
- * out[naoi,naoj,naok,comp] in F-order
- */
-void GTOnr3c_fill_s1(
-    int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), 
-    double* out, double* buf, int comp, int jobid, int* shls_slice, int* ao_loc, CINTOpt* cintopt,
-    int* atm, int natm, int* bas, int nbas, double* env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int ksh0 = shls_slice[4];
-    const int ksh1 = shls_slice[5];
-    const int nksh = ksh1 - ksh0;
-
-    const int ksh = jobid % nksh + ksh0;
-    const int jstart = jobid / nksh * BLKSIZE + jsh0;
-    const int jend = std::min(jstart + BLKSIZE, jsh1);
-    if (jstart >= jend) {
-        return;
-    }
-
-    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
-    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-    const size_t naok = ao_loc[ksh1] - ao_loc[ksh0];
-    int dims[] = { naoi, naoj, naok };
-
-    const int k0 = ao_loc[ksh] - ao_loc[ksh0];
-    out += naoi * naoj * k0;
-
-    int ish, jsh, i0, j0;
-    int shls[3] = { 0, 0, ksh };
-
-    for (jsh = jstart; jsh < jend; jsh++) {
-        for (ish = ish0; ish < ish1; ish++) {
-            shls[0] = ish;
-            shls[1] = jsh;
-            i0 = ao_loc[ish] - ao_loc[ish0];
-            j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(out + j0 * naoi + i0, dims, shls, atm, natm, bas, nbas, env,
-                cintopt, buf);
+    ofx = 0;
+    ofy = envs->g_size;
+    ofz = envs->g_size * 2;
+    n = 0;
+    for (j = 0; j < nfj; j++) {
+        ofjx = ofx + dj * j_nx[j];
+        ofjy = ofy + dj * j_ny[j];
+        ofjz = ofz + dj * j_nz[j];
+        for (i = 0; i < nfi; i++) {
+            idx[n + 0] = ofjx + di * i_nx[i];
+            idx[n + 1] = ofjy + di * i_ny[i];
+            idx[n + 2] = ofjz + di * i_nz[i];
+            n += 3;
         }
     }
 }
-
 
 
 /*
@@ -4428,655 +4228,7 @@ void CINTsrg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
         (int)envs->ll_ceil, (int)envs->lj_ceil);
 }
 
-void CINTgout2e(double* gout, double* g, int* idx,
-    CINTEnvVars* envs, int gout_empty)
-{
-    int nf = envs->nf;
-    int i, ix, iy, iz, n;
-    double s;
 
-    if (gout_empty) {
-        switch (envs->nrys_roots) {
-        case 1:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz];
-            }
-            break;
-        case 2:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1];
-            }
-            break;
-        case 3:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2];
-            }
-            break;
-        case 4:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3];
-            }
-            break;
-        case 5:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4];
-            }
-            break;
-        case 6:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5];
-            }
-            break;
-        case 7:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5]
-                    + g[ix + 6] * g[iy + 6] * g[iz + 6];
-            }
-            break;
-        case 8:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] = g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5]
-                    + g[ix + 6] * g[iy + 6] * g[iz + 6]
-                    + g[ix + 7] * g[iy + 7] * g[iz + 7];
-            }
-            break;
-        default:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                s = 0;
-                for (i = 0; i < envs->nrys_roots; i++) {
-                    s += g[ix + i] * g[iy + i] * g[iz + i];
-                }
-                gout[n] = s;
-            }
-            break;
-        } // end switch nroots
-    }
-    else { // not flag_acc
-        switch (envs->nrys_roots) {
-        case 1:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz];
-            }
-            break;
-        case 2:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1];
-            }
-            break;
-        case 3:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2];
-            }
-            break;
-        case 4:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3];
-            }
-            break;
-        case 5:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4];
-            }
-            break;
-        case 6:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5];
-            }
-            break;
-        case 7:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5]
-                    + g[ix + 6] * g[iy + 6] * g[iz + 6];
-            }
-            break;
-        case 8:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                gout[n] += g[ix] * g[iy] * g[iz]
-                    + g[ix + 1] * g[iy + 1] * g[iz + 1]
-                    + g[ix + 2] * g[iy + 2] * g[iz + 2]
-                    + g[ix + 3] * g[iy + 3] * g[iz + 3]
-                    + g[ix + 4] * g[iy + 4] * g[iz + 4]
-                    + g[ix + 5] * g[iy + 5] * g[iz + 5]
-                    + g[ix + 6] * g[iy + 6] * g[iz + 6]
-                    + g[ix + 7] * g[iy + 7] * g[iz + 7];
-            }
-            break;
-        default:
-            for (n = 0; n < nf; n++, idx += 3) {
-                ix = idx[0];
-                iy = idx[1];
-                iz = idx[2];
-                s = 0;
-                for (i = 0; i < envs->nrys_roots; i++) {
-                    s += g[ix + i] * g[iy + i] * g[iz + i];
-                }
-                gout[n] += s;
-            }
-            break;
-        } // end switch nroots
-    }
-}
-
-void CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr)
-{
-    int i, ip;
-    double maxc;
-    for (ip = 0; ip < nprim; ip++) {
-        maxc = 0;
-        for (i = 0; i < nctr; i++) {
-            maxc = std::max(maxc, fabs(coeff[i * nprim + ip]));
-        }
-        log_maxc[ip] = std::log(maxc);
-    }
-}
-
-int CINTset_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double* rj,
-    double* log_maxci, double* log_maxcj,
-    int li_ceil, int lj_ceil, int iprim, int jprim,
-    double rr_ij, double expcutoff, double* env)
-{
-    int ip, jp, n;
-    double aij, eij, cceij, wj;
-    // Normally
-    //    (aj*d/sqrt(aij)+1)^li * (ai*d/sqrt(aij)+1)^lj
-    //    * pi^1.5/aij^{(li+lj+3)/2} * exp(-ai*aj/aij*rr_ij)
-    // is a good approximation for overlap integrals.
-    //    <~ (aj*d/aij+1/sqrt(aij))^li * (ai*d/aij+1/sqrt(aij))^lj * (pi/aij)^1.5
-    //    <~ (d+1/sqrt(aij))^(li+lj) * (pi/aij)^1.5
-    aij = ai[iprim - 1] + aj[jprim - 1];
-    double log_rr_ij = 1.7 - 1.5 * std::log(aij);
-    int lij = li_ceil + lj_ceil;
-    if (lij > 0) {
-        double dist_ij = sqrt(rr_ij);
-        double omega = env[PTR_RANGE_OMEGA];
-        if (omega < 0) {
-            double r_guess = 8.;
-            double omega2 = omega * omega;
-            double theta = omega2 / (omega2 + aij);
-            log_rr_ij += lij * std::log(dist_ij + theta * r_guess + 1.);
-        }
-        else {
-            log_rr_ij += lij * std::log(dist_ij + 1.);
-        }
-    }
-    PairData* pdata;
-
-    int empty = 1;
-    for (n = 0, jp = 0; jp < jprim; jp++) {
-        for (ip = 0; ip < iprim; ip++, n++) {
-            aij = 1 / (ai[ip] + aj[jp]);
-            eij = rr_ij * ai[ip] * aj[jp] * aij;
-            cceij = eij - log_rr_ij - log_maxci[ip] - log_maxcj[jp];
-            pdata = pairdata + n;
-            pdata->cceij = cceij;
-            if (cceij < expcutoff) {
-                empty = 0;
-                wj = aj[jp] * aij;
-                pdata->rij[0] = ri[0] + wj * (rj[0] - ri[0]);
-                pdata->rij[1] = ri[1] + wj * (rj[1] - ri[1]);
-                pdata->rij[2] = ri[2] + wj * (rj[2] - ri[2]);
-                pdata->eij = exp(-eij);
-            }
-            else {
-                pdata->rij[0] = 1e18;
-                pdata->rij[1] = 1e18;
-                pdata->rij[2] = 1e18;
-                pdata->eij = 0;
-            }
-        }
-    }
-    return empty;
-}
-
-void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
-{
-    int inc = 0;
-    int lx, ly, lz;
-
-    for (lx = lmax; lx >= 0; lx--) {
-        for (ly = lmax - lx; ly >= 0; ly--) {
-            lz = lmax - lx - ly;
-            nx[inc] = lx;
-            ny[inc] = ly;
-            nz[inc] = lz;
-            inc++;
-        }
-    }
-}
-
-void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
-{
-    const int i_l = envs->i_l;
-    const int j_l = envs->j_l;
-    const int k_l = envs->k_l;
-    const int l_l = envs->l_l;
-    const int nfi = envs->nfi;
-    const int nfj = envs->nfj;
-    const int nfk = envs->nfk;
-    const int nfl = envs->nfl;
-    const int di = envs->g_stride_i;
-    const int dk = envs->g_stride_k;
-    const int dl = envs->g_stride_l;
-    const int dj = envs->g_stride_j;
-    int i, j, k, l, n;
-    int ofx, ofkx, oflx;
-    int ofy, ofky, ofly;
-    int ofz, ofkz, oflz;
-    int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
-    int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
-    int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
-    int l_nx[CART_MAX], l_ny[CART_MAX], l_nz[CART_MAX];
-
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
-    CINTcart_comp(l_nx, l_ny, l_nz, l_l);
-
-    ofx = 0;
-    ofy = envs->g_size;
-    ofz = envs->g_size * 2;
-    n = 0;
-    for (j = 0; j < nfj; j++) {
-        for (l = 0; l < nfl; l++) {
-            oflx = ofx + dj * j_nx[j] + dl * l_nx[l];
-            ofly = ofy + dj * j_ny[j] + dl * l_ny[l];
-            oflz = ofz + dj * j_nz[j] + dl * l_nz[l];
-            for (k = 0; k < nfk; k++) {
-                ofkx = oflx + dk * k_nx[k];
-                ofky = ofly + dk * k_ny[k];
-                ofkz = oflz + dk * k_nz[k];
-                switch (i_l) {
-                case 0:
-                    idx[n + 0] = ofkx;
-                    idx[n + 1] = ofky;
-                    idx[n + 2] = ofkz;
-                    n += 3;
-                    break;
-                case 1:
-                    idx[n + 0] = ofkx + di;
-                    idx[n + 1] = ofky;
-                    idx[n + 2] = ofkz;
-                    idx[n + 3] = ofkx;
-                    idx[n + 4] = ofky + di;
-                    idx[n + 5] = ofkz;
-                    idx[n + 6] = ofkx;
-                    idx[n + 7] = ofky;
-                    idx[n + 8] = ofkz + di;
-                    n += 9;
-                    break;
-                case 2:
-                    idx[n + 0] = ofkx + di * 2;
-                    idx[n + 1] = ofky;
-                    idx[n + 2] = ofkz;
-                    idx[n + 3] = ofkx + di;
-                    idx[n + 4] = ofky + di;
-                    idx[n + 5] = ofkz;
-                    idx[n + 6] = ofkx + di;
-                    idx[n + 7] = ofky;
-                    idx[n + 8] = ofkz + di;
-                    idx[n + 9] = ofkx;
-                    idx[n + 10] = ofky + di * 2;
-                    idx[n + 11] = ofkz;
-                    idx[n + 12] = ofkx;
-                    idx[n + 13] = ofky + di;
-                    idx[n + 14] = ofkz + di;
-                    idx[n + 15] = ofkx;
-                    idx[n + 16] = ofky;
-                    idx[n + 17] = ofkz + di * 2;
-                    n += 18;
-                    break;
-                default:
-                    for (i = 0; i < nfi; i++) {
-                        idx[n + 0] = ofkx + di * i_nx[i]; //(:,ix,kx,lx,jx,1)
-                        idx[n + 1] = ofky + di * i_ny[i]; //(:,iy,ky,ly,jy,2)
-                        idx[n + 2] = ofkz + di * i_nz[i]; //(:,iz,kz,lz,jz,3)
-                        n += 3;
-                    } // i
-                }
-            } // k
-        } // l
-    } // j
-}
-
-
-void CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
-    int iprim, int ictr)
-{
-    int ip, j, k, kp;
-    int* zeroidx = new int[ictr];
-    for (ip = 0; ip < iprim; ip++) {
-        for (j = 0, k = 0, kp = 0; j < ictr; j++) {
-            if (ci[iprim * j + ip] != 0) {
-                sortedidx[k] = j;
-                k++;
-            }
-            else {
-                zeroidx[kp] = j;
-                kp++;
-            }
-        }
-        // Append the index of zero-coeff to sortedidx for function CINTprim_to_ctr_0
-        for (j = 0; j < kp; j++) {
-            sortedidx[k + j] = zeroidx[j];
-        }
-        non0ctr[ip] = k;
-        sortedidx += ictr;
-    }
-}
-
-
-
-
-
-void CINTg1e_index_xyz(int* idx, CINTEnvVars* envs)
-{
-    const int i_l = envs->i_l;
-    const int j_l = envs->j_l;
-    const int nfi = envs->nfi;
-    const int nfj = envs->nfj;
-    const int di = envs->g_stride_i;
-    const int dj = envs->g_stride_j;
-    int i, j, n;
-    int ofx, ofjx;
-    int ofy, ofjy;
-    int ofz, ofjz;
-    int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
-    int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
-
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-
-    ofx = 0;
-    ofy = envs->g_size;
-    ofz = envs->g_size * 2;
-    n = 0;
-    for (j = 0; j < nfj; j++) {
-        ofjx = ofx + dj * j_nx[j];
-        ofjy = ofy + dj * j_ny[j];
-        ofjz = ofz + dj * j_nz[j];
-        for (i = 0; i < nfi; i++) {
-            idx[n + 0] = ofjx + di * i_nx[i];
-            idx[n + 1] = ofjy + di * i_ny[i];
-            idx[n + 2] = ofjz + di * i_nz[i];
-            n += 3;
-        }
-    }
-}
-
-
-int CINT2c2e_loop_nopt(double* gctr, CINTEnvVars* envs, double* cache, int* empty)
-{
-    int* shls = envs->shls;
-    int* bas = envs->bas;
-    double* env = envs->env;
-    int i_sh = shls[0];
-    int k_sh = shls[1];
-    int i_ctr = envs->x_ctr[0];
-    int k_ctr = envs->x_ctr[1];
-    int i_prim = bas(NPRIM_OF, i_sh);
-    int k_prim = bas(NPRIM_OF, k_sh);
-    double* ai = env + bas(PTR_EXP, i_sh);
-    double* ak = env + bas(PTR_EXP, k_sh);
-    double* ci = env + bas(PTR_COEFF, i_sh);
-    double* ck = env + bas(PTR_COEFF, k_sh);
-    double expcutoff = envs->expcutoff;
-    double* ri = envs->ri;
-    double* rk = envs->rk;
-    int n_comp = envs->ncomp_tensor;
-    double fac1i, fac1k;
-    int ip, kp;
-    int _empty[3] = { 1, 1, 1 };
-    int* iempty = _empty + 0;
-    int* kempty = _empty + 1;
-    int* gempty = _empty + 2;
-    size_t nf = envs->nf;
-    const int nc = i_ctr * k_ctr;
-    const int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    const int lenk = nf * nc * n_comp; // gctrk
-    const int leni = nf * i_ctr * n_comp; // gctri
-    const int len0 = nf * n_comp; // gout
-    const int len = leng + lenk + leni + len0;
-    double* g;
-    MALLOC_INSTACK(g, len);
-    double* g1 = g + leng;
-    double* gout, * gctri, * gctrk;
-
-    ALIAS_ADDR_IF_EQUAL(k, m);
-    ALIAS_ADDR_IF_EQUAL(i, k);
-    ALIAS_ADDR_IF_EQUAL(g, i);
-
-    int* idx;
-    MALLOC_INSTACK_INT(idx, envs->nf * 3);
-    CINTg1e_index_xyz(idx, envs);
-
-    int* non0ctri, * non0ctrk;
-    int* non0idxi, * non0idxk;
-    MALLOC_INSTACK_INT(non0ctri, i_prim + k_prim + i_prim * i_ctr + k_prim * k_ctr);
-    non0ctrk = non0ctri + i_prim;
-    non0idxi = non0ctrk + k_prim;
-    non0idxk = non0idxi + i_prim * i_ctr;
-    if (i_ctr > 1) {
-        CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    }
-    if (k_ctr > 1) {
-        CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
-    }
-
-    for (kp = 0; kp < k_prim; kp++) {
-        envs->ak[0] = ak[kp];
-        envs->al[0] = 0; // to use CINTg0_2e
-        if (k_ctr == 1) {
-            fac1k = envs->common_factor * ck[kp];
-        }
-        else {
-            fac1k = envs->common_factor;
-            *iempty = 1;
-        }
-        for (ip = 0; ip < i_prim; ip++) {
-            envs->ai[0] = ai[ip];
-            envs->aj[0] = 0;
-            if (i_ctr == 1) {
-                fac1i = fac1k * ci[ip];
-            }
-            else {
-                fac1i = fac1k;
-            }
-            envs->fac[0] = fac1i;
-            if ((*envs->f_g0_2e)(g, ri, rk, expcutoff, envs)) {
-                (*envs->f_gout)(gout, g, idx, envs, *gempty);
-                PRIM2CTR0(i, gout, len0);
-            }
-        } // end loop i_prim
-        if (!*iempty) {
-            PRIM2CTR0(k, gctri, leni);
-        }
-    } // end loop k_prim
-
-    if (n_comp > 1 && !*kempty) {
-        TRANSPOSE(gctrk);
-    }
-    return !*empty;
-}
-
-
-int int1e_cache_size(CINTEnvVars* envs)
-{
-    int* shls = envs->shls;
-    int* bas = envs->bas;
-    int i_prim = bas(NPRIM_OF, shls[0]);
-    int j_prim = bas(NPRIM_OF, shls[1]);
-    int* x_ctr = envs->x_ctr;
-    int nc = envs->nf * x_ctr[0] * x_ctr[1];
-    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
-    int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    int lenj = envs->nf * nc * n_comp;
-    int leni = envs->nf * x_ctr[0] * n_comp;
-    int len0 = envs->nf * n_comp;
-    int pdata_size = (i_prim * j_prim * 5
-        + i_prim * x_ctr[0]
-        + j_prim * x_ctr[1]
-        + (i_prim + j_prim) * 2 + envs->nf * 3);
-    int cache_size = std::max(nc * n_comp + leng + lenj + leni + len0 + pdata_size,
-        nc * n_comp + envs->nf * 8 * OF_CMPLX);
-    return cache_size;
-}
-
-int CINT2c2e_drv(double* out, int* dims, CINTEnvVars* envs, CINTOpt* opt,
-    double* cache, void (*f_c2s)(double* , double* , int* ,CINTEnvVars* , double* ))
-{
-    int* x_ctr = envs->x_ctr;
-    int nc = envs->nf * x_ctr[0] * x_ctr[1];
-    int n_comp = envs->ncomp_e1 * envs->ncomp_e2 * envs->ncomp_tensor;
-    if (out == NULL) {
-        return int1e_cache_size(envs);
-    }
-    double* stack = NULL;
-    if (cache == NULL) {
-        size_t cache_size = int1e_cache_size(envs);
-        stack = (double*)malloc(sizeof(double) * cache_size);
-        cache = stack;
-    }
-    double* gctr;
-    MALLOC_INSTACK(gctr, nc * n_comp);
-
-    int n;
-    int empty = 1;
-    if (opt != NULL) {
-        envs->opt = opt;
-        //CINT2c2e_loop(gctr, envs, cache, &empty);
-        std::cout << "OPTY for 2c2e NOT DEFINED!!" << std::endl;
-        exit(1);
-    }
-    else {
-        CINT2c2e_loop_nopt(gctr, envs, cache, &empty);
-    }
-
-    int counts[4];
-    if (f_c2s == &c2s_sph_1e) {
-        counts[0] = (envs->i_l * 2 + 1) * x_ctr[0];
-        counts[1] = (envs->k_l * 2 + 1) * x_ctr[1];
-    }
-    else {
-        counts[0] = envs->nfi * x_ctr[0];
-        counts[1] = envs->nfk * x_ctr[1];
-    }
-    counts[2] = 1;
-    counts[3] = 1;
-    if (dims == NULL) {
-        dims = counts;
-    }
-    int nout = dims[0] * dims[1];
-    if (!empty) {
-        for (n = 0; n < n_comp; n++) {
-            (*f_c2s)(out + nout * n, gctr + nc * n, dims, envs, cache);
-        }
-    }
-    else {
-        for (n = 0; n < n_comp; n++) {
-            c2s_dset0(out + nout * n, dims, counts);
-        }
-    }
-    if (stack != NULL) {
-        free(stack);
-    }
-    return !empty;
-}
 
 
 void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
@@ -5108,7 +4260,7 @@ void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     envs->ri = env + atm(PTR_COORD, bas(ATOM_OF, i_sh));
     envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
-    
+
     envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
@@ -5179,104 +4331,11 @@ void CINTinit_int2c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     envs->g_stride_j = envs->g_stride_k;
 }
 
-int int2c2e_sph(double* out, int* dims, int* shls, int* atm, int natm,
-    int* bas, int nbas, double* env, CINTOpt* opt, double* cache)
-{
-    int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
-    CINTEnvVars envs;
-    CINTinit_int2c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-    envs.f_gout = &CINTgout2e;
-    return CINT2c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_1e);
-}
-
-//void int2c2e_optimizer(CINTOpt** opt, int* atm, int natm,
-//    int* bas, int nbas, double* env)
-//{
-//    int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
-//    CINTall_2c2e_optimizer(opt, ng, atm, natm, bas, nbas, env);
-//}
-
-
-/*
- * mat(naoi,naoj,comp) in F-order
- */
-void GTOint2c(int (*intor)(double*, int*, int*, int*, int, int*, int, double*, CINTOpt*, double*), double* mat, int comp, int hermi,
-    int* shls_slice, int* ao_loc, CINTOpt* opt,
-    int* atm, int natm, int* bas, int nbas, double* env)
-{
-    const int ish0 = shls_slice[0];
-    const int ish1 = shls_slice[1];
-    const int jsh0 = shls_slice[2];
-    const int jsh1 = shls_slice[3];
-    const int nish = ish1 - ish0;
-    const int njsh = jsh1 - jsh0;
-    const size_t naoi = ao_loc[ish1] - ao_loc[ish0];
-    const size_t naoj = ao_loc[jsh1] - ao_loc[jsh0];
-    const int cache_size = GTOmax_cache_size(intor, shls_slice, 2,
-        atm, natm, bas, nbas, env);
-#pragma omp parallel
-    {
-        int dims[] = { naoi, naoj };
-        int ish, jsh, ij, i0, j0;
-        int shls[2];
-        double* cache = (double*)malloc(sizeof(double) * cache_size);
-#pragma omp for schedule(dynamic, 4)
-        for (ij = 0; ij < nish * njsh; ij++) {
-            ish = ij / njsh;
-            jsh = ij % njsh;
-
-            ish += ish0;
-            jsh += jsh0;
-            shls[0] = ish;
-            shls[1] = jsh;
-            i0 = ao_loc[ish] - ao_loc[ish0];
-            j0 = ao_loc[jsh] - ao_loc[jsh0];
-            (*intor)(mat + j0 * naoi + i0, dims, shls,
-                atm, natm, bas, nbas, env, opt, cache);
-        }
-        free(cache);
-    }
-}
-
-
-void computeEri2c(Int_Params& params, vec& eri2c)
-{
-    ivec bas = params.get_bas();
-    ivec atm = params.get_atm();
-    vec env = params.get_env();
-
-    int nbas = params.get_nbas();
-    int nat = params.get_natoms();
-
-    ivec shl_slice = { 0, nbas, 0, nbas };
-    ivec aoloc = make_loc(bas, nbas);
-
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-
-    //Opt opty = int2c2e_optimizer(atm, nat, bas, nbas, env);
-
-    // Compute integrals
-    vec res(naoi * naoj, 0.0);
-    eri2c.resize(naoi * naoj, 0.0);
-    GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
-
-
-
-    //res is in fortran order, write the result in regular ordering
-    for (int i = 0; i < naoi; i++) {
-        for (int j = 0; j < naoj; j++) {
-            eri2c[j * naoi + i] = res[i * naoj + j];
-        }
-    }
-}
-
 
 /*
  * Note the 3c2e functions takes i,j,k parameters. But we initialize
  * ll_ceil, to reuse g2e_g02d function.
  */
-
 void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
@@ -5382,9 +4441,7 @@ void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
     if (rys_order <= 2) {
         envs->f_g0_2d4d = &CINTg0_2e_2d4d_unrolled;
         if (rys_order != nrys_roots) {
-            std::cout << "rys_order != nrys_roots  THIS IS NOT GOOD!!" << std::endl;
-            exit(1);
-            //envs->f_g0_2d4d = &CINTsrg0_2e_2d4d_unrolled;
+            envs->f_g0_2d4d = &CINTsrg0_2e_2d4d_unrolled;
         }
     }
     else if (ibase) {
@@ -5394,316 +4451,4 @@ void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
         envs->f_g0_2d4d = &CINTg0_2e_lj2d4d;
     }
     envs->f_g0_2e = &CINTg0_2e;
-}
-
-
-
-int CINT3c2e_loop_nopt(double* gctr, CINTEnvVars* envs, double* cache, int* empty)
-{
-    int* shls = envs->shls;
-    int* bas = envs->bas;
-    double* env = envs->env;
-    int i_sh = shls[0];
-    int j_sh = shls[1];
-    int k_sh = shls[2];
-    int i_ctr = envs->x_ctr[0];
-    int j_ctr = envs->x_ctr[1];
-    int k_ctr = envs->x_ctr[2];
-    int i_prim = bas(NPRIM_OF, i_sh);
-    int j_prim = bas(NPRIM_OF, j_sh);
-    int k_prim = bas(NPRIM_OF, k_sh);
-    //double *ri = envs->ri;
-    //double *rj = envs->rj;
-    double* ai = env + bas(PTR_EXP, i_sh);
-    double* aj = env + bas(PTR_EXP, j_sh);
-    double* ak = env + bas(PTR_EXP, k_sh);
-    double* ci = env + bas(PTR_COEFF, i_sh);
-    double* cj = env + bas(PTR_COEFF, j_sh);
-    double* ck = env + bas(PTR_COEFF, k_sh);
-
-    double expcutoff = envs->expcutoff;
-    double rr_ij = SQUARE(envs->rirj);
-    double* log_maxci, * log_maxcj;
-    PairData* pdata_base, * pdata_ij;
-    MALLOC_INSTACK(log_maxci, i_prim + j_prim);
-    MALLOC_INSTACK_PAIRDATA(pdata_base, i_prim * j_prim);
-    log_maxcj = log_maxci + i_prim;
-    CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
-    CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
-    if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
-        log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
-        i_prim, j_prim, rr_ij, expcutoff, env)) {
-        return 0;
-    }
-
-    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
-    size_t nf = envs->nf;
-    double fac1i, fac1j, fac1k;
-    int ip, jp, kp;
-    int _empty[4] = { 1, 1, 1, 1 };
-    int* iempty = _empty + 0;
-    int* jempty = _empty + 1;
-    int* kempty = _empty + 2;
-    int* gempty = _empty + 3;
-    /* COMMON_ENVS_AND_DECLARE end */
-
-    double expij, cutoff;
-    double* rij;
-    double* rkl = envs->rk;
-    double omega = env[PTR_RANGE_OMEGA];
-    if (omega < 0 && envs->rys_order > 1) {
-        double r_guess = 8.;
-        double omega2 = omega * omega;
-        int lij = envs->li_ceil + envs->lj_ceil;
-        if (lij > 0) {
-            double dist_ij = sqrt(rr_ij);
-            double aij = ai[i_prim - 1] + aj[j_prim - 1];
-            double theta = omega2 / (omega2 + aij);
-            expcutoff += lij * std::log(
-                (dist_ij + theta * r_guess + 1.) / (dist_ij + 1.));
-        }
-        if (envs->lk_ceil > 0) {
-            double theta = omega2 / (omega2 + ak[k_prim - 1]);
-            expcutoff += envs->lk_ceil * std::log(theta * r_guess + 1.);
-        }
-    }
-
-    int* idx;
-    MALLOC_INSTACK_INT(idx, nf * 3);
-    CINTg2e_index_xyz(idx, envs);
-
-    int* non0ctri, * non0ctrj, * non0ctrk;
-    int* non0idxi, * non0idxj, * non0idxk;
-    MALLOC_INSTACK_INT(non0ctri, i_prim + j_prim + k_prim + i_prim * i_ctr + j_prim * j_ctr + k_prim * k_ctr);
-    non0ctrj = non0ctri + i_prim;
-    non0ctrk = non0ctrj + j_prim;
-    non0idxi = non0ctrk + k_prim;
-    non0idxj = non0idxi + i_prim * i_ctr;
-    non0idxk = non0idxj + j_prim * j_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
-
-    int nc = i_ctr * j_ctr * k_ctr;
-    // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t lenk = nf * nc * n_comp; // gctrk
-    size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
-    size_t leni = nf * i_ctr * n_comp; // gctri
-    size_t len0 = nf * n_comp; // gout
-    size_t len = leng + lenk + lenj + leni + len0;
-    double* g;
-    MALLOC_INSTACK(g, len);  // must be allocated last in this function
-    double* g1 = g + leng;
-    double* gout, * gctri, * gctrj, * gctrk;
-
-    ALIAS_ADDR_IF_EQUAL(k, m);
-    ALIAS_ADDR_IF_EQUAL(j, k);
-    ALIAS_ADDR_IF_EQUAL(i, j);
-    ALIAS_ADDR_IF_EQUAL(g, i);
-
-    for (kp = 0; kp < k_prim; kp++) {
-        envs->ak[0] = ak[kp];
-        if (k_ctr == 1) {
-            fac1k = envs->common_factor * ck[kp];
-        }
-        else {
-            fac1k = envs->common_factor;
-            *jempty = 1;
-        }
-
-        pdata_ij = pdata_base;
-        for (jp = 0; jp < j_prim; jp++) {
-            envs->aj[0] = aj[jp];
-            if (j_ctr == 1) {
-                fac1j = fac1k * cj[jp];
-            }
-            else {
-                fac1j = fac1k;
-                *iempty = 1;
-            }
-            for (ip = 0; ip < i_prim; ip++, pdata_ij++) {
-                if (pdata_ij->cceij > expcutoff) {
-                    goto i_contracted;
-                }
-                envs->ai[0] = ai[ip];
-                expij = pdata_ij->eij;
-                rij = pdata_ij->rij;
-                cutoff = expcutoff - pdata_ij->cceij;
-                if (i_ctr == 1) {
-                    fac1i = fac1j * ci[ip] * expij;
-                }
-                else {
-                    fac1i = fac1j * expij;
-                }
-                envs->fac[0] = fac1i;
-                if ((*envs->f_g0_2e)(g, rij, rkl, cutoff, envs)) {
-                    (*envs->f_gout)(gout, g, idx, envs, *gempty);
-                    PRIM2CTR0(i, gout, len0);
-                }
-            i_contracted:;
-            } // end loop i_prim
-            if (!*iempty) {
-                PRIM2CTR0(j, gctri, leni);
-            }
-        } // end loop j_prim
-        if (!*jempty) {
-            PRIM2CTR0(k, gctrj, lenj);
-        }
-    } // end loop k_prim
-
-    if (n_comp > 1 && !*kempty) {
-        TRANSPOSE(gctrk);
-    }
-    return !*empty;
-}
-
-
-int CINT3c2e_drv(double* out,const int* dims, CINTEnvVars* envs, CINTOpt* opt,
-    double* cache, void (*f_e1_c2s)(double* , double* ,const int* ,CINTEnvVars* , double* ), int is_ssc)
-{
-    int* x_ctr = envs->x_ctr;
-    size_t nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
-    int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
-    if (out == NULL) {
-        PAIRDATA_NON0IDX_SIZE(pdata_size);
-        int leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        int len0 = envs->nf * n_comp;
-        int cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
-            nc * n_comp + envs->nf * 3);
-        return cache_size;
-    }
-    double* stack = NULL;
-    if (cache == NULL) {
-        PAIRDATA_NON0IDX_SIZE(pdata_size);
-        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        size_t len0 = envs->nf * n_comp;
-        size_t cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
-            nc * n_comp + envs->nf * 3);
-        stack = (double *)malloc(sizeof(double) * cache_size);
-        cache = stack;
-    }
-    double* gctr;
-    MALLOC_INSTACK(gctr, nc * n_comp);
-
-    int n;
-    int empty = 1;
-    if (opt != NULL) {
-        envs->opt = opt;
-        n = ((envs->x_ctr[0] == 1) << 2) + ((envs->x_ctr[1] == 1) << 1) + (envs->x_ctr[2] == 1);
-		std::cout << "OPTY for 3c2e NOT DEFINED!!" << std::endl;
-        exit(1);
-        //CINTf_3c2e_loop[n](gctr, envs, cache, &empty);
-    }
-    else {
-        CINT3c2e_loop_nopt(gctr, envs, cache, &empty);
-    }
-
-    int counts[4];
-    if (f_e1_c2s == &c2s_sph_3c2e1) {
-        counts[0] = (envs->i_l * 2 + 1) * x_ctr[0];
-        counts[1] = (envs->j_l * 2 + 1) * x_ctr[1];
-        if (is_ssc) {
-            counts[2] = envs->nfk * x_ctr[2];
-        }
-        else {
-            counts[2] = (envs->k_l * 2 + 1) * x_ctr[2];
-        }
-    }
-    else {
-        counts[0] = envs->nfi * x_ctr[0];
-        counts[1] = envs->nfj * x_ctr[1];
-        counts[2] = envs->nfk * x_ctr[2];
-    }
-    counts[3] = 1;
-    if (dims == NULL) {
-        dims = counts;
-    }
-    int nout = dims[0] * dims[1] * dims[2];
-    if (!empty) {
-        for (n = 0; n < n_comp; n++) {
-            (*f_e1_c2s)(out + nout * n, gctr + nc * n, dims, envs, cache);
-        }
-    }
-    else {
-        for (n = 0; n < n_comp; n++) {
-            c2s_dset0(out + nout * n, dims, counts);
-        }
-    }
-    if (stack != NULL) {
-        free(stack);
-    }
-    return !empty;
-}
-
-int int3c2e_sph(double* out, int* dims, int* shls, int* atm, int natm,
-    int* bas, int nbas, double* env, CINTOpt* opt, double* cache)
-{
-    int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
-    CINTEnvVars envs;
-    CINTinit_int3c2e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
-    envs.f_gout = &CINTgout2e;
-    return CINT3c2e_drv(out, dims, &envs, opt, cache, &c2s_sph_3c2e1, 0);
-}
-
-
-// Function to compute three-center two-electron integrals (eri3c)
-void computeEri3c(Int_Params& param1,
-    Int_Params& param2,
-    vec& eri3c)
-{
-    int nQM = param1.get_nbas();
-    int nAux = param2.get_nbas();
-
-    Int_Params combined = param1 + param2;
-	//combined.print_data("combined");
-
-    ivec bas = combined.get_bas();
-    ivec atm = combined.get_atm();
-    vec env = combined.get_env();
-
-    ivec shl_slice = {
-        0,
-        nQM,
-        0,
-        nQM,
-        nQM,
-        nQM + nAux,
-    };
-
-
-    int nat = combined.get_natoms();
-    int nbas = combined.get_nbas();
-
-    assert(shl_slice[1] <= nbas);
-    assert(shl_slice[3] <= nbas);
-    assert(shl_slice[5] <= nbas);
-
-    ivec aoloc = make_loc(bas, nbas);
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-    int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
-
-
-    //CINTOpt opty = int3c2e_optimizer(atm, nat, bas, nbas, env);
-
-    // Compute integrals
-    vec res(naoi * naoj * naok, 0.0);
-    eri3c.resize(naoi * naoj * naok, 0.0);
-
-    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
-
-    //FOR TESTING PURPOSES!!!!
-    //GTOnr3c_drv(int3c2e_sph, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
-
-    //res is in fortran order, write the result in regular ordering
-    for (int k = 0; k < naok; k++) {
-        for (int j = 0; j < naoj; j++) {
-            for (int i = 0; i < naoi; i++) {
-                std::size_t idx_F = i + j * naoi + k * (naoi * naoj);
-                std::size_t idx_C = i * (naoj * naok) + j * naok + k;
-                eri3c[idx_C] = res[idx_F];
-            }
-        }
-    }
 }

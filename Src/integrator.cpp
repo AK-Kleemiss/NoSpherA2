@@ -1,7 +1,7 @@
 #include "integrator.h"
 #include "integration_params.h"
 #include "JKFit.h"
-#include "int2e.h"
+#include "libCintMain.h"
 #include "math.h"
 
 #define lapack_complex_float std::complex<float>
@@ -37,7 +37,7 @@ vec einsum_ijk_ij_p(const vec3& v1, const vec2& v2)
     return rho;
 }
 
-vec einsum_ijp_ij_p(const vec& v1, const vec& v2, const int I, const int J, const int P) {
+vec einsum_ijk_ij_p(const vec& v1, const vec& v2, const int I, const int J, const int P) {
     // Initialize the result vector
     vec rho(P, 0.0);
 
@@ -133,10 +133,11 @@ vec reorder_p(vec coefs_in, WFN aux_basis) {
 }
 
 
-vec density_fit(const WFN& wavy, const std::string auxname)
+vec density_fit(const WFN& wavy, const std::string auxname, int max_RAM)
 {
-    std::vector<double> eri2c;
-    std::vector<double> eri3c;
+    vec eri2c;
+    vec eri3c;
+    vec rho;
 
     // Initialize basis functions (qmBasis and auxBasis)
 
@@ -161,14 +162,14 @@ vec density_fit(const WFN& wavy, const std::string auxname)
 
     // Compute integrals
     computeEri2c(aux_basis, eri2c);
-    computeEri3c(normal_basis, aux_basis, eri3c);
+    //computeEri3c(normal_basis, aux_basis, eri3c);
 
 
     vec2 dm = wavy.get_dm();
-    vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
-
+    //vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
+	computeRho(normal_basis, aux_basis, dm, rho, max_RAM);
     // Perform contractions using BLAS
-    vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
+    //vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);
 
 #ifdef _WIN32
