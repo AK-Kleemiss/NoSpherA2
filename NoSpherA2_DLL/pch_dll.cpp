@@ -7,7 +7,7 @@
 // When you are using pre-compiled headers, this source file is necessary for compilation to succeed.
 // This is the only source file that includes pch_dll.h
 
-std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(std::filesystem::path fn1, std::filesystem::path fn2, double resolution, double radius) {
+std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesystem::path& fn1, const std::filesystem::path& fn2, double resolution, double radius) {
 
     if (radius < 2.5)
     {
@@ -15,8 +15,8 @@ std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(std::filesystem::pat
         radius = 2.5;
     }
     std::cout << "Calculating Hirshfeld Surface for " << fn1 << " and " << fn2 << std::endl;
-    WFN wfn1(fn1, true);
-    WFN wfn2(fn2, true);
+    WFN wfn1("D:\\git\\NoSpherA2\\tests\\isosurface\\asu.xyz", true);
+    WFN wfn2("D:\\git\\NoSpherA2\\tests\\isosurface\\pack.xyz", true);
     double MinMax[6];
     int NbSteps[3];
     readxyzMinMax_fromWFN(wfn1, MinMax, NbSteps, radius, resolution, false);

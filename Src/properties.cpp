@@ -14,7 +14,7 @@ void Calc_Spherical_Dens(
 {
     using namespace std;
     _time_point start = get_time();
-    ProgressBar *progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
+    //ProgressBar *progress = new ProgressBar(CubeSpher.get_size(0), 50, "=", " ", "Calculating Spherical Density");
 
     vector<Thakkar> atoms;
     for (int a = 0; a < 92; a++) {
@@ -81,9 +81,9 @@ void Calc_Spherical_Dens(
 
                 CubeSpher.set_value(temp_i, temp_j, temp_k, CubeSpher.get_value(temp_i, temp_j, temp_k) + dens_all);
             }
-        progress->update();
+        //progress->update();
     }
-    delete (progress);
+    //delete (progress);
 
     _time_point end = get_time();
     if (get_sec(start, end) < 60)

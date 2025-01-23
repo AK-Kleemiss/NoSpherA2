@@ -63,4 +63,4 @@ public:
 //std::array<double, 3 > DLL_EXPORT Triangle::get_v(const int& nr) const;
 //RGB DLL_EXPORT Triangle::get_colour() const;
 
-std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(std::filesystem::path fn1, std::filesystem::path fn2, double resolution, double radius);
+std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesystem::path& fn1, const std::filesystem::path& fn2, double resolution, double radius);

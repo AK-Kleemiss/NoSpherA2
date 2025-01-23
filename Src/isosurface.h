@@ -15,6 +15,10 @@ public:
     Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3) : v1(v1), v2(v2), v3(v3), colour({ 0, 0, 0 }), colour_index(0) {};
     Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3, RGB colour) : v1(v1), v2(v2), v3(v3), colour(colour), colour_index(0) {};
     Triangle(std::array<double, 3> v1, std::array<double, 3> v2, std::array<double, 3> v3, RGB colour, int colour_index) : v1(v1), v2(v2), v3(v3), colour(colour), colour_index(colour_index) {};
+    Triangle() = default;
+    Triangle(const Triangle&) = default;
+    Triangle& operator=(const Triangle&) = default;
+    ~Triangle() = default;
 
     RGB get_colour() const { return colour; };
     void set_colour(const RGB& given) { colour = given; };
