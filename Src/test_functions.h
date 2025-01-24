@@ -753,7 +753,7 @@ void bondwise_laplacian_plots(std::filesystem::path& wfn_name) {
                 const vec bond_vec = { (wavy.get_atom_coordinate(j,0) - wavy.get_atom_coordinate(i,0))/points, (wavy.get_atom_coordinate(j,1) - wavy.get_atom_coordinate(i,1))/points, (wavy.get_atom_coordinate(j,2) - wavy.get_atom_coordinate(i,2))/points };
                 double dr = distance / points;
                 vec lapl(points, 0.0);
-                vec pos = { wavy.get_atom_coordinate(i,0), wavy.get_atom_coordinate(i,1), wavy.get_atom_coordinate(i,2) };
+                const vec pos = { wavy.get_atom_coordinate(i,0), wavy.get_atom_coordinate(i,1), wavy.get_atom_coordinate(i,2) };
 #pragma omp parallel for
                 for (int k = 0; k < points; k++) {
                     std::array<double, 3> t_pos = { pos[0], pos[1], pos[2] };
@@ -770,6 +770,9 @@ void bondwise_laplacian_plots(std::filesystem::path& wfn_name) {
                 }
                 result.flush();
                 result.close();
+            }
+            else {
+                std::cout << "No bond between " << i << " and " << j << " with distance " << distance << " and svdW " << svdW << std::endl;
             }
         }
     }
