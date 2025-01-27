@@ -191,10 +191,7 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
             CINTrys_roots(rorder, x, u, w);
             CINTrys_roots(rorder, theta * x, u + rorder, w + rorder);
             if (envs->g_size == 2) {
-                g[0] = 1;
-                g[1] = 1;
-                g[2] = 1;
-                g[3] = 1;
+                g[0] = g[1] = g[2] = g[3] = 1;
                 g[4] *= fac1;
                 g[5] *= fac1 * sqrt_theta;
                 return 1;
@@ -223,8 +220,7 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
         }
     }
     if (envs->g_size == 1) {
-        g[0] = 1;
-        g[1] = 1;
+        g[0] = g[1] = 1;
         g[2] *= fac1;
         return 1;
     }
