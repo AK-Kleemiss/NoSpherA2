@@ -432,23 +432,23 @@ void CINTg0_2e_2d(double* g, Rys2eT* bc, CINTEnvVars* envs)
  /* 2d is based on l,j */
 void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
 {
-    int li = envs->li_ceil;
-    int lk = envs->lk_ceil;
+    const int li = envs->li_ceil;
+    const int lk = envs->lk_ceil;
     if (li == 0 && lk == 0) {
         return;
     }
-    int nmax = envs->li_ceil + envs->lj_ceil;
-    int mmax = envs->lk_ceil + envs->ll_ceil;
+    const int nmax = envs->li_ceil + envs->lj_ceil;
+    const int mmax = envs->lk_ceil + envs->ll_ceil;
     //int ll = envs->ll_ceil;
-    int lj = envs->lj_ceil;
-    int nroots = envs->nrys_roots;
+    const int lj = envs->lj_ceil;
+    const int nroots = envs->nrys_roots;
     int i, j, k, l, n;
-    int di = envs->g_stride_i;
-    int dk = envs->g_stride_k;
-    int dl = envs->g_stride_l;
-    int dj = envs->g_stride_j;
-    double* rirj = envs->rirj;
-    double* rkrl = envs->rkrl;
+    const int di = envs->g_stride_i;
+    const int dk = envs->g_stride_k;
+    const int dl = envs->g_stride_l;
+    const int dj = envs->g_stride_j;
+    const double* rirj = envs->rirj;
+    const double* rkrl = envs->rkrl;
     DEF_GXYZ(double, g, gx, gy, gz);
     double* p1x, * p1y, * p1z, * p2x, * p2y, * p2z;
     double rx, ry, rz;
@@ -465,11 +465,11 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     p2z = gz - di + dj;
     for (i = 1; i <= li; i++) {
         for (j = 0; j <= nmax - i; j++) {
-            int base_ptr = j * dj + i * di;
+            const int base_ptr = j * dj + i * di;
             for (l = 0; l <= mmax; l++) {
-                int ptr = base_ptr + l * dl;
-                for (n = 0; n < ptr + nroots; n++) {
-                    int idx = ptr + n;
+                const int ptr = base_ptr + l * dl;
+                for (n = 0; n < nroots; n++) {
+                    const int idx = ptr + n;
                     gx[idx] = rx * p1x[idx] + p2x[idx];
                     gy[idx] = ry * p1y[idx] + p2y[idx];
                     gz[idx] = rz * p1z[idx] + p2z[idx];
@@ -489,12 +489,12 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     p2y = gy - dk + dl;
     p2z = gz - dk + dl;
     for (j = 0; j <= lj; j++) {
-        int base_ptr = j * dj;
+        const int base_ptr = j * dj;
         for (k = 1; k <= lk; k++) {
             for (l = 0; l <= mmax - k; l++) {
-                int ptr = base_ptr + l * dl + k * dk;
+                const int ptr = base_ptr + l * dl + k * dk;
                 for (n = 0; n < dk; n++) {
-                    int idx = ptr + n;
+                    const int idx = ptr + n;
                     gx[idx] = rx * p1x[idx] + p2x[idx];
                     gy[idx] = ry * p1y[idx] + p2y[idx];
                     gz[idx] = rz * p1z[idx] + p2z[idx];
