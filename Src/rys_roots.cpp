@@ -286,7 +286,7 @@ void lgamma_inc_like(long double* f, long double t, int m)
     }
 }
 
-static inline double _pow(double base, int exponent)
+inline double _pow(double base, int exponent)
 {
     int i;
     double result = 1;
@@ -299,7 +299,7 @@ static inline double _pow(double base, int exponent)
     return result;
 }
 
-static inline long double _powl(long double base, int exponent)
+inline long double _powl(long double base, int exponent)
 {
     int i;
     long double result = 1.l;
@@ -6080,7 +6080,7 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double* u, double* w)
     }
 }
 
-static int rys_root1(double X, double* roots, double* weights)
+int rys_root1(double X, double* roots, double* weights)
 {
     double Y, F1;
 
@@ -6143,22 +6143,18 @@ static int rys_root1(double X, double* roots, double* weights)
             1.99999999997023E-01) * X + 3.33333333333318E-01;
     }
 
-    double WW1 = 2. * X * F1 + E;
+    const double WW1 = 2. * X * F1 + E;
     weights[0] = WW1;
     roots[0] = F1 / (WW1 - F1);
     return 0;
 }
 
-static int rys_root2(double X, double* roots, double* weights)
+int rys_root2(double X, double* roots, double* weights)
 {
 
-    double R12, R22, W22;
+    constexpr double R12 = 2.75255128608411E-01, R22 = 2.72474487139158E+00, W22 = 9.17517095361369E-02;
     double RT1, RT2, WW1, WW2;
     double F1, E, Y;
-
-    R12 = 2.75255128608411E-01;
-    R22 = 2.72474487139158E+00;
-    W22 = 9.17517095361369E-02;
 
     if (X < 3.e-7) {
         RT1 = 1.30693606237085E-01 - 2.90430236082028E-02 * X;
@@ -6316,18 +6312,12 @@ static int rys_root2(double X, double* roots, double* weights)
     return 0;
 }
 
-static int rys_root3(double X, double* roots, double* weights)
+int rys_root3(double X, double* roots, double* weights)
 {
 
-    double R13, R23, W23, R33, W33;
+    constexpr double R13 = 1.90163509193487E-01, R23 = 1.78449274854325E+00, W23 = 1.77231492083829E-01, R33 = 5.52534374226326E+00, W33 = 5.11156880411248E-03;
     double RT1, RT2, RT3, WW1, WW2, WW3;
     double F1, F2, E, T1, T2, T3, A1, A2, Y;
-
-    R13 = 1.90163509193487E-01;
-    R23 = 1.78449274854325E+00;
-    W23 = 1.77231492083829E-01;
-    R33 = 5.52534374226326E+00;
-    W33 = 5.11156880411248E-03;
 
     if (X < 3.e-7) {
         RT1 = 6.03769246832797E-02 - 9.28875764357368E-03 * X;
@@ -6596,19 +6586,11 @@ static int rys_root3(double X, double* roots, double* weights)
     return 0;
 }
 
-static int rys_root4(double X, double* roots, double* weights)
+int rys_root4(double X, double* roots, double* weights)
 {
-    double R14, R24, W24, R34, W34, R44, W44;
+    constexpr double R14 = 1.45303521503316E-01, R24 = 1.33909728812636E+00, W24 = 2.34479815323517E-01, R34 = 3.92696350135829E+00, W34 = 1.92704402415764E-02, R44 = 8.58863568901199E+00, W44 = 2.25229076750736E-04;
     double RT1, RT2, RT3, RT4, WW1, WW2, WW3, WW4;
     double Y, E;
-
-    R14 = 1.45303521503316E-01;
-    R24 = 1.33909728812636E+00;
-    W24 = 2.34479815323517E-01;
-    R34 = 3.92696350135829E+00;
-    W34 = 1.92704402415764E-02;
-    R44 = 8.58863568901199E+00;
-    W44 = 2.25229076750736E-04;
 
     if (X <= 3.0E-7) {
         RT1 = 3.48198973061471E-02 - 4.09645850660395E-03 * X;
@@ -6970,21 +6952,11 @@ static int rys_root4(double X, double* roots, double* weights)
     return 0;
 }
 
-static int rys_root5(double X, double* roots, double* weights)
+int rys_root5(double X, double* roots, double* weights)
 {
-    double R15, R25, W25, R35, W35, R45, W45, R55, W55;
+    constexpr double R15 = 1.17581320211778E-01, R25 = 1.07456201243690E+00, W25 = 2.70967405960535E-01, R35 = 3.08593744371754E+00, W35 = 3.82231610015404E-02, R45 = 6.41472973366203E+00, W45 = 1.51614186862443E-03, R55 = 1.18071894899717E+01, W55 = 8.62130526143657E-06;
     double RT1, RT2, RT3, RT4, RT5, WW1, WW2, WW3, WW4, WW5;
     double Y, E, XXX;
-
-    R15 = 1.17581320211778E-01;
-    R25 = 1.07456201243690E+00;
-    W25 = 2.70967405960535E-01;
-    R35 = 3.08593744371754E+00;
-    W35 = 3.82231610015404E-02;
-    R45 = 6.41472973366203E+00;
-    W45 = 1.51614186862443E-03;
-    R55 = 1.18071894899717E+01;
-    W55 = 8.62130526143657E-06;
 
     if (X < 3.e-7) {
         RT1 = 2.26659266316985E-02 - 2.15865967920897E-03 * X;
@@ -7556,7 +7528,7 @@ static int _rdk_rys_roots(int nroots, double* fmt_ints,
     double* roots, double* weights)
 {
     int i, k, j, order;
-    int nroots1 = nroots + 1;
+    const int nroots1 = nroots + 1;
     double rt[MXRYSROOTS + MXRYSROOTS * MXRYSROOTS];
     double* cs = rt + nroots1;
     double* a;
@@ -7630,7 +7602,7 @@ int CINTrys_schmidt(int nroots, double x, double lower, double* roots, double* w
 #ifdef HAVE_SQRTL
 #define SQRTL   sqrtl
 #else
-static long double c99_sqrtl(long double x)
+long double c99_sqrtl(long double x)
 {
     long double z = sqrt(x);
     // ref. Babylonian method
@@ -7646,14 +7618,14 @@ static long double c99_sqrtl(long double x)
 #else
 // Does it need to swith to 128 bit expl algorithm?
 // ref https://github.com/JuliaLang/openlibm/ld128/e_expl.c
-static long double c99_expl(long double x)
+long double c99_expl(long double x)
 {
     return exp(x);
 }
 #define EXPL    c99_expl
 #endif
 
-static int R_lsmit(long double* cs, long double* fmt_ints, int n)
+int R_lsmit(long double* cs, long double* fmt_ints, int n)
 {
     int i, j, k;
     long double fac, dot, tmp;

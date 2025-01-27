@@ -461,12 +461,12 @@ void CINTgout2e(double* gout, double* g, int* idx,
     double s;
 
     for (int n = 0; n < nf; n++, idx += 3) {
-        int ix = idx[0];
-        int iy = idx[1];
-        int iz = idx[2];
+        const double* gx = &g[idx[0]];
+        const double* gy = &g[idx[1]];
+        const double* gz = &g[idx[2]];
         s = 0;
         for (int i = 0; i < nrys_roots; i++) {
-            s += g[ix + i] * g[iy + i] * g[iz + i];
+            s += *(gx + i) * *(gy + i) * *(gz + i);
         }
         gout[n] = gout_empty ? s : gout[n] + s;
     }
