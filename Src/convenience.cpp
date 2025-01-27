@@ -2297,16 +2297,16 @@ void options::digest_options()
             iam_switch = true;
         else if (temp == "-lap")
             calc = lap = true;
-        else if (temp == "-max_mem")
+        else if (temp == "-mem")
         {
-            max_RAM = stoi(arguments[i + 1]); //In MB
+            mem = stod(arguments[i + 1]); //In MB
             vec a;
             size_t vec_max_size = a.max_size();
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
-			if (max_RAM > doubel_max_size)
+			if (mem > doubel_max_size)
 			{
-				cout << "Max memory set to " << max_RAM << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << doubel_max_size - 10 << " MB." << endl;
-				max_RAM = static_cast<int>(doubel_max_size)-10;
+				cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+                mem = 50000.0;
 			}
 
         }
@@ -2423,7 +2423,11 @@ void options::digest_options()
 					cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
                     exit(0);
                 }
-            }     
+            }
+            else {
+				cout << "No basis set specified. Using fallback 'combo_basis_fit'!" << endl;
+				SALTED_DFBASIS = "combo_basis_fit";
+            }
         }
 
         else if (temp.find("-s_rho") < 1)

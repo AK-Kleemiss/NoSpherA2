@@ -5,6 +5,12 @@
 #include "int_optimizer.h"
 #include "int_g2e.h"
 
+#include "math.h"
+
+#if has_RAS == 1
+#include "cblas.h"
+#endif
+
 #define gctrg   gout
 #define gctrm   gctr
 #define mempty  empty
@@ -1577,6 +1583,40 @@ void computeEri3c(Int_Params& param1,
     }
 }
 
+//Function to calculate the number of 3-center 2-electron integrals to compute at once based on the available memory
+//naoi = number of basis functions in the first shell
+//naoj = number of basis functions in the second shell
+//aoloc = Running total of functions to computed based on the order of the basis functions
+//nQM = number of basis functions in the QM basis
+//nAux = number of basis functions in the auxiliary basis
+//max_RAM = maximum available memory in MB
+//Returns the number of functions to compute at once
+ivec calc_Eri3c_steps(const unsigned long long int naoi, const unsigned long long int naoj, const ivec aoloc, const int nQM, const int nAux, const double max_mem) {
+    ivec steps = {nQM};
+
+	//First check if the maximum memory is enough to compute all integrals at once
+	//Calculate minimum memory needed for all integrals
+	unsigned long long int naok_end = aoloc[nQM + nAux] - aoloc[nQM];
+	double min_mem = static_cast<double>(sizeof(double) * naoi * naoj * naok_end) * 1e-6 + 200; //Small buffer of 200MB for other memory usage
+	if (min_mem < max_mem) {
+		steps.push_back(nQM + nAux);
+		return steps;
+	}
+
+	//Calculate maximum number of basis functions for every iteration to stay under the memory limit
+    int current_step = 0;
+    unsigned long long int naok_max = static_cast<unsigned long long int>(max_mem / ((static_cast<double>(sizeof(double) * naoi * naoj)) * 1e-6));
+	for (int bas_i = 1; bas_i <= nAux; bas_i++) {
+		unsigned long long int naok = aoloc[nQM + bas_i] - aoloc[steps[current_step]];
+		if (naok > naok_max) {
+            steps.push_back(nQM + bas_i - 1);
+            current_step += 1;
+		}
+    }
+	steps.push_back(nQM + nAux);
+	return steps;
+}
+
 
 // Function to compute three-center two-electron integrals (eri3c)
 //max_RAM in MB
@@ -1584,7 +1624,7 @@ void computeRho(Int_Params& param1,
     Int_Params& param2,
     vec2& dm,
     vec& rho,
-    int max_RAM)
+    double max_mem)
 {
     int nQM = param1.get_nbas();
     int nAux = param2.get_nbas();
@@ -1604,97 +1644,72 @@ void computeRho(Int_Params& param1,
 
 
     rho.resize(param2.get_nao(), 0.0);
-   
     
 
     unsigned long long int naoi = aoloc[nQM] - aoloc[0];
     unsigned long long int naoj = aoloc[nQM] - aoloc[0];
-    unsigned long long int naok_end = aoloc[nQM + nAux] - aoloc[nQM];
 
-	//Calc max naok with given max_RAM
+    ivec steps = calc_Eri3c_steps(naoi, naoj, aoloc, nQM, nAux, max_mem);
+
+    //Calculate maximum vector size
     double min_mem = static_cast<double>(sizeof(double) * naoi * naoj) * 1e-6;
-    double remaining_mem = max_RAM - min_mem;
-    unsigned long long int naok_max = static_cast<unsigned long long int>(remaining_mem / (static_cast<double>(min_mem)));
-    if (naok_end < naok_max) {
-        naok_max = naok_end;
+    unsigned long long int naok_max = static_cast<unsigned long long int>((max_mem - min_mem) / (static_cast<double>(min_mem))) + 5;
+    if (naok_max > (aoloc[nQM + nAux] - aoloc[nQM])) {
+		naok_max = aoloc[nQM + nAux] - aoloc[nQM];
     }
 
+    std::cout << "Preallocating: " << static_cast<double>(sizeof(double) * naoi * naoj * naok_max) * 1e-6 << " MB" << std::endl;
     vec res(naoi * naoj * naok_max, 0.0);
 
     CINTOpt* opty = nullptr;
     int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
 
-    int idx_curr_rho = 0;
-    int n_bas_done = 0;
-    for (int idx_aux_bas = 0; idx_aux_bas < param2.get_nbas(); idx_aux_bas++) {
-		int aux_bas_part = nQM + n_bas_done;
-        int n_next_func = 1; //Starting point to check further
-        
-        if (naok_end == naok_max) {
-            if (n_bas_done != 0) {
-                break;
-            }
-			n_next_func = nAux;
-        }
-        else {
-            //Calculate the number of functions to be computed in this iteration based on the max_RAM given
-            while (true) {
-                unsigned long long int naok_temp = aoloc[aux_bas_part + n_next_func] - aoloc[aux_bas_part];
-                size_t max_mem = sizeof(double) * naoi * naoj * naok_temp;
-                if (static_cast<double>(max_mem) * 1e-6 > max_RAM) {
-                    n_next_func--;
-                    break;
-                }
-                n_next_func++;
-            }
-
-            if ((nQM + nAux) < (aux_bas_part + n_next_func)) {
-                n_next_func = (nQM + nAux) - aux_bas_part;
-                if (n_next_func <= 0) break;
-            }
-        }
-
-
-
-        n_bas_done += n_next_func;
+    for (int step_idx = 1; step_idx < steps.size(); step_idx++) {
         ivec shl_slice = {
             0,
             nQM,
             0,
             nQM,
-            aux_bas_part,
-            aux_bas_part + n_next_func,
+            steps[step_idx - 1],
+            steps[step_idx]
         };
 
         unsigned long long int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
-
         std::cout << "Memory needed for rho: " << static_cast<double>(sizeof(double) * naoi * naoj * naok) * 1e-6 << " MB" << std::endl;
 
-        
-		// Compute 3-center integrals
+        // Compute 3-center integrals
         GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
 
-        //vec eri3c(naoi * naoj * naok, 0.0);
-		//vec3 eri3c_3d(naoi, vec2(naoj, vec(naok, 0.0)));
+        int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
+      
+#if has_RAS == 1
+		//einsum('ijk,ij->k', res, dm, out=rho)
+        //This is 100% pure magic, thanks ChatGPT
+        cblas_dgemv(CblasRowMajor, CblasNoTrans,
+            naok,
+            naoi * naoj,
+            1.0,
+            res.data(), naoi * naoj,
+            flatten(dm).data(), 1,
+            0.0,
+            &rho[idx_curr_rho], 1);
+#else
         //res is in fortran order, write the result in regular ordering
-#pragma omp parallel for
+ #pragma omp parallel for 
         for (int k = 0; k < naok; k++) {
             double sum_k = 0.0;
             for (int j = 0; j < naoj; j++) {
                 for (int i = 0; i < naoi; i++) {
                     std::size_t idx_F = i + j * naoi + k * (naoi * naoj);
-                    //std::size_t idx_C = i * (naoj * naok) + j * naok + k;
-                    //eri3c[idx_C] = res[idx_F];
-					//eri3c_3d[i][j][k] = res[idx_F];
+
 					sum_k += res[idx_F] * dm[i][j];
-					//rho[idx_curr_rho + k] += res[idx_F] * dm[i][j];
                 }
             }
 			rho[idx_curr_rho + k] = sum_k;
         }
-
-        std::fill(res.begin(), res.end(), 0);
-		idx_curr_rho += naok;
+#endif
+		//std::fill(res.begin(), res.end(), 0); //This might be unnecessary, saves about 1sec for 15 steps  TEST THIS!!!!!
     }
+   
 }

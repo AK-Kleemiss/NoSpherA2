@@ -528,7 +528,7 @@ struct options
     double d_sfac_scan = 0.0;
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
-    double mem = 0.0;
+    double mem = 1000.0; //In MB
     double efield = 0.005;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;
@@ -607,7 +607,6 @@ struct options
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
-    int max_RAM = 2000; //2GB
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 
