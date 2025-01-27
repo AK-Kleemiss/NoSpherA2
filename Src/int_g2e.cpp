@@ -442,7 +442,7 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     //int ll = envs->ll_ceil;
     int lj = envs->lj_ceil;
     int nroots = envs->nrys_roots;
-    int i, j, k, l, ptr, n;
+    int i, j, k, l, n;
     int di = envs->g_stride_i;
     int dk = envs->g_stride_k;
     int dl = envs->g_stride_l;
@@ -465,12 +465,14 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     p2z = gz - di + dj;
     for (i = 1; i <= li; i++) {
         for (j = 0; j <= nmax - i; j++) {
+            int base_ptr = j * dj + i * di;
             for (l = 0; l <= mmax; l++) {
-                ptr = j * dj + l * dl + i * di;
-                for (n = ptr; n < ptr + nroots; n++) {
-                    gx[n] = rx * p1x[n] + p2x[n];
-                    gy[n] = ry * p1y[n] + p2y[n];
-                    gz[n] = rz * p1z[n] + p2z[n];
+                int ptr = base_ptr + l * dl;
+                for (n = 0; n < ptr + nroots; n++) {
+                    int idx = ptr + n;
+                    gx[idx] = rx * p1x[idx] + p2x[idx];
+                    gy[idx] = ry * p1y[idx] + p2y[idx];
+                    gz[idx] = rz * p1z[idx] + p2z[idx];
                 }
             }
         }
@@ -487,13 +489,15 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     p2y = gy - dk + dl;
     p2z = gz - dk + dl;
     for (j = 0; j <= lj; j++) {
+        int base_ptr = j * dj;
         for (k = 1; k <= lk; k++) {
             for (l = 0; l <= mmax - k; l++) {
-                ptr = j * dj + l * dl + k * dk;
-                for (n = ptr; n < ptr + dk; n++) {
-                    gx[n] = rx * p1x[n] + p2x[n];
-                    gy[n] = ry * p1y[n] + p2y[n];
-                    gz[n] = rz * p1z[n] + p2z[n];
+                int ptr = base_ptr + l * dl + k * dk;
+                for (n = 0; n < dk; n++) {
+                    int idx = ptr + n;
+                    gx[idx] = rx * p1x[idx] + p2x[idx];
+                    gy[idx] = ry * p1y[idx] + p2y[idx];
+                    gz[idx] = rz * p1z[idx] + p2z[idx];
                 }
             }
         }
