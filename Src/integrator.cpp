@@ -133,7 +133,7 @@ vec reorder_p(vec coefs_in, WFN aux_basis) {
 }
 
 
-vec density_fit(const WFN& wavy, const std::string auxname, int max_RAM)
+vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem)
 {
     vec eri2c;
     vec eri3c;
@@ -167,7 +167,7 @@ vec density_fit(const WFN& wavy, const std::string auxname, int max_RAM)
 
     vec2 dm = wavy.get_dm();
     //vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
-	computeRho(normal_basis, aux_basis, dm, rho, max_RAM);
+	computeRho(normal_basis, aux_basis, dm, rho, max_mem);
     // Perform contractions using BLAS
     //vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);

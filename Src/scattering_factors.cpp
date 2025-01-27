@@ -3631,11 +3631,11 @@ bool calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.max_RAM);
+	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.mem);
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
     time_points.push_back(get_time());
-    time_descriptions.push_back("SALTED prediction");
+    time_descriptions.push_back("RI-Fit");
 
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wavy.get_atoms());

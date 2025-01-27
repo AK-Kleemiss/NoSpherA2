@@ -68,9 +68,13 @@ BasisSetLibrary::BasisSetLibrary() {
 	basisSets["cc-pvqz-jkfit"] = BasisSet(QZVP_JKfit);
 }
 
-BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name = "def2_qzvppd_rifit") {
+BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
 	//Check if the supplied basis name is contained in part of a given basis set name
 	std::string found_basis = "";
+	if (basis_name == "") {
+		std::cout << "No Basis Name Supplied! Aborting!!!" << std::endl;
+		exit(1);
+	}
 	for (auto const& [key, val] : basisSets) {
 		if (key.find(basis_name) != std::string::npos) {
 			found_basis = key;

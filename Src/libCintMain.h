@@ -18,4 +18,4 @@ void computeRho(Int_Params& param1,
     Int_Params& param2,
     vec2& dm,
 	vec& rho,
-    int max_RAM);
+    double max_mem);
