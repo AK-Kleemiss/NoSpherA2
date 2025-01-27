@@ -3438,7 +3438,6 @@ bool calculate_scattering_factors_ML(
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
 
-    SP.unload_BLAS();
     SP.shrink_intermediate_vectors();
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
@@ -3862,8 +3861,6 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     file << setw(13*4) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
-
-    SP.unload_BLAS();
     SP.shrink_intermediate_vectors();
 
     vec2 k_pt;

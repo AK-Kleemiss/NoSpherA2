@@ -1542,10 +1542,10 @@ void test_openblas()
 {
 #if has_RAS
     SALTEDPredictor SP;
-    SP.load_BLAS();
+    BLAS_pointer = math_load_BLAS(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
-    SP.unload_BLAS();
+    math_unload_BLAS(BLAS_pointer);
     exit(0);
 #else
     err_not_impl_f("Openblas not included in Executable!", std::cout);

@@ -92,36 +92,6 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
 
 SALTEDPredictor::SALTEDPredictor() : _opt(*(new options())) {}
 
-
-SALTEDPredictor::~SALTEDPredictor()
-{
-    unload_BLAS();
-}
-
-void SALTEDPredictor::load_BLAS()
-{
-#if has_RAS
-#ifdef _WIN32
-    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(_opt.threads).c_str());
-    typedef void (*ExampleFunctionType)(void);
-    BLAS_pointer = math_load_BLAS(_opt.threads);
-    has_BLAS = BLAS_pointer != NULL;
-#else
-    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(_opt.threads);
-    char* env = strdup(nums.c_str());
-    putenv(env);
-    has_BLAS = true;
-#endif
-#endif
-}
-
-void SALTEDPredictor::unload_BLAS()
-{
-#ifdef _WIN32
-    math_unload_BLAS(BLAS_pointer);
-#endif
-}
-
 const std::string SALTEDPredictor::get_dfbasis_name() const
 {
     return config.dfbasis;
@@ -240,9 +210,7 @@ void SALTEDPredictor::read_model_data()
             }
             if (config.zeta == 1)
             {
-                load_BLAS();
                 power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
-                unload_BLAS();
             }
         }
     }
@@ -310,9 +278,7 @@ void SALTEDPredictor::read_model_data_h5()
             }
             if (config.zeta == 1)
             {
-                load_BLAS();
                 power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
-                unload_BLAS();
             }
         }
     }
@@ -400,8 +366,6 @@ vec SALTEDPredictor::predict()
         }
         pvec[lam] = p;
     }
-
-    load_BLAS();
 
     std::vector<vec3> psi_nm(config.species.size());
     for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)

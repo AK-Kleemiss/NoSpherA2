@@ -149,17 +149,6 @@ vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem
     wavy_aux.delete_basis_set();
     Int_Params aux_basis(wavy_aux, auxname);
 
-
-#ifdef _WIN32
-    void* blas = math_load_BLAS(4);
-    if (blas == NULL)
-    {
-        ExtractDLL("libopenblas.dll");
-        blas = math_load_BLAS(4);
-    }
-    err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
-#endif // __WIN32
-
     // Compute integrals
     computeEri2c(aux_basis, eri2c);
     //computeEri3c(normal_basis, aux_basis, eri3c);
@@ -171,10 +160,6 @@ vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem
     // Perform contractions using BLAS
     //vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);
-
-#ifdef _WIN32
-    math_unload_BLAS(blas);
-#endif
 
     vec coefs = reorder_p(rho, wavy_aux);
     return coefs;
