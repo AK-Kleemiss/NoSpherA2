@@ -280,7 +280,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers();
-            if (wavy[i].get_origin() != 7 && !opt.SALTED)
+            if (wavy[i].get_origin() != 7 && !opt.SALTED && !opt.RI_FIT)
             {
                 result.append(calculate_scattering_factors_MTC(
                                   opt,
@@ -321,6 +321,16 @@ int main(int argc, char **argv)
                 log_file << "SALTED is not available in this build!" << endl;
                 exit(-1);
 #endif
+            }
+            else if (opt.RI_FIT) {
+                result.append(calculate_scattering_factors_MTC_RI_fit(
+                                  opt,
+                                  wavy,
+                                  log_file,
+                                  known_scatterer,
+                                  i,
+                                  &known_kpts),
+                              log_file);
             }
             else
             {

@@ -52,6 +52,9 @@ public:
     }
     return coefficients[_nr];
   }; 
+  const vec get_coefficients() const {
+	  return coefficients;
+  };
   const double get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };

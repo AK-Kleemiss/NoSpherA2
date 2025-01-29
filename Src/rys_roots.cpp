@@ -15,9 +15,10 @@
 #include "convenience.h"
 #include "constants.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
+//#define lapack_complex_float std::complex<float>
+//#define lapack_complex_double std::complex<double>
 #if has_RAS == 1
+#include "lapacke_config.h"
 #include "lapacke.h"
 #include "cblas.h"
 #endif
@@ -3767,7 +3768,15 @@ static int rys_wheeler_partial(int n, double* alpha, double* beta, double* momen
 
     for (i = 0; i < n; i++) {
         roots[i] = roots[i] / (1 - roots[i]);
+
+//This has to do with the c++ implementation of LAPACKE
+//In the original C implementaion the LAPACK function was called using COL_MAJOR ordering resulting in a transposed matrix
+//The C++ implementation uses ROW_MAJOR ordering and the matrix is not transposed. Thus c0 is indexed only using i
+#if has_RAS == 1
+        weights[i] = c0[i] * c0[i] * mu0;
+#else
         weights[i] = c0[i * n] * c0[i * n] * mu0;
+#endif
     }
     return error;
 }
@@ -4017,37 +4026,6 @@ int CINTlrys_jacobi(int n, double x, double lower, double* roots, double* weight
 
 
 //  CODE FROM eigh.c of libcit
-
-//THIS DOES NOT WORK CORRECTLY!!!!
-//TODO: FIX THIS
-//int  _CINTdiagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec)
-//{
-//    int32_t M = n;
-//    int32_t LDZ = std::max(1,n);
-//    int32_t NZC = std::max(1,n);
-//    int32_t ISUPPZ[MXRYSROOTS * 2];
-//    int32_t TRYRAC = 1;
-//    double WORK[MXRYSROOTS * 18];
-//    int32_t LWORK = MXRYSROOTS * 18;
-//    int32_t IWORK[MXRYSROOTS * 10];
-//    int32_t LIWORK = MXRYSROOTS * 10;
-//    /*
-//        int matrix_layout, char jobz, char range,
-//        lapack_int n, double* d, double* e, double vl,
-//        double vu, lapack_int il, lapack_int iu,
-//        lapack_int* m, double* w, double* z, lapack_int ldz,
-//        lapack_int nzc, lapack_int* isuppz,
-//        lapack_logical* tryrac
-//        */
-//#if has_RAS == 1
-//    //int INFO = LAPACKE_dstemr_work(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M,  eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC,  WORK, LWORK, IWORK, LIWORK);
-//    //return INFO;
-//#endif
-//    return 1;
-//}
-
-
-
 
 #define MAX(x, y)       ((x) > (y) ? (x) : (y))
 #define MIN(x, y)       ((x) < (y) ? (x) : (y))
@@ -5487,6 +5465,38 @@ static int _dlaev2(double* eig, double* vec, double* diag, double* diag_off1)
     return 0;
 }
 
+
+#if has_RAS == 1
+int  _CINTdiagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec)
+{
+    int32_t M = n;
+    int32_t LDZ = std::max(1, n);
+    int32_t NZC = std::max(1, n);
+    int32_t ISUPPZ[MXRYSROOTS * 2];
+    int32_t TRYRAC = 1;
+    double WORK[MXRYSROOTS * 18];
+    int32_t LWORK = MXRYSROOTS * 18;
+    int32_t IWORK[MXRYSROOTS * 10];
+    int32_t LIWORK = MXRYSROOTS * 10;
+    /*
+        int matrix_layout, char jobz, char range,
+        lapack_int n, double* d, double* e, double vl,
+        double vu, lapack_int il, lapack_int iu,
+        lapack_int* m, double* w, double* z, lapack_int ldz,
+        lapack_int nzc, lapack_int* isuppz,
+        lapack_logical* tryrac
+        */
+    int INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M,  eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
+    //Transpose vec of size n x n
+    //Original version usess COL_MAJOR version but this just does not seem to work here?
+	//for (int i = 0; i < n; i++) {
+	//	for (int j = i +1; j < n; j++) {
+ //           std::swap(vec[i * n + j], vec[j * n + i]);
+	//	}
+	//}
+    return INFO;
+}
+#else
 int _CINTdiagonalize(int n, double* diag, double* diag_off1, double* eig, double* vec)
 {
     if (n == 0) {
@@ -5515,7 +5525,7 @@ int _CINTdiagonalize(int n, double* diag, double* diag_off1, double* eig, double
     }
     return info;
 }
-
+#endif
 
 
 //-----------------------------------------------------------------------

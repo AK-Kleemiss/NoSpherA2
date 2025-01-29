@@ -1255,6 +1255,71 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         coef.resize(0);
         getline(rf, line);
     }
+
+    //Trying to actually read in all the information where it belongs
+  //  int n_occ = 0;
+  //  vec2 MOs_mat;
+  //  vec2 reordered_MOs_mat(MOs[0].get_primitive_count(), vec(MOs.size()));
+  //  for (int i = 0; i < MOs.size(); i++) {
+  //      if (MOs[i].get_occ() <= 0.0)continue;
+  //      MOs_mat.push_back(MOs[i].get_coefficients());
+  //      n_occ++;
+  //  }
+  //  centers;
+
+  //  MOs_mat = transpose(MOs_mat);
+
+  //  for (int type_idx = 0; type_idx < MOs_mat.size(); type_idx++) {
+  //      int type = types[type_idx];
+  //      if (type == 1) {//s-Type
+  //          atoms[centers[type_idx] - 1].push_back_basis_set(coef[type_idx], exponents[type_idx], 1, atoms[centers[type_idx] - 1].get_shellcount_size());
+  //          reordered_MOs_mat[type_idx] = MOs_mat[type_idx];
+  //          continue;
+  //      }else if (type >1 && type < 5)
+		//{
+		//	type = 1;
+		//}
+		//else if (type >= 5 && type < 10){
+		//	type = 2;
+		//}
+		//else if (type >= 10 && type < 17) {
+		//	type = 3;
+		//}
+		//else if (type >= 17 && type < 26) {
+		//	type = 4;
+		//}
+		//else if (type >= 26 && type < 37) {
+		//	type = 5;
+		//}
+  //      else{
+		//	file << "Higher angular momentum basis functions than G, not supported!" << endl;
+  //          exit(1);
+		//}
+
+  //      //Pretending to not know about contraction....
+  //      int shell = atoms[centers[type_idx] - 1].get_shellcount_size();
+  //      for (int m = -type; m <= type; m++) {
+  //          atoms[centers[type_idx] - 1].push_back_basis_set(coef[type_idx + m + type], exponents[type_idx + m + type], type + 1, shell);
+  //          reordered_MOs_mat[type_idx + constants::orca_2_pySCF[type][m]] = MOs_mat[type_idx + m + type];
+  //      }
+  //      type_idx += 2 * type;
+  //  }
+
+
+  //  vec coeff_mo(n_occ * MOs_mat.size(), 0.0);
+  //  vec coeff_small(n_occ * MOs_mat.size(), 0.0);
+  //  for (int i = 0; i < MOs_mat.size(); i++) {
+  //      for (int oc = 0; oc < MOs.size(); oc++) {
+		//	if (MOs[oc].get_occ() <= 0.0)continue;
+  //          coeff_mo[i * n_occ + oc] = MOs_mat[i][oc] * MOs[oc].get_occ();
+  //          coeff_small[i * n_occ + oc] = MOs_mat[i][oc];
+  //      }
+  //  }
+
+  //  DM = dot(coeff_mo, coeff_small, (int)MOs_mat.size(), (int)n_occ, (int)MOs_mat.size(), (int)n_occ, false, true);
+
+    
+
     while (line.find("<Energy =") == string::npos)
         getline(rf, line);
     getline(rf, line);

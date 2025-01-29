@@ -102,6 +102,7 @@ public:
     unsigned int get_shellcount_size() const { return (unsigned int)shellcount.size(); };
     void set_shellcount(const unsigned int& nr, const unsigned int& value) { shellcount[nr] = value; };
     unsigned int get_shellcount(const unsigned int& nr) const { return shellcount[nr]; };
+    void push_back_shell(const unsigned int& type) { shellcount.push_back(type); };
     void clear_shellcount() { shellcount.clear(); };
     void set_ADPs(const vec2& adps) { ADPs = adps; };
     vec2 get_ADPs() const { return ADPs; };

@@ -110,6 +110,19 @@ itsc_block calculate_scattering_factors_MTC_SALTED(
     const int& nr,
     vec2* kpts = NULL);
 
+
+
+
+
+
+itsc_block calculate_scattering_factors_MTC_RI_fit(
+    options& opt,
+    const std::vector<WFN> &wave,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts = NULL);
+
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.

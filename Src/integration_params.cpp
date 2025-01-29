@@ -91,7 +91,7 @@ void Int_Params::collect_basis_data()
             exponents.push_back(basis[shell].get_exponent());
         }
         // Normalize the GTOs depending on the context
-        if (wfn_origin == 9)
+        if (wfn_origin == 9 || wfn_origin == 6)
         {
             for (int i = 0; i < coefficients.size(); i++)
             {
@@ -124,7 +124,7 @@ void Int_Params::collect_basis_data()
         {
             int new_l = 0;
             if (wfn_origin == 0)      new_l = basis[func].get_type();
-            else if (wfn_origin == 9) new_l = basis[func].get_type() -1;
+            else if (wfn_origin == 9 || wfn_origin == 6) new_l = basis[func].get_type() -1;
             else {
                 std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                 new_l = basis[func].get_type() -1;
@@ -141,8 +141,8 @@ void Int_Params::collect_basis_data()
             for (int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
-                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) {
-                    if (wfn_origin != 0 && wfn_origin != 9) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
+                if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9 || wfn_origin == 6))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
+                    if (wfn_origin != 0 && wfn_origin != 9 && wfn_origin != 6) std::cout << "THIS WFN ORIGIN IS UNTESTED, THREAD CAREFULLY!!!!!" << std::endl;
                     n_funcs += curr_funcs;
                     continue;
                 }

@@ -37,30 +37,6 @@ vec einsum_ijk_ij_p(const vec3& v1, const vec2& v2)
     return rho;
 }
 
-vec einsum_ijk_ij_p(const vec& v1, const vec& v2, const int I, const int J, const int P) {
-    // Initialize the result vector
-    vec rho(P, 0.0);
-
-    //v1 of size I * J * P
-    //v2 of size I * J
-
-    // Perform the summation
-    for (int p = 0; p < P; ++p)
-    {
-        for (int i = 0; i < I; ++i)
-        {
-            for (int j = 0; j < J; ++j)
-            {
-                int inda = p * I * J + i * J + j;
-                rho[p] += v1[p * I * J + i * J + j] * v2[i * J + j];
-            }
-        }
-    }
-
-    return rho;
-}
-
-
 
 void solve_linear_system(const vec2& A, vec& b)
 {
