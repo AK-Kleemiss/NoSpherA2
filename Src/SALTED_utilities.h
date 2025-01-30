@@ -1,6 +1,7 @@
 #pragma once
 
 #include "convenience.h"
+#include "cube.h"
 
 #if has_RAS
 #include "rascaline.hpp"
@@ -84,4 +85,4 @@ const double calc_density_ML(const double& x,
 vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs);
 
 
-void calc_cube_ML(vec data, WFN& dummy, const int atom = -1);
+cube calc_cube_ML(const vec data,  WFN& dummy, const int atom = -1);

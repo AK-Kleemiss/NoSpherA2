@@ -14,9 +14,9 @@ extern const std::array<std::vector<primitive>, 118> HGBSP3_7;
 extern const std::array<std::vector<primitive>, 118> def2_qzvppd_rifit; //Combinaton of def2_qzvppd_rifit and HGBSP3_5 for the few remaining elements
 extern const std::array<std::vector<primitive>, 118> combo_basis_fit; //Combination of cc-pvqz-jkfit, def2-qzvppd-rifit and HGBSP3-5 for the few remaining elements
 
-extern const std::array<std::vector<primitive>, 35> TZVP_JKfit;
-extern const std::array<std::vector<primitive>, 35> QZVP_JKfit;
-extern const std::array<std::vector<primitive>, 35> PV5Z_JKfit;
+extern const std::array<std::vector<primitive>, 35> CC_TZVP_JKfit;
+extern const std::array<std::vector<primitive>, 35> CC_QZVP_JKfit;
+extern const std::array<std::vector<primitive>, 35> CC_PV5Z_JKfit;
 
 
 // Templated BasisSet class definition

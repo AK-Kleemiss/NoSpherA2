@@ -453,22 +453,65 @@ void GTOnr3c_fill_s1(
 
 
 
-void CINTgout2e(double* gout, double* g, int* idx,
-    CINTEnvVars* envs, int gout_empty)
+//void CINTgout2e(double* gout, double* g, int* idx,
+//    CINTEnvVars* envs, int gout_empty)
+//{
+//    const int nf = envs->nf;
+//    const int nrys_roots = envs->nrys_roots;
+//    double s;
+//
+//    for (int n = 0; n < nf; n++, idx += 3) {
+//        const double* gx = &g[idx[0]];
+//        const double* gy = &g[idx[1]];
+//        const double* gz = &g[idx[2]];
+//        s = 0;
+//        for (int i = 0; i < nrys_roots; i++) {
+//            s += *(gx + i) * *(gy + i) * *(gz + i);
+//        }
+//        gout[n] = gout_empty ? s : gout[n] + s;
+//    }
+//}
+
+void CINTgout2e(double*  gout,
+    double*  g,
+    int* idx,
+    CINTEnvVars* envs,
+    int gout_empty)
 {
     const int nf = envs->nf;
     const int nrys_roots = envs->nrys_roots;
-    double s;
-
-    for (int n = 0; n < nf; n++, idx += 3) {
-        const double* gx = &g[idx[0]];
-        const double* gy = &g[idx[1]];
-        const double* gz = &g[idx[2]];
-        s = 0;
-        for (int i = 0; i < nrys_roots; i++) {
-            s += *(gx + i) * *(gy + i) * *(gz + i);
+    double s = 0.0;
+    if (gout_empty) {
+        // If gout is to be overwritten (empty), do a direct assignment
+        for (int n = 0; n < nf; n++, idx += 3) {
+            // Pointers to the relevant slices of g
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+            
+            // Inner loop: accumulate products
+#pragma ivdep
+            for (int i = 0; i < nrys_roots; i++) {
+                s += gx[i] * gy[i] * gz[i];
+            }
+            gout[n] = s;
+            s = 0.0;
         }
-        gout[n] = gout_empty ? s : gout[n] + s;
+    }
+    else {
+        // If gout already has data, accumulate
+        for (int n = 0; n < nf; n++, idx += 3) {
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+
+#pragma ivdep
+            for (int i = 0; i < nrys_roots; i++) {
+                s += gx[i] * gy[i] * gz[i];
+            }
+            gout[n] += s;
+            s = 0.0;
+        }
     }
 }
 

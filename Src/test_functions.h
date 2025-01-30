@@ -8,6 +8,8 @@
 #include "JKFit.h"
 #include "SALTED_utilities.h"
 #include "sphere_lebedev_rule.h"
+#include "integrator.h"
+
 #if has_RAS
 #include "math.h"
 #include "rascaline.hpp"
@@ -1256,12 +1258,13 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
 
-    const int nr_coefs = load_basis_into_WFN(dummy, def2_qzvppd_rifit);
+    const int nr_coefs = load_basis_into_WFN(dummy, BasisSetLibrary().get_basis_set("cc-pvqz-jkfit"));
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
-    calc_cube_ML(data, dummy);
-
-    for (int i = 0; i < dummy.get_ncen(); i++)
-        calc_cube_ML(data, dummy, i);
+    cube res = calc_cube_ML(data, dummy);
+    res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
+    res.write_file(true);
+    //for (int i = 0; i < dummy.get_ncen(); i++)
+    //    calc_cube_ML(data, dummy, i);
 }
 
 void test_xtb_molden(options &opt, std::ostream &log_file)
@@ -1790,6 +1793,58 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     CubeMO.set_path("Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube");
     CubeMO.write_file();
 }
+
+
+//Function to calculate a cubefile containing the electron density of a given wavefunction using the RI-Fit and the regular basis set
+//Also calculate the difference between the two densities
+void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) {
+	std::cout << "Calculating density using RI-FIT" << std::endl;
+    vec ri_coefs =  density_fit(wavy, aux_basis, (*opt).mem);
+	std::cout << "Calculating RI-FIT cube" << std::endl;
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(wavy.get_atoms());
+    wavy_aux.set_ncen(wavy.get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
+    cube cube_RI_FIT = calc_cube_ML(ri_coefs, wavy_aux);
+	cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "RI_FIT_rho.cube"));
+	cube_RI_FIT.write_file(true);
+
+    
+	std::cout << "Calculating density using regular WFN" << std::endl;
+	//Check if the cube file already exists, if so read it
+	std::filesystem::path fn = std::filesystem::path(wavy.get_path().stem().string() + "normal_rho.cube");
+  //  if (std::filesystem::exists(fn)) {
+  //      //cube cube_normal(fn, true, );
+		//std::cout << "TO BE CONTINUED!" << std::endl;
+  //  }
+  //  else {
+        double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+        int steps[3]{ 0, 0, 0 };
+        readxyzMinMax_fromWFN(wavy, MinMax, steps, 2.5, 0.1, true);
+        cube cube_normal(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
+        cube_normal.give_parent_wfn(wavy);
+        for (int i = 0; i < 3; i++)
+        {
+            cube_normal.set_origin(i, MinMax[i]);
+            cube_normal.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        }
+        cube_normal.set_comment1("Calculated density using NoSpherA2");
+        cube_normal.set_comment2("from " + wavy.get_path().string());
+        cube_normal.set_path(std::filesystem::path(wavy.get_path().stem().string() + "normal_rho.cube"));
+        Calc_Rho(cube_normal, wavy, (*opt).radius, std::cout, false);
+        cube_normal.write_file(true);
+    //}
+
+	std::cout << "Calculating difference cube" << std::endl;
+	cube cube_diff = cube_normal - cube_RI_FIT;
+    cube_diff.give_parent_wfn(wavy);
+	cube_diff.set_comment1("Difference between RI-FIT and normal density");
+	cube_diff.set_comment2("from " + wavy.get_path().string());
+	cube_diff.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_diff.cube"));
+	cube_diff.write_file(true);
+}
+
 
 // const double dlm_function(const unsigned int& l, const int& m, const double& theta, const double& phi) {
 //     double result = (double)NAN;

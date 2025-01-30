@@ -14,6 +14,10 @@
 #include <complex.h>
 #include "cart2sph.h"
 
+#if has_RAS == 1
+#include "cblas.h"
+#endif
+
 #define MALLOC_ALIGN8_INSTACK(var, n) \
         var = (double *)(((uintptr_t)cache + 63) & (~(uintptr_t)63)); \
         cache = (double *)(var + (n));
@@ -3580,12 +3584,17 @@ static struct cart2sp_t g_c2s[] = {
 void CINTdgemm_NN1(int m, int n, int k,
     double* a, double* b, double* c, int ldc)
 {
+	std::fill(c, c + m * n, 0.0);
+
+#if has_RAS == 1
+    cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+        m, n, k,
+        1.0, a, m, b, k,
+        0.0, c, ldc);
+#else
     int i, j, kp;
     double bi;
     for (j = 0; j < n; j++) {
-        for (i = 0; i < m; i++) {
-            c[i + ldc * j] = 0;
-        }
         for (kp = 0; kp < k; kp++) {
             bi = b[kp + k * j];
 #pragma ivdep
@@ -3594,6 +3603,21 @@ void CINTdgemm_NN1(int m, int n, int k,
             }
         }
     }
+#endif
+//    int i, j, kp;
+//    double bi;
+//    for (j = 0; j < n; j++) {
+//        for (i = 0; i < m; i++) {
+//            c[i + ldc * j] = 0;
+//        }
+//        for (kp = 0; kp < k; kp++) {
+//            bi = b[kp + k * j];
+//#pragma ivdep
+//            for (i = 0; i < m; i++) {
+//                c[i + ldc * j] += a[i + m * kp] * bi;
+//            }
+//        }
+//    }
 }
 
 void CINTdgemm_TN(int m, int n, int k,
@@ -4563,6 +4587,9 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                 }
         }
 }
+
+
+
 
 //static void zcopy_iklj(double complex *fijkl, double *gctrR, double *gctrI,
 //                       const int ni, const int nj, const int nk, const int nl,

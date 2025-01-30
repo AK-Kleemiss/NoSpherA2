@@ -2429,6 +2429,17 @@ void options::digest_options()
 				SALTED_DFBASIS = "combo_basis_fit";
             }
         }
+        else if (temp == "-RI_CUBE" || temp == "-ri_cube") {
+            WFN wavy(wfn);
+			//First name of coef_file, second name of xyz file
+            //cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
+
+
+			//std::string aux_basis = arguments[i + 1];
+            gen_CUBE_for_RI(wavy, "def2_universal_JKfit", this);
+
+            exit(0);
+        }
 
         else if (temp.find("-s_rho") < 1)
             s_rho = true;

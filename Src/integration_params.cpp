@@ -134,7 +134,7 @@ void Int_Params::collect_basis_data()
         }
 
         vec coefficients_new(coefficients.size(), 0.0), exponents_new(exponents.size(), 0.0);
-        vec shellcount_new, shelltype;
+        ivec shellcount_new, shelltype;
         size_t pos_in_new_coeffs = 0;
         for (int l = 0; l <= max_l; l++) {
 			int n_funcs = 0;
@@ -158,7 +158,7 @@ void Int_Params::collect_basis_data()
             }
         }
         //Populate basis_sets dictionary  (Element:[coefficients, exponents, starting point in _env vector, shellcount])
-        basis_sets.insert({ atoms[atom_idx].get_charge(), {coefficients_new, exponents_new, {0.0}, shellcount_new, shelltype}});
+        basis_sets.insert({ atoms[atom_idx].get_charge(), LibCintBasis{coefficients_new, exponents_new, 0, shellcount_new, shelltype}});
     }
 }
 
@@ -198,15 +198,15 @@ void Int_Params::populate_env()
 			continue;
 		}
 
-        basis_sets[charge][2][0] = (double)bas_ptr;
+        basis_sets[charge].env_idx = (double)bas_ptr;
 
-        vec2 basis_data = basis_sets[charge];
-        vec coefficients = basis_data[0];
-        vec exponents = basis_data[1];
+        LibCintBasis basis_data = basis_sets[charge];
+        vec coefficients = basis_data.coefficients;
+        vec exponents = basis_data.exponents;
 
         int func_count = 0;
-        for (int shell = 0; shell < basis_sets[charge][3].size(); shell++) {
-            int n_funcs = basis_sets[charge][3][shell];
+        for (int shell = 0; shell < basis_sets[charge].shellcount.size(); shell++) {
+            int n_funcs = basis_sets[charge].shellcount[shell];
             for (int func = 0; func < n_funcs; func++) {
                 _env.push_back(exponents[func + func_count]);
             }
@@ -227,13 +227,13 @@ void Int_Params::populate_bas()
     int index = 0;
     for (int atom_idx = 0; atom_idx < ncen; atom_idx++)
     {
-        vec2 basis = basis_sets[atoms[atom_idx].get_charge()];
-        int bas_ptr = basis[2][0];
-        for (int shell = 0; shell < basis[3].size(); shell++)
+        LibCintBasis basis = basis_sets[atoms[atom_idx].get_charge()];
+        int bas_ptr = basis.env_idx;
+        for (int shell = 0; shell < basis.shellcount.size(); shell++)
         {
             _bas[index * 8 + 0] = atom_idx; // atom_id
-            _bas[index * 8 + 1] = (int)basis[4][shell];  // l s=0, p=1, d=2 ...
-            _bas[index * 8 + 2] = (int)basis[3][shell];                  // nprim
+            _bas[index * 8 + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
+            _bas[index * 8 + 2] = (int)basis.shellcount[shell];                  // nprim
             _bas[index * 8 + 3] = 1;                                     // ncentr    Not sure
             _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the end of the _env vector
             bas_ptr += _bas[index * 8 + 2];

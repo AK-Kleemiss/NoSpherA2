@@ -64,8 +64,9 @@ BasisSetLibrary::BasisSetLibrary() {
 	basisSets["def2_SVP_JKfit"] = BasisSet(def2_SVP_JKfit);
 	basisSets["HGBSP3_7"] = BasisSet(HGBSP3_7);
 	basisSets["def2_qzvppd_rifit"] = BasisSet(def2_qzvppd_rifit);
-	basisSets["TZVP_JKfit"] = BasisSet(TZVP_JKfit);
-	basisSets["cc-pvqz-jkfit"] = BasisSet(QZVP_JKfit);
+	basisSets["cc-TZVP_JKfit"] = BasisSet(CC_TZVP_JKfit);
+	basisSets["cc-pvqz-jkfit"] = BasisSet(CC_QZVP_JKfit);
+	basisSets["cc-PV5Z_JKfit"] = BasisSet(CC_PV5Z_JKfit);
 }
 
 BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
@@ -41894,7 +41895,7 @@ const std::array<std::vector<primitive>, 86> def2_SVP_JKfit =
     }
 };
 
-const std::array<std::vector<primitive>, 35> TZVP_JKfit =
+const std::array<std::vector<primitive>, 35> CC_TZVP_JKfit =
 {
     {
         {{0, 0, 9.5302493327, 1.0},
@@ -42509,7 +42510,7 @@ const std::array<std::vector<primitive>, 35> TZVP_JKfit =
     }
 };
 
-const std::array<std::vector<primitive>, 35> QZVP_JKfit =
+const std::array<std::vector<primitive>, 35> CC_QZVP_JKfit =
 {
     {
         {// center  type  exp         coef
@@ -43163,7 +43164,7 @@ const std::array<std::vector<primitive>, 35> QZVP_JKfit =
     }
 };
 
-const std::array<std::vector<primitive>, 35> PV5Z_JKfit =
+const std::array<std::vector<primitive>, 35> CC_PV5Z_JKfit =
 {
     {
         {{0, 0, 9.5302493327, 1.0},

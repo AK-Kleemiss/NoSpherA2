@@ -129,13 +129,23 @@
 
 #define BLKSIZE 8
 
+//Temporary basis set format
+typedef struct LibCintBasis {
+    vec coefficients;
+    vec exponents;
+    int env_idx;
+    ivec shellcount;
+    ivec shelltypes;
+};
+
+
 class Int_Params {
 private:
     int ncen = 0;           // Number of centers (atoms)
     int wfn_origin = 0;
     std::vector<atom> atoms;
 
-    std::map<int, vec2> basis_sets;  //Maps atomic number -> (vec(coefs), vec(expon))
+    std::map<int, LibCintBasis> basis_sets;  //Maps atomic number -> (vec(coefs), vec(expon))
 
     ivec _atm;              // Flattened ATM array
     ivec _bas;              // Flattened BAS array
@@ -178,6 +188,8 @@ public:
 
     void print_data(std::string name); //FOR DEBUG PURPOSES
 };
+
+
 
 typedef struct {
     double rij[3];

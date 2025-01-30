@@ -275,6 +275,7 @@ const double calc_density_ML(const double& x,
     const std::vector<atom>& atoms,
     const int& atom_nr)
 {
+    std::pair<double, double> spherical;
     double dens = 0, radial = 0;
     int coef_counter = 0;
     int e = 0, size = 0;
@@ -298,9 +299,18 @@ const double calc_density_ML(const double& x,
                 }
                 continue;
             }
+
             // normalize distances for spherical harmonic
             for (e = 0; e < 3; e++)
                 d[e] /= d[3];
+
+            if (d[3] == 0)
+                spherical = std::make_pair(0.0, 0.0);
+            else
+                // normalize the spherical harmonics k_point
+                spherical = constants::norm_cartesian_to_spherical(d[0], d[1], d[2]);
+
+
             for (e = 0; e < size; e++)
             {
                 bf = atoms[a].get_basis_set_entry(e);
@@ -314,7 +324,7 @@ const double calc_density_ML(const double& x,
                 for (int m = -p.get_type(); m <= p.get_type(); m++)
                 {
                     // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
+                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::real_spherical(p.get_type(), m, spherical.first, spherical.second);
                 }
                 coef_counter += (2 * p.get_type() + 1);
             }
@@ -365,6 +375,103 @@ const double calc_density_ML(const double& x,
     return dens;
 }
 
+//const double calc_density_ML(const double& x,
+//    const double& y,
+//    const double& z,
+//    const vec& coefficients,
+//    const std::vector<atom>& atoms,
+//    const int& atom_nr)
+//{
+//    double dens = 0, radial = 0;
+//    int coef_counter = 0;
+//    int e = 0, size = 0;
+//    if (atom_nr == -1) {
+//        for (int a = 0; a < atoms.size(); a++)
+//        {
+//            size = (int)atoms[a].get_basis_set_size();
+//            basis_set_entry bf;
+//            double d[4]{
+//                x - atoms[a].get_coordinate(0),
+//                y - atoms[a].get_coordinate(1),
+//                z - atoms[a].get_coordinate(2), 0.0 };
+//            // store r in last element
+//            d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+//            if (d[3] < -46.0517)
+//            { // corresponds to cutoff of ex ~< 1E-20
+//                for (e = 0; e < size; e++)
+//                {
+//                    bf = atoms[a].get_basis_set_entry(e);
+//                    coef_counter += (2 * bf.get_type() + 1);
+//                }
+//                continue;
+//            }
+//            // normalize distances for spherical harmonic
+//            for (e = 0; e < 3; e++)
+//                d[e] /= d[3];
+//            for (e = 0; e < size; e++)
+//            {
+//                bf = atoms[a].get_basis_set_entry(e);
+//                primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
+//                radial = gaussian_radial(p, d[3]);
+//                if (radial < 1E-10)
+//                {
+//                    coef_counter += (2 * p.get_type() + 1);
+//                    continue;
+//                }
+//                for (int m = -p.get_type(); m <= p.get_type(); m++)
+//                {
+//                    // m+p.type should yield just the running index of coefficents, since we start at -p.type
+//                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
+//                }
+//                coef_counter += (2 * p.get_type() + 1);
+//            }
+//        }
+//    }
+//    else {
+//        for (int a = 0; a < atoms.size(); a++)
+//        {
+//            size = (int)atoms[a].get_basis_set_size();
+//            if (a == atom_nr)
+//            {
+//
+//                basis_set_entry bf;
+//                double d[4]{
+//                    x - atoms[a].get_coordinate(0),
+//                    y - atoms[a].get_coordinate(1),
+//                    z - atoms[a].get_coordinate(2), 0.0 };
+//                // store r in last element
+//                d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+//                // normalize distances for spherical harmonic
+//                for (e = 0; e < 3; e++)
+//                    d[e] /= d[3];
+//                for (e = 0; e < size; e++)
+//                {
+//                    bf = atoms[a].get_basis_set_entry(e);
+//                    primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
+//
+//                    radial = gaussian_radial(p, d[3]);
+//                    for (int m = -p.get_type(); m <= p.get_type(); m++)
+//                    {
+//                        // m+p.type should yield just the running index of coefficents, since we start at -p.type
+//                        dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
+//                    }
+//                    coef_counter += (2 * p.get_type() + 1);
+//                }
+//                return dens;
+//            }
+//            else
+//            {
+//                for (e = 0; e < size; e++)
+//                {
+//                    coef_counter += (2 * atoms[a].get_basis_set_type(e) + 1);
+//                }
+//            }
+//        }
+//    }
+//    // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
+//    return dens;
+//}
+
 
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.
@@ -412,7 +519,7 @@ vec calc_atomic_density(const std::vector<atom>& atoms, const vec& coefs) {
 }
 
 
-void calc_cube_ML(vec data, WFN& dummy, const int atom)
+cube calc_cube_ML(const vec data, WFN& dummy, const int atom)
 {
     double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     int steps[3]{ 0, 0, 0 };
@@ -427,7 +534,7 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
     }
     CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
     CubeRho.set_comment2("from " + dummy.get_path().string());
-    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_RI_rho.cube");
 
     _time_point start = get_time();
 
@@ -465,12 +572,5 @@ void calc_cube_ML(vec data, WFN& dummy, const int atom)
     else
         std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
-    if (atom == -1)
-    {
-        CubeRho.write_file(true);
-    }
-    else
-    {
-        CubeRho.write_file((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_" + std::to_string(atom) + ".cube", false);
-    }
+	return CubeRho;
 };

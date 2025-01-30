@@ -109,7 +109,8 @@ void CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
 {
     int ip, j, k, kp;
     //int zeroidx[ictr];
-    std::vector<int> zeroidx(ictr);
+    //std::vector<int> zeroidx(ictr);
+	int zeroidx[32];  //THIS IS A TEST, HOPE AND PRAY THAT zeroidx is not larger than 32!!!
     for (ip = 0; ip < iprim; ip++) {
         for (j = 0, k = 0, kp = 0; j < ictr; j++) {
             if (ci[iprim * j + ip] != 0) {
