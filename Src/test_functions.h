@@ -10,6 +10,8 @@
 #include "sphere_lebedev_rule.h"
 #include "integrator.h"
 
+#include "NNLS.h"
+
 #if has_RAS
 #include "math.h"
 #include "rascaline.hpp"
@@ -1845,6 +1847,64 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) 
 	cube_diff.write_file(true);
 }
 
+// Convert a row-major matrix to column-major format
+std::vector<double> rowToColMajor(const std::vector<double>& rowMajorMatrix, int rows, int cols) {
+    std::vector<double> colMajorMatrix(rows * cols);
+
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols; ++c) {
+            colMajorMatrix[c * rows + r] = rowMajorMatrix[r * cols + c];
+        }
+    }
+    return colMajorMatrix;
+}
+
+void test_NNLS() {
+    // Define the matrix A in column-major order (Fortran-style storage)
+    std::vector<double> A_in = {
+       54.88135039, 71.51893664, 60.27633761, 54.4883183 , 42.36547993 ,
+       64.58941131, 43.75872113, 89.17730008, 96.36627605, 38.34415188,
+       79.17250381, 52.88949198, 56.80445611, 92.55966383,  7.10360582,
+       8.71292997,  2.02183974, 83.26198455, 77.81567509, 87.00121482,
+       97.86183422, 79.91585642, 46.14793623, 78.05291763, 11.82744259,
+       63.99210213, 14.33532874, 94.4668917 , 52.18483218, 41.466194,
+       26.45556121, 77.42336894, 45.61503322, 56.84339489,  1.87898004,
+       61.76354971, 61.20957227, 61.69339969, 94.37480785, 68.18202991,
+       35.95079006, 43.70319538, 69.76311959,  6.02254716, 66.67667154,
+       67.06378696, 21.03825611, 12.89262977, 31.54283509, 36.37107709
+    };
+    // Dimensions
+    int m = 10;    // Number of rows
+    int n = 5;    // Number of columns
+
+    // Right-hand side vector B
+    std::vector<double> B = { 57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592 };
+
+	vec A = rowToColMajor(A_in, m, n);
+
+
+    // Call the NNLS solver
+    NNLSResult res = nnls(A, m, n, B);
+
+	std::cout << "NNLS solution: " << std::endl;
+	std::cout << "Mode: " << res.status << std::endl;
+    std::cout << "X: ";
+	for (int i = 0; i < res.x.size(); i++) {
+		std::cout << res.x[i] << " ";
+	}
+	std::cout << std::endl;
+	std::cout << "Residual: " << res.rnorm << std::endl;
+
+	//Check vs correct solution
+	std::vector<double> correct = { 0.00370583, 0.58600469, 0.14755389, 0.04786599, 0.0 };
+	for (int i = 0; i < res.x.size(); i++) {
+		if (std::abs(res.x[i] - correct[i]) > 1E-8) {
+			std::cout << "NNLS solution is incorrect!" << std::endl;
+			exit(1);
+		}
+	}
+	std::cout << "NNLS solution is correct!" << std::endl;
+}
 
 // const double dlm_function(const unsigned int& l, const int& m, const double& theta, const double& phi) {
 //     double result = (double)NAN;

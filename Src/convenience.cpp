@@ -2379,6 +2379,10 @@ void options::digest_options()
         }
         else if (temp == "-mult")
             mult = stoi(arguments[i + 1]);
+        else if(temp == "-NNLS_TEST") {
+            test_NNLS();
+            exit(0);
+        }
         else if (temp == "-no-date" || temp == "-no_date")
             no_date = true;
         else if (temp == "-pbc")
