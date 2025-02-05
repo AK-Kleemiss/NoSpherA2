@@ -14,19 +14,15 @@
 #endif
 
 
-
 NNLSResult nnls(
     std::vector<double>& A, int m, int n,
     std::vector<double>& B,
     int maxiter,
     double tol)
 {
-#if has_RAS != 1
-	std::cerr << "Error: NNLS requires LAPACKE and CBLAS.\n";
-	exit(1);
-#endif
+#if has_RAS == 1
     // Define output Variables
-    vec X(n,0);
+    vec X(n, 0);
 	double RNORM = 0.0;
 	int MODE = 0;
 
@@ -44,7 +40,6 @@ NNLSResult nnls(
     std::vector<double> S(n, 0.0);       // Trial solution
     std::vector<bool> P(n, false);       // Active set (boolean)
 
-#if has_RAS == 1
     // Compute A^T * A (normal equations matrix)
     cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
         n, n, m, 1.0, A.data(), m, A.data(), m,
@@ -54,7 +49,6 @@ NNLSResult nnls(
     cblas_dgemv(CblasColMajor, CblasTrans, m, n,
         1.0, A.data(), m, B.data(), 1,
         0.0, Atb.data(), 1);
-#endif
     // Set max iterations
     if (maxiter == -1) maxiter = 3 * n;
     if (tol == -1) tol = 10 * std::max(m, n) * std::numeric_limits<double>::epsilon();
@@ -64,6 +58,10 @@ NNLSResult nnls(
 
     int iter = 0;
 
+	//Initialize workspace variables
+    std::vector<double> AtA_active(n*n, 0.0);
+    std::vector<double> Atb_active(n, 0);
+    std::vector<int> ipiv(n);
     while (iter < maxiter) {
         // Step B: Find most active coefficient
         int k = -1;
@@ -87,9 +85,6 @@ NNLSResult nnls(
         }
 
         int activeCount = activeIndices.size();
-        std::vector<double> AtA_active(activeCount * activeCount, 0.0);
-        std::vector<double> Atb_active(activeCount, 0.0);
-        std::vector<int> ipiv(activeCount);
 
         // Extract submatrix AtA[P, P] and Atb[P]
         for (int i = 0; i < activeCount; i++) {
@@ -102,13 +97,12 @@ NNLSResult nnls(
         }
 
         // Solve AtA_active * S[P] = Atb_active
-#if has_RAS == 1
         int info = LAPACKE_dposv(LAPACK_COL_MAJOR, 'U', activeCount, 1,
             AtA_active.data(), activeCount, Atb_active.data(), activeCount);
-#endif
 
         if (info != 0) {
             std::cerr << "Warning: Ill-conditioned matrix detected in NNLS.\n";
+			std::cerr << "Error Code: " << info << std::endl;
             MODE = 1;
             break;
         }
@@ -153,26 +147,27 @@ NNLSResult nnls(
         for (int i = 0; i < n; i++) {
             X[i] = S[i];
         }
-#if has_RAS == 1
         // Compute residual W = Atb - AtA @ X
         cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
         cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
             -1.0, AtA.data(), n, X.data(), 1,
             1.0, W.data(), 1);
-#endif
     }
 
     // Compute residual norm ||A * X - B||
     std::vector<double> Ax(m, 0.0);
-#if has_RAS == 1
     cblas_dgemv(CblasColMajor, CblasNoTrans, m, n,
         1.0, A.data(), m, X.data(), 1,
         0.0, Ax.data(), 1);
-#endif
     double sum_sq = 0.0;
     for (int i = 0; i < m; i++) {
         sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
     }
 
 	return NNLSResult(X, std::sqrt(sum_sq), MODE);
+#else
+    std::cerr << "Error: NNLS requires LAPACKE and CBLAS.\n";
+    exit(1);
+#endif
 }
+
