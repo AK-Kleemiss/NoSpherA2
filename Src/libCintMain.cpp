@@ -5,7 +5,7 @@
 #include "int_optimizer.h"
 #include "int_g2e.h"
 
-#include "math.h"
+#include "nos_math.h"
 
 #if has_RAS == 1
 #include "cblas.h"

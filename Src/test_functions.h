@@ -11,7 +11,7 @@
 #include "integrator.h"
 
 #if has_RAS
-#include "math.h"
+#include "nos_math.h"
 #include "rascaline.hpp"
 #include "metatensor.h"
 #endif

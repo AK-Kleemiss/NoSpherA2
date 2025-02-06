@@ -11,7 +11,7 @@ LIBOPENBLAS := ../Lib/OpenBlas/lib/libopenblas_openmp.a
 all: NoSpherA2 
 
 # List of object file names without extensions
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain hdf5 math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain hdf5 nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)

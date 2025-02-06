@@ -5,7 +5,7 @@
 #include "JKFit.h"
 #include "wfn_class.h"
 
-#include "math.h"
+#include "nos_math.h"
 #include "SALTED_io.h"
 #include "SALTED_utilities.h"
 #include "SALTED_equicomb.h"

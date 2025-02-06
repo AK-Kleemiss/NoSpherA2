@@ -6,7 +6,7 @@
 #include "fchk.h"
 #include "integrator.h"
 #include "basis_set.h"
-#include "math.h"
+#include "nos_math.h"
 
 void WFN::fill_pre()
 {

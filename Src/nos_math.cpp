@@ -1,12 +1,10 @@
-#include "math.h"
-#include <algorithm>
+#include "nos_math.h"
 
 #if has_RAS
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
 #include "lapacke.h" // for LAPACKE_xxx
 #include "cblas.h"
-#include "openblas_config.h"
 #endif
 
 template <typename T>
@@ -900,10 +898,6 @@ void _test_openblas()
 
   std::cout << "All BLAS tests passed!" << std::endl;
 }
-#ifdef _WIN32
-#include "DLL_Helper.h"
-#endif
-
 
 
 NNLSResult nnls(
@@ -943,7 +937,7 @@ NNLSResult nnls(
         0.0, Atb.data(), 1);
     // Set max iterations
     if (maxiter == -1) maxiter = 3 * n;
-    if (tol == -1) tol = 10 * max(m, n) * std::numeric_limits<double>::epsilon();
+    if (tol == -1) tol = 10 * std::max(m, n) * std::numeric_limits<double>::epsilon();
 
     // Initialize W, S
     W = Atb; // Projected residual W = A^T * B
@@ -1024,7 +1018,7 @@ NNLSResult nnls(
             for (int i = 0; i < activeCount; i++) {
                 int idx = activeIndices[i];
                 if (S[idx] < 0) {
-                    alpha = min(alpha, X[idx] / (X[idx] - S[idx]));
+                    alpha = std::min(alpha, X[idx] / (X[idx] - S[idx]));
                 }
             }
 
@@ -1064,6 +1058,9 @@ NNLSResult nnls(
 }
 
 
+#ifdef _WIN32
+#include "DLL_Helper.h"
+#endif
 
 void* math_load_BLAS(int num_threads)
 {

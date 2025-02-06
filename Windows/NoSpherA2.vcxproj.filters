@@ -192,9 +192,6 @@
     <ClCompile Include="..\Src\ECPs_corrections.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\math.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\isosurface.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -218,6 +215,9 @@
     </ClCompile>
     <ClCompile Include="..\Src\libCintMain.cpp">
       <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\nos_math.cpp">
+      <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -1010,9 +1010,6 @@
     <ClInclude Include="..\Src\pch.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\math.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\isosurface.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -1036,6 +1033,9 @@
     </ClInclude>
     <ClInclude Include="..\Src\libCintMain.h">
       <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\nos_math.h">
+      <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

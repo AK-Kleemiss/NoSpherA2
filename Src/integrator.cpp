@@ -2,7 +2,7 @@
 #include "integration_params.h"
 #include "JKFit.h"
 #include "libCintMain.h"
-#include "math.h"
+#include "nos_math.h"
 
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
