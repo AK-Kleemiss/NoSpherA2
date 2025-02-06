@@ -177,8 +177,8 @@ void c2s_sph_3c2e1_ssc(double *fijkl, double *gctr, int *dims, CINTEnvVars *envs
 //void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, int *dims, CINTEnvVars *envs, double *cache);
 //void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, int *dims, CINTEnvVars *envs, double *cache);
 
-void c2s_sph_3c1e(double *fijkl, double *gctr, int *dims, CINTEnvVars *envs, double *cache);
-void c2s_cart_3c1e(double *fijkl, double *gctr, int *dims, CINTEnvVars *envs, double *cache);
+void c2s_sph_3c1e(double *fijkl, double *gctr, const int *dims, CINTEnvVars *envs, double *cache);
+void c2s_cart_3c1e(double *fijkl, double *gctr, const int *dims, CINTEnvVars *envs, double *cache);
 
 void c2s_dset0(double *out, const int *dims, int *counts);
 //void c2s_zset0(double complex *out, int *dims, int *counts);

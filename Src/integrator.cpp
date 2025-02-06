@@ -109,7 +109,7 @@ vec reorder_p(vec coefs_in, WFN aux_basis) {
 }
 
 
-vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem)
+vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem, const char metric)
 {
     vec eri2c;
     vec eri3c;
@@ -125,21 +125,26 @@ vec density_fit(const WFN& wavy, const std::string auxname, const double max_mem
     wavy_aux.delete_basis_set();
     Int_Params aux_basis(wavy_aux, auxname);
 
-    // Compute integrals
-    computeEri2c(aux_basis, eri2c);
-    //computeEri3c(normal_basis, aux_basis, eri3c);
-
-
     vec2 dm = wavy.get_dm();
-    //vec3 eri3c_3d = reshape(eri3c, { normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() });
-	computeRho(normal_basis, aux_basis, dm, rho, max_mem);
-    // Perform contractions using BLAS
-    //vec rho = einsum_ijk_ij_p(eri3c_3d, dm);
+
+    // Compute integrals
+    if (metric == 'C'){
+        computeEri2c(aux_basis, eri2c);
+        computeRho_Coulomb(normal_basis, aux_basis, dm, rho, max_mem);
+    }
+    else if (metric == 'O') {
+        compute2c_Overlap(aux_basis, eri2c);
+        computeRho_Overlap(normal_basis, aux_basis, dm, rho, max_mem);
+    }
+
+
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);
 
     vec coefs = reorder_p(rho, wavy_aux);
     return coefs;
 }
+
+
 
 int fixed_density_fit_test()
 {

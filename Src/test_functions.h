@@ -1801,7 +1801,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 //Also calculate the difference between the two densities
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) {
 	std::cout << "Calculating density using RI-FIT" << std::endl;
-    vec ri_coefs =  density_fit(wavy, aux_basis, (*opt).mem);
+    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'O');
 	std::cout << "Calculating RI-FIT cube" << std::endl;
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wavy.get_atoms());
@@ -1809,22 +1809,23 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) 
     wavy_aux.delete_basis_set();
     load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
     cube cube_RI_FIT = calc_cube_ML(ri_coefs, wavy_aux);
-	cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "RI_FIT_rho.cube"));
+	cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
 	cube_RI_FIT.write_file(true);
 
     
 	std::cout << "Calculating density using regular WFN" << std::endl;
-	//Check if the cube file already exists, if so read it
-	std::filesystem::path fn = std::filesystem::path(wavy.get_path().stem().string() + "normal_rho.cube");
-  //  if (std::filesystem::exists(fn)) {
-  //      //cube cube_normal(fn, true, );
-		//std::cout << "TO BE CONTINUED!" << std::endl;
-  //  }
-  //  else {
-        double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
-        int steps[3]{ 0, 0, 0 };
-        readxyzMinMax_fromWFN(wavy, MinMax, steps, 2.5, 0.1, true);
-        cube cube_normal(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
+	
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    readxyzMinMax_fromWFN(wavy, MinMax, steps, 2.5, 0.1, true);
+    cube cube_normal(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
+	std::filesystem::path normal_cube_path = std::filesystem::path(wavy.get_path().stem().string() + "_normal_rho.cube");
+    cube_normal.set_path(normal_cube_path);
+    //Check if the cube file already exists, if so read it
+    if (std::filesystem::exists(normal_cube_path)) {
+        cube_normal.read_file(true, true);
+    }
+    else {
         cube_normal.give_parent_wfn(wavy);
         for (int i = 0; i < 3; i++)
         {
@@ -1833,10 +1834,11 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) 
         }
         cube_normal.set_comment1("Calculated density using NoSpherA2");
         cube_normal.set_comment2("from " + wavy.get_path().string());
-        cube_normal.set_path(std::filesystem::path(wavy.get_path().stem().string() + "normal_rho.cube"));
         Calc_Rho(cube_normal, wavy, (*opt).radius, std::cout, false);
         cube_normal.write_file(true);
-    //}
+    }
+    cube_normal.calc_dv();
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_normal.sum() << std::endl;
 
 	std::cout << "Calculating difference cube" << std::endl;
 	cube cube_diff = cube_normal - cube_RI_FIT;
@@ -1844,7 +1846,11 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt) 
 	cube_diff.set_comment1("Difference between RI-FIT and normal density");
 	cube_diff.set_comment2("from " + wavy.get_path().string());
 	cube_diff.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_diff.cube"));
-	cube_diff.write_file(true);
+    cube_diff.write_file(true);
+    cube_diff.calc_dv();
+	std::cout << "Number of electrons in difference cube: " << std::fixed << std::setprecision(5) << cube_diff.sum() << std::endl;
+	std::cout << "RRS of difference cube: " << std::fixed << std::setprecision(5) << cube_normal.rrs(cube_RI_FIT) << std::endl;
+	std::cout << "Done!" << std::endl;
 }
 
 // Convert a row-major matrix to column-major format

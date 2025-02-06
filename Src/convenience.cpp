@@ -2440,7 +2440,7 @@ void options::digest_options()
 
 
 			//std::string aux_basis = arguments[i + 1];
-            gen_CUBE_for_RI(wavy, "def2_universal_JKfit", this);
+            gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
 
             exit(0);
         }

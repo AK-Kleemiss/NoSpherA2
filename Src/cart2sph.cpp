@@ -5841,7 +5841,7 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, const int *dims,
         } } }
 }
 
-void c2s_cart_3c2e1(double *bufijk, double *gctr, int *dims,
+void c2s_cart_3c2e1(double *bufijk, double *gctr, const int *dims,
                     CINTEnvVars *envs, double *cache)
 {
         int i_ctr = envs->x_ctr[0];
@@ -6373,13 +6373,13 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
  * 3-center 1-electron integral transformation
  *
  *************************************************/
-void c2s_sph_3c1e(double *out, double *gctr, int *dims,
+void c2s_sph_3c1e(double *out, double *gctr, const int *dims,
                   CINTEnvVars *envs, double *cache)
 {
         c2s_sph_3c2e1(out, gctr, dims, envs, cache);
 }
 
-void c2s_cart_3c1e(double *out, double *gctr, int *dims,
+void c2s_cart_3c1e(double *out, double *gctr, const int *dims,
                    CINTEnvVars *envs, double *cache)
 {
         c2s_cart_3c2e1(out, gctr, dims, envs, cache);

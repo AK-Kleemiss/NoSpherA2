@@ -27,6 +27,9 @@ struct NNLSResult {
  * Note:
  * - Requires LAPACKE and CBLAS libraries for matrix operations
  * - If LAPACKE or CBLAS is not available, the function will terminate with an error message
+ * - Bro, Rasmus and de Jong, Sijmen, "A Fast Non-Negativity-
+       Constrained Least Squares Algorithm", Journal Of Chemometrics, 1997,
+       :doi:`10.1002/(SICI)1099-128X(199709/10)11:5<393::AID-CEM483>3.0.CO;2-L`
  */
 NNLSResult nnls(
     std::vector<double>& A, int m, int n,

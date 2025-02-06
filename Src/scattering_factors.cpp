@@ -3630,7 +3630,7 @@ bool calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.mem);
+	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.mem, 'C');
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
     time_points.push_back(get_time());
@@ -4063,7 +4063,7 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-    vec coefs = density_fit(wave[nr], opt.SALTED_DFBASIS, opt.mem);
+    vec coefs = density_fit(wave[nr], opt.SALTED_DFBASIS, opt.mem, 'C');
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
     time_points.push_back(get_time());

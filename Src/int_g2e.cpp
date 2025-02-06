@@ -17,6 +17,50 @@ void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
     }
 }
 
+void CINTg3c1e_index_xyz(int* idx, const CINTEnvVars* envs)
+{
+    const int i_l = envs->i_l;
+    const int j_l = envs->j_l;
+    const int k_l = envs->k_l;
+    const int nfi = envs->nfi;
+    const int nfj = envs->nfj;
+    const int nfk = envs->nfk;
+    const int dj = envs->g_stride_j;
+    const int dk = envs->g_stride_k;
+    int i, j, k, n;
+    int ofx, ofjx, ofkx;
+    int ofy, ofjy, ofky;
+    int ofz, ofjz, ofkz;
+    int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
+    int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
+    int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
+
+    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+
+    ofx = 0;
+    ofy = envs->g_size;
+    ofz = envs->g_size * 2;
+    n = 0;
+    for (k = 0; k < nfk; k++) {
+        ofkx = ofx + dk * k_nx[k];
+        ofky = ofy + dk * k_ny[k];
+        ofkz = ofz + dk * k_nz[k];
+        for (j = 0; j < nfj; j++) {
+            ofjx = ofkx + dj * j_nx[j];
+            ofjy = ofky + dj * j_ny[j];
+            ofjz = ofkz + dj * j_nz[j];
+            for (i = 0; i < nfi; i++) {
+                idx[n + 0] = ofjx + i_nx[i];
+                idx[n + 1] = ofjy + i_ny[i];
+                idx[n + 2] = ofjz + i_nz[i];
+                n += 3;
+            }
+        }
+    }
+}
+
 void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
 {
     const int i_l = envs->i_l;
@@ -111,7 +155,6 @@ void CINTg2e_index_xyz(int* idx, const CINTEnvVars* envs)
     } // j
 }
 
-
 void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
 {
     const int i_l = envs->i_l;
@@ -147,6 +190,135 @@ void CINTg1e_index_xyz(int* idx, const CINTEnvVars* envs)
     }
 }
 
+int CINTg1e_ovlp(double* g, CINTEnvVars* envs)
+{
+    double* gx = g;
+    double* gy = g + envs->g_size;
+    double* gz = g + envs->g_size * 2;
+    double aij = envs->ai[0] + envs->aj[0];
+
+    gx[0] = 1;
+    gy[0] = 1; 
+    gz[0] = envs->fac[0] * constants::sqr_pi * constants::PI / (aij * sqrt(aij));
+
+    int nmax = envs->li_ceil + envs->lj_ceil;
+    if (nmax == 0) {
+        return 1;
+    }
+
+    double* rij = envs->rij;
+    double* rirj = envs->rirj;
+    int lj, di, dj;
+    int i, j, n, ptr;
+    double* rx;
+    if (envs->li_ceil > envs->lj_ceil) {
+        // li = envs->li_ceil;
+        lj = envs->lj_ceil;
+        di = envs->g_stride_i;
+        dj = envs->g_stride_j;
+        rx = envs->ri;
+    }
+    else {
+        // li = envs->lj_ceil;
+        lj = envs->li_ceil;
+        di = envs->g_stride_j;
+        dj = envs->g_stride_i;
+        rx = envs->rj;
+    }
+    double rijrx[3];
+    rijrx[0] = rij[0] - rx[0];
+    rijrx[1] = rij[1] - rx[1];
+    rijrx[2] = rij[2] - rx[2];
+
+    gx[di] = rijrx[0] * gx[0];
+    gy[di] = rijrx[1] * gy[0];
+    gz[di] = rijrx[2] * gz[0];
+
+    double aij2 = .5 / aij;
+    for (i = 1; i < nmax; i++) {
+        gx[(i + 1) * di] = i * aij2 * gx[(i - 1) * di] + rijrx[0] * gx[i * di];
+        gy[(i + 1) * di] = i * aij2 * gy[(i - 1) * di] + rijrx[1] * gy[i * di];
+        gz[(i + 1) * di] = i * aij2 * gz[(i - 1) * di] + rijrx[2] * gz[i * di];
+    }
+
+    for (j = 1; j <= lj; j++) {
+        ptr = dj * j;
+        for (i = 0, n = ptr; i <= nmax - j; i++, n += di) {
+            gx[n] = gx[n + di - dj] + rirj[0] * gx[n - dj];
+            gy[n] = gy[n + di - dj] + rirj[1] * gy[n - dj];
+            gz[n] = gz[n + di - dj] + rirj[2] * gz[n - dj];
+        }
+    }
+    return 1;
+}
+
+void CINTg3c1e_ovlp(double* g, double ai, double aj, double ak,
+    const CINTEnvVars* envs)
+{
+    const int li = envs->li_ceil;
+    const int lj = envs->lj_ceil;
+    const int lk = envs->lk_ceil;
+    const int nmax = li + lj + lk;
+    const int mmax = lj + lk;
+    double* gx = g;
+    double* gy = g + envs->g_size;
+    double* gz = g + envs->g_size * 2;
+    gx[0] = 1;
+    gy[0] = 1;
+    gz[0] = envs->fac[0];
+    if (nmax == 0) {
+        return;
+    }
+
+    int dj = li + 1;
+    const int dk = envs->g_stride_k;
+    const double aijk = ai + aj + ak;
+    const double aijk1 = .5 / aijk;
+    const double* ri = envs->ri;
+    const double* rj = envs->rj;
+    const double* rk = envs->rk;
+    int i, j, k, off;
+    const double* rirj = envs->rirj;
+    double rjrk[3], rjrijk[3];
+
+    rjrk[0] = rj[0] - rk[0];
+    rjrk[1] = rj[1] - rk[1];
+    rjrk[2] = rj[2] - rk[2];
+
+    rjrijk[0] = rj[0] - (ai * ri[0] + aj * rj[0] + ak * rk[0]) / aijk;
+    rjrijk[1] = rj[1] - (ai * ri[1] + aj * rj[1] + ak * rk[1]) / aijk;
+    rjrijk[2] = rj[2] - (ai * ri[2] + aj * rj[2] + ak * rk[2]) / aijk;
+
+    gx[dj] = -rjrijk[0] * gx[0];
+    gy[dj] = -rjrijk[1] * gy[0];
+    gz[dj] = -rjrijk[2] * gz[0];
+
+    for (j = 1; j < nmax; j++) {
+        gx[(j + 1) * dj] = aijk1 * j * gx[(j - 1) * dj] - rjrijk[0] * gx[j * dj];
+        gy[(j + 1) * dj] = aijk1 * j * gy[(j - 1) * dj] - rjrijk[1] * gy[j * dj];
+        gz[(j + 1) * dj] = aijk1 * j * gz[(j - 1) * dj] - rjrijk[2] * gz[j * dj];
+    }
+
+    for (i = 1; i <= li; i++) {
+        for (j = 0; j <= nmax - i; j++) { // upper limit lj+lk
+            gx[i + j * dj] = gx[i - 1 + (j + 1) * dj] - rirj[0] * gx[i - 1 + j * dj];
+            gy[i + j * dj] = gy[i - 1 + (j + 1) * dj] - rirj[1] * gy[i - 1 + j * dj];
+            gz[i + j * dj] = gz[i - 1 + (j + 1) * dj] - rirj[2] * gz[i - 1 + j * dj];
+        }
+    }
+
+    dj = envs->g_stride_j;
+    for (k = 1; k <= lk; k++) {
+        for (j = 0; j <= mmax - k; j++) {
+            off = k * dk + j * dj;
+            for (i = off; i <= off + li; i++) {
+                gx[i] = gx[i + dj - dk] + rjrk[0] * gx[i - dk];
+                gy[i] = gy[i + dj - dk] + rjrk[1] * gy[i - dk];
+                gz[i] = gz[i + dj - dk] + rjrk[2] * gz[i - dk];
+            }
+        }
+    }
+}
 
 /*
  * g[i,k,l,j] = < ik | lj > = ( i j | k l )
@@ -4451,4 +4623,176 @@ void CINTinit_int3c2e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
         envs->f_g0_2d4d = &CINTg0_2e_lj2d4d;
     }
     envs->f_g0_2e = &CINTg0_2e;
+}
+
+
+void CINTinit_int3c1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+    int* atm, int natm, int* bas, int nbas, double* env)
+{
+    envs->natm = natm;
+    envs->nbas = nbas;
+    envs->atm = atm;
+    envs->bas = bas;
+    envs->env = env;
+    envs->shls = shls;
+
+    const int i_sh = shls[0];
+    const int j_sh = shls[1];
+    const int k_sh = shls[2];
+    envs->i_l = bas(ANG_OF, i_sh);
+    envs->j_l = bas(ANG_OF, j_sh);
+    envs->k_l = bas(ANG_OF, k_sh);
+    envs->l_l = 0;
+    envs->x_ctr[0] = bas(NCTR_OF, i_sh);
+    envs->x_ctr[1] = bas(NCTR_OF, j_sh);
+    envs->x_ctr[2] = bas(NCTR_OF, k_sh);
+    envs->x_ctr[3] = 1;
+    envs->nfi = (envs->i_l + 1) * (envs->i_l + 2) / 2;
+    envs->nfj = (envs->j_l + 1) * (envs->j_l + 2) / 2;
+    envs->nfk = (envs->k_l + 1) * (envs->k_l + 2) / 2;
+    envs->nfl = 1;
+    envs->nf = envs->nfi * envs->nfj * envs->nfk;
+
+    envs->ri = env + atm(PTR_COORD, bas(ATOM_OF, i_sh));
+    envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
+    envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
+
+    envs->gbits = ng[GSHIFT];
+    envs->ncomp_e1 = ng[POS_E1];
+    envs->ncomp_e2 = 0;
+    envs->ncomp_tensor = ng[TENSOR];
+
+    envs->li_ceil = envs->i_l + ng[IINC];
+    envs->lj_ceil = envs->j_l + ng[JINC];
+    envs->lk_ceil = envs->k_l + ng[KINC];
+    envs->ll_ceil = 0;
+    envs->nrys_roots = (envs->li_ceil + envs->lj_ceil + envs->lk_ceil) / 2 + 1;
+
+    envs->common_factor = constants::PI * constants::sqr_pi
+        * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l)
+        * CINTcommon_fac_sp(envs->k_l);
+    if (env[PTR_EXPCUTOFF] == 0) {
+        envs->expcutoff = EXPCUTOFF;
+    }
+    else {
+        envs->expcutoff = std::max((double)MIN_EXPCUTOFF, env[PTR_EXPCUTOFF]);
+    }
+
+    int dli = envs->li_ceil + 1;
+    int dlj = envs->lj_ceil + envs->lk_ceil + 1;
+    int dlk = envs->lk_ceil + 1;
+    envs->g_stride_i = 1;
+    envs->g_stride_j = dli;
+    envs->g_stride_k = dli * dlj;
+    envs->g_stride_l = envs->g_stride_k;
+    int nmax = envs->li_ceil + dlj;
+    envs->g_size = std::max(dli * dlj * dlk, dli * nmax);
+
+    envs->rirj[0] = envs->ri[0] - envs->rj[0];
+    envs->rirj[1] = envs->ri[1] - envs->rj[1];
+    envs->rirj[2] = envs->ri[2] - envs->rj[2];
+}
+
+
+void CINTinit_int1e_EnvVars(CINTEnvVars* envs, int* ng, int* shls,
+    int* atm, int natm,
+    int* bas, int nbas, double* env)
+{
+    envs->natm = natm;
+    envs->nbas = nbas;
+    envs->atm = atm;
+    envs->bas = bas;
+    envs->env = env;
+    envs->shls = shls;
+
+    const int i_sh = shls[0];
+    const int j_sh = shls[1];
+    envs->i_l = bas(ANG_OF, i_sh);
+    envs->j_l = bas(ANG_OF, j_sh);
+    envs->x_ctr[0] = bas(NCTR_OF, i_sh);
+    envs->x_ctr[1] = bas(NCTR_OF, j_sh);
+    envs->nfi = (envs->i_l + 1) * (envs->i_l + 2) / 2;
+    envs->nfj = (envs->j_l + 1) * (envs->j_l + 2) / 2;
+    envs->nf = envs->nfi * envs->nfj;
+    envs->common_factor = 1;
+    if (env[PTR_EXPCUTOFF] == 0) {
+        envs->expcutoff = EXPCUTOFF;
+    }
+    else {
+        envs->expcutoff = std::max((double)MIN_EXPCUTOFF, env[PTR_EXPCUTOFF]);
+    }
+
+    envs->li_ceil = envs->i_l + ng[IINC];
+    envs->lj_ceil = envs->j_l + ng[JINC];
+    envs->ri = env + atm(PTR_COORD, bas(ATOM_OF, i_sh));
+    envs->rj = env + atm(PTR_COORD, bas(ATOM_OF, j_sh));
+
+    envs->gbits = ng[GSHIFT];
+    envs->ncomp_e1 = ng[POS_E1];
+    envs->ncomp_tensor = ng[TENSOR];
+    if (ng[SLOT_RYS_ROOTS] > 0) {
+        envs->nrys_roots = ng[SLOT_RYS_ROOTS];
+    }
+    else {
+        envs->nrys_roots = (envs->li_ceil + envs->lj_ceil) / 2 + 1;
+    }
+
+    int dli, dlj;
+    int ibase = envs->li_ceil > envs->lj_ceil;
+    if (ibase) {
+        dli = envs->li_ceil + envs->lj_ceil + 1;
+        dlj = envs->lj_ceil + 1;
+        envs->rirj[0] = envs->ri[0] - envs->rj[0];
+        envs->rirj[1] = envs->ri[1] - envs->rj[1];
+        envs->rirj[2] = envs->ri[2] - envs->rj[2];
+    }
+    else {
+        dli = envs->li_ceil + 1;
+        dlj = envs->li_ceil + envs->lj_ceil + 1;
+        envs->rirj[0] = envs->rj[0] - envs->ri[0];
+        envs->rirj[1] = envs->rj[1] - envs->ri[1];
+        envs->rirj[2] = envs->rj[2] - envs->ri[2];
+    }
+    envs->g_stride_i = envs->nrys_roots;
+    envs->g_stride_j = envs->nrys_roots * dli;
+    envs->g_size = envs->nrys_roots * dli * dlj;
+    envs->g_stride_k = envs->g_size;
+    envs->g_stride_l = envs->g_size;
+
+    assert(i_sh < SHLS_MAX);
+    assert(j_sh < SHLS_MAX);
+    assert(envs->i_l < ANG_MAX);
+    assert(envs->j_l < ANG_MAX);
+    assert(bas(ATOM_OF, i_sh) >= 0);
+    assert(bas(ATOM_OF, j_sh) >= 0);
+    assert(bas(ATOM_OF, i_sh) < natm);
+    assert(bas(ATOM_OF, j_sh) < natm);
+    assert(envs->nrys_roots < MXRYSROOTS);
+}
+
+
+void make_g1e_gout(double* gout, double* g, int* idx,
+    CINTEnvVars* envs, int empty, int int1e_type)
+{
+    int ia;
+    switch (int1e_type) {
+    case 0:
+        CINTg1e_ovlp(g, envs);
+        (*envs->f_gout)(gout, g, idx, envs, empty);
+        break;
+    case 1:
+        std::cout << "CINTg1e_nuc not implemented!" << std::endl;
+        exit(1);
+        //CINTg1e_nuc(g, envs, -1);
+        //(*envs->f_gout)(gout, g, idx, envs, empty);
+        break;
+    case 2:
+        std::cout << "CINTg1e_kin not implemented!" << std::endl;
+        exit(1);
+        for (ia = 0; ia < envs->natm; ia++) {
+            //CINTg1e_nuc(g, envs, ia);
+            //(*envs->f_gout)(gout, g, idx, envs, (empty && ia == 0));
+        }
+        break;
+    }
 }
