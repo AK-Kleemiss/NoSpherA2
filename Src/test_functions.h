@@ -10,8 +10,6 @@
 #include "sphere_lebedev_rule.h"
 #include "integrator.h"
 
-#include "NNLS.h"
-
 #if has_RAS
 #include "math.h"
 #include "rascaline.hpp"

@@ -219,9 +219,6 @@
     <ClCompile Include="..\Src\libCintMain.cpp">
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\NNLS.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -1039,9 +1036,6 @@
     </ClInclude>
     <ClInclude Include="..\Src\libCintMain.h">
       <Filter>Headerdateien\libCint</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\NNLS.h">
-      <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

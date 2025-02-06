@@ -2922,7 +2922,6 @@
     <ClCompile Include="..\Src\isosurface.cpp" />
     <ClCompile Include="..\Src\JKFit.cpp" />
     <ClCompile Include="..\Src\libCintMain.cpp" />
-    <ClCompile Include="..\Src\NNLS.cpp" />
     <ClCompile Include="..\Src\rys_roots.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
@@ -3192,7 +3191,6 @@
     <ClInclude Include="..\Src\libCintMain.h" />
     <ClInclude Include="..\Src\metatensor.h" />
     <ClInclude Include="..\Src\metatensor.hpp" />
-    <ClInclude Include="..\Src\NNLS.h" />
     <ClInclude Include="..\Src\OpenBLAS.h" />
     <ClInclude Include="..\Src\pch.h" />
     <ClInclude Include="..\Src\rascaline.h" />
