@@ -43,13 +43,17 @@ int main(int argc, char **argv)
         log_file << build_date;
     }
     log_file.flush();
-    bool BLAS = check_OpenBLAS_DLL(opt.debug);
+
+	bool BLAS = false;
+#ifdef _WIN32
+    BLAS = check_OpenBLAS_DLL(opt.debug);
     if (BLAS) {
         BLAS_pointer = math_load_BLAS(opt.threads);
     }
     else {
         std::cout << "No OpenBLAS found!\nWill use a fallback Implementation!" << endl;
     }
+#endif
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
