@@ -4162,8 +4162,9 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
 
     return blocky;
 #else
+    tsc_block<int, cdouble> blocky;
     err_not_impl_f("RASCALINE is not supported by this build", file);
-    return false;
+    return blocky;
 #endif
 }
 
