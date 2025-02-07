@@ -3,7 +3,7 @@ RM := rm
 
 all: lipo
 
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections integrator math isosurface
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections integrator nos_math isosurface
 OBJS_arm64 := $(OBJ_NAMES:=.o_arm64)
 OBJS_x86_64 := $(OBJ_NAMES:=.o_x86_64)
 
