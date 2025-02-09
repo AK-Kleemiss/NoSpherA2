@@ -234,12 +234,7 @@ inline void print_centered_text(const std::string &text, int &bar_width)
 class ProgressBar
 {
 public:
-    ~ProgressBar()
-    {
-        progress_ = 100.0f;
-        write_progress();
-        std::cout << std::endl;
-    }
+    ~ProgressBar();
 
     ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
@@ -248,6 +243,7 @@ public:
         // Write status text
         print_centered_text(status_text_, bw);
         linestart = std::cout.tellp();
+        initialize_taskbar_progress();
     }
 
     void set_progress()
@@ -268,41 +264,7 @@ public:
         }
     }
 
-    void write_progress(std::ostream &os = std::cout)
-    {
-        // No need to write once progress is 100%
-        if (progress_ > 100.0f)
-            return;
-
-        // Move cursor to the first position on the same line
-        // Check if os is a file stream
-        if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
-        {
-            os.seekp(linestart); // Is a file stream
-        }
-        else
-        {
-            os << "\r" << std::flush; // Is not a file stream
-        }
-
-        // Start bar
-        os << "[";
-
-        const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
-        for (size_t i = 0; i <= completed; ++i)
-        {
-            os << fill_;
-        }
-
-        // End bar
-        if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
-        {
-            os << "] 100% " << std::flush;
-            return;
-        }
-
-        os << std::flush;
-    }
+    void write_progress(std::ostream &os = std::cout);
 
 private:
     const int worksize_;
@@ -315,6 +277,9 @@ private:
     std::atomic<int> workdone;
     float progress_;
     std::streampos linestart;
+    ITaskbarList3 *taskbarList_;
+
+    void initialize_taskbar_progress();
 };
 
 void readxyzMinMax_fromWFN(

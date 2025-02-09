@@ -44,6 +44,9 @@
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
 #include <io.h>
+#define NOMINMAX
+#include <windows.h>
+#include <shobjidl.h>
 #include "OpenBLAS.h"
 #else
 #define GetCurrentDir getcwd

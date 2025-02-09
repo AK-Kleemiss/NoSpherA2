@@ -3153,4 +3153,75 @@ bool check_OpenBLAS_DLL(const bool &debug)
     }
     return true;
 }
+
+ProgressBar::~ProgressBar()
+{
+    progress_ = 100.0f;
+    write_progress();
+    std::cout << std::endl;
+    if (taskbarList_)
+    {
+        taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
+        taskbarList_->Release();
+    }
+}
+
+void ProgressBar::write_progress(std::ostream &os)
+{
+    // No need to write once progress is 100%
+    if (progress_ > 100.0f)
+        return;
+
+    // Move cursor to the first position on the same line
+    // Check if os is a file stream
+    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    {
+        os.seekp(linestart); // Is a file stream
+    }
+    else
+    {
+        os << "\r" << std::flush; // Is not a file stream
+    }
+
+    // Start bar
+    os << "[";
+
+    const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
+    for (size_t i = 0; i <= completed; ++i)
+    {
+        os << fill_;
+    }
+
+    // End bar
+    if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
+    {
+        os << "] 100% " << std::flush;
+        if (taskbarList_)
+        {
+            taskbarList_->SetProgressValue(GetConsoleWindow(), 100, 100);
+            taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
+        }
+        return;
+    }
+
+    os << std::flush;
+    // Update taskbar progress
+    if (taskbarList_)
+    {
+        taskbarList_->SetProgressValue(GetConsoleWindow(), static_cast<ULONGLONG>(progress_), 100);
+    }
+}
+
+void ProgressBar::initialize_taskbar_progress()
+{
+        if (SUCCEEDED(CoInitialize(nullptr)))
+        {
+            if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbarList_))))
+            {
+                taskbarList_->HrInit();
+                taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NORMAL);
+            }
+        }
+}
+
 #endif
