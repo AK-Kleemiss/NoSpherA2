@@ -3159,11 +3159,13 @@ ProgressBar::~ProgressBar()
     progress_ = 100.0f;
     write_progress();
     std::cout << std::endl;
+#ifdef _WIN32
     if (taskbarList_)
     {
         taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
         taskbarList_->Release();
     }
+#endif
 }
 
 void ProgressBar::write_progress(std::ostream &os)
@@ -3196,22 +3198,28 @@ void ProgressBar::write_progress(std::ostream &os)
     if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
     {
         os << "] 100% " << std::flush;
+#ifdef _WIN32
         if (taskbarList_)
         {
             taskbarList_->SetProgressValue(GetConsoleWindow(), 100, 100);
             taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
         }
+#endif
         return;
     }
 
     os << std::flush;
+
+#ifdef _WIN32
     // Update taskbar progress
     if (taskbarList_)
     {
         taskbarList_->SetProgressValue(GetConsoleWindow(), static_cast<ULONGLONG>(progress_), 100);
     }
+#endif
 }
 
+#ifdef _WIN32
 void ProgressBar::initialize_taskbar_progress()
 {
         if (SUCCEEDED(CoInitialize(nullptr)))
@@ -3223,5 +3231,6 @@ void ProgressBar::initialize_taskbar_progress()
             }
         }
 }
+#endif
 
 #endif

@@ -243,7 +243,9 @@ public:
         // Write status text
         print_centered_text(status_text_, bw);
         linestart = std::cout.tellp();
+#ifdef _WIN32
         initialize_taskbar_progress();
+#endif
     }
 
     void set_progress()
@@ -277,9 +279,11 @@ private:
     std::atomic<int> workdone;
     float progress_;
     std::streampos linestart;
+#ifdef _WIN32
     ITaskbarList3 *taskbarList_;
 
     void initialize_taskbar_progress();
+#endif
 };
 
 void readxyzMinMax_fromWFN(
