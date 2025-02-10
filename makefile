@@ -12,34 +12,19 @@ endif
 
 all: NoSpherA2
 
-NoSpherA2_Rascaline:
-	@echo "Building NoSpherA2_Rascaline for $(NAME)"
-ifeq ($(NAME),WINDOWS)
-	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
-endif
-ifeq ($(NAME),LINUX)
-	@echo "Start making Linux executable for NoSpherA2_Rascaline"
-	rm -f NoSpherA2_Rascaline
-	cd Linux && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline -j
-endif
-ifeq ($(NAME),MAC)
-	@echo "Start making Mac executable for NoSpherA2_Rascaline"
-	cd Mac && rm -f NoSpherA2_Rascaline && make NoSpherA2_Rascaline -j
-endif
-
-NoSpherA2_Rascaline_Debug:
-	@echo "Building NoSpherA2_Rascaline_Debug for $(NAME)"
+NoSpherA2_Debug:
+	@echo "Building NoSpherA2_Debug for $(NAME)"
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 endif
 ifeq ($(NAME),LINUX)
-	@echo "Start making Linux executable for NoSpherA2_Rascaline_Debug"
-	rm -f NoSpherA2_rascaline_debug
-	cd Linux && rm -f NoSpherA2_Rascaline_Debug && make NoSpherA2_Rascaline_Debug -j
+	@echo "Start making Linux executable for NoSpherA2_Debug"
+	rm -f NoSpherA2_Debug
+	cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 ifeq ($(NAME),MAC)
-	@echo "Start making Mac executable for NoSpherA2_Rascaline_Debug"
-	cd Mac && rm -f NoSpherA2_Rascaline_Debug && make NoSpherA2_Rascaline_debug -j
+	@echo "Start making Mac executable for NoSpherA2_Debug"
+	cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 
 NoSpherA2:
@@ -62,12 +47,5 @@ test:
 tests: 
 	cd tests && make all -k -B
 
-test_r: 
-	@echo "Running tests for Rascaline"
-	cd tests && make all -k -B MODE=RASCALINE
-tests_r:
-	@echo "Running tests for Rascaline"
-	cd tests && make all -k -B MODE=RASCALINE
 
-
-.PHONY: test tests NoSpherA2_Rascaline NoSpherA2 all NoSpherA2_Rascaline_Debug test_r tests_r
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug

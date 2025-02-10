@@ -8,7 +8,6 @@
 #include "DLL_Helper.h"
 #endif
 
-
 //-SALTED D:\Models\Iron_Complex -cif mohrs_salt_IAM.cif -wfn mohrs_salt_IAM.xyz  -cpus 8 -hkl_min_max -14 14 -12 27 -19 20
 // std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
@@ -38,13 +37,9 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         }
 
         // If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
-#if has_RAS
         _path = _path / config.h5_filename;
         H5::H5File config_file(_path, H5F_ACC_RDONLY);
         config.populateFromFile(config_file);
-#else
-        err_not_impl_f("HDF5 files are not supported by this build", std::cout);
-#endif
     }
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
@@ -85,9 +80,9 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         wavy = wavy_in;
     }
     wavy.write_xyz("temp_rascaline.xyz");
-	config.predict_filename = "temp_rascaline.xyz";
+    config.predict_filename = "temp_rascaline.xyz";
     if (wavy.get_nmo() != 0)
-        wavy.clear_MOs(); //Delete unneccesarry MOs, since we are predicting anyway.
+        wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
 }
 
 SALTEDPredictor::SALTEDPredictor() : _opt(*(new options())) {}
@@ -145,7 +140,6 @@ void SALTEDPredictor::setup_atomic_environment()
     }
 
     // RASCALINE (Generate descriptors)
-#if has_RAS
     v1 = Rascaline_Descriptors(
              config.predict_filename,
              config.nrad1,
@@ -176,9 +170,6 @@ void SALTEDPredictor::setup_atomic_environment()
 
     // Calculate the conjugate of v2 and store it back in v2, to avoid recalculating it in the equicomb function
     calculateConjugate(v2);
-#else
-    err_not_impl_f("RASCALINE is not supported by this build", std::cout);
-#endif
     // END RASCALINE
 }
 
@@ -189,7 +180,6 @@ void SALTEDPredictor::read_model_data()
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
-#if has_RAS == 1
     H5::H5File features(_opt.SALTED_DIR / "GPR_data" / ("FEAT_M-" + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
     H5::H5File projectors(_opt.SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
@@ -216,9 +206,6 @@ void SALTEDPredictor::read_model_data()
     }
     features.close();
     projectors.close();
-#else
-    err_not_impl_f("Not possible wihtout Rascaline and BLAS", std::cout);
-#endif
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
@@ -248,12 +235,11 @@ void SALTEDPredictor::read_model_data()
     }
     else
     {
-        filesystem::path path = _opt.SALTED_DIR / "GPR_data"/ ("weights_N" + to_string(ntrain) + "_reg-6.npy");
+        filesystem::path path = _opt.SALTED_DIR / "GPR_data" / ("weights_N" + to_string(ntrain) + "_reg-6.npy");
         read_npy(path, weights);
     }
 }
 
-#if has_RAS
 void SALTEDPredictor::read_model_data_h5()
 {
     using namespace std;
@@ -316,7 +302,6 @@ void SALTEDPredictor::read_model_data_h5()
         weights = readHDF5<double>(input, "weights", dims_out_temp);
     }
 }
-#endif
 
 vec SALTEDPredictor::predict()
 {
@@ -560,11 +545,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
     }
     else
     {
-#if has_RAS
         read_model_data_h5();
-#else
-        err_not_impl_f("HDF5 files are not supported by this build", std::cout);
-#endif
     }
 
     vec coefs = predict();

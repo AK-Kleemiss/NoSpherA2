@@ -146,7 +146,7 @@ void _test_openblas();
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results
 struct NNLSResult {
-    std::vector<double> x;   // solution
+    vec x;   // solution
     double rnorm;            // residual norm
     int status;              // 0 if success, -1 if iteration limit, or other codes
 };

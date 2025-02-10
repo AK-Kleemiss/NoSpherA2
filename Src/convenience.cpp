@@ -82,7 +82,6 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
         t.append("      and many more in communications or by feedback!\n");
-#if has_RAS == 1
         t.append("NoSpherA2 uses Rascaline, Metatensor, OpenBLAS and the HDF5 library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
         t.append("Please see, respectively:\n");
@@ -90,7 +89,6 @@ std::string NoSpherA2_message(bool no_date)
         t.append("   https://github.com/lab-cosmo/metatensor\n");
         t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
         t.append("   https://github.com/HDFGroup/hdf5\n");
-#endif
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     }
@@ -1375,12 +1373,12 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
                     log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i,0), -1) && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1) && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
+                    if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i, 0), -1) && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1) && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
                     {
                         if (debug)
                             log3 << "WFN position: " << wavy.get_atom_coordinate(i, 0) << " " << wavy.get_atom_coordinate(i, 1) << " " << wavy.get_atom_coordinate(i, 2) << endl
                                  << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
-                        wavy.set_atom_label(i,fields[label_field]);
+                        wavy.set_atom_label(i, fields[label_field]);
                         wavy.set_atom_frac_coords(i, {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])});
                         found_this_one = true;
                         break;
@@ -1623,7 +1621,7 @@ bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_
     }
 
     for (int i = 0; i < wavy.get_ncen(); i++)
-        wavy.set_atom_ADPs(i, { Uij[i], Cijk[i], Dijkl[i] });
+        wavy.set_atom_ADPs(i, {Uij[i], Cijk[i], Dijkl[i]});
 
     return true;
 };
@@ -2299,16 +2297,15 @@ void options::digest_options()
             calc = lap = true;
         else if (temp == "-mem")
         {
-            mem = stod(arguments[i + 1]); //In MB
+            mem = stod(arguments[i + 1]); // In MB
             vec a;
             size_t vec_max_size = a.max_size();
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
-			if (mem > doubel_max_size)
-			{
-				cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+            if (mem > doubel_max_size)
+            {
+                cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
                 mem = 50000.0;
-			}
-
+            }
         }
         else if (temp == "-method")
             method = arguments[i + 1];
@@ -2379,7 +2376,8 @@ void options::digest_options()
         }
         else if (temp == "-mult")
             mult = stoi(arguments[i + 1]);
-        else if(temp == "-NNLS_TEST") {
+        else if (temp == "-NNLS_TEST")
+        {
             test_NNLS();
             exit(0);
         }
@@ -2418,28 +2416,32 @@ void options::digest_options()
             delete (wavy);
             exit(0);
         }
-        else if (temp == "-RI_FIT" || temp == "-ri_fit") {
-			RI_FIT = true;
-            //Check if next argument is a valid basis set name or a new argument starting with "-"
-            if (i + 1 < argc && arguments[i + 1].find("-") != 0) {
+        else if (temp == "-RI_FIT" || temp == "-ri_fit")
+        {
+            RI_FIT = true;
+            // Check if next argument is a valid basis set name or a new argument starting with "-"
+            if (i + 1 < argc && arguments[i + 1].find("-") != 0)
+            {
                 SALTED_DFBASIS = arguments[i + 1];
-                if (!BasisSetLibrary().check_basis_set_exists(SALTED_DFBASIS)) {
-					cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
+                if (!BasisSetLibrary().check_basis_set_exists(SALTED_DFBASIS))
+                {
+                    cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
                     exit(0);
                 }
             }
-            else {
-				cout << "No basis set specified. Using fallback 'combo_basis_fit'!" << endl;
-				SALTED_DFBASIS = "combo_basis_fit";
+            else
+            {
+                cout << "No basis set specified. Using fallback 'combo_basis_fit'!" << endl;
+                SALTED_DFBASIS = "combo_basis_fit";
             }
         }
-        else if (temp == "-RI_CUBE" || temp == "-ri_cube") {
+        else if (temp == "-RI_CUBE" || temp == "-ri_cube")
+        {
             WFN wavy(wfn);
-			//First name of coef_file, second name of xyz file
-            //cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
+            // First name of coef_file, second name of xyz file
+            // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
 
-
-			//std::string aux_basis = arguments[i + 1];
+            // std::string aux_basis = arguments[i + 1];
             gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
 
             exit(0);
@@ -3153,6 +3155,7 @@ bool check_OpenBLAS_DLL(const bool &debug)
     }
     return true;
 }
+#endif
 
 ProgressBar::~ProgressBar()
 {
@@ -3222,15 +3225,13 @@ void ProgressBar::write_progress(std::ostream &os)
 #ifdef _WIN32
 void ProgressBar::initialize_taskbar_progress()
 {
-        if (SUCCEEDED(CoInitialize(nullptr)))
+    if (SUCCEEDED(CoInitialize(nullptr)))
+    {
+        if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbarList_))))
         {
-            if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbarList_))))
-            {
-                taskbarList_->HrInit();
-                taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NORMAL);
-            }
+            taskbarList_->HrInit();
+            taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NORMAL);
         }
+    }
 }
-#endif
-
 #endif

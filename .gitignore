@@ -75,3 +75,10 @@ tests/SALTED/sfacs.dat
 *NoSpherA2_DLL.dll
 *OpenBLAS.res
 *NoSpherA2_DLL.res
+*.o_arm64
+*.o_arm64_d
+/llvm-project
+/OpenBLAS
+Mac/NoSpherA2_Debug
+NoSpherA2_Debug
+*.tmp

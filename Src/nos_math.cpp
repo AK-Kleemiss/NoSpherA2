@@ -1,11 +1,9 @@
 #include "nos_math.h"
 
-#if has_RAS
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
 #include "lapacke.h" // for LAPACKE_xxx
 #include "cblas.h"
-#endif
 
 template <typename T>
 std::vector<std::vector<T>> reshape(const std::vector<T> &flatVec, Shape2D sizes)
@@ -306,7 +304,7 @@ std::vector<std::vector<T>> dot_BLAS(const std::vector<T> &flatMat1, const std::
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
 
-    return reshape(result_flat, { m, n });
+    return reshape(result_flat, {m, n});
 }
 template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template vec2 dot_BLAS(const std::vector<double> &mat1, const std::vector<double> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
@@ -361,7 +359,7 @@ template cvec self_dot(const cvec2 &mat, const cvec &_vec, bool transp1);
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
-std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1)
+std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &_vec, bool transp1)
 {
     std::vector<std::vector<T>> matCopy = mat;
     if (transp1)
@@ -374,7 +372,7 @@ std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, con
     int vec_size = static_cast<int>(_vec.size());
 
     // Check if matrix multiplication is possible
-    err_checkf (mat_cols == vec_size || mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
+    err_checkf(mat_cols == vec_size || mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
 
     std::vector<std::vector<T>> result(mat_rows, std::vector<T>(mat_cols));
 #pragma omp parallel
@@ -391,9 +389,9 @@ std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, con
 
     return result;
 }
-template std::vector<std::vector<float>> diag_dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& _vec, bool transp1);
-template vec2 diag_dot(const vec2& mat, const vec& _vec, bool transp1);
-template cvec2 diag_dot(const cvec2& mat, const cvec& _vec, bool transp1);
+template std::vector<std::vector<float>> diag_dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &_vec, bool transp1);
+template vec2 diag_dot(const vec2 &mat, const vec &_vec, bool transp1);
+template cvec2 diag_dot(const cvec2 &mat, const cvec &_vec, bool transp1);
 
 // Base implementation of matrix-vector multiplication
 template <typename T>
@@ -473,7 +471,7 @@ template vec dot_BLAS(const std::vector<double> &flatMat, const std::vector<doub
 template cvec dot_BLAS(const std::vector<cdouble> &flatMat, const std::vector<cdouble> &vec, const int &m, const int &n, bool transp);
 
 template <typename T>
-T conj(const T& val)
+T conj(const T &val)
 {
     if constexpr (std::is_same_v<T, cdouble>)
     {
@@ -490,13 +488,15 @@ template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    if (conjugate) {
+    if (conjugate)
+    {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += conj(vec1[i]) * vec2[i];
         }
     }
-    else {
+    else
+    {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];
@@ -506,7 +506,7 @@ T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
 }
 template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
 template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-template std::complex<double> self_dot(const std::vector<std::complex<double>>& vec1, const std::vector<std::complex<double>>& vec2, bool conjugate);
+template std::complex<double> self_dot(const std::vector<std::complex<double>> &vec1, const std::vector<std::complex<double>> &vec2, bool conjugate);
 
 template <typename T>
 T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
@@ -551,7 +551,7 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     {
         const openblas_complex_double t = conjugate ? cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1)
                                                     : cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1);
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
         result = cdouble(t.real, t.imag);
 #else
         result = t;
@@ -564,114 +564,6 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     return result;
 }
-// #if has_RAS
-// #ifdef _WIN32
-////Windows specific implementation
-//{
-//	T result = 0.0;
-//	HMODULE hOpenBlas = LoadLibrary(TEXT("libopenblas.dll"));
-//	if (hOpenBlas != NULL)
-//	{
-//		ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress(hOpenBlas, "cblas_sdot");
-//		if (eF != NULL)
-//		{
-//			if constexpr (std::is_same_v<T, double>)
-//			{
-//                result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-//			}
-//			else if constexpr (std::is_same_v<T, float>)
-//			{
-//				// Call cblas_sdot
-//				result = cblas_sdot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-//			}
-//			else if constexpr (std::is_same_v<T, cdouble>)
-//			{
-//                if (!conjugate) {
-//                    result = reinterpret_cast<cdouble&>(cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
-//                }
-//				else {
-//					result = reinterpret_cast<cdouble&>(cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1));
-//				}
-//			}
-//			else
-//			{
-//				err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
-//                return {};
-//			}
-//			return result;
-//		}
-//		else
-//		{
-//			// DLL found but function not found
-//			err_not_impl_f("OpenBLAS DLL found but function not found!", std::cout);
-//            return {};
-//		}
-//	}
-//	else
-//	{
-//		std::cout << "OpenBLAS DLL not found, using fallback." << std::endl;
-//        if (!conjugate) {
-//            for (size_t i = 0; i < vec1.size(); ++i)
-//            {
-//                result += vec1[i] * vec2[i];
-//            }
-//		}
-//		else {
-//            err_not_impl_f("Conjugate dot product not implemented for this data type", std::cout);
-//            return {};
-//        }
-//		return result;
-//	}
-//}
-// #else
-////Linux specific implementation
-//{
-//	T result = 0.0;
-//	if constexpr (std::is_same_v<T, double>)
-//	{
-//		// Call cblas_ddot
-//		result = cblas_ddot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
-//	}
-//	else if constexpr (std::is_same_v<T, float>)
-//	{
-//		// Call cblas_sdot
-//		result = cblas_sdot(vec1.size(), vec1.data(), 1, vec2.data(), 1);
-//	}
-//	else if constexpr (std::is_same_v<T, cdouble>)
-//	{
-//		if (!conjugate) {
-//			result = cblas_zdotu(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
-//		}
-//		else {
-//			result = cblas_zdotc(vec1.size(), reinterpret_cast<const cdouble*>(vec1.data()), 1, reinterpret_cast<const cdouble*>(vec2.data()), 1);
-//		}
-//	}
-//	else
-//	{
-//		err_not_impl_f("Unsupported data type for vector multiplication", std::cout);
-//	}
-//	return result;
-//}
-// #endif
-// #else
-//// Fallback implementation
-//{
-//	T result = 0.0;
-//	if (!conjugate) {
-//		for (size_t i = 0; i < vec1.size(); ++i)
-//		{
-//			result += vec1[i] * vec2[i];
-//		}
-//	}
-//	else {
-//		for (size_t i = 0; i < vec1.size(); ++i)
-//		{
-//			result += conj(vec1[i]) * vec2[i];
-//		}
-//	}
-//	return result;
-//}
-// #endif
 template float dot_BLAS(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
 template double dot_BLAS(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
 template cdouble dot_BLAS(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
@@ -733,27 +625,27 @@ template ivec2 transpose(const ivec2 &mat);
 
 // Flat 2D MATRIX
 template <class T>
-std::vector<T> transpose(const std::vector<T>& mat, const int rows, const int cols)
+std::vector<T> transpose(const std::vector<T> &mat, const int rows, const int cols)
 {
     std::vector<T> result(rows * cols);
-    
-	for (int i = 0; i < rows; ++i)
-	{
-		for (int j = 0; j < cols; ++j)
-		{
-			result[j * rows + i] = mat[i * cols + j];
-		}
-	}
+
+    for (int i = 0; i < rows; ++i)
+    {
+        for (int j = 0; j < cols; ++j)
+        {
+            result[j * rows + i] = mat[i * cols + j];
+        }
+    }
 
     return result;
 }
-template vec  transpose(const vec&  mat, const int rows, const int cols);
-template cvec transpose(const cvec& mat, const int rows, const int cols);
-template ivec transpose(const ivec& mat, const int rows, const int cols);
+template vec transpose(const vec &mat, const int rows, const int cols);
+template cvec transpose(const cvec &mat, const int rows, const int cols);
+template ivec transpose(const ivec &mat, const int rows, const int cols);
 
 // vec -> 2D MATRIX
 template <class T>
-std::vector<std::vector<T>> transpose(const std::vector<T>& vector)
+std::vector<std::vector<T>> transpose(const std::vector<T> &vector)
 {
     int size = static_cast<int>(vector.size());
     std::vector<std::vector<T>> result(1, std::vector<T>(size));
@@ -764,9 +656,9 @@ std::vector<std::vector<T>> transpose(const std::vector<T>& vector)
     }
     return result;
 }
-template vec2 transpose(const vec& vector);
-template cvec2 transpose(const cvec& vector);
-template ivec2 transpose(const ivec& vector);
+template vec2 transpose(const vec &vector);
+template cvec2 transpose(const cvec &vector);
+template ivec2 transpose(const ivec &vector);
 
 // Reorder 3D Vectors following a given order
 template <typename T>
@@ -867,208 +759,229 @@ void _test_openblas()
     vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
     // Init Mat B with some values
     vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-  math_load_BLAS(1);
-  //First test regular dot-product
-  compare_matrices(dot(A, B, false, false), self_dot(A, B));
+    math_load_BLAS(1);
+    // First test regular dot-product
+    compare_matrices(dot(A, B, false, false), self_dot(A, B));
 
-  ////Second compare first transpose
-  compare_matrices(dot(A, B, true, false), self_dot(transpose(A), B));
+    ////Second compare first transpose
+    compare_matrices(dot(A, B, true, false), self_dot(transpose(A), B));
 
-  ////Third comparte second transpose
-  compare_matrices(dot(A, B, false, true), self_dot(A, transpose(B)));
+    ////Third comparte second transpose
+    compare_matrices(dot(A, B, false, true), self_dot(A, transpose(B)));
 
-  ////Fourth compare both transposed
-  compare_matrices(dot(A, B, true, true), self_dot(transpose(A), transpose(B)));
+    ////Fourth compare both transposed
+    compare_matrices(dot(A, B, true, true), self_dot(transpose(A), transpose(B)));
 
     // Init Complex matrices
     cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
     cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
 
-  //First test regular dot-product
-  compare_matrices(dot(C, D, false, false), self_dot(C, D));
+    // First test regular dot-product
+    compare_matrices(dot(C, D, false, false), self_dot(C, D));
 
-  ////Second compare first transpose
-  compare_matrices(dot(C, D, true, false), self_dot(transpose(C), D));
+    ////Second compare first transpose
+    compare_matrices(dot(C, D, true, false), self_dot(transpose(C), D));
 
-  ////Third comparte second transpose
-  compare_matrices(dot(C, D, false, true), self_dot(C, transpose(D)));
+    ////Third comparte second transpose
+    compare_matrices(dot(C, D, false, true), self_dot(C, transpose(D)));
 
-  ////Fourth compare both transposed
-  compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
+    ////Fourth compare both transposed
+    compare_matrices(dot(C, D, true, true), self_dot(transpose(C), transpose(D)));
 
-  std::cout << "All BLAS tests passed!" << std::endl;
+    std::cout << "All BLAS tests passed!" << std::endl;
 }
 
-
 NNLSResult nnls(
-    std::vector<double>& A, int m, int n,
-    std::vector<double>& B,
+    std::vector<double> &A, int m, int n,
+    std::vector<double> &B,
     int maxiter,
     double tol)
 {
-#if has_RAS == 1
-    // Define output Variables
-    vec X(n, 0);
-    double RNORM = 0.0;
-    int MODE = 0;
+    if (has_BLAS)
+    {
+        // Define output Variables
+        vec X(n, 0);
+        double RNORM = 0.0;
+        int MODE = 0;
 
-    // Check input dimensions
-    if (A.size() != m * n) {
-        std::cerr << "Error: Matrix A has incorrect dimensions in NNLS.\n";
-        return NNLSResult{ X, RNORM, 1 };
-    }
-
-
-    // Define workspace variables
-    std::vector<double> AtA(n * n, 0.0); // A^T * A
-    std::vector<double> Atb(n, 0.0);     // A^T * b
-    std::vector<double> W(n, 0.0);       // Dual vector
-    std::vector<double> S(n, 0.0);       // Trial solution
-    std::vector<bool> P(n, false);       // Active set (boolean)
-
-    // Compute A^T * A (normal equations matrix)
-    cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
-        n, n, m, 1.0, A.data(), m, A.data(), m,
-        0.0, AtA.data(), n);
-
-    // Compute A^T * B (normal equations RHS)
-    cblas_dgemv(CblasColMajor, CblasTrans, m, n,
-        1.0, A.data(), m, B.data(), 1,
-        0.0, Atb.data(), 1);
-    // Set max iterations
-    if (maxiter == -1) maxiter = 3 * n;
-    if (tol == -1) tol = 10 * std::max(m, n) * std::numeric_limits<double>::epsilon();
-
-    // Initialize W, S
-    W = Atb; // Projected residual W = A^T * B
-
-    int iter = 0;
-
-    //Initialize workspace variables
-    std::vector<double> AtA_active(n * n, 0.0);
-    std::vector<double> Atb_active(n, 0);
-    std::vector<int> ipiv(n);
-    while (iter < maxiter) {
-        // Step B: Find most active coefficient
-        int k = -1;
-        double maxW = -1e12;
-        for (int i = 0; i < n; i++) {
-            if (!P[i] && W[i] > tol && W[i] > maxW) {
-                k = i;
-                maxW = W[i];
-            }
+        // Check input dimensions
+        if (A.size() != m * n)
+        {
+            std::cerr << "Error: Matrix A has incorrect dimensions in NNLS.\n";
+            return NNLSResult{X, RNORM, 1};
         }
 
-        if (k == -1) break; // No positive residuals, terminate.
+        // Define workspace variables
+        std::vector<double> AtA(n * n, 0.0); // A^T * A
+        std::vector<double> Atb(n, 0.0);     // A^T * b
+        std::vector<double> W(n, 0.0);       // Dual vector
+        std::vector<double> S(n, 0.0);       // Trial solution
+        std::vector<bool> P(n, false);       // Active set (boolean)
 
-        // Step B.3: Move k to active set
-        P[k] = true;
+        // Compute A^T * A (normal equations matrix)
+        cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
+                    n, n, m, 1.0, A.data(), m, A.data(), m,
+                    0.0, AtA.data(), n);
 
-        // Solve least squares for active set (B.4)
-        std::vector<int> activeIndices;
-        for (int i = 0; i < n; i++) {
-            if (P[i]) activeIndices.push_back(i);
-        }
+        // Compute A^T * B (normal equations RHS)
+        cblas_dgemv(CblasColMajor, CblasTrans, m, n,
+                    1.0, A.data(), m, B.data(), 1,
+                    0.0, Atb.data(), 1);
+        // Set max iterations
+        if (maxiter == -1)
+            maxiter = 3 * n;
+        if (tol == -1)
+            tol = 10 * std::max(m, n) * std::numeric_limits<double>::epsilon();
 
-        int activeCount = activeIndices.size();
+        // Initialize W, S
+        W = Atb; // Projected residual W = A^T * B
 
-        // Extract submatrix AtA[P, P] and Atb[P]
-        for (int i = 0; i < activeCount; i++) {
-            int row = activeIndices[i];
-            for (int j = 0; j < activeCount; j++) {
-                int col = activeIndices[j];
-                AtA_active[i * activeCount + j] = AtA[row * n + col];
-            }
-            Atb_active[i] = Atb[row];
-        }
+        int iter = 0;
 
-        // Solve AtA_active * S[P] = Atb_active
-        int info = LAPACKE_dposv(LAPACK_COL_MAJOR, 'U', activeCount, 1,
-            AtA_active.data(), activeCount, Atb_active.data(), activeCount);
-
-        if (info != 0) {
-            std::cerr << "Warning: Ill-conditioned matrix detected in NNLS.\n";
-            std::cerr << "Error Code: " << info << std::endl;
-            MODE = 1;
-            break;
-        }
-
-        // Assign solution to S
-        for (int i = 0; i < activeCount; i++) {
-            S[activeIndices[i]] = Atb_active[i];
-        }
-
-        // Step C: Check feasibility
-        while (iter < maxiter) {
-            iter++;
-            double minS = 1e12;
-            int minIdx = -1;
-
-            for (int i = 0; i < activeCount; i++) {
-                if (S[activeIndices[i]] < 0 && S[activeIndices[i]] < minS) {
-                    minS = S[activeIndices[i]];
-                    minIdx = activeIndices[i];
+        // Initialize workspace variables
+        std::vector<double> AtA_active(n * n, 0.0);
+        std::vector<double> Atb_active(n, 0);
+        std::vector<int> ipiv(n);
+        while (iter < maxiter)
+        {
+            // Step B: Find most active coefficient
+            int k = -1;
+            double maxW = -1e12;
+            for (int i = 0; i < n; i++)
+            {
+                if (!P[i] && W[i] > tol && W[i] > maxW)
+                {
+                    k = i;
+                    maxW = W[i];
                 }
             }
 
-            if (minS >= 0) break; // All positive, proceed.
+            if (k == -1)
+                break; // No positive residuals, terminate.
 
-            // Compute alpha to move back in feasible space
-            double alpha = 1.0;
-            for (int i = 0; i < activeCount; i++) {
-                int idx = activeIndices[i];
-                if (S[idx] < 0) {
-                    alpha = std::min(alpha, X[idx] / (X[idx] - S[idx]));
+            // Step B.3: Move k to active set
+            P[k] = true;
+
+            // Solve least squares for active set (B.4)
+            std::vector<int> activeIndices;
+            for (int i = 0; i < n; i++)
+            {
+                if (P[i])
+                    activeIndices.push_back(i);
+            }
+
+            int activeCount = activeIndices.size();
+
+            // Extract submatrix AtA[P, P] and Atb[P]
+            for (int i = 0; i < activeCount; i++)
+            {
+                int row = activeIndices[i];
+                for (int j = 0; j < activeCount; j++)
+                {
+                    int col = activeIndices[j];
+                    AtA_active[i * activeCount + j] = AtA[row * n + col];
                 }
+                Atb_active[i] = Atb[row];
             }
 
-            // Adjust X and remove minIdx from active set
-            for (int i = 0; i < n; i++) {
-                X[i] = X[i] + alpha * (S[i] - X[i]);
+            // Solve AtA_active * S[P] = Atb_active
+            int info = LAPACKE_dposv(LAPACK_COL_MAJOR, 'U', activeCount, 1, AtA_active.data(), activeCount, Atb_active.data(), activeCount);
+
+            if (info != 0)
+            {
+                std::cerr << "Warning: Ill-conditioned matrix detected in NNLS.\n";
+                std::cerr << "Error Code: " << info << std::endl;
+                MODE = 1;
+                break;
             }
-            P[minIdx] = false; // Remove from active set
+
+            // Assign solution to S
+            for (int i = 0; i < activeCount; i++)
+            {
+                S[activeIndices[i]] = Atb_active[i];
+            }
+
+            // Step C: Check feasibility
+            while (iter < maxiter)
+            {
+                iter++;
+                double minS = 1e12;
+                int minIdx = -1;
+
+                for (int i = 0; i < activeCount; i++)
+                {
+                    if (S[activeIndices[i]] < 0 && S[activeIndices[i]] < minS)
+                    {
+                        minS = S[activeIndices[i]];
+                        minIdx = activeIndices[i];
+                    }
+                }
+
+                if (minS >= 0)
+                    break; // All positive, proceed.
+
+                // Compute alpha to move back in feasible space
+                double alpha = 1.0;
+                for (int i = 0; i < activeCount; i++)
+                {
+                    int idx = activeIndices[i];
+                    if (S[idx] < 0)
+                    {
+                        alpha = std::min(alpha, X[idx] / (X[idx] - S[idx]));
+                    }
+                }
+
+                // Adjust X and remove minIdx from active set
+                for (int i = 0; i < n; i++)
+                {
+                    X[i] = X[i] + alpha * (S[i] - X[i]);
+                }
+                P[minIdx] = false; // Remove from active set
+            }
+
+            // Assign final solution
+            for (int i = 0; i < n; i++)
+            {
+                X[i] = S[i];
+            }
+            // Compute residual W = Atb - AtA @ X
+            cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
+            cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
+                        -1.0, AtA.data(), n, X.data(), 1,
+                        1.0, W.data(), 1);
         }
 
-        // Assign final solution
-        for (int i = 0; i < n; i++) {
-            X[i] = S[i];
+        // Compute residual norm ||A * X - B||
+        std::vector<double> Ax(m, 0.0);
+        cblas_dgemv(CblasColMajor, CblasNoTrans, m, n,
+                    1.0, A.data(), m, X.data(), 1,
+                    0.0, Ax.data(), 1);
+        double sum_sq = 0.0;
+        for (int i = 0; i < m; i++)
+        {
+            sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
         }
-        // Compute residual W = Atb - AtA @ X
-        cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
-        cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
-            -1.0, AtA.data(), n, X.data(), 1,
-            1.0, W.data(), 1);
+        sum_sq = std::sqrt(sum_sq);
+        NNLSResult resy({X, sum_sq, MODE});
+        return resy;
     }
-
-    // Compute residual norm ||A * X - B||
-    std::vector<double> Ax(m, 0.0);
-    cblas_dgemv(CblasColMajor, CblasNoTrans, m, n,
-        1.0, A.data(), m, X.data(), 1,
-        0.0, Ax.data(), 1);
-    double sum_sq = 0.0;
-    for (int i = 0; i < m; i++) {
-        sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
+    else
+    {
+        std::cerr << "Error: NNLS requires LAPACKE and CBLAS.\n";
+        exit(1);
     }
-
-    return NNLSResult(X, std::sqrt(sum_sq), MODE);
-#else
-    std::cerr << "Error: NNLS requires LAPACKE and CBLAS.\n";
-    exit(1);
-#endif
 }
-
 
 #ifdef _WIN32
 #include "DLL_Helper.h"
 #endif
 
-void* math_load_BLAS(int num_threads)
+void *math_load_BLAS(int num_threads)
 {
-#if has_RAS
 #ifdef _WIN32
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
     typedef void (*ExampleFunctionType)(void);
-    BLAS_pointer = static_cast<void*>(LoadLibrary(TEXT("libopenblas.dll")));
+    BLAS_pointer = static_cast<void *>(LoadLibrary(TEXT("libopenblas.dll")));
     if (BLAS_pointer != NULL)
     {
         ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)BLAS_pointer, "cblas_sgemm");
@@ -1079,15 +992,14 @@ void* math_load_BLAS(int num_threads)
     return BLAS_pointer;
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
-    char* env = strdup(nums.c_str());
+    char *env = strdup(nums.c_str());
     putenv(env);
     has_BLAS = true;
     return NULL;
 #endif
-#endif
 }
 
-void math_unload_BLAS(void* _hOpenBlas)
+void math_unload_BLAS(void *_hOpenBlas)
 {
 #ifdef _WIN32
     if (_hOpenBlas != NULL)

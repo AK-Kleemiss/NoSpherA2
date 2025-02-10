@@ -17,14 +17,15 @@ jobs:
     - name: make_OpenMP
       run: >
           git clone --depth 1 https://github.com/llvm/llvm-project.git &&
-          cd llvm-project/openmp && mkdir build && mkdir build_x64 && cd build &&
+          cd llvm-project/openmp && mkdir build && cd build &&
           cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. &&
-          make && cd ../build_x64 &&
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. &&
           make
+    - name: make_OpenBLAS
+      run: >
+          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
     - name: make_MacOS
       run: >
-          cd Mac && make && mv universal_NoSpherA2 NoSpherA2_Mac_universal
+          cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -35,7 +36,7 @@ jobs:
       with:
         name: executable_MacOS
         path: |
-          Mac/NoSpherA2_Mac_universal
+          NoSpherA2_Mac
 
   build_windows:
     runs-on: windows-2022
@@ -59,6 +60,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: make_OpenBLAS
+      run: >
+          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
     - name: make_Linux
       run: sudo apt update && sudo apt install liblapacke-dev liblapack-dev libgfortran-$(g++ -dumpversion)-dev build-essential g++ make && make NoSpherA2
     - name: tmate session if tests fail build
@@ -73,7 +77,7 @@ jobs:
         path: |
           Linux/NoSpherA2
     - name: Run tests
-      run: chmod +x NoSpherA2 && cd tests && make all -k MODE=RASCALINE
+      run: chmod +x NoSpherA2 && cd tests && make all -k
     - name: tmate session if tests fail tests
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
@@ -104,4 +108,3 @@ jobs:
           NoSpherA2
           NoSpherA2.exe
           NoSpherA2_Mac
-          NoSpherA2_Mac_universal

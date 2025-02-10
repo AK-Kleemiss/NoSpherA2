@@ -175,7 +175,7 @@ void read_hkl(const std::filesystem::path &hkl_filename,
         file << "Number of reflections before twin: " << hkl.size() << std::endl;
     if (twin_law.size() > 0)
     {
-        for (const hkl_t&hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
             for (int i = 0; i < twin_law.size(); i++)
                 hkl.emplace(hkl_t{
                     static_cast<int>(twin_law[i][0] * hkl__[0] + twin_law[i][1] * hkl__[1] + twin_law[i][2] * hkl__[2]),
@@ -333,7 +333,7 @@ void generate_hkl(const double &dmin,
         {
             continue;
         }
-        for (const hkl_t&hkl__ : hkl)
+        for (const hkl_t &hkl__ : hkl)
         {
             tempv = {0, 0, 0};
             for (int h = 0; h < 3; h++)
@@ -348,7 +348,7 @@ void generate_hkl(const double &dmin,
     if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
-    for (const hkl_t& hkl__ : hkl_enlarged)
+    for (const hkl_t &hkl__ : hkl_enlarged)
     {
         if (hkl.find(hkl__) != hkl.end())
             continue;
@@ -459,7 +459,7 @@ void generate_hkl(const ivec2 &hkl_min_max,
         }
     }
     hkl.clear();
-    if(debug)
+    if (debug)
         file << "Number of reflections after sym gen: " << hkl_enlarged.size() << endl;
 
     for (const hkl_t &hkl__ : hkl_enlarged)
@@ -654,10 +654,12 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 if (debug)
                     file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
-                if (fields[group_field].c_str()[0] == '.') {
+                if (fields[group_field].c_str()[0] == '.')
+                {
                     constant_atoms.push_back(true);
                 }
-                else {
+                else
+                {
                     constant_atoms.push_back(false);
                 }
 
@@ -667,7 +669,8 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 {
                     if (fields[label_field] == known_atoms[run])
                     {
-                        if (SALTED && fields[group_field].c_str()[0] == '.') continue;
+                        if (SALTED && fields[group_field].c_str()[0] == '.')
+                            continue;
                         old_atom = true;
                         if (debug)
                             file << "I already know this one! " << fields[label_field] << " " << known_atoms[run] << endl;
@@ -685,7 +688,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                     {
                         tolerances[j] = 2 * max(min(abs(precisions[j]), 1.0), 0.01);
                     }
-                    if (is_similar_abs(position[0], wave.get_atom_coordinate(i,0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i,1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i,2), tolerances[2]))
+                    if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
                     {
                         string element = constants::atnr2letter(wave.get_atom_charge(i));
                         err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
@@ -697,9 +700,9 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                         if (debug)
                         {
                             file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
-                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i,0) << " "
-                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i,1) << " "
-                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i,2) << flush;
+                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
+                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
+                                 << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
                             if (input_groups.size() > 0)
                             {
                                 file << " checking disorder group: " << fields[group_field] << " vs. ";
@@ -1330,9 +1333,9 @@ void fill_xyzc(
     for (int i = 0; i < wave.get_ncen(); i++)
     {
         atom_z[i] = wave.get_atom_charge(i);
-        x[i] = wave.get_atom_coordinate(i,0);
-        y[i] = wave.get_atom_coordinate(i,1);
-        z[i] = wave.get_atom_coordinate(i,2);
+        x[i] = wave.get_atom_coordinate(i, 0);
+        y[i] = wave.get_atom_coordinate(i, 1);
+        z[i] = wave.get_atom_coordinate(i, 2);
         if (pbc != 0)
         {
             int j = 0;
@@ -1346,9 +1349,9 @@ void fill_xyzc(
                         {
                             j++;
                             atom_z[i + j * wave.get_ncen()] = wave.get_atom_charge(i);
-                            x[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i,0) + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
-                            y[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i,1) + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
-                            z[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i,2) + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
+                            x[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i, 0) + pbc_x * unit_cell.get_cm(0, 0) + pbc_y * unit_cell.get_cm(0, 1) + pbc_z * unit_cell.get_cm(0, 2);
+                            y[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i, 1) + pbc_x * unit_cell.get_cm(1, 0) + pbc_y * unit_cell.get_cm(1, 1) + pbc_z * unit_cell.get_cm(1, 2);
+                            z[i + j * wave.get_ncen()] = wave.get_atom_coordinate(i, 2) + pbc_x * unit_cell.get_cm(2, 0) + pbc_y * unit_cell.get_cm(2, 1) + pbc_z * unit_cell.get_cm(2, 2);
                         }
                     }
         }
@@ -1406,7 +1409,7 @@ void calc_spherical_values(
         {
             for (int p = 0; p < num_points[g]; p++)
             {
-                double d = sqrt(pow(grid[g][0][p] - wave.get_atom_coordinate(i,0), 2) + pow(grid[g][1][p] - wave.get_atom_coordinate(i,1), 2) + pow(grid[g][2][p] - wave.get_atom_coordinate(i,2), 2));
+                double d = sqrt(pow(grid[g][0][p] - wave.get_atom_coordinate(i, 0), 2) + pow(grid[g][1][p] - wave.get_atom_coordinate(i, 1), 2) + pow(grid[g][2][p] - wave.get_atom_coordinate(i, 2), 2));
                 double temp =
                     linear_interpolate_spherical_density(
                         radial_density[type_list_number],
@@ -1444,7 +1447,7 @@ void calc_spherical_values(
                                     radial_density[type_list_number],
                                     radial_dist[type_list_number],
                                     sqrt(
-                                        pow(grid[g][0][p] - (wave.get_atom_coordinate(i,0) + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][1][p] - (wave.get_atom_coordinate(i,1) + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][2][p] - (wave.get_atom_coordinate(i,2) + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
+                                        pow(grid[g][0][p] - (wave.get_atom_coordinate(i, 0) + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][1][p] - (wave.get_atom_coordinate(i, 1) + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][2][p] - (wave.get_atom_coordinate(i, 2) + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
                                     lincr,
                                     1.0E-7);
                         }
@@ -1981,9 +1984,9 @@ int make_hirshfeld_grids(
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(ci,0));
-                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(ci,1));
-                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(ci,2));
+                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(ci, 0));
+                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(ci, 1));
+                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(ci, 2));
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
                 if (wave.get_atom_ECP_electrons(ci) != 0)
                 {
@@ -2236,7 +2239,7 @@ static int make_hirshfeld_grids_ML(
 
     if (debug)
         file << "before loop" << endl;
-        // Generate Electron sums
+    // Generate Electron sums
 #pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) // el_sum_spherical)
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
@@ -2286,7 +2289,7 @@ static int make_hirshfeld_grids_ML(
         double temp_dens = 0;
         for (e = 0; e < size; e++)
         {
-            bf = wave.get_atom_basis_set_entry(i,e);
+            bf = wave.get_atom_basis_set_entry(i, e);
             primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
             if (p.get_type() > 0)
             {
@@ -2311,7 +2314,7 @@ static int make_hirshfeld_grids_ML(
         atom_els[3][i] += temp_dens;
         for (e = 0; e < size; e++)
         {
-            bf = wave.get_atom_basis_set_entry(i,e);
+            bf = wave.get_atom_basis_set_entry(i, e);
             coef_counter += (2 * bf.get_type() + 1);
         }
         file << "---------------------------------" << endl;
@@ -2402,9 +2405,9 @@ static int make_hirshfeld_grids_ML(
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(asym_atom_list[i],0));
-                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(asym_atom_list[i],1));
-                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(asym_atom_list[i],2));
+                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(asym_atom_list[i], 0));
+                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(asym_atom_list[i], 1));
+                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(asym_atom_list[i], 2));
                 diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
                 if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
                 {
@@ -2675,7 +2678,7 @@ void calc_SF(const int &points,
             {
                 rho = dens_local[p];
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-                sf_local[s] += cdouble(rho*cos(work), rho*sin(work));
+                sf_local[s] += cdouble(rho * cos(work), rho * sin(work));
             }
         }
         progress->update();
@@ -2835,7 +2838,7 @@ bool thakkar_sfac(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-	bvec constant_atoms;
+    bvec constant_atoms;
     bvec needs_grid(wave.get_ncen(), false);
     svec known_atoms;
 
@@ -2849,7 +2852,7 @@ bool thakkar_sfac(
                                       asym_atom_list,
                                       needs_grid,
                                       file,
-		                              constant_atoms,     
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -3088,9 +3091,9 @@ tsc_block<int, cdouble> MTC_thakkar_sfac(
                                       atom_type_list,
                                       asym_atom_to_type_list,
                                       asym_atom_list,
-                                      needs_grid,  
+                                      needs_grid,
                                       file,
-        constant_atoms,
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -3226,9 +3229,9 @@ bool calculate_scattering_factors_HF(
                                       atom_type_list,
                                       asym_atom_to_type_list,
                                       asym_atom_list,
-                                      needs_grid,             
+                                      needs_grid,
                                       file,
-        constant_atoms,
+                                      constant_atoms,
                                       opt.debug);
 
     cif_input.close();
@@ -3254,7 +3257,7 @@ bool calculate_scattering_factors_HF(
         file << "made it post CIF, now make grids!" << endl;
     vec2 d1, d2, d3, dens;
 
-    //density_fit(wave, "cc-pvqz-rifit");
+    // density_fit(wave, "cc-pvqz-rifit");
 
     int points = make_hirshfeld_grids(opt.pbc,
                                       opt.accuracy,
@@ -3369,7 +3372,6 @@ bool calculate_scattering_factors_ML(
     SALTEDPredictor &SP,
     std::ostream &file)
 {
-#if has_RAS == 1
     using namespace std;
     err_checkf(SP.wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3433,7 +3435,7 @@ bool calculate_scattering_factors_ML(
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
-    file << setw(12*4+2) << "... done!\n"
+    file << setw(12 * 4 + 2) << "... done!\n"
          << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
@@ -3482,7 +3484,7 @@ bool calculate_scattering_factors_ML(
         coefs,
         SP.wavy.get_atoms(),
         sf);
-    file << setw(12 * 4+2) << "... done!" << endl;
+    file << setw(12 * 4 + 2) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
@@ -3544,12 +3546,7 @@ bool calculate_scattering_factors_ML(
     file << " ... done!" << endl;
 
     return true;
-#else
-    err_not_impl_f("RASCALINE is not supported by this build", file);
-    return false;
-#endif
 }
-
 
 /**
  * Calculates the scattering factors for the given options, wave, and expansion coefficients.
@@ -3562,11 +3559,10 @@ bool calculate_scattering_factors_ML(
  * @return True if the scattering factors were calculated successfully, false otherwise.
  */
 bool calculate_scattering_factors_RI_fit(
-    options& opt,
-    const WFN& wavy,
-    std::ostream& file)
+    options &opt,
+    const WFN &wavy,
+    std::ostream &file)
 {
-#if has_RAS == 1
     using namespace std;
     err_checkf(wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
     err_checkf(exists(opt.cif), "CIF does not exists!", file);
@@ -3587,17 +3583,17 @@ bool calculate_scattering_factors_RI_fit(
     svec known_atoms;
 
     auto labels = read_atoms_from_CIF(cif_input,
-        opt.groups[0],
-        unit_cell,
-        wavy,
-        known_atoms,
-        atom_type_list,
-        asym_atom_to_type_list,
-        asym_atom_list,
-        needs_grid,
-        file,
-        constant_atoms,
-        opt.debug);
+                                      opt.groups[0],
+                                      unit_cell,
+                                      wavy,
+                                      known_atoms,
+                                      atom_type_list,
+                                      asym_atom_to_type_list,
+                                      asym_atom_list,
+                                      needs_grid,
+                                      file,
+                                      constant_atoms,
+                                      opt.debug);
 
     cif_input.close();
 
@@ -3627,12 +3623,11 @@ bool calculate_scattering_factors_RI_fit(
     time_points.push_back(get_time());
     time_descriptions.push_back("Generating hkl");
 
-
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-	vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.mem, 'C');
+    vec coefs = density_fit(wavy, opt.SALTED_DFBASIS, opt.mem, 'C');
     file << setw(12 * 4 + 2) << "... done!\n"
-        << flush;
+         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("RI-Fit");
 
@@ -3654,7 +3649,7 @@ bool calculate_scattering_factors_RI_fit(
         file,
         opt.debug);
     file << "                          ... done!\n"
-        << flush;
+         << flush;
     file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
@@ -3662,13 +3657,13 @@ bool calculate_scattering_factors_RI_fit(
 
     vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
     file << "Table of Charges in electrons\n"
-        << "       Atom      ML" << endl;
+         << "       Atom      ML" << endl;
 
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
             file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
@@ -3705,10 +3700,10 @@ bool calculate_scattering_factors_RI_fit(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-            wavy_aux,
-            sf,
-            unit_cell,
-            hkl);
+                      wavy_aux,
+                      sf,
+                      unit_cell,
+                      hkl);
     }
 
     tsc_block<int, cdouble> blocky(
@@ -3722,8 +3717,8 @@ bool calculate_scattering_factors_RI_fit(
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-            time_points,
-            time_descriptions);
+                             time_points,
+                             time_descriptions);
     }
 
     file << "Writing tsc file... " << flush;
@@ -3735,12 +3730,7 @@ bool calculate_scattering_factors_RI_fit(
     file << " ... done!" << endl;
 
     return true;
-#else
-    err_not_impl_f("RASCALINE is not supported by this build", file);
-    return false;
-#endif
 }
-
 
 /**
  * Calculates the scattering factors for the MulTi Cif mode (MTC).
@@ -3754,12 +3744,12 @@ bool calculate_scattering_factors_RI_fit(
  * @return The calculated scattering factors.
  */
 tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
-    options& opt,
-    SALTEDPredictor& SP,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts)
+    options &opt,
+    SALTEDPredictor &SP,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts)
 {
     using namespace std;
     err_checkf(SP.wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
@@ -3787,26 +3777,24 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     bvec needs_grid(SP.wavy.get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,
-        opt.groups[nr],
-        unit_cell,
-        SP.wavy,
-        known_atoms,
-        atom_type_list,
-        asym_atom_to_type_list,
-        asym_atom_list,
-        needs_grid,
-        file,
-        constant_atoms,
-        opt.debug);
+                                      opt.groups[nr],
+                                      unit_cell,
+                                      SP.wavy,
+                                      known_atoms,
+                                      atom_type_list,
+                                      asym_atom_to_type_list,
+                                      asym_atom_list,
+                                      needs_grid,
+                                      file,
+                                      constant_atoms,
+                                      opt.debug);
 
     cif_input.close();
     time_points.push_back(get_time());
     time_descriptions.push_back("CIF reading");
 
-
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
 
     hkl_list hkl;
     if (!opt.read_k_pts)
@@ -3828,25 +3816,28 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     if (opt.debug)
         file << "made it post CIF now make grids!" << endl;
 
-    //Remove all unneccecary atoms from wavy
+    // Remove all unneccecary atoms from wavy
     int current_index = 0;
-    for (int i = 0; i < needs_grid.size() ; i++) {
-        if (opt.debug)std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+    for (int i = 0; i < needs_grid.size(); i++)
+    {
+        if (opt.debug)
+            std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
 
-        if (!needs_grid[i]) {
+        if (!needs_grid[i])
+        {
             SP.wavy.erase_atom(current_index);
             constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
             current_index--;
         }
         current_index++;
     }
-    //We need tp write a new xyz-file as rascaline needs one for the calculation
+    // We need tp write a new xyz-file as rascaline needs one for the calculation
     SP.wavy.write_xyz("temp_rascaline.xyz");
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
-    file << setw(13*4) << "... done!" << endl;
+    file << setw(13 * 4) << "... done!" << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("SALTED prediction");
     SP.shrink_intermediate_vectors();
@@ -3863,47 +3854,50 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
         opt.debug);
 
     file << "                          ... done!\n"
-        << flush;
+         << flush;
     file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
 
-    //Remove all unneccecary atoms from wavy only if it is not the first calculation
-    if (nr != 0) {
-        //We need coeffs for the atoms and coeff seperateley
+    // Remove all unneccecary atoms from wavy only if it is not the first calculation
+    if (nr != 0)
+    {
+        // We need coeffs for the atoms and coeff seperateley
         int current_coef_index = coefs.size();
-        for (int i = constant_atoms.size() -1; i >= 0 ; i--) {
-            //Count up all coeffs for one atom
+        for (int i = constant_atoms.size() - 1; i >= 0; i--)
+        {
+            // Count up all coeffs for one atom
             const int lim = (int)SP.wavy.get_atom_basis_set_size(i);
-			int coef_count = 0;
+            int coef_count = 0;
             for (int i_basis = 0; i_basis < lim; i_basis++)
             {
-                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i,i_basis).get_primitive().get_type() + 1;
+                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i, i_basis).get_primitive().get_type() + 1;
             }
 
-            //Remove atoms and coeffs from list if they are constant atoms
-            if (constant_atoms[i]) {
+            // Remove atoms and coeffs from list if they are constant atoms
+            if (constant_atoms[i])
+            {
                 labels.erase(labels.begin() + i, labels.begin() + i + 1);
                 SP.wavy.erase_atom(i);
                 coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
             }
-			current_coef_index -= coef_count;
+            current_coef_index -= coef_count;
         };
     }
 
-    //SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
-	//calc_cube_ML(coefs,SP.wavy);
+    // SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
+    // calc_cube_ML(coefs,SP.wavy);
 
     vec atom_elecs = calc_atomic_density(SP.wavy.get_atoms(), coefs);
     file << "Table of Charges in electrons\n"
-        << "       Atom      ML" << endl;
+         << "       Atom      ML" << endl;
 
     for (int i = 0; i < SP.wavy.get_ncen(); i++)
     {
 
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(i) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(i) - atom_elecs[i];
         if (opt.debug)
             file << " " << setw(4) << SP.wavy.get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
@@ -3919,8 +3913,8 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
         coefs,
         SP.wavy.get_atoms(),
         sf);
-    file << setw(13*4) << "... done!\n"
-        << flush;
+    file << setw(13 * 4) << "... done!\n"
+         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("Fourier transform");
 
@@ -3940,10 +3934,10 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-            SP.wavy,
-            sf,
-            unit_cell,
-            hkl);
+                      SP.wavy,
+                      sf,
+                      unit_cell,
+                      hkl);
     }
 
     tsc_block<int, cdouble> blocky(
@@ -3957,14 +3951,12 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-            time_points,
-            time_descriptions);
+                             time_points,
+                             time_descriptions);
     }
 
     return blocky;
 }
-
-
 
 /**
  * Calculates the scattering factors for the given options, wave, and expansion coefficients.
@@ -3977,14 +3969,13 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC_SALTED(
  * @return True if the scattering factors were calculated successfully, false otherwise.
  */
 itsc_block calculate_scattering_factors_MTC_RI_fit(
-    options& opt,
-    const std::vector<WFN>& wave,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts)
+    options &opt,
+    const std::vector<WFN> &wave,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts)
 {
-#if has_RAS == 1
     using namespace std;
     err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
     if (!opt.cif_based_combined_tsc_calc)
@@ -4000,7 +3991,7 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
     }
     err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
     file << "Number of protons: " << wave[nr].get_nr_electrons() << endl
-        << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
+         << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
     if (wave[nr].get_has_ECPs())
         file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
     // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
@@ -4020,17 +4011,17 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
     bvec needs_grid(wave[nr].get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,
-        opt.groups[0],
-        unit_cell,
-        wave[nr],
-        known_atoms,
-        atom_type_list,
-        asym_atom_to_type_list,
-        asym_atom_list,
-        needs_grid,
-        file,
-        constant_atoms,
-        opt.debug);
+                                      opt.groups[0],
+                                      unit_cell,
+                                      wave[nr],
+                                      known_atoms,
+                                      atom_type_list,
+                                      asym_atom_to_type_list,
+                                      asym_atom_list,
+                                      needs_grid,
+                                      file,
+                                      constant_atoms,
+                                      opt.debug);
 
     cif_input.close();
 
@@ -4060,12 +4051,11 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
     time_points.push_back(get_time());
     time_descriptions.push_back("Generating hkl");
 
-
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = density_fit(wave[nr], opt.SALTED_DFBASIS, opt.mem, 'C');
     file << setw(12 * 4 + 2) << "... done!\n"
-        << flush;
+         << flush;
     time_points.push_back(get_time());
     time_descriptions.push_back("RI-Fit");
 
@@ -4087,7 +4077,7 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
         file,
         opt.debug);
     file << "                          ... done!\n"
-        << flush;
+         << flush;
     file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
@@ -4095,13 +4085,13 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
 
     vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
     file << "Table of Charges in electrons\n"
-        << "       Atom      ML" << endl;
+         << "       Atom      ML" << endl;
 
     for (int i = 0; i < asym_atom_list.size(); i++)
     {
         int a = asym_atom_list[i];
         file << setw(10) << labels[i]
-            << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+             << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
         if (opt.debug)
             file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
         file << endl;
@@ -4138,10 +4128,10 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-            wavy_aux,
-            sf,
-            unit_cell,
-            hkl);
+                      wavy_aux,
+                      sf,
+                      unit_cell,
+                      hkl);
     }
 
     tsc_block<int, cdouble> blocky(
@@ -4152,22 +4142,15 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
     time_points.push_back(get_time());
     time_descriptions.push_back("last corrections");
 
-
     if (!opt.no_date)
     {
         write_timing_to_file(file,
-            time_points,
-            time_descriptions);
+                             time_points,
+                             time_descriptions);
     }
 
     return blocky;
-#else
-    tsc_block<int, cdouble> blocky;
-    err_not_impl_f("RASCALINE is not supported by this build", file);
-    return blocky;
-#endif
 }
-
 
 /**
  * Calculates the scattering factors for the MulTi Cif mode (MTC).
@@ -4228,7 +4211,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_MTC(
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
-	bvec constant_atoms;    
+    bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
 
     auto labels = read_atoms_from_CIF(cif_input,

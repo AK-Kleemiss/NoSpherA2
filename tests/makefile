@@ -3,13 +3,7 @@ DIFF := diff -q -i -b
 
 # Define the base path
 BASE_PATH = ../../NoSpherA2
-MODE ?= ""
-ifeq ($(MODE),RASCALINE)
-	BASE_PATH = ../../NoSpherA2
-	ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED fourier_transform
-else
-  ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode
-endif
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED fourier_transform
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op

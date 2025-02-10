@@ -15,11 +15,6 @@ void not_implemented(const std::source_location loc, const std::string &error_me
 #define err_chkf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err_chekf(condition, error_message, file) error_check(condition, std::source_location::current(), error_message, file)
 #define err_not_impl_f(error_message, file) not_implemented(std::source_location::current(), error_message, file)
-#if defined(_WIN32) || defined(__RASCALINE__)
-#define has_RAS 1
-#else
-#define has_RAS 0
-#endif
 #ifdef _WIN32
 #define ivdep loop(ivdep)
 #else
@@ -406,6 +401,7 @@ private:
     int center, type;
     double exp, coefficient;
     double norm_const = -10;
+
 public:
     void normalize()
     {
@@ -445,19 +441,19 @@ public:
     {
         return coefficient;
     };
-    void set_center(const int& c)
+    void set_center(const int &c)
     {
         center = c;
     };
-    void set_type(const int& t)
+    void set_type(const int &t)
     {
         type = t;
     };
-    void set_exp(const double& e)
+    void set_exp(const double &e)
     {
         exp = e;
     };
-    void set_coef(const double& c)
+    void set_coef(const double &c)
     {
         coefficient = c;
     };
@@ -497,7 +493,7 @@ struct options
     double d_sfac_scan = 0.0;
     double sfac_diffuse = 0.0;
     double dmin = 99.0;
-    double mem = 1000.0; //In MB
+    double mem = 1000.0; // In MB
     double efield = 0.005;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     ivec MOs;

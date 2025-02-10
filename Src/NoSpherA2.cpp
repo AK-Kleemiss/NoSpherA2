@@ -27,6 +27,13 @@ int main(int argc, char **argv)
     }
     ofstream log_file("NoSpherA2.log", ios::out);
     auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
+    // If we get rid of HDF5 this can go again. PLEASE GET RID OF ME!
+#ifdef __APPLE__
+    if (!(setenv("HDF5_DISABLE_VERSION_CHECK", "2", 1) == 0))
+    {
+        std::cerr << "Failed to set environment variable." << std::endl;
+    }
+#endif
     options opt(argc, argv, log_file);
     opt.digest_options();
     vector<WFN> wavy;
@@ -44,13 +51,15 @@ int main(int argc, char **argv)
     }
     log_file.flush();
 
-	bool BLAS = false;
+    bool BLAS = false;
 #ifdef _WIN32
     BLAS = check_OpenBLAS_DLL(opt.debug);
-    if (BLAS) {
+    if (BLAS)
+    {
         BLAS_pointer = math_load_BLAS(opt.threads);
     }
-    else {
+    else
+    {
         std::cout << "No OpenBLAS found!\nWill use a fallback Implementation!" << endl;
     }
 #endif
@@ -63,7 +72,8 @@ int main(int argc, char **argv)
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         return 0;
@@ -159,7 +169,8 @@ int main(int argc, char **argv)
         writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         return 0;
@@ -225,7 +236,8 @@ int main(int argc, char **argv)
         Rho_diff.write_file(Rho_diff.get_path(), false);
         std::cout << " ... done :)" << endl;
         std::cout << "Bye Bye!" << endl;
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         return 0;
@@ -297,7 +309,6 @@ int main(int argc, char **argv)
             }
             else if (opt.SALTED)
             {
-#if has_RAS == 1
                 // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 #ifdef _WIN32
@@ -321,12 +332,9 @@ int main(int argc, char **argv)
                                   &known_kpts),
                               log_file);
                 delete temp_pred;
-#else
-                log_file << "SALTED is not available in this build!" << endl;
-                exit(-1);
-#endif
             }
-            else if (opt.RI_FIT) {
+            else if (opt.RI_FIT)
+            {
                 result.append(calculate_scattering_factors_MTC_RI_fit(
                                   opt,
                                   wavy,
@@ -371,7 +379,8 @@ int main(int argc, char **argv)
             log_file << endl;
         }
         log_file.flush();
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         std::cout.rdbuf(coutbuf); // reset to standard output again
@@ -395,7 +404,8 @@ int main(int argc, char **argv)
             log_file << "Entering scattering Factor Calculation!" << endl;
         err_checkf(thakkar_sfac(opt, log_file, wavy[0]), "Error during SF Calculation!", log_file);
         log_file.flush();
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         std::cout.rdbuf(coutbuf); // reset to standard output again
@@ -464,12 +474,13 @@ int main(int argc, char **argv)
                                    wavy[0],
                                    log_file),
                                "Error during SF Calcualtion", log_file);
-                else if (wavy[0].get_origin() != 7 && opt.RI_FIT) {
+                else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
+                {
                     err_checkf(calculate_scattering_factors_RI_fit(
-                        opt,
-                        wavy[0],
-                        log_file),
-                        "Error during SF Calcualtion", log_file);
+                                   opt,
+                                   wavy[0],
+                                   log_file),
+                               "Error during SF Calcualtion", log_file);
                 }
                 else
                     err_checkf(thakkar_sfac(
@@ -480,7 +491,6 @@ int main(int argc, char **argv)
             }
             else
             {
-#if has_RAS == 1
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 #ifdef _WIN32
@@ -501,19 +511,13 @@ int main(int argc, char **argv)
                                log_file),
                            "Error during ML-SF Calcualtion", log_file);
                 delete temp_pred;
-#else
-                log_file << "SALTED is not available in this build!" << endl;
-                if (BLAS) {
-                    math_unload_BLAS(BLAS_pointer);
-                }
-                exit(-1);
-#endif
             }
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         if (opt.write_CIF)
@@ -528,7 +532,8 @@ int main(int argc, char **argv)
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         return 0;
@@ -544,7 +549,8 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
-        if (BLAS) {
+        if (BLAS)
+        {
             math_unload_BLAS(BLAS_pointer);
         }
         return 0;
@@ -555,7 +561,8 @@ int main(int argc, char **argv)
     std::cout << "Did not understand the task to perform!\n"
               << help_message << endl;
     log_file.flush();
-    if (BLAS) {
+    if (BLAS)
+    {
         math_unload_BLAS(BLAS_pointer);
     }
     return 0;
