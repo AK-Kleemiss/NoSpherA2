@@ -48,7 +48,7 @@ jobs:
       uses: microsoft/setup-msbuild@v2
     - name: make_OpenBLAS
       run: >
-          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
+          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
     - name: make_Windows
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
     - name: Upload .exe
