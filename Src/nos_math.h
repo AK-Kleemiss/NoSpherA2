@@ -117,7 +117,7 @@ template <typename T>
 std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n, bool transp);
 
 template <typename T>
-std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec);
+std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec, bool transp1 = false);
 
 
 // 1D x 1D MATRIX MULTIPLICATION

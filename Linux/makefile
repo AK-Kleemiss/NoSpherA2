@@ -1,13 +1,13 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -llapacke -Wl,-Bstatic -llapack -Wl,-Bstatic -lgfortran -Wl,-Bstatic -lquadmath -Wl,-Bstatic -lm
+LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-Bstatic -Wl,-Bstatic -lgfortran -Wl,-Bstatic -lquadmath -Wl,-Bstatic -lm
 LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgfortran.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libquadmath.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
 LIBHDF5 := ../Lib/libhdf5.a
-LIBOPENBLAS := ../OpenBlas/lib/libopenblas.a
-LIBOPENBLAS_I := -I../OpenBlas/include
+LIBOPENBLAS := ../OpenBLAS/installation/lib/libopenblas.a
+LIBOPENBLAS_I := -I../OpenBLAS/installation/include
 
 all: NoSpherA2 
 
@@ -16,7 +16,7 @@ OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set con
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
-OBJS_d := $(OBJ_NAMES:=.o_RASC_d)
+OBJS_d := $(OBJ_NAMES:=.o_d)
 GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 GCC_OPTS_DEBUG := -std=c++20 -Og -g -c -fmessage-length=0 -static -MMD -MP
 
@@ -27,7 +27,7 @@ GCC_OPTS_DEBUG := -std=c++20 -Og -g -c -fmessage-length=0 -static -MMD -MP
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
-%.o_RASC_d: ../Src/%.cpp
+%.o_d: ../Src/%.cpp
 	@echo 'Building file: $<'
 	g++ ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'

@@ -312,7 +312,7 @@ template cvec2 dot_BLAS(const std::vector<cdouble> &mat1, const std::vector<cdou
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
-std::vector<T> self_dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &_vec, bool transp1 = false)
+std::vector<T> self_dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &_vec, bool transp1)
 {
     std::vector<std::vector<T>> matCopy = mat;
     if (transp1)
