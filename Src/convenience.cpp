@@ -10,11 +10,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
-bool has_BLAS = false;
-#else
-bool has_BLAS = true;
 #endif
-void *BLAS_pointer = nullptr;
+bool has_BLAS = true;
 
 std::string help_message =
     ("\n----------------------------------------------------------------------------\n"
@@ -3074,6 +3071,7 @@ std::string sha::sha256(const std::string &input)
     return ss.str();
 }
 
+/*
 #ifdef _WIN32
 // Function to convert a narrow string to a wide string
 std::wstring s2ws(const std::string &s)
@@ -3156,6 +3154,7 @@ bool check_OpenBLAS_DLL(const bool &debug)
     return true;
 }
 #endif
+*/
 
 ProgressBar::~ProgressBar()
 {

@@ -182,5 +182,5 @@ NNLSResult nnls(
 
 
 
-void* math_load_BLAS(int num_threads);
-void math_unload_BLAS(void* _hOpenBlas);
+void math_load_BLAS(int num_threads);
+void math_unload_BLAS();

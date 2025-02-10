@@ -139,15 +139,7 @@ vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem
 
 int fixed_density_fit_test()
 {
-#ifdef _WIN32
-    void *blas = math_load_BLAS(4);
-    if (blas == NULL)
-    {
-        ExtractDLL("libopenblas.dll");
-        blas = math_load_BLAS(4);
-    }
-    err_checkf(blas != NULL, "BLAS NOT LOADED CORRECTLY!", std::cout);
-#endif // __WIN32
+    math_load_BLAS(4);
 
     WFN wavy_gbw("TESTMOL.gbw");
     Int_Params normal_basis(wavy_gbw);
@@ -212,9 +204,5 @@ int fixed_density_fit_test()
         if ((i + 1) % 10 == 0)
             std::cout << std::endl;
     }
-
-#ifdef _WIN32
-    math_unload_BLAS(blas);
-#endif
     return 0;
 }

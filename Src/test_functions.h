@@ -1564,10 +1564,9 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 void test_openblas()
 {
     SALTEDPredictor SP;
-    BLAS_pointer = math_load_BLAS(4);
+    math_load_BLAS(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
-    math_unload_BLAS(BLAS_pointer);
     exit(0);
 }
 

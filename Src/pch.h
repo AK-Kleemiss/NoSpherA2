@@ -47,7 +47,6 @@
 #define NOMINMAX
 #include <windows.h>
 #include <shobjidl.h>
-#include "OpenBLAS.h"
 #else
 #define GetCurrentDir getcwd
 #include <optional>
@@ -58,5 +57,4 @@
 #include <cstring>
 #endif
 
-extern void *BLAS_pointer;
 extern bool has_BLAS;

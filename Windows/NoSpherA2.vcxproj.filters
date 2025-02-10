@@ -183,9 +183,6 @@
     <ClCompile Include="..\Src\SALTED_predictor.cpp">
       <Filter>Quelldateien\SALTED</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\DLL_Helper.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\constants.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -995,9 +992,6 @@
     <ClInclude Include="..\Src\SALTED_predictor.h">
       <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
-    <ClInclude Include="..\Src\DLL_Helper.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -1037,6 +1031,9 @@
     <ClInclude Include="..\Src\nos_math.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="resource1.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">
@@ -1056,13 +1053,13 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <_EmbedManagedResourceFile Include="..\Lib\OpenBlas\bin\libopenblas.dll">
-      <Filter>Ressourcendateien</Filter>
-    </_EmbedManagedResourceFile>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="..\Src\OpenBLAS.rc">
+    <ResourceCompile Include="Resource.rc">
       <Filter>Ressourcendateien</Filter>
     </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="NSA2.ico">
+      <Filter>Ressourcendateien</Filter>
+    </Image>
   </ItemGroup>
 </Project>

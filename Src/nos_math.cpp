@@ -972,58 +972,24 @@ NNLSResult nnls(
     }
 }
 
-#ifdef _WIN32
-#include "DLL_Helper.h"
-#endif
-
-void *math_load_BLAS(int num_threads)
+void math_load_BLAS(int num_threads)
 {
+    if (has_BLAS)
+    {
+        return;
+    }
 #ifdef _WIN32
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
-    typedef void (*ExampleFunctionType)(void);
-    BLAS_pointer = static_cast<void *>(LoadLibrary(TEXT("libopenblas.dll")));
-    if (BLAS_pointer != NULL)
-    {
-        ExampleFunctionType eF = (ExampleFunctionType)GetProcAddress((HMODULE)BLAS_pointer, "cblas_sgemm");
-        if (eF == NULL)
-            return NULL;
-    }
-    has_BLAS = true;
-    return BLAS_pointer;
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
     char *env = strdup(nums.c_str());
     putenv(env);
-    has_BLAS = true;
-    return NULL;
 #endif
+    has_BLAS = true;
+    return;
 }
 
-void math_unload_BLAS(void *_hOpenBlas)
+void math_unload_BLAS()
 {
-#ifdef _WIN32
-    if (_hOpenBlas != NULL)
-    {
-        int ret;
-        int max_iterations = 150;
-        while (max_iterations > 0)
-        {
-            ret = FreeLibrary((HMODULE)_hOpenBlas);
-            if (ret == 0)
-            {
-                break;
-            }
-            max_iterations--;
-        }
-        if (max_iterations == 0)
-        {
-            std::cout << "Could not free the OpenBLAS library" << std::endl;
-        }
-        else
-        {
-            _hOpenBlas = NULL;
-        }
-    }
     has_BLAS = false;
-#endif
 }

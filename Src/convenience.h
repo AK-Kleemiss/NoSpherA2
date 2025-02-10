@@ -623,8 +623,9 @@ bool is_nan(long double &in);
 bool is_nan(cdouble &in);
 
 bool read_block_from_fortran_binary(std::ifstream &file, void *Target);
-
+/*
 #ifdef _WIN32
 bool ExtractDLL(const std::filesystem::path &dllName);
 bool check_OpenBLAS_DLL(const bool &debug = false);
 #endif
+*/

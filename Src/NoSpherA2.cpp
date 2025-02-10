@@ -51,18 +51,7 @@ int main(int argc, char **argv)
     }
     log_file.flush();
 
-    bool BLAS = false;
-#ifdef _WIN32
-    BLAS = check_OpenBLAS_DLL(opt.debug);
-    if (BLAS)
-    {
-        BLAS_pointer = math_load_BLAS(opt.threads);
-    }
-    else
-    {
-        std::cout << "No OpenBLAS found!\nWill use a fallback Implementation!" << endl;
-    }
-#endif
+    math_load_BLAS(opt.threads);
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
@@ -72,10 +61,6 @@ int main(int argc, char **argv)
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         return 0;
     }
     // Perform Hirshfeld surface based on input and quit
@@ -169,10 +154,6 @@ int main(int argc, char **argv)
         writeColourObj("Hirshfeld_surface_e.obj", triangles_e);
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         return 0;
     }
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
@@ -236,10 +217,6 @@ int main(int argc, char **argv)
         Rho_diff.write_file(Rho_diff.get_path(), false);
         std::cout << " ... done :)" << endl;
         std::cout << "Bye Bye!" << endl;
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         return 0;
     }
     if (opt.pol_wfns.size() != 0)
@@ -311,9 +288,6 @@ int main(int argc, char **argv)
             {
                 // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-#ifdef _WIN32
-                check_OpenBLAS_DLL(opt.debug);
-#endif
                 BasisSetLibrary basis_library;
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[i], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
@@ -379,10 +353,6 @@ int main(int argc, char **argv)
             log_file << endl;
         }
         log_file.flush();
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
@@ -404,10 +374,6 @@ int main(int argc, char **argv)
             log_file << "Entering scattering Factor Calculation!" << endl;
         err_checkf(thakkar_sfac(opt, log_file, wavy[0]), "Error during SF Calculation!", log_file);
         log_file.flush();
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         return 0;
@@ -493,9 +459,6 @@ int main(int argc, char **argv)
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-#ifdef _WIN32
-                check_OpenBLAS_DLL(opt.debug);
-#endif
                 BasisSetLibrary basis_library;
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
@@ -516,10 +479,6 @@ int main(int argc, char **argv)
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
         // log_file.close();
@@ -532,10 +491,6 @@ int main(int argc, char **argv)
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         return 0;
     }
     // Converts gbw file to wfn file and leaves
@@ -549,10 +504,6 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
             wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
-        if (BLAS)
-        {
-            math_unload_BLAS(BLAS_pointer);
-        }
         return 0;
     }
     std::cout << NoSpherA2_message(opt.no_date);
@@ -561,9 +512,5 @@ int main(int argc, char **argv)
     std::cout << "Did not understand the task to perform!\n"
               << help_message << endl;
     log_file.flush();
-    if (BLAS)
-    {
-        math_unload_BLAS(BLAS_pointer);
-    }
     return 0;
 }
