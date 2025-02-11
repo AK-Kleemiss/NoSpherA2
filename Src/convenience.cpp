@@ -2571,7 +2571,11 @@ void options::digest_options()
         }
         else if (temp == "-test_analytical")
         {
-            test_analytical_fourier();
+			bool full = false;
+            if ("full" == arguments[i + 1]) {
+				full = true;
+            }
+            test_analytical_fourier(full);
             exit(0);
         }
         else if (temp == "-test_RI")

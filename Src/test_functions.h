@@ -1570,7 +1570,7 @@ void test_openblas()
     exit(0);
 }
 
-void test_analytical_fourier()
+void test_analytical_fourier(bool full)
 {
     // Generate grid and k_pts
     vec2 kpts;
@@ -1594,13 +1594,23 @@ void test_analytical_fourier()
     vec2 grid;
     grid.resize(5); // x, y, z, dens, atomic_weight
 
+    // Conditions for the Wavefunction
+    const double c_exp = 2.0;
+    double vals[] = { 1.0 };
+    unsigned int max_l = 6;
+    double radial_res = 1E-17;
+    if (full) {
+        max_l = 9;
+		radial_res = 1E-25;
+    }
+
     double alpha_min[] = {0.5};
-    AtomGrid griddy(1E-25,
+    AtomGrid griddy(radial_res,
                     350,
-                    770,
+                    5000,
                     1,
-                    4.5,
-                    1,
+                    c_exp,
+                    max_l,
                     alpha_min,
                     std::cout);
 
@@ -1618,9 +1628,7 @@ void test_analytical_fourier()
     sf_A[0].resize(kpts.size(), 0.0);
     sf_N[0].resize(kpts.size(), 0.0);
 
-    // Conditions for the Wavefunction
-    const double c_exp = 2.0;
-    double vals[] = {1.0};
+    
 
     // double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     // int steps[3]{ 0, 0, 0 };
@@ -1635,11 +1643,11 @@ void test_analytical_fourier()
     // Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
     // CubeMO.path = "MO.cube";
     // CubeMO.write_file(true);
-
-    bool correct = true;
+	bool all_correct = true; //Veryfiy if all m for one l are correct break if one failed
+	bool correct = true; //Verify if the current m is correct
 
     cdouble max_diff, diff;
-    for (int type = 6; type < 7; type++)
+    for (int type = 0; type <= max_l; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
@@ -1679,7 +1687,6 @@ void test_analytical_fourier()
                 sf_A[0][i] = 0.0;
                 sf_N[0][i] = 0.0;
             }
-
 #pragma omp parallel for
             for (int i = 0; i < kpts.size(); i++)
             {
@@ -1699,27 +1706,28 @@ void test_analytical_fourier()
                 {
                     max_diff = diff;
                 }
-                if (abs(diff) > 2.1E-4)
+                if (abs(diff) > 2E-5)
                 {
+					all_correct = false;
                     correct = false;
                 }
             }
             if (!correct)
             {
                 std::cout << "Error at m: " << l - type << "   Max diff: " << std::setprecision(6) << max_diff << std::endl;
-                break;
+                correct = true;
             }
             else
             {
                 std::cout << "m: " << l - type << " passed!" << " Max diff: " << std::setprecision(6) << max_diff << std::endl;
             }
         }
-        if (!correct)
+        if (!all_correct)
             break;
         std::cout << "l = " << type << " passed!\n"
                   << std::endl;
     }
-    if (!correct)
+    if (!all_correct)
     {
         using namespace std;
         ofstream result("sfacs.dat", ios::out);
@@ -1738,6 +1746,8 @@ void test_analytical_fourier()
         }
         result.flush();
         result.close();
+		std::cout << "Error in the calculations!" << std::endl;
+        exit(1);
     }
     else
     {

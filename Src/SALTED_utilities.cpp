@@ -265,19 +265,18 @@ cvec4 Rascaline_Descriptors::calculate_expansion_coeffs()
     return get_expansion_coeffs(descriptor_buffer);
 }
 
-const double calc_density_ML(const double &x,
-                             const double &y,
-                             const double &z,
-                             const vec &coefficients,
-                             const std::vector<atom> &atoms,
-                             const int &atom_nr)
+
+const double calc_density_ML(const double& x,
+    const double& y,
+    const double& z,
+    const vec& coefficients,
+    const std::vector<atom>& atoms,
+    const int& atom_nr)
 {
-    std::pair<double, double> spherical;
     double dens = 0, radial = 0;
     int coef_counter = 0;
     int e = 0, size = 0;
-    if (atom_nr == -1)
-    {
+    if (atom_nr == -1) {
         for (int a = 0; a < atoms.size(); a++)
         {
             size = (int)atoms[a].get_basis_set_size();
@@ -285,7 +284,7 @@ const double calc_density_ML(const double &x,
             double d[4]{
                 x - atoms[a].get_coordinate(0),
                 y - atoms[a].get_coordinate(1),
-                z - atoms[a].get_coordinate(2), 0.0};
+                z - atoms[a].get_coordinate(2), 0.0 };
             // store r in last element
             d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
             if (d[3] < -46.0517)
@@ -297,17 +296,9 @@ const double calc_density_ML(const double &x,
                 }
                 continue;
             }
-
             // normalize distances for spherical harmonic
             for (e = 0; e < 3; e++)
                 d[e] /= d[3];
-
-            if (d[3] == 0)
-                spherical = std::make_pair(0.0, 0.0);
-            else
-                // normalize the spherical harmonics k_point
-                spherical = constants::norm_cartesian_to_spherical(d[0], d[1], d[2]);
-
             for (e = 0; e < size; e++)
             {
                 bf = atoms[a].get_basis_set_entry(e);
@@ -321,14 +312,13 @@ const double calc_density_ML(const double &x,
                 for (int m = -p.get_type(); m <= p.get_type(); m++)
                 {
                     // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::real_spherical(p.get_type(), m, spherical.first, spherical.second);
+                    dens += coefficients[coef_counter + m + p.get_type()] * radial * constants::spherical_harmonic(p.get_type(), m, d);
                 }
                 coef_counter += (2 * p.get_type() + 1);
             }
         }
     }
-    else
-    {
+    else {
         for (int a = 0; a < atoms.size(); a++)
         {
             size = (int)atoms[a].get_basis_set_size();
@@ -339,7 +329,7 @@ const double calc_density_ML(const double &x,
                 double d[4]{
                     x - atoms[a].get_coordinate(0),
                     y - atoms[a].get_coordinate(1),
-                    z - atoms[a].get_coordinate(2), 0.0};
+                    z - atoms[a].get_coordinate(2), 0.0 };
                 // store r in last element
                 d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
                 // normalize distances for spherical harmonic
@@ -372,6 +362,7 @@ const double calc_density_ML(const double &x,
     // err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
     return dens;
 }
+
 
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.

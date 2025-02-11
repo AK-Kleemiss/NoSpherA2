@@ -92,12 +92,12 @@ bool atom::push_back_basis_set(const double& exponent, const double& coefficient
 		shellcount.push_back((unsigned int)1);
 	else
 		shellcount[shell]++;
-	if (type >= 0 && type < 7 && shell >= 0) {
+	if (type >= 0 && shell >= 0) {
 		basis_set.push_back(basis_set_entry(coefficient, exponent, type, shell));
 		return true;
 	}
 	else {
-		if (type >= 7) err_checkf(false, "h and higher types are not yet supported!", std::cout);
+		if (type >= 10) err_checkf(false, "h and higher types are not yet supported!", std::cout);
 		std::cout << "This is not a valid basis set entry!" << std::endl;
 		std::cout << "Exponent: " << exponent << " coefficient: " << coefficient << " type: " << type << " shell: " << shell << std::endl;
 		return false;

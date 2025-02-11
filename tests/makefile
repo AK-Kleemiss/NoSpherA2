@@ -127,6 +127,11 @@ grown_water:
 		&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
+fourier_transform_full:
+	@echo 'Running test: $@'
+	cd SALTED && $(BASE_PATH) -test_analytical full -no-date && mv NoSpherA2.log $@.log
+	@echo 'Finished running: $@'
+
 fourier_transform:
 	@echo 'Running test: $@'
 	cd SALTED && $(BASE_PATH) -test_analytical -no-date && mv NoSpherA2.log $@.log
