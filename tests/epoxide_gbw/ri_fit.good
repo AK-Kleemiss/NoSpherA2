@@ -1,0 +1,116 @@
+Turning on verbose mode!
+ Recap of input:
+size: 10
+C:\Users\Lukas\source\repos\NoSpherA2\Windows\x64\D_RI_Test\NoSpherA2.exe
+-wfn
+epoxide.gbw
+-cif
+epoxide.cif
+-dmin
+0.4
+-ri_fit
+No basis set specified. Using fallback 'combo_basis_fit'!
+-v
+-no-date
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                "epoxide.gbw"File is valid, continuing...
+C:\Users\Lukas\source\repos\NoSpherA2\tests\epoxide_gbw
+I read the pointer of geometry successfully
+I read the geometry of 7 atoms successfully
+I read the pointer of basis set successfully
+I read the basis of 7 atoms successfully
+I read the pointer of MOs successfully
+operators: 1 coef_nr: 1225 dimension: 35
+I read the coefficients successfully
+I read the occupations successfully
+I read the energies successfully
+I read the irreps successfully
+I read the cores successfully
+I am expecting 35 coefficients per MO
+
+I read 35/35 MOs of 1 operators successfully
+There are 57 primitives after conversion
+method/mult/charge:  0 0
+ done!
+Number of atoms in Wavefunction file: 7 Number of MOs: 35
+Entering scattering Factor Calculation!
+Number of protons: 24
+starting to read cif!
+Reading:                                "epoxide.cif"
+Starting while !.eof()
+Making cm and rcm
+6.12323e-17 -0.180004 6.12323e-17 1 0.983666 1 251.778
+0.219427 0.119048 0.15457
+line in loop field definition:   _space_group_symop_id
+line in loop field definition:   _space_group_symop_operation_xyz
+line in loop field definition:  1 +X,+Y,+Z
+Reading operation! 1 +X,+Y,+Z
+Comparing 1 0 0 0 1 0 0 0 1 
+This is a new symmetry operation!
+Reading operation! 2 1/2-X,1/2+Y,1/2-Z
+Comparing -1 0 0 0 1 0 0 0 -1 
+This is a new symmetry operation!
+Reading operation! 3 -X,-Y,-Z
+Comparing -1 0 0 0 -1 0 0 0 -1 
+Reading operation! 4 1/2+X,1/2-Y,1/2+Z
+Comparing 1 0 0 0 -1 0 0 0 1 
+RCM done!
+  0.215843   0.000000   0.000000 
+  0.000000   0.119048   0.000000 
+  0.039498   0.000000   0.154570 
+CM in 2*PI bohr:
+  2.451678   0.000000  -2.341997 
+  0.000000   4.445089  -3.153514 
+  0.000000  -3.153514   3.480399 
+ done!
+There are 3 Types of atoms and 7 atoms in total
+Generating hkl indices up to d=:              0.40extreme: 11 21 16
+... done!
+Nr of reflections generated:                 26048
+Number of reflections before twin: 26048
+Number of reflections after twin: 26048
+Read 2 symmetry elements!
+  1  0  0
+  0  1  0
+  0  0  1
+
+ -1  0  0
+  0  1  0
+  0  0 -1
+
+Number of reflections after sym gen: 28009
+Nr of reflections to be used:                16275
+made it post CIF, now make grids!
+
+Generating densities... 
+Using basis set: combo_basis_fit
+Preallocating: 5.1156 MB
+Memory needed for rho: 5.1156 MB
+                                        ... done!
+Using basis set: combo_basis_fit
+
+Generating k-points...  K_point_vector is here! size: 16275
+                          ... done!
+Number of k - points to evaluate : 16275
+Table of Charges in electrons
+       Atom      ML
+        O1    -1.338    8      9.338
+        C2     0.163    6      5.837
+       H2a     0.292    1      0.708
+       H2b     0.285    1      0.715
+        C3     0.045    6      5.955
+       H3a     0.275    1      0.725
+       H3b     0.275    1      0.725
+Total number of analytical Electrons: 24.0018
+[               Generating scattering factors...               ]
+[#############################################################] 100% 
+                                         ... done!
+Writing tsc file...  ... done!

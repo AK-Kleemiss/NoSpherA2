@@ -80,3 +80,4 @@ const double calc_density_ML(const double &x,
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 
 cube calc_cube_ML(const vec data, WFN &dummy, const int atom = -1);
+void calc_cube_ML(const vec data, WFN& dummy, const int atom_nr, cube& CubeRho);

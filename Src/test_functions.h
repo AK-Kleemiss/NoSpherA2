@@ -1823,27 +1823,27 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 // Also calculate the difference between the two densities
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
-    std::cout << "Calculating density using RI-FIT" << std::endl;
-    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'O');
-    std::cout << "Calculating RI-FIT cube" << std::endl;
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wavy.get_atoms());
-    wavy_aux.set_ncen(wavy.get_ncen());
-    wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
-    cube cube_RI_FIT = calc_cube_ML(ri_coefs, wavy_aux);
-    cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
-    cube_RI_FIT.write_file(true);
+	const double radius = 3.0;
+	const double resolution = 0.01;
 
-    std::cout << "Calculating density using regular WFN" << std::endl;
-
+    std::cout << "-------------------------------------DENSITY USING ORCA GBW-------------------------------------" << std::endl;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(wavy, MinMax, steps, 2.5, 0.1, true);
+    readxyzMinMax_fromWFN(wavy, MinMax, steps, radius, resolution, true);
     cube cube_normal(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
+    cube cube_RI_FIT(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
+
+
     std::filesystem::path normal_cube_path = std::filesystem::path(wavy.get_path().stem().string() + "_normal_rho.cube");
     cube_normal.set_path(normal_cube_path);
     // Check if the cube file already exists, if so read it
+    for (int i = 0; i < 3; i++)
+    {
+        cube_normal.set_origin(i, MinMax[i]);
+		cube_RI_FIT.set_origin(i, MinMax[i]);
+        cube_normal.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+		cube_RI_FIT.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
     if (std::filesystem::exists(normal_cube_path))
     {
         cube_normal.read_file(true, true);
@@ -1851,20 +1851,31 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     else
     {
         cube_normal.give_parent_wfn(wavy);
-        for (int i = 0; i < 3; i++)
-        {
-            cube_normal.set_origin(i, MinMax[i]);
-            cube_normal.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-        }
         cube_normal.set_comment1("Calculated density using NoSpherA2");
         cube_normal.set_comment2("from " + wavy.get_path().string());
-        Calc_Rho(cube_normal, wavy, (*opt).radius, std::cout, false);
+        Calc_Rho(cube_normal, wavy, radius, std::cout, false);
         cube_normal.write_file(true);
     }
     cube_normal.calc_dv();
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_normal.sum() << std::endl;
 
-    std::cout << "Calculating difference cube" << std::endl;
+    std::cout << "-------------------------------------RI Fit-------------------------------------" << std::endl;
+    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'O');
+    std::cout << "Calculating RI-FIT cube" << std::endl;
+
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(wavy.get_atoms());
+    wavy_aux.set_ncen(wavy.get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
+
+    
+    cube_RI_FIT.give_parent_wfn(wavy_aux);
+    calc_cube_ML(ri_coefs, wavy_aux, -1, cube_RI_FIT);
+    cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
+    cube_RI_FIT.write_file(true);
+
+    std::cout << "-------------------------------------DIFFERENCE CUBE-------------------------------------" << std::endl;
     cube cube_diff = cube_normal - cube_RI_FIT;
     cube_diff.give_parent_wfn(wavy);
     cube_diff.set_comment1("Difference between RI-FIT and normal density");

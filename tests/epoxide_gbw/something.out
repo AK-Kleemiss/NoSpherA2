@@ -1,0 +1,259 @@
+Turning on verbose mode!
+Turning on verbose mode!
+ Recap of input:
+size: 11
+C:\Users\Lukas\source\repos\NoSpherA2\Windows\x64\D_gbw_SF\NoSpherA2.exe
+-wfn
+epoxide.gbw
+-v2
+-v
+-hkl
+epoxide.hkl
+-cif
+epoxide.cif
+-acc
+1
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause library.
+List of contributors of pieces of code or funcitonality:
+      Florian Kleemiss,
+      Emmanuel Hupf,
+      Alessandro Genoni,
+      Lukas Seifert,
+      and many more in communications or by feedback!
+NoSpherA2 uses Rascaline, Metatensor, OpenBLAS and the HDF5 library.
+The used packages are published under BSD-3 clause License.
+Please see, respectively:
+   https://github.com/Luthaf/rascaline
+   https://github.com/lab-cosmo/metatensor
+   https://github.com/OpenMathLib/OpenBLAS
+   https://github.com/HDFGroup/hdf5
+NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.
+Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.
+This Executable was built on: Jul 15 2024 16:37:51
+method/mult/charge:  0 0
+Reading:                                  epoxide.gbwReading gbw file
+File is valid, continuing...
+C:\Users\Lukas\source\repos\NoSpherA2\tests\epoxide_gbw
+I read the pointer of geometry succesfully
+I read the geometry of 7 atoms succesfully
+I read the pointer of basis set succesfully
+I read the basis of 7 atoms succesfully
+I read the pointer of MOs succesfully
+operators: 1 coef_nr: 1225 dimension: 35
+I read the coefficients succesfully
+I read the occupations succesfully
+I read the energies succesfully
+I read the irreps succesfully
+I read the cores succesfully
+I am expecting 35 coefficients per MO
+
+I read 35/35 MOs of 1 operators succesfully
+There are 57 primitives after conversion
+ done!
+Number of atoms in Wavefunction file: 7 Number of MOs: 35
+Entering scattering Factor Calculation!
+Number of protons: 24
+Number of electrons: 24
+starting to read cif!
+Reading:                               epoxide.cif
+Starting while !.eof()
+Making cm and rcm
+1.22465e-16 -0.180004 1.22465e-16 1 0.983666 1 251.778
+0.219427 0.119048 0.15457
+line in loop field definition:   _space_group_symop_id
+line in loop field definition:   _space_group_symop_operation_xyz
+line in loop field definition:  1 +X,+Y,+Z
+Reading operation! 1 +X,+Y,+Z
+Comparing 1 0 0 0 1 0 0 0 1 
+This is a new symmetry operation!
+Reading operation! 2 1/2-X,1/2+Y,1/2-Z
+Comparing -1 0 0 0 1 0 0 0 -1 
+This is a new symmetry operation!
+Reading operation! 3 -X,-Y,-Z
+Comparing -1 0 0 0 -1 0 0 0 -1 
+Reading operation! 4 1/2+X,1/2-Y,1/2+Z
+Comparing 1 0 0 0 -1 0 0 0 1 
+RCM done!
+  0.215843   0.000000   0.000000 
+  0.000000   0.119048   0.000000 
+  0.039498   0.000000   0.154570 
+CM in 2*PI bohr:
+  2.451678   0.000000  -2.341997 
+  0.000000   4.445089  -3.153514 
+  0.000000  -3.153514   3.480399 
+line in loop field definition: _space_group_symop_id
+line in loop field definition: _space_group_symop_id
+I don't think this is the atom block.. moving on!
+line in loop field definition: _atom_site_label
+line in loop field definition: _atom_site_label
+line in loop field definition: _atom_site_type_symbol
+line in loop field definition: _atom_site_fract_x
+line in loop field definition: _atom_site_fract_y
+line in loop field definition: _atom_site_fract_z
+line in loop field definition: _atom_site_U_iso_or_equiv
+line in loop field definition: _atom_site_adp_type
+line in loop field definition: _atom_site_occupancy
+line in loop field definition: _atom_site_refinement_flags_posn
+line in loop field definition: _atom_site_site_symmetry_order
+line in loop field definition: _atom_site_disorder_group
+label:       O1 type: O frac. pos: 0.116+/-0.000 0.831+/-0.000 0.125+/-0.000  cart. pos.:    0.740+/-0.000   13.193+/-0.000    1.524+/-0.000
+ASYM:         o charge:                 8                          wfn cart. pos:            0.740           13.193            1.524 nr= 0
+label:       C2 type: C frac. pos: 0.148+/-0.000 0.939+/-0.000 0.296+/-0.000  cart. pos.:    0.638+/-0.001   14.900+/-0.001    3.618+/-0.001
+ASYM:         c charge:                 6                          wfn cart. pos:            0.638           14.900            3.618 nr= 1
+label:      H2a type: H frac. pos: 0.283+/-0.002 0.892+/-0.001 0.437+/-0.001  cart. pos.:    1.502+/-0.012   14.167+/-0.013    5.344+/-0.012
+ASYM:         h charge:                 1                          wfn cart. pos:            1.502           14.168            5.343 nr= 2
+label:      H2b type: H frac. pos: 0.175+/-0.002 1.063+/-0.001 0.257+/-0.001  cart. pos.:    0.956+/-0.011   16.880+/-0.011    3.141+/-0.012
+ASYM:         h charge:                 1                          wfn cart. pos:            0.956           16.881            3.140 nr= 3
+label:       C3 type: C frac. pos: -0.134+/-0.000 0.865+/-0.000 0.218+/-0.000  cart. pos.:   -1.664+/-0.001   13.726+/-0.001    2.666+/-0.001
+ASYM:         c charge:                 6                          wfn cart. pos:           -1.664           13.726            2.666 nr= 4
+label:      H3a type: H frac. pos: -0.307+/-0.002 0.932+/-0.001 0.121+/-0.001  cart. pos.:   -2.956+/-0.012   14.799+/-0.014    1.483+/-0.013
+ASYM:         h charge:                 1                          wfn cart. pos:           -2.955           14.800            1.482 nr= 5
+label:      H3b type: H frac. pos: -0.207+/-0.002 0.767+/-0.001 0.303+/-0.001  cart. pos.:   -2.490+/-0.011   12.178+/-0.014    3.711+/-0.015
+ASYM:         h charge:                 1                          wfn cart. pos:           -2.490           12.179            3.710 nr= 6
+... done!
+There are 3 types of atoms
+   8   6   1
+asym_atoms_to_type_list: 
+   0   1   2   2   1   2   2
+Charges of atoms:
+   8   6   1   1   6   1   1
+There are 3 Types of atoms and 7 atoms in total
+Reading:                                  epoxide.hklpopping back 0 0 0
+ done!
+Nr of reflections read from file: 2143
+Number of reflections before twin: 2143
+Number of reflections after twin: 2143
+Read 2 symmetry elements!
+  1  0  0
+  0  1  0
+  0  0  1
+
+ -1  0  0
+  0  1  0
+  0  0 -1
+
+Nr of reflections to be used: 4181
+made it post CIF, now make grids!
+  label  | wfn  | grid
+       O |    0 |    0
+       C |    1 |    1
+       H |    2 |    2
+       H |    3 |    3
+       C |    4 |    4
+       H |    5 |    5
+       H |    6 |    6
+Atoms are there! max_l:    2
+alpha_min is there!
+Nr of asym atoms: 7 Number of atoms in wfn: 7
+Atom Type 0: 8
+max_l: 1 alpha_max: 3.220e+02 alpha_min:      3.737e-01     3.737e-01 accuracy: 1
+Atom Type 1: 6
+max_l: 1 alpha_max: 1.723e+02 alpha_min:      1.959e-01     1.959e-01 accuracy: 1
+Atom Type 2: 1
+max_l: 0 alpha_max: 5.447e+00 alpha_min:      1.832e-01 accuracy: 1
+max_l_overall: 2
+
+Selected accuracy: 1
+Making Becke Grids...
+Number of gridpoints for atom type 8: 1526
+Number of gridpoints for atom type 6: 1562
+Number of gridpoints for atom type 1: 1282
+Time until prototypes are done: 26 ms
+Making grid for atom 0
+Making grid for atom 1
+Making grid for atom 2
+Making grid for atom 3
+Making grid for atom 4
+Making grid for atom 5
+Making grid for atom 6
+  label  | wfn  | grid | number of gridpoints
+       O |    0 |    0 |   1526
+       C |    1 |    1 |   1562
+       H |    2 |    2 |   1282
+       H |    3 |    3 |   1282
+       C |    4 |    4 |   1562
+       H |    5 |    5 |   1282
+       H |    6 |    6 |   1282
+Becke Grid exists
+Calculating spherical densities...
+Size of atom_type_list:    3
+
+Calculating for atomic number 8
+Number of radial density points for atomic number 8: 3734
+
+Calculating for atomic number 6
+Number of radial density points for atomic number 6: 3770
+
+Calculating for atomic number 1
+Number of radial density points for atomic number 1: 3726
+Cleared the sphericals!
+Cleared the sphericals!
+0 Atom type: 8
+1 Atom type: 6
+2 Atom type: 1
+2 Atom type: 1
+1 Atom type: 6
+2 Atom type: 1
+2 Atom type: 1
+                    done!
+Pruning Grid...sphericals done!
+Calculating non-spherical densities...
+Using 12 MOs in temporary wavefunction
+There are 9778 points to evaluate.
+
+with total number of points: 9778
+Applying hirshfeld weights and integrating charges...before loop
+ asym atom list: 
+0 1 2 3 4 5 6 Becke grid with hirshfeld weights done!
+atom_els[2]:      8.193      6.017      0.941      0.944      6.018      0.943      0.945 
+ done!
+Number of points evaluated: 9778 with  23.997407 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+        O1    -0.056     0.263    -0.193    8     -0.056     7.737     8.193
+        C2    -0.144    -0.012    -0.017    6     -0.144     6.012     6.017
+       H2a     0.089     0.031     0.059    1      0.089     0.969     0.941
+       H2b     0.086     0.031     0.056    1      0.086     0.969     0.944
+        C3    -0.141    -0.008    -0.018    6     -0.141     6.008     6.018
+       H3a     0.086     0.030     0.057    1      0.086     0.970     0.943
+       H3b     0.082     0.028     0.055    1      0.082     0.972     0.945
+Total number of electrons in the wavefunction: 23.997
+ and Hirshfeld electrons (asym unit): 24.000
+Taking time...
+resized outer dens
+resized outer d1-3
+NRMSD value of density =                53.0261
+R value of sph. vs non-sph. density =    8.0556 %
+K_point_vector is here! size: 4181
+
+Number of k-points to evaluate: 4181 for 9734 gridpoints.
+Initialized FFs
+asym atom list size: 7 total grid size: 9734
+Time to prepare: 54 ms
+Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
+
+
+------------------------------ Time Breakdown! ------------------------------
+                                     mm:ss:ms
+... for Prototype Grid setup       : 00:00:026  (48.86%)
+... for Becke Grid setup           : 00:00:000  (1.42%)
+... for spherical density          : 00:00:013  (24.66%)
+... for Grid Pruning               : 00:00:000  (1.05%)
+... for aspherical density         : 00:00:007  (14.08%)
+... for density vectors            : 00:00:000  (1.03%)
+... for k-points preparation       : 00:00:004  (8.70%)
+... for final preparation          : 00:00:000  (0.19%)
+... for tsc calculation            : 00:00:000  (0.00%)
+Total Time                         : 00:00:054
+---------------------------------------------------------------------------
+Writing tsc file...  ... done!

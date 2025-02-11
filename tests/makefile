@@ -3,7 +3,7 @@ DIFF := diff -q -i -b
 
 # Define the base path
 BASE_PATH = ../../NoSpherA2
-ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED fourier_transform
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS SALTED fourier_transform ri_fit
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
@@ -183,6 +183,20 @@ rubredoxin_cmtc_full:
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
 		-cpus 24
+	@echo 'Finished running: $@'
+
+
+ri_fit:
+	@echo 'Running test: $@'
+	cd epoxide_gbw && $(BASE_PATH)^\
+	-wfn epoxide.gbw \
+	-cif epoxide.cif \
+	-dmin 0.4 \
+	-ri_fit \
+	-v \
+	-no-data \
+	&& mv NoSpherA2.log $@.log \
+	&& ${DIFF} $@.log $@.good
 	@echo 'Finished running: $@'
 
 Hybrid_mode:
