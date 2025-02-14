@@ -2,6 +2,7 @@
 RM := rm -f
 
 COMP := g++
+C_COMP := gcc
 
 LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic
 ver := $(shell expr `${COMP} -dumpversion`)
@@ -25,7 +26,7 @@ GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP
 
 omp: 
 	@echo 'Building OpenMP'
-	cd ../llvm-project/openmp && mkdir -p build && cd build && cmake .. -DCMAKE_C_COMPILER=${COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF && make -j
+	cd ../llvm-project/openmp && mkdir -p build && cd build && cmake .. -DCMAKE_C_COMPILER=${C_COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF && make -j
 
 OpenBLAS: 
 	@echo 'Building OpenBLAS'
