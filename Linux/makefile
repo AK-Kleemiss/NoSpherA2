@@ -1,8 +1,11 @@
 #THIS IS THE LINUX MAKEFILE#
 RM := rm -f
 
-LIBS := -Wl,-Bstatic -lgomp -static-libgcc -static-libstdc++ -Wl,-Bstatic -Wl,-Bstatic -Wl,-Bstatic -lgfortran -Wl,-Bstatic -lquadmath -Wl,-Bstatic -lm
-LIBOMP := /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgomp.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libgfortran.a /usr/lib/gcc/x86_64-linux-gnu/$(shell expr `g++ -dumpversion`)/libquadmath.a
+COMP := g++
+
+LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic 
+ver := $(shell expr `${COMP} -dumpversion`)
+LIBOMP := ../llvm-project/openmp/build/runtime/src/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
 LIBHDF5 := ../Lib/libhdf5.a
@@ -17,30 +20,34 @@ OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set con
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_d)
-GCC_OPTS := -std=c++20 -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++20 -Og -g -c -fmessage-length=0 -static -MMD -MP
+GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
+GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP
+
+# Precompiled header
+pch.h.gch: ../Src/pch.h
+	${COMP} -std=c++23 -x c++-header -o pch.h.gch ../Src/pch.h
 
 # Pattern rule to compile all .cpp files
-%.o: ../Src/%.cpp
+%.o: ../Src/%.cpp pch.h.gch
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
-%.o_d: ../Src/%.cpp
+%.o_d: ../Src/%.cpp pch.h.gch
 	@echo 'Building file: $<'
-	g++ ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
+	${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2 ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
-	g++ -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
+	${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2_Debug ../
 	@echo 'Done building Debug version of NoSpherA2'
 
@@ -48,7 +55,7 @@ clean:
 	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ${OBJS} ${OBJS_d}
 	-@echo ' '
 
-.PHONY: all
+.PHONY: all clean
 .SECONDARY:
 
 

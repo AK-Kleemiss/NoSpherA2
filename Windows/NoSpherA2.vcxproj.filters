@@ -37,6 +37,9 @@
     <Filter Include="Quelldateien\libCint">
       <UniqueIdentifier>{9a89d622-da09-4a7d-aeb8-e84c75fa0c4f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headerdateien\mdspan">
+      <UniqueIdentifier>{53cebc2e-6707-423c-b1e4-3e8b01ff9900}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -214,6 +217,9 @@
       <Filter>Quelldateien\libCint</Filter>
     </ClCompile>
     <ClCompile Include="..\Src\nos_math.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\pch.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
   </ItemGroup>
@@ -992,12 +998,6 @@
     <ClInclude Include="..\Src\SALTED_predictor.h">
       <Filter>Headerdateien\SALTED</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Src\OpenBLAS.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="..\Src\constants.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -1029,9 +1029,6 @@
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\nos_math.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
-    <ClInclude Include="resource1.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

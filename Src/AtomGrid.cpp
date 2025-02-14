@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #include "sphere_lebedev_rule.h"

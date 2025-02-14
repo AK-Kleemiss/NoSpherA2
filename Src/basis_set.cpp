@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "basis_set.h"
 #include "convenience.h"
 class basis_set_entry;

@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "wfn_class.h"
 #include "properties.h"
 #include "convenience.h"

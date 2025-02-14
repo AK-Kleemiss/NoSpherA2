@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "wfn_class.h"
 #include "convenience.h"
 #include "mo_class.h"
@@ -2045,8 +2046,10 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         }
         occ.push_back(0);
     }
-    vec2 temp_co = diag_dot(coefficients[0], occ, true);
-    DM = dot(temp_co, coefficients[0]);
+    vec _coefficients = flatten(coefficients);
+    dMatrix2 m_coefs = reshape(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
+    dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
+    DM = dot(temp_co, m_coefs);
     
     return true;
 };
@@ -2481,21 +2484,21 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
 
         vec2 reordered_coefs(dimension, vec(dimension, 0.0));
-        vec2 coefs_2D = reshape(coefficients[0], { dimension, dimension });
+        dMatrix2 coefs_2D = reshape(coefficients[0], Shape2D(dimension, dimension));
         int index = 0;
         for (int atom_idx = 0; atom_idx < atoms.size(); atom_idx++) {
             std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
             int temp_bas_idx = 0;
             for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
-                int type = basis[temp_bas_idx].get_type() -1;
+                int type = basis[temp_bas_idx].get_type() - 1;
                 temp_bas_idx += atoms[atom_idx].get_shellcount(shell);
                 if (type == 0) { //Skip s-type
-                    reordered_coefs[index] = coefs_2D[index];
-                    index += 2 * type + 1;
+                    std::copy(&coefs_2D[std::array{ index,0 }], &coefs_2D[std::array{ index, (int)coefs_2D.extent(1)}], reordered_coefs[index].begin());
+                    index += 1; // since s type has only one function
                     continue;
                 };
                 for (int m = -type; m <= type; m++) {
-					reordered_coefs[index + constants::orca_2_pySCF[type][m]] = coefs_2D[index + m+type];
+                    std::copy(&coefs_2D[std::array{ index + m + type,0 }], &coefs_2D[std::array{ index + m + type, (int)coefs_2D.extent(1) }], reordered_coefs[index + constants::orca_2_pySCF[type][m]].begin());
                 }
                 index += 2 * type + 1;
             }
@@ -2516,15 +2519,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 coeff_small[i * n_occ + oc] = reordered_coefs[i][oc];
             }
         }
-        //vec2 coeff_mo_2D = reshape(coeff_mo, {dimension, n_occ});
-        //vec2 coeff_small_2D = reshape(coeff_small, { dimension, n_occ });
-        //DM = dot(coeff_mo_2D, coeff_small_2D, false, true);
         DM = dot(coeff_mo, coeff_small, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
-
-         //build denisty matrix
-        //vec2 coeff_temp = reshape(coefficients[0], Shape2D(dimension, dimension));
-        //vec2 temp_co = diag_dot(coeff_temp, occupations[0]);
-        //DM = dot(temp_co, coeff_temp, false, true);
 
 
         if (debug)
@@ -2852,12 +2847,8 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     rf.flush();
     for (int i = 0; i < ncen; i++)
     {
-        rf << atoms[i].get_label();
-        if (i < 9)
-            rf << "     ";
-        else
-            rf << "    ";
-        rf << i + 1 << "    (CENTRE ";
+        rf << setw(5) << atoms[i].get_label();
+        rf << setw(3) << i + 1 << "    (CENTRE ";
         if (i < 9)
             rf << ' ';
         rf << i + 1 << ") ";
@@ -6965,7 +6956,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
     vec tempvec(nbf*nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
-    vec2 momat = reshape(tempvec, { nmomax, nbf });
+    dMatrix2 momat = reshape(tempvec, Shape2D(nmomax, nbf));
 
     // making it into the wavefunction data
     for (int i = 0; i < ncent; i++)
@@ -7042,17 +7033,17 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         vec values;
         for (int j = 0; j < nmomax; j++)
         {
-            values.push_back(momat[j][ipao[i] - 1] * contr[i]);
+            values.push_back(momat[std::array{ j,ipao[i] - 1 }] * contr[i]);
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }
-
-    while (momat.size() < nbf) {
-        momat.push_back(vec(nbf, 0.0));
-        occ.push_back(0);
-    }
+    // To Do: This needs reviewing in light of mdspan!
+    //while (momat.size() < nbf) {
+    //    momat.push_back(vec(nbf, 0.0));
+    //    occ.push_back(0);
+    //}
     // build density matrix
-    vec2 temp_co = diag_dot(momat, occ, true);
+    dMatrix2 temp_co = diag_dot(momat, occ, true);
     DM = dot(temp_co, momat, false, false);
 
     err_checkf(nprims == nex, "Error adding primitives to WFN!", file);

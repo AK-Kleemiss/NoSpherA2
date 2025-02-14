@@ -46,7 +46,7 @@ private:
     vec exponents;
     vec UT_DensityMatrix;
     vec UT_SpinDensityMatrix;
-    vec2 DM;
+    dMatrix2 DM;
     const std::array<std::vector<primitive>, 118> *basis_set;
 
     bool erase_center(const int &g_nr);
@@ -262,7 +262,7 @@ public:
     const double get_DM(const int &nr) const;
     const int get_DM_size() const { return (int)UT_DensityMatrix.size(); };
     void resize_DM(const int &size, const double &value = 0.0);
-    vec2 get_dm() const { return DM; };
+    dMatrix2 get_dm() const { return DM; };
     //----------S_DM Handling--------------------------------
     void push_back_SDM(const double &value = 0.0);
     bool set_SDM(const int &nr, const double &value = 0.0);

@@ -1,4 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
+#ifdef _WIN32
+import std;
+#endif
+#include "pch.h"
 #include "tsc_block.h"
 #include "convenience.h"
 #include "JKFit.h"

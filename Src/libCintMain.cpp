@@ -2093,7 +2093,7 @@ ivec calc_3c_steps(const unsigned long long int naoi, const unsigned long long i
 
 void computeRho_Coulomb(Int_Params &param1,
                         Int_Params &param2,
-                        vec2 &dm,
+                        const dMatrix2 &dm,
                         vec &rho,
                         double max_mem)
 {
@@ -2157,7 +2157,7 @@ void computeRho_Coulomb(Int_Params &param1,
                     naoi * naoj,
                     1.0,
                     res.data(), naoi * naoj,
-                    flatten(dm).data(), 1,
+                    dm.data_handle(), 1,
                     0.0,
                     &rho[idx_curr_rho], 1);
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
@@ -2167,7 +2167,7 @@ void computeRho_Coulomb(Int_Params &param1,
 
 void computeRho_Overlap(Int_Params &param1,
                         Int_Params &param2,
-                        vec2 &dm,
+                        dMatrix2 &dm,
                         vec &rho,
                         double max_mem)
 {
@@ -2228,7 +2228,7 @@ void computeRho_Overlap(Int_Params &param1,
                     naoi * naoj,
                     1.0,
                     res.data(), naoi * naoj,
-                    flatten(dm).data(), 1,
+                    dm.data_handle(), 1,
                     0.0,
                     &rho[idx_curr_rho], 1);
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)

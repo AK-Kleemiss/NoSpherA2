@@ -1,5 +1,5 @@
+#include "pch.h"
 #include "JKFit.h"
-
 
 // Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
 BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {

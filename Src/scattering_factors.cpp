@@ -3,7 +3,7 @@
  * @brief This file contains functions related to reading and generating hkl indices and k-points.
  *
  */
-
+#include "pch.h"
 #include "tsc_block.h"
 #include "scattering_factors.h"
 #include "convenience.h"
@@ -4453,7 +4453,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     const long long int imax = static_cast<long long int>(dens.size());
     const long long int smax = static_cast<long long int>(k_pt[0].size());
     long long int pmax = static_cast<long long int>(dens[0].size());
-    const long long int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
+    //const long long int step = max(static_cast<long long int>(floor(smax / 20)), 1LL);
     std::cout << "Done with making k_pt " << smax << " " << imax << " " << pmax << endl;
     sf.reserve(imax * smax);
     sf.resize(imax);

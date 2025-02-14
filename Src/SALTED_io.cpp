@@ -91,6 +91,62 @@ template std::vector<int> readHDF5(H5::H5File file, std::string dataset_name, st
 template std::vector<int64_t> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
 template std::vector<unsigned long long> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
 
+template <typename T>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out)
+{
+
+    try
+    {
+        H5::Exception::dontPrint();
+        H5::DataSet dataset = file.openDataSet(dataset_name);
+        H5::DataSpace dataspace = dataset.getSpace();
+
+        const int rank = dataspace.getSimpleExtentNdims();
+        dims_out.resize(rank);
+        dataspace.getSimpleExtentDims(dims_out.data(), NULL);
+
+        size_t totalSize = 1;
+        for (const auto& dim : dims_out)
+        {
+            totalSize *= dim;
+        }
+
+        std::vector<T> flatData(totalSize);
+        readHDF5Data(dataset, flatData);
+        dataset.close();
+
+        return Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>>(flatData.data(), (unsigned long long) totalSize);
+    }
+    // catch failure caused by the H5File operations
+    catch (H5::FileIException error)
+    {
+        error.printErrorStack();
+    }
+    // catch failure caused by the DataSet operations
+    catch (H5::DataSetIException error)
+    {
+        error.printErrorStack();
+    }
+    // catch failure caused by the DataSpace operations
+    catch (H5::DataSpaceIException error)
+    {
+        error.printErrorStack();
+    }
+    // catch failure caused by the DataSpace operations
+    catch (H5::DataTypeIException error)
+    {
+        error.printErrorStack();
+    }
+    catch (H5::Exception error)
+    {
+        error.printErrorStack();
+    }
+    return {};
+}
+template dMatrix1 readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+template iMatrix1 readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
+
+
 std::filesystem::path find_first_h5_file(const std::filesystem::path &directory_path)
 {
     try

@@ -37,11 +37,12 @@ private:
     void setup_atomic_environment();
 
     vec weights{};
-    std::unordered_map<std::string, vec2> Vmat{};
+    std::unordered_map<std::string, dMatrix2> Vmat{};
     std::unordered_map<std::string, int> Mspe{};
     std::unordered_map<int, std::vector<int64_t>> vfps{};
     std::unordered_map<int, vec> wigner3j{};
-    std::unordered_map<std::string, vec> av_coefs{}, power_env_sparse{};
+    std::unordered_map<std::string, dMatrix2> power_env_sparse{};
+    std::unordered_map<std::string, vec> av_coefs{};
     std::unordered_map<int, int> featsize{};
     void read_model_data();
     void read_model_data_h5();

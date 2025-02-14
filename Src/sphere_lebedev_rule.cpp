@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "sphere_lebedev_rule.h"
 #include "convenience.h"
 #include "constants.h"

@@ -1647,7 +1647,7 @@ void test_analytical_fourier(bool full)
 	bool correct = true; //Verify if the current m is correct
 
     cdouble max_diff, diff;
-    for (int type = 0; type <= max_l; type++)
+    for (unsigned int type = 0; type <= max_l; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);

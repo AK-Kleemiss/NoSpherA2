@@ -92,7 +92,7 @@ public:
     void set_basis_set_type(const int& _nr, const int& value) { basis_set[_nr].set_type(value); };
     void set_basis_set_shell(const int& _nr, const int& value) { basis_set[_nr].set_shell(value); };
     std::vector<basis_set_entry> get_basis_set() const { return basis_set; };
-    void erase_basis_set(const unsigned int& nr) { basis_set.erase(basis_set.begin() + nr); };
+    void erase_basis_set(const unsigned int& _nr) { basis_set.erase(basis_set.begin() + _nr); };
     int get_basis_set_type(const int& _nr) const { return basis_set[_nr].get_type(); };
     int get_basis_set_shell(const int& _nr) const { return basis_set[_nr].get_shell(); };
     void set_basis_set_id(const int& id) { basis_set_id = id; };

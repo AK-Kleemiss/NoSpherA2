@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
@@ -885,7 +886,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         string wave(input.substr(0, input.find('.')));
         string cube(input.substr(input.find('.') + 1));
         unsigned int nr_wave = fromString<unsigned int>(wave);
-        unsigned int nr_cube = fromString<unsigned int>(cube);
+        int nr_cube = fromString<int>(cube);
         if (debug)
             cout << "Translated: " << nr_wave << " " << nr_cube << endl;
         if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].get_cube_count())
@@ -2229,8 +2230,8 @@ void options::digest_options()
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
-            WFN *temp = new WFN(9);
-            cube residual(arguments[i + 1], true, *temp, std::cout);
+            WFN *temp_w = new WFN(9);
+            cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {
                 int k_max = stod(arguments[i + 2]);
@@ -2241,7 +2242,7 @@ void options::digest_options()
             }
             else
                 residual.ewald_sum();
-            delete (temp);
+            delete (temp_w);
             exit(0);
         }
         else if (temp == "-fchk")

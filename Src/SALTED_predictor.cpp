@@ -186,9 +186,9 @@ void SALTEDPredictor::read_model_data()
         {
 
             vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
-            power_env_sparse[spe + std::to_string(lam)] = temp_power;
+            power_env_sparse[spe + std::to_string(lam)] = reshape(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
             vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{(int)dims_out_proj[0], (int)dims_out_proj[1]});
+            Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]});
 
             if (lam == 0)
             {
@@ -196,7 +196,9 @@ void SALTEDPredictor::read_model_data()
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + std::to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
+                dMatrix2 tem_pr = reshape(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
+                dMatrix2 tem_pw = reshape(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
+                power_env_sparse[spe + std::to_string(lam)] = dot(tem_pr, tem_pw, true, false);
             }
         }
     }
@@ -250,9 +252,9 @@ void SALTEDPredictor::read_model_data_h5()
             string spar_descrip = "sparse_descriptors/" + spe + "/" + to_string(lam);
             string proj = "projectors/" + spe + "/" + to_string(lam);
             vec temp_power = readHDF5<double>(input, spar_descrip, dims_out_descrip);
-            power_env_sparse[spe + to_string(lam)] = temp_power;
+            power_env_sparse[spe + to_string(lam)] = reshape(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
             vec temp_proj = readHDF5<double>(input, proj, dims_out_proj);
-            Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D{(int)dims_out_proj[0], (int)dims_out_proj[1]});
+            Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D({(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]}));
 
             if (lam == 0)
             {
@@ -260,7 +262,9 @@ void SALTEDPredictor::read_model_data_h5()
             }
             if (config.zeta == 1)
             {
-                power_env_sparse[spe + to_string(lam)] = flatten(dot<double>(temp_proj, temp_power, (int)dims_out_proj[0], (int)dims_out_proj[1], (int)dims_out_descrip[0], (int)dims_out_descrip[1], true, false));
+                dMatrix2 tem_pr = reshape(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
+                dMatrix2 tem_pw = reshape(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
+                power_env_sparse[spe + to_string(lam)] = dot(tem_pr, tem_pw, true, false);
             }
         }
     }
@@ -348,7 +352,7 @@ vec SALTEDPredictor::predict()
         pvec[lam] = p;
     }
 
-    std::vector<vec3> psi_nm(config.species.size());
+    std::vector<std::vector<dMatrix2>> psi_nm(config.species.size());
     for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
     {
         const string spe = config.species[spe_idx];
@@ -358,7 +362,7 @@ vec SALTEDPredictor::predict()
         {
             continue;
         }
-        vec2 kernell0_nm;
+        dMatrix2 kernell0_nm;
         for (int lam = 0; lam < lmax[spe] + 1; ++lam)
         {
             int lam2_1 = 2 * lam + 1;
@@ -375,43 +379,44 @@ vec SALTEDPredictor::predict()
                 // Copy the block directly into flatVec2
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
-
-            vec2 kernel_nm = dot<double>(pvec_lam, power_env_sparse[spe + to_string(lam)], natom_dict[spe] * lam2_1, featsize[lam], Mspe[spe] * lam2_1, featsize[lam], false, true);
+            dMatrix2 m_pvec_lam = reshape(pvec_lam, Shape2D{ static_cast<unsigned long long>(atom_idx[spe].size()), static_cast<unsigned long long>(row_size) });
+            dMatrix2 kernel_nm = dot(m_pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
 
             if (config.zeta == 1)
             {
                 psi_nm[spe_idx][lam] = kernel_nm;
-                continue;
             }
+            else {
 
-            if (lam == 0)
-            {
-                kernell0_nm = kernel_nm;
-                kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
-            }
-            else
-            {
-                for (size_t i1 = 0; i1 < natom_dict[spe]; ++i1)
+                if (lam == 0)
                 {
-                    for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
+                    kernell0_nm = kernel_nm;
+                    kernel_nm = elementWiseExponentiation(kernel_nm, config.zeta);
+                }
+                else
+                {
+                    for (size_t i1 = 0; i1 < natom_dict[spe]; ++i1)
                     {
-                        for (size_t i = 0; i < lam2_1; ++i)
+                        for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
-                            for (size_t j = 0; j < lam2_1; ++j)
+                            for (size_t i = 0; i < lam2_1; ++i)
                             {
-                                kernel_nm[i1 * lam2_1 + i][i2 * lam2_1 + j] *= pow(kernell0_nm[i1][i2], config.zeta - 1);
+                                for (size_t j = 0; j < lam2_1; ++j)
+                                {
+                                    kernel_nm[std::array{ i1 * lam2_1 + i,i2 * lam2_1 + j }] *= pow(kernell0_nm[std::array{ i1,i2 }], config.zeta - 1);
+                                }
                             }
                         }
                     }
                 }
+                psi_nm[spe_idx][lam] = dot(kernel_nm, Vmat[spe + to_string(lam)], false, false);
             }
-            psi_nm[spe_idx][lam] = dot<double>(kernel_nm, Vmat[spe + to_string(lam)], false, false);
         }
     }
     pvec.clear();
     pvec.shrink_to_fit();
 
-    unordered_map<string, vec> C{};
+    unordered_map<string, dMatrix1> C{};
     unordered_map<string, int> ispe{};
     int isize = 0;
     for (int spe_idx = 0; spe_idx < config.species.size(); spe_idx++)
@@ -434,7 +439,7 @@ vec SALTEDPredictor::predict()
                 //{
                 //     isize += static_cast<int>(Vmat[spe + to_string(l)][0].size());
                 // }
-                isize += static_cast<int>(Vmat[spe + to_string(l)][0].size()) * nmax[spe + to_string(l)];
+                isize += static_cast<int>(Vmat[spe + to_string(l)].extent(1)) * nmax[spe + to_string(l)];
             }
             continue;
         }
@@ -444,10 +449,10 @@ vec SALTEDPredictor::predict()
             for (int n = 0; n < nmax[spe + to_string(l)]; ++n)
             {
                 // int Mcut = static_cast<int>(psi_nm[spe + to_string(l)][0].size());
-                int Mcut = static_cast<int>(psi_nm[spe_idx][l][0].size());
+                int Mcut = static_cast<int>(psi_nm[spe_idx][l].extent(1));
                 // Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
-                vec weights_subset(weights.begin() + isize, weights.begin() + isize + Mcut);
+                dMatrix1 weights_subset(weights.data() + isize, Kokkos::extents<unsigned long long, std::dynamic_extent>(Mcut));
                 C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false);
 
                 isize += Mcut;
@@ -488,7 +493,7 @@ vec SALTEDPredictor::predict()
                 //{
                 //     pred_coefs[i + ind] = C[spe + to_string(l) + to_string(n)][ispe[spe] * (2 * l + 1) + ind];
                 // }
-                std::copy_n(C[spe + to_string(l) + to_string(n)].begin() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
+                std::copy_n(C[spe + to_string(l) + to_string(n)].data_handle() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
 
                 if (config.average && l == 0)
                 {
@@ -569,12 +574,12 @@ void SALTEDPredictor::shrink_intermediate_vectors()
     v1.shrink_to_fit();
     v2.shrink_to_fit();
     weights.shrink_to_fit();
-    std::unordered_map<std::string, vec2> umap;
+    std::unordered_map<std::string, dMatrix2> umap;
     std::unordered_map<std::string, int> umap2;
-    std::unordered_map<std::string, vec> umap3;
+    std::unordered_map<std::string, dMatrix1> umap3;
     Vmat.swap(umap);
     natom_dict.swap(umap2);
     lmax.swap(umap2);
     nmax.swap(umap2);
-    power_env_sparse.swap(umap3);
+    power_env_sparse.swap(umap);
 };

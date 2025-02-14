@@ -1,6 +1,5 @@
 ﻿#pragma once
 #include "pch.h"
-
 // Pre-definition of classes included later
 class WFN;
 class cell;
@@ -35,6 +34,22 @@ typedef std::vector<bool> bvec;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> dMatrix1;
+typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent>> cMatrix1;
+typedef Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent>> iMatrix1;
+typedef Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent>> bMatrix1;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dMatrix2;
+typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> cMatrix2;
+typedef Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> iMatrix2;
+typedef Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> bMatrix2;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> dMatrix3;
+typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrix3;
+typedef Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> iMatrix3;
+typedef Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> bMatrix3;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> dMatrix4;
+typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> cMatrix4;
+typedef Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> iMatrix4;
+typedef Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> bMatrix4;
 
 int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);

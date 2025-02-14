@@ -1,0 +1,6 @@
+[submodule "mdspan"]
+	path = mdspan
+	url = https://github.com/kokkos/mdspan
+[submodule "OpenBLAS"]
+	path = OpenBLAS
+	url = https://github.com/OpenMathLib/OpenBLAS

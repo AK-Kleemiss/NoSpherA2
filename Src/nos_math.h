@@ -3,10 +3,10 @@
 
 struct Shape2D
 {
-    int rows;
-    int cols;
+    unsigned long long rows;
+    unsigned long long cols;
     Shape2D() : rows(0), cols(0) {}
-    Shape2D(int rows, int cols) : rows(rows), cols(cols) {
+    Shape2D(unsigned long long rows, unsigned long long cols) : rows(rows), cols(cols) {
       err_checkf(rows >= 0, "cannot have negative size!", std::cout);
       err_checkf(cols >= 0, "cannot have negative cols!", std::cout);
     }
@@ -14,23 +14,47 @@ struct Shape2D
 
 struct Shape3D
 {
-    int depth;
-    int rows;
-    int cols;
+    unsigned long long depth;
+    unsigned long long rows;
+    unsigned long long cols;
     Shape3D() : depth(0), rows(0), cols(0) {}
-    Shape3D(int depth, int rows, int cols) : depth(depth), rows(rows), cols(cols) { 
+    Shape3D(unsigned long long depth, unsigned long long rows, unsigned long long cols) : depth(depth), rows(rows), cols(cols) {
       err_checkf(depth >= 0, "cannot have negative size!", std::cout);
       err_checkf(rows >= 0, "cannot have negative size!", std::cout);
       err_checkf(cols >= 0, "cannot have negative size!", std::cout);
     }
 };
 
-// To_2D
+struct Shape4D
+{
+    unsigned long long depth;
+    unsigned long long rows;
+    unsigned long long cols;
+    unsigned long long time;
+    Shape4D() : depth(0), rows(0), cols(0), time(0) {}
+    Shape4D(unsigned long long depth, unsigned long long rows, unsigned long long cols, unsigned long long time) : depth(depth), rows(rows), cols(cols), time(time){
+        err_checkf(depth >= 0, "cannot have negative size!", std::cout);
+        err_checkf(rows >= 0, "cannot have negative size!", std::cout);
+        err_checkf(cols >= 0, "cannot have negative size!", std::cout);
+        err_checkf(time >= 0, "cannot have negative size!", std::cout);
+    }
+};
+
+//// To_2D
+//template <typename T>
+//std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes);
+//// To_3D
+//template <typename T>
+//std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes);
+
 template <typename T>
-std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes);
-// To_3D
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>>& fmat, Shape2D size);
 template <typename T>
-std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes);
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape2D size);
+template <typename T>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape3D size);
+template <typename T>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape4D size);
 
 // TRANSPOSES
 // 3D MATRIX
@@ -40,6 +64,8 @@ std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector
 // 2D MATRIX
 template <class T>
 std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &mat);
+template <typename T>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat);
 
 // Flat 2D MATRIX
 template <class T>
@@ -68,6 +94,9 @@ std::vector<T> flatten(const std::vector<std::vector<T>> &vec2D);
 template <typename T>
 std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
 
+template <typename T, typename eT>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> flatten(const Kokkos::mdspan<T, eT>& vecND);
+
 // SLICE Operation
 std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length);
 
@@ -78,25 +107,24 @@ std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t l
 // 2D x 2D MATRIX MULTIPLICATION
 //BLAS implementation of matrix multiplication
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<std::vector<T>> &mat1,
-                            const std::vector<std::vector<T>> &mat2,
-                            bool transp1=false,
-                            bool transp2=false);
+T dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
 
 //BLAS dot product from flattend matrices
 template <typename T>
-std::vector<std::vector<T>> dot(const std::vector<T>& faltMat1,
-                                const std::vector<T>& flatMat2,
-                                const int& mat1_d0,
-                                const int& mat1_d1,
-                                const int& mat2_d0,
-                                const int& mat2_d1,
-                                bool transp1=false,
-                                bool transp2=false);
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T>& flatMat1,
+                                                                                               const std::vector<T>& flatMat2,
+                                                                                               const int& mat1_d0,
+                                                                                               const int& mat1_d1,
+                                                                                               const int& mat2_d0,
+                                                                                               const int& mat2_d1,
+                                                                                               bool transp1=false,
+                                                                                               bool transp2=false);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
-std::vector<std::vector<T>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
+template <typename T>
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat1, const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 
 //Own implementation of matrix multiplication
 template <typename T>
@@ -110,11 +138,17 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, co
 template <typename T>
 std::vector<T> dot(const std::vector<std::vector<T>>& mat, 
                     const std::vector<T>& vec,
-                    bool transp);
+                    bool transp = false);
+template <typename T, typename T2>
+T dot(const T2& mat,
+    const T& vec,
+    bool transp = false);
 
 //BLAS implementation of matrix multiplication 2D x 1D
 template <typename T>
-std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n, bool transp);
+std::vector<T> dot_BLAS(const std::vector<T>& flatMat, const std::vector<T>& vec, const int& m, const int& n, bool transp = false);
+template <typename T, typename T2>
+T dot_BLAS(const T2& Mat, const T& vec, bool transp = false);
 
 template <typename T>
 std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& vec, bool transp1 = false);
@@ -134,10 +168,11 @@ template <typename T>
 T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
 
 template <typename T>
-std::vector<std::vector<T>> diag_dot(const std::vector<std::vector<T>>& mat, const std::vector<T>& _vec, bool transp1 = false);
+Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
+dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 
 void _test_openblas();
 

@@ -71,7 +71,7 @@ There are:
   26 atoms read from the wavefunction, of which 
    6 are identified as asymmetric unit atoms!
 
-Making Becke Grids... ...                  done! Number of gridpoints: 408
+Making Becke Grids... ...                             done! Number of gridpoints: 408
 Calculating spherical densities...                    done!
 Pruning Grid...                                       done! Number of gridpoints: 408
 Calculating non-spherical densities...                done!

@@ -141,7 +141,7 @@ typedef struct LibCintBasis {
 
 class Int_Params {
 private:
-    int ncen = 0;           // Number of centers (atoms)
+    unsigned long long ncen = 0;           // Number of centers (atoms)
     int wfn_origin = 0;
     std::vector<atom> atoms;
 
@@ -151,8 +151,8 @@ private:
     ivec _bas;              // Flattened BAS array
     vec _env;
 
-    int nao = 0;
-    int nbas = 0;
+    unsigned long long nao = 0;
+    unsigned long long nbas = 0;
     void calc_integration_parameters();
     void collect_basis_data();
     //   void collect_basis_data_from_gbw();
@@ -182,9 +182,9 @@ public:
     ivec get_bas() { return _bas; };
     vec get_env() { return _env; };
 
-    int get_nbas() { return nbas; };  // Number of basis segments
-    int get_nao() { return nao; };    // Number of atomic orbitals  
-    int get_natoms() { return ncen; };
+    unsigned long long get_nbas() { return nbas; };  // Number of basis segments
+    unsigned long long get_nao() { return nao; };    // Number of atomic orbitals  
+    unsigned long long get_natoms() { return ncen; };
 
     void print_data(std::string name); //FOR DEBUG PURPOSES
 };

@@ -14,6 +14,8 @@ void readHDF5Data(H5::DataSet &dataset, std::vector<T> &data);
 
 template <typename T>
 std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
+//template <typename T>
+//Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
 
 std::filesystem::path find_first_h5_file(const std::filesystem::path &directory_path);
 

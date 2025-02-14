@@ -1,4 +1,3 @@
-#pragma once
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -31,12 +30,15 @@
 #include <deque>
 #include <filesystem>
 #include <source_location>
+#include <memory>
+#include <cstddef>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif
 #ifdef __AVX__
 #include <immintrin.h>
 #endif
+#include "../mdspan/include/mdspan/mdspan.hpp"
 
 // Here are the system specific libaries
 #ifdef _WIN32

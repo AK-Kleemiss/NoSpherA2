@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "cube.h"
 #include "isosurface.h"
 
@@ -556,7 +557,7 @@ bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>
     // 1) Write each triangle’s vertices
     //    Keep track of how many vertices we’ve written so far
     //    so we can index them properly in the 'f' lines.
-    size_t vertexCount = 0;
+    //size_t vertexCount = 0;
     for (const auto& tri : triangles) {
         // "v x y z"
         file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";
@@ -596,7 +597,7 @@ bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>
     // 1) Write each triangle’s vertices
     //    Keep track of how many vertices we’ve written so far
     //    so we can index them properly in the 'f' lines.
-    size_t vertexCount = 0;
+    //size_t vertexCount = 0;
     for (const auto& tri : triangles) {
         // "v x y z"
         file << "v " << tri.get_v(1)[0] << " " << tri.get_v(1)[1] << " " << tri.get_v(1)[2] << "\n";

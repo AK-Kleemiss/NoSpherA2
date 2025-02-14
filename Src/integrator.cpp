@@ -6,16 +6,15 @@
 
 #define lapack_complex_float std::complex<float>
 #define lapack_complex_double std::complex<double>
-#include <memory>
-#include <cstddef>
+
 #include "lapacke.h"
 #include "cblas.h"
 
-vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
+vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
 {
-    const int I = v1.size();
-    const int J = v1[0].size();
-    const int P = v1[0][0].size();
+    const int I = v1.extent(0);
+    const int J = v1.extent(1);
+    const int P = v1.extent(2);
     // Initialize the result vector
     vec rho(P, 0.0);
 
@@ -26,7 +25,7 @@ vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
         {
             for (int j = 0; j < J; ++j)
             {
-                rho[p] += v1[i][j][p] * v2[i][j];
+                rho[p] += v1[std::array{ i, j, p }] * v2[std::array{ i,j }];
             }
         }
     }
@@ -117,7 +116,7 @@ vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem
     wavy_aux.delete_basis_set();
     Int_Params aux_basis(wavy_aux, auxname);
 
-    vec2 dm = wavy.get_dm();
+    dMatrix2 dm = wavy.get_dm();
 
     // Compute integrals
     if (metric == 'C')
@@ -178,8 +177,8 @@ int fixed_density_fit_test()
     //     file2.close();
     // }
 
-    vec2 dm = wavy_gbw.get_dm();
-    vec3 eri3c_3d = reshape(eri3c, {normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao()});
+    dMatrix2 dm = wavy_gbw.get_dm();
+    dMatrix3 eri3c_3d = reshape(eri3c, Shape3D({ normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() }));
     // Perform contractions using BLAS
     vec rho_test = einsum_ijk_ij_p(eri3c_3d, dm);
 
