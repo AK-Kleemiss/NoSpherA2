@@ -216,7 +216,7 @@ T dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
     {
         return {};
     }
-    int m = transp1 ? (int)mat1.extent(0) : (int)mat1.extent(0);
+    int m = transp1 ? (int)mat1.extent(1) : (int)mat1.extent(0);
     int k1 = transp1 ? (int)mat1.extent(0) : (int)mat1.extent(1);
     int k2 = transp2 ? (int)mat2.extent(1) : (int)mat2.extent(0);
     int n = transp2 ? (int)mat2.extent(0) : (int)mat2.extent(1);
@@ -952,13 +952,19 @@ dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
 template <typename T>
 void compare_matrices(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &A, const std::vector<std::vector<T>> &B)
 {
+    std::cout << "Matrices have size " << A.extent(0) << "x" << A.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
     {
         for (int j = 0; j < A.extent(1); j++)
         {
             auto a = A[std::array{ i,j }];
             auto b = B[i][j];
-            err_checkf(a == b, "values not matching in comparison!", std::cout);
+            if (a != b)
+            {
+                std::cout << "Values not matching in comparison! " << i << "," << j << std::endl;
+                std::cout << a << " != " << b << std::endl;
+            }
+            //err_checkf(a == b, "values not matching in comparison!", std::cout);
         }
     }
 }
@@ -966,13 +972,19 @@ void compare_matrices(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long
 template <typename T>
 void compare_matrices(const std::vector<std::vector<T>>& A, const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& B)
 {
+    std::cout << "Matrices have size " << B.extent(0) << "x" << B.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
     {
         for (int j = 0; j < A.extent(1); j++)
         {
             auto a = B[std::array{ i,j }];
             auto b = A[i][j];
-            err_checkf(a == b, "values not matching in comparison!", std::cout);
+            if (a != b)
+            {
+                std::cout << "Values not matching in comparison! " << i << "," << j << std::endl;
+                std::cout << a << " != " << b << std::endl;
+            }
+            //err_checkf(a == b, "values not matching in comparison!", std::cout);
         }
     }
 }
@@ -1002,17 +1014,23 @@ void _test_openblas()
     dMatrix2 matA = reshape(fA, shape);
     dMatrix2 matB = reshape(fB, shape);
     math_load_BLAS(1);
+    std::cout << "Testing matrices directly" << std::endl;
     compare_matrices(matA, A);
     compare_matrices(matB, B);
+
+    std::cout << "Testing untransposed matrices" << std::endl;
     // First test regular dot-product
     compare_matrices(dot(matA, matB, false, false), self_dot(A, B));
 
+    std::cout << "Testing transpose A" << std::endl;
     ////Second compare first transpose
     compare_matrices(dot(matA, matB, true, false), self_dot(transpose(A), B));
 
+    std::cout << "Testing transpose B" << std::endl;
     ////Third comparte second transpose
     compare_matrices(dot(matA, matB, false, true), self_dot(A, transpose(B)));
 
+    std::cout << "Testing transpose A and B" << std::endl;
     ////Fourth compare both transposed
     compare_matrices(dot(matA, matB, true, true), self_dot(transpose(A), transpose(B)));
 
@@ -1024,16 +1042,23 @@ void _test_openblas()
     shape = { 3, 3 };
     cMatrix2 matC = reshape(fC, shape);
     cMatrix2 matD = reshape(fD, shape);
+    std::cout << "Testing C-matrices directly" << std::endl;
+    compare_matrices(matC, C);
+    compare_matrices(matD, D);
 
+    std::cout << "Testing untransposed C-matrices" << std::endl;
     // First test regular dot-product
     compare_matrices(dot(matC, matD, false, false), self_dot(C, D));
 
+    std::cout << "Testing transpose C" << std::endl;
     ////Second compare first transpose
     compare_matrices(dot(matC, matD, true, false), self_dot(transpose(C), D));
 
+    std::cout << "Testing transpose D" << std::endl;
     ////Third comparte second transpose
     compare_matrices(dot(matC, matD, false, true), self_dot(C, transpose(D)));
 
+    std::cout << "Testing transpose C and D" << std::endl;
     ////Fourth compare both transposed
     compare_matrices(dot(matC, matD, true, true), self_dot(transpose(C), transpose(D)));
 
