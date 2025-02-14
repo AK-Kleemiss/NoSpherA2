@@ -25,16 +25,24 @@ GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
 GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP
 
 omp: 
-	@echo 'Building OpenMP'
-	cd ../llvm-project/openmp && mkdir -p build && cd build && cmake .. -DCMAKE_C_COMPILER=${C_COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF && make -j
+	@if [ ! -f $(LIBOMP) ]; then \
+		echo 'Building OpenMP, since $(LIBOMP) doesnt exist'; \
+		cd ../llvm-project/openmp && mkdir -p build && cd build && cmake .. -DCMAKE_C_COMPILER=${C_COMP} -DCMAKE_CXX_COMPILER=${COMP} -DCMAKE_BUILD_TYPE=Release -DLIBOMP_ENABLE_SHARED=OFF && make -j; \
+	else \
+		echo 'Skipping OpenMP build, $(LIBOMP) already exists'; \
+	fi
 
 OpenBLAS: 
-	@echo 'Building OpenBLAS'
-	cd ../OpenBLAS && make -j && mkdir installation && make install PREFIX=installation
+	@if [ ! -f $(LIBOPENBLAS) ]; then \
+		echo 'Building OpenBLAS, since $(LIBOPENBLAS) doesnt exist'; \
+		cd ../OpenBLAS && make -j && ${RM} installation && make install PREFIX=installation; \
+	else \
+		echo 'Skipping OpenBLAS build, $(LIBOPENBLAS) already exists'; \
+	fi
 
 # Precompiled header
 pch.h.gch: ../Src/pch.h omp OpenBLAS
-	${COMP} -std=c++23 -x c++-header -o pch.h.gch ../Src/pch.h
+	${COMP} -std=c++23 -x c++-header -o "$@" "$<"
 
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch omp OpenBLAS
