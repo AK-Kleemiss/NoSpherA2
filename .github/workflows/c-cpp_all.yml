@@ -45,7 +45,7 @@ jobs:
       uses: microsoft/setup-msbuild@v2
     - name: make_OpenBLAS
       run: >
-          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
+          cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
     - name: make_Windows
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
     - name: Upload .exe
@@ -62,14 +62,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: install_compiler
       run: sudo apt update && sudo apt install build-essential
-    - name: make_OpenMP
-      run: >
-          git clone --depth 1 https://github.com/llvm/llvm-project.git && cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DLIBOMP_ENABLE_SHARED=OFF .. && make
-    - name: make_OpenBLAS
-      run: >
-          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
     - name: make_Linux
-      run: sudo apt update && sudo apt install build-essential && make NoSpherA2
+      run: make
     - name: tmate session if tests fail build
       if: failure() && github.event_name == 'workflow_dispatch'
       uses: mxschmitt/action-tmate@v3
