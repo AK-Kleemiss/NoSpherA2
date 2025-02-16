@@ -168,7 +168,7 @@ bool cube::read_file(bool full, bool header, bool expert)
             while (reads2 < size[2] && !file.eof())
             {
                 getline(file, line);
-                reads1 = sscanf(line.c_str(), "%lf%lf%lf%lf%lf%lf",
+                reads1 = sscanf_s(line.c_str(), "%lf%lf%lf%lf%lf%lf",
                                 &tmp[0],
                                 &tmp[1],
                                 &tmp[2],
@@ -839,7 +839,7 @@ cube cube::operator+(cube &right) const
                 if (!right.get_loaded())
                 {
                     getline(file2, line2);
-                    reads1 = sscanf(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
+                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
                                     &tmp[0],
                                     &tmp[1],
                                     &tmp[2],
@@ -932,7 +932,7 @@ cube cube::operator-(cube &right) const
                 if (!right.get_loaded())
                 {
                     getline(file2, line2);
-                    reads1 = sscanf(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
+                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
                                     &tmp[0],
                                     &tmp[1],
                                     &tmp[2],
@@ -1025,7 +1025,7 @@ cube cube::operator*(cube &right) const
                 if (!right.get_loaded())
                 {
                     getline(file2, line2);
-                    reads1 = sscanf(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
+                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
                                     &tmp[0],
                                     &tmp[1],
                                     &tmp[2],
@@ -1125,7 +1125,7 @@ cube cube::operator/(cube &right) const
                 if (!right.get_loaded())
                 {
                     getline(file2, line2);
-                    reads1 = sscanf(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
+                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
                                     &tmp[0],
                                     &tmp[1],
                                     &tmp[2],

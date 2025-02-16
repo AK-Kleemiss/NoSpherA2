@@ -389,7 +389,7 @@ double calc_d_i(const std::array<double, 3>& p_t, const WFN& wavy) {
 
 void get_colour(Triangle& t, double(*func)(const std::array<double, 3>&, const WFN&), const WFN& wavy, std::array<std::array<int, 3>, 3> Colourcode, double low_lim, double high_lim) {
     const double mid_point = (low_lim + high_lim) / 2.0;
-    const double range = high_lim - low_lim;
+    //const double range = high_lim - low_lim;
     RGB colour;
     const std::array<double, 3> p = t.calc_center();
     double val = func(p, wavy);

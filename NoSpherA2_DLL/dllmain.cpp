@@ -1,4 +1,5 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
+#include "../Src/pch.h"
 #include "pch_dll.h"
 
 BOOL APIENTRY DllMain( HMODULE hModule,

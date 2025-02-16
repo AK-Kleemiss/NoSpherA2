@@ -246,7 +246,7 @@ class ProgressBar
 public:
     ~ProgressBar();
 
-    ProgressBar(const int &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
+    ProgressBar(const unsigned long long &worksize, const int &bar_width = 60, const std::string &fill = "#", const std::string &remainder = " ", const std::string &status_text = "")
         : worksize_(worksize), bar_width_(bar_width), fill_(fill), remainder_(remainder), status_text_(status_text), workdone(0), progress_(0.0f), workpart_(100.0f / worksize), percent_((worksize / 100 > 1) ? worksize / 100 : 1)
     {
         int bw = bar_width_ + 2;
@@ -279,14 +279,14 @@ public:
     void write_progress(std::ostream &os = std::cout);
 
 private:
-    const int worksize_;
+    const unsigned long long worksize_;
     const float workpart_;
-    const int percent_;
+    const unsigned long long percent_;
     int bar_width_;
     std::string fill_;
     std::string remainder_;
     std::string status_text_;
-    std::atomic<int> workdone;
+    std::atomic<unsigned long long> workdone;
     float progress_;
     std::streampos linestart;
 #ifdef _WIN32

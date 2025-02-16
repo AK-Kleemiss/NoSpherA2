@@ -2,19 +2,14 @@
 #include <filesystem>
 
 #include "convenience.h"
-#include "JKFit.h"
-#include "wfn_class.h"
-
-#include "nos_math.h"
 #include "SALTED_io.h"
-#include "SALTED_utilities.h"
-#include "SALTED_equicomb.h"
+#include "wfn_class.h"
 
 class SALTEDPredictor
 {
 public:
-    SALTEDPredictor(const WFN &wavy, options &opt);
-    SALTEDPredictor();
+    SALTEDPredictor(const WFN &wavy, options &opt_in);
+    SALTEDPredictor() = default;
 
     const std::string get_dfbasis_name() const;
     vec gen_SALTED_densities();
@@ -27,9 +22,11 @@ public:
 
 private:
     Config config;
-    options &_opt;
 
     int natoms;
+    std::filesystem::path SALTED_DIR;
+    std::filesystem::path coef_file;
+    bool debug;
     std::vector<std::string> atomic_symbols{};
     std::unordered_map<std::string, std::vector<int>> atom_idx{};
     std::unordered_map<std::string, int> natom_dict{}, lmax{}, nmax{};
@@ -49,3 +46,4 @@ private:
 
     vec predict();
 };
+

@@ -1,5 +1,6 @@
 // pch_dll.cpp: source file corresponding to the pre-compiled header
 
+#include "../Src/pch.h"
 #include "pch_dll.h"
 #include "../Src/cube.h"
 #include "../Src/properties.h"

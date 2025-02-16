@@ -11,6 +11,7 @@ import std;
 #include "scattering_factors.h"
 #include "properties.h"
 #include "isosurface.h"
+#include "nos_math.h"
 
 int main(int argc, char **argv)
 {

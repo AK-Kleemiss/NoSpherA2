@@ -1,25 +1,30 @@
+#include "pch.h"
 #include "SALTED_predictor.h"
+#include "SALTED_utilities.h"
+#include "SALTED_equicomb.h"
+#include "nos_math.h"
 #include "constants.h"
 #include "wfn_class.h"
-#include "pch.h"
 #include <filesystem>
 
 //-SALTED D:\Models\Iron_Complex -cif mohrs_salt_IAM.cif -wfn mohrs_salt_IAM.xyz  -cpus 8 -hkl_min_max -14 14 -12 27 -19 20
 // std::string find_first_h5_file(const std::string& directory_path)
-SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt_in)
+SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {
-    std::filesystem::path _path = _opt.SALTED_DIR;
+    std::filesystem::path _path = opt_in.SALTED_DIR;
+    SALTED_DIR = opt_in.SALTED_DIR;
+    debug = opt_in.debug;
 
-    config.h5_filename = find_first_h5_file(_opt.SALTED_DIR);
+    config.h5_filename = find_first_h5_file(SALTED_DIR);
 
     if (config.h5_filename == "")
     {
-        if (_opt.debug)
+        if (debug)
         {
             std::cout << "No HDF5 file found in the SALTED directory. Using inputs.txt instead." << std::endl;
         }
         _path = _path / "inputs.txt";
-        if (_opt.debug)
+        if (debug)
         {
             std::cout << "Using inputs file: " << _path << std::endl;
         }
@@ -27,7 +32,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
     }
     else
     {
-        if (_opt.debug)
+        if (debug)
         {
             std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
         }
@@ -69,19 +74,18 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in) : _opt(opt
         std::filesystem::path new_fn = wavy.get_path().parent_path() / "SALTED_temp.xyz";
         wavy.write_xyz(new_fn);
         wavy.set_path(new_fn);
-        _opt.needs_Thakkar_fill = true;
+        opt_in.needs_Thakkar_fill = true;
     }
     else
     {
         wavy = wavy_in;
     }
     wavy.write_xyz("temp_rascaline.xyz");
+    natoms = wavy.get_ncen();
     config.predict_filename = "temp_rascaline.xyz";
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
 }
-
-SALTEDPredictor::SALTEDPredictor() : _opt(*(new options())) {}
 
 const std::string SALTEDPredictor::get_dfbasis_name() const
 {
@@ -118,7 +122,7 @@ void SALTEDPredictor::setup_atomic_environment()
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);
 
     // Print all Atomic symbols
-    if (_opt.debug)
+    if (debug)
     {
         std::cout << "Atomic symbols: ";
         for (const auto &symbol : atomic_symbols)
@@ -176,8 +180,8 @@ void SALTEDPredictor::read_model_data()
     std::ostringstream stream;
     stream << std::fixed << std::setprecision(1) << config.zeta;
     std::string zeta_str = stream.str();
-    H5::H5File features(_opt.SALTED_DIR / "GPR_data" / ("FEAT_M-" + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
-    H5::H5File projectors(_opt.SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
+    H5::H5File features(SALTED_DIR / "GPR_data" / ("FEAT_M-" + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
+    H5::H5File projectors(SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
     std::vector<hsize_t> dims_out_descrip;
     std::vector<hsize_t> dims_out_proj;
     for (string spe : config.species)
@@ -207,19 +211,19 @@ void SALTEDPredictor::read_model_data()
 
     for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
     {
-        wigner3j[lam] = readVectorFromFile<double>(_opt.SALTED_DIR / "wigners" / ("wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat"));
+        wigner3j[lam] = readVectorFromFile<double>(SALTED_DIR / "wigners" / ("wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat"));
     }
 
     if (config.sparsify)
     {
-        filesystem::path path = _opt.SALTED_DIR / "GPR_data" / ("fps" + to_string(config.ncut) + "-");
+        filesystem::path path = SALTED_DIR / "GPR_data" / ("fps" + to_string(config.ncut) + "-");
         vfps = read_fps<int64_t>(path, SALTED_Utils::get_lmax_max(lmax));
     };
     if (config.average)
     {
         for (string spe : config.species)
         {
-            filesystem::path path = _opt.SALTED_DIR / "averages" / ("averages_" + spe + ".npy");
+            filesystem::path path = SALTED_DIR / "averages" / ("averages_" + spe + ".npy");
             read_npy(path, av_coefs[spe]);
         }
     }
@@ -233,7 +237,7 @@ void SALTEDPredictor::read_model_data()
     }
     else
     {
-        filesystem::path path = _opt.SALTED_DIR / "GPR_data" / ("weights_N" + to_string(ntrain) + "_reg-6.npy");
+        filesystem::path path = SALTED_DIR / "GPR_data" / ("weights_N" + to_string(ntrain) + "_reg-6.npy");
         read_npy(path, weights);
     }
 }
@@ -241,7 +245,7 @@ void SALTEDPredictor::read_model_data()
 void SALTEDPredictor::read_model_data_h5()
 {
     using namespace std;
-    const filesystem::path _H5path = _opt.SALTED_DIR / config.h5_filename;
+    const filesystem::path _H5path = SALTED_DIR / config.h5_filename;
     H5::H5File input(_H5path, H5F_ACC_RDONLY);
     vector<hsize_t> dims_out_descrip;
     vector<hsize_t> dims_out_proj;
@@ -525,17 +529,17 @@ vec SALTEDPredictor::predict()
 vec SALTEDPredictor::gen_SALTED_densities()
 {
     using namespace std;
-    if (_opt.coef_file != "")
+    if (coef_file != "")
     {
         vec coefs{};
-        cout << "Reading coefficients from file: " << _opt.coef_file << endl;
-        read_npy<double>(_opt.coef_file, coefs);
+        cout << "Reading coefficients from file: " << coef_file << endl;
+        read_npy<double>(coef_file, coefs);
         return coefs;
     }
 
     // Run generation of tsc file
     _time_point start;
-    if (_opt.debug)
+    if (debug)
         start = get_time();
 
     setup_atomic_environment();

@@ -176,8 +176,28 @@ double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b)
 std::filesystem::path get_home_path(void)
 {
 #ifdef _WIN32
-    std::string temp1 = getenv("HOMEDRIVE");
-    std::string temp2 = getenv("HOMEPATH");
+    char* homeDrive = nullptr;
+    size_t len = 0;
+    std::string temp1, temp2;
+
+    errno_t err = _dupenv_s(&homeDrive, &len, "HOMEDRIVE");
+    if (err == 0 && homeDrive != nullptr) {
+        temp1 = homeDrive;
+        // Free the allocated memory
+        free(homeDrive);
+    }
+    else {
+        std::cerr << "Failed to retrieve the environment variable." << std::endl;
+    }
+    err = _dupenv_s(&homeDrive, &len, "HOMEPATH");
+    if (err == 0 && homeDrive != nullptr) {
+        temp2 = homeDrive;
+        // Free the allocated memory
+        free(homeDrive);
+    }
+    else {
+        std::cerr << "Failed to retrieve the environment variable." << std::endl;
+    }
     temp1.append(temp2);
     return temp1;
 #else
@@ -2234,7 +2254,7 @@ void options::digest_options()
             cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {
-                int k_max = stod(arguments[i + 2]);
+                int k_max = stoi(arguments[i + 2]);
                 if (argc >= i + 4)
                     residual.ewald_sum(k_max, stod(arguments[i + 3]));
                 else

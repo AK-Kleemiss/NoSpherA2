@@ -14,8 +14,11 @@
 #include <filesystem>
 #define WIN32_LEAN_AND_MEAN // Exclude rarely-used stuff from Windows headers
 // Windows Header Files
+#define NOMINMAX
 #include <windows.h>
+#include "../Src/pch.h"
 #include "../Src/isosurface.h"
+#include "../mdspan/include/mdspan/mdspan.hpp"
 
 #ifdef _WIN32
 #ifdef BUILDING_DLL
