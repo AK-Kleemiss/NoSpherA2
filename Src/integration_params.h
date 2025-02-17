@@ -130,7 +130,7 @@
 #define BLKSIZE 8
 
 //Temporary basis set format
-typedef struct LibCintBasis {
+struct LibCintBasis {
     vec coefficients;
     vec exponents;
     int env_idx;
@@ -191,20 +191,20 @@ public:
 
 
 
-typedef struct {
+struct PairData {
     double rij[3];
     double eij;
     double cceij;
-} PairData;
+};
 
-typedef struct {
+struct CINTOpt {
     int** index_xyz_array; // LMAX1**4 pointers to index_xyz
     int** non0ctr;
     int** sortedidx;
     int nbas;
     double** log_max_coeff;
     PairData** pairdata;  // NULL indicates not-initialized, NO_VALUE can be skipped
-} CINTOpt;
+};
 
 typedef struct {
     double c00x[32];

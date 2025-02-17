@@ -40,21 +40,8 @@ struct Shape4D
     }
 };
 
-//// To_2D
-//template <typename T>
-//std::vector<std::vector<T>> reshape(const std::vector<T>& flatVec, Shape2D sizes);
-//// To_3D
-//template <typename T>
-//std::vector<std::vector<std::vector<T>>> reshape(const std::vector<T>& flatVec, Shape3D sizes);
-
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>>& fmat, Shape2D size);
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape2D size);
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape3D size);
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape4D size);
+template <typename mat_t, typename vec_t, typename Shape_t>
+mat_t reshape(vec_t& flatVec, Shape_t size);
 
 // TRANSPOSES
 // 3D MATRIX
@@ -89,13 +76,13 @@ vec3 collectRows(const vec3 &cube, const ivec &indices);
 // FLATTEN Operation
 //  Flatten vector 2D
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<T>> &vec2D);
+T flatten(const std::vector<T>& vec2D);
 // Flatten vector 3D
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
+T flatten(const std::vector<std::vector<T>> &vec3D);
 
-template <typename T, typename eT>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> flatten(const Kokkos::mdspan<T, eT>& vecND);
+template <typename T1, typename T2>
+T1 flatten(const T2& vecND);
 
 // SLICE Operation
 std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length);
@@ -124,11 +111,11 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
 template <typename T>
 Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat1, const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
+T dot_BLAS(const T& Mat1, const T& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 
 //Own implementation of matrix multiplication
 template <typename T>
-std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>>& mat1, const std::vector<std::vector<T>>& mat2, bool transp1 = false, bool transp2 = false);
+T self_dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
 
 
 

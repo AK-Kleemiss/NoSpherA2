@@ -6,63 +6,72 @@
 #include "lapacke.h" // for LAPACKE_xxx
 #include "cblas.h"
 
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(Kokkos::mdspan < T, Kokkos::extents<unsigned long long, std::dynamic_extent>>& fmat, Shape2D size)
-{
-    Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent> e1(size.rows, size.cols);
-    Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result(fmat.data_handle(), e1);
-    return result;
+
+template <typename mat_t, typename vec_t, typename Shape_t>
+mat_t reshape(vec_t& flatVec, Shape_t size) {
+    if constexpr (std::is_same_v<vec_t, std::vector<double>> || std::is_same_v<vec_t, std::vector<cdouble>> || std::is_same_v<vec_t, std::vector<int>>) {
+        if constexpr (std::is_same_v<Shape_t, Shape2D>) {
+            mat_t result(flatVec.data(), size.rows, size.cols);
+            return result;
+        }
+        else if constexpr (std::is_same_v<Shape_t, Shape3D>) {
+            mat_t result(flatVec.data(), size.depth, size.rows, size.cols);
+            return result;
+        }
+        else if constexpr (std::is_same_v<Shape_t, Shape4D>) {
+            mat_t result(flatVec.data(), size.depth, size.rows, size.cols, size.time);
+            return result;
+        }
+        else {
+            err_checkf(false, "Invalid Shape!", std::cout);
+        }
+    }
+    else if constexpr (std::is_same_v < vec_t, dMatrix1> || std::is_same_v < vec_t, cMatrix1> || std::is_same_v < vec_t, iMatrix1>) {
+        if constexpr (std::is_same_v<Shape_t, Shape2D>) {
+            mat_t result(flatVec.data_handle(), size.rows, size.cols);
+            return result;
+        }
+        else if constexpr (std::is_same_v<Shape_t, Shape3D>) {
+            mat_t result(flatVec.data_handle(), size.depth, size.rows, size.cols);
+            return result;
+        }
+        else if constexpr (std::is_same_v<Shape_t, Shape4D>) {
+            mat_t result(flatVec.data_handle(), size.depth, size.rows, size.cols, size.time);
+            return result;
+        }
+        else {
+            err_checkf(false, "Invalid Shape!", std::cout);
+        }
+    }
+    else {
+        err_checkf(false, "Invalid Types!", std::cout);
+    }
 }
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(dMatrix1& fmat, Shape2D size);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(cMatrix1& fmat, Shape2D size);
 template Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(iMatrix1& fmat, Shape2D size);
-
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape2D size) {
-
-        Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent> e1(size.rows, size.cols);
-        Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result(flatVec.data(), e1);
-        return result;
-}
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(vec& flatVec, Shape2D size);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(cvec& flatVec, Shape2D size);
 template Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(ivec& flatVec, Shape2D size);
-//template Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> reshape(bvec& flatVec, Shape2D size);
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape3D size) {
-
-        Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent> e1(size.depth, size.rows, size.cols);
-        Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> result(flatVec.data(), e1);
-        return result;
-}
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(vec& flatVec, Shape3D size);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(cvec& flatVec, Shape3D size);
 template Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(ivec& flatVec, Shape3D size);
-//template Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(bvec& flatVec, Shape3D size);
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(std::vector<T>& flatVec, Shape4D size) {
-
-        Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent> e1(size.depth, size.rows, size.cols, size.time);
-        Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> result(flatVec.data(), e1);
-        return result;
-}
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(vec& flatVec, Shape4D size);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(cvec& flatVec, Shape4D size);
 template Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(ivec& flatVec, Shape4D size);
-//template Kokkos::mdspan<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> reshape(bvec& flatVec, Shape4D size);
 
 // Flatten Vectors 2D
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<T>> &vec2D)
+T flatten(const std::vector<T> &vec2D)
 {
-    std::vector<T> flatVec;
+    T flatVec;
     size_t totalSize = 0;
     for (const auto &row : vec2D)
     {
         totalSize += row.size();
     }
     flatVec.reserve(totalSize);
-    for (const std::vector<T> &row : vec2D)
+    for (const T &row : vec2D)
     {
         // Use std::copy to copy the entire row at once
         flatVec.insert(flatVec.end(), row.begin(), row.end());
@@ -74,12 +83,12 @@ template cvec flatten(const cvec2 &vec2D);
 template ivec flatten(const ivec2 &vec2D);
 
 // Flatten Matrix ND
-template <typename T, typename eT>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> flatten(const Kokkos::mdspan<T, eT>& vecND)
+template <typename T1, typename T2>
+T1 flatten(const T2& vecND)
 {
     auto DH = vecND.data_handle();
     auto size = vecND.size();
-    Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> res (DH, size);
+    T1 res (DH, size);
     return res;
 }
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> flatten(const dMatrix2& vecND);
@@ -95,9 +104,9 @@ template Kokkos::mdspan<int, Kokkos::extents<unsigned long long, std::dynamic_ex
 
 // Flatten Vectors 3D
 template <typename T>
-std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D)
+T flatten(const std::vector<std::vector<T>> &vec3D)
 {
-    std::vector<T> flatVec;
+    T flatVec;
     size_t totalSize = 0;
     for (const auto &row : vec3D)
     {
@@ -107,9 +116,9 @@ std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D)
         }
     }
     flatVec.reserve(totalSize);
-    for (const std::vector<std::vector<T>> &row : vec3D)
+    for (const std::vector<T> &row : vec3D)
     {
-        for (const std::vector<T> &innerRow : row)
+        for (const T &innerRow : row)
         {
             // Use std::copy to copy the entire innerRow at once
             flatVec.insert(flatVec.end(), innerRow.begin(), innerRow.end());
@@ -139,7 +148,7 @@ std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t l
 // 2D x 2D MATRIX MULTIPLICATION
 // Slow direct implementation
 template <typename T>
-std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, const std::vector<std::vector<T>> &mat2, bool transp1, bool transp2)
+T self_dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 {
     // if either of the matrices is empty, return a empty matrix
     if (mat1.empty() || mat2.empty())
@@ -147,8 +156,8 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
         return {};
     }
 
-    std::vector<std::vector<T>> mat1Copy = mat1;
-    std::vector<std::vector<T>> mat2Copy = mat2;
+    T mat1Copy = mat1;
+    T mat2Copy = mat2;
 
     if (transp1)
     {
@@ -167,13 +176,15 @@ std::vector<std::vector<T>> self_dot(const std::vector<std::vector<T>> &mat1, co
     // Check if matrix multiplication is possible
     err_checkf(cols1 == rows2, "Matrix dimensions do not match for multiplication", std::cout);
 
-    std::vector<std::vector<T>> result(rows1, std::vector<T>(cols2, 0.0));
+    using v_t = typename T::value_type;
+
+    T result(rows1, v_t(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
     size_t total_size = rows1 * cols2;
 
 #pragma omp parallel
     {
-        std::vector<T> local_result(total_size, 0.0);
+        v_t local_result(total_size, 0.0);
         int i, j, k, flatIndex;
 
 #pragma omp for schedule(static) private(i, j, k, flatIndex) nowait
@@ -228,8 +239,6 @@ T dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
     if (has_BLAS)
     {
         // Flatten input matrices
-        //std::vector<T> flatMat1 = flatten(mat1);
-        //std::vector<T> flatMat2 = flatten(mat2);
         return dot_BLAS(mat1, mat2, m, k1, k2, n, transp1, transp2);
     }
     else
@@ -274,10 +283,6 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
     {
         std::cout << "Something went wrong, using dot fallback." << std::endl;
         exit(-1);
-        //std::vector<T> result_flat(m * n, 0.0);
-        //Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> mat1_2D = reshape(flatMat1, {m, k1});
-        //Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> mat2_2D = reshape(flatMat2, {n, k2});
-        //return self_dot(mat1_2D, mat2_2D, transp1, transp2);
     }
 }
 //template std::vector<std::vector<float>> dot(const std::vector<float> &flatMat1, const std::vector<float> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
@@ -333,17 +338,18 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
     Shape2D result_shape({ (unsigned long long)m, (unsigned long long)n });
-    return reshape(result_flat, result_shape);
+    return reshape< Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, result_shape);
 }
 //template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const vec & flatMat1, const vec & flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const cvec & flatMat1, const cvec & flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat1, const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2)
+T dot_BLAS(const T& Mat1, const T& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2)
 {
-    std::vector<T> result_flat(m * n, 0.0);
-    if constexpr (std::is_same_v<T, double>)
+    using v_t = T::value_type;
+    std::vector<v_t> result_flat(m * n, 0.0);
+    if constexpr (std::is_same_v<v_t, double>)
     {
         // Call cblas_dgemm
         cblas_dgemm(CblasRowMajor,
@@ -356,7 +362,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
             0.0,
             result_flat.data(), n);
     }
-    else if constexpr (std::is_same_v<T, float>)
+    else if constexpr (std::is_same_v<v_t, float>)
     {
         // Call cblas_sgemm
         cblas_sgemm(CblasRowMajor,
@@ -369,7 +375,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
             0.0f,
             result_flat.data(), n);
     }
-    else if constexpr (std::is_same_v<T, cdouble>)
+    else if constexpr (std::is_same_v<v_t, cdouble>)
     {
         cdouble one = cdouble(1.0, 0.0);
         cdouble zero = cdouble(0.0, 0.0);
@@ -388,7 +394,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
     Shape2D result_shape({ (unsigned long long)m, (unsigned long long)n });
-    return reshape(result_flat, result_shape);
+    return reshape<T>(result_flat, result_shape);
 }
 //template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template dMatrix2 dot_BLAS(const dMatrix2& Mat1, const dMatrix2& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
@@ -480,7 +486,7 @@ template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynami
 
 // Base implementation of matrix-vector multiplication
 template <typename T>
-std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> &vec, bool transp)
+T dot(const std::vector<T> &mat, const T &vec, bool transp)
 {
     int mat_rows = static_cast<int>(mat.size());
     int mat_cols = static_cast<int>(mat[0].size());
@@ -491,12 +497,12 @@ std::vector<T> dot(const std::vector<std::vector<T>> &mat, const std::vector<T> 
 
     if (has_BLAS)
     {
-        return dot_BLAS(flatten(mat), vec, mat_rows, mat_cols, transp);
+        return dot_BLAS<T>(flatten(mat), vec, mat_rows, mat_cols, transp);
     }
     else
     {
         std::cout << "Something went wrong, using dot fallback." << std::endl;
-        return self_dot(mat, vec, transp);
+        //return self_dot(mat, vec, transp);
     }
 }
 template std::vector<float> dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &vec, bool transp);
@@ -936,7 +942,7 @@ vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent)
 {
     vec result(matrix.size(), 0.0);
-    dMatrix2 result_m = reshape(result, Shape2D({matrix.extent(0), matrix.extent(1)}));
+    dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({matrix.extent(0), matrix.extent(1)}));
 
     for (size_t i = 0; i < matrix.extent(0); ++i)
     { // Iterate over rows
@@ -1007,12 +1013,12 @@ void _test_openblas()
     vec2 A = { {1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0} };
     vec2 B = { {1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0} };
     // Init Mat A with some values as a 3x3 matrix
-    vec fA = flatten(A);
+    vec fA = flatten<vec>(A);
     // Init Mat B with some values
-    vec fB = flatten(B);
+    vec fB = flatten<vec>(B);
     Shape2D shape = { 3, 3 };
-    dMatrix2 matA = reshape(fA, shape);
-    dMatrix2 matB = reshape(fB, shape);
+    dMatrix2 matA = reshape<dMatrix2>(fA, shape);
+    dMatrix2 matB = reshape<dMatrix2>(fB, shape);
     math_load_BLAS(1);
     std::cout << "Testing matrices directly" << std::endl;
     compare_matrices(matA, A);
@@ -1037,11 +1043,11 @@ void _test_openblas()
     // Init Complex matrices
     cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
     cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
-    cvec fC = flatten(C);
-    cvec fD = flatten(D);
+    cvec fC = flatten<cvec>(C);
+    cvec fD = flatten<cvec>(D);
     shape = { 3, 3 };
-    cMatrix2 matC = reshape(fC, shape);
-    cMatrix2 matD = reshape(fD, shape);
+    cMatrix2 matC = reshape<cMatrix2>(fC, shape);
+    cMatrix2 matD = reshape<cMatrix2>(fD, shape);
     std::cout << "Testing C-matrices directly" << std::endl;
     compare_matrices(matC, C);
     compare_matrices(matD, D);

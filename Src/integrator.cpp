@@ -42,7 +42,7 @@ void solve_linear_system(const vec2 &A, vec &b)
     const int lda = n;      // Leading dimension of eri2c
     const int ldb = n;      // Leading dimension of rho
     ivec ipiv(n, 0);        // Pivot indices
-    vec temp = flatten(transpose(A));
+    vec temp = flatten<vec>(transpose(A));
     // Call LAPACK function to solve the system
     int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
 
@@ -179,7 +179,7 @@ int fixed_density_fit_test()
     // }
 
     dMatrix2 dm = wavy_gbw.get_dm();
-    dMatrix3 eri3c_3d = reshape(eri3c, Shape3D({ normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() }));
+    dMatrix3 eri3c_3d = reshape<dMatrix3>(eri3c, Shape3D({ normal_basis.get_nao(), normal_basis.get_nao(), aux_basis.get_nao() }));
     // Perform contractions using BLAS
     vec rho_test = einsum_ijk_ij_p(eri3c_3d, dm);
 

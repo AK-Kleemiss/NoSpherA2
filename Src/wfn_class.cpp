@@ -2046,8 +2046,8 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         }
         occ.push_back(0);
     }
-    vec _coefficients = flatten(coefficients);
-    dMatrix2 m_coefs = reshape(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
+    vec _coefficients = flatten<vec>(coefficients);
+    dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
     dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
     DM = dot(temp_co, m_coefs);
     
@@ -2484,7 +2484,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
 
         vec2 reordered_coefs(dimension, vec(dimension, 0.0));
-        dMatrix2 coefs_2D = reshape(coefficients[0], Shape2D(dimension, dimension));
+        dMatrix2 coefs_2D = reshape<dMatrix2>(coefficients[0], Shape2D(dimension, dimension));
         int index = 0;
         for (int atom_idx = 0; atom_idx < atoms.size(); atom_idx++) {
             std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
@@ -6956,7 +6956,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
     vec tempvec(nbf*nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
-    dMatrix2 momat = reshape(tempvec, Shape2D(nmomax, nbf));
+    dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 
     // making it into the wavefunction data
     for (int i = 0; i < ncent; i++)

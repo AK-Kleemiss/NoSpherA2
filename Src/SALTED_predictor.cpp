@@ -190,9 +190,9 @@ void SALTEDPredictor::read_model_data()
         {
 
             vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
-            power_env_sparse[spe + std::to_string(lam)] = reshape(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
+            power_env_sparse[spe + std::to_string(lam)] = reshape<dMatrix2>(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
             vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            Vmat[spe + std::to_string(lam)] = reshape(temp_proj, Shape2D{(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]});
+            Vmat[spe + std::to_string(lam)] = reshape<dMatrix2>(temp_proj, Shape2D{(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]});
 
             if (lam == 0)
             {
@@ -200,8 +200,8 @@ void SALTEDPredictor::read_model_data()
             }
             if (config.zeta == 1)
             {
-                dMatrix2 tem_pr = reshape(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
-                dMatrix2 tem_pw = reshape(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
+                dMatrix2 tem_pr = reshape<dMatrix2>(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
+                dMatrix2 tem_pw = reshape<dMatrix2>(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
                 power_env_sparse[spe + std::to_string(lam)] = dot(tem_pr, tem_pw, true, false);
             }
         }
@@ -256,9 +256,9 @@ void SALTEDPredictor::read_model_data_h5()
             string spar_descrip = "sparse_descriptors/" + spe + "/" + to_string(lam);
             string proj = "projectors/" + spe + "/" + to_string(lam);
             vec temp_power = readHDF5<double>(input, spar_descrip, dims_out_descrip);
-            power_env_sparse[spe + to_string(lam)] = reshape(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
+            power_env_sparse[spe + to_string(lam)] = reshape<dMatrix2>(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
             vec temp_proj = readHDF5<double>(input, proj, dims_out_proj);
-            Vmat[spe + to_string(lam)] = reshape(temp_proj, Shape2D({(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]}));
+            Vmat[spe + to_string(lam)] = reshape<dMatrix2>(temp_proj, Shape2D({(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]}));
 
             if (lam == 0)
             {
@@ -266,8 +266,8 @@ void SALTEDPredictor::read_model_data_h5()
             }
             if (config.zeta == 1)
             {
-                dMatrix2 tem_pr = reshape(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
-                dMatrix2 tem_pw = reshape(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
+                dMatrix2 tem_pr = reshape<dMatrix2>(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
+                dMatrix2 tem_pw = reshape<dMatrix2>(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
                 power_env_sparse[spe + to_string(lam)] = dot(tem_pr, tem_pw, true, false);
             }
         }
@@ -383,7 +383,7 @@ vec SALTEDPredictor::predict()
                 // Copy the block directly into flatVec2
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
-            dMatrix2 m_pvec_lam = reshape(pvec_lam, Shape2D{ static_cast<unsigned long long>(atom_idx[spe].size()), static_cast<unsigned long long>(row_size) });
+            dMatrix2 m_pvec_lam = reshape<dMatrix2>(pvec_lam, Shape2D{ static_cast<unsigned long long>(atom_idx[spe].size()), static_cast<unsigned long long>(row_size) });
             dMatrix2 kernel_nm = dot(m_pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
 
             if (config.zeta == 1)
