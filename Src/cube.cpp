@@ -167,14 +167,15 @@ bool cube::read_file(bool full, bool header, bool expert)
             reads2 = rest2;
             while (reads2 < size[2] && !file.eof())
             {
+                reads1 = 0;
                 getline(file, line);
-                reads1 = sscanf_s(line.c_str(), "%lf%lf%lf%lf%lf%lf",
-                                &tmp[0],
-                                &tmp[1],
-                                &tmp[2],
-                                &tmp[3],
-                                &tmp[4],
-                                &tmp[5]);
+                std::istringstream iss(line);
+                for (int i = 0; i < 6; ++i) {
+                    if (!(iss >> tmp[i])) {
+                        tmp[i] = 0.0; // Default value if there are fewer than 6 values
+                        reads1 = i;
+                    }
+                }
                 reads2 += reads1;
                 rest2 = reads2 - size[2];
                 if (rest2 < 6 && rest2 > 0)
@@ -838,14 +839,15 @@ cube cube::operator+(cube &right) const
             {
                 if (!right.get_loaded())
                 {
+                    reads1 = 0;
                     getline(file2, line2);
-                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
-                                    &tmp[0],
-                                    &tmp[1],
-                                    &tmp[2],
-                                    &tmp[3],
-                                    &tmp[4],
-                                    &tmp[5]);
+                    std::istringstream iss(line2);
+                    for (int i = 0; i < 6; ++i) {
+                        if (!(iss >> tmp[i])) {
+                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
+							reads1 = i;
+                        }
+                    }
                     reads2 += reads1;
                     rest2 = reads2 - size[2];
                     if (rest2 < 6 && rest2 > 0)
@@ -931,14 +933,15 @@ cube cube::operator-(cube &right) const
             {
                 if (!right.get_loaded())
                 {
+                    reads1 = 0;
                     getline(file2, line2);
-                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
-                                    &tmp[0],
-                                    &tmp[1],
-                                    &tmp[2],
-                                    &tmp[3],
-                                    &tmp[4],
-                                    &tmp[5]);
+                    std::istringstream iss(line2);
+                    for (int i = 0; i < 6; ++i) {
+                        if (!(iss >> tmp[i])) {
+                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
+                            reads1 = i;
+                        }
+                    }
                     reads2 += reads1;
                     rest2 = reads2 - size[2];
                     if (rest2 < 6 && rest2 > 0)
@@ -1024,14 +1027,15 @@ cube cube::operator*(cube &right) const
             {
                 if (!right.get_loaded())
                 {
+                    reads1 = 0;
                     getline(file2, line2);
-                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
-                                    &tmp[0],
-                                    &tmp[1],
-                                    &tmp[2],
-                                    &tmp[3],
-                                    &tmp[4],
-                                    &tmp[5]);
+                    std::istringstream iss(line2);
+                    for (int i = 0; i < 6; ++i) {
+                        if (!(iss >> tmp[i])) {
+                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
+                            reads1 = i;
+                        }
+                    }
                     reads2 += reads1;
                     rest2 = reads2 - size[2];
                     if (rest2 < 6 && rest2 > 0)
@@ -1124,14 +1128,15 @@ cube cube::operator/(cube &right) const
             {
                 if (!right.get_loaded())
                 {
+                    reads1 = 0;
                     getline(file2, line2);
-                    reads1 = sscanf_s(line2.c_str(), "%lf%lf%lf%lf%lf%lf",
-                                    &tmp[0],
-                                    &tmp[1],
-                                    &tmp[2],
-                                    &tmp[3],
-                                    &tmp[4],
-                                    &tmp[5]);
+                    std::istringstream iss(line2);
+                    for (int i = 0; i < 6; ++i) {
+                        if (!(iss >> tmp[i])) {
+                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
+                            reads1 = i;
+                        }
+                    }
                     reads2 += reads1;
                     rest2 = reads2 - size[2];
                     if (rest2 < 6 && rest2 > 0)
