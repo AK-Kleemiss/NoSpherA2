@@ -2144,13 +2144,16 @@ void computeRho_Coulomb(Int_Params &param1,
             steps[step_idx - 1],
             steps[step_idx]};
 
-        unsigned long long int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+        unsigned int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
         std::cout << "Memory needed for rho: " << static_cast<double>(sizeof(double) * tot_size * naok) / 1024 / 1024 << " MB" << std::endl;
 
         // Compute 3-center integrals
         GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
         int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
+        auto s1 = dm.extent(0);
+        auto s2 = dm.extent(1);
+        std::cout << s1 << " " << s2 << std::endl;
         // einsum('ijk,ij->k', res, dm, out=rho)
         // This is 100% pure magic, thanks ChatGPT
         cblas_dgemv(CblasRowMajor, 

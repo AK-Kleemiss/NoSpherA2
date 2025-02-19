@@ -212,7 +212,6 @@ T self_dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 
     return result;
 }
-template std::vector<std::vector<float>> self_dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2, bool transp1, bool transp2);
 template vec2 self_dot(const vec2 &mat1, const vec2 &mat2, bool transp1, bool transp2);
 template cvec2 self_dot(const cvec2 &mat1, const cvec2 &mat2, bool transp1, bool transp2);
 
@@ -249,7 +248,6 @@ T dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
     }
     // return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
 }
-//template std::vector<std::vector<float>> dot(const std::vector<std::vector<float>> &mat1, const std::vector<std::vector<float>> &mat2, bool transp1, bool transp2);
 template dMatrix2 dot(const dMatrix2& mat1, const dMatrix2& mat2, bool transp1, bool transp2);
 template cMatrix2 dot(const cMatrix2& mat1, const cMatrix2& mat2, bool transp1, bool transp2);
 
@@ -285,7 +283,6 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
         exit(-1);
     }
 }
-//template std::vector<std::vector<float>> dot(const std::vector<float> &flatMat1, const std::vector<float> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const vec &flatMat1, const vec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const cvec &flatMat1, const cvec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 
@@ -304,19 +301,6 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
                     flatMat1.data(), transp1 ? m : k1,
                     flatMat2.data(), transp2 ? k2 : n,
                     0.0,
-                    result_flat.data(), n);
-    }
-    else if constexpr (std::is_same_v<T, float>)
-    {
-        // Call cblas_sgemm
-        cblas_sgemm(CblasRowMajor,
-                    transp1 ? CblasTrans : CblasNoTrans,
-                    transp2 ? CblasTrans : CblasNoTrans,
-                    m, n, k1,
-                    1.0f,
-                    flatMat1.data(), transp1 ? m : k1,
-                    flatMat2.data(), transp2 ? k2 : n,
-                    0.0f,
                     result_flat.data(), n);
     }
     else if constexpr (std::is_same_v<T, cdouble>)
@@ -340,7 +324,6 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
     Shape2D result_shape({ (unsigned long long)m, (unsigned long long)n });
     return reshape< Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, result_shape);
 }
-//template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const vec & flatMat1, const vec & flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const cvec & flatMat1, const cvec & flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 
@@ -360,19 +343,6 @@ T dot_BLAS(const T& Mat1, const T& Mat2, const int& m, const int& k1, const int&
             Mat1.data_handle(), transp1 ? m : k1,
             Mat2.data_handle(), transp2 ? k2 : n,
             0.0,
-            result_flat.data(), n);
-    }
-    else if constexpr (std::is_same_v<v_t, float>)
-    {
-        // Call cblas_sgemm
-        cblas_sgemm(CblasRowMajor,
-            transp1 ? CblasTrans : CblasNoTrans,
-            transp2 ? CblasTrans : CblasNoTrans,
-            m, n, k1,
-            1.0f,
-            Mat1.data_handle(), transp1 ? m : k1,
-            Mat2.data_handle(), transp2 ? k2 : n,
-            0.0f,
             result_flat.data(), n);
     }
     else if constexpr (std::is_same_v<v_t, cdouble>)
@@ -396,7 +366,6 @@ T dot_BLAS(const T& Mat1, const T& Mat2, const int& m, const int& k1, const int&
     Shape2D result_shape({ (unsigned long long)m, (unsigned long long)n });
     return reshape<T>(result_flat, result_shape);
 }
-//template std::vector<std::vector<float>> dot_BLAS(const std::vector<float> &mat1, const std::vector<float> &mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template dMatrix2 dot_BLAS(const dMatrix2& Mat1, const dMatrix2& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 template cMatrix2 dot_BLAS(const cMatrix2& Mat1, const cMatrix2& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 
@@ -443,7 +412,6 @@ std::vector<T> self_dot(const std::vector<std::vector<T>> &mat, const std::vecto
 
     return result;
 }
-template std::vector<float> self_dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &_vec, bool transp1);
 template vec self_dot(const vec2 &mat, const vec &_vec, bool transp1);
 template cvec self_dot(const cvec2 &mat, const cvec &_vec, bool transp1);
 
@@ -480,7 +448,6 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
 
     return result_m;
 }
-//template std::vector<std::vector<float>> diag_dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &_vec, bool transp1);
 template Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>&mat, const vec &_vec, bool transp1);
 template Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>&mat, const cvec &_vec, bool transp1);
 
@@ -505,7 +472,6 @@ T dot(const std::vector<T> &mat, const T &vec, bool transp)
         //return self_dot(mat, vec, transp);
     }
 }
-template std::vector<float> dot(const std::vector<std::vector<float>> &mat, const std::vector<float> &vec, bool transp);
 template vec dot(const vec2 &mat, const vec &vec, bool transp);
 template cvec dot(const cvec2 &mat, const cvec &vec, bool transp);
 
@@ -524,18 +490,6 @@ std::vector<T> dot_BLAS(const std::vector<T> &flatMat, const std::vector<T> &vec
                     flatMat.data(), transp ? m : n,
                     vec.data(), 1,
                     0.0,
-                    result.data(), 1);
-    }
-    else if constexpr (std::is_same_v<T, float>)
-    {
-        // Call cblas_sgemv
-        cblas_sgemv(CblasRowMajor,
-                    transp ? CblasTrans : CblasNoTrans,
-                    m, n,
-                    1.0f,
-                    flatMat.data(), transp ? m : n,
-                    vec.data(), 1,
-                    0.0f,
                     result.data(), 1);
     }
     else if constexpr (std::is_same_v<T, cdouble>)
@@ -558,7 +512,6 @@ std::vector<T> dot_BLAS(const std::vector<T> &flatMat, const std::vector<T> &vec
     }
     return result;
 }
-template std::vector<float> dot_BLAS(const std::vector<float> &flatMat, const std::vector<float> &vec, const int &m, const int &n, bool transp);
 template vec dot_BLAS(const std::vector<double> &flatMat, const std::vector<double> &vec, const int &m, const int &n, bool transp);
 template cvec dot_BLAS(const std::vector<cdouble> &flatMat, const std::vector<cdouble> &vec, const int &m, const int &n, bool transp);
 
@@ -580,18 +533,6 @@ T dot_BLAS(const T2& Mat, const T& vec, bool transp)
             Mat.data_handle(), transp ? m : n,
             vec.data_handle(), 1,
             0.0,
-            result.data(), 1);
-    }
-    else if constexpr (std::is_same_v<T, float>)
-    {
-        // Call cblas_sgemv
-        cblas_sgemv(CblasRowMajor,
-            transp ? CblasTrans : CblasNoTrans,
-            m, n,
-            1.0f,
-            Mat.data_handle(), transp ? m : n,
-            vec.data_handle(), 1,
-            0.0f,
             result.data(), 1);
     }
     else if constexpr (std::is_same_v<T, cdouble>)
@@ -641,14 +582,13 @@ T dot(const T2& mat, const T& vec, bool transp)
         //return self_dot(mat, vec, transp);
     }
 }
-//template std::vector<float> dot(const std::vector<std::vector<float>>& mat, const std::vector<float>& vec, bool transp);
 template dMatrix1 dot(const dMatrix2& mat, const dMatrix1& vec, bool transp);
 template cMatrix1 dot(const cMatrix2& mat, const cMatrix1& vec, bool transp);
 
 template <typename T>
 T conj(const T &val)
 {
-    if constexpr (std::is_same_v<T, cdouble>)
+    if constexpr (std::is_same_v<T, cdouble> || std::is_same_v<T, std::complex<int>>)
     {
         return std::conj(val);
     }
@@ -679,9 +619,8 @@ T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     return result;
 }
-template float self_dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
 template double self_dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
-template std::complex<double> self_dot(const std::vector<std::complex<double>> &vec1, const std::vector<std::complex<double>> &vec2, bool conjugate);
+template cdouble self_dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
 
 template <typename T>
 T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
@@ -705,7 +644,6 @@ T dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
         return self_dot(vec1, vec2, conjugate);
     }
 }
-template float dot(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
 template double dot(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
 template cdouble dot(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
 
@@ -716,11 +654,6 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     if constexpr (std::is_same_v<T, double>)
     {
         result = cblas_ddot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
-    }
-    else if constexpr (std::is_same_v<T, float>)
-    {
-        // Call cblas_sdot
-        result = cblas_sdot((int)vec1.size(), vec1.data(), 1, vec2.data(), 1);
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
@@ -739,7 +672,6 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     return result;
 }
-template float dot_BLAS(const std::vector<float> &vec1, const std::vector<float> &vec2, bool conjugate);
 template double dot_BLAS(const std::vector<double> &vec1, const std::vector<double> &vec2, bool conjugate);
 template cdouble dot_BLAS(const std::vector<cdouble> &vec1, const std::vector<cdouble> &vec2, bool conjugate);
 
