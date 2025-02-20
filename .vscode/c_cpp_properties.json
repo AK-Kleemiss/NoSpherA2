@@ -15,12 +15,15 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "windows-msvc-x64",
-            "compileCommands": "${workspaceFolder}/Windows/NoSpherA2/x64/Release + Copy/NoSpherA2.ClangTidy/compile_commands.json"
+            "compileCommands": [
+                "${workspaceFolder}/Windows/NoSpherA2/x64/Release + Copy/NoSpherA2.ClangTidy/compile_commands.json"
+            ]
         },
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/OpenBLAS/installation/include"
             ],
             "defines": [],
             "macFrameworkPath": [

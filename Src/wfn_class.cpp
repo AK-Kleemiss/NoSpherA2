@@ -2046,7 +2046,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         }
         occ.push_back(0);
     }
-    vec _coefficients = flatten<vec>(coefficients);
+    vec _coefficients = flatten<double>(coefficients);
     dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
     dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
     DM = dot(temp_co, m_coefs);

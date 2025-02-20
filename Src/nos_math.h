@@ -76,10 +76,10 @@ vec3 collectRows(const vec3 &cube, const ivec &indices);
 // FLATTEN Operation
 //  Flatten vector 2D
 template <typename T>
-T flatten(const std::vector<T>& vec2D);
+std::vector<T> flatten(const std::vector<std::vector<T>>& vec2D);
 // Flatten vector 3D
 template <typename T>
-T flatten(const std::vector<std::vector<T>> &vec3D);
+std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
 
 template <typename T1, typename T2>
 T1 flatten(const T2& vecND);
@@ -144,15 +144,15 @@ std::vector<T> self_dot(const std::vector<std::vector<T>>& mat, const std::vecto
 // 1D x 1D MATRIX MULTIPLICATION
 // Wrapper for BLAS dot product
 template <typename T>
-T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+T dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 
 //BLAS implementation of matrix multiplication 1D x 1D
 template <typename T>
-T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+T dot_BLAS(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate = false);
 
 // Self written matrix multiplication with flat vectors
 template <typename T>
-T self_dot(const std::vector<T>& vec1, const std::vector<T>& vec2, bool conjugate);
+std::vector<T> dot(const std::vector<T> &mat, const std::vector<T> &vec, bool transp = false);
 
 template <typename T>
 Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);

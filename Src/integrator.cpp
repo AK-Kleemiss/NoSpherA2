@@ -42,7 +42,7 @@ void solve_linear_system(const vec2 &A, vec &b)
     const int lda = n;      // Leading dimension of eri2c
     const int ldb = n;      // Leading dimension of rho
     ivec ipiv(n, 0);        // Pivot indices
-    vec temp = flatten<vec>(transpose(A));
+    vec temp = flatten<double>(transpose(A));
     // Call LAPACK function to solve the system
     int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
 
