@@ -171,14 +171,13 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<st
 
 void _test_openblas()
 {
-
-    vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-    vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
     // Init Mat A with some values as a 3x3 matrix
-    vec fA = flatten<double>(A);
+    vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
     // Init Mat B with some values
-    vec fB = flatten<double>(B);
+    vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
     Shape2D shape = {3, 3};
+	auto fA = flatten<double>(A);
+	auto fB = flatten<double>(B);
     dMatrix2 matA = reshape<dMatrix2>(fA, shape);
     dMatrix2 matB = reshape<dMatrix2>(fB, shape);
     math_load_BLAS(1);

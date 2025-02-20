@@ -8,19 +8,13 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/NoSpherA2_Rascaline_Debug",
+            "program": "${workspaceFolder}/NoSpherA2_Debug",
             "args": [
-                "-SALTED",
-                "Model",
-                "-cif",
-                "test_cysteine.cif",
-                "-wfn",
-                "test_cysteine.xyz",
-                "-dmin",
-                "0.5"
+                "-blastest",
+                "-no-date"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/tests/SALTED",
+            "cwd": "${workspaceFolder}/tests/OpenBLAS",
             "environment": [],
             "externalConsole": false,
             "MIMode": "gdb",

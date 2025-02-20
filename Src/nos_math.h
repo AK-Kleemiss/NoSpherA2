@@ -41,7 +41,7 @@ struct Shape4D
 };
 
 template <typename mat_t, typename vec_t, typename Shape_t>
-mat_t reshape(vec_t& flatVec, Shape_t size);
+mat_t reshape(vec_t& flatVec, const Shape_t size);
 
 // TRANSPOSES
 // 3D MATRIX
