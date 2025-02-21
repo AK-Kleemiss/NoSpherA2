@@ -2,22 +2,8 @@
 
 #include "convenience.h"
 #include "npy.h"
-#include "H5Cpp.h"
-#include <H5public.h>
-#include <H5Dpublic.h>
-#include <H5Opublic.h>
 
-// vec2 readHDF5(H5::H5File file, std::string dataset_name);
-
-template <typename T>
-void readHDF5Data(H5::DataSet &dataset, std::vector<T> &data);
-
-template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-//template <typename T>
-//Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-
-std::filesystem::path find_first_h5_file(const std::filesystem::path &directory_path);
+std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path);
 
 template <class T>
 std::vector<T> readVectorFromFile(const std::filesystem::path &filename);
@@ -28,11 +14,12 @@ std::unordered_map<int, std::vector<T>> read_fps(std::filesystem::path &filename
 template <typename Scalar>
 void read_npy(std::filesystem::path &filename, std::vector<Scalar> &data);
 
+
 struct Config
 {
 public:
-    bool from_h5;
-    std::filesystem::path h5_filename = "";
+    bool from_binary;
+    std::filesystem::path salted_filename;
     std::filesystem::path predict_filename;
     bool average;
     bool field;
@@ -61,25 +48,58 @@ public:
     int nspe2 = -1;
 
     void populateFromFile(const std::filesystem::path &filename);
-    void populateFromFile(const H5::H5File file);
-
 private:
     std::vector<std::string> parseVector(const std::string &str);
-    void populate_config(const std::filesystem::path &dataset_name, const int &data);
-    void populate_config(const std::filesystem::path &dataset_name, const float &data);
-    void populate_config(const std::filesystem::path &dataset_name, const double &data);
-    void populate_config(const std::filesystem::path &dataset_name, const std::string &data);
-    void populate_config(const std::filesystem::path &dataset_name, const std::vector<std::string> &data);
+};
 
-    void handle_int_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet);
-    void handle_float_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet);
-    void handle_string_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet);
 
-    static herr_t op_func(hid_t loc_id, const char *name, const H5L_info_t *info, void *operator_data);
+class SALTED_BINARY_FILE {
+private:
+    const std::string MAGIC_NUMBER = "SALTD";
+    static const int HEADER_SIZE = 5;
+    enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
 
-    std::unordered_map<H5T_class_t, std::function<void(const std::string &, H5::DataSet &)>> handlers = {
-        {H5T_INTEGER, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)},
-        {H5T_FLOAT, std::bind(&Config::handle_float_dataset, this, std::placeholders::_1, std::placeholders::_2)},
-        {H5T_STRING, std::bind(&Config::handle_string_dataset, this, std::placeholders::_1, std::placeholders::_2)},
-        {H5T_ENUM, std::bind(&Config::handle_int_dataset, this, std::placeholders::_1, std::placeholders::_2)}};
+    std::filesystem::path filepath;
+    std::ifstream file;
+
+    int32_t version;
+    int32_t numBlocks;
+    std::map<std::string, size_t> table_of_contents;
+	int conf_location = 0; //Initialized after gen_config was called
+	int header_end = -1;
+
+    void open_file();
+    bool read_header();
+    
+
+    template <typename T>
+    void read_dataset(std::vector<T>& data, ivec& dims);
+
+    std::string read_string_remove_NULL(const int lengh);
+
+    template <typename T>
+    T read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block);
+    std::unordered_map<std::string, vec2> read_lambda_based_data(const std::string& key);
+
+public:
+    SALTED_BINARY_FILE(const std::filesystem::path& fpath) : filepath(fpath) {
+        open_file();
+        err_checkf(read_header(), "Error reading header!", std::cout);
+    };
+
+    ~SALTED_BINARY_FILE() {
+        if (file.is_open()) {
+            file.close();
+        }
+    };
+
+    void populate_config(Config &config_in);
+
+
+    std::unordered_map<int, std::vector<int64_t>> read_fps();
+    std::unordered_map<std::string, vec> read_averages();
+    std::unordered_map<int, vec> read_wigners();
+    vec read_weights();
+    std::unordered_map<std::string, vec2> read_projectors();
+    std::unordered_map<std::string, vec2> read_features();
 };

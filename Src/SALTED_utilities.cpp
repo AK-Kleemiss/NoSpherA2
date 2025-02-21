@@ -304,7 +304,7 @@ const double calc_density_ML(const double& x,
             {
                 bf = atoms[a].get_basis_set_entry(e);
                 primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-                radial = gaussian_radial(p, d[3]);
+                radial = gaussian_radial(p, d[3]) * p.get_coef();
                 if (radial < 1E-10)
                 {
                     coef_counter += (2 * p.get_type() + 1);
@@ -365,6 +365,17 @@ const double calc_density_ML(const double& x,
 }
 
 
+double helper_even(const int l) {
+    if (l == 0) {
+        return 1.0;
+    }
+    double res = 1.0;
+    for (int i = 0; i <= l; i += 2) {
+        res *= i;
+    }
+    return res;
+}
+
 /**
  * Calculates the atomic density for a given list of atoms and coefficients.
  *
@@ -395,9 +406,27 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
             {
                 break;
             }
-            radial = constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.get_coef() * p.normalization_constant();
+            radial = constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.get_coef() * p.normalization_constant() * p.get_coef();
 
-            temp_dens += coefs[coef_counter + e] * radial;
+    //        radial = constants::sqr_pi / (std::pow(p.get_exp(), 1.5) * 4.0);
+    //        switch (p.get_type())
+    //        {
+    //        case 0:
+    //            radial *= constants::c_1_4p / 2; //1.0 / (constants::FOUR_PI);//
+    //            break;
+    //        case 1:
+    //            radial *= 0.0;
+    //            break;
+    //        case 2:
+    //            radial *= helper_even(2);
+    //            break;
+    //        default:
+				//std::cerr << "ERROR: Unsupported angular momentum in calc_atomic_density" << std::endl;
+    //            exit(1);
+				//break;
+    //        }
+            //radial *= p.get_coef() * p.normalization_constant();
+            temp_dens += coefs[coef_counter + e] * radial ;
         }
 
         atom_elecs[i] += temp_dens;

@@ -16,6 +16,7 @@
 #include "TargetConditionals.h"
 #endif
 
+
 void thakkar_d_test(options &opt)
 {
     using namespace std;
@@ -1574,22 +1575,26 @@ void test_analytical_fourier(bool full)
 {
     // Generate grid and k_pts
     vec2 kpts;
-    for (int i = 1; i < 100; i++)
-    {
-        kpts.push_back({0.01 * i, 0, 0});                   // X
-        kpts.push_back({0, 0.01 * i, 0});                   // Y
-        kpts.push_back({0, 0, 0.01 * i});                   // Z
-        kpts.push_back({0.01 * i, 0.01 * i, 0});            // XY
-        kpts.push_back({0.01 * i, 0, 0.01 * i});            // XZ
-        kpts.push_back({0, 0.01 * i, 0.01 * i});            // YZ
-        kpts.push_back({0.01 * i * 2, 0.01 * i, 0.01 * i}); // XYZ
-        kpts.push_back({-0.01 * i, 0, 0});
-        kpts.push_back({0, -0.01 * i, 0});
-        kpts.push_back({0, 0, -0.01 * i});
-        kpts.push_back({-0.01 * i, -0.01 * i, 0});
-        kpts.push_back({-0.01 * i, 0, -0.01 * i});
-        kpts.push_back({0, -0.01 * i, -0.01 * i});
-        kpts.push_back({-0.01 * i * 2, -0.01 * i, -0.01 * i});
+    //for (int i = 1; i < 100; i++)
+    //{
+    //    kpts.push_back({0.01 * i, 0, 0});                   // X
+    //    kpts.push_back({0, 0.01 * i, 0});                   // Y
+    //    kpts.push_back({0, 0, 0.01 * i});                   // Z
+    //    kpts.push_back({0.01 * i, 0.01 * i, 0});            // XY
+    //    kpts.push_back({0.01 * i, 0, 0.01 * i});            // XZ
+    //    kpts.push_back({0, 0.01 * i, 0.01 * i});            // YZ
+    //    kpts.push_back({0.01 * i * 2, 0.01 * i, 0.01 * i}); // XYZ
+    //    kpts.push_back({-0.01 * i, 0, 0});
+    //    kpts.push_back({0, -0.01 * i, 0});
+    //    kpts.push_back({0, 0, -0.01 * i});
+    //    kpts.push_back({-0.01 * i, -0.01 * i, 0});
+    //    kpts.push_back({-0.01 * i, 0, -0.01 * i});
+    //    kpts.push_back({0, -0.01 * i, -0.01 * i});
+    //    kpts.push_back({-0.01 * i * 2, -0.01 * i, -0.01 * i});
+    //}
+    for (int i = 1; i < 1000; i++) {
+		//Generate random k-points with values between -1 and 1
+		kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
     }
     vec2 grid;
     grid.resize(5); // x, y, z, dens, atomic_weight
@@ -1659,6 +1664,7 @@ void test_analytical_fourier(bool full)
         wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
         primitive p(1, type, c_exp, vals[0]);
 
+
         for (int l = 0; l < type * 2 + 1; l++)
         {
             for (int i = 0; i < coefs.size(); i++)
@@ -1677,7 +1683,7 @@ void test_analytical_fourier(bool full)
 
             for (int i = 0; i < grid[0].size(); i++)
             {
-                // grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
+                //grid[3][i] = wavy.compute_dens(grid[0][i], grid[1][i], grid[2][i]);
                 grid[3][i] = calc_density_ML(grid[0][i], grid[1][i], grid[2][i], coefs, wavy.get_atoms());
             }
 
@@ -1696,6 +1702,7 @@ void test_analytical_fourier(bool full)
                     k_pt_local[d] = kpts[i][d] * 2 * constants::PI;
                 }
                 sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
+				//sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
                 {
                     double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
@@ -1823,8 +1830,8 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 // Also calculate the difference between the two densities
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
-	const double radius = 3.0;
-	const double resolution = 0.01;
+	const double radius = 2.5;
+	const double resolution = 0.02;
 
     std::cout << "-------------------------------------DENSITY USING ORCA GBW-------------------------------------" << std::endl;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
@@ -1860,7 +1867,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_normal.sum() << std::endl;
 
     std::cout << "-------------------------------------RI Fit-------------------------------------" << std::endl;
-    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'O');
+    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'C');
     std::cout << "Calculating RI-FIT cube" << std::endl;
 
     WFN wavy_aux(0);
@@ -1871,9 +1878,22 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 
     
     cube_RI_FIT.give_parent_wfn(wavy_aux);
-    calc_cube_ML(ri_coefs, wavy_aux, -1, cube_RI_FIT);
+    //calc_cube_ML(ri_coefs, wavy_aux, -1, cube_RI_FIT);
     cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
     cube_RI_FIT.write_file(true);
+
+	std::cout << "------------------------------------RI Fit analytical integral------------------------------------" << std::endl;
+    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), ri_coefs);
+    std::cout << "Table of Charges in electrons\n"
+        << "       Atom      ML" << std::endl;
+
+    for (int i = 0; i < wavy_aux.get_ncen(); i++)
+    {
+        std::cout << std::setw(10) << wavy_aux.get_atom_label(i)
+            << std::fixed << std::setw(10) << std::setprecision(3) << wavy_aux.get_atom_charge(i) - atom_elecs[i];
+            std::cout << " " << std::setw(4) << wavy_aux.get_atom_charge(i) << " " << std::fixed << std::setw(10) << std::setprecision(3) << atom_elecs[i];
+        std::cout << std::endl;
+    }
 
     std::cout << "-------------------------------------DIFFERENCE CUBE-------------------------------------" << std::endl;
     cube cube_diff = cube_normal - cube_RI_FIT;
@@ -1887,6 +1907,113 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     std::cout << "RRS of difference cube: " << std::fixed << std::setprecision(5) << cube_normal.rrs(cube_RI_FIT) << std::endl;
     std::cout << "Done!" << std::endl;
 }
+
+void test_reading_SALTED_binary_file() {
+    SALTED_BINARY_FILE file = SALTED_BINARY_FILE("combo_v2.salted");
+    Config config;
+    file.populate_config(config);
+    std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
+	std::unordered_map<std::string, vec> averages = file.read_averages();
+    std::unordered_map<int, vec> wigners = file.read_wigners();
+    vec weights = file.read_weights();
+	std::unordered_map<std::string, vec2> feats = file.read_features();
+    std::unordered_map<std::string, vec2> proj = file.read_projectors();
+
+	// TEST if both configs are the same
+	std::cout << "Comparing configs" << std::endl;
+	std::cout << "Average:" << config.average << std::endl;
+	std::cout << "Field:" << config.field << std::endl;
+	std::cout << "Sparsify:" << config.sparsify << std::endl;
+	std::cout << "Ncut:" << config.ncut << std::endl;
+	std::cout << "Ntrain:" << config.Ntrain << std::endl;
+	std::cout << "Menv:" << config.Menv << std::endl;
+	std::cout << "trainfrac:" << config.trainfrac << std::endl;
+    std::cout << "Rcut1:" << config.rcut1 << std::endl;
+	std::cout << "Rcut2:" << config.rcut2 << std::endl;
+	std::cout << "nang1:" << config.nang1 << std::endl;
+	std::cout << "nang2:" << config.nang2 << std::endl;
+	std::cout << "sig1:" << config.sig1 << std::endl;
+	std::cout << "sig2:" << config.sig2 << std::endl;
+	std::cout << "zeta:" << config.zeta << std::endl;
+	std::cout << "neighspe size:" << config.neighspe1.size() << std::endl;
+    for (int i = 0; i < config.neighspe1.size(); i++)
+    {
+		std::cout << "neighspe1[" << i << "]:" << config.neighspe1[i] << std::endl;
+	}
+	std::cout << "neighspe2 size:" << config.neighspe2.size() << std::endl;
+	for (int i = 0; i < config.neighspe2.size(); i++)
+	{
+		std::cout << "neighspe2[" << i << "]:"  << config.neighspe2[i] << std::endl;
+	}
+	std::cout << "dfBasis:" << config.dfbasis << std::endl;
+    
+    //Vmat = key : vec2
+	std::cout << "Comparing Vmat" << std::endl;
+	for (auto const& [key, val] : proj)
+	{
+		vec temp_new = flatten(proj[key]);
+		std::cout << "Key: " << key << std::endl;
+		for (int i = 0; i < temp_new.size(); i+=100)
+		{
+			std::cout << temp_new[i] << " ";
+		}
+        std::cout << std::endl;
+	}
+
+    //power_env_sparse = key : vec
+	std::cout << "Comparing power_env_sparse" << std::endl;
+	for (auto const& [key, val] : feats)
+	{
+		std::cout << "Key: " << key << std::endl;
+        vec temp = flatten(feats[key]);
+		for (int i = 0; i < val.size(); i+=950)
+		{
+			std::cout << temp[i] << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	std::cout << "Comparing weights" << std::endl;
+	for (int i = 0; i < weights.size(); i+=100)
+	{
+		std::cout << weights[i] << " ";
+	}
+
+
+	std::cout <<std::endl << "Comparing averages" << std::endl;
+	for (auto const& [key, val] : averages)
+	{
+		std::cout << "Key: " << key << std::endl;
+		for (int i = 0; i < val.size(); i+=2)
+		{
+			std::cout << val[i] << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	std::cout << "Comparing wigners" << std::endl;
+	for (int i = 0; i < wigners.size(); i++)
+	{
+		for (int j = 0; j < wigners[i].size(); j+=10)
+		{
+			std::cout << wigners[i][j] << " ";
+		}
+		std::cout << std::endl;
+	}
+
+	std::cout << "Comparing FPS" << std::endl;
+	for (int i = 0; i < fps.size(); i++)
+	{
+		for (int j = 0; j < fps[i].size(); j+=10)
+		{
+			std::cout << fps[i][j] << " ";
+		}
+        std::cout << std::endl;
+	}
+
+	std::cout << "All tests passed!" << std::endl;
+}
+
 
 // Convert a row-major matrix to column-major format
 std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int rows, int cols)

@@ -7,41 +7,24 @@
 #include "wfn_class.h"
 #include <filesystem>
 
-//-SALTED D:\Models\Iron_Complex -cif mohrs_salt_IAM.cif -wfn mohrs_salt_IAM.xyz  -cpus 8 -hkl_min_max -14 14 -12 27 -19 20
-// std::string find_first_h5_file(const std::string& directory_path)
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {
     std::filesystem::path _path = opt_in.SALTED_DIR;
     SALTED_DIR = opt_in.SALTED_DIR;
     debug = opt_in.debug;
 
-    config.h5_filename = find_first_h5_file(SALTED_DIR);
+    config.salted_filename = find_first_salted_file(_opt.SALTED_DIR);
 
-    if (config.h5_filename == "")
-    {
-        if (debug)
-        {
-            std::cout << "No HDF5 file found in the SALTED directory. Using inputs.txt instead." << std::endl;
-        }
-        _path = _path / "inputs.txt";
-        if (debug)
-        {
-            std::cout << "Using inputs file: " << _path << std::endl;
-        }
-        config.populateFromFile(_path);
+	if (config.salted_filename == "") {
+        std::cout << "No SALTED binary file found in directory: " << _opt.SALTED_DIR << std::endl;
+        exit(1);
     }
-    else
-    {
-        if (debug)
-        {
-            std::cout << "Using HDF5 file: " << config.h5_filename << std::endl;
-        }
 
-        // If RAS is enabled (i.e. hdf5 is enabled) read the contents of the hdf5 file
-        _path = _path / config.h5_filename;
-        H5::H5File config_file(_path, H5F_ACC_RDONLY);
-        config.populateFromFile(config_file);
-    }
+    if (_opt.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
+    _path = _path / config.salted_filename;
+	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
+	file.populate_config(config);
+
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
     for (int a = 0; a < wavy_in.get_ncen(); a++)
@@ -173,139 +156,41 @@ void SALTEDPredictor::setup_atomic_environment()
     // END RASCALINE
 }
 
-void SALTEDPredictor::read_model_data()
-{
-    using namespace std;
-    // Define zeta as a string with one decimal
-    std::ostringstream stream;
-    stream << std::fixed << std::setprecision(1) << config.zeta;
-    std::string zeta_str = stream.str();
-    H5::H5File features(SALTED_DIR / "GPR_data" / ("FEAT_M-" + std::to_string(config.Menv) + ".h5"), H5F_ACC_RDONLY);
-    H5::H5File projectors(SALTED_DIR / "GPR_data" / ("projector_M" + std::to_string(config.Menv) + "_zeta" + zeta_str + ".h5"), H5F_ACC_RDONLY);
-    std::vector<hsize_t> dims_out_descrip;
-    std::vector<hsize_t> dims_out_proj;
-    for (string spe : config.species)
-    {
-        for (int lam = 0; lam < lmax[spe] + 1; lam++)
-        {
 
-            vec temp_power = readHDF5<double>(features, "sparse_descriptors/" + spe + "/" + to_string(lam), dims_out_descrip);
-            power_env_sparse[spe + std::to_string(lam)] = reshape<dMatrix2>(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
-            vec temp_proj = readHDF5<double>(projectors, "projectors/" + spe + "/" + to_string(lam), dims_out_proj);
-            Vmat[spe + std::to_string(lam)] = reshape<dMatrix2>(temp_proj, Shape2D{(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]});
-
-            if (lam == 0)
-            {
-                Mspe[spe] = (int)dims_out_descrip[0];
-            }
-            if (config.zeta == 1)
-            {
-                dMatrix2 tem_pr = reshape<dMatrix2>(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
-                dMatrix2 tem_pw = reshape<dMatrix2>(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
-                power_env_sparse[spe + std::to_string(lam)] = dot(tem_pr, tem_pw, true, false);
-            }
-        }
-    }
-    features.close();
-    projectors.close();
-
-    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
-    {
-        wigner3j[lam] = readVectorFromFile<double>(SALTED_DIR / "wigners" / ("wigner_lam-" + to_string(lam) + "_lmax1-" + to_string(config.nang1) + "_lmax2-" + to_string(config.nang2) + ".dat"));
-    }
-
-    if (config.sparsify)
-    {
-        filesystem::path path = SALTED_DIR / "GPR_data" / ("fps" + to_string(config.ncut) + "-");
-        vfps = read_fps<int64_t>(path, SALTED_Utils::get_lmax_max(lmax));
-    };
-    if (config.average)
-    {
-        for (string spe : config.species)
-        {
-            filesystem::path path = SALTED_DIR / "averages" / ("averages_" + spe + ".npy");
-            read_npy(path, av_coefs[spe]);
-        }
-    }
-
-    int ntrain = static_cast<int>(config.Ntrain * config.trainfrac);
-
-    if (config.field)
-    {
-        cout << "Field" << endl;
+void SALTEDPredictor::read_model_data() {
+    const std::filesystem::path _SALTEDpath = _opt.SALTED_DIR / config.salted_filename;
+    SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_SALTEDpath);
+    if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
-    else
-    {
-        filesystem::path path = SALTED_DIR / "GPR_data" / ("weights_N" + to_string(ntrain) + "_reg-6.npy");
-        read_npy(path, weights);
-    }
+    weights = file.read_weights();
+	wigner3j = file.read_wigners();
+
+    if (config.average) av_coefs = file.read_averages();
+	if (config.sparsify) vfps = file.read_fps();
+
+
+	std::unordered_map<std::string, vec2> temp_features = file.read_features();
+    Vmat = file.read_projectors();
+    std::string key;
+	for (std::string spe : config.species) {
+		for (int lam = 0; lam < lmax[spe] + 1; lam++) {
+			key = spe + std::to_string(lam);
+			if (lam == 0) Mspe[spe] = temp_features[key].size();
+
+			vec flat_features = flatten(temp_features[key]);
+            if (config.zeta == 1.0) {
+				power_env_sparse[key] = flatten(dot<double>(flatten(Vmat[key]), flat_features, //Input matrices
+                    Vmat[key].size(), Vmat[key][0].size(), temp_features[key].size(), temp_features[key][0].size(), //Sizes
+					true, false)); //Transpose the first matrix
+			}
+            else {
+                power_env_sparse[key] = flat_features;
+            }
+		}
+	}
 }
 
-void SALTEDPredictor::read_model_data_h5()
-{
-    using namespace std;
-    const filesystem::path _H5path = SALTED_DIR / config.h5_filename;
-    H5::H5File input(_H5path, H5F_ACC_RDONLY);
-    vector<hsize_t> dims_out_descrip;
-    vector<hsize_t> dims_out_proj;
-    for (string spe : config.species)
-    {
-        for (int lam = 0; lam < lmax[spe] + 1; lam++)
-        {
-            string spar_descrip = "sparse_descriptors/" + spe + "/" + to_string(lam);
-            string proj = "projectors/" + spe + "/" + to_string(lam);
-            vec temp_power = readHDF5<double>(input, spar_descrip, dims_out_descrip);
-            power_env_sparse[spe + to_string(lam)] = reshape<dMatrix2>(temp_power, Shape2D((unsigned long long)dims_out_descrip[0], (unsigned long long)dims_out_descrip[1]));
-            vec temp_proj = readHDF5<double>(input, proj, dims_out_proj);
-            Vmat[spe + to_string(lam)] = reshape<dMatrix2>(temp_proj, Shape2D({(unsigned long long)dims_out_proj[0], (unsigned long long)dims_out_proj[1]}));
-
-            if (lam == 0)
-            {
-                Mspe[spe] = (int)dims_out_descrip[0];
-            }
-            if (config.zeta == 1)
-            {
-                dMatrix2 tem_pr = reshape<dMatrix2>(temp_proj, Shape2D(dims_out_proj[0], dims_out_proj[1]));
-                dMatrix2 tem_pw = reshape<dMatrix2>(temp_power, Shape2D(dims_out_descrip[0], dims_out_descrip[1]));
-                power_env_sparse[spe + to_string(lam)] = dot(tem_pr, tem_pw, true, false);
-            }
-        }
-    }
-
-    vector<hsize_t> dims_out_temp;
-    string wigner = "wigners";
-    for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
-    {
-        wigner3j[lam] = readHDF5<double>(input, wigner + "/lam-" + to_string(lam), dims_out_temp);
-    }
-
-    if (config.sparsify)
-    {
-        string fps = "fps";
-        for (int lam = 0; lam < SALTED_Utils::get_lmax_max(lmax) + 1; lam++)
-        {
-            vfps[lam] = readHDF5<int64_t>(input, fps + "/lam-" + to_string(lam), dims_out_temp);
-        }
-    };
-    if (config.average)
-    {
-        for (string spe : config.species)
-        {
-            av_coefs[spe] = readHDF5<double>(input, "averages/" + spe, dims_out_temp);
-        }
-    }
-
-    if (config.field)
-    {
-        cout << "Field" << endl;
-        err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
-    }
-    else
-    {
-        weights = readHDF5<double>(input, "weights", dims_out_temp);
-    }
-}
 
 vec SALTEDPredictor::predict()
 {
@@ -544,14 +429,9 @@ vec SALTEDPredictor::gen_SALTED_densities()
 
     setup_atomic_environment();
 
-    if (!config.from_h5)
-    {
-        read_model_data();
-    }
-    else
-    {
-        read_model_data_h5();
-    }
+
+    read_model_data();
+
 
     vec coefs = predict();
     shrink_intermediate_vectors();

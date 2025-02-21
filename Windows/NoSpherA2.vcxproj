@@ -141,6 +141,10 @@
       <Configuration>D_RI_Test</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="D_SALTED_BINARY|x64">
+      <Configuration>D_SALTED_BINARY</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="D_SALTED_tsc|x64">
       <Configuration>D_SALTED_tsc</Configuration>
       <Platform>x64</Platform>
@@ -454,6 +458,15 @@
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Static</UseOfMfc>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -751,6 +764,9 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -926,6 +942,10 @@
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -1421,7 +1441,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;../Lib/libhdf5.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -2017,6 +2037,42 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;../Lib/libhdf5.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <OpenMPSupport>true</OpenMPSupport>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -3983,37 +4039,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
-    <ClCompile Include="..\Lib\H5AbstractDs.cpp" />
-    <ClCompile Include="..\Lib\H5ArrayType.cpp" />
-    <ClCompile Include="..\Lib\H5AtomType.cpp" />
-    <ClCompile Include="..\Lib\H5Attribute.cpp" />
-    <ClCompile Include="..\Lib\H5CommonFG.cpp" />
-    <ClCompile Include="..\Lib\H5CompType.cpp" />
-    <ClCompile Include="..\Lib\H5DaccProp.cpp" />
-    <ClCompile Include="..\Lib\H5DataSet.cpp" />
-    <ClCompile Include="..\Lib\H5DataSpace.cpp" />
-    <ClCompile Include="..\Lib\H5DataType.cpp" />
-    <ClCompile Include="..\Lib\H5DcreatProp.cpp" />
-    <ClCompile Include="..\Lib\H5DxferProp.cpp" />
-    <ClCompile Include="..\Lib\H5EnumType.cpp" />
-    <ClCompile Include="..\Lib\H5Exception.cpp" />
-    <ClCompile Include="..\Lib\H5FaccProp.cpp" />
-    <ClCompile Include="..\Lib\H5FcreatProp.cpp" />
-    <ClCompile Include="..\Lib\H5File.cpp" />
-    <ClCompile Include="..\Lib\H5FloatType.cpp" />
-    <ClCompile Include="..\Lib\H5Group.cpp" />
-    <ClCompile Include="..\Lib\H5IdComponent.cpp" />
-    <ClCompile Include="..\Lib\H5IntType.cpp" />
-    <ClCompile Include="..\Lib\H5LaccProp.cpp" />
-    <ClCompile Include="..\Lib\H5LcreatProp.cpp" />
-    <ClCompile Include="..\Lib\H5Library.cpp" />
-    <ClCompile Include="..\Lib\H5Location.cpp" />
-    <ClCompile Include="..\Lib\H5Object.cpp" />
-    <ClCompile Include="..\Lib\H5OcreatProp.cpp" />
-    <ClCompile Include="..\Lib\H5PredType.cpp" />
-    <ClCompile Include="..\Lib\H5PropList.cpp" />
-    <ClCompile Include="..\Lib\H5StrType.cpp" />
-    <ClCompile Include="..\Lib\H5VarLenType.cpp" />
     <ClCompile Include="..\Src\atoms.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">pch.h</PrecompiledHeaderFile>
@@ -4913,235 +4938,6 @@
     <ClInclude Include="../Src/test_functions.h" />
     <ClInclude Include="../Src/tsc_block.h" />
     <ClInclude Include="../Src/Thakkar_coefs.h" />
-    <ClInclude Include="..\Lib\H5AbstractDs.h" />
-    <ClInclude Include="..\Lib\H5ACmodule.h" />
-    <ClInclude Include="..\Lib\H5ACpkg.h" />
-    <ClInclude Include="..\Lib\H5ACprivate.h" />
-    <ClInclude Include="..\Lib\H5ACpublic.h" />
-    <ClInclude Include="..\Lib\H5Alltypes.h" />
-    <ClInclude Include="..\Lib\H5Amodule.h" />
-    <ClInclude Include="..\Lib\H5api_adpt.h" />
-    <ClInclude Include="..\Lib\H5Apkg.h" />
-    <ClInclude Include="..\Lib\H5Aprivate.h" />
-    <ClInclude Include="..\Lib\H5Apublic.h" />
-    <ClInclude Include="..\Lib\H5ArrayType.h" />
-    <ClInclude Include="..\Lib\H5AtomType.h" />
-    <ClInclude Include="..\Lib\H5Attribute.h" />
-    <ClInclude Include="..\Lib\H5B2module.h" />
-    <ClInclude Include="..\Lib\H5B2pkg.h" />
-    <ClInclude Include="..\Lib\H5B2private.h" />
-    <ClInclude Include="..\Lib\H5Bmodule.h" />
-    <ClInclude Include="..\Lib\H5Bpkg.h" />
-    <ClInclude Include="..\Lib\H5Bprivate.h" />
-    <ClInclude Include="..\Lib\H5Classes.h" />
-    <ClInclude Include="..\Lib\H5Clog.h" />
-    <ClInclude Include="..\Lib\H5Cmodule.h" />
-    <ClInclude Include="..\Lib\H5CommonFG.h" />
-    <ClInclude Include="..\Lib\H5CompType.h" />
-    <ClInclude Include="..\Lib\H5Cpkg.h" />
-    <ClInclude Include="..\Lib\H5Cpp.h" />
-    <ClInclude Include="..\Lib\H5CppDoc.h" />
-    <ClInclude Include="..\Lib\H5Cprivate.h" />
-    <ClInclude Include="..\Lib\H5Cpublic.h" />
-    <ClInclude Include="..\Lib\H5CXmodule.h" />
-    <ClInclude Include="..\Lib\H5CXprivate.h" />
-    <ClInclude Include="..\Lib\H5DaccProp.h" />
-    <ClInclude Include="..\Lib\H5DataSet.h" />
-    <ClInclude Include="..\Lib\H5DataSpace.h" />
-    <ClInclude Include="..\Lib\H5DataType.h" />
-    <ClInclude Include="..\Lib\H5DcreatProp.h" />
-    <ClInclude Include="..\Lib\H5Dmodule.h" />
-    <ClInclude Include="..\Lib\H5Dpkg.h" />
-    <ClInclude Include="..\Lib\H5Dprivate.h" />
-    <ClInclude Include="..\Lib\H5Dpublic.h" />
-    <ClInclude Include="..\Lib\H5DxferProp.h" />
-    <ClInclude Include="..\Lib\H5EAmodule.h" />
-    <ClInclude Include="..\Lib\H5EApkg.h" />
-    <ClInclude Include="..\Lib\H5EAprivate.h" />
-    <ClInclude Include="..\Lib\H5Edefin.h" />
-    <ClInclude Include="..\Lib\H5Einit.h" />
-    <ClInclude Include="..\Lib\H5Emajdef.h" />
-    <ClInclude Include="..\Lib\H5Emindef.h" />
-    <ClInclude Include="..\Lib\H5Emodule.h" />
-    <ClInclude Include="..\Lib\H5encode.h" />
-    <ClInclude Include="..\Lib\H5EnumType.h" />
-    <ClInclude Include="..\Lib\H5Epkg.h" />
-    <ClInclude Include="..\Lib\H5Eprivate.h" />
-    <ClInclude Include="..\Lib\H5Epubgen.h" />
-    <ClInclude Include="..\Lib\H5Epublic.h" />
-    <ClInclude Include="..\Lib\H5ESdevelop.h" />
-    <ClInclude Include="..\Lib\H5ESmodule.h" />
-    <ClInclude Include="..\Lib\H5ESpkg.h" />
-    <ClInclude Include="..\Lib\H5ESprivate.h" />
-    <ClInclude Include="..\Lib\H5ESpublic.h" />
-    <ClInclude Include="..\Lib\H5Eterm.h" />
-    <ClInclude Include="..\Lib\H5Exception.h" />
-    <ClInclude Include="..\Lib\H5FaccProp.h" />
-    <ClInclude Include="..\Lib\H5FAmodule.h" />
-    <ClInclude Include="..\Lib\H5FApkg.h" />
-    <ClInclude Include="..\Lib\H5FAprivate.h" />
-    <ClInclude Include="..\Lib\H5FcreatProp.h" />
-    <ClInclude Include="..\Lib\H5FDcore.h" />
-    <ClInclude Include="..\Lib\H5FDdevelop.h" />
-    <ClInclude Include="..\Lib\H5FDdirect.h" />
-    <ClInclude Include="..\Lib\H5FDdrvr_module.h" />
-    <ClInclude Include="..\Lib\H5FDfamily.h" />
-    <ClInclude Include="..\Lib\H5FDhdfs.h" />
-    <ClInclude Include="..\Lib\H5FDlog.h" />
-    <ClInclude Include="..\Lib\H5FDmirror.h" />
-    <ClInclude Include="..\Lib\H5FDmirror_priv.h" />
-    <ClInclude Include="..\Lib\H5FDmodule.h" />
-    <ClInclude Include="..\Lib\H5FDmpi.h" />
-    <ClInclude Include="..\Lib\H5FDmpio.h" />
-    <ClInclude Include="..\Lib\H5FDmulti.h" />
-    <ClInclude Include="..\Lib\H5FDonion.h" />
-    <ClInclude Include="..\Lib\H5FDonion_header.h" />
-    <ClInclude Include="..\Lib\H5FDonion_history.h" />
-    <ClInclude Include="..\Lib\H5FDonion_index.h" />
-    <ClInclude Include="..\Lib\H5FDonion_priv.h" />
-    <ClInclude Include="..\Lib\H5FDpkg.h" />
-    <ClInclude Include="..\Lib\H5FDprivate.h" />
-    <ClInclude Include="..\Lib\H5FDpublic.h" />
-    <ClInclude Include="..\Lib\H5FDros3.h" />
-    <ClInclude Include="..\Lib\H5FDs3comms.h" />
-    <ClInclude Include="..\Lib\H5FDsec2.h" />
-    <ClInclude Include="..\Lib\H5FDsplitter.h" />
-    <ClInclude Include="..\Lib\H5FDstdio.h" />
-    <ClInclude Include="..\Lib\H5FDwindows.h" />
-    <ClInclude Include="..\Lib\H5File.h" />
-    <ClInclude Include="..\Lib\H5FLmodule.h" />
-    <ClInclude Include="..\Lib\H5FloatType.h" />
-    <ClInclude Include="..\Lib\H5FLprivate.h" />
-    <ClInclude Include="..\Lib\H5Fmodule.h" />
-    <ClInclude Include="..\Lib\H5FOprivate.h" />
-    <ClInclude Include="..\Lib\H5Fpkg.h" />
-    <ClInclude Include="..\Lib\H5Fprivate.h" />
-    <ClInclude Include="..\Lib\H5Fpublic.h" />
-    <ClInclude Include="..\Lib\H5FSmodule.h" />
-    <ClInclude Include="..\Lib\H5FSpkg.h" />
-    <ClInclude Include="..\Lib\H5FSprivate.h" />
-    <ClInclude Include="..\Lib\H5Gmodule.h" />
-    <ClInclude Include="..\Lib\H5Gpkg.h" />
-    <ClInclude Include="..\Lib\H5Gprivate.h" />
-    <ClInclude Include="..\Lib\H5Gpublic.h" />
-    <ClInclude Include="..\Lib\H5Group.h" />
-    <ClInclude Include="..\Lib\H5HFmodule.h" />
-    <ClInclude Include="..\Lib\H5HFpkg.h" />
-    <ClInclude Include="..\Lib\H5HFprivate.h" />
-    <ClInclude Include="..\Lib\H5HGmodule.h" />
-    <ClInclude Include="..\Lib\H5HGpkg.h" />
-    <ClInclude Include="..\Lib\H5HGprivate.h" />
-    <ClInclude Include="..\Lib\H5HLmodule.h" />
-    <ClInclude Include="..\Lib\H5HLpkg.h" />
-    <ClInclude Include="..\Lib\H5HLprivate.h" />
-    <ClInclude Include="..\Lib\H5IdComponent.h" />
-    <ClInclude Include="..\Lib\H5Idevelop.h" />
-    <ClInclude Include="..\Lib\H5Imodule.h" />
-    <ClInclude Include="..\Lib\H5Include.h" />
-    <ClInclude Include="..\Lib\H5IntType.h" />
-    <ClInclude Include="..\Lib\H5Ipkg.h" />
-    <ClInclude Include="..\Lib\H5Iprivate.h" />
-    <ClInclude Include="..\Lib\H5Ipublic.h" />
-    <ClInclude Include="..\Lib\H5LaccProp.h" />
-    <ClInclude Include="..\Lib\H5LcreatProp.h" />
-    <ClInclude Include="..\Lib\H5Ldevelop.h" />
-    <ClInclude Include="..\Lib\H5Library.h" />
-    <ClInclude Include="..\Lib\H5Lmodule.h" />
-    <ClInclude Include="..\Lib\H5Location.h" />
-    <ClInclude Include="..\Lib\H5Lpkg.h" />
-    <ClInclude Include="..\Lib\H5Lprivate.h" />
-    <ClInclude Include="..\Lib\H5Lpublic.h" />
-    <ClInclude Include="..\Lib\H5MFmodule.h" />
-    <ClInclude Include="..\Lib\H5MFpkg.h" />
-    <ClInclude Include="..\Lib\H5MFprivate.h" />
-    <ClInclude Include="..\Lib\H5Mmodule.h" />
-    <ClInclude Include="..\Lib\H5MMprivate.h" />
-    <ClInclude Include="..\Lib\H5MMpublic.h" />
-    <ClInclude Include="..\Lib\H5module.h" />
-    <ClInclude Include="..\Lib\H5Mpkg.h" />
-    <ClInclude Include="..\Lib\H5Mprivate.h" />
-    <ClInclude Include="..\Lib\H5Mpublic.h" />
-    <ClInclude Include="..\Lib\H5Object.h" />
-    <ClInclude Include="..\Lib\H5OcreatProp.h" />
-    <ClInclude Include="..\Lib\H5Omodule.h" />
-    <ClInclude Include="..\Lib\H5Opkg.h" />
-    <ClInclude Include="..\Lib\H5Oprivate.h" />
-    <ClInclude Include="..\Lib\H5Opublic.h" />
-    <ClInclude Include="..\Lib\H5Oshared.h" />
-    <ClInclude Include="..\Lib\H5overflow.h" />
-    <ClInclude Include="..\Lib\H5PBmodule.h" />
-    <ClInclude Include="..\Lib\H5PBpkg.h" />
-    <ClInclude Include="..\Lib\H5PBprivate.h" />
-    <ClInclude Include="..\Lib\H5PLextern.h" />
-    <ClInclude Include="..\Lib\H5PLmodule.h" />
-    <ClInclude Include="..\Lib\H5PLpkg.h" />
-    <ClInclude Include="..\Lib\H5PLprivate.h" />
-    <ClInclude Include="..\Lib\H5PLpublic.h" />
-    <ClInclude Include="..\Lib\H5Pmodule.h" />
-    <ClInclude Include="..\Lib\H5Ppkg.h" />
-    <ClInclude Include="..\Lib\H5Pprivate.h" />
-    <ClInclude Include="..\Lib\H5Ppublic.h" />
-    <ClInclude Include="..\Lib\H5PredType.h" />
-    <ClInclude Include="..\Lib\H5private.h" />
-    <ClInclude Include="..\Lib\H5PropList.h" />
-    <ClInclude Include="..\Lib\H5pubconf.h" />
-    <ClInclude Include="..\Lib\H5public.h" />
-    <ClInclude Include="..\Lib\H5Rmodule.h" />
-    <ClInclude Include="..\Lib\H5Rpkg.h" />
-    <ClInclude Include="..\Lib\H5Rprivate.h" />
-    <ClInclude Include="..\Lib\H5Rpublic.h" />
-    <ClInclude Include="..\Lib\H5RSmodule.h" />
-    <ClInclude Include="..\Lib\H5RSprivate.h" />
-    <ClInclude Include="..\Lib\H5SLmodule.h" />
-    <ClInclude Include="..\Lib\H5SLprivate.h" />
-    <ClInclude Include="..\Lib\H5SMmodule.h" />
-    <ClInclude Include="..\Lib\H5Smodule.h" />
-    <ClInclude Include="..\Lib\H5SMpkg.h" />
-    <ClInclude Include="..\Lib\H5SMprivate.h" />
-    <ClInclude Include="..\Lib\H5Spkg.h" />
-    <ClInclude Include="..\Lib\H5Sprivate.h" />
-    <ClInclude Include="..\Lib\H5Spublic.h" />
-    <ClInclude Include="..\Lib\H5StrType.h" />
-    <ClInclude Include="..\Lib\H5Tconv.h" />
-    <ClInclude Include="..\Lib\H5Tconv_array.h" />
-    <ClInclude Include="..\Lib\H5Tconv_bitfield.h" />
-    <ClInclude Include="..\Lib\H5Tconv_compound.h" />
-    <ClInclude Include="..\Lib\H5Tconv_enum.h" />
-    <ClInclude Include="..\Lib\H5Tconv_float.h" />
-    <ClInclude Include="..\Lib\H5Tconv_integer.h" />
-    <ClInclude Include="..\Lib\H5Tconv_macros.h" />
-    <ClInclude Include="..\Lib\H5Tconv_reference.h" />
-    <ClInclude Include="..\Lib\H5Tconv_string.h" />
-    <ClInclude Include="..\Lib\H5Tconv_vlen.h" />
-    <ClInclude Include="..\Lib\H5Tdevelop.h" />
-    <ClInclude Include="..\Lib\H5Tmodule.h" />
-    <ClInclude Include="..\Lib\H5Tpkg.h" />
-    <ClInclude Include="..\Lib\H5Tprivate.h" />
-    <ClInclude Include="..\Lib\H5Tpublic.h" />
-    <ClInclude Include="..\Lib\H5TSdevelop.h" />
-    <ClInclude Include="..\Lib\H5TSprivate.h" />
-    <ClInclude Include="..\Lib\H5UCprivate.h" />
-    <ClInclude Include="..\Lib\H5VarLenType.h" />
-    <ClInclude Include="..\Lib\H5version.h" />
-    <ClInclude Include="..\Lib\H5VLconnector.h" />
-    <ClInclude Include="..\Lib\H5VLconnector_passthru.h" />
-    <ClInclude Include="..\Lib\H5VLmodule.h" />
-    <ClInclude Include="..\Lib\H5VLnative.h" />
-    <ClInclude Include="..\Lib\H5VLnative_private.h" />
-    <ClInclude Include="..\Lib\H5VLpassthru.h" />
-    <ClInclude Include="..\Lib\H5VLpkg.h" />
-    <ClInclude Include="..\Lib\H5VLprivate.h" />
-    <ClInclude Include="..\Lib\H5VLpublic.h" />
-    <ClInclude Include="..\Lib\H5VMprivate.h" />
-    <ClInclude Include="..\Lib\H5WBprivate.h" />
-    <ClInclude Include="..\Lib\H5win32defs.h" />
-    <ClInclude Include="..\Lib\H5Zdevelop.h" />
-    <ClInclude Include="..\Lib\H5Zmodule.h" />
-    <ClInclude Include="..\Lib\H5Zpkg.h" />
-    <ClInclude Include="..\Lib\H5Zprivate.h" />
-    <ClInclude Include="..\Lib\H5Zpublic.h" />
-    <ClInclude Include="..\Lib\hdf5.h" />
-    <ClInclude Include="..\Lib\uthash.h" />
     <ClInclude Include="..\Src\integration_params.h" />
     <ClInclude Include="..\Src\integrator.h" />
     <ClInclude Include="..\Src\int_g2e.h" />

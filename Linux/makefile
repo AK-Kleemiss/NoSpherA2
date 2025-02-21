@@ -9,14 +9,13 @@ ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../llvm-project/openmp/build/runtime/src/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
 LIBRASCALINE += ../Lib/libmetatensor.a
-LIBHDF5 := ../Lib/libhdf5.a
 LIBOPENBLAS := ../OpenBLAS/installation/lib/libopenblas.a
 LIBOPENBLAS_I := -I../OpenBLAS/installation/include
 
 all: NoSpherA2 
 
 # List of object file names without extensions
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain hdf5 nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
@@ -58,13 +57,13 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 
 NoSpherA2: ${OBJS} omp OpenBLAS
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
+	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2 ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d} omp OpenBLAS
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBHDF5} ${LIBS} ${LIBOPENBLAS}
+	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2_Debug ../
 	@echo 'Done building Debug version of NoSpherA2'
 

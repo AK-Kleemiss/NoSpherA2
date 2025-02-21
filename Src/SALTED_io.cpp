@@ -1,162 +1,18 @@
 #include "pch.h"
 #include "SALTED_io.h"
 #include <filesystem>
+#include <iostream>
+#include "nos_math.h"
 
-template <typename T>
-void readHDF5Data(H5::DataSet &dataset, std::vector<T> &data)
-{
-    // Select correct datatype depending on T
-    H5::PredType type = H5::PredType::PREDTYPE_CONST;
-    if constexpr (std::is_same_v<T, double>)
-    {
-        type = H5::PredType::NATIVE_DOUBLE;
-    }
-    else if constexpr (std::is_same_v<T, float>)
-    {
-        type = H5::PredType::NATIVE_FLOAT;
-    }
-    else if constexpr (std::is_same_v<T, int>)
-    {
-        type = H5::PredType::NATIVE_INT;
-    }
-    else if constexpr (std::is_same_v<T, int64_t>)
-    {
-        type = H5::PredType::NATIVE_INT64;
-    }
-    else
-    {
-        throw std::runtime_error("Unsupported datatype");
-    }
-    dataset.read(data.data(), type);
-}
-template void readHDF5Data(H5::DataSet &dataset, std::vector<double> &data);
-template void readHDF5Data(H5::DataSet &dataset, std::vector<float> &data);
-template void readHDF5Data(H5::DataSet &dataset, std::vector<int> &data);
-template void readHDF5Data(H5::DataSet &dataset, std::vector<int64_t> &data);
-
-template <typename T>
-std::vector<T> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out)
-{
-
-    try
-    {
-        H5::Exception::dontPrint();
-        H5::DataSet dataset = file.openDataSet(dataset_name);
-        H5::DataSpace dataspace = dataset.getSpace();
-
-        const int rank = dataspace.getSimpleExtentNdims();
-        dims_out.resize(rank);
-        dataspace.getSimpleExtentDims(dims_out.data(), NULL);
-
-        size_t totalSize = 1;
-        for (const auto &dim : dims_out)
-        {
-            totalSize *= dim;
-        }
-
-        std::vector<T> flatData(totalSize);
-        readHDF5Data(dataset, flatData);
-        dataset.close();
-
-        return flatData;
-    }
-    // catch failure caused by the H5File operations
-    catch (H5::FileIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSet operations
-    catch (H5::DataSetIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSpace operations
-    catch (H5::DataSpaceIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSpace operations
-    catch (H5::DataTypeIException error)
-    {
-        error.printErrorStack();
-    }
-    catch (H5::Exception error)
-    {
-        error.printErrorStack();
-    }
-    return {};
-}
-template std::vector<double> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-template std::vector<float> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-template std::vector<int> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-template std::vector<int64_t> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-template std::vector<unsigned long long> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t> &dims_out);
-
-template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out)
-{
-
-    try
-    {
-        H5::Exception::dontPrint();
-        H5::DataSet dataset = file.openDataSet(dataset_name);
-        H5::DataSpace dataspace = dataset.getSpace();
-
-        const int rank = dataspace.getSimpleExtentNdims();
-        dims_out.resize(rank);
-        dataspace.getSimpleExtentDims(dims_out.data(), NULL);
-
-        size_t totalSize = 1;
-        for (const auto& dim : dims_out)
-        {
-            totalSize *= dim;
-        }
-
-        std::vector<T> flatData(totalSize);
-        readHDF5Data(dataset, flatData);
-        dataset.close();
-
-        return Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent>>(flatData.data(), (unsigned long long) totalSize);
-    }
-    // catch failure caused by the H5File operations
-    catch (H5::FileIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSet operations
-    catch (H5::DataSetIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSpace operations
-    catch (H5::DataSpaceIException error)
-    {
-        error.printErrorStack();
-    }
-    // catch failure caused by the DataSpace operations
-    catch (H5::DataTypeIException error)
-    {
-        error.printErrorStack();
-    }
-    catch (H5::Exception error)
-    {
-        error.printErrorStack();
-    }
-    return {};
-}
-template dMatrix1 readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-template iMatrix1 readHDF5(H5::H5File file, std::string dataset_name, std::vector<hsize_t>& dims_out);
-
-
-std::filesystem::path find_first_h5_file(const std::filesystem::path &directory_path)
+std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
 {
     try
     {
         // Iterate through the directory
         for (const auto &entry : std::filesystem::directory_iterator(directory_path))
         {
-            // Check if the entry is a regular file and has a .h5 extension
-            if (entry.is_regular_file() && entry.path().extension() == ".h5")
+            // Check if the entry is a regular file and has a .salted extension
+            if (entry.is_regular_file() && entry.path().extension() == ".salted")
             {
                 return entry.path().filename().string(); // Return the filename
             }
@@ -171,7 +27,7 @@ std::filesystem::path find_first_h5_file(const std::filesystem::path &directory_
         std::cerr << "General error: " << e.what() << std::endl;
     }
 
-    return std::filesystem::path(); // Return an empty path if no .h5 file is found
+    return std::filesystem::path(); // Return an empty path if no .salted file is found
 }
 
 template <typename Scalar>
@@ -302,7 +158,7 @@ void Config::populateFromFile(const std::filesystem::path &filename)
     }
     this->nspe1 = static_cast<int>(this->neighspe1.size());
     this->nspe2 = static_cast<int>(this->neighspe2.size());
-    this->from_h5 = false;
+    this->from_binary = false;
 }
 std::vector<std::string> Config::parseVector(const std::string &value)
 {
@@ -335,173 +191,198 @@ std::vector<std::string> Config::parseVector(const std::string &value)
     return result;
 }
 
-// Included in h5 file
-void Config::populateFromFile(const H5::H5File file)
-{
-    err_checkf(!file.attrExists("input"), "Group 'input' not found in h5-File!", std::cout);
-    H5::Group input_grp = file.openGroup("input");
 
-    std::vector<std::string> *dataset_names = new std::vector<std::string>();
-    // Get all datasets in the group
-    herr_t status;
-    status = H5Literate(input_grp.getId(), H5_INDEX_NAME, H5_ITER_NATIVE, NULL, &Config::op_func, dataset_names);
-    err_checkf((status == 0), "Error reading h5 input file", std::cout);
+std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int lengh) {
+	std::vector<char> string_out(lengh, '\0');
+	file.read(string_out.data(), lengh);
+	//Remove null characters from the string
+	string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
+	return std::string(string_out.begin(), string_out.end());
+}
 
-    for (int i = 0; i < dataset_names->size(); i++)
-    {
-        std::string dataset_name = dataset_names->at(i);
-        H5::DataSet dataSet = input_grp.openDataSet(dataset_name);
-        // read type of dataset
-        H5T_class_t type_class = dataSet.getTypeClass();
-        // call the correct handler
-        if (this->handlers.find(type_class) != this->handlers.end())
-        {
-            this->handlers[type_class](dataset_name, dataSet);
+void SALTED_BINARY_FILE::open_file() {
+    //Check if file exists and if it is already open
+	err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
+	err_checkf(!file.is_open(), "File already open, leaving", std::cout);
+	file.open(filepath, std::ios::in | std::ios::binary);
+	err_checkf(file.is_open(), "Couldn't open file: " + filepath.string(), std::cout);
+}
+
+bool SALTED_BINARY_FILE::read_header() {
+    // Read and verify magic number
+	file.seekg(0, std::ios::beg);
+    char magic[HEADER_SIZE];
+    file.read(magic, HEADER_SIZE);
+    if (std::string(magic, HEADER_SIZE) != MAGIC_NUMBER) {
+        std::cerr << "Invalid file format!" << std::endl;
+        return false;
+    }
+    // Read version
+    file.read((char*)&version, sizeof(int));
+    //std::cout << "File Version: " << version << std::endl;
+
+	//Read number of blocks
+	file.read((char*)&numBlocks, sizeof(int));
+	//std::cout << "Number of blocks: " << numBlocks << std::endl;
+
+	//Now follows (Chunkname (5b str), location (4b int)) * numBlocks
+    // Chunknames that are not 5 bytes long are padded with ' '
+	for (int i = 0; i < numBlocks; i++) {
+        std::string chunkname = read_string_remove_NULL(5);
+		int location;
+		file.read((char*)&location, sizeof(int));
+		table_of_contents[chunkname] = location;
+		//std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
+	}
+
+	header_end = file.tellg();
+
+	return true;
+}
+
+//Small macro to read a block of data
+//Skips the first 9 bytes of the block with info about the key (5 bytes str) +  datatype (4 bytes int32) 
+//Reads the data into the container
+//Increments the block_id
+#define READ_BLOCK(container, size) file.seekg(9, std::ios::cur); file.read((char*)container, size);
+#define READ_BLOCK_STRING(container) file.seekg(9, std::ios::cur); file.read((char*)&string_size, 4); container.resize(string_size, '\0');  file.read((char*)container.data(), string_size);
+
+void SALTED_BINARY_FILE::populate_config(Config &config) {
+    err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
+    file.seekg(table_of_contents["CONFG"], std::ios::beg);
+
+    // Read config data
+	READ_BLOCK(&config.average, 1); //Bool data
+	READ_BLOCK(&config.field, 1); 
+	READ_BLOCK(&config.sparsify, 1); 
+	READ_BLOCK(&config.ncut, 4); //Int data
+	READ_BLOCK(&config.nang1, 4); 
+	READ_BLOCK(&config.nang2, 4);
+	READ_BLOCK(&config.nrad1, 4); 
+	READ_BLOCK(&config.nrad2, 4); 
+	READ_BLOCK(&config.Menv, 4); 
+	READ_BLOCK(&config.Ntrain, 4);
+	READ_BLOCK(&config.rcut1, 8);  //Double data
+	READ_BLOCK(&config.rcut2, 8);
+	READ_BLOCK(&config.sig1, 8);
+	READ_BLOCK(&config.sig2, 8);
+	READ_BLOCK(&config.zeta, 8);
+	READ_BLOCK(&config.trainfrac, 8);
+
+    int string_size;
+    std::vector<char> string_out;
+	READ_BLOCK_STRING(string_out);
+    config.species = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
+
+    READ_BLOCK_STRING(string_out);
+    config.neighspe1 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
+	config.nspe1 = config.neighspe1.size();
+
+    READ_BLOCK_STRING(string_out);
+	config.neighspe2 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
+	config.nspe2 = config.neighspe2.size();
+
+    READ_BLOCK_STRING(string_out);
+	config.dfbasis = std::string(string_out.begin(), string_out.end());
+}
+
+
+template <typename T>
+void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, ivec& dims) {
+    int ndims;
+    file.read((char*)&ndims, 4);
+    dims.resize(ndims, 0);
+    for (int i = 0; i < ndims; i++) {
+        file.read((char*)&dims[i], 4);
+    }
+    int size = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
+    data.resize(size);
+    file.read((char*)data.data(), size * sizeof(T));
+}
+
+template <typename T>
+T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block) {
+    err_checkf(header_end != -1, "Header not read yet! Aborting", std::cout);
+    file.seekg(table_of_contents[key], std::ios::beg);
+    file.seekg(4, std::ios::cur); // Skip the datatype
+
+    int n_blocks;
+    file.read(reinterpret_cast<char*>(&n_blocks), sizeof(n_blocks));
+
+    T result(n_blocks);
+    for (int i = 0; i < n_blocks; i++) {
+        process_block(result, i);
+    }
+    return result;
+}
+
+std::unordered_map<int, std::vector<int64_t>> SALTED_BINARY_FILE::read_fps() {
+    return read_generic_blocks<std::unordered_map<int, std::vector<int64_t>>>("FPS",
+        [this](std::unordered_map<int, std::vector<int64_t>>& fps, int i) {
+            ivec dims;
+            std::vector<int64_t> data;
+            read_dataset(data, dims);
+            fps[i] = data;
         }
-    }
-    this->nspe1 = static_cast<int>(this->neighspe1.size());
-    this->nspe2 = static_cast<int>(this->neighspe2.size());
-    this->from_h5 = true;
+    );
 }
 
-void Config::populate_config(const std::filesystem::path &dataset_name, const int &data)
-{
-    if (dataset_name == "average" || dataset_name == "averages")
-        this->average = data != 0; // Assuming boolean stored as integer
-    else if (dataset_name == "field")
-        this->field = data != 0; // Assuming boolean stored as integer
-    else if (dataset_name == "sparsify")
-        this->sparsify = data != 0; // Assuming boolean stored as integer
-    else if (dataset_name == "ncut")
-        this->ncut = data;
-    else if (dataset_name == "nang1")
-        this->nang1 = data;
-    else if (dataset_name == "nang2")
-        this->nang2 = data;
-    else if (dataset_name == "nrad1")
-        this->nrad1 = data;
-    else if (dataset_name == "nrad2")
-        this->nrad2 = data;
-    else if (dataset_name == "Menv")
-        this->Menv = data;
-    else if (dataset_name == "Ntrain")
-        this->Ntrain = data;
-    else
-        std::cout << "Unknown dataset name: " << dataset_name << std::endl;
-}
-void Config::populate_config(const std::filesystem::path &dataset_name, const float &data)
-{
-    if (dataset_name == "rcut1")
-        this->rcut1 = data;
-    else if (dataset_name == "rcut2")
-        this->rcut2 = data;
-    else if (dataset_name == "sig1")
-        this->sig1 = data;
-    else if (dataset_name == "sig2")
-        this->sig2 = data;
-    else if (dataset_name == "zeta")
-        this->zeta = data;
-    else if (dataset_name == "trainfrac")
-        this->trainfrac = data;
-    else
-        std::cout << "Unknown dataset name: " << dataset_name << std::endl;
-}
-void Config::populate_config(const std::filesystem::path &dataset_name, const double &data)
-{
-    if (dataset_name == "rcut1")
-        this->rcut1 = data;
-    else if (dataset_name == "rcut2")
-        this->rcut2 = data;
-    else if (dataset_name == "sig1")
-        this->sig1 = data;
-    else if (dataset_name == "sig2")
-        this->sig2 = data;
-    else if (dataset_name == "zeta")
-        this->zeta = data;
-    else if (dataset_name == "trainfrac")
-        this->trainfrac = data;
-    else
-        std::cout << "Unknown dataset name: " << dataset_name << std::endl;
-}
-void Config::populate_config(const std::filesystem::path &dataset_name, const std::string &data)
-{
-    if (dataset_name == "dfbasis")
-        this->dfbasis = data;
-    else
-        std::cout << "Unknown dataset name: " << dataset_name << std::endl;
-}
-void Config::populate_config(const std::filesystem::path &dataset_name, const std::vector<std::string> &data)
-{
-    if (dataset_name == "species")
-        this->species = data;
-    else if (dataset_name == "neighspe1")
-        this->neighspe1 = data;
-    else if (dataset_name == "neighspe2")
-        this->neighspe2 = data;
-    else
-        std::cout << "Unknown dataset name: " << dataset_name << std::endl;
-}
-
-void Config::handle_int_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet)
-{
-    int data{};
-    dataSet.read(&data, H5::PredType::NATIVE_INT);
-    populate_config(dataset_name, data);
-}
-void Config::handle_float_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet)
-{
-    size_t byteSize = dataSet.getFloatType().getSize();
-    if (byteSize == 4)
-    {
-        float data{};
-        dataSet.read(&data, H5::PredType::NATIVE_FLOAT);
-        populate_config(dataset_name, data);
-    }
-    else if (byteSize == 8)
-    {
-        double data{};
-        dataSet.read(&data, H5::PredType::NATIVE_DOUBLE);
-        populate_config(dataset_name, data);
-    }
-}
-void Config::handle_string_dataset(const std::filesystem::path &dataset_name, H5::DataSet &dataSet)
-{
-    H5::DataSpace dataspace = dataSet.getSpace();
-    hsize_t dims_out[2];
-    int ndims = dataspace.getSimpleExtentDims(dims_out, NULL);
-    if (ndims == 0)
-    {
-        std::string data{};
-        dataSet.read(data, dataSet.getStrType(), H5S_SCALAR);
-        populate_config(dataset_name, data);
-    }
-    else
-    {
-        H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-        std::vector<char *> data{};
-        data.resize(dims_out[0]);
-        dataSet.read(data.data(), dataSet.getStrType());
-        std::vector<std::string> data_str;
-        for (int i = 0; i < data.size(); i++)
-        {
-            data_str.push_back(data[i]);
+std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_averages() {
+    return read_generic_blocks<std::unordered_map<std::string, vec>>("AVERG",
+        [this](std::unordered_map<std::string, vec>& averages, int i) {
+            std::string element = read_string_remove_NULL(5);
+            ivec dims;
+            vec data;
+            read_dataset(data, dims);
+            averages[element] = data;
         }
-        populate_config(dataset_name, data_str);
-    }
+    );
 }
 
-herr_t Config::op_func(hid_t loc_id, const char *name, const H5L_info_t *info, void *operator_data)
-{
-    // Get the type of the object and read the name into the vector
-    herr_t status;
-    H5O_info_t infobuf;
-#if H5_VERSION_GE(1, 12, 0) && !defined(H5_USE_110_API) && !defined(H5_USE_18_API) && !defined(H5_USE_16_API)
-    status = H5Oget_info_by_name(loc_id, name, &infobuf, H5O_INFO_ALL, H5P_DEFAULT);
-#else
-    status = H5Oget_info_by_name(loc_id, name, &infobuf, H5P_DEFAULT);
-#endif
-    std::vector<std::string> *data = (std::vector<std::string> *)operator_data;
-    data->push_back(name);
-    return 0;
-    (void)info;
+std::unordered_map<int, vec> SALTED_BINARY_FILE::read_wigners() {
+    return read_generic_blocks<std::unordered_map<int, vec>>("WIG",
+        [this](std::unordered_map<int, vec>& wigners, int i) {
+            ivec dims;
+            vec data;
+            read_dataset(data, dims);
+            wigners[i] = data;
+        }
+    );
+}
+
+vec SALTED_BINARY_FILE::read_weights() {
+    vec weights;
+    read_generic_blocks<std::vector<vec>>("WEIGH",
+        [this, &weights](std::vector<vec>&, int i) {
+            ivec dims;
+            vec data;
+            read_dataset(data, dims);
+            weights = data;
+        }
+    );
+    return weights;
+}
+
+std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_projectors() {
+    return read_lambda_based_data("PROJ");
+}
+
+std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_features() {
+    return read_lambda_based_data("FEATS");
+}
+
+std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
+    return read_generic_blocks<std::unordered_map<std::string, vec2>>(key,
+        [this](std::unordered_map<std::string, vec2>& container, int i) {
+            std::string element = read_string_remove_NULL(5);
+            int nlambda;
+            file.read(reinterpret_cast<char*>(&nlambda), sizeof(nlambda));
+            for (int lam = 0; lam < nlambda; lam++) {
+                ivec dims;
+                vec data;
+                read_dataset(data, dims);
+                container[element + std::to_string(lam)] = reshape(data, { dims[0], dims[1] });
+            }
+        }
+    );
 }

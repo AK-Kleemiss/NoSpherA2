@@ -49,58 +49,6 @@ namespace constants {
         return temp1 * constants::sqrt(temp_e * temp / temp2);
     };
 
-    const std::complex<double> complex_spherical_harmonic(const int& l, const int& m, double& theta, double& phi){
-        if (l < 6) {
-			std::cout << "Nopyt Nope, spherical harmonic" << std::endl;
-            exit(1);
-        }
-        std::complex<double> res = 0;
-        switch (l) {
-        case 6:
-            switch (m) {
-            case -6:
-				res = 1.0 / 64.0 * sqrt(3003.0 / PI) * pow(sin(theta), 6) * exp(-6.0 * cone * phi);
-				break;
-			case -5:
-				res = 1.0 / 32.0 * sqrt(1001.0 / PI) * pow(sin(theta), 5) * cos(theta) * exp(-5.0 * cone * phi);
-                break;
-			case -4:
-				res = 3.0 / 32.0 * sqrt(91.0 / (2.0 * PI)) * pow(sin(theta), 4) * (11.0 * cos(theta) * cos(theta) - 1.0) * exp(-4.0 * cone * phi);
-				break;
-            case -3:
-				res = 1.0 / 32.0 * sqrt(1365.0 / PI) * pow(sin(theta), 3) * cos(theta) * (11.0 * cos(theta) * cos(theta) - 3.0) * exp(-3.0 * cone * phi);
-                break;
-			case -2:
-				res = 1.0 / 64.0 * sqrt(1365.0 / PI) * pow(sin(theta), 2) * (33.0 *  pow(cos(theta), 4.0) - 18.0 * cos(theta) * cos(theta) + 1) * exp(-2.0 * cone * phi);
-                break;
-			case -1:
-				res = 1.0 / 16.0 * sqrt(273.0 / (2.0 * PI)) * sin(theta) * cos(theta) * (33.0 * pow(cos(theta), 4.0) - 30.0 * cos(theta) * cos(theta) + 5) * exp(-1.0 * cone * phi);
-				break;
-            case 0:
-				res = 1.0 / 32.0 * sqrt(13.0 / PI) * (231.0 * pow(cos(theta), 6) - 315.0 * pow(cos(theta), 4) + 105.0 * pow(cos(theta), 2) - 5.0);
-				break;
-			case 1:
-				res = -1.0 / 16.0 * sqrt(273.0 / (2.0 * PI)) * sin(theta) * cos(theta) * (33.0 * pow(cos(theta), 4.0) - 30.0 * cos(theta) * cos(theta) + 5) * exp(1.0 * cone * phi);
-                break;
-			case 2:
-				res = 1.0 / 64.0 * sqrt(1365.0 / PI) * pow(sin(theta), 2) * (33.0 * pow(cos(theta), 4.0) - 18.0 * cos(theta) * cos(theta) + 1) * exp(2.0 * cone * phi);
-                break;
-			case 3:
-				res = -1.0 / 32.0 * sqrt(1365.0 / PI) * pow(sin(theta), 3) * cos(theta) * (11.0 * cos(theta) * cos(theta) - 3.0) * exp(3.0 * cone * phi);
-				break;
-			case 4:
-				res = 3.0 / 32.0 * sqrt(91.0 / (2.0 * PI)) * pow(sin(theta), 4) * (11.0 * cos(theta) * cos(theta) - 1.0) * exp(4.0 * cone * phi);
-				break;
-			case 5:
-				res = -3 / 32.0 * sqrt(1001.0 / PI) * pow(sin(theta), 5) * cos(theta) * exp(5.0 * cone * phi);
-				break;
-			case 6:
-				res = 1.0 / 64.0 * sqrt(3003.0 / PI) * pow(sin(theta), 6) * exp(6.0 * cone * phi);
-                break;
-            }
-        }
-        return res;
-    }
 
     const double spherical_harmonic(const int& l, const int& m, const double* d)
     {
@@ -874,20 +822,20 @@ namespace constants {
         return { acos(z), atan2(y, x) };
     }
 
-    const vec2 spherical_norms{
-        {sqrt(1 / constants::FOUR_PI)}, // l=0
+    const vec2 spherical_norms{ 
+        { constants::c_1_4p }, // l=0
         {sqrt(3 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[0])),
-         sqrt(3 / constants::FOUR_PI),
+         constants::c_3_4p,
          sqrt(3 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[2]))}, // l=1 m=-1, m=0, m=1
         {sqrt(5 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[0])),
          sqrt(5 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[1])),
-         sqrt(5 / constants::FOUR_PI) ,
+         constants::c_5_4p ,
          sqrt(5 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[3])),
          sqrt(5 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[4]))}, // l=2 m=-2, m=-1, m=0, m=1, m=2
         {sqrt(7 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[0])),
          sqrt(7 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[1])),
          sqrt(7 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[2])),
-         sqrt(7 / constants::FOUR_PI),
+         constants::c_7_4p,
          sqrt(7 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[4])),
          sqrt(7 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[5])),
          sqrt(7 / constants::TWO_PI * double(constants::ft[0]) / double(constants::ft[6]))}, // l=3 m=-3, m=-2, m=-1, m=0, m=1, m=2, m=3
@@ -895,7 +843,7 @@ namespace constants {
          sqrt(9 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[1])),
          sqrt(9 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[2])),
          sqrt(9 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[3])),
-         sqrt(9 / constants::FOUR_PI),
+         constants::c_9_4p,
          sqrt(9 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[5])),
          sqrt(9 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[6])),
          sqrt(9 / constants::TWO_PI * double(constants::ft[1]) / double(constants::ft[7])),
@@ -905,7 +853,7 @@ namespace constants {
          sqrt(11 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[2])),
          sqrt(11 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[3])),
          sqrt(11 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[4])),
-         sqrt(11 / constants::FOUR_PI),
+         constants::c_11_4p,
          sqrt(11 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[6])),
          sqrt(11 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[7])),
          sqrt(11 / constants::TWO_PI * double(constants::ft[2]) / double(constants::ft[8])),
@@ -917,7 +865,7 @@ namespace constants {
          sqrt(13 / constants::TWO_PI * double(constants::ft[9]) / double(constants::ft[3])),
          sqrt(13 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[4])),
          sqrt(13 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[5])),
-         sqrt(13 / constants::FOUR_PI),
+         constants::c_13_4p,
          sqrt(13 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[7])),
          sqrt(13 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[8])),
          sqrt(13 / constants::TWO_PI * double(constants::ft[3]) / double(constants::ft[9])),
@@ -931,7 +879,7 @@ namespace constants {
 		sqrt(15 / constants::TWO_PI * double(constants::ft[10]) / double(constants::ft[4])),
 		sqrt(15 / constants::TWO_PI * double(constants::ft[9]) / double(constants::ft[5])),
 		sqrt(15 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[6])),
-		sqrt(15 / constants::FOUR_PI),
+        constants::c_15_4p,
 		sqrt(15 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[8])),
 		sqrt(15 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[9])),
 		sqrt(15 / constants::TWO_PI * double(constants::ft[4]) / double(constants::ft[10])),
@@ -947,7 +895,7 @@ namespace constants {
 		sqrt(17 / constants::TWO_PI * double(constants::ft[11]) / double(constants::ft[5])),
 		sqrt(17 / constants::TWO_PI * double(constants::ft[10]) / double(constants::ft[6])),
 		sqrt(17 / constants::TWO_PI * double(constants::ft[9]) / double(constants::ft[7])),
-		sqrt(17 / constants::FOUR_PI),
+        constants::c_17_4p,
 		sqrt(17 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[9])),
 		sqrt(17 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[10])),
 		sqrt(17 / constants::TWO_PI * double(constants::ft[5]) / double(constants::ft[11])),
@@ -965,7 +913,7 @@ namespace constants {
 		sqrt(19 / constants::TWO_PI * double(constants::ft[12]) / double(constants::ft[6])),
 		sqrt(19 / constants::TWO_PI * double(constants::ft[11]) / double(constants::ft[7])),
 		sqrt(19 / constants::TWO_PI * double(constants::ft[10]) / double(constants::ft[8])),
-		sqrt(19 / constants::FOUR_PI),
+        constants::c_19_4p,
 		sqrt(19 / constants::TWO_PI * double(constants::ft[8]) / double(constants::ft[10])),
 		sqrt(19 / constants::TWO_PI * double(constants::ft[7]) / double(constants::ft[11])),
 		sqrt(19 / constants::TWO_PI * double(constants::ft[6]) / double(constants::ft[12])),

@@ -9,7 +9,7 @@ Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
 Reading:                          "test_cysteine.xyz" done!
 Number of atoms in Wavefunction file: 14 Number of MOs: 0
-Using "Combo_v1.h5" for the prediction
+Using "combo_v1.salted" for the prediction
 Using basis set: cc-pvqz-jkfit
 Number of protons: 64
 Reading:                          "test_cysteine.cif" done!
