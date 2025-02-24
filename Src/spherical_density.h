@@ -13,6 +13,54 @@ inline void not_implemented_SA(const std::string &file, const int &line, const s
 };
 #define err_not_impl_SA() not_implemented_SA(__FILE__, __LINE__, __func__, "Virtual_function", std::cout);
 
+inline vec linear_interpolate_spherical_densities( // same as below but for a vector of densities
+	const vec2& radial_dens,
+	const vec& spherical_dist,
+	const double dist,
+	const double lincr,
+	const double start)
+{
+	vec result;
+
+	// Prevent log(negative) by ensuring dist is never < start
+	if (dist < start)
+		return radial_dens[0];  // Return first density set
+
+	// Compute the index safely
+	int nr = int(floor(log(dist / start) / lincr));
+
+	// Ensure `nr` is within valid bounds
+	if (nr < 0)
+		nr = 0;
+	if (nr >= spherical_dist.size() - 1) // Prevent out-of-bounds
+		return radial_dens[radial_dens.size() - 1];
+
+	// Ensure `dist` is within bounds of `spherical_dist`
+	if (dist > spherical_dist[spherical_dist.size() - 1])
+		return vec(radial_dens[0].size(), 0.0); // Return zero vector
+
+	// Linear interpolation of densities
+	double denominator = spherical_dist[nr] - spherical_dist[nr - 1];
+	if (denominator == 0) return radial_dens[nr]; // Avoid division by zero
+
+	double t = (dist - spherical_dist[nr - 1]) / denominator;
+
+	// Initialize result vector
+	result.resize(radial_dens[nr].size());
+
+	// Perform interpolation
+	for (size_t i = 0; i < radial_dens[nr].size(); i++)
+	{
+		result[i] = radial_dens[nr][i] + t * (radial_dens[nr + 1][i] - radial_dens[nr][i]);
+
+		// Avoid numerical precision issues (set very small values to 0)
+		if (result[i] < 1E-10)
+			result[i] = 0;
+	}
+
+	return result;
+}
+
 inline double linear_interpolate_spherical_density(
 	const vec &radial_dens,
 	const vec &spherical_dist,

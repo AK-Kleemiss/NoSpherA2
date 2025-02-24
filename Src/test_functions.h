@@ -439,12 +439,11 @@ double calc_grid_averaged_at_r(const WFN &wavy,
     return dens;
 }
 /// not like above //////////////////////////////////////////////////////////////////////////-spherical_aver_hirsh in convience.cpp////////
-double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
-                                     const int i, /// now counts for several atoms
-                                     const double &r,
-                                     const int &min_angular = 60,
-                                     const int &max_angular = 1000,
-                                     const bool print = false)
+vec calc_fukui_averaged_at_r(const std::vector<WFN>& gbws_wfn_vec,
+    const double& r,
+    const int& min_angular = 360,
+    const int& max_angular = 1000,
+    const bool print = false)
 {
 
     const int min_num_angular_points_closest =
@@ -470,7 +469,7 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
                        angular_w.data() + angular_off);
     }
 
-    const double rb = constants::bragg_angstrom[wavy.get_atom_charge(i)] / (5.0E10 * constants::a0);
+    const double rb = constants::bragg_angstrom[gbws_wfn_vec[0].get_atom_charge(0)] / (5.0E10 * constants::a0);
 
     int num_angular = max_num_angular_points_closest;
     if (r < rb)
@@ -490,46 +489,663 @@ double calc_hirsh_grid_averaged_at_r(const WFN &wavy,
     const int size = start + num_angular;
     int p = 0;
     double dens = 0.0;
-    Thakkar A(wavy.get_atom_charge(i)); /// for the atom i, a Thakkar object is created
-#pragma omp parallel
+    int size_gbws = gbws_wfn_vec.size();
+    std::vector<double> densities(size_gbws, 0.0);
+    //#pragma omp parallel
     {
         vec2 d(16);
-        vec _phi(wavy.get_nmo(), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy.get_ncen(), 0.0);
-#pragma omp for reduction(+ : dens)
-        for (int iang = start; iang < size; iang++)
-        {
+        vec _phi1(gbws_wfn_vec[0].get_nmo(), 0.0); /// the wavefunction of the atom with only one electron is considered extra
+
+        vec2 phies;
+        for (int i = 1; i < size_gbws; i++) {
+            phies.push_back(vec(std::max(gbws_wfn_vec[i].get_nmo(), gbws_wfn_vec[i - 1].get_nmo()), 0.0));
+        }
+
+        for (int j = 0; j < 16; j++) d[j].resize(gbws_wfn_vec[0].get_ncen(), 0.0);
+        //#pragma omp for reduction(+:dens)
+        for (int iang = start; iang < size; iang++) {
             p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy.get_atom_coordinate(i, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy.get_atom_coordinate(i, 1);
-            const double z = angular_z[p] * r + wavy.get_atom_coordinate(i, 2);
-            const std::array<double, 3> d_ = {angular_x[p] * r, angular_y[p] * r, angular_z[p] * r}; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.get_atom_coordinate(i,0) is 0
-            const double dist = array_length(d_);
-            const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
-            double rho_all = rho_a;                          /// the molecular density based on pro-atoms
-            for (int atom = 0; atom < wavy.get_ncen(); atom++)
-            { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
-                if (atom == i)
-                    continue; /// if the atom is the same as the atom i, the loop is skipped
-                const std::array<double, 3> d_atom = {x - wavy.get_atom_coordinate(atom, 0), y - wavy.get_atom_coordinate(atom, 1), z - wavy.get_atom_coordinate(atom, 2)};
-                const double dist_atom = array_length(d_atom); /// is like d_, but for another atom
-                Thakkar thakkar_atom(wavy.get_atom_charge(atom));
-                rho_all += thakkar_atom.get_radial_density(dist_atom);
+            const double x_f = angular_x[p] * r + gbws_wfn_vec[0].get_atom_coordinate(0, 0);  /// maybe moving the atom centered fukuis to the lebedev points
+            const double y_f = angular_y[p] * r + gbws_wfn_vec[0].get_atom_coordinate(0, 1);
+            const double z_f = angular_z[p] * r + gbws_wfn_vec[0].get_atom_coordinate(0, 2);
+            densities[0] += (gbws_wfn_vec[0].compute_dens(x_f, y_f, z_f, d, _phi1)) * constants::FOUR_PI * angular_w[p];
+            for (int i = 1; i < size_gbws; i++) {
+                densities[i] += (gbws_wfn_vec[i].compute_dens(x_f, y_f, z_f, d, phies[i - 1]) - gbws_wfn_vec[i - 1].compute_dens(x_f, y_f, z_f, d, phies[i - 1])) * constants::FOUR_PI * angular_w[p];
             }
-            const double hirsh_weight = rho_a / rho_all;
-            dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
         }
     }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
-    return dens;
+    return densities;
 }
-double calc_grid_averaged_at_r_from_cube(const cube &cuby,
-                                         const double &r,
-                                         const int &min_angular = 60,
-                                         const int &max_angular = 1000,
-                                         const bool print = false)
+
+void remove_column(vec2& matrix, size_t col) {
+    for (auto& row : matrix) {
+        if (col < row.size()) { // Ensure the column exists
+            row.erase(row.begin() + col);
+        }
+    }
+}
+
+int check_for_negative(const vec& _vect) {
+	for (int i = 0; i < _vect.size(); i++) {
+		if (_vect[i] < 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+vec fit_coefficients( vec& D,
+    vec2& components
+) {
+	vec D_copy = D;
+	vec2 components_copy = components;
+	//coefficients.clear();
+
+    solve_linear_problem(components_copy, D_copy);
+    vec coefficients(D_copy.begin(), D_copy.begin() + components[0].size());
+	//vec subvec;
+	//for (int i = 0; i < components[0].size(); i++) {
+	//	subvec.push_back(D_copy[i]);
+	//} 
+
+	//coefficients = subvec; // hopefully gives the soltion to the eigenvalue problem
+    return coefficients;
+}   
+
+svec read_specific_files(const std::string& directoryPath, const std::string& pattern) {
+	std::vector<std::string> files;
+	for (const auto& entry : std::filesystem::directory_iterator(directoryPath)) {
+        if (entry.path().filename().string().find(pattern) != std::string::npos) {
+            files.push_back(entry.path().string()); // Add the full file path
+        }
+	}
+	return files;
+}
+
+//std::tuple<vec, vec, vec2> calc_hirsh_grid_averaged_at_r(const WFN& wavy, /// the parent wavefunction, molecule must be of type [AB]
+//    vec coefficients_m,
+//    vec2 matrix_big,
+//    const int& min_angular = 360,
+//    const int& max_angular = 1000,
+//    const bool print = false,
+//    const int threads = 16)
+//{
+//
+//    BLAS_pointer = math_load_BLAS(threads);
+//    const int min_num_angular_points_closest =
+//        constants::get_closest_num_angular(min_angular);
+//    const int max_num_angular_points_closest =
+//        constants::get_closest_num_angular(max_angular);
+//    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+//
+//    vec angular_x(constants::max_LT * constants::MAG, 0.0);
+//    vec angular_y(constants::max_LT * constants::MAG, 0.0);
+//    vec angular_z(constants::max_LT * constants::MAG, 0.0);
+//    vec angular_w(constants::max_LT * constants::MAG, 0.0);
+//    int angular_off;
+//    lebedev_sphere ls;
+//
+//    for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+//        angular_off = j * constants::MAG;
+//        ls.ld_by_order(constants::lebedev_table[j],
+//            angular_x.data() + angular_off,
+//            angular_y.data() + angular_off,
+//            angular_z.data() + angular_off,
+//            angular_w.data() + angular_off);
+//    }
+//    const int nr_atoms = wavy.atoms.size();
+//
+//    /// generating a vector of WFNs of all atoms
+//    std::vector<std::vector<WFN>> gbws_other_atoms;
+//    int sum_gbws = 0;
+//    for (int i = 0; i < nr_atoms; i++) {
+//        auto gbws_other = read_specific_files("./gbws", wavy.atoms[i].label);
+//        int size_gbws_other = gbws_other.size();
+//        std::vector<WFN> gbws_wfn_vec_other;
+//        gbws_wfn_vec_other.reserve(size_gbws_other);
+//        sum_gbws += size_gbws_other;
+//        for (int j = 0; j < size_gbws_other; j++) {
+//            gbws_wfn_vec_other.push_back(WFN(gbws_other[j]));
+//            gbws_wfn_vec_other.back().delete_unoccupied_MOs();
+//        }
+//        gbws_other_atoms.push_back(gbws_wfn_vec_other);
+//    }//////////////////////////////////////////////////////////
+//    double r_maxi = 3.0;
+//    double r_stepi = 0.05;
+//
+//    vec2 dens_matrix_big((r_maxi / r_stepi) * nr_atoms + nr_atoms, vec(sum_gbws, 0.0));
+//    vec2 fukui_matrix = matrix_big;
+//
+//
+//    int column_interator = 0; /// use to keep track of the columns in the dens_matrix_big at which the next entries have to be filled
+//    int row_interator = 0; /// use to keep track of the rows in the dens_matrix_big at which the next entries have to be filled
+//    int row_interator_copy = 0;
+//    double factor_re = 1;
+//
+//    std::vector<double> dens_rho_a;
+//    vec2 dens_matrix_copy((r_maxi / r_stepi) * nr_atoms, vec(sum_gbws, 0.0));
+//
+//    for (int i_atom = 0; i_atom < nr_atoms; i_atom++) {///////////////////////////////////////////////////////////////////////////////////////starting atom loop
+//        std::vector<std::vector<double>> dens_matrix;
+//        std::vector<double> dens_rho_a_copy; ///// stores the density for the charge calculation of the current atom
+//
+//        auto gbws = read_specific_files("./gbws", wavy.atoms[i_atom].label);
+//        int size_gbws = gbws.size();
+//        std::vector<WFN> gbws_wfn_vec; /// conatins the wavefunctions of the gbws, the first is (eg) Li_no_elec_1, the second is Li_no_elec_2, etc.
+//        gbws_wfn_vec.reserve(size_gbws);
+//        for (int i = 0; i < size_gbws; i++) {
+//            gbws_wfn_vec.push_back(WFN(gbws[i]));
+//            gbws_wfn_vec.back().delete_unoccupied_MOs();
+//        }
+//
+//        vec _phi(wavy.get_nmo(), 0.0);
+//        vec _phi1(gbws_wfn_vec[0].get_nmo(), 0.0); /// the wavefunction of the atom with only one electron is considered extra
+//
+//        vec2 phies;
+//        for (int i = 1; i < size_gbws; i++) {
+//            phies.push_back(vec(std::max(gbws_wfn_vec[i].get_nmo(), gbws_wfn_vec[i - 1].get_nmo()), 0.0));
+//        }
+//
+//        for (double r = 0.001; r < r_maxi; r += r_stepi) {///////////////////////////////////////////////////////////////////////////////////////starting r loop
+//            //std::vector<double> dens_row;
+//            int counter = 0;
+//
+//            const double rb = constants::bragg_angstrom[wavy.atoms[i_atom].charge] / (5.0E10 * constants::a0);
+//            int num_angular = max_num_angular_points_closest;
+//            if (r < rb) {
+//                num_angular = static_cast<int>(max_num_angular_points_closest *
+//                    (r / rb));
+//                num_angular = constants::get_closest_num_angular(num_angular);
+//                err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+//                if (num_angular < min_num_angular_points_closest)
+//                    num_angular = min_num_angular_points_closest;
+//            }
+//            angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+//            err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+//            const int start = 0;
+//            angular_off -= start;
+//            const int size = start + num_angular;
+//            int p = 0;
+//            double dens = 0.0;
+//            std::vector<double> densities(size_gbws, 0.0);
+//            Thakkar A(wavy.atoms[i_atom].charge); /// for the atom i, a Thakkar object is created
+//            //#pragma omp parallel
+//            {
+//                vec2 d(16);
+//                for (int j = 0; j < 16; j++) d[j].resize(wavy.get_ncen(), 0.0);
+//                //#pragma omp for reduction(+:dens)
+//                for (int iang = start; iang < size; iang++) {
+//                    p = angular_off + iang;
+//                    const double x = angular_x[p] * r + wavy.atoms[i_atom].x; /// moving the lebedev points to the atom i
+//                    const double y = angular_y[p] * r + wavy.atoms[i_atom].y;
+//                    const double z = angular_z[p] * r + wavy.atoms[i_atom].z;
+//
+//                    if (coefficients_m.empty()) {
+//                        const double x_f = angular_x[p] * r + gbws_wfn_vec[0].atoms[0].x;  /// maybe moving the atom centered fukuis to the lebedev points
+//                        const double y_f = angular_y[p] * r + gbws_wfn_vec[0].atoms[0].y;
+//                        const double z_f = angular_z[p] * r + gbws_wfn_vec[0].atoms[0].z;
+//                        densities[0] += (gbws_wfn_vec[0].compute_dens(x_f, y_f, z_f, d, _phi1)) * constants::FOUR_PI * angular_w[p];
+//                        for (int i = 1; i < size_gbws; i++) {
+//                            densities[i] += (gbws_wfn_vec[i].compute_dens(x_f, y_f, z_f, d, phies[i - 1]) - gbws_wfn_vec[i - 1].compute_dens(x_f, y_f, z_f, d, phies[i - 1])) * constants::FOUR_PI * angular_w[p];
+//                        }
+//
+//                        const std::array<double, 3> d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.atoms[i].x is 0 
+//                        const double dist = array_length(d_);
+//
+//                        const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
+//                        double rho_all = rho_a; /// the molecular density based on pro-atoms
+//                        for (int atom = 0; atom < wavy.atoms.size(); atom++) { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
+//                            if (atom == i_atom) continue; /// if the atom is the same as the atom i, the loop is skipped
+//                            const std::array<double, 3> d_atom = { x - wavy.atoms[atom].x, y - wavy.atoms[atom].y, z - wavy.atoms[atom].z };
+//                            const double dist_atom = array_length(d_atom); /// is like d_, but for another atom 
+//                            Thakkar thakkar_atom(wavy.atoms[atom].charge);
+//                            rho_all += thakkar_atom.get_radial_density(dist_atom);
+//                        }
+//                        const double hirsh_weight = rho_a / rho_all;
+//                        dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+//                    }
+//
+//                    else {
+//                        double rho_a = 0.0;
+//
+//                        for (int j = 0; j < sum_gbws; j++) { // if i at some point have to cut out negative coefficients, this have to be coefficients_m.size()
+//                            rho_a += coefficients_m[j] * fukui_matrix[counter + (i_atom * (r_maxi / r_stepi))][j];
+//                        }
+//
+//                        double rho_all = rho_a;
+//                        int coeff_iterator_end = 0;
+//
+//                        for (int atom = 0; atom < wavy.atoms.size(); atom++) {
+//                            //auto gbws_other_atoms_hirsh = read_specific_files("./gbws", wavy.atoms[atom].label);
+//                            std::vector<WFN> gbws_other_atoms_hirsh = gbws_other_atoms[atom];
+//                            int size_gbws_atoms_hirsh = gbws_other_atoms_hirsh.size();
+//
+//                            coeff_iterator_end += size_gbws_atoms_hirsh;
+//                            if (atom == i_atom) continue;
+//
+//                            const std::array<double, 3> d_atom = { x - wavy.atoms[atom].x, y - wavy.atoms[atom].y, z - wavy.atoms[atom].z };
+//                            const double dist_atom = array_length(d_atom);
+//                            int r_atom = dist_atom - r;
+//                            if (r_atom < 0) r_atom = abs(r_atom);
+//
+//                            vec fukui_dens;
+//                            fukui_dens = calc_fukui_averaged_at_r(gbws_other_atoms_hirsh, r_atom);
+//                            for (int j = (coeff_iterator_end - size_gbws_atoms_hirsh); j < coeff_iterator_end; j++) {
+//                                rho_all += coefficients_m[j] * fukui_dens[j];
+//                            }
+//                        }
+//                        const double hirsh_weight = rho_a / rho_all;
+//                        dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+//                    }
+//                }
+//            }
+//            dens_rho_a.push_back(dens);
+//            dens_rho_a_copy.push_back(dens);
+//            dens_matrix.push_back(densities);
+//            counter++;
+//        }
+//        ///////////////////////////////////////////////////////////////////////////////////////ending r loop /// the following construct a unique matrix of fukui functions and 1 1 1 1 values as restrainer.
+//
+//        int new_rows = dens_matrix.size();
+//        int new_col = dens_matrix[0].size();
+//        for (int i = 0; i < new_rows; i++) {
+//            for (int j = 0; j < new_col; j++) {
+//                dens_matrix_big[row_interator + i][column_interator + j] = dens_matrix[i][j];
+//            }
+//        } //////((((((((((making a version without the ones
+//        for (int i = 0; i < new_rows; i++) {
+//            for (int j = 0; j < new_col; j++) {
+//                dens_matrix_copy[row_interator_copy + i][column_interator + j] = dens_matrix[i][j];
+//            }
+//        }
+//
+//        //////////////)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+//        vec lower_vector(dens_matrix_big[0].size(), 0.0); ///////////////////////////////////////////////This ensures, that below each block of matrix elements, a row of 1 1 1 .. es placed apropriat
+//        for (int i = 0; i < dens_matrix_big[0].size(); i++) {
+//            if (i < column_interator || i >= column_interator + new_col)
+//                lower_vector[i] = 0.0;
+//            else
+//                lower_vector[i] = 0.0 * factor_re; /// adjust here 
+//        }
+//        dens_matrix_big[row_interator + new_rows] = lower_vector;////////////////////////////////////////
+//
+//        double charge = 0.0;
+//        for (int i = 0; i < dens_rho_a_copy.size(); i++) {
+//            charge += (dens_rho_a_copy[i] * (0.001 + i * r_stepi) * (0.001 + i * r_stepi) * r_stepi); // no FOUR_PI , because it is already included in the dens_rho_a
+//        }
+//        dens_rho_a.push_back(charge * factor_re);
+//
+//        row_interator_copy += new_rows;
+//        column_interator += size_gbws;
+//        row_interator += (r_maxi / r_stepi) + 1;
+//        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//    }
+//    vec lower_vector_large(dens_matrix_big[0].size(), 1.0 * factor_re);
+//    dens_matrix_big.push_back(lower_vector_large);
+//    dens_rho_a.push_back(4.0 * factor_re);
+//
+//
+//    vec dens_rho_a_returner = dens_rho_a;
+//    vec coefficients = fit_coefficients(dens_rho_a, dens_matrix_big);
+//    // now making sure that every coefficient is positive, otherwise the whole column in components is set to zero and the fitting repeated.
+///*    ivec checker(dens_matrix_big[0].size(), 1);
+//    for (int i = 0; i < dens_matrix_big[0].size(); i++) {
+//        int index_negative = check_for_negative(coefficients);
+//        if (index_negative != -1) {
+//            checker[index_negative] = 0;
+//            dens_rho_a = dens_rho_a_copy;
+//
+//            remove_column(dens_matrix_big, index_negative);
+//
+//            coefficients = fit_coefficients(dens_rho_a, dens_matrix_big);
+//        }
+//        else {
+//            break;
+//        }
+//    }   */                                                      // not needed right now, as the coefficients are not recalcualted but corrected afterwards instead./////////////////////////////////////
+//    //return {coefficients, dens_rho_a_copy, dens_matrix_copy};
+//    return { coefficients, dens_rho_a_returner, dens_matrix_copy };
+//}
+
+vec2 make_up_lebedev(const int& min_angular = 360, // under construction
+	const int& max_angular = 1000)
+{
+	const int min_num_angular_points_closest =
+		constants::get_closest_num_angular(min_angular);
+	const int max_num_angular_points_closest =
+		constants::get_closest_num_angular(max_angular);
+	err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+	vec angular_x(constants::max_LT * constants::MAG, 0.0);
+	vec angular_y(constants::max_LT * constants::MAG, 0.0);
+	vec angular_z(constants::max_LT * constants::MAG, 0.0);
+	vec angular_w(constants::max_LT * constants::MAG, 0.0);
+	int angular_off;
+	lebedev_sphere ls;
+	for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+		angular_off = j * constants::MAG;
+		ls.ld_by_order(constants::lebedev_table[j],
+			angular_x.data() + angular_off,
+			angular_y.data() + angular_off,
+			angular_z.data() + angular_off,
+			angular_w.data() + angular_off);
+	}
+	return { angular_x, angular_y, angular_z, angular_w };
+}
+
+std::tuple<vec, vec2, vec2, vec3> calc_hirsh_grid_averaged_at_r(const WFN& wavy, /// the parent wavefunction, molecule must be of type [AB]
+    vec coefficients_m,
+    vec2 matrix_big,
+    const int& min_angular = 360,
+    const int& max_angular = 1000,
+    const bool print = false,
+    const int threads = 16)
+{
+    const int nr_atoms = wavy.get_atoms().size();
+    int sum_gbws = 0;
+	const int restraint_factor = 10000;
+
+
+    math_load_BLAS(threads);
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_angular);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_angular);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+
+    /// generating a vector of WFNs of all atoms
+    std::vector<std::vector<WFN>> gbws_all_atoms;
+    for (int i = 0; i < nr_atoms; i++) {
+        auto gbws_all = read_specific_files("./gbws", wavy.get_atom_label(i));
+        int size_gbws_all = gbws_all.size();
+        std::vector<WFN> gbws_vec_all;
+        gbws_vec_all.reserve(size_gbws_all);
+        sum_gbws += size_gbws_all;
+        for (int j = 0; j < size_gbws_all; j++) {
+            gbws_vec_all.push_back(WFN(gbws_all[j]));
+            gbws_vec_all.back().delete_unoccupied_MOs();
+        }
+        gbws_all_atoms.push_back(gbws_vec_all);
+    }//////////////////////////////////////////////////////////
+
+	vec3 dens_matrix(nr_atoms);
+    vec2 dens_rho_A(nr_atoms);
+    vec2 distances(nr_atoms);
+	double tot_charge = 0;
+
+    ivec index_helper = { 0 };
+    int sum_for_index_helper = 0;
+    for (int i = 0; i < nr_atoms - 1 ; i++) {
+        sum_for_index_helper += gbws_all_atoms[i].size();
+        index_helper.push_back(sum_for_index_helper);
+    }
+
+#pragma omp parallel for
+    for (int i_atom = 0; i_atom < nr_atoms; i_atom++) {///////////////////////////////////////////////////////////////////////////////////////starting atom loop
+
+        vec angular_x(constants::max_LT * constants::MAG, 0.0);
+        vec angular_y(constants::max_LT * constants::MAG, 0.0);
+        vec angular_z(constants::max_LT * constants::MAG, 0.0);
+        vec angular_w(constants::max_LT * constants::MAG, 0.0);
+        int angular_off;
+        lebedev_sphere ls;
+
+        for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+            angular_off = j * constants::MAG;
+            ls.ld_by_order(constants::lebedev_table[j],
+                angular_x.data() + angular_off,
+                angular_y.data() + angular_off,
+                angular_z.data() + angular_off,
+                angular_w.data() + angular_off);
+        }
+        
+		std::vector<WFN> gbws = gbws_all_atoms[i_atom];
+		int size_gbws = gbws.size();
+
+		vec _phi(wavy.get_nmo(), 0.0);
+		int phi_max = 0;
+        
+		for (int i = 0; i < size_gbws; i++) {
+			gbws[i].get_nmo() > phi_max ? phi_max = gbws[i].get_nmo() : phi_max;
+		}
+        vec _phi1(phi_max, 0.0);// this needs to get rewritten somehow
+
+		double dens = 1.0;
+        const double incr_start = 1.020;
+        const double r_min = 0.00001;
+        const int accuracy = 2;
+
+        const double incr = pow(incr_start, std::max(1, accuracy - 1));
+        const double lincr = log(incr);
+
+		double r = r_min;
+        while (dens > 1E-6) {
+			dens = 0.0;
+
+            const double rb = constants::bragg_angstrom[wavy.get_atom_charge(0)] / (5.0E10 * constants::a0);
+            int num_angular = max_num_angular_points_closest;
+            if (r < rb) {
+                num_angular = static_cast<int>(max_num_angular_points_closest *
+                    (r / rb));
+                num_angular = constants::get_closest_num_angular(num_angular);
+                err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+                if (num_angular < min_num_angular_points_closest)
+                    num_angular = min_num_angular_points_closest;
+            }
+            angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+            err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+            const int start = 0;
+            const int size = start + num_angular;
+            int p = 0;
+            Thakkar A(wavy.get_atom_charge(i_atom)); /// for the atom i, a Thakkar object is created
+
+            vec2 d(16);
+            vec densities(sum_gbws, 0.0);
+            for (int j = 0; j < 16; j++) d[j].resize(wavy.get_ncen(), 0.0);
+            for (int iang = start; iang < size; iang++) {
+                p = angular_off + iang;
+                const double x = angular_x[p] * r + wavy.get_atom_coordinate(0, 0); /// moving the lebedev points to the atom i
+                const double y = angular_y[p] * r + wavy.get_atom_coordinate(0, 1);
+                const double z = angular_z[p] * r + wavy.get_atom_coordinate(0, 2);
+
+				const double x_f = angular_x[p] * r + gbws[0].get_atom_coordinate(0, 0);  /// 0 since theres only one atom in the fukui wavefunctions
+                const double y_f = angular_y[p] * r + gbws[0].get_atom_coordinate(0, 1);
+                const double z_f = angular_z[p] * r + gbws[0].get_atom_coordinate(0, 2);
+                densities[ 0 + index_helper[i_atom] ] += (gbws[0].compute_dens(x_f, y_f, z_f, d, _phi1)) * constants::FOUR_PI * angular_w[p];
+                if (gbws.size() >= 1) {
+                    for (int i = 1; i < size_gbws; i++) {
+                        densities[i + index_helper[i_atom]] += (gbws[i].compute_dens(x_f, y_f, z_f, d, _phi1) - gbws[i - 1].compute_dens(x_f, y_f, z_f, d, _phi1)) * constants::FOUR_PI * angular_w[p];
+                    }
+                }
+                const std::array<double, 3> d_ = { angular_x[p] * r, angular_y[p] * r, angular_z[p] * r }; /// as the function get_radial_density needs a distance, the distance is calculated. The atom A is in the origin, the wavy.atoms[i].x is 0 
+                const double dist = array_length(d_);
+
+                const double rho_a = A.get_radial_density(dist); /// the radial density of the atom i is calculated
+                double rho_all = rho_a; /// the molecular density based on pro-atoms
+                for (int atom = 0; atom < wavy.get_atoms().size(); atom++) { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
+                    if (atom == i_atom) continue; /// if the atom is the same as the atom i, the loop is skipped
+                    const std::array<double, 3> d_atom = { x - wavy.get_atom_coordinate(0, 0), y - wavy.get_atom_coordinate(0, 1), z - wavy.get_atom_coordinate(0, 2)};
+                    const double dist_atom = array_length(d_atom); /// is like d_, but for another atom 
+                    rho_all += Thakkar(wavy.get_atom_charge(atom)).get_radial_density(dist_atom);
+                }
+                const double hirsh_weight = rho_a / rho_all;
+                dens += wavy.compute_dens(x, y, z, d, _phi) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+            }
+            /// here could one insert a vector of 0.0 or whatever
+            dens_rho_A[i_atom].push_back(dens);
+            dens_matrix[i_atom].push_back(densities);
+            distances[i_atom].push_back(r);
+			r *= incr;
+        }
+        double charge = dens_rho_A[i_atom][0] * distances[i_atom][0] * distances[i_atom][0] * distances[i_atom][0];
+        for (int i = 1; i < dens_rho_A[i_atom].size(); i++) {
+            charge += dens_rho_A[i_atom][i] * distances[i_atom][i] * distances[i_atom][i] * (distances[i_atom][i] - distances[i_atom][i-1]);
+        }
+#pragma omp critical
+		dens_rho_A[i_atom].push_back(charge * restraint_factor);
+		tot_charge += charge;
+    }
+	vec dens_rho_Big = flatten(dens_rho_A); // one could predefine the size of this matrix to speed it up later by parralelizing the loop
+	dens_rho_Big.push_back(tot_charge * restraint_factor);
+
+    vec2 dens_matrix_big;// one could predefine the size of this matrix to speed it up later by parralelizing the loop
+	for (int i = 0; i < nr_atoms; i++) {
+		for (int j = 0; j < dens_matrix[i].size(); j++) {
+			dens_matrix_big.push_back(dens_matrix[i][j]);
+		}
+		dens_matrix_big.push_back(std::vector<double>(sum_gbws, 0.0 * restraint_factor)); // here we restrain the sum of the coefficients to be the charge of the i_th atom
+	}
+    dens_matrix_big.push_back(std::vector<double>(sum_gbws, 1.0 * restraint_factor));// here we restrain the sum of the coefficients to be the total number of electrons
+
+    vec coefficients = fit_coefficients(dens_rho_Big, dens_matrix_big);
+
+	return {coefficients, dens_rho_A, distances, dens_matrix };
+}
+
+vec fukui_fitting(const WFN& wavy, /// the parent wavefunction, molecule must be of type [AB]
+    vec coefficients_m,
+    vec2 distances,
+    vec3 matrix_big,
+    const int& min_angular = 360,
+    const int& max_angular = 1000,
+    const bool print = false,
+    const int threads = 16)
+{
+	const int nr_atoms = wavy.get_atoms().size();
+    vec2 dens_rho_A(nr_atoms);
+    vec3 dens_matrix_new_fitting(nr_atoms);
+    vec2 distances_new(nr_atoms);
+	int restraint_factor = 10000;
+    int sum_gbws = 0;
+	double tot_charge = 0;
+
+    /// generating a vector of WFNs of all atoms
+    for (int i = 0; i < nr_atoms; i++) {
+        auto gbws_all = read_specific_files("./gbws", wavy.get_atom_label(i));
+        int size_gbws_all = gbws_all.size();
+        std::vector<WFN> gbws_vec_all;
+        gbws_vec_all.reserve(size_gbws_all);
+        sum_gbws += size_gbws_all;
+	}//////////////////////////////////////////////////////////
+
+    math_load_BLAS(threads);
+    const int min_num_angular_points_closest =
+        constants::get_closest_num_angular(min_angular);
+    const int max_num_angular_points_closest =
+        constants::get_closest_num_angular(max_angular);
+    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
+
+#pragma omp parallel for
+    for (int i_atom = 0; i_atom < nr_atoms; i_atom++) {
+
+        vec angular_x(constants::max_LT * constants::MAG, 0.0);
+        vec angular_y(constants::max_LT * constants::MAG, 0.0);
+        vec angular_z(constants::max_LT * constants::MAG, 0.0);
+        vec angular_w(constants::max_LT * constants::MAG, 0.0);
+        int angular_off;
+        lebedev_sphere ls;
+
+        for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++) {
+            angular_off = j * constants::MAG;
+            ls.ld_by_order(constants::lebedev_table[j],
+                angular_x.data() + angular_off,
+                angular_y.data() + angular_off,
+                angular_z.data() + angular_off,
+                angular_w.data() + angular_off);
+        }
+
+        const double rb = constants::bragg_angstrom[wavy.get_atom_charge(0)] / (5.0E10 * constants::a0);
+
+        double dens = 1.0;
+        const double incr_start = 1.020;
+        const double r_min = 0.00001;
+        const int accuracy = 2;
+
+        const double incr = pow(incr_start, std::max(1, accuracy - 1));
+        const double lincr = log(incr);
+
+        double r = r_min;
+        while (dens > 1E-6) {
+            dens = 0.0;
+
+            int num_angular = max_num_angular_points_closest;
+            if (r < rb) {
+                num_angular = static_cast<int>(max_num_angular_points_closest *
+                    (r / rb));
+                num_angular = constants::get_closest_num_angular(num_angular);
+                err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
+                if (num_angular < min_num_angular_points_closest)
+                    num_angular = min_num_angular_points_closest;
+            }
+
+            angular_off = constants::get_angular_order(num_angular) * constants::MAG;
+            err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
+            const int start = 0;
+            angular_off -= start;
+            const int size = start + num_angular;
+            int p = 0;
+            vec2 d(16);
+            vec2 fukui_matrix = matrix_big[i_atom];
+			vec fukui_densities = linear_interpolate_spherical_densities(fukui_matrix, distances[i_atom], r, lincr, r_min);
+            vec phi1(wavy.get_nmo(), 0.0); /// the wavefunction of the atom with only one electron is considered extra
+            for (int j = 0; j < 16; j++) d[j].resize(wavy.get_ncen(), 0.0);
+            for (int iang = start; iang < size; iang++) {
+                p = angular_off + iang;
+                const double x = angular_x[p] * r + wavy.get_atom_coordinate(0, 0);  /// maybe moving the atom centered fukuis to the lebedev points
+                const double y = angular_y[p] * r + wavy.get_atom_coordinate(0, 1);
+                const double z = angular_z[p] * r + wavy.get_atom_coordinate(0, 2);
+
+				// old: vec2 fukui_matrix = matrix_big[i_atom];
+				// old: vec fukui_densities = linear_interpolate_spherical_densities(fukui_matrix, distances[i_atom], r, lincr, r_min); in theory, this are the fukui densoities i would need for the fitting
+				double rho_a = 0.0;
+                for (int j = 0; j < fukui_densities.size(); j++) {
+                    rho_a += coefficients_m[j] * fukui_densities[j];
+                }
+                double rho_all = rho_a;
+				for (int atom = 0; atom < wavy.get_atoms().size(); atom++) { /// a new for loop is started, which calculates the sum of rhos, with respect to the lebedev points
+					if (atom == i_atom) continue; /// if the atom is the same as the atom i, the loop is skipped
+					const std::array<double, 3> d_atom = { x - wavy.get_atom_coordinate(0, 0), y - wavy.get_atom_coordinate(0, 1), z - wavy.get_atom_coordinate(0, 2) };
+					const double dist_atom = array_length(d_atom); /// is like d_, but for another atom
+					vec2 fukui_atom_matrix = matrix_big[atom];
+					vec fukui_atom_densities = linear_interpolate_spherical_densities(fukui_atom_matrix, distances[atom], dist_atom, lincr, r_min);
+					for (int j = 0; j < fukui_atom_densities.size(); j++) {
+						rho_all += coefficients_m[j] * fukui_atom_densities[j];
+					}
+				}
+                const double hirsh_weight = rho_a / rho_all;
+				dens += wavy.compute_dens(x, y, z, d, phi1) * hirsh_weight * constants::FOUR_PI * angular_w[p];
+
+            }
+		    dens_rho_A[i_atom].push_back(dens);
+			dens_matrix_new_fitting[i_atom].push_back(fukui_densities);
+            distances_new[i_atom].push_back(r);
+            r *= incr;
+        }
+		double charge = dens_rho_A[i_atom][0] * distances_new[i_atom][0] * distances_new[i_atom][0] * distances_new[i_atom][0];
+		for (int i = 1; i < dens_rho_A[i_atom].size(); i++) {
+			charge += dens_rho_A[i_atom][i] * distances_new[i_atom][i] * distances_new[i_atom][i] * (distances_new[i_atom][i] - distances_new[i_atom][i - 1]);
+		}
+		tot_charge += charge;
+    }   
+    vec dens_rho_Big = flatten(dens_rho_A);
+    dens_rho_Big.push_back(tot_charge* restraint_factor);
+
+    vec2 dens_matrix_big;// one could predefine the size of this matrix to speed it up later by parralelizing the loop
+    for (int i = 0; i < nr_atoms; i++) {
+        for (int j = 0; j < dens_matrix_new_fitting[i].size(); j++) {
+            dens_matrix_big.push_back(dens_matrix_new_fitting[i][j]);
+        }
+        // dens_matrix_big.push_back(std::vector<double>(sum_gbws, 0.0 * restraint_factor));  here we restrain the sum of the coefficients to be the charge of the i_th atom
+    }
+    dens_matrix_big.push_back(std::vector<double>(sum_gbws, 1.0 * restraint_factor));
+	vec coefficients = fit_coefficients(dens_rho_Big, dens_matrix_big); // a new set of coefficients is calculated
+    return coefficients;
+}
+
+double calc_grid_averaged_at_r_from_cube(const cube& cuby,
+    const double& r,
+    const int& min_angular = 360,
+    const int& max_angular = 1000,
+    const bool print = false)
 {
 
     const int min_num_angular_points_closest =
@@ -596,81 +1212,8 @@ double calc_grid_averaged_at_r_from_cube(const cube &cuby,
     return dens;
 }
 
-double calc_fukui_averaged_at_r(const WFN &wavy1,
-                                const WFN &wavy2,
-                                const double &r,
-                                const int &min_angular = 60,
-                                const int &max_angular = 1000,
-                                const bool print = false)
-{
-
-    const int min_num_angular_points_closest =
-        constants::get_closest_num_angular(min_angular);
-    const int max_num_angular_points_closest =
-        constants::get_closest_num_angular(max_angular);
-    err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", std::cout);
-
-    vec angular_x(constants::max_LT * constants::MAG, 0.0);
-    vec angular_y(constants::max_LT * constants::MAG, 0.0);
-    vec angular_z(constants::max_LT * constants::MAG, 0.0);
-    vec angular_w(constants::max_LT * constants::MAG, 0.0);
-    int angular_off;
-    lebedev_sphere ls;
-
-    for (int j = constants::get_angular_order(min_num_angular_points_closest); j < constants::get_angular_order(max_num_angular_points_closest) + 1; j++)
-    {
-        angular_off = j * constants::MAG;
-        ls.ld_by_order(constants::lebedev_table[j],
-                       angular_x.data() + angular_off,
-                       angular_y.data() + angular_off,
-                       angular_z.data() + angular_off,
-                       angular_w.data() + angular_off);
-    }
-
-    const double rb = constants::bragg_angstrom[wavy1.get_atom_charge(0)] / (5.0E10 * constants::a0);
-
-    int num_angular = max_num_angular_points_closest;
-    if (r < rb)
-    {
-        num_angular = static_cast<int>(max_num_angular_points_closest *
-                                       (r / rb));
-        num_angular = constants::get_closest_num_angular(num_angular);
-        err_checkf(num_angular != -1, "No valid value for angular number found!", std::cout);
-        if (num_angular < min_num_angular_points_closest)
-            num_angular = min_num_angular_points_closest;
-    }
-
-    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
-    err_checkf(angular_off != -constants::MAG, "Invalid angular order!", std::cout);
-    const int start = 0;
-    angular_off -= start;
-    const int size = start + num_angular;
-    int p = 0;
-    double dens = 0.0;
-
-#pragma omp parallel
-    {
-        vec2 d(16);
-        vec _phi(std::max(wavy1.get_nmo(), wavy2.get_nmo()), 0.0);
-        for (int j = 0; j < 16; j++)
-            d[j].resize(wavy1.get_ncen(), 0.0);
-#pragma omp for reduction(+ : dens)
-        for (int iang = start; iang < size; iang++)
-        {
-            p = angular_off + iang;
-            const double x = angular_x[p] * r + wavy1.get_atom_coordinate(0, 0); /// moving the lebedev points to the atom i
-            const double y = angular_y[p] * r + wavy1.get_atom_coordinate(0, 1);
-            const double z = angular_z[p] * r + wavy1.get_atom_coordinate(0, 2);
-            dens += (wavy1.compute_dens(x, y, z, d, _phi) - wavy2.compute_dens(x, y, z, d, _phi)) * constants::FOUR_PI * angular_w[p];
-        }
-    }
-    if (print)
-        std::cout << "Done with " << std::setw(10) << std::setprecision(5) << r << std::endl;
-    return dens;
-}
-
-double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
-                              std::filesystem::path &wfn_name_2, const double &r, const double &resol)
+double subtract_dens_from_gbw(std::filesystem::path& wfn_name_1,
+	std::filesystem::path& wfn_name_2, const double& r, const double& resol)
 {
     using namespace std;
 
@@ -716,6 +1259,10 @@ double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
         dens2.set_origin(i, MinMax[i]);
         dens2.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
     }
+	
+    dens1.set_path((wavy1.get_path().parent_path() / wavy1.get_path().stem()).string() + "_rho.cube");
+	dens2.set_path(wavy2.get_path().stem() += "_rho.cube");
+    
 
     //   dens1.path = get_basename_without_ending(wavy1.get_path()) + "_rho.cube";
     // dens2.path = get_basename_without_ending(wavy2.get_path()) + "_rho.cube";

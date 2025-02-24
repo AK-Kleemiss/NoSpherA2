@@ -10,6 +10,7 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		D_BLAS|x64 = D_BLAS|x64
+		D_Daniel|x64 = D_Daniel|x64
 		D_def2_ECP|x64 = D_def2_ECP|x64
 		D_ECP_file|x64 = D_ECP_file|x64
 		D_ECP_pot|x64 = D_ECP_pot|x64
@@ -32,7 +33,6 @@ Global
 		D_xTB_Co_molden|x64 = D_xTB_Co_molden|x64
 		D_xTB_F_molden|x64 = D_xTB_F_molden|x64
 		D_xTB_molden|x64 = D_xTB_molden|x64
-		debug_Daniel|x64 = debug_Daniel|x64
 		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
 		Debug_Fractal|x64 = Debug_Fractal|x64
 		Debug_gbw2wfn|x64 = Debug_gbw2wfn|x64
@@ -61,6 +61,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_BLAS|x64.ActiveCfg = D_BLAS|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_BLAS|x64.Build.0 = D_BLAS|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Daniel|x64.ActiveCfg = D_Daniel|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Daniel|x64.Build.0 = D_Daniel|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_def2_ECP|x64.ActiveCfg = D_def2_ECP|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_def2_ECP|x64.Build.0 = D_def2_ECP|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ECP_file|x64.ActiveCfg = D_ECP_file|x64
@@ -105,8 +107,6 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_F_molden|x64.Build.0 = D_xTB_F_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_xTB_molden|x64.Build.0 = D_xTB_molden|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x64.ActiveCfg = debug_Daniel|x64
-		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x64.Build.0 = debug_Daniel|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
@@ -156,6 +156,7 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.ActiveCfg = Release|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Release|x64.Build.0 = Release|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_BLAS|x64.ActiveCfg = D_xTB_molden|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_Daniel|x64.ActiveCfg = D_SALTED_tsc|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_def2_ECP|x64.ActiveCfg = D_def2_ECP|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ECP_file|x64.ActiveCfg = D_ECP_file|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ECP_pot|x64.ActiveCfg = D_ECP_pot|x64
@@ -179,7 +180,6 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_Co_molden|x64.ActiveCfg = D_xTB_Co_molden|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_F_molden|x64.ActiveCfg = D_xTB_F_molden|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
-		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.debug_Daniel|x64.ActiveCfg = debug_Daniel|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_fchk_generation|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_Fractal|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_gbw2wfn|x64.ActiveCfg = Debug|x64

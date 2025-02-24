@@ -33,6 +33,52 @@ vec einsum_ijk_ij_p(const vec3 &v1, const vec2 &v2)
     return rho;
 }
 
+vec einsum_ijp_ij_p(const vec& v1, const vec& v2, const int I, const int J, const int P) {
+    // Initialize the result vector
+    vec rho(P, 0.0);
+
+    //v1 of size I * J * P
+    //v2 of size I * J
+
+    // Perform the summation
+    for (int p = 0; p < P; ++p)
+    {
+        for (int i = 0; i < I; ++i)
+        {
+            for (int j = 0; j < J; ++j)
+            {
+                int inda = p * I * J + i * J + j;
+				rho[p] += v1[p * I * J + i * J + j] * v2[i * J + j];
+            }
+        }
+    }
+
+    return rho;
+}
+
+void solve_linear_problem(const vec2& A, vec& b) // renaming 
+{
+    const int m = A.size();
+	const int n = A[0].size();
+	const int nrhs = 1; // since b is a vector (btw nrhs is the number of right-hand sides)
+	const int lda = m; // Leading dimension of A
+    const int ldb = std::max(m, n); // the result is a n x 1 matrix, or vector
+	vec temp = flatten(transpose(A));
+	ivec ipiv(n, 0); // Pivot indices
+	double rcond = 1E-12; // Use machine precision
+	int32_t rank = 0; // Rank of the matrix A
+    math_load_BLAS(4);
+
+	int info = LAPACKE_dgelsy(LAPACK_COL_MAJOR, m, n, nrhs, temp.data(), lda, b.data(), ldb, ipiv.data(), rcond, &rank); //LAPACKE_dgels(LAPACK_COL_MAJOR, 'N', m, n, nrhs, temp.data(), lda, b.data(), ldb);
+
+	if (info != 0)
+	{
+		std::cout << "Error: LAPACKE_dgels returned " << info << std::endl;
+	}
+    math_unload_BLAS();
+}
+
+
 void solve_linear_system(const vec2 &A, vec &b)
 {
     err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);

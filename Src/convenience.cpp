@@ -2485,50 +2485,71 @@ void options::digest_options()
             subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
             exit(0);
         }
-        else if (temp == "-spherical_aver_fukui")
-        {
-            filesystem::path wfn1_name = arguments[i + 1];
-            filesystem::path wfn2_name = arguments[i + 2];
-            WFN *wavy1 = new WFN(wfn1_name);
-            WFN *wavy2 = new WFN(wfn2_name);
-            ofstream outputFile("fukui_averaged_density_wfn.dat");
-            for (double r = 0.001; r < 10.0; r += 0.001)
-            {
-                // double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
-                double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
-                outputFile << r << " " << dens << "\n";
-            }
-            outputFile.close();
-            cout << "Data written to output.dat" << endl;
-            delete (wavy1);
-            delete (wavy2);
-            exit(0);
-        }
         else if (temp == "-spherical_aver_hirsh")
         {
-            string wfn_name = arguments[i + 1];
-            cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN *wavy = new WFN(wfn_name);
-            cout << "Assigning ECPs" << endl;
-            if (ECP)
-                wavy->set_has_ECPs(true);
-            cout << "Starting spherical averaging" << endl;
-            double dens;
+            filesystem::path wfn_name = arguments[i + 1];
+            WFN* wavy = new WFN(wfn_name);
 
-            for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
-            {
-                ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
-                for (double r = 0.001; r < 5.0; r += 0.002)
-                {
-                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800);
-                    outputFile << r << " " << dens << "\n";
+            const int nr_atoms = WFN(wfn_name).get_atoms().size();
+            vec coefficients_m(0);
+            double r_stepi = 0.05;
+            double r_maxi = 3.0;
+			vec2 matrix_big(0);
+
+            auto [coefficients, dens_rho_a, distances, dens_matrix
+            ] = calc_hirsh_grid_averaged_at_r(*wavy, coefficients_m, matrix_big, 360, 1000, false, threads);
+
+            for (int iter = 0; iter < 10; iter++) {
+
+                for (int i_atom = 0; i_atom < nr_atoms; i_atom++) {
+
+                    string label_atom = WFN(wfn_name).get_atom_label(i_atom);
+                    ofstream outputFile("hirsh_averaged_density_" + label_atom + ".dat");
+					for (int i = 0; i < dens_rho_a[i_atom].size() -1; i++) { // for (r_maxi / r_stepi) = 60, this loop gets all elemets right rho_a vector without the intersecting charges
+                        outputFile << distances[i_atom][i] << " " << dens_rho_a[i_atom][i] << "\n";
+                    }
+                    outputFile.close();
+
+                    //int negative_coeff = check_for_negative(coefficients);/////adjust the coefficients so that they are all positive and keep the sum of the negative ones/////
+                    // double sum_negative = 0.0;
+                    //double sum_positive = 0.0;
+                    //for (int i = 0; i < coefficients.size(); i++) {
+                    //     if (coefficients[i] < 0.0) {
+                    //          sum_negative += coefficients[i];
+                    //          coefficients[i] = 0.0;
+                    //     }
+                    //     else {
+                    //          sum_positive += coefficients[i];
+                    //    }
+                    //}//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                        
+                    ofstream outputFile_2("reconst_" + to_string(iter) + label_atom + ".dat");
+                    for (int i = 0; i < distances[i_atom].size(); i++) {
+                        outputFile_2 << distances[i_atom][i] << " ";
+
+                        double sum = 0;
+                        for (int j = 0; j < coefficients.size(); j++) {
+                            sum += (coefficients[j]) * dens_matrix[i_atom][i][j];// *(1 - ((sum_negative * -1) / sum_positive) * coefficients[j])) * dens_matrix_copy[i][j];
+                        }
+                        outputFile_2 << sum << " " << "\n";
+                    }
+                    outputFile_2.close();
+
+					double sum_coeff = 0.0;
+                    ofstream outputFile_3("coeff.dat");
+                    for (int i = 0; i < coefficients.size(); i++) {
+                        outputFile_3 << i << " " << coefficients[i] << "\n";//* (1 - ( (sum_negative * -1) / sum_positive) * coefficients[i] ) << "\n"
+						sum_coeff += coefficients[i];
+                    }
+					outputFile_3 << "sum " << sum_coeff << "\n";
+                    outputFile_3.close();
                 }
-                outputFile.close();
+                coefficients = fukui_fitting(*wavy, coefficients, distances, dens_matrix);
             }
             cout << "Data written to output.dat" << endl;
-            delete (wavy);
-            exit(0);
-        }
+			delete(wavy);
+			exit(0);
+        }/////// end
         else if (temp == "-spherical_harmonic")
         {
             spherical_harmonic_test();
