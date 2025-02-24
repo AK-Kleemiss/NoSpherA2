@@ -219,11 +219,11 @@ bool SALTED_BINARY_FILE::read_header() {
     }
     // Read version
     file.read((char*)&version, sizeof(int));
-    //std::cout << "File Version: " << version << std::endl;
+    if (debug) std::cout << "File Version: " << version << std::endl;
 
 	//Read number of blocks
 	file.read((char*)&numBlocks, sizeof(int));
-	//std::cout << "Number of blocks: " << numBlocks << std::endl;
+    if (debug) std::cout << "Number of blocks: " << numBlocks << std::endl;
 
 	//Now follows (Chunkname (5b str), location (4b int)) * numBlocks
     // Chunknames that are not 5 bytes long are padded with ' '
@@ -232,8 +232,9 @@ bool SALTED_BINARY_FILE::read_header() {
 		int location;
 		file.read((char*)&location, sizeof(int));
 		table_of_contents[chunkname] = location;
-		//std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
+        if (debug) std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
 	}
+
 
 	header_end = file.tellg();
 
@@ -288,7 +289,7 @@ void SALTED_BINARY_FILE::populate_config(Config &config) {
 
 
 template <typename T>
-void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, ivec& dims) {
+void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>& dims) {
     int ndims;
     file.read((char*)&ndims, 4);
     dims.resize(ndims, 0);
@@ -319,7 +320,7 @@ T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<
 std::unordered_map<int, std::vector<int64_t>> SALTED_BINARY_FILE::read_fps() {
     return read_generic_blocks<std::unordered_map<int, std::vector<int64_t>>>("FPS",
         [this](std::unordered_map<int, std::vector<int64_t>>& fps, int i) {
-            ivec dims;
+            std::vector<size_t> dims;
             std::vector<int64_t> data;
             read_dataset(data, dims);
             fps[i] = data;
@@ -331,7 +332,7 @@ std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_averages() {
     return read_generic_blocks<std::unordered_map<std::string, vec>>("AVERG",
         [this](std::unordered_map<std::string, vec>& averages, int i) {
             std::string element = read_string_remove_NULL(5);
-            ivec dims;
+            std::vector<size_t> dims;
             vec data;
             read_dataset(data, dims);
             averages[element] = data;
@@ -342,7 +343,7 @@ std::unordered_map<std::string, vec> SALTED_BINARY_FILE::read_averages() {
 std::unordered_map<int, vec> SALTED_BINARY_FILE::read_wigners() {
     return read_generic_blocks<std::unordered_map<int, vec>>("WIG",
         [this](std::unordered_map<int, vec>& wigners, int i) {
-            ivec dims;
+            std::vector<size_t> dims;
             vec data;
             read_dataset(data, dims);
             wigners[i] = data;
@@ -354,7 +355,7 @@ vec SALTED_BINARY_FILE::read_weights() {
     vec weights;
     read_generic_blocks<std::vector<vec>>("WEIGH",
         [this, &weights](std::vector<vec>&, int i) {
-            ivec dims;
+            std::vector<size_t> dims;
             vec data;
             read_dataset(data, dims);
             weights = data;
@@ -363,25 +364,28 @@ vec SALTED_BINARY_FILE::read_weights() {
     return weights;
 }
 
-std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_projectors() {
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_projectors() {
     return read_lambda_based_data("PROJ");
 }
 
-std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_features() {
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_features() {
     return read_lambda_based_data("FEATS");
 }
 
-std::unordered_map<std::string, vec2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
-    return read_generic_blocks<std::unordered_map<std::string, vec2>>(key,
-        [this](std::unordered_map<std::string, vec2>& container, int i) {
+std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_data(const std::string& key) {
+    return read_generic_blocks<std::unordered_map<std::string, dMatrix2>>(key,
+        [this](std::unordered_map<std::string, dMatrix2>& container, int i) {
             std::string element = read_string_remove_NULL(5);
             int nlambda;
             file.read(reinterpret_cast<char*>(&nlambda), sizeof(nlambda));
             for (int lam = 0; lam < nlambda; lam++) {
-                ivec dims;
+                std::vector<size_t> dims;
                 vec data;
                 read_dataset(data, dims);
-                container[element + std::to_string(lam)] = reshape(data, { dims[0], dims[1] });
+				//container.emplace(std::piecewise_construct, std::forward_as_tuple(element + std::to_string(lam)), std::forward_as_tuple(dims[0], dims[1]));
+                //dMatrix2 A = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+				//std::copy(data.begin(), data.end(), container[element + std::to_string(lam)].data());
+				container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
             }
         }
     );

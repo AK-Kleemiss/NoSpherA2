@@ -55,6 +55,7 @@ private:
 
 class SALTED_BINARY_FILE {
 private:
+    bool debug = false;
     const std::string MAGIC_NUMBER = "SALTD";
     static const int HEADER_SIZE = 5;
     enum DataType { INT32 = 0, FLOAT64 = 1, STRING = 2 };
@@ -73,16 +74,17 @@ private:
     
 
     template <typename T>
-    void read_dataset(std::vector<T>& data, ivec& dims);
+    void read_dataset(std::vector<T>& data, std::vector<size_t>& dims);
 
     std::string read_string_remove_NULL(const int lengh);
 
     template <typename T>
     T read_generic_blocks(const std::string& key, std::function<void(T&, int)> process_block);
-    std::unordered_map<std::string, vec2> read_lambda_based_data(const std::string& key);
+    std::unordered_map<std::string, dMatrix2> read_lambda_based_data(const std::string& key);
 
 public:
-    SALTED_BINARY_FILE(const std::filesystem::path& fpath) : filepath(fpath) {
+    SALTED_BINARY_FILE(const std::filesystem::path& fpath, const bool debug_in = false) : filepath(fpath) {
+        debug = debug_in;
         open_file();
         err_checkf(read_header(), "Error reading header!", std::cout);
     };
@@ -93,13 +95,13 @@ public:
         }
     };
 
-    void populate_config(Config &config_in);
+    void populate_config(Config& config_in);
 
 
     std::unordered_map<int, std::vector<int64_t>> read_fps();
     std::unordered_map<std::string, vec> read_averages();
     std::unordered_map<int, vec> read_wigners();
     vec read_weights();
-    std::unordered_map<std::string, vec2> read_projectors();
-    std::unordered_map<std::string, vec2> read_features();
+    std::unordered_map<std::string, dMatrix2> read_projectors();
+    std::unordered_map<std::string, dMatrix2> read_features();
 };

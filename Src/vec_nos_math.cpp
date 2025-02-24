@@ -53,20 +53,6 @@ template vec flatten(const vec3 &vec3D);
 template cvec flatten(const cvec3 &vec3D);
 template ivec flatten(const std::vector<ivec2> &vec3D);
 
-// SLICE Operation
-std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length)
-{
-    err_checkf(start + length < vec.size(), "Slice range is out of bounds.", std::cout);
-
-    std::vector<double> result;
-    for (size_t i = start; i < start + length; ++i)
-    {
-        result.push_back(vec[i]);
-    }
-
-    return result;
-}
-
 // Matrix multiplication
 // 2D x 2D MATRIX MULTIPLICATION
 // Slow direct implementation

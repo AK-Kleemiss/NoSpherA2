@@ -2162,7 +2162,7 @@ void computeRho_Coulomb(Int_Params &param1,
                     tot_size,
                     1.0,
                     res.data(), tot_size,
-                    dm.data_handle(), 1,
+                    dm.data(), 1,
                     0.0,
                     &rho[idx_curr_rho], 1);
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
@@ -2233,7 +2233,7 @@ void computeRho_Overlap(Int_Params &param1,
                     naoi * naoj,
                     1.0,
                     res.data(), naoi * naoj,
-                    dm.data_handle(), 1,
+                    dm.data(), 1,
                     0.0,
                     &rho[idx_curr_rho], 1);
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)

@@ -2484,13 +2484,13 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         //Two for two spins 
         vec3 reordered_coefs(2, vec2(dimension, vec(dimension, 0.0)));
-        vec2 coefs_2D_s1 = reshape(coefficients[0], { dimension, dimension }), coefs_2D_s2;
-        //if (operators == 2) {
-		//	coefs_2D_s2 = reshape(coefficients[1], { dimension, dimension });
-		//}
+        vec2 coefs_2D_s1(dimension, vec(dimension)), coefs_2D_s2;
 
-        vec2 reordered_coefs(dimension, vec(dimension, 0.0));
-        dMatrix2 coefs_2D = reshape<dMatrix2>(coefficients[0], Shape2D(dimension, dimension));
+		if (operators == 2) coefs_2D_s2.resize(dimension, vec(dimension));
+        for (int d1 = 0; d1 < dimension; d1++) {
+			std::copy(coefficients[0].begin() + d1 * dimension, coefficients[0].begin() + (d1 + 1) * dimension, reordered_coefs[0][d1].begin());
+            if (operators == 2) std::copy(coefficients[1].begin() + d1 * dimension, coefficients[1].begin() + (d1 + 1) * dimension, reordered_coefs[1][d1].begin());
+        }
     	
         int index = 0;
         for (int atom_idx = 0; atom_idx < atoms.size(); atom_idx++) {
@@ -2540,9 +2540,9 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
             dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
 
-            for (int i = 0; i < DM_s1.size(); i++) {
-                for (int j = 0; j < DM_s1[0].size(); j++) {
-                    DM_s1[std::array{i,j}] += DM_s2[std::array{i,j}];
+            for (int i = 0; i < DM_s1.extent(0); i++) {
+                for (int j = 0; j < DM_s1.extent(1); j++) {
+                    DM_s1(i,j) += DM_s2(i,j);
                 }
             }
             DM = DM_s1;
@@ -2825,16 +2825,7 @@ const vec WFN::get_norm_const(std::ostream &file, bool debug) const
 const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int &axis) const
 {
     err_checkf(!((int)nr >= ncen || axis > 2), "This input is invalid for get_atom_coordinate!", std::cout);
-    switch (axis)
-    {
-    case 0:
-    case 1:
-    case 2:
-        return atoms[nr].get_coordinate(axis);
-        break;
-    default:
-        return -2;
-    }
+    return atoms[nr].get_coordinate(axis);
 };
 
 bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied)
@@ -7060,7 +7051,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         vec values;
         for (int j = 0; j < nmomax; j++)
         {
-            values.push_back(momat[std::array{ j,ipao[i] - 1 }] * contr[i]);
+            values.push_back(momat(j,ipao[i] - 1) * contr[i]);
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }

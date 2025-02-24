@@ -1,4 +1,4 @@
-#pragma once
+ #pragma once
 #include "convenience.h"
 
 struct Shape2D
@@ -52,7 +52,7 @@ std::vector<std::vector<std::vector<T>>> transpose(const std::vector<std::vector
 template <class T>
 std::vector<std::vector<T>> transpose(const std::vector<std::vector<T>> &mat);
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat);
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat);
 
 // Flat 2D MATRIX
 template <class T>
@@ -84,8 +84,6 @@ std::vector<T> flatten(const std::vector<std::vector<std::vector<T>>> &vec3D);
 template <typename T1, typename T2>
 T1 flatten(const T2& vecND);
 
-// SLICE Operation
-std::vector<double> slice(const std::vector<double> &vec, size_t start, size_t length);
 
 // Matrix multiplication
 
@@ -98,7 +96,7 @@ T dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
 
 //BLAS dot product from flattend matrices
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T>& flatMat1,
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T>& flatMat1,
                                                                                                const std::vector<T>& flatMat2,
                                                                                                const int& mat1_d0,
                                                                                                const int& mat1_d1,
@@ -109,7 +107,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T>& flatMat1, const std::vector<T>& flatMat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1 = false, bool transp2 = false);
 template <typename T>
 T dot_BLAS(const T& Mat1, const T& Mat2, const int& m, const int& k1, const int& k2, const int& n, bool transp1, bool transp2);
 
@@ -155,7 +153,7 @@ template <typename T>
 std::vector<T> dot(const std::vector<T> &mat, const std::vector<T> &vec, bool transp = false);
 
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>& mat, const std::vector<T>& _vec, bool transp1 = false);
 
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
@@ -197,8 +195,7 @@ struct NNLSResult {
        :doi:`10.1002/(SICI)1099-128X(199709/10)11:5<393::AID-CEM483>3.0.CO;2-L`
  */
 NNLSResult nnls(
-    std::vector<double>& A, int m, int n,
-    std::vector<double>& B,
+    dMatrix2& A, dMatrix1& B,
     int maxiter = -1,
     double tol = -1);
 

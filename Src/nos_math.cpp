@@ -99,8 +99,6 @@ vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 
     return result;
 }
-
-// Element-wise exponentiation of a matrix
 dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
 {
     vec result(matrix.size(), 0.0);
@@ -110,7 +108,7 @@ dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
     { // Iterate over rows
         for (size_t j = 0; j < matrix.extent(1); ++j)
         {                                                                              // Iterate over columns
-            result_m[std::array{i, j}] = std::pow(matrix[std::array{i, j}], exponent); // Apply exponentiation
+            result_m(i, j) = std::pow(matrix(i, j), exponent); // Apply exponentiation
         }
     }
 
@@ -118,14 +116,14 @@ dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
 }
 
 template <typename T>
-void compare_matrices(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &A, const std::vector<std::vector<T>> &B)
+void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &A, const std::vector<std::vector<T>> &B)
 {
     std::cout << "Matrices have size " << A.extent(0) << "x" << A.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
     {
         for (int j = 0; j < A.extent(1); j++)
         {
-            auto a = A[std::array{i, j}];
+            auto a = A(i, j);
             auto b = B[i][j];
             if (a != b)
             {
@@ -138,14 +136,14 @@ void compare_matrices(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long
 }
 
 template <typename T>
-void compare_matrices(const std::vector<std::vector<T>> &A, const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &B)
+void compare_matrices(const std::vector<std::vector<T>> &A, const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &B)
 {
     std::cout << "Matrices have size " << B.extent(0) << "x" << B.extent(1) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
     {
         for (int j = 0; j < A.extent(1); j++)
         {
-            auto a = B[std::array{i, j}];
+            auto a = B(i, j);
             auto b = A[i][j];
             if (a != b)
             {
@@ -171,16 +169,30 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<st
 
 void _test_openblas()
 {
+    ivec dims = { 2, 2 };
     // Init Mat A with some values as a 3x3 matrix
-    vec2 A = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-    // Init Mat B with some values
-    vec2 B = {{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}};
-    Shape2D shape = {3, 3};
-	auto fA = flatten<double>(A);
-	auto fB = flatten<double>(B);
-    dMatrix2 matA = reshape<dMatrix2>(fA, shape);
-    dMatrix2 matB = reshape<dMatrix2>(fB, shape);
-    math_load_BLAS(1);
+    vec2 A(dims[0], vec(dims[1]));
+    vec2 B(dims[0], vec(dims[1]));
+    //Init A and B with random values between -100 and 100
+	for (int i = 0; i < dims[0]; i++)
+	{
+		for (int j = 0; j < dims[1]; j++)
+		{
+			A[i][j] = rand() % 200 - 100;
+			B[i][j] = rand() % 200 - 100;
+		}
+	}
+
+	vec fA = flatten<double>(A);
+	vec fB = flatten<double>(B);
+
+    dMatrix2 matA(dims[0], dims[1]);
+	std::copy(fA.data(), fA.data() + fA.size(), matA.data());
+    dMatrix2 matB(dims[0], dims[1]);
+	std::copy(fB.data(), fB.data() + fB.size(), matB.data());
+     //Init Mat A and Mat B as 3x3 matrices
+
+
     std::cout << "Testing matrices directly" << std::endl;
     compare_matrices(matA, A);
     compare_matrices(matB, B);
@@ -206,7 +218,7 @@ void _test_openblas()
     cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
     cvec fC = flatten<cdouble>(C);
     cvec fD = flatten<cdouble>(D);
-    shape = {3, 3};
+    Shape2D shape = {3, 3};
     cMatrix2 matC = reshape<cMatrix2>(fC, shape);
     cMatrix2 matD = reshape<cMatrix2>(fD, shape);
     std::cout << "Testing C-matrices directly" << std::endl;
@@ -232,12 +244,13 @@ void _test_openblas()
     std::cout << "All BLAS tests passed!" << std::endl;
 }
 
+
 NNLSResult nnls(
-    std::vector<double> &A, int m, int n,
-    std::vector<double> &B,
+    dMatrix2& A, dMatrix1& B,
     int maxiter,
-    double tol)
-{
+    double tol) {
+	int m = A.extent(0);
+	int n = A.extent(1);
     if (has_BLAS)
     {
         // Define output Variables
@@ -249,7 +262,7 @@ NNLSResult nnls(
         if (A.size() != m * n)
         {
             std::cerr << "Error: Matrix A has incorrect dimensions in NNLS.\n";
-            return NNLSResult{X, RNORM, 1};
+            return NNLSResult{ X, RNORM, 1 };
         }
 
         // Define workspace variables
@@ -260,14 +273,15 @@ NNLSResult nnls(
         std::vector<bool> P(n, false);       // Active set (boolean)
 
         // Compute A^T * A (normal equations matrix)
-        cblas_dgemm(CblasColMajor, CblasTrans, CblasNoTrans,
-                    n, n, m, 1.0, A.data(), m, A.data(), m,
-                    0.0, AtA.data(), n);
+        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+            n, n, m, 1.0, A.data(), n, A.data(), n,
+            0.0, AtA.data(), n);
 
         // Compute A^T * B (normal equations RHS)
-        cblas_dgemv(CblasColMajor, CblasTrans, m, n,
-                    1.0, A.data(), m, B.data(), 1,
-                    0.0, Atb.data(), 1);
+        cblas_dgemv(CblasRowMajor, CblasTrans, m, n,
+            1.0, A.data(), n, B.data(), 1,
+            0.0, Atb.data(), 1);
+
         // Set max iterations
         if (maxiter == -1)
             maxiter = 3 * n;
@@ -316,13 +330,13 @@ NNLSResult nnls(
             // Extract submatrix AtA[P, P] and Atb[P]
             for (int i = 0; i < activeCount; i++)
             {
-                int row = activeIndices[i];
+                int col = activeIndices[i];
                 for (int j = 0; j < activeCount; j++)
                 {
-                    int col = activeIndices[j];
-                    AtA_active[i * activeCount + j] = AtA[row * n + col];
+                    int row = activeIndices[j];
+                    AtA_active[i * activeCount + j] = AtA[col * n + row];
                 }
-                Atb_active[i] = Atb[row];
+                Atb_active[i] = Atb[col]; 
             }
 
             // Solve AtA_active * S[P] = Atb_active
@@ -388,22 +402,22 @@ NNLSResult nnls(
             // Compute residual W = Atb - AtA @ X
             cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
             cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
-                        -1.0, AtA.data(), n, X.data(), 1,
-                        1.0, W.data(), 1);
+                -1.0, AtA.data(), n, X.data(), 1,
+                1.0, W.data(), 1);
         }
 
         // Compute residual norm ||A * X - B||
         std::vector<double> Ax(m, 0.0);
-        cblas_dgemv(CblasColMajor, CblasNoTrans, m, n,
-                    1.0, A.data(), m, X.data(), 1,
-                    0.0, Ax.data(), 1);
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, m, n,
+            1.0, A.data(), n, X.data(), 1,
+            0.0, Ax.data(), 1);
         double sum_sq = 0.0;
         for (int i = 0; i < m; i++)
         {
-            sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
+            sum_sq += (Ax[i] - B(i)) * (Ax[i] - B(i));
         }
         sum_sq = std::sqrt(sum_sq);
-        NNLSResult resy({X, sum_sq, MODE});
+        NNLSResult resy({ X, sum_sq, MODE });
         return resy;
     }
     else

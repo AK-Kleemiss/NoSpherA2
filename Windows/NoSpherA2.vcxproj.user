@@ -187,20 +187,20 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED ..\SALTED\Model -cif malbac.cif -wfn malbac.gbw -dmin 0.73 -cpus 8 -acc 2</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\ECP_SF</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\SALTED</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-cpus 12 -wfn Fe.gbw -RI_CUBE</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cpus 12 -wfn sucrose.gbw -RI_CUBE</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -no-date</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\SALTED</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-test_reading_SALTED_binary</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\SALTED_read_binary</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
@@ -211,7 +211,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_BLAS|x64'">
-    <LocalDebuggerCommandArguments>-blastest</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-blastest -NNLS_TEST</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\OpenBLAS</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

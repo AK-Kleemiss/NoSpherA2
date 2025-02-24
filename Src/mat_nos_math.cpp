@@ -4,7 +4,7 @@
 #include "cblas.h"
 
 template <typename mat_t, typename vec_t, typename Shape_t>
-mat_t reshape(vec_t& flatVec, const Shape_t size)
+mat_t reshape(vec_t& vec_in, const Shape_t size)
 {
     using ext_t = typename mat_t::extents_type;
 	using ele_t = typename mat_t::element_type;
@@ -25,9 +25,11 @@ mat_t reshape(vec_t& flatVec, const Shape_t size)
     {
         err_checkf(false, "Invalid Shape!", std::cout);
     }
+
+	mat_t result(exts);
     if constexpr (std::is_same_v<vec_t, vec> || std::is_same_v<vec_t, cvec> || std::is_same_v<vec_t, ivec>)
     {
-        mat_t result(flatVec.data(), exts);
+        std::copy(vec_in.begin(), vec_in.end(), result.data());
         return result;
     }
     else if constexpr (std::is_same_v<vec_t, dMatrix1> || std::is_same_v<vec_t, cMatrix1> || std::is_same_v<vec_t, iMatrix1>
@@ -35,7 +37,7 @@ mat_t reshape(vec_t& flatVec, const Shape_t size)
         || std::is_same_v<vec_t, dMatrix3> || std::is_same_v<vec_t, cMatrix3> || std::is_same_v<vec_t, iMatrix3>
         || std::is_same_v<vec_t, dMatrix4> || std::is_same_v<vec_t, cMatrix4> || std::is_same_v<vec_t, iMatrix4>)
     {
-        mat_t result(flatVec.data_handle(), exts);
+		std::copy(vec_in.data(), vec_in.data() + vec_in.size(), result.data());
         return result;
     }
     else
@@ -45,59 +47,59 @@ mat_t reshape(vec_t& flatVec, const Shape_t size)
     mat_t res_0;
 	return res_0;
 }
-template dMatrix2 reshape(dMatrix1 &flatVec, const Shape2D size);
-template cMatrix2 reshape(cMatrix1 &flatVec, const Shape2D size);
-template iMatrix2 reshape(iMatrix1 &flatVec, const Shape2D size);
-template dMatrix2 reshape(dMatrix2& flatVec, const Shape2D size);
-template cMatrix2 reshape(cMatrix2& flatVec, const Shape2D size);
-template iMatrix2 reshape(iMatrix2& flatVec, const Shape2D size);
-template dMatrix2 reshape(dMatrix3& flatVec, const Shape2D size);
-template cMatrix2 reshape(cMatrix3& flatVec, const Shape2D size);
-template iMatrix2 reshape(iMatrix3& flatVec, const Shape2D size);
-template dMatrix2 reshape(dMatrix4& flatVec, const Shape2D size);
-template cMatrix2 reshape(cMatrix4& flatVec, const Shape2D size);
-template iMatrix2 reshape(iMatrix4& flatVec, const Shape2D size);
-template dMatrix3 reshape(dMatrix1& flatVec, const Shape3D size);
-template cMatrix3 reshape(cMatrix1& flatVec, const Shape3D size);
-template iMatrix3 reshape(iMatrix1& flatVec, const Shape3D size);
-template dMatrix3 reshape(dMatrix2& flatVec, const Shape3D size);
-template cMatrix3 reshape(cMatrix2& flatVec, const Shape3D size);
-template iMatrix3 reshape(iMatrix2& flatVec, const Shape3D size);
-template dMatrix3 reshape(dMatrix3& flatVec, const Shape3D size);
-template cMatrix3 reshape(cMatrix3& flatVec, const Shape3D size);
-template iMatrix3 reshape(iMatrix3& flatVec, const Shape3D size);
-template dMatrix3 reshape(dMatrix4& flatVec, const Shape3D size);
-template cMatrix3 reshape(cMatrix4& flatVec, const Shape3D size);
-template iMatrix3 reshape(iMatrix4& flatVec, const Shape3D size);
-template dMatrix4 reshape(dMatrix1& flatVec, const Shape4D size);
-template cMatrix4 reshape(cMatrix1& flatVec, const Shape4D size);
-template iMatrix4 reshape(iMatrix1& flatVec, const Shape4D size);
-template dMatrix4 reshape(dMatrix2& flatVec, const Shape4D size);
-template cMatrix4 reshape(cMatrix2& flatVec, const Shape4D size);
-template iMatrix4 reshape(iMatrix2& flatVec, const Shape4D size);
-template dMatrix4 reshape(dMatrix3& flatVec, const Shape4D size);
-template cMatrix4 reshape(cMatrix3& flatVec, const Shape4D size);
-template iMatrix4 reshape(iMatrix3& flatVec, const Shape4D size);
-template dMatrix4 reshape(dMatrix4& flatVec, const Shape4D size);
-template cMatrix4 reshape(cMatrix4& flatVec, const Shape4D size);
-template iMatrix4 reshape(iMatrix4& flatVec, const Shape4D size);
-template dMatrix2 reshape(vec& flatVec, const Shape2D size);
-template cMatrix2 reshape(cvec& flatVec, const Shape2D size);
-template iMatrix2 reshape(ivec &flatVec, const Shape2D size);
-template dMatrix3 reshape(vec &flatVec, const Shape3D size);
-template cMatrix3 reshape(cvec &flatVec, const Shape3D size);
-template iMatrix3 reshape(ivec &flatVec, const Shape3D size);
-template dMatrix4 reshape(vec &flatVec, const Shape4D size);
-template cMatrix4 reshape(cvec &flatVec, const Shape4D size);
-template iMatrix4 reshape(ivec &flatVec, const Shape4D size);
+template dMatrix2 reshape(dMatrix1 &vec_in, const Shape2D size);
+template cMatrix2 reshape(cMatrix1 &vec_in, const Shape2D size);
+template iMatrix2 reshape(iMatrix1 &vec_in, const Shape2D size);
+template dMatrix2 reshape(dMatrix2& vec_in, const Shape2D size);
+template cMatrix2 reshape(cMatrix2& vec_in, const Shape2D size);
+template iMatrix2 reshape(iMatrix2& vec_in, const Shape2D size);
+template dMatrix2 reshape(dMatrix3& vec_in, const Shape2D size);
+template cMatrix2 reshape(cMatrix3& vec_in, const Shape2D size);
+template iMatrix2 reshape(iMatrix3& vec_in, const Shape2D size);
+template dMatrix2 reshape(dMatrix4& vec_in, const Shape2D size);
+template cMatrix2 reshape(cMatrix4& vec_in, const Shape2D size);
+template iMatrix2 reshape(iMatrix4& vec_in, const Shape2D size);
+template dMatrix3 reshape(dMatrix1& vec_in, const Shape3D size);
+template cMatrix3 reshape(cMatrix1& vec_in, const Shape3D size);
+template iMatrix3 reshape(iMatrix1& vec_in, const Shape3D size);
+template dMatrix3 reshape(dMatrix2& vec_in, const Shape3D size);
+template cMatrix3 reshape(cMatrix2& vec_in, const Shape3D size);
+template iMatrix3 reshape(iMatrix2& vec_in, const Shape3D size);
+template dMatrix3 reshape(dMatrix3& vec_in, const Shape3D size);
+template cMatrix3 reshape(cMatrix3& vec_in, const Shape3D size);
+template iMatrix3 reshape(iMatrix3& vec_in, const Shape3D size);
+template dMatrix3 reshape(dMatrix4& vec_in, const Shape3D size);
+template cMatrix3 reshape(cMatrix4& vec_in, const Shape3D size);
+template iMatrix3 reshape(iMatrix4& vec_in, const Shape3D size);
+template dMatrix4 reshape(dMatrix1& vec_in, const Shape4D size);
+template cMatrix4 reshape(cMatrix1& vec_in, const Shape4D size);
+template iMatrix4 reshape(iMatrix1& vec_in, const Shape4D size);
+template dMatrix4 reshape(dMatrix2& vec_in, const Shape4D size);
+template cMatrix4 reshape(cMatrix2& vec_in, const Shape4D size);
+template iMatrix4 reshape(iMatrix2& vec_in, const Shape4D size);
+template dMatrix4 reshape(dMatrix3& vec_in, const Shape4D size);
+template cMatrix4 reshape(cMatrix3& vec_in, const Shape4D size);
+template iMatrix4 reshape(iMatrix3& vec_in, const Shape4D size);
+template dMatrix4 reshape(dMatrix4& vec_in, const Shape4D size);
+template cMatrix4 reshape(cMatrix4& vec_in, const Shape4D size);
+template iMatrix4 reshape(iMatrix4& vec_in, const Shape4D size);
+template dMatrix2 reshape(vec&      vec_in, const Shape2D size);
+template cMatrix2 reshape(cvec&     vec_in, const Shape2D size);
+template iMatrix2 reshape(ivec &    vec_in, const Shape2D size);
+template dMatrix3 reshape(vec &     vec_in, const Shape3D size);
+template cMatrix3 reshape(cvec &    vec_in, const Shape3D size);
+template iMatrix3 reshape(ivec &    vec_in, const Shape3D size);
+template dMatrix4 reshape(vec &     vec_in, const Shape4D size);
+template cMatrix4 reshape(cvec &    vec_in, const Shape4D size);
+template iMatrix4 reshape(ivec &    vec_in, const Shape4D size);
 
 // Flatten Matrix ND
 template <typename T1, typename T2>
 T1 flatten(const T2 &vecND)
 {
-    auto DH = vecND.data_handle();
     auto size = vecND.size();
-    T1 res(DH, size);
+    T1 res(size);
+	std::copy(vecND.data(), vecND.data() + size, res.data());
     return res;
 }
 template dMatrix1 flatten(const dMatrix2 &vecND);
@@ -115,7 +117,7 @@ template <typename T>
 T dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 {
     // if either of the matrices is empty, return a empty matrix
-    if (mat1.empty() || mat2.empty())
+    if ((mat1.size() == 0) || (mat2.size() == 0))
     {
         return {};
     }
@@ -136,7 +138,7 @@ template cMatrix2 dot(const cMatrix2 &mat1, const cMatrix2 &mat2, bool transp1, 
 
 // When the matrices are given as flat vectors
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2)
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2)
 {
     // Check if flatMat1 and flatMat2 have the correct size
     err_checkf(flatMat1.size() == mat1_d0 * mat1_d1, "flat Matrix 1 has incorrect size", std::cout);
@@ -162,7 +164,7 @@ template dMatrix2 dot(const vec &flatMat1, const vec &flatMat2, const int &mat1_
 template cMatrix2 dot(const cvec &flatMat1, const cvec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
 {
     std::vector<T> result_flat(m * n, 0.0);
     if constexpr (std::is_same_v<T, double>)
@@ -197,7 +199,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
     }
     Shape2D result_shape({(unsigned long long)m, (unsigned long long)n});
-    return reshape<Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, result_shape);
+    return reshape<Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>>>(result_flat, result_shape);
 }
 template dMatrix2 dot_BLAS(const vec &flatMat1, const vec &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
 template cMatrix2 dot_BLAS(const cvec &flatMat1, const cvec &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2);
@@ -215,8 +217,8 @@ T dot_BLAS(const T &Mat1, const T &Mat2, const int &m, const int &k1, const int 
                     transp2 ? CblasTrans : CblasNoTrans,
                     m, n, k1,
                     1.0,
-                    Mat1.data_handle(), transp1 ? m : k1,
-                    Mat2.data_handle(), transp2 ? k2 : n,
+                    Mat1.data(), transp1 ? m : k1,
+                    Mat2.data(), transp2 ? k2 : n,
                     0.0,
                     result_flat.data(), n);
     }
@@ -229,8 +231,8 @@ T dot_BLAS(const T &Mat1, const T &Mat2, const int &m, const int &k1, const int 
                     transp2 ? CblasTrans : CblasNoTrans,
                     m, n, k1,
                     &(one),
-                    reinterpret_cast<const cdouble *>(Mat1.data_handle()), transp1 ? m : k1,
-                    reinterpret_cast<const cdouble *>(Mat2.data_handle()), transp2 ? k2 : n,
+                    reinterpret_cast<const cdouble *>(Mat1.data()), transp1 ? m : k1,
+                    reinterpret_cast<const cdouble *>(Mat2.data()), transp2 ? k2 : n,
                     &(zero),
                     reinterpret_cast<cdouble *>(result_flat.data()), n);
     }
@@ -246,9 +248,9 @@ template cMatrix2 dot_BLAS(const cMatrix2 &Mat1, const cMatrix2 &Mat2, const int
 
 // 2D x 1D MATRIX MULTIPLICATION
 template <typename T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &mat, const std::vector<T> &_vec, bool transp1)
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> diag_dot(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &mat, const std::vector<T> &_vec, bool transp1)
 {
-    Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> matCopy = mat;
+    Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> matCopy = mat;
     if (transp1)
     {
         matCopy = transpose(mat);
@@ -261,8 +263,7 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
     // Check if matrix multiplication is possible
     err_checkf(mat_cols == vec_size || mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
 
-    std::vector<T> result(mat_rows * mat_cols, 0.0);
-    Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result_m(result.data(), Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>(mat_rows, mat_cols));
+    Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result(mat_rows, mat_cols);
 #pragma omp parallel
     {
 #pragma omp for schedule(static)
@@ -270,33 +271,32 @@ Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::
         {
             for (int j = 0; j < mat_cols; j++)
             {
-                result_m[std::array{i, j}] = matCopy[std::array{i, j}] * _vec[j];
+                result(i, j) = matCopy(i, j) * _vec[j];
             }
         }
     }
 
-    return result_m;
+    return result;
 }
 template dMatrix2 diag_dot(const dMatrix2 &mat, const vec &_vec, bool transp1);
 template cMatrix2 diag_dot(const cMatrix2 &mat, const cvec &_vec, bool transp1);
 
 // 2D MATRIX
 template <class T>
-Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &mat)
+Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> transpose(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> &mat)
 {
     int rows = static_cast<int>(mat.extent(0));
     int cols = static_cast<int>(mat.extent(1));
-    std::vector<T> result(cols * rows, 0.0);
-    Kokkos::mdspan<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result_m(result.data(), Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>(cols, rows));
+    Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> result(cols, rows);
 
     for (int i = 0; i < rows; ++i)
     {
         for (int j = 0; j < cols; ++j)
         {
-            result_m[std::array{j, i}] = mat[std::array{i, j}];
+            result(j, i) = mat(i, j);
         }
     }
-    return result_m;
+    return result;
 }
 template dMatrix2 transpose(const dMatrix2 &mat);
 template cMatrix2 transpose(const cMatrix2 &mat);
@@ -310,19 +310,19 @@ T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
     int m = Mat.extent(1);
     using DataType = typename T2::element_type;
     std::vector<DataType> result(transp ? n : m, 0.0);
-    if constexpr (std::is_same_v<T, double>)
+    if constexpr (std::is_same_v<DataType, double>)
     {
         // Call cblas_dgemv
         cblas_dgemv(CblasRowMajor,
                     transp ? CblasTrans : CblasNoTrans,
                     m, n,
                     1.0,
-                    Mat.data_handle(), transp ? m : n,
-                    vec.data_handle(), 1,
+                    Mat.data(), transp ? m : n,
+                    vec.data(), 1,
                     0.0,
                     result.data(), 1);
     }
-    else if constexpr (std::is_same_v<T, cdouble>)
+    else if constexpr (std::is_same_v<DataType, cdouble>)
     {
         cdouble one = cdouble(1.0, 0.0);
         cdouble zero = cdouble(0.0, 0.0);
@@ -330,8 +330,8 @@ T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
                     transp ? CblasTrans : CblasNoTrans,
                     m, n,
                     &(one),
-                    reinterpret_cast<const cdouble *>(Mat.data_handle()), transp ? m : n,
-                    reinterpret_cast<const cdouble *>(vec.data_handle()), 1,
+                    reinterpret_cast<const cdouble *>(Mat.data()), transp ? m : n,
+                    reinterpret_cast<const cdouble *>(vec.data()), 1,
                     &(zero),
                     reinterpret_cast<cdouble *>(result.data()), 1);
     }
@@ -340,7 +340,9 @@ T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
         err_not_impl_f("Unsupported data type for matrix multiplication", std::cout);
         return {};
     }
-    return T(result.data(), Kokkos::extents<unsigned long long, std::dynamic_extent>(result.size()));
+    T result_m(result.size());
+	std::move(result.begin(), result.end(), result_m.data());
+    return result_m;
 }
 template dMatrix1 dot_BLAS(const dMatrix2 &Mat, const dMatrix1 &vec, bool transp);
 template cMatrix1 dot_BLAS(const cMatrix2 &Mat, const cMatrix1 &vec, bool transp);

@@ -13,14 +13,14 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     SALTED_DIR = opt_in.SALTED_DIR;
     debug = opt_in.debug;
 
-    config.salted_filename = find_first_salted_file(_opt.SALTED_DIR);
+    config.salted_filename = find_first_salted_file(opt_in.SALTED_DIR);
 
 	if (config.salted_filename == "") {
-        std::cout << "No SALTED binary file found in directory: " << _opt.SALTED_DIR << std::endl;
+        std::cout << "No SALTED binary file found in directory: " << opt_in.SALTED_DIR << std::endl;
         exit(1);
     }
 
-    if (_opt.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
+    if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
     _path = _path / config.salted_filename;
 	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
 	file.populate_config(config);
@@ -158,7 +158,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
 
 void SALTEDPredictor::read_model_data() {
-    const std::filesystem::path _SALTEDpath = _opt.SALTED_DIR / config.salted_filename;
+    const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
     SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_SALTEDpath);
     if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
@@ -170,22 +170,19 @@ void SALTEDPredictor::read_model_data() {
 	if (config.sparsify) vfps = file.read_fps();
 
 
-	std::unordered_map<std::string, vec2> temp_features = file.read_features();
+	std::unordered_map<std::string, dMatrix2> features = file.read_features();
     Vmat = file.read_projectors();
     std::string key;
 	for (std::string spe : config.species) {
 		for (int lam = 0; lam < lmax[spe] + 1; lam++) {
 			key = spe + std::to_string(lam);
-			if (lam == 0) Mspe[spe] = temp_features[key].size();
+			if (lam == 0) Mspe[spe] = features[key].extent(0);
 
-			vec flat_features = flatten(temp_features[key]);
             if (config.zeta == 1.0) {
-				power_env_sparse[key] = flatten(dot<double>(flatten(Vmat[key]), flat_features, //Input matrices
-                    Vmat[key].size(), Vmat[key][0].size(), temp_features[key].size(), temp_features[key][0].size(), //Sizes
-					true, false)); //Transpose the first matrix
+				power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
 			}
             else {
-                power_env_sparse[key] = flat_features;
+                power_env_sparse[key] = features[key];
             }
 		}
 	}
@@ -268,7 +265,7 @@ vec SALTEDPredictor::predict()
                 // Copy the block directly into flatVec2
                 pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
             }
-            dMatrix2 m_pvec_lam = reshape<dMatrix2>(pvec_lam, Shape2D{ static_cast<unsigned long long>(atom_idx[spe].size()), static_cast<unsigned long long>(row_size) });
+            dMatrix2 m_pvec_lam = reshape<dMatrix2>(pvec_lam, Shape2D{ atom_idx[spe].size() * lam2_1, static_cast<size_t>(featsize[lam]) });
             dMatrix2 kernel_nm = dot(m_pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
 
             if (config.zeta == 1)
@@ -292,7 +289,7 @@ vec SALTEDPredictor::predict()
                             {
                                 for (size_t j = 0; j < lam2_1; ++j)
                                 {
-                                    kernel_nm[std::array{ i1 * lam2_1 + i,i2 * lam2_1 + j }] *= pow(kernell0_nm[std::array{ i1,i2 }], config.zeta - 1);
+                                    kernel_nm( i1* lam2_1 + i,i2* lam2_1 + j ) *= pow(kernell0_nm( i1,i2 ), config.zeta - 1);
                                 }
                             }
                         }
@@ -341,7 +338,10 @@ vec SALTEDPredictor::predict()
                 int Mcut = static_cast<int>(psi_nm[spe_idx][l].extent(1));
                 // Check if isize + Mcut > weights.size()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
-                dMatrix1 weights_subset(weights.data() + isize, Kokkos::extents<unsigned long long, std::dynamic_extent>(Mcut));
+
+                dMatrix1 weights_subset(Mcut);
+				std::copy(weights.data() + isize, weights.data() + isize + Mcut, weights_subset.data());
+
                 C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false);
 
                 isize += Mcut;
@@ -382,7 +382,7 @@ vec SALTEDPredictor::predict()
                 //{
                 //     pred_coefs[i + ind] = C[spe + to_string(l) + to_string(n)][ispe[spe] * (2 * l + 1) + ind];
                 // }
-                std::copy_n(C[spe + to_string(l) + to_string(n)].data_handle() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
+                std::copy_n(C[spe + to_string(l) + to_string(n)].data() + ispe[spe] * (2 * l + 1), 2 * l + 1, pred_coefs.begin() + i);
 
                 if (config.average && l == 0)
                 {

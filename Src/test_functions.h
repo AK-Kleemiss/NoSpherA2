@@ -1568,7 +1568,7 @@ void test_openblas()
     math_load_BLAS(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
-    exit(0);
+    //exit(0);
 }
 
 void test_analytical_fourier(bool full)
@@ -1831,7 +1831,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
 	const double radius = 2.5;
-	const double resolution = 0.02;
+	const double resolution = 0.1;
 
     std::cout << "-------------------------------------DENSITY USING ORCA GBW-------------------------------------" << std::endl;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
@@ -1909,15 +1909,15 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 }
 
 void test_reading_SALTED_binary_file() {
-    SALTED_BINARY_FILE file = SALTED_BINARY_FILE("combo_v2.salted");
+    SALTED_BINARY_FILE file = SALTED_BINARY_FILE("Combo_v2.salted", true);
     Config config;
     file.populate_config(config);
     std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
 	std::unordered_map<std::string, vec> averages = file.read_averages();
     std::unordered_map<int, vec> wigners = file.read_wigners();
     vec weights = file.read_weights();
-	std::unordered_map<std::string, vec2> feats = file.read_features();
-    std::unordered_map<std::string, vec2> proj = file.read_projectors();
+	std::unordered_map<std::string, dMatrix2> feats = file.read_features();
+    std::unordered_map<std::string, dMatrix2> proj = file.read_projectors();
 
 	// TEST if both configs are the same
 	std::cout << "Comparing configs" << std::endl;
@@ -1951,11 +1951,11 @@ void test_reading_SALTED_binary_file() {
 	std::cout << "Comparing Vmat" << std::endl;
 	for (auto const& [key, val] : proj)
 	{
-		vec temp_new = flatten(proj[key]);
+		dMatrix1 temp_new = flatten<dMatrix1>(proj[key]);
 		std::cout << "Key: " << key << std::endl;
 		for (int i = 0; i < temp_new.size(); i+=100)
 		{
-			std::cout << temp_new[i] << " ";
+			std::cout << temp_new(i) << " ";
 		}
         std::cout << std::endl;
 	}
@@ -1965,10 +1965,10 @@ void test_reading_SALTED_binary_file() {
 	for (auto const& [key, val] : feats)
 	{
 		std::cout << "Key: " << key << std::endl;
-        vec temp = flatten(feats[key]);
+        dMatrix1 temp = flatten<dMatrix1>(feats[key]);
 		for (int i = 0; i < val.size(); i+=950)
 		{
-			std::cout << temp[i] << " ";
+			std::cout << temp(i) << " ";
 		}
 		std::cout << std::endl;
 	}
@@ -2045,16 +2045,20 @@ void test_NNLS()
         35.95079006, 43.70319538, 69.76311959, 6.02254716, 66.67667154,
         67.06378696, 21.03825611, 12.89262977, 31.54283509, 36.37107709};
     // Dimensions
-    int m = 10; // Number of rows
-    int n = 5;  // Number of columns
-
+    const int m = 10; // Number of rows
+    const int n = 5;  // Number of columns
+    
     // Right-hand side vector B
-    std::vector<double> B = {57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592};
+    std::vector<double> B_in = {57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592};
 
-    vec A = rowToColMajor(A_in, m, n);
 
-    // Call the NNLS solver
-    NNLSResult res = nnls(A, m, n, B);
+    dMatrix1 B(B_in.size());
+    std::copy(B_in.begin(), B_in.end(), B.data());
+    dMatrix2 A(m, n);
+	std::copy(A_in.begin(), A_in.end(), A.data());
+    NNLSResult res = nnls(A, B);
+
+
 
     std::cout << "NNLS solution: " << std::endl;
     std::cout << "Mode: " << res.status << std::endl;

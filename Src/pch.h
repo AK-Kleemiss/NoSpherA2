@@ -38,7 +38,11 @@
 #ifdef __AVX__
 #include <immintrin.h>
 #endif
-#include "../mdspan/include/mdspan/mdspan.hpp"
+#define MDSPAN_HAS_CXX_17 1
+//#define MDSPAN_USE_BRACKET_OPERATOR 1
+#define MDSPAN_USE_PAREN_OPERATOR 1
+#include "../mdspan/include/mdspan/mdarray.hpp"
+
 
 // Here are the system specific libaries
 #ifdef _WIN32
