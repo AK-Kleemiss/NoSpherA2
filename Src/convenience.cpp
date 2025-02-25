@@ -2068,6 +2068,7 @@ void options::digest_options()
         else if (temp == "-blastest")
         {
             test_openblas();
+            exit(0);
         }
         else if (temp == "-Cation")
         {
