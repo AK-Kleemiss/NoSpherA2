@@ -84,7 +84,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
     {
         for (int j = 0; j < A.extent(1); j++)
         {
-            auto a = A[i, j];
+            auto a = A(i, j);
             auto b = B[i][j];
             if (a != b)
             {
@@ -102,7 +102,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
     std::cout << "Matrices have size " << A.extent(0) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
     {
-        auto a = A[i];
+        auto a = A(i);
         auto b = B[i];
         if (a != b)
         {
@@ -423,7 +423,7 @@ NNLSResult nnls(
         double sum_sq = 0.0;
         for (int i = 0; i < m; i++)
         {
-            sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
+            sum_sq += (Ax[i] - B(i)) * (Ax[i] - B(i));
         }
         sum_sq = std::sqrt(sum_sq);
         NNLSResult resy({ X, sum_sq, MODE });

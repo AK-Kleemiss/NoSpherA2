@@ -285,7 +285,7 @@ vec SALTEDPredictor::predict()
                             {
                                 for (size_t j = 0; j < lam2_1; ++j)
                                 {
-                                    kernel_nm[ i1* lam2_1 + i,i2* lam2_1 + j ] *= pow(kernell0_nm[ i1,i2 ], config.zeta - 1);
+                                    kernel_nm( i1* lam2_1 + i,i2* lam2_1 + j ) *= pow(kernell0_nm( i1,i2 ), config.zeta - 1);
                                 }
                             }
                         }

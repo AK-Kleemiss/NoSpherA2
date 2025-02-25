@@ -8,7 +8,6 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
-#include <print>
 
 void WFN::fill_pre()
 {
@@ -2522,11 +2521,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
-                coeff_mo_s1[i, oc] = reorderd_coefs_s1[i, oc] * occupations[0][oc];
-                coeff_small_s1[i, oc] = reorderd_coefs_s1[i, oc];
+                coeff_mo_s1(i, oc) = reorderd_coefs_s1(i, oc) * occupations[0][oc];
+                coeff_small_s1(i, oc) = reorderd_coefs_s1(i, oc);
 
-                if (operators == 2) coeff_mo_s2[i, oc] = reorderd_coefs_s2[i, oc] * occupations[1][oc];
-                if (operators == 2) coeff_small_s2[i, oc] = reorderd_coefs_s2[i, oc];
+                if (operators == 2) coeff_mo_s2(i, oc) = reorderd_coefs_s2(i, oc) * occupations[1][oc];
+                if (operators == 2) coeff_small_s2(i, oc) = reorderd_coefs_s2(i, oc);
             }
         }
 
@@ -2540,7 +2539,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
             for (int i = 0; i < DM_s1.extent(0); i++) {
                 for (int j = 0; j < DM_s1.extent(1); j++) {
-                    DM_s1[i,j] += DM_s2[i,j];
+                    DM_s1(i,j) += DM_s2(i,j);
                 }
             }
             DM = DM_s1;
@@ -7049,7 +7048,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         vec values;
         for (int j = 0; j < nmomax; j++)
         {
-            values.push_back(momat[j, ipao[i] - 1] * contr[i]);
+            values.push_back(momat(j, ipao[i] - 1) * contr[i]);
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }

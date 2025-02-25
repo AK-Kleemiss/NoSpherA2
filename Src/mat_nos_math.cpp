@@ -245,7 +245,7 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
         {
             for (int j = 0; j < mat_cols; j++)
             {
-                result[i, j] = matCopy[i, j] * _vec[j];
+                result(i, j) = matCopy(i, j) * _vec[j];
             }
         }
     }
@@ -267,7 +267,7 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
     {
         for (int j = 0; j < cols; ++j)
         {
-            result[j, i] = mat[i, j];
+            result(j, i) = mat(i, j);
         }
     }
     return result;

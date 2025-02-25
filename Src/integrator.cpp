@@ -26,7 +26,7 @@ vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
         {
             for (int j = 0; j < J; ++j)
             {
-                rho[p] += v1[i, j, p] * v2[i, j];
+                rho[p] += v1(i, j, p) * v2(i, j);
             }
         }
     }
