@@ -187,14 +187,14 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
-    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v1 -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-SALTED Model -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\SALTED</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-cpus 12 -wfn Fe.gbw -cif Fe.cif -dmin 0.4 -ri_fit def2_universal_JKfit -v</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
