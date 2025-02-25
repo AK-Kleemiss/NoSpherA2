@@ -5,6 +5,7 @@
 #define lapack_complex_double std::complex<double>
 #include "lapacke.h" // for LAPACKE_xxx
 #include "cblas.h"
+#include <execution>
 
 template <typename T>
 T conj(const T &val)
@@ -50,40 +51,6 @@ std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector
 }
 template vec3 reorder3D(const vec3 &original);
 
-// Function to collect rows from a matrix based on a vector of indices
-vec2 collectRows(const vec2 &matrix, const ivec &indices)
-{
-    // If no indices are provided, return empty matrix
-    if (indices.empty())
-    {
-        return {};
-    }
-    vec2 result;
-    for (int index : indices)
-    {
-        err_checkf(index < matrix.size(), "Index out of range", std::cout);
-        result.push_back(matrix[index]);
-    }
-    return result;
-}
-
-// Function to collect rows from a Cube based on a vector of indices
-vec3 collectRows(const vec3 &cube, const ivec &indices)
-{
-    // If no indices are provided, return empty matrix
-    if (indices.empty())
-    {
-        return {};
-    }
-    vec3 result;
-    for (int index : indices)
-    {
-        err_checkf(index < cube.size(), "Index out of range", std::cout);
-        result.push_back(cube[index]);
-    }
-    return result;
-}
-
 // Element-wise exponentiation of a matrix
 vec2 elementWiseExponentiation(const vec2 &matrix, double exponent)
 {
@@ -104,13 +71,7 @@ dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
     vec result(matrix.size(), 0.0);
     dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({matrix.extent(0), matrix.extent(1)}));
 
-    for (size_t i = 0; i < matrix.extent(0); ++i)
-    { // Iterate over rows
-        for (size_t j = 0; j < matrix.extent(1); ++j)
-        {                                                                              // Iterate over columns
-            result_m(i, j) = std::pow(matrix(i, j), exponent); // Apply exponentiation
-        }
-    }
+	std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val) { return std::pow(val, exponent); });
 
     return result_m;
 }
@@ -123,7 +84,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
     {
         for (int j = 0; j < A.extent(1); j++)
         {
-            auto a = A(i, j);
+            auto a = A[i, j];
             auto b = B[i][j];
             if (a != b)
             {
@@ -132,6 +93,23 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
             }
             // err_checkf(a == b, "values not matching in comparison!", std::cout);
         }
+    }
+}
+
+template <typename T>
+void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long,  std::dynamic_extent>>& A, const std::vector<T>& B)
+{
+    std::cout << "Matrices have size " << A.extent(0) << std::endl;
+    for (int i = 0; i < A.extent(0); i++)
+    {
+        auto a = A[i];
+        auto b = B[i];
+        if (a != b)
+        {
+            std::cout << "Values not matching in comparison! " << i << std::endl;
+            std::cout << a << " != " << b << std::endl;
+        }
+        // err_checkf(a == b, "values not matching in comparison!", std::cout);
     }
 }
 
@@ -251,6 +229,26 @@ void _test_openblas()
     std::cout << "Testing transpose C and D" << std::endl;
     ////Fourth compare both transposed
     compare_matrices(dot(matC, matD, true, true), self_dot(transpose(C), transpose(D)));
+
+	// Test 2D x 1D matrix multiplication
+    dims[0] = 12;
+	vec E(dims[1]);
+	vec2 F(dims[0], vec(dims[1]));
+    for (int i = 0; i < dims[1]; i++) {
+		E[i] = rand() % 200 - 100;
+		for (int j = 0; j < dims[0]; j++) {
+			F[j][i] = rand() % 200 - 100;
+		}
+    }
+	vec fE = flatten<double>(F);
+	dMatrix1 matE(dims[1]);
+	dMatrix2 matF(dims[0], dims[1]);
+	std::copy(E.data(), E.data() + E.size(), matE.data());
+	std::copy(fE.data(), fE.data() + fE.size(), matF.data());
+
+    //For matrix just reuse matA
+	std::cout << "Testing 2D x 1D matrix multiplication" << std::endl;
+	compare_matrices(dot(matF, matE, false), self_dot(F, E));
 
     std::cout << "All BLAS tests passed!" << std::endl;
 }
@@ -425,7 +423,7 @@ NNLSResult nnls(
         double sum_sq = 0.0;
         for (int i = 0; i < m; i++)
         {
-            sum_sq += (Ax[i] - B(i)) * (Ax[i] - B(i));
+            sum_sq += (Ax[i] - B[i]) * (Ax[i] - B[i]);
         }
         sum_sq = std::sqrt(sum_sq);
         NNLSResult resy({ X, sum_sq, MODE });

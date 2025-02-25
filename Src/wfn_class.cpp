@@ -8,6 +8,7 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include <print>
 
 void WFN::fill_pre()
 {
@@ -2482,67 +2483,64 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             }
         }
 
-        //Two for two spins 
-        vec3 reordered_coefs(2, vec2(dimension, vec(dimension, 0.0)));
-        vec2 coefs_2D_s1(dimension, vec(dimension)), coefs_2D_s2;
 
-		if (operators == 2) coefs_2D_s2.resize(dimension, vec(dimension));
-        for (int d1 = 0; d1 < dimension; d1++) {
-			std::copy(coefficients[0].begin() + d1 * dimension, coefficients[0].begin() + (d1 + 1) * dimension, reordered_coefs[0][d1].begin());
-            if (operators == 2) std::copy(coefficients[1].begin() + d1 * dimension, coefficients[1].begin() + (d1 + 1) * dimension, reordered_coefs[1][d1].begin());
-        }
-    	
+		dMatrix2 reorderd_coefs_s1(dimension,dimension), reorderd_coefs_s2;
+		if (operators == 2) reorderd_coefs_s2 = dMatrix2(dimension, dimension);
+
+        dSpan2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
+        dSpan2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
+
         int index = 0;
-        for (int atom_idx = 0; atom_idx < atoms.size(); atom_idx++) {
-            std::vector<basis_set_entry> basis = atoms[atom_idx].get_basis_set();
+        for (const atom& _atom : atoms) {
+            std::vector<basis_set_entry> basis = _atom.get_basis_set();
             int temp_bas_idx = 0;
-            for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++) {
+            for (int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
                 int type = basis[temp_bas_idx].get_type() - 1;
-                temp_bas_idx += atoms[atom_idx].get_shellcount(shell);
-                if (type == 0) { //Skip s-type
-                    reordered_coefs[0][index] = coefs_2D_s1[index];
-					if (operators == 2 )reordered_coefs[1][index] = coefs_2D_s2[index];
-                    index += 2 * type + 1;
-                    continue;
-                };
+                temp_bas_idx += _atom.get_shellcount(shell);
                 for (int m = -type; m <= type; m++) {
-					reordered_coefs[0][index + constants::orca_2_pySCF[type][m]] = coefs_2D_s1[index + m+type];
-					if (operators == 2) reordered_coefs[1][index + constants::orca_2_pySCF[type][m]] = coefs_2D_s2[index + m + type];
+                    auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m + type, Kokkos::full_extent);
+                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                    std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
+                    if (operators == 2) {
+                        auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
+                        auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                        std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
+                    }
+                    
                 }
                 index += 2 * type + 1;
             }
         }
 
-
 		int n_occ = 0;
 		for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
         
-        vec coeff_mo_s1(n_occ * dimension, 0.0), coeff_small_s1(n_occ* dimension, 0.0);
-		vec coeff_mo_s2, coeff_small_s2;
-        if (operators == 2) {
-			coeff_mo_s2.resize(n_occ* dimension, 0.0);
-			coeff_small_s2.resize(n_occ* dimension, 0.0);
-        }
+        dMatrix2 coeff_mo_s1(dimension, n_occ), coeff_small_s1(dimension, n_occ);
+        dMatrix2 coeff_mo_s2, coeff_small_s2;
+        if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, n_occ); coeff_small_s2 = dMatrix2(dimension, n_occ);
+
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
-                coeff_mo_s1[i * n_occ + oc] = reordered_coefs[0][i][oc] * occupations[0][oc];
-                coeff_small_s1[i * n_occ + oc] = reordered_coefs[0][i][oc];
-				if (operators == 2) coeff_mo_s2[i * n_occ + oc] = reordered_coefs[1][i][oc] * occupations[1][oc];
-                if (operators == 2) coeff_small_s2[i * n_occ + oc] = reordered_coefs[1][i][oc];
+                coeff_mo_s1[i, oc] = reorderd_coefs_s1[i, oc] * occupations[0][oc];
+                coeff_small_s1[i, oc] = reorderd_coefs_s1[i, oc];
+
+                if (operators == 2) coeff_mo_s2[i, oc] = reorderd_coefs_s2[i, oc] * occupations[1][oc];
+                if (operators == 2) coeff_small_s2[i, oc] = reorderd_coefs_s2[i, oc];
             }
         }
 
+
         if (operators == 1) {
-			DM = dot(coeff_mo_s1, coeff_small_s1, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
+			DM = dot(coeff_mo_s1, coeff_small_s1, false, true);
         }
         else {
-            dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
-            dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, (int)dimension, (int)n_occ, (int)dimension, (int)n_occ, false, true);
+            dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, false, true);
+            dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, false, true);
 
             for (int i = 0; i < DM_s1.extent(0); i++) {
                 for (int j = 0; j < DM_s1.extent(1); j++) {
-                    DM_s1(i,j) += DM_s2(i,j);
+                    DM_s1[i,j] += DM_s2[i,j];
                 }
             }
             DM = DM_s1;
@@ -7051,7 +7049,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
         vec values;
         for (int j = 0; j < nmomax; j++)
         {
-            values.push_back(momat(j,ipao[i] - 1) * contr[i]);
+            values.push_back(momat[j, ipao[i] - 1] * contr[i]);
         }
         add_primitive(aoatcart[i], lao[i], exps[i], values.data());
     }

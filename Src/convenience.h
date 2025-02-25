@@ -52,6 +52,7 @@ typedef Kokkos::Experimental::mdarray<int, Kokkos::extents<unsigned long long, s
 typedef Kokkos::Experimental::mdarray<bool, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> bMatrix4;
 
 typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> dSpan1;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dSpan2;
 
 int vec_sum(const bvec &in);
 int vec_sum(const ivec &in);

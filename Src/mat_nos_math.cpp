@@ -136,32 +136,6 @@ T dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 template dMatrix2 dot(const dMatrix2 &mat1, const dMatrix2 &mat2, bool transp1, bool transp2);
 template cMatrix2 dot(const cMatrix2 &mat1, const cMatrix2 &mat2, bool transp1, bool transp2);
 
-// When the matrices are given as flat vectors
-template <typename T>
-Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2)
-{
-    // Check if flatMat1 and flatMat2 have the correct size
-    err_checkf(flatMat1.size() == mat1_d0 * mat1_d1, "flat Matrix 1 has incorrect size", std::cout);
-    err_checkf(flatMat2.size() == mat2_d0 * mat2_d1, "flat Matrix 2 has incorrect size", std::cout);
-
-    // if either of the matrices is empty, return a empty matrix
-    if (flatMat1.empty() || flatMat2.empty())
-    {
-        return {};
-    }
-    int m = transp1 ? mat1_d1 : mat1_d0;
-    int k1 = transp1 ? mat1_d0 : mat1_d1;
-    int k2 = transp2 ? mat2_d1 : mat2_d0;
-    int n = transp2 ? mat2_d0 : mat2_d1;
-    // The resulting matrix will have dimensions m x n
-
-    // Check if matrix multiplication is possible
-    err_checkf(k1 == k2, "Inner matrix dimensions must agree.", std::cout);
-
-    return dot_BLAS(flatMat1, flatMat2, m, k1, k2, n, transp1, transp2);
-}
-template dMatrix2 dot(const vec &flatMat1, const vec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
-template cMatrix2 dot(const cvec &flatMat1, const cvec &flatMat2, const int &mat1_d0, const int &mat1_d1, const int &mat2_d0, const int &mat2_d1, bool transp1, bool transp2);
 
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
@@ -271,7 +245,7 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
         {
             for (int j = 0; j < mat_cols; j++)
             {
-                result(i, j) = matCopy(i, j) * _vec[j];
+                result[i, j] = matCopy[i, j] * _vec[j];
             }
         }
     }
@@ -293,7 +267,7 @@ Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynami
     {
         for (int j = 0; j < cols; ++j)
         {
-            result(j, i) = mat(i, j);
+            result[j, i] = mat[i, j];
         }
     }
     return result;
@@ -306,8 +280,8 @@ template iMatrix2 transpose(const iMatrix2 &mat);
 template <typename T, typename T2>
 T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
 {
-    int n = Mat.extent(0);
-    int m = Mat.extent(1);
+    int m = Mat.extent(0);
+    int n = Mat.extent(1);
     using DataType = typename T2::element_type;
     std::vector<DataType> result(transp ? n : m, 0.0);
     if constexpr (std::is_same_v<DataType, double>)

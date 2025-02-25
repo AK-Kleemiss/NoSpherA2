@@ -67,12 +67,6 @@ std::vector<std::vector<T>> transpose(const std::vector<T>& vector);
 template <typename T>
 std::vector<std::vector<std::vector<T>>> reorder3D(const std::vector<std::vector<std::vector<T>>> &original);
 
-// Function to collect rows from a vec2 based on a vector of indices
-vec2 collectRows(const vec2 &matrix, const ivec &indices);
-
-// Function to collect rows from a vec3 based on a vector of indices
-vec3 collectRows(const vec3 &cube, const ivec &indices);
-
 // FLATTEN Operation
 //  Flatten vector 2D
 template <typename T>
@@ -87,23 +81,10 @@ T1 flatten(const T2& vecND);
 
 // Matrix multiplication
 
-
-
 // 2D x 2D MATRIX MULTIPLICATION
 //BLAS implementation of matrix multiplication
 template <typename T>
 T dot(const T& mat1, const T& mat2, bool transp1 = false, bool transp2 = false);
-
-//BLAS dot product from flattend matrices
-template <typename T>
-Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot(const std::vector<T>& flatMat1,
-                                                                                               const std::vector<T>& flatMat2,
-                                                                                               const int& mat1_d0,
-                                                                                               const int& mat1_d1,
-                                                                                               const int& mat2_d0,
-                                                                                               const int& mat2_d1,
-                                                                                               bool transp1=false,
-                                                                                               bool transp2=false);
 
 //BLAS implementation of matrix multiplication 2D x 2D
 template <typename T>

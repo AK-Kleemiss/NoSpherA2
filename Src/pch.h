@@ -38,9 +38,8 @@
 #ifdef __AVX__
 #include <immintrin.h>
 #endif
-#define MDSPAN_HAS_CXX_17 1
-//#define MDSPAN_USE_BRACKET_OPERATOR 1
-#define MDSPAN_USE_PAREN_OPERATOR 1
+#define MDSPAN_USE_BRACKET_OPERATOR 1
+//#define MDSPAN_USE_PAREN_OPERATOR 0
 #include "../mdspan/include/mdspan/mdarray.hpp"
 
 

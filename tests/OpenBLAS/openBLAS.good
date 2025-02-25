@@ -21,4 +21,6 @@ Testing transpose D
 Matrices have size 10x10
 Testing transpose C and D
 Matrices have size 10x10
+Testing 2D x 1D matrix multiplication
+Matrices have size 12
 All BLAS tests passed!

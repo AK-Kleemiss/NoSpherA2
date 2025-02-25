@@ -1954,7 +1954,7 @@ void test_reading_SALTED_binary_file() {
 		std::cout << "Key: " << key << std::endl;
 		for (int i = 0; i < temp_new.size(); i+=100)
 		{
-			std::cout << temp_new(i) << " ";
+			std::cout << temp_new[i] << " ";
 		}
         std::cout << std::endl;
 	}
@@ -1967,7 +1967,7 @@ void test_reading_SALTED_binary_file() {
         dMatrix1 temp = flatten<dMatrix1>(feats[key]);
 		for (int i = 0; i < val.size(); i+=950)
 		{
-			std::cout << temp(i) << " ";
+			std::cout << temp[i] << " ";
 		}
 		std::cout << std::endl;
 	}

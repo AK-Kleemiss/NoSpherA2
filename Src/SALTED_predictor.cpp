@@ -254,19 +254,15 @@ vec SALTEDPredictor::predict()
             int lam2_1 = 2 * lam + 1;
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
-            vec pvec_lam;
-            pvec_lam.reserve(atom_idx[spe].size() * row_size); // Preallocate memory for pvec_lam to avoid reallocations
-
-            for (int idx : atom_idx[spe])
+            dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
+            for (int idx = 0; idx < atom_idx[spe].size(); idx++)
             {
-                int start_idx = idx * row_size;     // Start index in pvec_flat
+                int start_idx = atom_idx[spe][idx] * row_size;     // Start index in pvec_flat
                 int end_idx = start_idx + row_size; // End index in pvec_flat
-
                 // Copy the block directly into flatVec2
-                pvec_lam.insert(pvec_lam.end(), pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx);
+                std::copy(pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx, pvec_lam.data() + idx*row_size);
             }
-            dMatrix2 m_pvec_lam = reshape<dMatrix2>(pvec_lam, Shape2D{ atom_idx[spe].size() * lam2_1, static_cast<size_t>(featsize[lam]) });
-            dMatrix2 kernel_nm = dot(m_pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
+            dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
 
             if (config.zeta == 1)
             {
@@ -289,7 +285,7 @@ vec SALTEDPredictor::predict()
                             {
                                 for (size_t j = 0; j < lam2_1; ++j)
                                 {
-                                    kernel_nm( i1* lam2_1 + i,i2* lam2_1 + j ) *= pow(kernell0_nm( i1,i2 ), config.zeta - 1);
+                                    kernel_nm[ i1* lam2_1 + i,i2* lam2_1 + j ] *= pow(kernell0_nm[ i1,i2 ], config.zeta - 1);
                                 }
                             }
                         }
@@ -350,8 +346,7 @@ vec SALTEDPredictor::predict()
     }
     psi_nm.clear();
     psi_nm.shrink_to_fit();
-    // std::unordered_map<string, vec2>  temp;
-    // psi_nm.swap(temp);
+
 
     int Tsize = 0;
     for (int iat = 0; iat < natoms; iat++)
