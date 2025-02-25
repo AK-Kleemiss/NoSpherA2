@@ -1568,7 +1568,6 @@ void test_openblas()
     math_load_BLAS(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
-    //exit(0);
 }
 
 void test_analytical_fourier(bool full)

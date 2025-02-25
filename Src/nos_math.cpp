@@ -169,7 +169,7 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<st
 
 void _test_openblas()
 {
-    ivec dims = { 2, 2 };
+    ivec dims = { 10, 10 };
     // Init Mat A with some values as a 3x3 matrix
     vec2 A(dims[0], vec(dims[1]));
     vec2 B(dims[0], vec(dims[1]));
@@ -214,14 +214,25 @@ void _test_openblas()
     compare_matrices(dot(matA, matB, true, true), self_dot(transpose(A), transpose(B)));
 
     // Init Complex matrices
-    cvec2 C = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
-    cvec2 D = {{{1.0, 1.0}, {2.0, 2.0}, {3.0, 3.0}}, {{4.0, 4.0}, {5.0, 5.0}, {6.0, 6.0}}, {{7.0, 7.0}, {8.0, 8.0}, {9.0, 9.0}}};
+	cvec2 C(dims[0], cvec(dims[1])), D(dims[0], cvec(dims[1]));
+	for (int i = 0; i < dims[0]; i++)
+	{
+		for (int j = 0; j < dims[1]; j++)
+		{
+			C[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
+			D[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
+		}
+	}
+
     cvec fC = flatten<cdouble>(C);
     cvec fD = flatten<cdouble>(D);
-    Shape2D shape = {3, 3};
-    cMatrix2 matC = reshape<cMatrix2>(fC, shape);
-    cMatrix2 matD = reshape<cMatrix2>(fD, shape);
-    std::cout << "Testing C-matrices directly" << std::endl;
+    cMatrix2 matC(dims[0], dims[1]);
+    std::copy(fC.data(), fC.data() + fC.size(), matC.data());
+    cMatrix2 matD(dims[0], dims[1]);
+    std::copy(fD.data(), fD.data() + fD.size(), matD.data());
+
+
+	std::cout << "Testing C-matrices directly" << std::endl;
     compare_matrices(matC, C);
     compare_matrices(matD, D);
 
