@@ -371,7 +371,14 @@ int main(int argc, char **argv)
         //use atoms of group 0
         opt.groups[0].push_back(0);
         itsc_block res = thakkar_sfac(opt, log_file, empty, wavy, 0);
-        res.write_tscb_file();
+        log_file << "Writing tsc file... " << flush;
+        if (opt.binary_tsc)
+            res.write_tscb_file();
+        if (opt.old_tsc)
+        {
+            res.write_tsc_file(opt.cif);
+        }
+        log_file << " ... done!" << endl;
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -423,6 +430,8 @@ int main(int argc, char **argv)
         {
             //in any case we work with group 0
             opt.groups[0].push_back(0);
+            itsc_block res;
+            svec empty({});
             if (!opt.SALTED)
             {
                 // Calculate tsc file from given files
@@ -430,8 +439,6 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                svec empty({});
-                itsc_block res;
                 if (wavy[0].get_origin() != 7 && !opt.RI_FIT)
                     res = calculate_scattering_factors(
                         opt,
@@ -453,7 +460,14 @@ int main(int argc, char **argv)
                         empty,
                         wavy,
                         0);
-                res.write_tscb_file();
+                log_file << "Writing tsc file... " << flush;
+                if (opt.binary_tsc)
+                    res.write_tscb_file();
+                if (opt.old_tsc)
+                {
+                    res.write_tsc_file(opt.cif);
+                }
+                log_file << " ... done!" << endl;
             }
             else
             {
@@ -468,16 +482,23 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                svec empty = {};
-                itsc_block res = calculate_scattering_factors_SALTED(
+                res = calculate_scattering_factors_SALTED(
                     opt,
                     *temp_pred,
                     log_file,
                     empty,
                     0);
-                res.write_tscb_file();
+                
                 delete temp_pred;
             }
+            log_file << "Writing tsc file... " << flush;
+            if (opt.binary_tsc)
+                res.write_tscb_file();
+            if (opt.old_tsc)
+            {
+                res.write_tsc_file(opt.cif);
+            }
+            log_file << " ... done!" << endl;
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again
