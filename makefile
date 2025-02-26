@@ -14,12 +14,12 @@ all: NoSpherA2
 
 OpenBLAS:
 ifeq ($(NAME),WINDOWS)
-	@if [ ! -f OpenBLAS/build/lib/RELEASE/openblas.lib ]; then \
+	@if not exist OpenBLAS/build/lib/RELEASE/openblas.lib ( \
 		@echo "Building OpenBLAS for $(NAME)"; \
 		cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake \
-	else \
+	) else (\
 		@echo "OpenBLAS already built"; \
-	fi
+	)
 else
 	@echo "OpenBLAS built handled internally for $(NAME)"
 endif
@@ -60,4 +60,4 @@ tests:
 	cd tests && make all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug OpenBLAS

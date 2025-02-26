@@ -11,6 +11,7 @@ This Software is published with BSD-2 clause license.
 Reading:                                "epoxide.gbw" done!
 Number of atoms in Wavefunction file: 7 Number of MOs: 35
 Number of protons: 24
+Number of electrons: 24
 Reading:                                "epoxide.cif" done!
 Generating hkl indices up to d=:              0.40... done!
 Nr of reflections generated:                 26048

@@ -31,9 +31,8 @@ Generating densities...
 [#############################################################] 100% 
 [              Calculating descriptors for l = 5               ]
 [#############################################################] 100% 
-                                        ... done!
-
-Generating k-points...                            ... done!
+                                           ... done!
+                          ... done!
 Number of k - points to evaluate : 7672
 Table of Charges in electrons
        Atom      ML
@@ -54,5 +53,5 @@ Table of Charges in electrons
 Total number of analytical Electrons: 64.2941
 [               Generating scattering factors...               ]
 [#############################################################] 100% 
-                                         ... done!
+                                          ... done!
 Writing tsc file...  ... done!

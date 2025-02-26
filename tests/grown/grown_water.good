@@ -12,10 +12,6 @@ Number of atoms in Wavefunction file: 48 Number of MOs: 261
 Number of protons: 261
 Number of electrons: 261
 Reading:                                  "water.cif" done!
-Reading:                                  "water.hkl" done!
-Nr of reflections read from file: 3019
-Number of symmetry operations: 2
-Nr of reflections to be used: 5928
 There are:
   48 atoms read from the wavefunction, of which 
   26 are identified as asymmetric unit atoms!
@@ -58,6 +54,10 @@ Table of Charges in electrons
       H10b     0.019    -0.126     0.123
 Total number of electrons in the wavefunction: 149.193
  and Hirshfeld electrons (asym unit): 147.734
+Reading:                                  "water.hkl" done!
+Nr of reflections read from file: 3019
+Number of symmetry operations: 2
+Nr of reflections to be used: 5928
 
 Number of k-points to evaluate: 5928 for 3722 gridpoints.
 [                Calculating Scattering Factors                ]

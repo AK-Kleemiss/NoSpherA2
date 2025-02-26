@@ -2922,8 +2922,6 @@ tsc_block<int, cdouble> thakkar_sfac(
     if (opt.debug)
         file << endl
              << "SFs are made, now just write them!" << endl;
-    file << endl
-         << "Writing tsc file..." << endl;
 
     tsc_block<int, cdouble> blocky(
         sf,

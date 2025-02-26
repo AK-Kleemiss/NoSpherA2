@@ -13,10 +13,6 @@ Number of protons: 182
 Number of electrons: 136
 Number of ECP electrons: 46
 Reading:                                "sucrose.cif" done!
-Generating hkl indices up to d=:              0.80... done!
-Nr of reflections generated:                 11232
-Number of symmetry operations:                   2
-Nr of reflections to be used:                 6387
 There are:
   45 atoms read from the wavefunction, of which 
   45 are identified as asymmetric unit atoms!
@@ -78,6 +74,10 @@ Table of Charges in electrons
       H12b     0.109     0.083     0.036
 Total number of electrons in the wavefunction: 181.632
  and Hirshfeld electrons (asym unit): 182.467
+Generating hkl indices up to d=:              0.80... done!
+Nr of reflections generated:                 11232
+Number of symmetry operations:                   2
+Nr of reflections to be used:                 6387
 
 Number of k-points to evaluate: 6387 for 4398 gridpoints.
 [                Calculating Scattering Factors                ]

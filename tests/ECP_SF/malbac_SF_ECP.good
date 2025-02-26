@@ -13,10 +13,6 @@ Number of protons: 276
 Number of electrons: 248
 Number of ECP electrons: 28
 Reading:                                 "malbac.cif" done!
-Reading:                                 "malbac.hkl" done!
-Nr of reflections read from file: 15646
-Number of symmetry operations: 1
-Nr of reflections to be used: 9134
 There are:
   52 atoms read from the wavefunction, of which 
   52 are identified as asymmetric unit atoms!
@@ -85,6 +81,10 @@ Table of Charges in electrons
        H34     0.133     0.080     0.062
 Total number of electrons in the wavefunction: 275.480
  and Hirshfeld electrons (asym unit): 275.391
+Reading:                                 "malbac.hkl" done!
+Nr of reflections read from file: 15646
+Number of symmetry operations: 1
+Nr of reflections to be used: 9134
 
 Number of k-points to evaluate: 9134 for 15728 gridpoints.
 [                Calculating Scattering Factors                ]
