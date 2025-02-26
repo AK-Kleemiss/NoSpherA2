@@ -234,6 +234,7 @@ int main(int argc, char **argv)
         }
         err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
         err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
+        err_checkf(opt.combined_tsc_calc_ECP.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and ECPs impossible!", log_file);
 
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
@@ -247,19 +248,16 @@ int main(int argc, char **argv)
             log_file << "Reading: " << setw(44) << opt.combined_tsc_calc_files[i] << flush;
             if (opt.debug)
             {
-                log_file << "\nm: " << opt.combined_tsc_calc_mult[i] << endl;
-                log_file << "c: " << opt.combined_tsc_calc_charge[i] << "\n";
+                log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
+                log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
+                log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
             }
             wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
             wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
             wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file, opt.debug);
-            if (opt.ECP)
+            if (opt.combined_tsc_calc_ECP[i] != 0)
             {
-                wavy[i].set_has_ECPs(true, true, opt.ECP_mode);
-            }
-            if (opt.set_ECPs)
-            {
-                wavy[i].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
+                wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
             }
             log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
@@ -272,7 +270,7 @@ int main(int argc, char **argv)
             known_scatterer = result.get_scatterers();
             if (wavy[i].get_origin() != 7 && !opt.SALTED && !opt.RI_FIT)
             {
-                result.append(calculate_scattering_factors_MTC(
+                result.append(calculate_scattering_factors(
                                   opt,
                                   wavy,
                                   log_file,
@@ -294,7 +292,7 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors_MTC_SALTED(
+                result.append(calculate_scattering_factors_SALTED(
                                   opt,
                                   *temp_pred,
                                   log_file,
@@ -306,7 +304,7 @@ int main(int argc, char **argv)
             }
             else if (opt.RI_FIT)
             {
-                result.append(calculate_scattering_factors_MTC_RI_fit(
+                result.append(calculate_scattering_factors_RI_fit(
                                   opt,
                                   wavy,
                                   log_file,
@@ -317,7 +315,7 @@ int main(int argc, char **argv)
             }
             else
             {
-                result.append(MTC_thakkar_sfac(
+                result.append(thakkar_sfac(
                                   opt,
                                   log_file,
                                   known_scatterer,
@@ -369,7 +367,9 @@ int main(int argc, char **argv)
             log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
         if (opt.debug)
             log_file << "Entering scattering Factor Calculation!" << endl;
-        err_checkf(thakkar_sfac(opt, log_file, wavy[0]), "Error during SF Calculation!", log_file);
+        svec empty({});
+        itsc_block res = thakkar_sfac(opt, log_file, empty, wavy, 0);
+        res.write_tscb_file();
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -389,11 +389,6 @@ int main(int argc, char **argv)
         if (opt.ECP)
         {
             wavy[0].set_has_ECPs(true, true, opt.ECP_mode);
-        }
-        if (opt.set_ECPs)
-        {
-            log_file << "Adding ECPs" << endl;
-            wavy[0].set_ECPs(opt.ECP_nrs, opt.ECP_elcounts);
         }
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
@@ -431,26 +426,30 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
+                svec empty({});
+                itsc_block res;
                 if (wavy[0].get_origin() != 7 && !opt.RI_FIT)
-                    err_checkf(calculate_scattering_factors_HF(
-                                   opt,
-                                   wavy[0],
-                                   log_file),
-                               "Error during SF Calcualtion", log_file);
+                    res = calculate_scattering_factors(
+                        opt,
+                        wavy,
+                        log_file,
+                        empty,
+                        0);
                 else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
-                {
-                    err_checkf(calculate_scattering_factors_RI_fit(
-                                   opt,
-                                   wavy[0],
-                                   log_file),
-                               "Error during SF Calcualtion", log_file);
-                }
+                    res = calculate_scattering_factors_RI_fit(
+                        opt,
+                        wavy,
+                        log_file,
+                        empty,
+                        0);
                 else
-                    err_checkf(thakkar_sfac(
-                                   opt,
-                                   log_file,
-                                   wavy[0]),
-                               "Error during SF Calcualtion", log_file);
+                    res = thakkar_sfac(
+                        opt,
+                        log_file,
+                        empty,
+                        wavy,
+                        0);
+                res.write_tscb_file();
             }
             else
             {
@@ -465,11 +464,14 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                err_checkf(calculate_scattering_factors_ML(
-                               opt,
-                               *temp_pred,
-                               log_file),
-                           "Error during ML-SF Calcualtion", log_file);
+                svec empty = {};
+                itsc_block res = calculate_scattering_factors_SALTED(
+                    opt,
+                    *temp_pred,
+                    log_file,
+                    empty,
+                    0);
+                res.write_tscb_file();
                 delete temp_pred;
             }
         }

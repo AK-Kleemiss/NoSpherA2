@@ -103,6 +103,7 @@ disorder_THPP:
 		olex2/Wfn_job/Part_2/thpp.wfx 0,2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
+		-mtc_ECP 0 0 \
 		-acc 0 \
 		-no-date \
 		&& ${MV} NoSpherA2.log $@.log \
@@ -155,6 +156,7 @@ rubredoxin_cmtc:
 		residues/4.gbw residues/4.cif 0 \
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
+		-mtc_ECP 0 0 0 0 \
 		-no-date \
 		&& ${MV} NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
@@ -192,6 +194,7 @@ Hybrid_mode:
 		-mtc ZP2_part1.gbw 0,1 ZP2_part2.gbw 0,2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
+		-mtc_ECP 0 0 \
 		-no-date \
 		&& ${MV} NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good

@@ -32,15 +32,6 @@ class cell;
 struct options;
 
 /**
- * @brief Calculates the Thakkar scattering factors.
- * @param opt The options for calculations.
- * @param file The output stream to write the results to.
- * @param wave The wavefunction.
- * @return True if the calculation is successful, false otherwise.
- */
-bool thakkar_sfac(const options &opt, std::ostream &file, const WFN &wave);
-
-/**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.
  * @param file The output stream to write the results to.
@@ -49,48 +40,12 @@ bool thakkar_sfac(const options &opt, std::ostream &file, const WFN &wave);
  * @param nr The number of wavefunctions.
  * @return True if the calculation is successful, false otherwise.
  */
-itsc_block MTC_thakkar_sfac(
+itsc_block thakkar_sfac(
     options &opt,
     std::ostream &file,
     svec &known_atoms,
     std::vector<WFN> &wave,
     const int &nr);
-
-/**
- * @brief Calculates the scattering factors for HF (Hartree-Fock) method.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_HF(const options &opt, const WFN &wave, std::ostream &file);
-
-
-/**
- * Calculates the scattering factors for the given options, wave, and expansion coefficients.
- *
- * @param opt The options for the calculation.
- * @param wave The WFN object representing the wave.
- * @param file The output stream to write the results to.
- * @return True if the scattering factors were calculated successfully, false otherwise.
- */
-bool calculate_scattering_factors_RI_fit(
-    options& opt,
-    const WFN& wavy,
-    std::ostream& file);
-
-/**
- * @brief Calculates the scattering factors for ML method.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @param exp_coefs The number of expansion coefficients.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_ML(
-    options &opt,
-    SALTEDPredictor &SP,
-    std::ostream &file);
 
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
@@ -102,7 +57,7 @@ bool calculate_scattering_factors_ML(
  * @param kpts The list of k-points.
  * @return The calculated scattering factors.
  */
-itsc_block calculate_scattering_factors_MTC_SALTED(
+itsc_block calculate_scattering_factors_SALTED(
     options& opt,
     SALTEDPredictor& SP,
     std::ostream& file,
@@ -111,11 +66,7 @@ itsc_block calculate_scattering_factors_MTC_SALTED(
     vec2* kpts = NULL);
 
 
-
-
-
-
-itsc_block calculate_scattering_factors_MTC_RI_fit(
+itsc_block calculate_scattering_factors_RI_fit(
     options& opt,
     const std::vector<WFN> &wave,
     std::ostream& file,
@@ -133,7 +84,7 @@ itsc_block calculate_scattering_factors_MTC_RI_fit(
  * @param kpts The list of k-points.
  * @return The calculated scattering factors.
  */
-itsc_block calculate_scattering_factors_MTC(
+itsc_block calculate_scattering_factors(
     options &opt,
     const std::vector<WFN> &wave,
     std::ostream &file,

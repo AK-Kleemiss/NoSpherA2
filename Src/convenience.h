@@ -523,6 +523,7 @@ struct options
     pathvec combined_tsc_calc_cifs;
     std::vector<unsigned int> combined_tsc_calc_mult;
     ivec combined_tsc_calc_charge;
+    ivec combined_tsc_calc_ECP;
     svec arguments;
     pathvec combine_mo;
     svec Cations;
@@ -530,8 +531,6 @@ struct options
     pathvec pol_wfns;
     ivec cmo1;
     ivec cmo2;
-    ivec ECP_nrs;
-    ivec ECP_elcounts;
     std::filesystem::path SALTED_DIR;
     std::string SALTED_DFBASIS;
     std::filesystem::path wfn;
@@ -581,7 +580,6 @@ struct options
     bool electron_diffraction = false;
     bool ECP = false;
     bool RI_FIT = false;
-    bool set_ECPs = false;
     bool needs_Thakkar_fill = false;
     int hirsh_number = 0;
     int NbSteps[3]{0, 0, 0};

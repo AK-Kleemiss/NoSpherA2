@@ -1293,14 +1293,18 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
     using namespace std;
     for (int i = 0; i < 1; i++)
     {
-        WFN wavy("Co2.molden");
+        std::vector<WFN> wavy;
+        wavy.emplace_back("Co2.molden");
         opt.cif = "Co2.cif";
         opt.dmin = 0.5;
         cout << "STARTING CALC" << endl;
-        calculate_scattering_factors_HF(
+        svec empty = {};
+        calculate_scattering_factors(
             opt,
             wavy,
-            log_file);
+            log_file,
+            empty,
+            0);
     }
 }
 

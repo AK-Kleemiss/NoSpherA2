@@ -2218,27 +2218,6 @@ void options::digest_options()
                 ECP_mode = stoi(arguments[i + 1]);
             }
         }
-        else if (temp == "-set_ECPs")
-        {
-            set_ECPs = true;
-            if (debug)
-                cout << "Reading set ECPs" << endl;
-            int j = 0;
-            while (argc >= i + 2 * (j + 1) &&
-                   string(arguments[i + j]).find("-") != 0 &&
-                   string(arguments[i + j + 1]).find("-") != 0)
-            {
-                ECP_nrs.push_back(stoi(arguments[i + j]));
-                ECP_elcounts.push_back(stoi(arguments[i + j + 1]));
-                j += 2;
-                if (debug)
-                {
-                    cout << j << " " << arguments[i + j] << " " << arguments[i + j + 1] << endl;
-                    cout << ECP_nrs.size() << endl;
-                    cout << ECP_elcounts.size() << endl;
-                }
-            }
-        }
         else if (temp == "-ED")
             electron_diffraction = true;
         else if (temp == "-eli")
@@ -2390,6 +2369,15 @@ void options::digest_options()
             {
                 combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
                 n++;
+            }
+        }
+        else if (temp == "-mtc_ECP")
+        {
+            int m = 1;
+            while (i + m < argc && string(arguments[i + m]).find("-") > 0)
+            {
+                combined_tsc_calc_ECP.push_back(stoi(arguments[i + m]));
+                m++;
             }
         }
         else if (temp == "-mult")
