@@ -12,7 +12,7 @@ LIBRASCALINE := ../Lib/librascaline_Mac.a
 LIBRASCALINE += ../Lib/libmetatensor_Mac.a
 
 GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++20 -Og -g -c -fmessage-length=0 -Xpreprocessor -MP
+GCC_OPTS_DEBUG := -std=c++2a -Og -g -c -fmessage-length=0 -Xpreprocessor -MP
 
 %.o_arm64: ../Src/%.cpp
 	@echo 'Building file: $<'

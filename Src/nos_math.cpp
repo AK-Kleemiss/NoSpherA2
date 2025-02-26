@@ -71,7 +71,13 @@ dMatrix2 elementWiseExponentiation(dMatrix2 &matrix, double exponent)
     vec result(matrix.size(), 0.0);
     dMatrix2 result_m = reshape<dMatrix2>(result, Shape2D({matrix.extent(0), matrix.extent(1)}));
 
-	std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val) { return std::pow(val, exponent); });
+#ifdef __APPLE__
+    std::transform(matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
+                   { return std::pow(val, exponent); });
+#else
+    std::transform(std::execution::par, matrix.container().begin(), matrix.container().end(), result_m.data(), [exponent](double val)
+                   { return std::pow(val, exponent); });
+#endif
 
     return result_m;
 }
@@ -97,7 +103,7 @@ void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<uns
 }
 
 template <typename T>
-void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long,  std::dynamic_extent>>& A, const std::vector<T>& B)
+void compare_matrices(const Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent>> &A, const std::vector<T> &B)
 {
     std::cout << "Matrices have size " << A.extent(0) << std::endl;
     for (int i = 0; i < A.extent(0); i++)
@@ -147,29 +153,28 @@ void compare_matrices(const std::vector<std::vector<T>> &A, const std::vector<st
 
 void _test_openblas()
 {
-    ivec dims = { 10, 10 };
+    ivec dims = {10, 10};
     // Init Mat A with some values as a 3x3 matrix
     vec2 A(dims[0], vec(dims[1]));
     vec2 B(dims[0], vec(dims[1]));
-    //Init A and B with random values between -100 and 100
-	for (int i = 0; i < dims[0]; i++)
-	{
-		for (int j = 0; j < dims[1]; j++)
-		{
-			A[i][j] = rand() % 200 - 100;
-			B[i][j] = rand() % 200 - 100;
-		}
-	}
+    // Init A and B with random values between -100 and 100
+    for (int i = 0; i < dims[0]; i++)
+    {
+        for (int j = 0; j < dims[1]; j++)
+        {
+            A[i][j] = rand() % 200 - 100;
+            B[i][j] = rand() % 200 - 100;
+        }
+    }
 
-	vec fA = flatten<double>(A);
-	vec fB = flatten<double>(B);
+    vec fA = flatten<double>(A);
+    vec fB = flatten<double>(B);
 
     dMatrix2 matA(dims[0], dims[1]);
-	std::copy(fA.data(), fA.data() + fA.size(), matA.data());
+    std::copy(fA.data(), fA.data() + fA.size(), matA.data());
     dMatrix2 matB(dims[0], dims[1]);
-	std::copy(fB.data(), fB.data() + fB.size(), matB.data());
-     //Init Mat A and Mat B as 3x3 matrices
-
+    std::copy(fB.data(), fB.data() + fB.size(), matB.data());
+    // Init Mat A and Mat B as 3x3 matrices
 
     std::cout << "Testing matrices directly" << std::endl;
     compare_matrices(matA, A);
@@ -192,15 +197,15 @@ void _test_openblas()
     compare_matrices(dot(matA, matB, true, true), self_dot(transpose(A), transpose(B)));
 
     // Init Complex matrices
-	cvec2 C(dims[0], cvec(dims[1])), D(dims[0], cvec(dims[1]));
-	for (int i = 0; i < dims[0]; i++)
-	{
-		for (int j = 0; j < dims[1]; j++)
-		{
-			C[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
-			D[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
-		}
-	}
+    cvec2 C(dims[0], cvec(dims[1])), D(dims[0], cvec(dims[1]));
+    for (int i = 0; i < dims[0]; i++)
+    {
+        for (int j = 0; j < dims[1]; j++)
+        {
+            C[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
+            D[i][j] = cdouble(rand() % 200 - 100, rand() % 200 - 100);
+        }
+    }
 
     cvec fC = flatten<cdouble>(C);
     cvec fD = flatten<cdouble>(D);
@@ -209,8 +214,7 @@ void _test_openblas()
     cMatrix2 matD(dims[0], dims[1]);
     std::copy(fD.data(), fD.data() + fD.size(), matD.data());
 
-
-	std::cout << "Testing C-matrices directly" << std::endl;
+    std::cout << "Testing C-matrices directly" << std::endl;
     compare_matrices(matC, C);
     compare_matrices(matD, D);
 
@@ -230,36 +234,38 @@ void _test_openblas()
     ////Fourth compare both transposed
     compare_matrices(dot(matC, matD, true, true), self_dot(transpose(C), transpose(D)));
 
-	// Test 2D x 1D matrix multiplication
+    // Test 2D x 1D matrix multiplication
     dims[0] = 12;
-	vec E(dims[1]);
-	vec2 F(dims[0], vec(dims[1]));
-    for (int i = 0; i < dims[1]; i++) {
-		E[i] = rand() % 200 - 100;
-		for (int j = 0; j < dims[0]; j++) {
-			F[j][i] = rand() % 200 - 100;
-		}
+    vec E(dims[1]);
+    vec2 F(dims[0], vec(dims[1]));
+    for (int i = 0; i < dims[1]; i++)
+    {
+        E[i] = rand() % 200 - 100;
+        for (int j = 0; j < dims[0]; j++)
+        {
+            F[j][i] = rand() % 200 - 100;
+        }
     }
-	vec fE = flatten<double>(F);
-	dMatrix1 matE(dims[1]);
-	dMatrix2 matF(dims[0], dims[1]);
-	std::copy(E.data(), E.data() + E.size(), matE.data());
-	std::copy(fE.data(), fE.data() + fE.size(), matF.data());
+    vec fE = flatten<double>(F);
+    dMatrix1 matE(dims[1]);
+    dMatrix2 matF(dims[0], dims[1]);
+    std::copy(E.data(), E.data() + E.size(), matE.data());
+    std::copy(fE.data(), fE.data() + fE.size(), matF.data());
 
-    //For matrix just reuse matA
-	std::cout << "Testing 2D x 1D matrix multiplication" << std::endl;
-	compare_matrices(dot(matF, matE, false), self_dot(F, E));
+    // For matrix just reuse matA
+    std::cout << "Testing 2D x 1D matrix multiplication" << std::endl;
+    compare_matrices(dot(matF, matE, false), self_dot(F, E));
 
     std::cout << "All BLAS tests passed!" << std::endl;
 }
 
-
 NNLSResult nnls(
-    dMatrix2& A, dMatrix1& B,
+    dMatrix2 &A, dMatrix1 &B,
     int maxiter,
-    double tol) {
-	int m = A.extent(0);
-	int n = A.extent(1);
+    double tol)
+{
+    int m = A.extent(0);
+    int n = A.extent(1);
     if (has_BLAS)
     {
         // Define output Variables
@@ -271,7 +277,7 @@ NNLSResult nnls(
         if (A.size() != m * n)
         {
             std::cerr << "Error: Matrix A has incorrect dimensions in NNLS.\n";
-            return NNLSResult{ X, RNORM, 1 };
+            return NNLSResult{X, RNORM, 1};
         }
 
         // Define workspace variables
@@ -283,13 +289,13 @@ NNLSResult nnls(
 
         // Compute A^T * A (normal equations matrix)
         cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            n, n, m, 1.0, A.data(), n, A.data(), n,
-            0.0, AtA.data(), n);
+                    n, n, m, 1.0, A.data(), n, A.data(), n,
+                    0.0, AtA.data(), n);
 
         // Compute A^T * B (normal equations RHS)
         cblas_dgemv(CblasRowMajor, CblasTrans, m, n,
-            1.0, A.data(), n, B.data(), 1,
-            0.0, Atb.data(), 1);
+                    1.0, A.data(), n, B.data(), 1,
+                    0.0, Atb.data(), 1);
 
         // Set max iterations
         if (maxiter == -1)
@@ -345,7 +351,7 @@ NNLSResult nnls(
                     int row = activeIndices[j];
                     AtA_active[i * activeCount + j] = AtA[col * n + row];
                 }
-                Atb_active[i] = Atb[col]; 
+                Atb_active[i] = Atb[col];
             }
 
             // Solve AtA_active * S[P] = Atb_active
@@ -411,22 +417,22 @@ NNLSResult nnls(
             // Compute residual W = Atb - AtA @ X
             cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
             cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
-                -1.0, AtA.data(), n, X.data(), 1,
-                1.0, W.data(), 1);
+                        -1.0, AtA.data(), n, X.data(), 1,
+                        1.0, W.data(), 1);
         }
 
         // Compute residual norm ||A * X - B||
         std::vector<double> Ax(m, 0.0);
         cblas_dgemv(CblasRowMajor, CblasNoTrans, m, n,
-            1.0, A.data(), n, X.data(), 1,
-            0.0, Ax.data(), 1);
+                    1.0, A.data(), n, X.data(), 1,
+                    0.0, Ax.data(), 1);
         double sum_sq = 0.0;
         for (int i = 0; i < m; i++)
         {
             sum_sq += (Ax[i] - B(i)) * (Ax[i] - B(i));
         }
         sum_sq = std::sqrt(sum_sq);
-        NNLSResult resy({ X, sum_sq, MODE });
+        NNLSResult resy({X, sum_sq, MODE});
         return resy;
     }
     else
@@ -458,7 +464,6 @@ void math_unload_BLAS()
     has_BLAS = false;
 }
 
-
-//Remeaining functions which were separated for readibility
+// Remeaining functions which were separated for readibility
 #include "mat_nos_math.cpp"
 #include "vec_nos_math.cpp"
