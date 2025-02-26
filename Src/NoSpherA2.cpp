@@ -460,14 +460,6 @@ int main(int argc, char **argv)
                         empty,
                         wavy,
                         0);
-                log_file << "Writing tsc file... " << flush;
-                if (opt.binary_tsc)
-                    res.write_tscb_file();
-                if (opt.old_tsc)
-                {
-                    res.write_tsc_file(opt.cif);
-                }
-                log_file << " ... done!" << endl;
             }
             else
             {
