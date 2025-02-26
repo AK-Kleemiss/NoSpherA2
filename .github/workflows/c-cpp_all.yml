@@ -14,6 +14,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: make_OpenMP
       run: >
           git clone --depth 1 https://github.com/llvm/llvm-project.git && cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
@@ -41,6 +43,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v2
     - name: make_OpenBLAS
@@ -60,6 +64,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        submodules: recursive
     - name: install_compiler
       run: sudo apt update && sudo apt install build-essential
     - name: make_Linux
