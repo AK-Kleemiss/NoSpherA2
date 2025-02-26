@@ -65,9 +65,6 @@
     <ClCompile Include="..\Src\fchk.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\Src\hdf5.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\Src\isosurface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

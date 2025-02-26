@@ -76,6 +76,7 @@ public:
   std::filesystem::path get_path() const { return path; };
   void set_path(const std::filesystem::path& given) { path = given; };
   std::vector<atom> get_parent_wfn_atoms() const;
+  bool read_values(std::ifstream& file);
 private:
   double dv;
   int na;

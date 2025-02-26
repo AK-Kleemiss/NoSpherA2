@@ -31,13 +31,6 @@ int main(int argc, char **argv)
     }
     ofstream log_file("NoSpherA2.log", ios::out);
     auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
-    // If we get rid of HDF5 this can go again. PLEASE GET RID OF ME!
-#ifdef __APPLE__
-    if (!(setenv("HDF5_DISABLE_VERSION_CHECK", "2", 1) == 0))
-    {
-        std::cerr << "Failed to set environment variable." << std::endl;
-    }
-#endif
     options opt(argc, argv, log_file);
     opt.digest_options();
     vector<WFN> wavy;

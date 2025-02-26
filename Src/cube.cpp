@@ -110,6 +110,92 @@ cube::cube(const cube &given)
     }
 };
 
+bool cube::read_values(std::ifstream& file) {
+    using namespace std;
+    string line;
+    file.seekg(0);
+    for (int i = 0; i < na + 6; i++)
+        getline(file, line);
+    values.resize(size[0]);
+    for (int i = 0; i < size[0]; i++)
+    {
+        values[i].resize(size[1]);
+        for (int j = 0; j < size[1]; j++)
+            values[i][j].resize(size[2]);
+    }
+    int reads1 = 0;
+    int rest2 = 0;
+    int run_x = 0;
+    int run_y = 0;
+    int run_z = 0;
+    double tmp[6] = { 0, 0, 0, 0, 0, 0 };
+    while (run_x < size[0] && run_y < size[1] && !file.eof())
+    {
+        run_z = rest2;
+        while (run_z < size[2] && !file.eof())
+        {
+            reads1 = 0;
+            getline(file, line);
+            std::istringstream iss(line);
+            for (int i = 0; i < 6; ++i) {
+                if (!(iss >> tmp[i]))
+                    tmp[i] = std::nan(""); // Default value if there are fewer than 6 values
+                else
+                    reads1 = i + 1;
+            }
+            run_z += reads1;
+            rest2 = run_z - size[2];
+            if (rest2 < 6 && rest2 > 0)
+            {
+                for (int j = 0; j < 6 - rest2; j++) {
+                    err_checkf(std::isnan(tmp[j]), "This should not happen! Read a value outside of range!", std::cout);
+                    values[run_x][run_y][size[2] - (6 - rest2) + j] = tmp[j];
+                }
+                if (run_y + 1 < size[1])
+                    for (int j = 0; j < rest2; j++) {
+                        err_checkf(std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
+                        values[run_x][run_y + 1][j] = tmp[j + (6 - rest2)];
+                    }
+                else if (run_x + 1 < size[0])
+                    for (int j = 0; j < rest2; j++) {
+                        err_checkf(std::isnan(tmp[j + (6 - rest2)]), "This should not happen! Read a value outside of range!", std::cout);
+                        values[run_x + 1][0][j] = tmp[j + (6 - rest2)];
+                    }
+                else
+                {
+                    cout << "This should not happen! Read a value outside of range!"
+                        << " Run_x: " << run_x
+                        << " Run_y: " << run_y
+                        << " rest2: " << rest2
+                        << " run_z: " << run_z << endl;
+                    return (false);
+                }
+            }
+            else
+                for (int i = 0; i < reads1; i++)
+                    values[run_x][run_y][run_z - reads1 + i] = tmp[i];
+        }
+        run_y++;
+        if (run_y == size[1])
+        {
+            run_x++;
+            if (run_x != size[0])
+                run_y = 0;
+        }
+    }
+    if (run_x != size[0] || run_y != size[1] || run_z != size[2])
+    {
+        cout << "This file ended before i read all expected values!" << endl;
+        if (file.eof())
+            cout << "ENCOUNTERED EOF!" << endl;
+        cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
+        return (false);
+    }
+    file.close();
+    loaded = true;
+    return true;
+}
+
 bool cube::read_file(bool full, bool header, bool expert)
 {
     using namespace std;
@@ -146,80 +232,7 @@ bool cube::read_file(bool full, bool header, bool expert)
     }
     if (full)
     {
-        file.seekg(0);
-        for (int i = 0; i < na + 6; i++)
-            getline(file, line);
-        values.resize(size[0]);
-        for (int i = 0; i < size[0]; i++)
-        {
-            values[i].resize(size[1]);
-            for (int j = 0; j < size[1]; j++)
-                values[i][j].resize(size[2]);
-        }
-        int reads2 = 0;
-        int reads1 = 0;
-        int rest2 = 0;
-        int run_x = 0;
-        int run_y = 0;
-        double tmp[6] = {0, 0, 0, 0, 0, 0};
-        while (run_x < size[0] && run_y < size[1] && !file.eof())
-        {
-            reads2 = rest2;
-            while (reads2 < size[2] && !file.eof())
-            {
-                reads1 = 0;
-                getline(file, line);
-                std::istringstream iss(line);
-                for (int i = 0; i < 6; ++i) {
-                    if (!(iss >> tmp[i])) {
-                        tmp[i] = 0.0; // Default value if there are fewer than 6 values
-                        reads1 = i;
-                    }
-                }
-                reads2 += reads1;
-                rest2 = reads2 - size[2];
-                if (rest2 < 6 && rest2 > 0)
-                {
-                    for (int j = 0; j < 6 - rest2; j++)
-                        values[run_x][run_y][size[2] - (6 - rest2) + j] = tmp[j];
-                    if (run_y + 1 < size[1])
-                        for (int j = 0; j < rest2; j++)
-                            values[run_x][run_y + 1][j] = tmp[j + (6 - rest2)];
-                    else if (run_x + 1 < size[0])
-                        for (int j = 0; j < rest2; j++)
-                            values[run_x + 1][0][j] = tmp[j + (6 - rest2)];
-                    else
-                    {
-                        cout << "This should not happen! Read a value outside of range!"
-                             << " Run_x: " << run_x
-                             << " Run_y: " << run_y
-                             << " reads1: " << reads1
-                             << " reads2: " << reads2 << endl;
-                        return (false);
-                    }
-                }
-                else
-                    for (int i = 0; i < reads1; i++)
-                        values[run_x][run_y][reads2 - reads1 + i] = tmp[i];
-            }
-            run_y++;
-            if (run_y == size[1])
-            {
-                run_x++;
-                if (run_x != size[0])
-                    run_y = 0;
-            }
-        }
-        if (run_x != size[0] || run_y != size[1])
-        {
-            cout << "This file ended before i read all expected values!" << endl;
-            if (file.eof())
-                cout << "ENCOUNTERED EOF!" << endl;
-            cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-            return (false);
-        }
-        file.close();
-        loaded = true;
+        return read_values(file);
     }
     return (true);
 }
@@ -812,90 +825,17 @@ cube cube::operator+(cube &right) const
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (right.get_loaded())
-#pragma omp parallel for
-        for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
-    else
-    {
-        using namespace std;
-        int reads2 = 0;
-        int reads1 = 0;
-        int rest2 = 0;
-        int run_x = 0;
-        int run_y = 0;
-        string line2;
-        ifstream file2(right.path, ios::in);
-        double tmp[6]{0, 0, 0, 0, 0, 0};
-        for (int i = 0; i < 6 + na; i++)
-            if (!right.get_loaded())
-                getline(file2, line2);
-        while (run_x < size[0] && run_y < size[1] && !file2.eof())
-        {
-            reads2 = rest2;
-            while (reads2 < size[2] && !file2.eof())
-            {
-                if (!right.get_loaded())
-                {
-                    reads1 = 0;
-                    getline(file2, line2);
-                    std::istringstream iss(line2);
-                    for (int i = 0; i < 6; ++i) {
-                        if (!(iss >> tmp[i])) {
-                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
-							reads1 = i;
-                        }
-                    }
-                    reads2 += reads1;
-                    rest2 = reads2 - size[2];
-                    if (rest2 < 6 && rest2 > 0)
-                    {
-                        for (int j = 0; j < 6 - rest2; j++)
-                            res_cube.set_value(run_x, run_y, size[2] - (6 - rest2) + j, res_cube.get_value(run_x, run_y, size[2] - (6 - rest2) + j) + tmp[j]);
-                        if (run_y + 1 < size[1])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x, run_y + 1, j, res_cube.get_value(run_x, run_y + 1, j) + tmp[(6 - rest2) + j]);
-                        else if (run_x + 1 < size[0])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x + 1, 0, j, res_cube.get_value(run_x + 1, 0, j) + tmp[(6 - rest2) + j]);
-                        else
-                        {
-                            cout << "This should not happen! Read a value outside of range!"
-                                 << " Run_x: " << run_x
-                                 << " Run_y: " << run_y
-                                 << " reads1: " << reads1
-                                 << " reads2: " << reads2 << endl;
-                            return (cube());
-                        }
-                    }
-                    else
-                        for (int i = 0; i < reads1; i++)
-                            res_cube.set_value(run_x, run_y, reads2 - reads1 + i, res_cube.get_value(run_x, run_y, reads2 - reads1 + i) + tmp[i]);
-                }
-                else
-                    for (int z = 0; z < size[2]; z++)
-                        res_cube.set_value(run_x, run_y, z, res_cube.get_value(run_x, run_y, z) + right.get_value(run_x, run_y, z));
-            }
-            run_y++;
-            if (run_y == size[1])
-            {
-                run_x++;
-                if (run_x != size[0])
-                    run_y = 0;
-            }
-        }
-        if (run_x != size[0] || run_y != size[1])
-        {
-            cout << "This file ended before i read all expected values!" << endl;
-            if (file2.eof())
-                cout << "ENCOUNTERED EOF!" << endl;
-            cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-            return (cube());
-        }
-        file2.close();
+    if (!right.get_loaded()) {
+        std::ifstream file2(right.path, std::ios::in);
+        right.read_values(file2);
     }
+
+#pragma omp parallel for
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++)
+                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
+
     return (res_cube);
 };
 
@@ -906,91 +846,16 @@ cube cube::operator-(cube &right) const
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (right.get_loaded())
+    if (!right.get_loaded()) {
+        std::ifstream file2(right.path, std::ios::in);
+        right.read_values(file2);
+    }
 #pragma omp parallel for
         for (int x = 0; x < size[0]; x++)
             for (int y = 0; y < size[1]; y++)
                 for (int z = 0; z < size[2]; z++)
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
-    else
-    {
-        using namespace std;
-        int reads2 = 0;
-        int reads1 = 0;
-        int rest2 = 0;
-        int run_x = 0;
-        int run_y = 0;
-        string line2;
-        ifstream file2(right.path, ios::in);
-        double tmp[6]{0, 0, 0, 0, 0, 0};
-        for (int i = 0; i < 6 + na; i++)
-            if (!right.get_loaded())
-                getline(file2, line2);
-        while (run_x < size[0] && run_y < size[1] && !file2.eof())
-        {
-            reads2 = rest2;
-            while (reads2 < size[2] && !file2.eof())
-            {
-                if (!right.get_loaded())
-                {
-                    reads1 = 0;
-                    getline(file2, line2);
-                    std::istringstream iss(line2);
-                    for (int i = 0; i < 6; ++i) {
-                        if (!(iss >> tmp[i])) {
-                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
-                            reads1 = i;
-                        }
-                    }
-                    reads2 += reads1;
-                    rest2 = reads2 - size[2];
-                    if (rest2 < 6 && rest2 > 0)
-                    {
-                        for (int j = 0; j < 6 - rest2; j++)
-                            res_cube.set_value(run_x, run_y, size[2] - (6 - rest2) + j, res_cube.get_value(run_x, run_y, size[2] - (6 - rest2) + j) - tmp[j]);
-                        if (run_y + 1 < size[1])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x, run_y + 1, j, res_cube.get_value(run_x, run_y + 1, j) - tmp[(6 - rest2) + j]);
-                        else if (run_x + 1 < size[0])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x + 1, 0, j, res_cube.get_value(run_x + 1, 0, j) - tmp[(6 - rest2) + j]);
-                        else
-                        {
-                            cout << "This should not happen! Read a value outside of range!"
-                                 << " Run_x: " << run_x
-                                 << " Run_y: " << run_y
-                                 << " reads1: " << reads1
-                                 << " reads2: " << reads2 << endl;
-                            return cube();
-                        }
-                    }
-                    else
-                        for (int i = 0; i < reads1; i++)
-                            res_cube.set_value(run_x, run_y, reads2 - reads1 + i, res_cube.get_value(run_x, run_y, reads2 - reads1 + i) - tmp[i]);
-                }
-                else
-#pragma omp parallel for
-                    for (int z = 0; z < size[2]; z++)
-                        res_cube.set_value(run_x, run_y, z, res_cube.get_value(run_x, run_y, z) - right.get_value(run_x, run_y, z));
-            }
-            run_y++;
-            if (run_y == size[1])
-            {
-                run_x++;
-                if (run_x != size[0])
-                    run_y = 0;
-            }
-        }
-        if (run_x != size[0] || run_y != size[1])
-        {
-            cout << "This file ended before i read all expected values!" << endl;
-            if (file2.eof())
-                cout << "ENCOUNTERED EOF!" << endl;
-            cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-            return (cube());
-        }
-        file2.close();
-    }
+ 
     return (res_cube);
 };
 
@@ -1001,90 +866,16 @@ cube cube::operator*(cube &right) const
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (right.get_loaded())
-        for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++)
-                    res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
-    else
-    {
-        using namespace std;
-        int reads2 = 0;
-        int reads1 = 0;
-        int rest2 = 0;
-        int run_x = 0;
-        int run_y = 0;
-        string line2;
-        ifstream file2(right.path, ios::in);
-        double tmp[6]{0, 0, 0, 0, 0, 0};
-        for (int i = 0; i < 6 + na; i++)
-            if (!right.get_loaded())
-                getline(file2, line2);
-        while (run_x < size[0] && run_y < size[1] && !file2.eof())
-        {
-            reads2 = rest2;
-            while (reads2 < size[2] && !file2.eof())
-            {
-                if (!right.get_loaded())
-                {
-                    reads1 = 0;
-                    getline(file2, line2);
-                    std::istringstream iss(line2);
-                    for (int i = 0; i < 6; ++i) {
-                        if (!(iss >> tmp[i])) {
-                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
-                            reads1 = i;
-                        }
-                    }
-                    reads2 += reads1;
-                    rest2 = reads2 - size[2];
-                    if (rest2 < 6 && rest2 > 0)
-                    {
-                        for (int j = 0; j < 6 - rest2; j++)
-                            res_cube.set_value(run_x, run_y, size[2] - (6 - rest2) + j, res_cube.get_value(run_x, run_y, size[2] - (6 - rest2) + j) * tmp[j]);
-                        if (run_y + 1 < size[1])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x, run_y + 1, j, res_cube.get_value(run_x, run_y + 1, j) * tmp[(6 - rest2) + j]);
-                        else if (run_x + 1 < size[0])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x + 1, 0, j, res_cube.get_value(run_x + 1, 0, j) * tmp[(6 - rest2) + j]);
-                        else
-                        {
-                            cout << "This should not happen! Read a value outside of range!"
-                                 << " Run_x: " << run_x
-                                 << " Run_y: " << run_y
-                                 << " reads1: " << reads1
-                                 << " reads2: " << reads2 << endl;
-                            return (cube());
-                        }
-                    }
-                    else
-                        for (int i = 0; i < reads1; i++)
-                            res_cube.set_value(run_x, run_y, reads2 - reads1 + i, res_cube.get_value(run_x, run_y, reads2 - reads1 + i) * tmp[i]);
-                }
-                else
-#pragma omp parallel for
-                    for (int z = 0; z < size[2]; z++)
-                        res_cube.set_value(run_x, run_y, z, res_cube.get_value(run_x, run_y, z) * right.get_value(run_x, run_y, z));
-            }
-            run_y++;
-            if (run_y == size[1])
-            {
-                run_x++;
-                if (run_x != size[0])
-                    run_y = 0;
-            }
-        }
-        if (run_x != size[0] || run_y != size[1])
-        {
-            cout << "This file ended before i read all expected values!" << endl;
-            if (file2.eof())
-                cout << "ENCOUNTERED EOF!" << endl;
-            cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-            return (cube());
-        }
-        file2.close();
+    if (!right.get_loaded()) {
+        std::ifstream file2(right.path, std::ios::in);
+        right.read_values(file2);
     }
+#pragma omp parallel for
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++)
+                res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
+    
     return (res_cube);
 };
 
@@ -1095,97 +886,21 @@ cube cube::operator/(cube &right) const
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (right.get_loaded())
-        for (int x = 0; x < size[0]; x++)
-            for (int y = 0; y < size[1]; y++)
-                for (int z = 0; z < size[2]; z++) {
-                    if (right.get_value(x, y, z) == 0)
-                        res_cube.set_value(x, y, z, 1E100);
-                    if (values[x][y][z] != 0)
-                        res_cube.set_value(x, y, z, values[x][y][z] / right.get_value(x, y, z));
-                    else
-                        res_cube.set_value(x, y, z, 0);
-                }
-                    
-    else
-    {
-        using namespace std;
-        int reads2 = 0;
-        int reads1 = 0;
-        int rest2 = 0;
-        int run_x = 0;
-        int run_y = 0;
-        string line2;
-        ifstream file2(right.path, ios::in);
-        double tmp[6]{0, 0, 0, 0, 0, 0};
-        for (int i = 0; i < 6 + na; i++)
-            if (!right.get_loaded())
-                getline(file2, line2);
-        while (run_x < size[0] && run_y < size[1] && !file2.eof())
-        {
-            reads2 = rest2;
-            while (reads2 < size[2] && !file2.eof())
-            {
-                if (!right.get_loaded())
-                {
-                    reads1 = 0;
-                    getline(file2, line2);
-                    std::istringstream iss(line2);
-                    for (int i = 0; i < 6; ++i) {
-                        if (!(iss >> tmp[i])) {
-                            tmp[i] = 0.0; // Default value if there are fewer than 6 values
-                            reads1 = i;
-                        }
-                    }
-                    reads2 += reads1;
-                    rest2 = reads2 - size[2];
-                    if (rest2 < 6 && rest2 > 0)
-                    {
-                        for (int j = 0; j < 6 - rest2; j++)
-                            res_cube.set_value(run_x, run_y, size[2] - (6 - rest2) + j, res_cube.get_value(run_x, run_y, size[2] - (6 - rest2) + j) / tmp[j]);
-                        if (run_y + 1 < size[1])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x, run_y + 1, j, res_cube.get_value(run_x, run_y + 1, j) / tmp[(6 - rest2) + j]);
-                        else if (run_x + 1 < size[0])
-                            for (int j = 0; j < rest2; j++)
-                                res_cube.set_value(run_x + 1, 0, j, res_cube.get_value(run_x + 1, 0, j) / tmp[(6 - rest2) + j]);
-                        else
-                        {
-                            cout << "This should not happen! Read a value outside of range!"
-                                 << " Run_x: " << run_x
-                                 << " Run_y: " << run_y
-                                 << " reads1: " << reads1
-                                 << " reads2: " << reads2 << endl;
-                            return cube();
-                        }
-                    }
-                    else
-                        for (int i = 0; i < reads1; i++)
-                            res_cube.set_value(run_x, run_y, reads2 - reads1 + i, res_cube.get_value(run_x, run_y, reads2 - reads1 + i) / tmp[i]);
-                }
-                else
-#pragma omp parallel for
-                    for (int z = 0; z < size[2]; z++)
-                        res_cube.set_value(run_x, run_y, z, res_cube.get_value(run_x, run_y, z) / right.get_value(run_x, run_y, z));
-            }
-            run_y++;
-            if (run_y == size[1])
-            {
-                run_x++;
-                if (run_x != size[0])
-                    run_y = 0;
-            }
-        }
-        if (run_x != size[0] || run_y != size[1])
-        {
-            cout << "This file ended before i read all expected values!" << endl;
-            if (file2.eof())
-                cout << "ENCOUNTERED EOF!" << endl;
-            cout << "x,y,reads1,reads2: " << run_x << " " << run_y << " " << reads1 << "," << reads2 << endl;
-            return (cube());
-        }
-        file2.close();
+    if (!right.get_loaded()) {
+        std::ifstream file2(right.path, std::ios::in);
+        right.read_values(file2);
     }
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++) {
+                if (right.get_value(x, y, z) == 0)
+                    res_cube.set_value(x, y, z, 1E100);
+                if (values[x][y][z] != 0)
+                    res_cube.set_value(x, y, z, values[x][y][z] / right.get_value(x, y, z));
+                else
+                    res_cube.set_value(x, y, z, 0);
+            }
+ 
     return (res_cube);
 };
 
