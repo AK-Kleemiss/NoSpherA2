@@ -368,6 +368,8 @@ int main(int argc, char **argv)
         if (opt.debug)
             log_file << "Entering scattering Factor Calculation!" << endl;
         svec empty({});
+        //use atoms of group 0
+        opt.groups.push_back({0});
         itsc_block res = thakkar_sfac(opt, log_file, empty, wavy, 0);
         res.write_tscb_file();
         log_file.flush();
@@ -419,6 +421,8 @@ int main(int argc, char **argv)
         // This one will calcualte a single tsc/tscb file form a single wfn
         if (opt.cif != "" || opt.hkl != "")
         {
+            //in any case we work with group 0
+            opt.groups.push_back({ 0 });
             if (!opt.SALTED)
             {
                 // Calculate tsc file from given files
