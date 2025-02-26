@@ -18,10 +18,10 @@ jobs:
         submodules: recursive
     - name: make_OpenMP
       run: >
-          git clone --depth 1 https://github.com/llvm/llvm-project.git && cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
+          cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
     - name: make_OpenBLAS
       run: >
-          git clone --depth 1 https://github.com/OpenMathLib/OpenBLAS && cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
     - name: make_MacOS
       run: >
           cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
