@@ -381,8 +381,8 @@ namespace constants {
             spherical = constants::norm_cartesian_to_spherical(x / leng, y / leng, z / leng);
             switch (m) {
                 case 0:
-                    // 1/256 sqrt(19/PI) (12155 cos^9(theta) - 25740 cos^7(theta) + 18018 cos^5(theta) - 4620 cos^3(theta) + 315 cos(theta))
-                    SH = (1.0 / 256.0) * sqrt(19.0 / PI) * (12155 * pow(cos(spherical.first), 9) - 25740 * pow(cos(spherical.first), 7) + 18018 * pow(cos(spherical.first), 5) - 4620 * pow(cos(spherical.first), 3) + 315 * cos(spherical.first));
+                    // 1/256 sqrt(19/PI) cos(theta) (12155 cos^8(theta) - 25740 cos^6(theta) + 18018 cos^4(theta) - 4620 cos^2(theta) + 315)
+                    SH = (1.0 / 256.0) * sqrt(19.0 / PI) * cos(spherical.first) * (12155 * pow(cos(spherical.first), 8) - 25740 * pow(cos(spherical.first), 6) + 18018 * pow(cos(spherical.first), 4) - 4620 * pow(cos(spherical.first), 2) + 315 );
                     break;
                 case 1:
                     // 3/256 sqrt(95/PI) sin(theta) (2431 cos^8(theta) - 4004 cos^6(theta) + 2002 cos^4(theta) - 308 cos^2(theta) + 7) cos(phi) UIUIUIUI
@@ -695,6 +695,7 @@ namespace constants {
             default:
                 err_checkf(false, "This is impossible!", std::cout);
             }
+            break;
         case 8:
 			switch (m)
 			{
@@ -735,12 +736,14 @@ namespace constants {
             default:
                 err_checkf(false, "This is impossible!", std::cout);
 			}
+            break;
         case 9:
+			std::cout << "associated legendre polynomial for l=9 not implemented yet!" << std::endl;
 			switch (m)
 			{
 			case 0:
                 // 1/128 (12155 x^9 - 25740 x^7 + 18018 x^5 - 4620 x^3 + 315 x)
-				return (1.0 / 128.0) * (12155 * pow(x, 9) - 25740 * pow(x, 7) + 18018 * pow(x, 5) - 4620 * pow(x, 3) + 315 * x);
+				return (1.0 / 128.0) * x * (12155 * pow(x, 8) - 25740 * pow(x, 6) + 18018 * pow(x, 4) - 4620 * pow(x, 2) + 315 );
 			case 1:
                 // -45/128 sqrt(1 - x^2) (2431 x^8 - 4004 x^6 + 2002 x^4 - 308 x^2 + 7)
 				return (45.0 / 128.0) * sqrt(1 - x * x) * (2431 * pow(x, 8) - 4004 * pow(x, 6) + 2002 * pow(x, 4) - 308 * pow(x, 2) + 7);
@@ -798,6 +801,7 @@ namespace constants {
 			default:
 				err_checkf(false, "This is impossible!", std::cout);
 			}
+            break;
         default:
             err_not_impl_f("associated_legendre_polynomial l > 9 ", std::cout);
         }

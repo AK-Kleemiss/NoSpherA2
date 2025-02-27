@@ -34,6 +34,7 @@ Global
 		D_xTB_molden|x64 = D_xTB_molden|x64
 		debug_Daniel|x64 = debug_Daniel|x64
 		Debug_fchk_generation|x64 = Debug_fchk_generation|x64
+		Debug_Fourier_Transform|x64 = Debug_Fourier_Transform|x64
 		Debug_Fractal|x64 = Debug_Fractal|x64
 		Debug_gbw2wfn|x64 = Debug_gbw2wfn|x64
 		Debug_grown|x64 = Debug_grown|x64
@@ -109,6 +110,8 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.debug_Daniel|x64.Build.0 = debug_Daniel|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.ActiveCfg = Debug_fchk_generation|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_fchk_generation|x64.Build.0 = Debug_fchk_generation|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fourier_Transform|x64.ActiveCfg = Debug_Fourier_Transform|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fourier_Transform|x64.Build.0 = Debug_Fourier_Transform|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.ActiveCfg = Debug_Fractal|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_Fractal|x64.Build.0 = Debug_Fractal|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_gbw2wfn|x64.ActiveCfg = Debug_gbw2wfn|x64
@@ -181,6 +184,7 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.debug_Daniel|x64.ActiveCfg = debug_Daniel|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_fchk_generation|x64.ActiveCfg = Debug|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_Fourier_Transform|x64.ActiveCfg = Debug_Fourier_Transform|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_Fractal|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_gbw2wfn|x64.ActiveCfg = Debug|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_grown|x64.ActiveCfg = Debug|x64

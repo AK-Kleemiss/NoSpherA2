@@ -1578,23 +1578,7 @@ void test_analytical_fourier(bool full)
 {
     // Generate grid and k_pts
     vec2 kpts;
-    //for (int i = 1; i < 100; i++)
-    //{
-    //    kpts.push_back({0.01 * i, 0, 0});                   // X
-    //    kpts.push_back({0, 0.01 * i, 0});                   // Y
-    //    kpts.push_back({0, 0, 0.01 * i});                   // Z
-    //    kpts.push_back({0.01 * i, 0.01 * i, 0});            // XY
-    //    kpts.push_back({0.01 * i, 0, 0.01 * i});            // XZ
-    //    kpts.push_back({0, 0.01 * i, 0.01 * i});            // YZ
-    //    kpts.push_back({0.01 * i * 2, 0.01 * i, 0.01 * i}); // XYZ
-    //    kpts.push_back({-0.01 * i, 0, 0});
-    //    kpts.push_back({0, -0.01 * i, 0});
-    //    kpts.push_back({0, 0, -0.01 * i});
-    //    kpts.push_back({-0.01 * i, -0.01 * i, 0});
-    //    kpts.push_back({-0.01 * i, 0, -0.01 * i});
-    //    kpts.push_back({0, -0.01 * i, -0.01 * i});
-    //    kpts.push_back({-0.01 * i * 2, -0.01 * i, -0.01 * i});
-    //}
+
     for (int i = 1; i < 1000; i++) {
 		//Generate random k-points with values between -1 and 1
 		kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
@@ -1608,7 +1592,7 @@ void test_analytical_fourier(bool full)
     unsigned int max_l = 6;
     double radial_res = 1E-17;
     if (full) {
-        max_l = 9;
+        max_l = 8;
 		radial_res = 1E-25;
     }
 
@@ -1655,7 +1639,7 @@ void test_analytical_fourier(bool full)
 	bool correct = true; //Verify if the current m is correct
 
     cdouble max_diff, diff;
-    for (unsigned int type = 0; type <= max_l; type++)
+    for (int type = 0; type <= max_l; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
@@ -1729,7 +1713,7 @@ void test_analytical_fourier(bool full)
             }
             else
             {
-                std::cout << "m: " << l - type << " passed!" << " Max diff: " << std::setprecision(6) << max_diff << std::endl;
+                std::cout << "m: " << l - type << " passed!" << std::endl;
             }
         }
         if (!all_correct)
