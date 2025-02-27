@@ -1,0 +1,43 @@
+No basis set specified. Using fallback 'combo_basis_fit'!
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                "epoxide.gbw" done!
+Number of atoms in Wavefunction file: 7 Number of MOs: 35
+Number of protons: 24
+Number of electrons: 24
+Reading:                                "epoxide.cif" done!
+Generating hkl indices up to d=:              0.40... done!
+Nr of reflections generated:                 26048
+Number of symmetry operations:                   2
+Nr of reflections to be used:                16275
+
+Generating densities... 
+Using basis set: combo_basis_fit
+Preallocating: 4.87862 MB
+Memory needed for rho: 4.87862 MB
+                                        ... done!
+Using basis set: combo_basis_fit
+
+Generating k-points...                            ... done!
+Number of k - points to evaluate : 16275
+Table of Charges in electrons
+       Atom      ML
+        O1    -1.338
+        C2     0.163
+       H2a     0.292
+       H2b     0.285
+        C3     0.045
+       H3a     0.275
+       H3b     0.275
+Total number of analytical Electrons: 24.0018
+[               Generating scattering factors...               ]
+[#############################################################] 100% 
+                                         ... done!
+Writing tsc file...  ... done!

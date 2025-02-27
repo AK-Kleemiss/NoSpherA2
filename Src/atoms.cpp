@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "convenience.h"
 #include "atoms.h"
 
@@ -15,25 +16,12 @@ basis_set_entry::basis_set_entry(double g_coefficient, double g_exponent, unsign
 	exponent = g_exponent;
 	type = g_type;
 	shell = g_shell;
+	p = primitive(0, type, exponent, coefficient);
 };
-
-basis_set_entry basis_set_entry::operator=(const basis_set_entry& rhs) {
-	coefficient = rhs.coefficient;
-	exponent = rhs.exponent;
-	type = rhs.type;
-	shell = rhs.shell;
-	return *this;
-};
-
-bool basis_set_entry::operator==(const basis_set_entry& other) const {
-	return coefficient == other.coefficient &&
-		exponent == other.exponent &&
-		type == other.type &&
-		shell == other.shell;
-}
 
 atom::atom() {
 	label = '?';
+	ID = "0000000000000";
 	nr = 0;
 	x = 0.0;
 	y = 0.0;
@@ -41,38 +29,31 @@ atom::atom() {
 	charge = 0;
 	basis_set_id = 0;
 	ECP_electrons = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
+	frac_coords = { 0.,0.,0. };
 };
 
-atom::atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch) {
-	nr = n;
-	label = l;
-	x = c1;
-	y = c2;
-	z = c3;
-	charge = ch;
-	ECP_electrons = 0;
-	basis_set_id = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
-};
+atom::atom(const std::string& l, 
+	const std::string& id, 
+	const int& n, 
+	const double& c1, 
+	const double& c2, 
+	const double& c3, 
+	const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }) 
+{};
 
-atom::atom(const std::string& l, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els) {
-	nr = n;
-	label = l;
-	x = c1;
-	y = c2;
-	z = c3;
-	charge = ch;
-	ECP_electrons = ECP_els;
-	basis_set_id = 0;
-	frac_coords.resize(3);
-	frac_coords = { 0,0,0 };
-};
+atom::atom(const std::string& l, 
+	const std::string& id, 
+	const int& n, 
+	const double& c1, 
+	const double& c2, 
+	const double& c3, 
+	const int& ch, 
+	const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 })
+{};
 
 atom atom::operator= (const atom& rhs) {
 	label = rhs.label;
+	ID = rhs.ID;
 	nr = rhs.nr;
 	x = rhs.x;
 	y = rhs.y;
@@ -85,19 +66,19 @@ atom atom::operator= (const atom& rhs) {
 	return *this;
 };
 
-void atom::print_values() {
+void atom::print_values() const {
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 };
 
-bool atom::is_anharm() {
+bool atom::is_anharm() const {
 	return ADPs.size() > 1;
 };
 
-void atom::print_values_long() {
+void atom::print_values_long() const {
 	std::cout << "nr: " << nr << " label: " << label << " x: " << x << " y: " << y << " z: " << z << " charge: " << charge << std::endl;
 	if (basis_set.size() > 0) {
 		for (unsigned int i = 0; i < basis_set.size(); i++) {
-			std::cout << "basis set entry " << i << ": expo: " << basis_set[i].exponent << " coef: " << basis_set[i].coefficient << " type: " << basis_set[i].type << " shell: " << basis_set[i].shell << std::endl;
+			std::cout << "basis set entry " << i << ": expo: " << basis_set[i].get_exponent() << " coef: " << basis_set[i].get_coefficient() << " type: " << basis_set[i].get_type() << " shell: " << basis_set[i].get_shell() << std::endl;
 		}
 	}
 	if (shellcount.size() > 0) {
@@ -109,22 +90,22 @@ void atom::print_values_long() {
 
 bool atom::push_back_basis_set(const double& exponent, const double& coefficient, const int& type, const int& shell) {
 	if (shell == shellcount.size())
-		shellcount.push_back(1);
+		shellcount.push_back((unsigned int)1);
 	else
 		shellcount[shell]++;
-	if (type >= 0 && type < 6 && shell >= 0) {
+	if (type >= 0 && shell >= 0) {
 		basis_set.push_back(basis_set_entry(coefficient, exponent, type, shell));
 		return true;
 	}
 	else {
-		if (type >= 6) err_checkf(false, "h and higher types are not yet supported!", std::cout);
+		if (type >= 10) err_checkf(false, "h and higher types are not yet supported!", std::cout);
 		std::cout << "This is not a valid basis set entry!" << std::endl;
 		std::cout << "Exponent: " << exponent << " coefficient: " << coefficient << " type: " << type << " shell: " << shell << std::endl;
 		return false;
 	}
 };
 
-bool atom::get_basis_set_loaded() {
+bool atom::get_basis_set_loaded() const {
 	if (basis_set.size() > 0) return true;
 	else return false;
 };
@@ -174,6 +155,35 @@ void atom::assign_ADPs(vec& second, vec& third, vec& fourth) {
 		ADPs[1] = third;
 		ADPs[2] = fourth;
 	}
+};
+
+void atom::assign_ID(const std::string& id) {
+	ID = id;
+};
+
+void atom::set_ID(const std::string& id) {
+	ID = id;
+};
+
+std::string atom::get_ID() const {
+	return ID;
+};
+
+double atom::get_coordinate(const unsigned int& axis) const {
+    if (axis == 0) return x;
+    else if (axis == 1) return y;
+    else if (axis == 2) return z;
+    else return 0.0;
+};
+
+void atom::set_coordinate(const unsigned int& axis, const double& value) {
+    if (axis == 0) x = value;
+    else if (axis == 1) y = value;
+    else if (axis == 2) z = value;
+};
+
+void atom::set_frac_coords(const std::array<double, 3>& frac) {
+    frac_coords = frac;
 };
 
 bool atom::operator==(const atom& other) const {

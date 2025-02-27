@@ -1,0 +1,276 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Quelldateien">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Headerdateien">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Ressourcendateien">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Ressourcendateien\Tests">
+      <UniqueIdentifier>{45d99421-05f7-4085-b74e-695a8a4377e4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\Rascaline">
+      <UniqueIdentifier>{2956515b-99de-4bf4-957b-7289c85b4f7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\SALTED">
+      <UniqueIdentifier>{68029808-cd9d-47d7-a879-f60a08d33d76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\SALTED">
+      <UniqueIdentifier>{411a5573-0e6b-43bd-8cf5-f94a2d53f41a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\libCint">
+      <UniqueIdentifier>{1fb1f3f3-df03-481e-9334-54667fc4e5a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Quelldateien\libCint">
+      <UniqueIdentifier>{9a89d622-da09-4a7d-aeb8-e84c75fa0c4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\mdspan">
+      <UniqueIdentifier>{53cebc2e-6707-423c-b1e4-3e8b01ff9900}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="../Src/AtomGrid.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/basis_set.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/convenience.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/cube.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/fchk.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/sphere_lebedev_rule.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/scattering_factors.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/wfn_class.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/properties.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/NoSpherA2.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="../Src/spherical_density.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\atoms.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\JKFit.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_io.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_equicomb.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_utilities.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\SALTED_predictor.cpp">
+      <Filter>Quelldateien\SALTED</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\constants.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\ECPs_corrections.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\isosurface.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\integrator.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\cart2sph.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\integration_params.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\rys_roots.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\int_optimizer.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\int_g2e.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\libCintMain.cpp">
+      <Filter>Quelldateien\libCint</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\nos_math.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\pch.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="../Src/AtomGrid.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/atoms.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/basis_set.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/convenience.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/cube.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/fchk.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/mo_class.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/sphere_lebedev_rule.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/scattering_factors.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/wfn_class.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/properties.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/spherical_density.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/cell.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/tsc_block.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/CUDA_utilities.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/test_functions.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/npy.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/Thakkar_coefs.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\ECPs_corrections.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/def2-ECPs_GA.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\JKFit.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\metatensor.h">
+      <Filter>Headerdateien\Rascaline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\rascaline.h">
+      <Filter>Headerdateien\Rascaline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\metatensor.hpp">
+      <Filter>Headerdateien\Rascaline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\rascaline.hpp">
+      <Filter>Headerdateien\Rascaline</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_utilities.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_io.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_equicomb.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\SALTED_predictor.h">
+      <Filter>Headerdateien\SALTED</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\constants.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\pch.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\isosurface.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\integrator.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\cart2sph.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\integration_params.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\rys_roots.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\int_optimizer.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\int_g2e.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\libCintMain.h">
+      <Filter>Headerdateien\libCint</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\nos_math.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.github\workflows\c-cpp_all.yml">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\Mac\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\Linux\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\.github\workflows\codeql-analysis.yml">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+    <None Include="..\tests\makefile">
+      <Filter>Ressourcendateien</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resource.rc">
+      <Filter>Ressourcendateien</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="NSA2.ico">
+      <Filter>Ressourcendateien</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

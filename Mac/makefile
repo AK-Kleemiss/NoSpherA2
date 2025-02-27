@@ -1,27 +1,42 @@
 #THIS IS THE MACOS MAKEFILE!#
 RM := rm
 
-all: lipo
+all: NoSpherA2
+
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
+OBJS_arm64 := $(OBJ_NAMES:=.o_arm64)
+OBJS_arm64_d := $(OBJ_NAMES:=.o_arm64_d)
+OMP_BUILD_arm64 := ../llvm-project/openmp/build/runtime/src
+blas_arm64 := ../OpenBLAS/installation/
+LIBRASCALINE := ../Lib/librascaline_Mac.a
+LIBRASCALINE += ../Lib/libmetatensor_Mac.a
 
 GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -fopenmp -static -MMD -MP
+GCC_OPTS_DEBUG := -std=c++2a -Og -g -c -fmessage-length=0 -Xpreprocessor -MP
 
-NoSpherA2_x86_64: ../Src/unity.cpp
+%.o_arm64: ../Src/%.cpp
+	@echo 'Building file: $<'
+	g++ ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" "$<" -target aarch64-apple-macos14.0
+	@echo 'Finished building: $<'
+
+NoSpherA2: ${OBJS_arm64}
 	@echo 'Building target: $@'
-	g++ ${GCC_OPTS} -I../llvm-project/openmp/build_x64/runtime/src -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_x64 "$<" -target x86_64-apple-macos14.0
-	g++ -o "NoSpherA2_64" ../llvm-project/openmp/build_x64/runtime/src/libomp.a unity.o_x64 -I../ -I../llvm-project/openmp/build_x64/runtime/src -L../llvm-project/openmp/build_x64/runtime/src -target x86_64-apple-macos14.0
-	${RM} unity.o_x64
+	g++ -o "$@" ${OMP_BUILD_arm64}/libomp.a ${blas_arm64}/lib/libopenblas.a ${OBJS_arm64} ${LIBRASCALINE} -I../ -I${blas_arm64}/include -L${OMP_BUILD_arm64} -L${blas_arm64}/lib -lcblas -target aarch64-apple-macos14.0
+	${RM} ${OBJS_arm64}
+	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
 
-NoSpherA2_arm64: ../Src/unity.cpp
+%.o_arm64_d: ../Src/%.cpp
+	@echo 'Building file: $<'
+	g++ ${GCC_OPTS_DEBUG} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" "$<" -target aarch64-apple-macos14.0
+	@echo 'Finished building: $<'
+
+NoSpherA2_Debug: ${OBJS_arm64_d}
 	@echo 'Building target: $@'
-	g++ ${GCC_OPTS} -I../llvm-project/openmp/build/runtime/src -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o unity.o_arm "$<" -target aarch64-apple-macos14.0
-	g++ -o "$@" ../llvm-project/openmp/build/runtime/src/libomp.a unity.o_arm -I../ -L../llvm-project/openmp/build/runtime/src -target aarch64-apple-macos14.0
-	${RM} unity.o_arm
+	g++ -o "$@" ${OMP_BUILD_arm64}/libomp.a ${blas_arm64}/lib/libopenblas.a ${OBJS_arm64_d} ${LIBRASCALINE} -I../ -I${blas_arm64}/include -L${OMP_BUILD_arm64} -L${blas_arm64}/lib -lcblas -target aarch64-apple-macos14.0
+	${RM} ${OBJS_arm64_d}
+	cp NoSpherA2_Debug ../
 	@echo 'Finished building target: $@'
-
-lipo: NoSpherA2_x86_64 NoSpherA2_arm64
-	lipo -create -output universal_NoSpherA2 NoSpherA2_arm64 NoSpherA2_64
-
 
 clean:
 	-${RM} NoSpherA2

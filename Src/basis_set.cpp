@@ -1,9 +1,8 @@
+#include "pch.h"
 #include "basis_set.h"
 #include "convenience.h"
-struct basis_set_entry;
+class basis_set_entry;
 class WFN;
-using namespace std;
-bool debug_dens = false;
 
 //-------------Reading basis sets and determining the density matrix from the wfn coefficients -----------------------
 
@@ -16,12 +15,11 @@ bool debug_dens = false;
  * @param debug A boolean flag indicating whether to enable debug mode.
  * @return Returns true if the basis set is successfully read and populated, false otherwise.
  */
-bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
+bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
 {
-    if (debug)
-        debug_dens = true;
+    using namespace std;
     string basis_set_name;
-    string temp;
+    std::filesystem::path temp;
     bool end = false;
     bool manual = false;
     while (!end)
@@ -38,7 +36,7 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
         temp.append(basis_set_name);
         if (exists(temp))
         {
-            if (debug_dens)
+            if (debug)
                 cout << "basis set is valid, continueing..." << endl;
             end = true;
         }
@@ -51,32 +49,32 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
             // cin >> basis_set_name;
         }
     }
-    if (debug_dens)
+    if (debug)
         cout << "File of basis set to load: " << temp << endl;
-    ifstream ifile(temp.c_str(), ios::in);
+    ifstream ifile(temp, ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "i: " << i << endl;
         for (int j = 0; j < elements_list.size(); j++)
         {
             if (elements_list[j].compare(wave.get_atom_label(i)) == 0)
                 found = true;
-            if (debug_dens)
+            if (debug)
                 cout << "   j: " << j << " Atom label: " << wave.get_atom_label(i) << endl;
         }
         if (!found)
         {
             elements_list.push_back(wave.get_atom_label(i));
-            if (debug_dens)
+            if (debug)
                 cout << "Added an atom which was not there yet!" << wave.get_atom_label(i) << endl;
         }
         found = false;
     }
-    if (debug_dens)
+    if (debug)
     {
         cout << "Number of elements in elements_list: " << elements_list.size() << endl;
         cout << "This is the elements list:" << endl;
@@ -86,12 +84,12 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
     // int found_counter = 0;
     for (int i = 0; i < elements_list.size(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "before: " << elements_list[i] << " " << i << endl;
         while (elements_list[i].find(" ") != -1)
             elements_list[i].erase(elements_list[i].find(" "), 1);
         elements_list[i].append(":");
-        if (debug_dens)
+        if (debug)
         {
             cout << "after: " << elements_list[i] << " " << i << endl;
         }
@@ -102,35 +100,35 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
         // check if we support that type of basis set
         while (line.find("keys=") == string::npos && !ifile.eof())
             getline(ifile, line);
-        if (debug_dens)
+        if (debug)
         {
             cout << "Line after looking for keys=: " << line << endl;
         }
-        if (line.find("keys=") < line.size() && debug_dens)
+        if (line.find("keys=") < line.size() && debug)
             cout << "Found keys=!" << endl;
         if (line.find("turbomole") < line.size())
         {
             file_type = 1;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in turbomole type!" << endl;
         }
         else if (line.find("gamess-us") < line.size())
         {
             file_type = 2;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gamess-us type!" << endl;
         }
         else if (line.find("gaussian") < line.size())
         {
             file_type = 3;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gaussian type!" << endl;
         }
         else if (line.find("CRYSTAL") < line.size())
         {
             file_type = 1;
             wave.set_d_f_switch(true);
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in CRYSTAL type!" << endl;
         }
         else
@@ -147,10 +145,10 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
         while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
         {
             getline(ifile, line);
-            if (debug_dens)
+            if (debug)
                 cout << "line while search for " << elements_list[i] << " :" << line << endl;
         }
-        if (debug_dens && line.find(elements_list[i]) != -1)
+        if (debug && line.find(elements_list[i]) != -1)
         {
             cout << "I found an entry i know from the element list!" << endl;
             cout << "The line is: " << line << endl;
@@ -186,25 +184,25 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
             if (file_type == 1)
             {
                 stream >> count >> c_temp;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             else if (file_type == 2)
             {
                 stream >> c_temp >> count;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             else if (file_type == 3)
             {
                 stream >> c_temp >> count;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             for (int j = 0; j < count; j++)
             {
                 getline(ifile, line);
-                if (debug_dens)
+                if (debug)
                 {
                     cout << "read the " << j << ". line: " << line << endl;
                 }
@@ -220,19 +218,19 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
                 {
                 case 's':
                 case 'S':
-                    temp_vals[1] *= pow((2 * temp[0] / pi), 0.75);
+                    temp_vals[1] *= pow((2 * temp_vals[0] / pi), 0.75);
                     break;
                 case 'p':
                 case 'P':
-                    temp_vals[1] *= pow((128 * pow(temp[0], 5) / pow(pi, 3)), 0.25);
+                    temp_vals[1] *= pow((128 * pow(temp_vals[0], 5) / pow(pi, 3)), 0.25);
                     break;
                 case 'd':
                 case 'D':
-                    temp_vals[1] *= (pow(2048 * pow(temp[0], 7) / (9 * pow(pi, 3)), 0.25));
+                    temp_vals[1] *= (pow(2048 * pow(temp_vals[0], 7) / (9 * pow(pi, 3)), 0.25));
                     break;
                 case 'f':
                 case 'F':
-                    temp_vals[1] *= pow((32768 * pow(temp[0], 9) / (225 * pow(pi, 3))), 0.25);
+                    temp_vals[1] *= pow((32768 * pow(temp_vals[0], 9) / (225 * pow(pi, 3))), 0.25);
                     break;
                 default:
                     cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -248,7 +246,7 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
                     temp_label.append(":");
                     if (elements_list[i].find(temp_label) != -1)
                     {
-                        if (debug_dens)
+                        if (debug)
                         {
                             cout << "It's a match!" << endl;
                             cout << "element_label: " << elements_list[i] << " temp_label: " << temp_label << endl;
@@ -257,43 +255,43 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
                         {
                         case 's':
                         case 'S':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 1, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type S" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type S" << endl;
                             break;
                         case 'p':
                         case 'P':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 2, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type P" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type P" << endl;
                             break;
                         case 'd':
                         case 'D':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 3, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type D" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type D" << endl;
                             break;
                         case 'f':
                         case 'F':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_vals[0], temp_vals[1], 4, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type F" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
+                                     << " and exp: " << temp_vals[0] << " and type F" << endl;
                             break;
                         default:
                             cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -302,8 +300,8 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
                     }     // end if(find atom_label + :
                 }         // end for h = ncen
                 //nr_exp++;
-                if (debug_dens)
-                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
+                if (debug)
+                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
                 if (dum > count)
                 {
                     cout << "this should not happen, lets stop before i do something silly!" << endl;
@@ -312,11 +310,11 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
             }
             shell++;
         } // end while line != }
-        if (debug_dens)
+        if (debug)
             cout << "I found }: " << line << endl;
         ifile.seekg(0);
     } // end for element_list.size()
-    if (debug_dens)
+    if (debug)
     {
         cout << "FINISHED WITH READING BASIS SET!" << endl;
     }
@@ -334,28 +332,20 @@ bool read_basis_set(const string &basis_set_path, WFN &wave, bool debug)
  * @param manual A boolean flag indicating whether to manually input the basis set name.
  * @return Returns true if the basis set is successfully read and set, false otherwise.
  */
-bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool &debug, bool manual)
+bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug, bool manual)
 {
-    if (debug)
-        debug_dens = true;
+    using namespace std;
     string basis_set_name;
-    string temp_name;
+    std::filesystem::path temp_name;
     bool end = false;
     while (!end)
     {
-        if (wave.get_basis_set_name().length() < 3 || manual)
-        {
-            cout << "Which basis set do you want to load?" << endl;
-            cin >> basis_set_name;
-        }
-        else if (!manual)
-            basis_set_name = wave.get_basis_set_name();
+        basis_set_name = wave.get_basis_set_name();
         // assemble basis set name and look if file exists
-        temp_name = basis_set_path;
-        temp_name.append(basis_set_name);
+        temp_name = basis_set_path / basis_set_name;
         if (exists(temp_name))
         {
-            if (debug_dens)
+            if (debug)
                 cout << "basis set is valid, continuing..." << endl;
             end = true;
         }
@@ -368,32 +358,32 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
         }
     }
     wave.set_basis_set_name(basis_set_name);
-    if (debug_dens)
+    if (debug)
         cout << "File of basis set to load: " << temp_name << endl;
-    ifstream ifile(temp_name.c_str(), ios::in);
+    ifstream ifile(temp_name, ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "i: " << i << endl;
         for (int j = 0; j < elements_list.size(); j++)
         {
             if (elements_list[j].compare(wave.get_atom_label(i)) == 0)
                 found = true;
-            if (debug_dens)
+            if (debug)
                 cout << "   j: " << j << " Atom label: " << wave.get_atom_label(i) << endl;
         }
         if (!found)
         {
             elements_list.push_back(wave.get_atom_label(i));
-            if (debug_dens)
+            if (debug)
                 cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << "!" << endl;
         }
         found = false;
     }
-    if (debug_dens)
+    if (debug)
     {
         cout << "Number of elements in elements_list: " << elements_list.size() << endl;
         cout << "This is the elements list:" << endl;
@@ -403,14 +393,14 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
     // int found_counter = 0;
     for (int i = 0; i < elements_list.size(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "before: " << elements_list[i] << " " << i << endl;
         while (elements_list[i].find(" ") != -1)
         {
             elements_list[i].erase(elements_list[i].find(" "), 1);
         } // Cut out spaces
         elements_list[i].append(":");
-        if (debug_dens)
+        if (debug)
         {
             cout << "after: " << elements_list[i] << " " << i << endl;
         }
@@ -421,35 +411,35 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
         // check if we support that type of basis set
         while (line.find("keys=") == -1 && !ifile.eof())
             getline(ifile, line);
-        if (debug_dens)
+        if (debug)
         {
             cout << "Line after looking for keys=: " << line << endl;
         }
-        if (line.find("keys=") < line.size() && debug_dens)
+        if (line.find("keys=") < line.size() && debug)
             cout << "Found keys=!" << endl;
         if (line.find("turbomole") < line.size())
         {
             file_type = 1;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in turbomole type!" << endl;
         }
         else if (line.find("gamess-us") < line.size())
         {
             file_type = 2;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gamess-us type!" << endl;
         }
         else if (line.find("gaussian") < line.size())
         {
             file_type = 3;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gaussian type!" << endl;
         }
         else if (line.find("CRYSTAL") < line.size())
         {
             file_type = 1;
             wave.set_d_f_switch(true);
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in CRYSTAL type!" << endl;
         }
         else
@@ -460,14 +450,14 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
         if (ifile.eof())
         {
             cout << "Please provide a basis set in the turbomole, gaussian or gamess-us format compatible with tonto."
-                 << "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like" << endl;
+                << "Look at the example files \"examble.basis\" and \"examble2.basis\" in the wfn_cpp folder if you want to see how it has to look like" << endl;
             return false;
         }
         while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
             getline(ifile, line);
-        if (debug_dens)
+        if (debug)
             cout << "line while search for " << elements_list[i] << " :" << line << endl;
-        if (debug_dens && line.find(elements_list[i]) != -1)
+        if (debug && line.find(elements_list[i]) != -1)
         {
             cout << "I found an entry i know from the element list!" << endl;
             cout << "The line is: " << line << endl;
@@ -496,24 +486,24 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
             int count = 0;
             //int nr_exp = 0;
             char c_temp = '?';
-            double temp_vals[2]{0, 0};
+            double temp_vals[2]{ 0, 0 };
             int dum = 0;
             if (file_type == 1)
             {
                 stream >> count >> c_temp;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             else if (file_type == 2 || file_type == 3)
             {
                 stream >> c_temp >> count;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             for (int j = 0; j < count; j++)
             {
                 getline(ifile, line);
-                if (debug_dens)
+                if (debug)
                 {
                     cout << "read the " << j << ". line: " << line << endl;
                 }
@@ -562,13 +552,13 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
                         {
                             cout << "ERROR while pushing back atoms basis set" << endl;
                         }
-                        if (debug_dens)
+                        if (debug)
                             cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_vals[1]
-                                 << " and exp: " << temp_vals[0] << " and type " << type << endl;
+                            << " and exp: " << temp_vals[0] << " and type " << type << endl;
                     } // end if(find atom_label + :
                 }     // end for h = ncen
                 //nr_exp++;
-                if (debug_dens)
+                if (debug)
                     cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_vals[0] << " exp: " << temp_vals[1] << endl;
                 if (dum > count)
                 {
@@ -578,11 +568,11 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
             }
             shell++;
         } // end while line != }
-        if (debug_dens)
+        if (debug)
             cout << "I found }: " << line << endl;
         ifile.seekg(0);
     } // end for element_list.size()
-    if (debug_dens)
+    if (debug)
     {
         cout << "FINISHED WITH READING BASIS SET!" << endl;
     }
@@ -599,29 +589,19 @@ bool read_basis_set_vanilla(const string &basis_set_path, WFN &wave, const bool 
  * @param debug Flag indicating whether to enable debug mode.
  * @return Returns true if the basis set was successfully read and updated, false otherwise.
  */
-bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
+bool read_basis_set_missing(const std::filesystem::path &basis_set_path, WFN &wave, bool debug)
 {
-    if (debug)
-        debug_dens = true;
-    string basis_set_name;
-    string temp;
+    using namespace std;
+    filesystem::path temp_p;
     bool end = false;
     bool manual = false;
     while (!end)
     {
-        if (wave.get_basis_set_name().length() < 3)
-        {
-            cout << "Which basis set do you want to load?" << endl;
-            cin >> basis_set_name;
-        }
-        else if (!manual)
-            basis_set_name = wave.get_basis_set_name();
         // assemble basis set name and look if file exists
-        temp = basis_set_path;
-        temp.append(basis_set_name);
-        if (exists(temp))
+        temp_p = basis_set_path / wave.get_basis_set_name();
+        if (exists(temp_p))
         {
-            if (debug_dens)
+            if (debug)
                 cout << "basis set is valid, continueing..." << endl;
             end = true;
         }
@@ -634,32 +614,32 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
             // cin >> basis_set_name;
         }
     }
-    if (debug_dens)
-        cout << "File of basis set to load: " << temp << endl;
-    ifstream ifile(temp.c_str(), ios::in);
+    if (debug)
+        cout << "File of basis set to load: " << temp_p << endl;
+    ifstream ifile(temp_p, ios::in);
     //  Looking for all the types of atoms we need to find
-    vector<string> elements_list;
+    svec elements_list;
     bool found = false;
     for (int i = 0; i < wave.get_ncen(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "i: " << i << endl;
         for (int j = 0; j < elements_list.size(); j++)
         {
             if (elements_list[j].find(wave.get_atom_label(i)) != -1)
                 found = true;
-            if (debug_dens)
+            if (debug)
                 cout << "   j: " << j << endl;
         }
         if (!found)
         {
             elements_list.push_back(wave.get_atom_label(i));
-            if (debug_dens)
+            if (debug)
                 cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << endl;
         }
         found = false;
     }
-    if (debug_dens)
+    if (debug)
     {
         cout << "Number of elements in elements_list: " << elements_list.size() << endl;
         cout << "This is the elements list:" << endl;
@@ -669,12 +649,12 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
     // int found_counter = 0;
     for (int i = 0; i < elements_list.size(); i++)
     {
-        if (debug_dens)
+        if (debug)
             cout << "before: " << elements_list[i] << " " << i << endl;
         if (elements_list[i].find(" "))
             elements_list[i].erase(elements_list[i].find(" "), 1);
         elements_list[i].append(":");
-        if (debug_dens)
+        if (debug)
         {
             cout << "after: " << elements_list[i] << " " << i << endl;
         }
@@ -685,34 +665,34 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
         // check if we support that type of basis set
         while (line.find("keys=") == -1 && !ifile.eof())
         {
-            if (debug_dens)
+            if (debug)
             {
                 cout << "line.size of first line: " << line.size() << "line.find(\"keys=\"): " << line.find("keys=") << endl;
             }
             getline(ifile, line);
         }
-        if (debug_dens)
+        if (debug)
         {
             cout << "Line after looking for keys=: " << line << endl;
         }
-        if (line.find("keys=") < line.size() && debug_dens)
+        if (line.find("keys=") < line.size() && debug)
             cout << "Found keys=!" << endl;
         if (line.find("turbomole") < line.size())
         {
             file_type = 1;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in turbomole type!" << endl;
         }
         else if (line.find("gamess-us") < line.size())
         {
             file_type = 2;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gamess-us type!" << endl;
         }
         else if (line.find("gaussian") < line.size())
         {
             file_type = 3;
-            if (debug_dens)
+            if (debug)
                 cout << "This file is written in gaussian type!" << endl;
         }
         else
@@ -729,10 +709,10 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
         while (!(line.find(elements_list[i]) < line.size()) && !ifile.eof())
         {
             getline(ifile, line);
-            if (debug_dens)
+            if (debug)
                 cout << "line while search for " << elements_list[i] << " :" << line << endl;
         }
-        if (debug_dens && line.find(elements_list[i]) != -1)
+        if (debug && line.find(elements_list[i]) != -1)
         {
             cout << "I found an entry i know from the element list!" << endl;
             cout << "The line is: " << line << endl;
@@ -762,25 +742,25 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
             if (file_type == 1)
             {
                 stream >> count >> c_temp;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             else if (file_type == 2)
             {
                 stream >> c_temp >> count;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             else if (file_type == 3)
             {
                 stream >> c_temp >> count;
-                if (debug_dens)
+                if (debug)
                     cout << "count: " << count << " type: " << c_temp << endl;
             }
             for (int j = 0; j < count; j++)
             {
                 getline(ifile, line);
-                if (debug_dens)
+                if (debug)
                 {
                     cout << "read the " << j << ". line: " << line << endl;
                 }
@@ -805,7 +785,7 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
                     temp_label.append(":");
                     if (elements_list[i].find(temp_label) != -1)
                     {
-                        if (debug_dens)
+                        if (debug)
                         {
                             cout << "It's a match!" << endl;
                             cout << "element_label: " << elements_list[i] << " temp_label: " << temp_label << endl;
@@ -814,43 +794,43 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
                         {
                         case 's':
                         case 'S':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 1, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 1, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type S" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type S" << endl;
                             break;
                         case 'p':
                         case 'P':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 2, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 2, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type P" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type P" << endl;
                             break;
                         case 'd':
                         case 'D':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 3, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 3, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type D" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type D" << endl;
                             break;
                         case 'f':
                         case 'F':
-                            if (!wave.push_back_atom_basis_set(h, temp[0], temp[1], 4, shell))
+                            if (!wave.push_back_atom_basis_set(h, temp_num[0], temp_num[1], 4, shell))
                             {
                                 cout << "ERROR while pushing back atoms basis set" << endl;
                             }
-                            if (debug_dens)
-                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp[1]
-                                     << " and exp: " << temp[0] << " and type F" << endl;
+                            if (debug)
+                                cout << "Pushing back on atom: " << h + 1 << " with coef: " << temp_num[1]
+                                     << " and exp: " << temp_num[0] << " and type F" << endl;
                             break;
                         default:
                             cout << "Sorry, orbital types higher than f-type are not yet supported!" << endl;
@@ -859,8 +839,8 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
                     }     // end if(find atom_label + :
                 }         // end for h = ncen
                 //nr_exp++;
-                if (debug_dens)
-                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp[0] << " exp: " << temp[1] << endl;
+                if (debug)
+                    cout << "recapitulation[" << j << "]... type: " << c_temp << " coef: " << temp_num[0] << " exp: " << temp_num[1] << endl;
                 if (dum > count)
                 {
                     cout << "this should not happen, lets stop before i do something silly!" << endl;
@@ -869,11 +849,11 @@ bool read_basis_set_missing(const string &basis_set_path, WFN &wave, bool debug)
             }
             shell++;
         } // end while line != }
-        if (debug_dens)
+        if (debug)
             cout << "I found }!" << endl;
         ifile.seekg(0);
     } // end for element_list.size()
-    if (debug_dens)
+    if (debug)
     {
         cout << "FINISHED WITH READING BASIS SET!" << endl;
     }

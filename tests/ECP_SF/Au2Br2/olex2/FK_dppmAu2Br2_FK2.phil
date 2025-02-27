@@ -1,0 +1,50 @@
+snum {
+  current_process_diagnostics = "refinement"
+  hkl {
+    hkl_stat_file = 'D:\\git\\wfn2fchk\\tests\\ECP_SF\\Au2Br2\\FK_dppmAu2Br2_FK2.hkl'
+    d_min = 0.55
+  }
+  solution {
+    current_atomic_volume = '20.4'
+  }
+  refinement {
+    completeness {
+      target = '- Laue Group Completeness to 2Θ=50.5: 100.0%%&#013;- Laue Group Completeness to 2Θ=80.5: 100.0%%'
+    }
+    data_parameter_ratio = 38.85
+    parameters = 205
+    max_shift_over_esd = '-0.0008'
+    max_shift_site = 419169.9025
+    max_shift_site_atom = "H15"
+    max_shift_u = 19.89012788
+    max_shift_u_atom = "C18"
+    max_peak = '1.3259'
+    max_hole = '-0.8352'
+    res_rms = 0.1667192806
+    goof = '1.0275'
+    last_R1 = '0.0148'
+    last_wR2 = '0.0322'
+    max_cycles = 20
+    max_peaks = 4
+    suggested_weight = 0.01162448148 2.915137969
+  }
+  history {
+    current_node = 'ebcf7adbf05ff779b4e3cd275da7b8f3'
+  }
+  auto_hydrogen_naming = False
+  xgrid {
+    scale = -0.577
+  }
+  NoSpherA2 {
+    use_aspherical = True
+    basis_name = "ECP-def2-TZVP"
+    file = "FK_dppmAu2Br2_FK2.tscb"
+    h_afix = False
+    h_aniso = False
+    method = "R2SCAN"
+    multiplicity = "1"
+    source = "ORCA 5.0"
+    mem = "155.2"
+    ncpus = "4"
+  }
+}
