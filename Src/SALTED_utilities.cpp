@@ -6,6 +6,7 @@
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
+	const double sqrt_2 = sqrt(2.0);
     using namespace std;
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
@@ -22,13 +23,13 @@ std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int>
             transformed_matrix[sizes[i] - j - 1][sizes[i] - j - 1] = complex<double>(-st, 0.0);
             st = -st;
         }
-        transformed_matrix[lval][lval] = sqrt(2.0);
+        transformed_matrix[lval][lval] = sqrt_2;
         // Divide each element by sqrt(2.0)
         for (auto &row : transformed_matrix)
         {
             for (auto &elem : row)
             {
-                elem /= sqrt(2.0);
+                elem /= sqrt_2;
             }
         }
         matrices.push_back(transformed_matrix);

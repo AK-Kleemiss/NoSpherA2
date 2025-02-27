@@ -2486,8 +2486,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 		dMatrix2 reorderd_coefs_s1(dimension,dimension), reorderd_coefs_s2;
 		if (operators == 2) reorderd_coefs_s2 = dMatrix2(dimension, dimension);
 
-        dSpan2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
-        dSpan2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
+        dMatrixRef2 coefs_2D_s1_span(coefficients[0].data(), dimension, dimension);
+        dMatrixRef2 coefs_2D_s2_span(coefficients[1].data(), dimension, dimension);
 
         int index = 0;
         for (const atom& _atom : atoms) {

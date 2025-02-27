@@ -1,6 +1,6 @@
 RM := rm
 
-ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS fourier_transform ri_fit
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
@@ -14,9 +14,9 @@ else
   DIFF := diff -q -i -b
 endif
 
-all: $(ALL_TARGETS)
+all: $(ALL_TARGETS) fourier_transform
 
-all_tests: $(ALL_TARGETS) SALTED fourier_transform_full rubredoxin_cmtc_full fchk_conversion
+all_tests: $(ALL_TARGETS) reading_SALTED SALTED fourier_transform_full rubredoxin_cmtc_full fchk_conversion
 
 sucrose_SF:
 	@echo 'Running test: $@'
@@ -57,6 +57,13 @@ SALTED:
 		-wfn test_cysteine.xyz \
 		-dmin 0.73 \
 		-no-date \
+		&& ${MV} NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
+
+reading_SALTED:
+	@echo 'Running test: $@'
+	@cd SALTED && $(BASE_PATH) \
+		-test_reading_SALTED_binary \
 		&& ${MV} NoSpherA2.log $@.log \
 		&& ${DIFF} $@.log $@.good
 

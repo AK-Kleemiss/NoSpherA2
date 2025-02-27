@@ -228,11 +228,13 @@ vec SALTEDPredictor::predict()
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
+			p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
             featsize[lam] = nfps;
         }
         else
         {
+			p.assign(natoms * (2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
         pvec[lam] = p;
@@ -255,14 +257,15 @@ vec SALTEDPredictor::predict()
             int row_size = featsize[lam] * lam2_1; // Size of a block of rows
 
             dMatrix2 pvec_lam(atom_idx[spe].size() * lam2_1, featsize[lam]);
-            for (int idx = 0; idx < atom_idx[spe].size(); idx++)
+            dMatrixRef2 _pvec(pvec[lam].data(), natoms, featsize[lam] * lam2_1);
+            double* pvec_ptr = pvec_lam.data();
+            for (const int idx : atom_idx[spe])
             {
-                int start_idx = atom_idx[spe][idx] * row_size;     // Start index in pvec_flat
-                int end_idx = start_idx + row_size; // End index in pvec_flat
-                // Copy the block directly into flatVec2
-                std::copy(pvec[lam].begin() + start_idx, pvec[lam].begin() + end_idx, pvec_lam.data() + idx*row_size);
+				auto _temp = Kokkos::submdspan(_pvec, idx, Kokkos::full_extent);
+				std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
+				pvec_ptr += row_size;
             }
-            dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true); // I AM NOT SURE THIS WILL USE THE RIGHT SIZES....
+            dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
 
             if (config.zeta == 1)
             {
@@ -281,11 +284,14 @@ vec SALTEDPredictor::predict()
                     {
                         for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
+							double scale_factor = pow(kernell0_nm(i1, i2), config.zeta - 1);
+							size_t base_i = i1 * lam2_1;
+							size_t base_j = i2 * lam2_1;
                             for (size_t i = 0; i < lam2_1; ++i)
                             {
                                 for (size_t j = 0; j < lam2_1; ++j)
                                 {
-                                    kernel_nm( i1* lam2_1 + i,i2* lam2_1 + j ) *= pow(kernell0_nm( i1,i2 ), config.zeta - 1);
+                                    kernel_nm(base_i + i, base_j + j) *= scale_factor;
                                 }
                             }
                         }

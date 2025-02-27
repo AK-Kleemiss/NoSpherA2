@@ -12,7 +12,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
               const int &nfps, const std::vector<int64_t> &vfps,
               vec &p)
 {
-
     const int l21 = 2 * lam + 1;
     const int llmax = (int)llvec[0].size();
 
@@ -22,15 +21,14 @@ void equicomb(int natoms, int nrad1, int nrad2,
 
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
-    double inner, normfact;
+    double inner, normfact, preal;
     const cdouble null(0.0, 0.0);
     ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
-#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact) default(none) shared(pb, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null, f_vec, std::cout)
+#pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2, inner, normfact, preal) default(none) shared(pb, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, null, f_vec, std::cout)
     for (iat = 0; iat < natoms; ++iat)
     {
         vec2 ptemp(l21, f_vec);
         cvec pcmplx(l21, null);
-        vec preal(l21, 0.0);
         inner = 0.0;
 
         ifeat = 0;
@@ -44,11 +42,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                     l1 = llvec[0][il];
                     l2 = llvec[1][il];
 
-                    // cvec2 *v1_ptr = (cvec2 *)&v1[l1][iat];
-                    // cvec2 *v2_ptr = (cvec2 *)&v2[l2][iat];
-
-                    cvec *v1_ptr = (cvec *)&v1[iat][n1][l1];
-                    cvec *v2_ptr = (cvec *)&v2[iat][n2][l2];
+                    cvec* v1_ptr = (cvec*) & v1[iat][n1][l1];
+                    cvec* v2_ptr = (cvec*)&v2[iat][n2][l2];
 
                     fill(pcmplx.begin(), pcmplx.end(), null);
 
@@ -62,22 +57,22 @@ void equicomb(int natoms, int nrad1, int nrad2,
                             if (abs(m2) <= l2)
                             {
                                 im2 = m2 + l2;
-                                // pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1][n1] * (*v2_ptr)[im2][n2];
                                 pcmplx[imu] += w3j[iwig] * (*v1_ptr)[im1] * (*v2_ptr)[im2];
                                 iwig++;
                             }
                         }
                     }
-
-                    fill(preal.begin(), preal.end(), 0.0);
+                    const cdouble* cvec_ptr;
                     for (i = 0; i < l21; ++i)
                     {
+						preal = 0.0;
+						cvec_ptr = c2r[i].data();
                         for (j = 0; j < l21; ++j)
                         {
-                            preal[i] += real(c2r[i][j] * pcmplx[j]);
+                            preal += real(cvec_ptr[j] * pcmplx[j]);
                         }
-                        inner += preal[i] * preal[i];
-                        ptemp[i][ifeat] = preal[i];
+                        inner += preal * preal;
+                        ptemp[i][ifeat] = preal;
                     }
                     ifeat++;
                 }
@@ -106,9 +101,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
               cvec2 &c2r, int featsize,
               vec &p)
 {
-    // Initialize p with zeros
-    p.assign(natoms * (2 * lam + 1) * featsize, 0.0);
-
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, iwig, l1, l2, mu, m1, m2;
     double inner, normfact;

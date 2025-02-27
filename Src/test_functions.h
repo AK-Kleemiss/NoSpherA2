@@ -1912,7 +1912,8 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 }
 
 void test_reading_SALTED_binary_file() {
-    SALTED_BINARY_FILE file = SALTED_BINARY_FILE("Combo_v2.salted", true);
+    std::filesystem::path path("Model/model.salted");
+    SALTED_BINARY_FILE file = SALTED_BINARY_FILE(path, true);
     Config config;
     file.populate_config(config);
     std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
