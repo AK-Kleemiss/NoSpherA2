@@ -131,11 +131,17 @@ grown_water:
 
 fourier_transform_full:
 	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) -test_analytical full -no-date && ${MV} NoSpherA2.log $@.log
+	@cd SALTED && $(BASE_PATH) \
+		-test_analytical full -no-date \
+		&& ${MV} NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good 
 
 fourier_transform:
 	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) -test_analytical -no-date && ${MV} NoSpherA2.log $@.log
+	@cd SALTED && $(BASE_PATH) \
+		-test_analytical -no-date \
+		&& ${MV} NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 
 fractal:
 	@echo 'Running test: $@'
@@ -224,7 +230,7 @@ fchk_conversion:
 		-wfn in.ffn -no-date \
 		&& ${DIFF} in.fchk good.fchk
 
-.PHONY: all clean dependents
+.PHONY: all clean dependents SALTED reading_SALTED
 .SECONDARY:
 
 

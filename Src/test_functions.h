@@ -1934,50 +1934,6 @@ void test_reading_SALTED_binary_file() {
 		std::cout << "neighspe2[" << i << "]:"  << config.neighspe2[i] << std::endl;
 	}
 	std::cout << "dfBasis:" << config.dfbasis << std::endl;
-    
-    //Vmat = key : vec2
-	std::cout << "Comparing Vmat" << std::endl;
-	for (auto const& [key, val] : proj)
-	{
-		dMatrix1 temp_new = flatten<dMatrix1>(proj[key]);
-		std::cout << "Key: " << key << std::endl;
-		for (int i = 0; i < temp_new.size(); i+=100)
-		{
-			std::cout << temp_new(i) << " ";
-		}
-        std::cout << std::endl;
-	}
-
-    //power_env_sparse = key : vec
-	std::cout << "Comparing power_env_sparse" << std::endl;
-	for (auto const& [key, val] : feats)
-	{
-		std::cout << "Key: " << key << std::endl;
-        dMatrix1 temp = flatten<dMatrix1>(feats[key]);
-		for (int i = 0; i < val.size(); i+=950)
-		{
-			std::cout << temp(i) << " ";
-		}
-		std::cout << std::endl;
-	}
-
-	std::cout << "Comparing weights" << std::endl;
-	for (int i = 0; i < weights.size(); i+=100)
-	{
-		std::cout << weights[i] << " ";
-	}
-
-
-	std::cout <<std::endl << "Comparing averages" << std::endl;
-	for (auto const& [key, val] : averages)
-	{
-		std::cout << "Key: " << key << std::endl;
-		for (int i = 0; i < val.size(); i+=2)
-		{
-			std::cout << val[i] << " ";
-		}
-		std::cout << std::endl;
-	}
 
 	std::cout << "Comparing wigners" << std::endl;
 	for (int i = 0; i < wigners.size(); i++)
