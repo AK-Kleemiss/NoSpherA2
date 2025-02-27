@@ -5,6 +5,8 @@ on:
     branches: [ master, Mac_Test ]
   pull_request:
     branches: [ master ]
+  schedule:
+    - cron: '0 0 * * 0' # Run every Sunday at midnight
   workflow_dispatch:
 
 jobs:
