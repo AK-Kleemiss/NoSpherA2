@@ -1,7 +1,8 @@
+#include "pch.h"
 #include "fchk.h"
 #include "convenience.h"
 #include "basis_set.h"
-using namespace std;
+#include "constants.h"
 //----------------------------FCHK Preparation and Gaussian--------------------------------------
 /*
 KEPT AS AN EXAMPLE HOW TO CALL G09 FROM WITHIN C++
@@ -166,7 +167,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   com << wave.get_centers(check_bohr(wave, true, debug));
   //	com << wave.get_centers (false);
   com << endl;
-  vector<string> elements_list;
+  svec elements_list;
   if (debug) cout << "elements_list.size()= " << elements_list.size() << endl;
   for (int a = 0; a < wave.get_ncen(); a++) {
     string label_temp;
@@ -224,7 +225,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
 bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wave, bool& debug, const bool& read) {
   wave.set_modified();
   if (debug) debug_fchk = true;
-  vector<double> CMO;
+  vec CMO;
   int nao = 0;
   int nshell = 0;
   int naotr = 0;
@@ -242,7 +243,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     double pi = 3.14159265358979;
     //---------------normalize basis set---------------------------------
     if (debug) cout << "starting to normalize the basis set" << endl;
-    vector<double> norm_const;
+    vec norm_const;
     //-----------debug output---------------------------------------------------------
     if (debug) {
       cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
@@ -514,7 +515,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     }
     //------------------ make the DM -----------------------------
     naotr = nao * (nao + 1) / 2;
-    vector<double> kp;
+    vec kp;
     for (int i = 0; i < naotr; i++) wave.push_back_DM(0.0);
     if (debug) cout << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
     for (int iu = 0; iu < nao; iu++) {
@@ -689,8 +690,71 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   return true;
 };
 */
-bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+//------------------Functions to read from .fchk files----------------------------------
+int read_fchk_integer(const std::string& in)
 {
+    return std::stoi(in.substr(49, in.length() - 49));
+};
+double read_fchk_double(const std::string& in)
+{
+    return std::stod(in.substr(49, in.length() - 49));
+};
+bool read_fchk_integer_block(std::ifstream& in, const char* heading, ivec& result, bool rewind)
+{
+    if (result.size() != 0)
+        result.clear();
+    std::string line = go_get_string(in, heading, rewind);
+    int limit = read_fchk_integer(line);
+    int run = 0;
+    int temp;
+    getline(in, line);
+    while (run < limit)
+    {
+        if (in.eof())
+            return false;
+        temp = stoi(line.substr(12 * (run % 6), 12 * (run % 6 + 1)));
+        result.push_back(temp);
+        run++;
+        if (run % 6 == 0)
+            getline(in, line);
+    }
+    return true;
+};
+bool read_fchk_double_block(std::ifstream& in, const char* heading, vec& result, bool rewind)
+{
+    if (result.size() != 0)
+        result.clear();
+    std::string line = go_get_string(in, heading, rewind);
+    int limit = read_fchk_integer(line);
+    int run = 0;
+    double temp;
+    getline(in, line);
+    while (run < limit)
+    {
+        if (in.eof())
+            return false;
+        temp = stod(line.substr(16 * (run % 5), 16 * (run % 5 + 1)));
+        result.push_back(temp);
+        run++;
+        if (run % 5 == 0)
+            getline(in, line);
+    }
+    return true;
+};
+int read_fchk_integer(std::ifstream& in, const char* search, bool rewind)
+{
+    std::string temp = go_get_string(in, search, rewind);
+    return std::stoi(temp.substr(49, temp.length() - 49));
+};
+double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
+{
+    std::string temp = go_get_string(in, search, rewind);
+    return std::stod(temp.substr(49, temp.length() - 49));
+};
+
+bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+{
+    using namespace std;
     int elcount = 0;
     elcount -= wave.get_charge();
     for (int i = 0; i < wave.get_ncen(); i++)
@@ -731,8 +795,8 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", file);
     }
     // wave.set_modified();
-    vector<double> CMO;
-    vector<double> CMO_beta;
+    vec CMO;
+    vec CMO_beta;
     if (debug)
     {
         file << "Origin: " << wave.get_origin() << endl;
@@ -760,7 +824,7 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         }
 
         //-------------------normalize the basis set shell wise into a copy vector---------
-        vector<vector<double>> basis_coefficients(wave.get_ncen());
+        vec2 basis_coefficients(wave.get_ncen());
 #pragma omp parallel for
         for (int a = 0; a < wave.get_ncen(); a++)
         {
@@ -950,7 +1014,7 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
         }
         //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
         int run = 0;
-        vector<vector<double>> changed_coefs;
+        vec2 changed_coefs;
         changed_coefs.resize(wave.get_nmo());
         if (debug)
         {
@@ -1242,10 +1306,10 @@ bool free_fchk(ofstream &file, const string &fchk_name, const string &basis_set_
             file << "Starting to write fchk now!" << endl;
         }
         // open fchk for writing
-        string temp_fchk = fchk_name;
-        temp_fchk.append(".fchk");
+        std::filesystem::path temp_fchk = fchk_name;
+        temp_fchk.replace_extension(".fchk");
         file << "Writing " << temp_fchk << " ..." << flush;
-        if (exists(temp_fchk) && !force_overwrite)
+        if (std::filesystem::exists(temp_fchk) && !force_overwrite)
         {
             file << "The fchk already exists!" << endl;
             return false;

@@ -1,5 +1,7 @@
+#include "pch.h"
 #include "sphere_lebedev_rule.h"
 #include "convenience.h"
+#include "constants.h"
 
 const int lebedev_sphere::gen_oh(const int &code,
                            const double &a,

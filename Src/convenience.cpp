@@ -1,77 +1,98 @@
+#include "pch.h"
 #include "convenience.h"
 #include "cell.h"
 #include "tsc_block.h"
 #include "test_functions.h"
+#include "integrator.h"
+#include "properties.h"
+#include "wfn_class.h"
+#include "atoms.h"
+#include "JKFit.h"
 
-using namespace std;
+#ifdef _WIN32
+#include <windows.h>
+#endif
+bool has_BLAS = true;
 
-string help_message()
+std::string help_message =
+    ("\n----------------------------------------------------------------------------\n"
+     "          These commands and arguments are known by NoSpherA2:\n"
+     "----------------------------------------------------------------------------\n\n"
+     ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
+     "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
+     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n"
+     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n"
+     "   -b              <FILENAME>               Read this basis set\n"
+     "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
+     "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
+     "                                            [1]: def2-ECP\n"
+     "                                            [2]: xTB\n"
+     "                                            [3]: pTB\n"
+     "   --help/-help/--h                         print this help\n"
+     "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
+     "   -v2                                      Even more stuff\n"
+     "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
+     "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
+     "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
+     "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
+     "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
+     "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
+     "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
+     "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
+     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
+     "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
+     "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
+     "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
+     "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
+     "   -merge          <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged.\n"
+     "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
+     "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
+     "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
+     "                                            without spaces.\n   Typical use Examples:\n"
+     "   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
+     "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+     "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
+     "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
+     "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n"
+     "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
+     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n"
+     "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
+     "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
+     "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
+     "      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
+std::string NoSpherA2_message(bool no_date)
 {
-    std::string t = "\n----------------------------------------------------------------------------\n";
-    t.append("          These commands and arguments are known by NoSpherA2:\n");
-    t.append("----------------------------------------------------------------------------\n\n");
-    t.append("   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n");
-    t.append("                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; fch* (UNTESTED!)\n");
-    t.append("   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n");
-    t.append("   -b              <FILENAME>               Read this basis set\n");
-    t.append("   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n");
-    t.append("   -dmin		     <NUMBER>                   Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n");
-    t.append("   --help/-help/--h                         print this help\n");
-    t.append("   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n");
-    t.append("   -v2                                      Even more stuff\n");
-    t.append("   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n");
-    t.append("   -method         <METHOD NAME>            Can be RKS or RHF to distinguish between DFT and HF\n");
-    t.append("   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n");
-    t.append("   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n");
-    t.append("   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n");
-    t.append("   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n");
-    t.append("   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n");
-    t.append("   -acc            0,1,2,3,4...             Accuracy of numerical grids used, where the bumber indicates a pre-defined level. 4 should be considered maximum,\n");
-    t.append("                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.");
-    t.append("   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n");
-    t.append("   -tscb           <FILENAME>.tsb           Convert binary tsc file to bigger, less accurate human-readable form.\n");
-    t.append("   -twin     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n");
-    t.append("             If there is more than a single twin law to be used, use the twin command multiple times.\n");
-    t.append("   -merge          <List of .tsc files>     Names/Paths to .tsc files to be merged.\n");
-    t.append("   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc files to be merged. They need to have identical hkl values.\n");
-    t.append("   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n");
-    t.append("                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n");
-    t.append("                                            without spaces.\n   Typical use Examples:\n");
-    t.append("      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n");
-    t.append("      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n");
-    t.append("      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n");
-    t.append("      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n");
-    t.append("      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n");
-    t.append("      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n");
-    t.append("      convert tsc:  NoSpherA2.exe -tscb A.tsc\n");
-    t.append("      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n");
-    t.append("      twin law:     NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7 -twin -1 0 0 0 -1 0 0 0 -1\n");
-    return t;
-}
-string NoSpherA2_message()
-{
-    string t = "    _   __     _____       __              ___   ___\n";
+    std::string t = "    _   __     _____       __              ___   ___\n";
     t.append("   / | / /___ / ___/____  / /_  ___  _____/   | |__ \\\n");
     t.append("  /  |/ / __ \\\\__ \\/ __ \\/ __ \\/ _ \\/ ___/ /| | __/ /\n");
     t.append(" / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/\n");
     t.append("/_/ |_/\\____/____/ .___/_/ /_/\\___/_/  /_/  |_/____/\n");
     t.append("                /_/\n");
     t.append("This software is part of the cuQCT software suite developed by Florian Kleemiss.\n");
-    t.append("Please give credit and cite corresponding pieces!\n");
-    t.append("List of contributors of pieces of code or funcitonality:\n");
-    t.append("      Florian Kleemiss,\n");
-    t.append("      Emmanuel Hupf,\n");
-    t.append("      Alessandro Genoni,\n");
-    t.append("      and many more in communications or by feedback!\n");
-    t.append("NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.\n");
-    t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
+    t.append("Please give credit and cite corresponding pieces!\nThis Software is published with BSD-2 clause license.\n");
+    if (!no_date)
+    {
+        t.append("List of contributors of pieces of code or functionality:\n");
+        t.append("      Florian Kleemiss,\n");
+        t.append("      Emmanuel Hupf,\n");
+        t.append("      Alessandro Genoni,\n");
+        t.append("      Lukas M. Seifert,\n");
+        t.append("      Daniel Bruex,\n");
+        t.append("      and many more in communications or by feedback!\n");
+        t.append("NoSpherA2 uses Rascaline, Metatensor, and the OpenBLAS library.\n");
+        t.append("The used packages are published under BSD-3 clause License.\n");
+        t.append("Please see, respectively:\n");
+        t.append("   https://github.com/Luthaf/rascaline\n");
+        t.append("   https://github.com/lab-cosmo/metatensor\n");
+        t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
+        t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
+        t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
+    }
     return t;
 }
 
-string build_date()
-{
-    return ("This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n");
-}
+std::string build_date = ("This Executable was built on: " + std::string(__DATE__) + " " + std::string(__TIME__) + "\n");
 
 bool is_similar_rel(const double &first, const double &second, const double &tolerance)
 {
@@ -100,272 +121,6 @@ bool is_similar_abs(const double &first, const double &second, const double &tol
         return true;
 };
 
-void cls()
-{
-    //    cout << string( 100, '\n' );
-#ifdef _WIN32
-    if (system("CLS"))
-        cout << "this should not happen...!" << endl;
-#else
-    if (system("clear"))
-        cout << "this should not happen...!" << endl;
-#endif
-};
-
-string atnr2letter(const int &nr)
-{
-    vector<string> Labels{"DM", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na", "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc", "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga", "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb", "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb", "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu", "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa", "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md", "No", "Lr"};
-    if (nr == 0)
-    {
-        // Exception for Q peaks in residual maps
-        return "Q";
-    }
-    if (nr > 103 || nr < 0)
-    {
-        if (nr == 119)
-        {
-            // Exception for Q in ECPs from ORCA
-            return "Q";
-        }
-        cout << "Only yet implemented from H-Lr, ask Florian for improvements or give a reasonable number between 1-103!" << endl;
-        return ("PROBLEM");
-    }
-    else
-        return Labels[nr];
-};
-
-int get_Z_from_label(const char *tmp)
-{
-    if (strcmp(tmp, "H") == 0)
-        return 0;
-    else if (strcmp(tmp, "D") == 0)
-        return 0;
-    else if (strcmp(tmp, "T") == 0)
-        return 0;
-    else if (strcmp(tmp, "He") == 0)
-        return 1;
-    else if (strcmp(tmp, "Li") == 0)
-        return 2;
-    else if (strcmp(tmp, "Be") == 0)
-        return 3;
-    else if (strcmp(tmp, "B") == 0)
-        return 4;
-    else if (strcmp(tmp, "C") == 0)
-        return 5;
-    else if (strcmp(tmp, "N") == 0)
-        return 6;
-    else if (strcmp(tmp, "O") == 0)
-        return 7;
-    else if (strcmp(tmp, "F") == 0)
-        return 8;
-    else if (strcmp(tmp, "Ne") == 0)
-        return 9;
-    else if (strcmp(tmp, "Na") == 0)
-        return 10;
-    else if (strcmp(tmp, "Mg") == 0)
-        return 11;
-    else if (strcmp(tmp, "Al") == 0)
-        return 12;
-    else if (strcmp(tmp, "Si") == 0)
-        return 13;
-    else if (strcmp(tmp, "P") == 0)
-        return 14;
-    else if (strcmp(tmp, "S") == 0)
-        return 15;
-    else if (strcmp(tmp, "Cl") == 0)
-        return 16;
-    else if (strcmp(tmp, "Ar") == 0)
-        return 17;
-    else if (strcmp(tmp, "K") == 0)
-        return 18;
-    else if (strcmp(tmp, "Ca") == 0)
-        return 19;
-    else if (strcmp(tmp, "Sc") == 0)
-        return 20;
-    else if (strcmp(tmp, "Ti") == 0)
-        return 21;
-    else if (strcmp(tmp, "V") == 0)
-        return 22;
-    else if (strcmp(tmp, "Cr") == 0)
-        return 23;
-    else if (strcmp(tmp, "Mn") == 0)
-        return 24;
-    else if (strcmp(tmp, "Fe") == 0)
-        return 25;
-    else if (strcmp(tmp, "Co") == 0)
-        return 26;
-    else if (strcmp(tmp, "Ni") == 0)
-        return 27;
-    else if (strcmp(tmp, "Cu") == 0)
-        return 28;
-    else if (strcmp(tmp, "Zn") == 0)
-        return 29;
-    else if (strcmp(tmp, "Ga") == 0)
-        return 30;
-    else if (strcmp(tmp, "Ge") == 0)
-        return 31;
-    else if (strcmp(tmp, "As") == 0)
-        return 32;
-    else if (strcmp(tmp, "Se") == 0)
-        return 33;
-    else if (strcmp(tmp, "Br") == 0)
-        return 34;
-    else if (strcmp(tmp, "Kr") == 0)
-        return 35;
-    else if (strcmp(tmp, "Rb") == 0)
-        return 36;
-    else if (strcmp(tmp, "Sr") == 0)
-        return 37;
-    else if (strcmp(tmp, "Y") == 0)
-        return 38;
-    else if (strcmp(tmp, "Zr") == 0)
-        return 39;
-    else if (strcmp(tmp, "Nb") == 0)
-        return 40;
-    else if (strcmp(tmp, "Mo") == 0)
-        return 41;
-    else if (strcmp(tmp, "Tc") == 0)
-        return 42;
-    else if (strcmp(tmp, "Ru") == 0)
-        return 43;
-    else if (strcmp(tmp, "Rh") == 0)
-        return 44;
-    else if (strcmp(tmp, "Pd") == 0)
-        return 45;
-    else if (strcmp(tmp, "Ag") == 0)
-        return 46;
-    else if (strcmp(tmp, "Cd") == 0)
-        return 47;
-    else if (strcmp(tmp, "In") == 0)
-        return 48;
-    else if (strcmp(tmp, "Sn") == 0)
-        return 49;
-    else if (strcmp(tmp, "Sb") == 0)
-        return 50;
-    else if (strcmp(tmp, "Te") == 0)
-        return 51;
-    else if (strcmp(tmp, "I") == 0)
-        return 52;
-    else if (strcmp(tmp, "Xe") == 0)
-        return 53;
-    else if (strcmp(tmp, "Cs") == 0)
-        return 54;
-    else if (strcmp(tmp, "Ba") == 0)
-        return 55;
-    else if (strcmp(tmp, "La") == 0)
-        return 56;
-    else if (strcmp(tmp, "Ce") == 0)
-        return 57;
-    else if (strcmp(tmp, "Pr") == 0)
-        return 58;
-    else if (strcmp(tmp, "Nd") == 0)
-        return 59;
-    else if (strcmp(tmp, "Pm") == 0)
-        return 60;
-    else if (strcmp(tmp, "Sm") == 0)
-        return 61;
-    else if (strcmp(tmp, "Eu") == 0)
-        return 62;
-    else if (strcmp(tmp, "Gd") == 0)
-        return 63;
-    else if (strcmp(tmp, "Tb") == 0)
-        return 64;
-    else if (strcmp(tmp, "Dy") == 0)
-        return 65;
-    else if (strcmp(tmp, "Ho") == 0)
-        return 66;
-    else if (strcmp(tmp, "Er") == 0)
-        return 67;
-    else if (strcmp(tmp, "Tm") == 0)
-        return 68;
-    else if (strcmp(tmp, "Yb") == 0)
-        return 69;
-    else if (strcmp(tmp, "Lu") == 0)
-        return 70;
-    else if (strcmp(tmp, "Hf") == 0)
-        return 71;
-    else if (strcmp(tmp, "Ta") == 0)
-        return 72;
-    else if (strcmp(tmp, "W") == 0)
-        return 73;
-    else if (strcmp(tmp, "Re") == 0)
-        return 74;
-    else if (strcmp(tmp, "Os") == 0)
-        return 75;
-    else if (strcmp(tmp, "Ir") == 0)
-        return 76;
-    else if (strcmp(tmp, "Pt") == 0)
-        return 77;
-    else if (strcmp(tmp, "Au") == 0)
-        return 78;
-    else if (strcmp(tmp, "Hg") == 0)
-        return 79;
-    else if (strcmp(tmp, "Ti") == 0)
-        return 80;
-    else if (strcmp(tmp, "Pb") == 0)
-        return 81;
-    else if (strcmp(tmp, "Bi") == 0)
-        return 82;
-    else if (strcmp(tmp, "Po") == 0)
-        return 83;
-    else if (strcmp(tmp, "At") == 0)
-        return 84;
-    else if (strcmp(tmp, "Rn") == 0)
-        return 85;
-
-    else if (strcmp(tmp, "Fr") == 0)
-        return 86;
-    else if (strcmp(tmp, "Ra") == 0)
-        return 87;
-    else if (strcmp(tmp, "Ac") == 0)
-        return 88;
-    else if (strcmp(tmp, "Th") == 0)
-        return 89;
-    else if (strcmp(tmp, "Pa") == 0)
-        return 90;
-    else if (strcmp(tmp, "U") == 0)
-        return 91;
-    else if (strcmp(tmp, "Np") == 0)
-        return 92;
-    else if (strcmp(tmp, "Pu") == 0)
-        return 93;
-    else if (strcmp(tmp, "Am") == 0)
-        return 94;
-    else if (strcmp(tmp, "Cm") == 0)
-        return 95;
-    else if (strcmp(tmp, "Bk") == 0)
-        return 96;
-    else if (strcmp(tmp, "Cf") == 0)
-        return 97;
-    else if (strcmp(tmp, "Es") == 0)
-        return 98;
-    else if (strcmp(tmp, "Fm") == 0)
-        return 99;
-    else if (strcmp(tmp, "Md") == 0)
-        return 100;
-    else if (strcmp(tmp, "No") == 0)
-        return 101;
-    else if (strcmp(tmp, "Lr") == 0)
-        return 102;
-    else if (strcmp(tmp, "Rf") == 0)
-        return 103;
-    else if (strcmp(tmp, "Db") == 0)
-        return 104;
-    else if (strcmp(tmp, "Sg") == 0)
-        return 105;
-    else if (strcmp(tmp, "Bh") == 0)
-        return 106;
-    else if (strcmp(tmp, "Hs") == 0)
-        return 107;
-    else if (strcmp(tmp, "Mt") == 0)
-        return 108;
-    else if (strcmp(tmp, "Ds") == 0)
-        return 109;
-    else if (strcmp(tmp, "Rg") == 0)
-        return 110;
-    else
-        return -1;
-}
 /*
 cosinus_annaeherung::cosinus_annaeherung() : mSize(0), mBase_values(nullptr), mStepwidth(1.0) {
     resize(100);
@@ -391,10 +146,10 @@ double cosinus_annaeherung::calculate_error_at(double x) const
     return cos(x) - get(x);
 }
 */
-void copy_file(string &from, string &to)
+void copy_file(std::filesystem::path &from, std::filesystem::path &to)
 {
-    ifstream source(from.c_str(), ios::binary);
-    ofstream dest(to.c_str(), ios::binary);
+    std::ifstream source(from.c_str(), std::ios::binary);
+    std::ofstream dest(to.c_str(), std::ios::binary);
 
     dest << source.rdbuf();
 
@@ -402,184 +157,53 @@ void copy_file(string &from, string &to)
     dest.close();
 };
 
+std::array<double, 3> cross(const std::array<double, 3> &a, const std::array<double, 3> &b)
+{
+    return {
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0]};
+}
+
+double a_dot(const std::array<double, 3> &a, const std::array<double, 3> &b)
+{
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+};
+
 //---------------------------Configuration files ---------------------------------------------------
 
-string get_home_path(void)
+std::filesystem::path get_home_path(void)
 {
 #ifdef _WIN32
-    string temp1 = getenv("HOMEDRIVE");
-    string temp2 = getenv("HOMEPATH");
+    char* homeDrive = nullptr;
+    size_t len = 0;
+    std::string temp1, temp2;
+
+    errno_t err = _dupenv_s(&homeDrive, &len, "HOMEDRIVE");
+    if (err == 0 && homeDrive != nullptr) {
+        temp1 = homeDrive;
+        // Free the allocated memory
+        free(homeDrive);
+    }
+    else {
+        std::cerr << "Failed to retrieve the environment variable." << std::endl;
+    }
+    err = _dupenv_s(&homeDrive, &len, "HOMEPATH");
+    if (err == 0 && homeDrive != nullptr) {
+        temp2 = homeDrive;
+        // Free the allocated memory
+        free(homeDrive);
+    }
+    else {
+        std::cerr << "Failed to retrieve the environment variable." << std::endl;
+    }
     temp1.append(temp2);
     return temp1;
 #else
-    string home = getenv("HOME");
+    std::string home = getenv("HOME");
     return home;
 #endif
 }
-
-void join_path(string &s1, string &s2)
-{
-#ifdef _WIN32
-    s1.append("\\");
-#else
-    if (s1.substr(s1.length() - 1) != "/")
-        s1.append("/");
-#endif
-    s1.append(s2);
-}
-
-string get_filename_from_path(const string &input)
-{
-#ifdef _WIN32
-    return input.substr(input.rfind("\\") + 1);
-#else
-    return input.substr(input.rfind("/") + 1);
-#endif
-}
-
-string get_foldername_from_path(const string &input)
-{
-#ifdef _WIN32
-    return input.substr(0, input.rfind("\\") + 1);
-#else
-    return input.substr(0, input.rfind("/") + 1);
-#endif
-}
-
-string get_basename_without_ending(const string &input)
-{
-    return input.substr(0, input.rfind("."));
-}
-
-void write_template_confi()
-{
-    string line;
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    if (exists(programs))
-    {
-        cout << "File already exists! Aborting!" << endl;
-        return;
-    }
-    ofstream conf(programs.c_str());
-#ifdef _WIN32
-    conf << "gaussian=\"D:\\g09\\g09\\\"" << endl;
-    conf << "turbomole=\"D:\\turbomole\\dscf7.1\\\"" << endl;
-    conf << "basis=\"D:\\tonto\\basis_sets\\\"" << endl;
-#else
-    conf << "gaussian=\"/usr/local/g09/g09\"" << endl;
-    conf << "turbomole=\"/usr/local/bin/dscf7.1\"" << endl;
-    conf << "basis=\"/basis_sets/\"" << endl;
-#endif
-    conf << "cpu=4" << endl;
-    conf << "mem=4.0" << endl;
-    conf << "rho=1" << endl;
-    conf << "rdg=1" << endl;
-    conf << "eli=0" << endl;
-    conf << "elf=0" << endl;
-    conf << "lap=0" << endl;
-    conf << "esp=0" << endl;
-    conf << "efv=0" << endl;
-    conf << "def=0" << endl;
-    conf << "hir=0" << endl;
-    conf.flush();
-    conf.close();
-#ifdef _WIN32
-    //	const wchar_t* fileLPCWSTR = programs.c_str();
-    //	wstring stemp = wstring(programs.begin(), programs.end());
-    //	int attr = GetFileAttributes(stemp.c_str());
-    //	if ((attr & FILE_ATTRIBUTE_HIDDEN) == 0) {
-    //		SetFileAttributes(stemp.c_str(), attr | FILE_ATTRIBUTE_HIDDEN);
-    //	}
-#endif
-    return;
-};
-
-int program_confi(string &gaussian_path, string &turbomole_path, string &basis, int &ncpus, double &mem, bool debug, bool expert, unsigned int counter)
-{
-    counter++;
-    if (counter == 3)
-    {
-        cout << "Too many iterations of tries to read config file, better abort..." << endl;
-        return -1;
-    }
-    string programs = get_home_path();
-    string filename = ".cuQCT.conf";
-    join_path(programs, filename);
-    ifstream conf(programs.c_str());
-    if (debug)
-        cout << programs << endl;
-    string line;
-    if (conf.good())
-    {
-        if (debug)
-            cout << "File is valid, continuing..." << endl;
-    }
-    else
-    {
-        if (expert)
-        {
-            cout << "couldn't open or find .cuQCT.conf, in your home folder: " << programs << ", writing a template for you!" << endl;
-            write_template_confi();
-            if (program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug, expert, counter) != 1)
-                return -1;
-            cout << "Wrote a template for you, read default values!" << endl;
-            return 0;
-        }
-        else
-        {
-            write_template_confi();
-            program_confi(gaussian_path, turbomole_path, basis, ncpus, mem, debug);
-            return 0;
-        }
-    }
-    conf.seekg(0);
-    getline(conf, line);
-    size_t length;
-    char *tempchar = new char[200];
-    int run = 0;
-    while (!conf.eof())
-    {
-        switch (run)
-        {
-        case 0:
-            length = line.copy(tempchar, line.size() - 11, 10);
-            tempchar[length] = '\0';
-            gaussian_path = tempchar;
-            break;
-        case 1:
-            length = line.copy(tempchar, line.size() - 12, 11);
-            tempchar[length] = '\0';
-            turbomole_path = tempchar;
-            break;
-        case 2:
-            length = line.copy(tempchar, line.size() - 8, 7);
-            tempchar[length] = '\0';
-            basis = tempchar;
-            break;
-        case 3:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            ncpus = stoi(tempchar);
-            break;
-        case 4:
-            length = line.copy(tempchar, line.size() - 3, 4);
-            tempchar[length] = '\0';
-            mem = stod(tempchar);
-            break;
-        default:
-            if (debug)
-                cout << "found everything i was looking for, if you miss something check the switch" << endl;
-            break;
-        }
-        if (debug)
-            cout << run << ". line: " << tempchar << endl;
-        run++;
-        getline(conf, line);
-    }
-    return 1;
-};
 
 bool check_bohr(WFN &wave, bool debug)
 {
@@ -600,7 +224,7 @@ bool check_bohr(WFN &wave, bool debug)
             d[2] = atom1[2] - atom2[2];
             double length = sqrt(pow(d[0], 2) + pow(d[1], 2) + pow(d[2], 2));
             if (debug)
-                cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << endl;
+                std::cout << "Length for: " << i << ";" << j << ": " << length << ", min_length: " << min_length << std::endl;
             if (length < min_length)
                 min_length = length;
         }
@@ -608,14 +232,14 @@ bool check_bohr(WFN &wave, bool debug)
     if (debug)
     {
         if (min_length < 2)
-            cout << "Decided it's written in Angstrom" << endl;
+            std::cout << "Decided it's written in Angstrom" << std::endl;
         else
-            cout << "Decided it's written in Bohr" << endl;
+            std::cout << "Decided it's written in Bohr" << std::endl;
     }
     return (!(min_length < 2));
 };
 
-int filetype_identifier(string &file, bool debug)
+int filetype_identifier(std::string &file, bool debug)
 {
     /*
     List of filetypes and correpsonding values:
@@ -627,36 +251,37 @@ int filetype_identifier(string &file, bool debug)
     -g/o *.grd      6: XDGraph grid file
     -o *.(F)fc(C)hk 5: fchk
     */
+    using namespace std;
     if (debug)
     {
-        cout << "Testing WFN:  " << file.find(".wfn") << endl
-             << "Testing out:  " << file.find(".out") << endl
-             << "Testing FFN:  " << file.find(".ffn") << endl
-             << "Testing CUB:  " << file.find(".cub") << endl
-             << "Testing CUBE: " << file.find(".cube") << endl
-             << "Testing Grid: " << file.find(".grd") << endl
-             << "Testing fchk: " << file.find(".fchk") << endl
-             << "Testing FChk: " << file.find(".FChk") << endl
-             << "Testing Fchk: " << file.find(".Fchk") << endl;
-        cout << "string::npos: " << string::npos << endl;
+        std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
+                  << "Testing out:  " << file.find(".out") << std::endl
+                  << "Testing FFN:  " << file.find(".ffn") << std::endl
+                  << "Testing CUB:  " << file.find(".cub") << std::endl
+                  << "Testing CUBE: " << file.find(".cube") << std::endl
+                  << "Testing Grid: " << file.find(".grd") << std::endl
+                  << "Testing fchk: " << file.find(".fchk") << std::endl
+                  << "Testing FChk: " << file.find(".FChk") << std::endl
+                  << "Testing Fchk: " << file.find(".Fchk") << std::endl;
+        std::cout << "string::npos: " << std::string::npos << std::endl;
     }
     int temp_type = 0;
     size_t found, temp;
     temp = 0;
     if (debug)
-        cout << "Temp before any checks: " << temp << endl;
-    vector<string> types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
-    if (file.find(".wfn") != string::npos)
+        std::cout << "Temp before any checks: " << temp << std::endl;
+    svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
+    if (file.find(".wfn") != std::string::npos)
     {
         if (debug)
-            cout << "Checking for"
-                 << ".wfn" << endl;
+            std::cout << "Checking for"
+                      << ".wfn" << std::endl;
         temp_type = 2;
         found = file.rfind(".wfn");
         if (debug)
-            cout << "Found: " << found << endl;
+            std::cout << "Found: " << found << std::endl;
         for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
+            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != std::string::npos)
                 temp = file.rfind(types[i]);
         if (debug)
             cout << "Temp: " << temp << endl;
@@ -765,15 +390,15 @@ int filetype_identifier(string &file, bool debug)
     return -1;
 }
 
-string go_get_string(ifstream &file, string search, bool rewind)
+std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
     if (rewind)
     {
         file.clear();
         file.seekg(0, file.beg);
     }
-    string line;
-    while (line.find(search) == string::npos && !file.eof() && getline(file, line))
+    std::string line;
+    while (line.find(search) == std::string::npos && !file.eof() && getline(file, line))
         continue;
     if (file.eof())
         return "";
@@ -781,7 +406,7 @@ string go_get_string(ifstream &file, string search, bool rewind)
         return line;
 }
 
-string shrink_string(string &input)
+std::string shrink_string(std::string &input)
 {
     while (input.find(" ") != -1)
     {
@@ -838,7 +463,7 @@ string shrink_string(string &input)
     return input;
 };
 
-string shrink_string_to_atom(string &input, const int &atom_number)
+std::string shrink_string_to_atom(std::string &input, const int &atom_number)
 {
     while (input.find(" ") != -1)
     {
@@ -892,7 +517,7 @@ string shrink_string_to_atom(string &input, const int &atom_number)
     {
         input.erase(input.find(")"), 1);
     }
-    string temp = atnr2letter(atom_number);
+    std::string temp = constants::atnr2letter(atom_number);
     err_checkf(temp != "PROBLEM", "Problem identifying atoms!", std::cout);
     if (input.find(temp) != 1)
         return temp;
@@ -900,6 +525,27 @@ string shrink_string_to_atom(string &input, const int &atom_number)
         while (input.size() > temp.size())
             input.pop_back();
     return input;
+};
+
+bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
+{
+    int size_begin = 0, size_end = 0;
+    file.read(reinterpret_cast<char *>(&size_begin), sizeof(int));
+    file.read(reinterpret_cast<char *>(Target), size_begin);
+    file.read(reinterpret_cast<char *>(&size_end), sizeof(int));
+    if (size_begin != size_end)
+    {
+        std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
+        return false;
+    }
+    return true;
+}
+
+primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
+{
+    norm_const = pow(
+        pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
+        0.25);
 };
 
 /*bool open_file_dialog(string &path, bool debug, vector <string> filter){
@@ -1167,11 +813,12 @@ bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
 };
 */
 
-void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
+void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
     //  selection[1][i] for iths selection of cube
+    using namespace std;
     cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
     if (nr_of_cubes > 1)
         cout << "s in total." << endl;
@@ -1185,9 +832,9 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
         cout << "_____________________________________________________________" << endl;
         cout << "WFN ";
         stream << setw(2) << w;
-        cout << stream.str() << ") " << get_basename_without_ending(wavy[w].get_path()) << endl;
+        cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
         stream.str("");
-        for (int c = 0; c < wavy[w].cub.size(); c++)
+        for (int c = 0; c < wavy[w].get_cube_count(); c++)
         {
             if (c == 0)
                 cout << "        |" << endl
@@ -1202,8 +849,8 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
             }
             else
                 cout << "     ";
-            cout << "   |_ " << get_basename_without_ending(wavy[w].cub[c].path);
-            if (!exists(wavy[w].cub[c].path))
+            cout << "   |_ " << wavy[w].get_cube_path(c).stem();
+            if (!exists(wavy[w].get_cube_path(c)))
                 cout << " (MEM ONLY)";
             cout << endl;
         }
@@ -1258,10 +905,10 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
         string wave(input.substr(0, input.find('.')));
         string cube(input.substr(input.find('.') + 1));
         unsigned int nr_wave = fromString<unsigned int>(wave);
-        unsigned int nr_cube = fromString<unsigned int>(cube);
+        int nr_cube = fromString<int>(cube);
         if (debug)
             cout << "Translated: " << nr_wave << " " << nr_cube << endl;
-        if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].cub.size())
+        if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].get_cube_count())
         {
             cout << "Invalid choice!" << endl;
             continue;
@@ -1278,30 +925,14 @@ void select_cubes(vector<vector<unsigned int>> &selection, vector<WFN> &wavy, un
     } while (true);
 };
 
-bool unsaved_files(vector<WFN> &wavy)
+bool unsaved_files(std::vector<WFN> &wavy)
 {
     for (int w = 0; w < wavy.size(); w++)
-        for (int c = 0; c < wavy[w].cub.size(); c++)
-            if (!exists(wavy[w].cub[c].path))
+        for (int c = 0; c < wavy[w].get_cube_count(); c++)
+            if (!exists(wavy[w].get_cube_path(c)))
                 return true;
     return false;
 };
-
-void progress_bar::write(double fraction)
-{
-    // clamp fraction to valid range [0,1]
-    if (fraction < 0)
-        fraction = 0;
-    else if (fraction > 1)
-        fraction = 1;
-
-    auto width = bar_width - message.size();
-    auto offset = bar_width - static_cast<unsigned>(width * round(fraction / precision) * precision);
-
-    os << '\r' << message;
-    os.write(full_bar.data() + offset, width);
-    os << " [" << std::setw(3) << static_cast<int>(100 * round(fraction / precision) * precision) << "%] " << std::flush;
-}
 
 void readxyzMinMax_fromWFN(
     WFN &wavy,
@@ -1311,54 +942,33 @@ void readxyzMinMax_fromWFN(
     double Increments,
     bool no_bohr)
 {
-    vector<vector<double>> PosAtoms;
-    PosAtoms.resize(wavy.get_ncen());
-    for (int i = 0; i < wavy.get_ncen(); i++)
-        PosAtoms[i].resize(3);
-    bool bohrang = !check_bohr(wavy, false);
-    if (no_bohr)
-        bohrang = true;
+    vec2 PosAtoms;
+    PosAtoms.resize(3);
+    for (int i = 0; i < 3; i++)
+        PosAtoms[i].resize(wavy.get_ncen());
+    bool bohrang = true;
+    if (!no_bohr)
+        bohrang = !check_bohr(wavy, false);
+
     for (int j = 0; j < wavy.get_ncen(); j++)
     {
-
-        PosAtoms[j][0] = wavy.atoms[j].x;
-        PosAtoms[j][1] = wavy.atoms[j].y;
-        PosAtoms[j][2] = wavy.atoms[j].z;
+        PosAtoms[0][j] = wavy.get_atom_coordinate(j, 0);
+        PosAtoms[1][j] = wavy.get_atom_coordinate(j, 1);
+        PosAtoms[2][j] = wavy.get_atom_coordinate(j, 2);
         if (!bohrang)
         {
-            cout << "Dividing atom positions!" << endl;
             for (int i = 0; i < 3; i++)
-                PosAtoms[j][i] = constants::ang2bohr(PosAtoms[j][i]);
-        }
-        if (j == 0)
-        {
-            CoordMinMax[0] = PosAtoms[j][0];
-            CoordMinMax[3] = PosAtoms[j][0];
-            CoordMinMax[1] = PosAtoms[j][1];
-            CoordMinMax[4] = PosAtoms[j][1];
-            CoordMinMax[2] = PosAtoms[j][2];
-            CoordMinMax[5] = PosAtoms[j][2];
-        }
-
-        else
-        {
-            if (CoordMinMax[0] > PosAtoms[j][0])
-                CoordMinMax[0] = PosAtoms[j][0];
-            if (CoordMinMax[3] < PosAtoms[j][0])
-                CoordMinMax[3] = PosAtoms[j][0];
-
-            if (CoordMinMax[1] > PosAtoms[j][1])
-                CoordMinMax[1] = PosAtoms[j][1];
-            if (CoordMinMax[4] < PosAtoms[j][1])
-                CoordMinMax[4] = PosAtoms[j][1];
-
-            if (CoordMinMax[2] > PosAtoms[j][2])
-                CoordMinMax[2] = PosAtoms[j][2];
-            if (CoordMinMax[5] < PosAtoms[j][2])
-                CoordMinMax[5] = PosAtoms[j][2];
+                PosAtoms[i][j] = constants::ang2bohr(PosAtoms[i][j]);
         }
     }
-    double temp_rad = constants::ang2bohr(Radius);
+    CoordMinMax[0] = *std::min_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    CoordMinMax[3] = *std::max_element(PosAtoms[0].begin(), PosAtoms[0].end());
+    CoordMinMax[1] = *std::min_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    CoordMinMax[4] = *std::max_element(PosAtoms[1].begin(), PosAtoms[1].end());
+    CoordMinMax[2] = *std::min_element(PosAtoms[2].begin(), PosAtoms[2].end());
+    CoordMinMax[5] = *std::max_element(PosAtoms[2].begin(), PosAtoms[2].end());
+
+    const double temp_rad = constants::ang2bohr(Radius);
     CoordMinMax[0] -= temp_rad;
     CoordMinMax[3] += temp_rad;
     CoordMinMax[1] -= temp_rad;
@@ -1372,149 +982,40 @@ void readxyzMinMax_fromWFN(
 }
 
 void readxyzMinMax_fromCIF(
-    string cif,
+    std::filesystem::path cif,
     double *CoordMinMax,
     int *NbSteps,
-    vector<vector<double>> &cm,
-    double Resolution,
-    ofstream &file,
-    bool debug)
+    vec2 &cm,
+    double Resolution)
 {
-    if (debug)
-        file << "starting to read cif!" << endl;
-    if (!exists(cif))
-    {
-        file << "CIF does not exists!" << endl;
-        return;
-    }
-    ifstream cif_input(cif.c_str(), ios::in);
-    vector<bool> found;
-    string line;
-    found.resize(7);
-    for (int k = 0; k < 7; k++)
-        found[k] = false;
-    double a = 0.0, b = 0.0, c = 0.0, v = 0.0;
-    double alpha = 0.0, beta = 0.0, gamma = 0.0;
-    vector<string> cell_keywords;
-    cell_keywords.push_back("_cell_length_a");
-    cell_keywords.push_back("_cell_length_b");
-    cell_keywords.push_back("_cell_length_c");
-    cell_keywords.push_back("_cell_angle_alpha");
-    cell_keywords.push_back("_cell_angle_beta");
-    cell_keywords.push_back("_cell_angle_gamma");
-    cell_keywords.push_back("_cell_volume");
-    if (debug)
-        file << "Starting while !.eof()" << endl;
-    while (!cif_input.eof())
-    {
-        if (debug)
-            file << "While line! " << setw(80) << line
-                 << setw(10) << a << found[0]
-                 << setw(10) << b << found[1]
-                 << setw(10) << c << found[2]
-                 << setw(10) << alpha << found[3]
-                 << setw(10) << beta << found[4]
-                 << setw(10) << gamma << found[5]
-                 << setw(10) << v << found[6] << endl;
-        getline(cif_input, line);
-        for (int k = 0; k < cell_keywords.size(); k++)
-        {
-            if (line.find(cell_keywords[k]) != string::npos)
-            {
-                switch (k)
-                {
-                case 0:
-                    a = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 1:
-                    b = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 2:
-                    c = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 3:
-                    alpha = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 4:
-                    beta = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 5:
-                    gamma = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                case 6:
-                    v = stod(line.substr(cell_keywords[k].length(), line.find("(")));
-                    break;
-                default:
-                    file << "This is weird... should never get here... aborting!" << endl;
-                    return;
-                }
-                found[k] = true;
-            }
-        }
-        if (found[0] == true && found[1] == true && found[2] == true && found[3] == true && found[4] == true && found[5] == true && found[6] == true)
-            break;
-    }
-    double ca = cos(constants::PI_180 * alpha);
-    double cb = cos(constants::PI_180 * beta);
-    double cg = cos(constants::PI_180 * gamma);
-    double sa = sin(constants::PI_180 * alpha);
-    double sb = sin(constants::PI_180 * beta);
-    double sg = sin(constants::PI_180 * gamma);
-    double Vp = sqrt((1 - ca * ca - cb * cb - cg * cg) + 2 * (ca * cb * cg));
-    double V = a * b * c * Vp;
+    using namespace std;
+    cell cell(cif);
 
-    if (debug)
-        file << "Making cm" << endl
-             << a << " " << b << " " << c << " " << ca << " " << cb << " " << cg << " " << sa << " " << sb << " " << sg << " " << V << " vs. " << v << endl;
-
-    cm[0][0] = a / 0.529177249;
-    cm[1][0] = 0.0;
-    cm[2][0] = 0.0;
-
-    cm[0][1] = b * cg / 0.529177249;
-    cm[1][1] = b * sg / 0.529177249;
-    cm[2][1] = 0.0;
-
-    cm[0][2] = c * cb / 0.529177249;
-    cm[1][2] = (c * (ca - cb * cg) / sg) / 0.529177249;
-    cm[2][2] = V / (a * b * sg) / 0.529177249;
+    cm[0][0] = constants::ang2bohr(cell.get_a());
+    cm[0][1] = constants::ang2bohr(cell.get_b() * cell.get_cg());
+    cm[0][2] = constants::ang2bohr(cell.get_c() * cell.get_cb());
+    cm[1][1] = constants::ang2bohr(cell.get_b() * cell.get_sg());
+    cm[1][2] = constants::ang2bohr(cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg());
+    cm[2][2] = constants::ang2bohr(cell.get_V() / (cell.get_a() * cell.get_b() * cell.get_sg()));
 
     CoordMinMax[0] = 0.0;
     CoordMinMax[1] = 0.0;
     CoordMinMax[2] = 0.0;
 
-    CoordMinMax[3] = (a + b * cg + c * cb) / 0.529177249;
-    CoordMinMax[4] = (b * sg + c * (ca - cb * cg) / sg) / 0.529177249;
-    CoordMinMax[5] = V / (a * b * sg) / 0.529177249;
+    CoordMinMax[3] = (cell.get_a() + cell.get_b() * cell.get_cg() + cell.get_c() * cell.get_cb()) / 0.529177249;
+    CoordMinMax[4] = (cell.get_b() * cell.get_sg() + cell.get_c() * (cell.get_ca() - cell.get_cb() * cell.get_cg()) / cell.get_sg()) / 0.529177249;
+    CoordMinMax[5] = cm[2][2];
 
-    NbSteps[0] = (int)ceil(a / Resolution);
-    NbSteps[1] = (int)ceil(b / Resolution);
-    NbSteps[2] = (int)ceil(c / Resolution);
+    NbSteps[0] = (int)ceil(cell.get_a() / Resolution);
+    NbSteps[1] = (int)ceil(cell.get_b() / Resolution);
+    NbSteps[2] = (int)ceil(cell.get_c() / Resolution);
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
             cm[i][j] /= NbSteps[j];
-
-    cif_input.close();
 }
 
-const double normgauss(const int &type, const double &exp)
-{
-    int t[3];
-    if (type > 0)
-    {
-        type2vector(type, t);
-        err_checkf(t[0] != -1, "Problem with type2vector!", std::cout);
-        err_checkf(t[1] != -1, "Problem with type2vector!", std::cout);
-        err_checkf(t[2] != -1, "Problem with type2vector!", std::cout);
-    }
-    else
-        t[0] = t[1] = t[2] = 0;
-    long long int temp = constants::ft[t[0]] * constants::ft[t[1]] * constants::ft[t[2]];
-    long long int temp2 = constants::ft[2 * t[0]] * constants::ft[2 * t[1]] * constants::ft[2 * t[2]];
-    return pow(2 * exp / constants::PI, 0.75) * sqrt(pow(8 * exp, t[0] + t[1] + t[2]) * temp / temp2);
-};
-bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vector<vec> &g)
+bool generate_sph2cart_mat(vec2 &p, vec2 &d, vec2 &f, vec2 &g)
 {
     //
     // From 3P: P0 P1 P2
@@ -1642,7 +1143,7 @@ bool generate_sph2cart_mat(vector<vec> &p, vector<vec> &d, vector<vec> &f, vecto
     g[14][4] = 3.0 / sqrt(7);
     return true;
 }
-bool generate_cart2sph_mat(vector<vec> &d, vector<vec> &f, vector<vec> &g, vector<vec> &h)
+bool generate_cart2sph_mat(vec2 &d, vec2 &f, vec2 &g, vec2 &h)
 {
     //
     // From 5D: D 0, D + 1, D - 1, D + 2, D - 2
@@ -1826,93 +1327,19 @@ bool generate_cart2sph_mat(vector<vec> &d, vector<vec> &f, vector<vec> &g, vecto
     return true;
 }
 
-const int type_vector[168]{
-    0, 0, 0,
-    1, 0, 0,
-    0, 1, 0,
-    0, 0, 1,
-    2, 0, 0,
-    0, 2, 0,
-    0, 0, 2,
-    1, 1, 0,
-    1, 0, 1,
-    0, 1, 1,
-    3, 0, 0,
-    0, 3, 0,
-    0, 0, 3,
-    2, 1, 0,
-    2, 0, 1,
-    0, 2, 1,
-    1, 2, 0,
-    1, 0, 2,
-    0, 1, 2,
-    1, 1, 1,
-    0, 0, 4,
-    0, 1, 3,
-    0, 2, 2,
-    0, 3, 1,
-    0, 4, 0,
-    1, 0, 3,
-    1, 1, 2,
-    1, 2, 1,
-    1, 3, 0,
-    2, 0, 2,
-    2, 1, 1,
-    2, 2, 0,
-    3, 0, 1,
-    3, 1, 0,
-    4, 0, 0,
-    0, 0, 5,
-    0, 1, 4,
-    0, 2, 3,
-    0, 3, 2,
-    0, 4, 1,
-    0, 5, 0,
-    1, 0, 4,
-    1, 1, 3,
-    1, 2, 2,
-    1, 3, 1,
-    1, 4, 0,
-    2, 0, 3,
-    2, 1, 2,
-    2, 2, 1,
-    2, 3, 0,
-    3, 0, 2,
-    3, 1, 1,
-    3, 2, 0,
-    4, 0, 1,
-    4, 1, 0,
-    5, 0, 0};
-
-void type2vector(
-    const int &index,
-    int *vector)
+bool read_fracs_ADPs_from_CIF(std::filesystem::path &cif, WFN &wavy, cell &unit_cell, std::ofstream &log3, bool debug)
 {
-    if (index < 1 || index > 56)
-    {
-        vector[0] = -1;
-        vector[1] = -1;
-        vector[2] = -1;
-        return;
-    }
-    const int temp = index - 1;
-    vector[0] = type_vector[temp * 3];
-    vector[1] = type_vector[temp * 3 + 1];
-    vector[2] = type_vector[temp * 3 + 2];
-}
-
-bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &log3, bool debug)
-{
-    vector<vec> Uij, Cijk, Dijkl;
-    ifstream asym_cif_input(cif.c_str(), std::ios::in);
+    using namespace std;
+    vec2 Uij, Cijk, Dijkl;
+    ifstream asym_cif_input(cif, std::ios::in);
     asym_cif_input.clear();
     asym_cif_input.seekg(0, asym_cif_input.beg);
     string line;
-    vector<string> labels;
+    svec labels;
     int count_fields = 0;
     int position_field[3] = {0, 0, 0};
     int label_field = 100;
-    vector<vector<double>> positions;
+    vec2 positions;
     positions.resize(wavy.get_ncen());
 
 #pragma omp parallel for schedule(dynamic)
@@ -1951,7 +1378,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -1963,13 +1390,13 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
                     log3 << "label: " << fields[label_field] << " cartesian position: " << positions[labels.size()][0] << " " << positions[labels.size()][1] << " " << positions[labels.size()][2] << endl;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (is_similar(positions[labels.size()][0], wavy.atoms[i].x, -1) && is_similar(positions[labels.size()][1], wavy.atoms[i].y, -1) && is_similar(positions[labels.size()][2], wavy.atoms[i].z, -1))
+                    if (is_similar(positions[labels.size()][0], wavy.get_atom_coordinate(i, 0), -1) && is_similar(positions[labels.size()][1], wavy.get_atom_coordinate(i, 1), -1) && is_similar(positions[labels.size()][2], wavy.get_atom_coordinate(i, 2), -1))
                     {
                         if (debug)
-                            log3 << "WFN position: " << wavy.atoms[i].x << " " << wavy.atoms[i].y << " " << wavy.atoms[i].z << endl
-                                 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.atoms[i].charge << endl;
-                        wavy.atoms[i].label = fields[label_field];
-                        wavy.atoms[i].frac_coords = {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])};
+                            log3 << "WFN position: " << wavy.get_atom_coordinate(i, 0) << " " << wavy.get_atom_coordinate(i, 1) << " " << wavy.get_atom_coordinate(i, 2) << endl
+                                 << "Found an atom: " << fields[label_field] << " Corresponding to atom charge " << wavy.get_atom_charge(i) << endl;
+                        wavy.set_atom_label(i, fields[label_field]);
+                        wavy.set_atom_frac_coords(i, {stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])});
                         found_this_one = true;
                         break;
                     }
@@ -2025,7 +1452,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2034,7 +1461,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Uij[i].resize(6);
                         for (int j = 0; j < 6; j++)
@@ -2100,7 +1527,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2109,7 +1536,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Cijk[i].resize(10);
                         for (int j = 0; j < 6; j++)
@@ -2185,7 +1612,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
             {
                 atoms_read = true;
                 stringstream s(line);
-                vector<string> fields;
+                svec fields;
                 fields.resize(count_fields);
                 for (int i = 0; i < count_fields; i++)
                     s >> fields[i];
@@ -2194,7 +1621,7 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
                 bool found_this_one = false;
                 for (int i = 0; i < wavy.get_ncen(); i++)
                 {
-                    if (fields[label_field] == wavy.atoms[i].label)
+                    if (fields[label_field] == wavy.get_atom_label(i))
                     {
                         Dijkl[i].resize(15);
                         for (int j = 0; j < 6; j++)
@@ -2211,71 +1638,11 @@ bool read_fracs_ADPs_from_CIF(string cif, WFN &wavy, cell &unit_cell, ofstream &
     }
 
     for (int i = 0; i < wavy.get_ncen(); i++)
-        wavy.atoms[i].assign_ADPs(Uij[i], Cijk[i], Dijkl[i]);
+        wavy.set_atom_ADPs(i, {Uij[i], Cijk[i], Dijkl[i]});
 
     return true;
 };
 
-bool read_fchk_integer_block(ifstream &in, string heading, ivec &result, bool rewind)
-{
-    if (result.size() != 0)
-        result.clear();
-    string line = go_get_string(in, heading, rewind);
-    int limit = read_fchk_integer(line);
-    int run = 0;
-    int temp;
-    getline(in, line);
-    while (run < limit)
-    {
-        if (in.eof())
-            return false;
-        temp = stoi(line.substr(12 * (run % 6), 12 * (run % 6 + 1)));
-        result.push_back(temp);
-        run++;
-        if (run % 6 == 0)
-            getline(in, line);
-    }
-    return true;
-};
-bool read_fchk_double_block(ifstream &in, string heading, vec &result, bool rewind)
-{
-    if (result.size() != 0)
-        result.clear();
-    string line = go_get_string(in, heading, rewind);
-    int limit = read_fchk_integer(line);
-    int run = 0;
-    double temp;
-    getline(in, line);
-    while (run < limit)
-    {
-        if (in.eof())
-            return false;
-        temp = stod(line.substr(16 * (run % 5), 16 * (run % 5 + 1)));
-        result.push_back(temp);
-        run++;
-        if (run % 5 == 0)
-            getline(in, line);
-    }
-    return true;
-};
-int read_fchk_integer(string in)
-{
-    return stoi(in.substr(49, in.length() - 49));
-};
-double read_fchk_double(string in)
-{
-    return stod(in.substr(49, in.length() - 49));
-};
-int read_fchk_integer(std::ifstream &in, std::string search, bool rewind)
-{
-    string temp = go_get_string(in, search, rewind);
-    return stoi(temp.substr(49, temp.length() - 49));
-};
-double read_fchk_double(std::ifstream &in, std::string search, bool rewind)
-{
-    string temp = go_get_string(in, search, rewind);
-    return stod(temp.substr(49, temp.length() - 49));
-};
 void swap_sort(ivec order, cvec &v)
 {
     int i = 0;
@@ -2389,119 +1756,192 @@ double get_lambda_1(double *a)
 
 const double gaussian_radial(primitive &p, double &r)
 {
-    return pow(r, p.type) * std::exp(-p.exp * r * r) * p.norm_const;
+    return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
 
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs)
+double get_bessel_ratio(const double nu, const double x)
 {
-    double dens = 0, radial = 0;
-    int coef_counter = 0;
-    int e = 0, size = 0;
-    for (int a = 0; a < atoms.size(); a++)
+    const double RECUR_BIG = DBL_MAX;
+    const double RECUR_SMALL = DBL_MIN;
+    const int maxiter = 10000;
+    int n = 1;
+    double Anm2 = 1.0;
+    double Bnm2 = 0.0;
+    double Anm1 = 0.0;
+    double Bnm1 = 1.0;
+    double a1 = x / (2.0 * (nu + 1.0));
+    double An = Anm1 + a1 * Anm2;
+    double Bn = Bnm1 + a1 * Bnm2;
+    double an;
+    double fn = An / Bn;
+    double dn = a1;
+    double s = 1.0;
+
+    while (n < maxiter)
     {
-        size = (int)atoms[a].basis_set.size();
-        basis_set_entry *bf;
-        double d[4]{
-            x - atoms[a].x,
-            y - atoms[a].y,
-            z - atoms[a].z, 0.0};
-        // store r in last element
-        d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        for (e = 0; e < size; e++)
+        double old_fn;
+        double del;
+        n++;
+        Anm2 = Anm1;
+        Bnm2 = Bnm1;
+        Anm1 = An;
+        Bnm1 = Bn;
+        an = -x * x / (4.0 * (nu + n - 1.0) * (nu + n));
+        An = Anm1 + an * Anm2;
+        Bn = Bnm1 + an * Bnm2;
+
+        if (fabs(An) > RECUR_BIG || fabs(Bn) > RECUR_BIG)
         {
-            bf = &atoms[a].basis_set[e];
-            primitive p(a, bf->type, bf->exponent, bf->coefficient);
-            radial = gaussian_radial(p, d[3]);
-            for (int m = -p.type; m <= p.type; m++)
-            {
-                // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
-            }
-            coef_counter += (2 * p.type + 1);
+            An /= RECUR_BIG;
+            Bn /= RECUR_BIG;
+            Anm1 /= RECUR_BIG;
+            Bnm1 /= RECUR_BIG;
+            Anm2 /= RECUR_BIG;
         }
+        else if (fabs(An) < RECUR_SMALL || fabs(Bn) < RECUR_SMALL)
+        {
+            An /= RECUR_SMALL;
+            Bn /= RECUR_SMALL;
+            Anm1 /= RECUR_SMALL;
+            Bnm1 /= RECUR_SMALL;
+            Anm2 /= RECUR_SMALL;
+            Bnm2 /= RECUR_SMALL;
+        }
+
+        old_fn = fn;
+        fn = An / Bn;
+        del = old_fn / fn;
+
+        dn = 1.0 / (2.0 * (nu + n) / x - dn);
+        if (dn < 0.0)
+            s = -s;
+
+        if (fabs(del - 1.0) < 2.0 * DBL_EPSILON)
+            break;
     }
-    err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
-    return dens;
+
+    return fn;
 }
 
-const double calc_density_ML(double &x,
-                             double &y,
-                             double &z,
-                             vec &coefficients,
-                             std::vector<atom> &atoms,
-                             const int &exp_coefs,
-                             const int &atom_nr)
+double bessel_first_kind(const int l, const double x)
 {
-    double dens = 0, radial = 0;
-    int coef_counter = 0;
-    int e = 0, size = 0;
-    for (int a = 0; a < atoms.size(); a++)
+    if (l < 0 || x < 0.0)
     {
-        if (a == atom_nr)
+        err_not_impl_f("This is not implemented, pelase dont do this to me!", std::cout);
+        return -1000;
+    }
+    else if (x == 0.0)
+    {
+        return (l > 0 ? 0.0 : 1.0);
+    }
+    else if (l == 0)
+    {
+        return sin(x) / x;
+    }
+    else if (l == 1)
+    {
+        return (sin(x) / x - cos(x)) / x;
+    }
+    else if (l == 2)
+    {
+        const double f = (3.0 / (x * x) - 1.0);
+        return (f * sin(x) - 3.0 * cos(x) / x) / x;
+    }
+    else if (l == 3)
+    {
+        double x2 = x * x;
+        const double f1 = (x2 - 15.0);
+        const double f2 = (6. * x2 - 15.);
+        return (-f2 * sin(x) + f1 * cos(x) * x) / pow(x, 4);
+    }
+    else if (l == 4)
+    {
+        double x2 = x * x;
+        const double f1 = (10. * x2 - 105.0);
+        const double f2 = (x2 * x2 - 45. * x2 + 105.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / pow(x, 5);
+    }
+    else if (l == 5)
+    {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = (-x4 + 105.0 * x2 - 945.);
+        const double f2 = (15. * x4 - 420. * x2 + 945.);
+        return (f2 * sin(x) + f1 * cos(x) * x) / (x4 * x2);
+    }
+    else if (l == 6)
+    {
+        double x2 = x * x;
+        double x4 = x2 * x2;
+        const double f1 = 21. * (x4 - 60.0 * x2 + 495.);
+        const double f2 = (-x4 * x2 + 210. * x4 - 4725 * x2 + 10395.);
+        return (f2 * sin(x) - f1 * cos(x) * x) / pow(x, 7);
+    }
+    else
+    {
+        double ratio = get_bessel_ratio(l + 0.5, x);
+        const double smallest = DBL_MIN / DBL_EPSILON;
+        double jellp1 = smallest * ratio;
+        double jell = smallest;
+        double jellm1;
+        int ell;
+        for (ell = l; ell > 0; ell--)
         {
-            size = (int)atoms[a].basis_set.size();
-            basis_set_entry *bf;
-            double d[4]{
-                x - atoms[a].x,
-                y - atoms[a].y,
-                z - atoms[a].z, 0.0};
-            // store r in last element
-            d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-            // normalize distances for spherical harmonic
-            for (e = 0; e < 3; e++)
-                d[e] /= d[3];
-            for (e = 0; e < size; e++)
-            {
-                bf = &atoms[a].basis_set[e];
-                primitive p(a, bf->type, bf->exponent, bf->coefficient);
-                radial = gaussian_radial(p, d[3]);
-                for (int m = -p.type; m <= p.type; m++)
-                {
-                    // m+p.type should yield just the running index of coefficents, since we start at -p.type
-                    dens += coefficients[coef_counter + m + p.type] * radial * spherical_harmonic(p.type, m, d);
-                }
-                coef_counter += (2 * p.type + 1);
-            }
+            jellm1 = -jellp1 + (2 * ell + 1) / x * jell;
+            jellp1 = jell;
+            jell = jellm1;
+        }
+
+        if (fabs(jell) > fabs(jellp1))
+        {
+            double pre = smallest / jell;
+            return bessel_first_kind(0, x) * pre;
         }
         else
         {
-            size = (int)atoms[a].basis_set.size();
-            for (e = 0; e < size; e++)
-            {
-                coef_counter += (2 * atoms[a].basis_set[e].type + 1);
-            }
+            double pre = smallest / jellp1;
+            return bessel_first_kind(1, x) * pre;
         }
     }
-    err_checkf(coef_counter == exp_coefs, "WRONG NUMBER OF COEFFICIENTS! " + std::to_string(coef_counter) + " vs. " + std::to_string(exp_coefs), std::cout);
-    return dens;
 }
 
-int load_basis_into_WFN(WFN &wavy, const std::vector<std::vector<primitive>> &b)
+int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b)
 {
+    wavy.set_basis_set_ptr(b);
     int nr_coefs = 0;
-    for (int i = 0; i < wavy.atoms.size(); i++)
+    for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        int current_charge = wavy.atoms[i].charge - 1;
+        int current_charge = wavy.get_atom_charge(i) - 1;
         const primitive *basis = b[current_charge].data();
         int size = (int)b[current_charge].size();
         for (int e = 0; e < size; e++)
         {
-            wavy.atoms[i].push_back_basis_set(basis[e].exp, 1.0, basis[e].type, e);
-            nr_coefs += 2 * basis[e].type + 1;
+            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
+            nr_coefs += 2 * basis[e].get_type() + 1;
         }
     }
     return nr_coefs;
 }
 
-double get_decimal_precision_from_CIF_number(string &given_string)
+int load_basis_into_WFN(WFN &wavy, BasisSet &b)
+{
+    wavy.set_basis_set_ptr(b.get_data());
+    int nr_coefs = 0;
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        int current_charge = wavy.get_atom_charge(i) - 1;
+        const std::vector<primitive> &basis = b[current_charge];
+        int size = (int)b[current_charge].size();
+        for (int e = 0; e < size; e++)
+        {
+            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
+            nr_coefs += 2 * basis[e].get_type() + 1;
+        }
+    }
+    return nr_coefs;
+}
+
+double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
     int len = (int)given_string.length();
     int open_bracket = -1;
@@ -2529,8 +1969,8 @@ double get_decimal_precision_from_CIF_number(string &given_string)
     if (open_bracket != -1 && close_bracket != -1)
     {
         size_of_precision = close_bracket - open_bracket - 1;
-        string temp = given_string.substr(open_bracket + 1, size_of_precision);
-        precision = stoi(temp);
+        std::string temp = given_string.substr(open_bracket + 1, size_of_precision);
+        precision = std::stoi(temp);
     }
     int digits = 0;
     if (open_bracket != -1 && close_bracket != -1)
@@ -2556,6 +1996,7 @@ double get_decimal_precision_from_CIF_number(string &given_string)
 
 void options::digest_options()
 {
+    using namespace std;
     // Lets print what was the command line, for debugging
     if (debug)
     {
@@ -2583,7 +2024,7 @@ void options::digest_options()
                 if (i + n - 1 > arguments.size())
                     break;
                 store = arguments[i + n];
-                vector<string> Z = split_string<string>(store, " ");
+                svec Z = split_string<string>(store, " ");
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
@@ -2593,10 +2034,17 @@ void options::digest_options()
                 n++;
             }
         }
-        else if (temp == "-atom_dens")
+        else if (temp == "-laplacian_bonds")
         {
             wfn = arguments[i + 1];
-            err_checkf(exists(wfn), "WFN doesn't exist", cout);
+            bondwise_laplacian_plots(wfn);
+            exit(0);
+        }
+        else if (temp == "-atom_dens")
+        {
+            cout << NoSpherA2_message() << endl;
+            wfn = arguments[i + 1];
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", cout);
             ivec val_MOs;
             ivec val_MOs_beta;
             if (argc >= i + 3)
@@ -2617,6 +2065,11 @@ void options::digest_options()
         }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
+        else if (temp == "-blastest")
+        {
+            test_openblas();
+            exit(0);
+        }
         else if (temp == "-Cation")
         {
             int n = 1;
@@ -2628,7 +2081,7 @@ void options::digest_options()
                 if (i + n - 1 > arguments.size())
                     break;
                 store = arguments[i + n];
-                vector<string> Z = split_string<string>(store, " ");
+                svec Z = split_string<string>(store, " ");
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
@@ -2645,15 +2098,21 @@ void options::digest_options()
         else if (temp == "-coef")
         {
             coef_file = arguments[i + 1];
-            err_checkf(exists(coef_file), "coef_file doesn't exist", cout);
+            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", cout);
+            SALTED = true;
         }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
-            err_checkf(exists(cif), "CIF doesn't exist", cout);
+            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", cout);
         }
         else if (temp == "-cpus")
+        {
             threads = stoi(arguments[i + 1]);
+#ifdef _OPENMP
+            omp_set_num_threads(threads);
+#endif
+        }
         else if (temp == "-cmtc")
         {
             cif_based_combined_tsc_calc = true;
@@ -2696,6 +2155,22 @@ void options::digest_options()
                 j++;
             }
         }
+        else if (temp == "-core_dens-corrected")
+        {
+            double prec = stod(arguments[i + 1]);
+            ivec a = split_string<int>(arguments[i + 3], ",");
+            ivec b = split_string<int>(arguments[i + 4], ",");
+            test_core_dens_corrected(prec, threads, arguments[i + 2], a, b);
+            exit(0);
+        }
+        else if (temp == "-core_tsc-corrected")
+        {
+            double prec = stod(arguments[i + 1]);
+            ivec a = split_string<int>(arguments[i + 3], ",");
+            ivec b = split_string<int>(arguments[i + 4], ",");
+            test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
+            exit(0);
+        }
         else if (temp == "-def" || temp == "-DEF")
             def = calc = true;
         else if (temp == "-density_difference" || temp == "-density-difference")
@@ -2706,33 +2181,41 @@ void options::digest_options()
             dmin = stod(arguments[i + 1]);
         else if (temp == "-d")
             basis_set_path = arguments[i + 1];
+        else if (temp == "-dipole_moments")
+        {
+            dipole_moments(*this);
+            exit(0);
+        }
+        // Visualize the specified orbital using spherical harmonics.
+        // Call as -draw_orbits lambda,m,resolution,radius
+        // Where resolution and radius are optional
+        else if (temp == "-draw_orbits")
+        {
+            vec opts = split_string<double>(arguments[i + 1], ",");
+            int l = static_cast<int>(opts[0]);
+            int m = static_cast<int>(opts[1]);
+            resolution = 0.025;
+            radius = 3.5;
+            if (opts.size() >= 3)
+            {
+                resolution = opts[2];
+            }
+            if (opts.size() == 4)
+            {
+                radius = opts[3];
+            }
+
+            draw_orbital(l, m, resolution, radius);
+            exit(0);
+        }
+        else if (temp == "-e_field")
+            efield = stod(arguments[i + 1]);
         else if (temp == "-ECP")
         {
             ECP = true;
             if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
             {
                 ECP_mode = stoi(arguments[i + 1]);
-            }
-        }
-        else if (temp == "-set_ECPs")
-        {
-            set_ECPs = true;
-            if (debug)
-                cout << "Reading set ECPs" << endl;
-            int j = 0;
-            while (argc >= i + 2 * (j + 1) &&
-                   string(arguments[i + j]).find("-") != 0 &&
-                   string(arguments[i + j + 1]).find("-") != 0)
-            {
-                ECP_nrs.push_back(stoi(arguments[i + j]));
-                ECP_elcounts.push_back(stoi(arguments[i + j + 1]));
-                j += 2;
-                if (debug)
-                {
-                    cout << j << " " << arguments[i + j] << " " << arguments[i + j + 1] << endl;
-                    cout << ECP_nrs.size() << endl;
-                    cout << ECP_elcounts.size() << endl;
-                }
             }
         }
         else if (temp == "-ED")
@@ -2743,6 +2226,24 @@ void options::digest_options()
             calc = elf = true;
         else if (temp == "-esp")
             calc = esp = true;
+        else if (temp == "-ewal_sum")
+        {
+            // bool read, WFN& wave, std::ostream& file,
+            WFN *temp_w = new WFN(9);
+            cube residual(arguments[i + 1], true, *temp_w, std::cout);
+            if (argc >= i + 3)
+            {
+                int k_max = stoi(arguments[i + 2]);
+                if (argc >= i + 4)
+                    residual.ewald_sum(k_max, stod(arguments[i + 3]));
+                else
+                    residual.ewald_sum(k_max);
+            }
+            else
+                residual.ewald_sum();
+            delete (temp_w);
+            exit(0);
+        }
         else if (temp == "-fchk")
             fchk = arguments[i + 1];
         else if (temp == "-fractal")
@@ -2767,20 +2268,47 @@ void options::digest_options()
             hdef = calc = true;
         else if (temp == "-hirsh")
             calc = hirsh = true, hirsh_number = stoi(arguments[i + 1]);
+        else if (temp == "-hirshfeld_surface")
+        {
+            hirshfeld_surface = arguments[i + 1];
+            hirshfeld_surface2 = arguments[i + 2];
+        }
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
-            err_checkf(exists(hkl), "hkl doesn't exist", cout);
+            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", cout);
+        }
+        else if (temp == "-hkl_min_max")
+        {
+            int h_min(stoi(arguments[i + 1]));
+            int h_max(stoi(arguments[i + 2]));
+            int k_min(stoi(arguments[i + 3]));
+            int k_max(stoi(arguments[i + 4]));
+            int l_min(stoi(arguments[i + 5]));
+            int l_max(stoi(arguments[i + 6]));
+            hkl_min_max = {{h_min, h_max}, {k_min, k_max}, {l_min, l_max}};
         }
         else if (temp == "-IAM")
             iam_switch = true;
         else if (temp == "-lap")
             calc = lap = true;
+        else if (temp == "-mem")
+        {
+            mem = stod(arguments[i + 1]); // In MB
+            vec a;
+            size_t vec_max_size = a.max_size();
+            double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
+            if (mem > doubel_max_size)
+            {
+                cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+                mem = 50000.0;
+            }
+        }
         else if (temp == "-method")
             method = arguments[i + 1];
         else if (temp == "-merge")
         {
-            vector<string> filenames;
+            pathvec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -2792,7 +2320,7 @@ void options::digest_options()
         }
         else if (temp == "-merge_nocheck")
         {
-            vector<string> filenames;
+            pathvec filenames;
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
@@ -2809,11 +2337,6 @@ void options::digest_options()
             else
                 all_mos = true;
             calc = true;
-        }
-        else if (temp == "-ML_test")
-        {
-            ML_test();
-            exit(0);
         }
         else if (temp == "-mtc")
         {
@@ -2848,16 +2371,35 @@ void options::digest_options()
                 n++;
             }
         }
+        else if (temp == "-mtc_ECP")
+        {
+            int m = 1;
+            while (i + m < argc && string(arguments[i + m]).find("-") > 0)
+            {
+                combined_tsc_calc_ECP.push_back(stoi(arguments[i + m]));
+                m++;
+            }
+        }
         else if (temp == "-mult")
             mult = stoi(arguments[i + 1]);
+        else if (temp == "-NNLS_TEST")
+        {
+            test_NNLS();
+            exit(0);
+        }
         else if (temp == "-no-date" || temp == "-no_date")
             no_date = true;
         else if (temp == "-pbc")
             pbc = stoi(arguments[i + 1]);
-        else if (temp == "-perf_benchmark")
+        else if (temp == "-polarizabilities")
         {
-            test_timing();
-            exit(0);
+            pol_wfns = {arguments[i + 1],
+                        arguments[i + 2],
+                        arguments[i + 3],
+                        arguments[i + 4],
+                        arguments[i + 5],
+                        arguments[i + 6],
+                        arguments[i + 7]};
         }
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
@@ -2867,17 +2409,66 @@ void options::digest_options()
             calc = rdg = true;
         else if (temp.find("-rkpts") < 1)
             read_k_pts = true;
-        else if (temp == "-rho_cube_test")
+        else if (temp == "-rho_cube")
         {
-            test_density_cubes(*this, log_file);
+            string wfn_name = arguments[i + 1];
+            cout << "Reading wavefunction: " << wfn_name << endl;
+            WFN *wavy = new WFN(wfn_name);
+            cout << "Assigning ECPs" << endl;
+            if (ECP)
+                wavy->set_has_ECPs(true);
+            cout << "Starting cube calculation" << endl;
+            calc_rho_cube(*wavy);
+            delete (wavy);
             exit(0);
         }
+        else if (temp == "-RI_FIT" || temp == "-ri_fit")
+        {
+            RI_FIT = true;
+            // Check if next argument is a valid basis set name or a new argument starting with "-"
+            if (i + 1 < argc && arguments[i + 1].find("-") != 0)
+            {
+                SALTED_DFBASIS = arguments[i + 1];
+                if (!BasisSetLibrary().check_basis_set_exists(SALTED_DFBASIS))
+                {
+                    cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
+                    exit(0);
+                }
+            }
+            else
+            {
+                cout << "No basis set specified. Using fallback 'combo_basis_fit'!" << endl;
+                SALTED_DFBASIS = "combo_basis_fit";
+            }
+        }
+        else if (temp == "-RI_CUBE" || temp == "-ri_cube")
+        {
+            WFN wavy(wfn);
+            // First name of coef_file, second name of xyz file
+            // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
+
+            // std::string aux_basis = arguments[i + 1];
+            gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            //gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
+
+            exit(0);
+        }
+
         else if (temp.find("-s_rho") < 1)
             s_rho = true;
-        else if (temp.find("-SALTED_BECKE") < 1 || temp.find("-salted_becke") < 1)
-            SALTED_BECKE = true;
         else if (temp == "-SALTED" || temp == "-salted")
+        {
             SALTED = true;
+            SALTED_DIR = arguments[i + 1];
+        }
+        else if (temp == "-DFBASIS" || temp == "-dfbasis")
+        {
+            SALTED_DFBASIS = arguments[i + 1];
+        }
+        else if (temp == "-test_reading_SALTED_binary") {
+            test_reading_SALTED_binary_file();
+			exit(0);
+        }
         else if (temp == "-skpts")
             save_k_pts = true;
         else if (temp == "-sfac_scan")
@@ -2888,17 +2479,6 @@ void options::digest_options()
             sfac_scan(*this, log_file);
             exit(0);
         }
-        else if (temp == "-test-ecp")
-        {
-            d_sfac_scan = fromString<double>(arguments[i + 1]);
-            sfac_scan_ECP(*this, log_file);
-            exit(0);
-        }
-        else if (temp == "-test-ecp-pot")
-        {
-            test_esp_dens();
-            exit(0);
-        }
         else if (temp == "-sfac_diffuse")
         {
             sfac_diffuse = fromString<double>(arguments[i + 1]);
@@ -2907,14 +2487,61 @@ void options::digest_options()
             dmin = fromString<double>(arguments[i + 4]);
             calc_sfac_diffuse(*this, std::cout);
         }
+        else if (temp == "-atom_dens_diff")
+        {
+            filesystem::path name_wfn_1 = arguments[i + 1];
+            filesystem::path name_wfn_2 = arguments[i + 2];
+
+            subtract_dens_from_gbw(name_wfn_1, name_wfn_2, 2, 0.05);
+            exit(0);
+        }
+        else if (temp == "-spherical_aver_fukui")
+        {
+            filesystem::path wfn1_name = arguments[i + 1];
+            filesystem::path wfn2_name = arguments[i + 2];
+            WFN *wavy1 = new WFN(wfn1_name);
+            WFN *wavy2 = new WFN(wfn2_name);
+            ofstream outputFile("fukui_averaged_density_wfn.dat");
+            for (double r = 0.001; r < 10.0; r += 0.001)
+            {
+                // double dens = calc_grid_averaged_at_r_from_cube(cube_from_file, r, 360, 5800);
+                double dens = calc_fukui_averaged_at_r(*wavy1, *wavy2, r, 5810, 5810);
+                outputFile << r << " " << dens << "\n";
+            }
+            outputFile.close();
+            cout << "Data written to output.dat" << endl;
+            delete (wavy1);
+            delete (wavy2);
+            exit(0);
+        }
+        else if (temp == "-spherical_aver_hirsh")
+        {
+            string wfn_name = arguments[i + 1];
+            cout << "Reading wavefunction: " << wfn_name << endl;
+            WFN *wavy = new WFN(wfn_name);
+            cout << "Assigning ECPs" << endl;
+            if (ECP)
+                wavy->set_has_ECPs(true);
+            cout << "Starting spherical averaging" << endl;
+            double dens;
+
+            for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
+            {
+                ofstream outputFile("hirsh_averaged_density_" + std::to_string(index_atom) + ".dat");
+                for (double r = 0.001; r < 5.0; r += 0.002)
+                {
+                    dens = calc_hirsh_grid_averaged_at_r(*wavy, index_atom, r, 360, 5800);
+                    outputFile << r << " " << dens << "\n";
+                }
+                outputFile.close();
+            }
+            cout << "Data written to output.dat" << endl;
+            delete (wavy);
+            exit(0);
+        }
         else if (temp == "-spherical_harmonic")
         {
             spherical_harmonic_test();
-            exit(0);
-        }
-        else if (temp == "-test-core")
-        {
-            test_core_dens();
             exit(0);
         }
         else if (temp == "-test")
@@ -2927,14 +2554,14 @@ void options::digest_options()
         else if (temp == "-twin")
         {
             twin_law.resize(twin_law.size() + 1);
-            twin_law[twin_law.size() - 1].resize(9);
+            twin_law.back().resize(9);
             for (int twl = 0; twl < 9; twl++)
-                twin_law[twin_law.size() - 1][twl] = stod(arguments[i + 1 + twl]);
+                twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
             if (debug)
             {
                 cout << "twin_law: ";
                 for (int twl = 0; twl < 9; twl++)
-                    cout << setw(7) << setprecision(2) << twin_law[twin_law.size() - 1][twl];
+                    cout << setw(7) << setprecision(2) << twin_law.back()[twl];
                 cout << endl;
             }
             i += 9;
@@ -2945,16 +2572,35 @@ void options::digest_options()
         }
         else if (temp == "-tscb")
         {
-            string name = arguments[i + 1];
+            std::filesystem::path name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
-            name = "test.cif";
-            blocky.write_tsc_file(name);
+            string cif_name = "test.cif";
+            if (name.extension() == "tscb")
+                blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
+            else if (name.extension() == "tsc")
+                blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
+            else
+                err_checkf(false, "Wrong file ending!", cout);
+            exit(0);
+        }
+        else if (temp == "-test_analytical")
+        {
+			bool full = false;
+            if ("full" == arguments[i + 1]) {
+				full = true;
+            }
+            test_analytical_fourier(full);
+            exit(0);
+        }
+        else if (temp == "-test_RI")
+        {
+            fixed_density_fit_test();
             exit(0);
         }
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(exists(wfn), "Wavefunction dos not exist!", cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!", cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2969,6 +2615,10 @@ void options::digest_options()
         {
             xyz_file = arguments[i + 1];
         }
+        else if (temp == "-partitioning_test")
+        {
+            calc_partition_densities();
+        }
     }
 };
 
@@ -2977,219 +2627,628 @@ void options::look_for_debug(int &argc, char **argv)
     // This loop figures out command line options
     for (int i = 0; i < argc; i++)
     {
-        string temp = argv[i];
+        std::string temp = argv[i];
         arguments.push_back(temp);
         if (temp.find("-") > 0)
             continue;
-        else if (temp == "-v" || temp == "-v2")
-            cout << "Turning on verbose mode!" << endl, debug = true;
+        else if (temp == "-v" || temp == "-v2" || temp == "-debug")
+            std::cout << "Turning on verbose mode!" << std::endl, debug = true;
         else if (temp == "--h" || temp == "-h" || temp == "-help" || temp == "--help")
         {
-            cout << NoSpherA2_message() << help_message() << build_date() << endl;
+            std::cout << NoSpherA2_message() << help_message << build_date << std::endl;
             exit(0);
         }
     }
 };
 
-const double spherical_harmonic(const int &l, const int &m, const double *d)
+bool is_nan(double &in)
 {
-    /*Here d[0] = x
-                 d[1] = y
-                 d[2] = z
-                 d[3] = r^2 IGNORED
-                 d[4] = r   IGNORED
-                 */
-    // Will need extension for up to l=8
-    // calc spherical harmonic
-    double SH = 0, x = d[0], y = d[1], z = d[2];
-    switch (l)
+    return in != in;
+};
+bool is_nan(float &in)
+{
+    return in != in;
+};
+bool is_nan(long double &in)
+{
+    return in != in;
+};
+bool is_nan(cdouble &in)
+{
+    return in != in;
+};
+
+bool ends_with(const std::string &str, const std::string &suffix)
+{
+    if (str.length() >= suffix.length())
     {
-    case 0: // S
-        SH = constants::c_1_4p;
-        break;
-    case 1:
-        switch (m)
-        {
-        case 0: // P 0 Z
-            SH = constants::c_3_4p * z;
-            break;
-        case 1: // P 1 X
-            SH = constants::c_3_4p * x;
-            break;
-        case -1: // P -1 Y
-            SH = constants::c_3_4p * y;
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    case 2:
-        switch (m)
-        {
-        case 0: // D 0 Z2
-            SH = constants::c_5_16p * (3 * pow(z, 2) - 1.0);
-            break;
-        case 1: // D 1 XZ
-            SH = constants::c_15_4p * x * z;
-            break;
-        case -1: // D -1 YZ
-            SH = constants::c_15_4p * y * z;
-            break;
-        case 2: // D 2 X2-Y2
-            SH = constants::c_15_16p * (pow(x, 2) - pow(y, 2));
-            break;
-        case -2: // D -2 XY
-            SH = constants::c_15_4p * y * x;
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    case 3:
-        switch (m)
-        {
-        case 0: // F 0 Z3
-            SH = constants::c_7_16p * (5 * pow(z, 3) - 3 * z);
-            break;
-        case 1: // F 1 XZZ
-            SH = constants::c_21_32p * x * (5 * pow(z, 2) - 1.0);
-            break;
-        case -1: // F -1 YZZ
-            SH = constants::c_21_32p * y * (5 * pow(z, 2) - 1.0);
-            break;
-        case 2: // F 2 Z(X2-Y2)
-            SH = constants::c_105_16p * ((pow(x, 2) - pow(y, 2)) * z);
-            break;
-        case -2: // F -2 XYZ
-            SH = constants::c_105_4p * x * y * z;
-            break;
-        case 3: // F 3 X(X^2-3Y^2)
-            SH = constants::c_35_32p * x * (pow(x, 2) - 3 * pow(y, 2));
-            break;
-        case -3: // F -3 Y(3X^2-Y^2)
-            SH = constants::c_35_32p * y * (3 * pow(x, 2) - pow(y, 2));
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    case 4:
-        switch (m)
-        {
-        case 0: // G 0 Z^4
-            SH = constants::c_9_256p * (35 * pow(z, 4) - 30 * pow(z, 2) + 3.0);
-            break;
-        case 1: // G 1 X(7Z^3-3ZR^2)
-            SH = constants::c_45_32p * x * (7 * pow(z, 3) - 3 * z);
-            break;
-        case -1: // G -1 Y(7Z^2-3ZR^2)
-            SH = constants::c_45_32p * y * (7 * pow(z, 3) - 3 * z);
-            break;
-        case 2: // G 2
-            SH = constants::c_45_64p * (pow(x, 2) - pow(y, 2)) * (7 * pow(z, 2) - 1.0);
-            break;
-        case -2: // G -2
-            SH = constants::c_45_16p * x * y * (7 * pow(z, 2) - 1.0);
-            break;
-        case 3: // G 3 XZ(X^2-3Y^2)
-            SH = constants::c_315_32p * x * (pow(x, 2) - 3 * pow(y, 2)) * z;
-            break;
-        case -3: // G -3 XZ(3X^2-Y^2)
-            SH = constants::c_315_32p * y * (3 * pow(x, 2) - pow(y, 2)) * z;
-            break;
-        case 4: // G 4 X^2(X^-3Y^2)-Y^2(3X^2-Y^2)
-            SH = constants::c_315_256p * ((pow(x, 2) * (pow(x, 2) - 3 * pow(y, 2))) -
-                                          (pow(y, 2) * (3 * pow(x, 2) - pow(y, 2))));
-            break;
-        case -4: // G -4 XY(X^2-Y^2)
-            SH = constants::c_315_16p * x * y * (pow(x, 2) - pow(y, 2));
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    case 5:
-        switch (m)
-        {
-        case 0: // H Z^5
-            SH = constants::c_11_256p * (63 * pow(z, 5) - 70 * pow(z, 3) + 15 * z);
-            break;
-        case 1:
-            SH = constants::c_165_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
-            break;
-        case -1:
-            SH = constants::c_165_256p * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
-            break;
-        case 2:
-            SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z);
-            break;
-        case -2:
-            SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z);
-            break;
-        case 3:
-            SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0);
-            break;
-        case -3:
-            SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0);
-            break;
-        case 4:
-            SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z;
-            break;
-        case -4:
-            SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z;
-            break;
-        case 5:
-            SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4));
-            break;
-        case -5:
-            SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4));
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    case 6:
-        switch (m)
-        {
-        case 0: // I Z^6
-            SH = constants::c_13_1024p * (231 * pow(z, 6) - 315 * pow(z, 4) + 105 * pow(z, 2) - 5);
-            break;
-        case 1:
-            SH = constants::c_273_256p * x * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
-            break;
-        case -1:
-            SH = constants::c_165_256p * 2 * y * (21 * pow(z, 4) - 14 * pow(z, 2) + 1.0);
-            break;
-        case 2:
-            SH = constants::c_1155_64p * (pow(x, 2) - pow(y, 2)) * (3 * pow(z, 3) - z);
-            break;
-        case -2:
-            SH = constants::c_1155_64p * 2 * x * y * (3 * pow(z, 3) - z);
-            break;
-        case 3:
-            SH = constants::c_385_512p * x * (pow(x, 2) - 3 * pow(y, 2)) * (9 * pow(z, 2) - 1.0);
-            break;
-        case -3:
-            SH = constants::c_385_512p * y * (3 * pow(x, 2) - pow(y, 2)) * (9 * pow(z, 2) - 1.0);
-            break;
-        case 4:
-            SH = constants::c_3465_256p * (pow(x, 4) - 6 * x * x * y * y + pow(y, 4)) * z;
-            break;
-        case -4:
-            SH = -constants::c_3465_256p * (4 * x * pow(y, 3) - 4 * pow(x, 3) * y) * z;
-            break;
-        case 5:
-            SH = constants::c_693_2048p * (2 * pow(x, 5) - 20 * pow(x, 3) * pow(y, 2) + 10 * x * pow(y, 4));
-            break;
-        case -5:
-            SH = constants::c_693_2048p * (2 * pow(y, 5) - 20 * pow(x, 2) * pow(y, 3) + 10 * y * pow(x, 4));
-            break;
-        default:
-            err_not_impl_f("Wrong spherical harmonic called!", std::cout);
-        }
-        break;
-    default:
-        err_not_impl_f("Higehr than l=4 not done for spherical harmonic!", std::cout);
+        return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
     }
-    return SH;
+    return false;
 }
+
+cdouble hypergeometric(double a, double b, double c, cdouble x)
+{
+    const double TOLERANCE = 1.0e-10;
+    cdouble term = a * b * x / c;
+    cdouble value = 1.0 + term;
+    int n = 1;
+
+    while (std::abs(term) > TOLERANCE)
+    {
+        a++, b++, c++, n++;
+        term *= a * b * x / c / static_cast<double>(n);
+        value += term;
+    }
+
+    return value;
+}
+
+double hypergeometric(double a, double b, double c, double x)
+{
+    const double TOLERANCE = 1.0e-10;
+    double term = a * b * x / c;
+    double value = 1.0 + term;
+    int n = 1;
+
+    while (std::abs(term) > TOLERANCE)
+    {
+        a++, b++, c++, n++;
+        term *= a * b * x / c / n;
+        value += term;
+    }
+
+    return value;
+}
+
+double double_from_string_with_esd(std::string in)
+{
+    if (in.find('(') == std::string::npos)
+        return stod(in);
+    else
+        return stod(in.substr(0, in.find('(')));
+}
+
+std::string trim(const std::string &s)
+{
+    if (s == "")
+        return "";
+    auto start = s.begin();
+    while (start != s.end() && std::isspace(*start))
+    {
+        start++;
+    }
+
+    auto end = s.end();
+    do
+    {
+        end--;
+    } while (std::distance(start, end) > 0 && std::isspace(*end));
+
+    return std::string(start, end + 1);
+}
+
+int CountWords(const char *str)
+{
+    if (str == NULL)
+        return -1;
+
+    bool inSpaces = true;
+    int numWords = 0;
+
+    while (*str != '\0')
+    {
+        if (std::isspace(*str))
+        {
+            inSpaces = true;
+        }
+        else if (inSpaces)
+        {
+            numWords++;
+            inSpaces = false;
+        }
+
+        ++str;
+    }
+
+    return numWords;
+};
+
+void print_duration(std::ostream &file, const std::string &description, const std::chrono::microseconds &duration, std::optional<std::chrono::microseconds> total_duration = std::nullopt)
+{
+    auto mins = std::chrono::duration_cast<std::chrono::minutes>(duration);
+    auto secs = std::chrono::duration_cast<std::chrono::seconds>(duration) % 60;
+    auto millisecs = std::chrono::duration_cast<std::chrono::milliseconds>(duration) % 1000;
+
+    file << std::setw(35) << std::left << std::setfill(' ') << description << ": " << std::right
+         << std::setw(2) << std::setfill('0') << mins.count() << ":"
+         << std::setw(2) << std::setfill('0') << secs.count() << ":"
+         << std::setw(3) << std::setfill('0') << millisecs.count();
+    if (total_duration.has_value())
+    {
+        double percentage = (double(duration.count()) / total_duration->count()) * 100.0;
+        std::cout << "  (" << std::fixed << std::setprecision(2) << percentage << "%)";
+    };
+    file << std::endl;
+    // Disable setfill 0 again
+    file << std::setfill(' ');
+}
+
+void write_timing_to_file(std::ostream &file,
+                          std::vector<_time_point> time_points,
+                          std::vector<std::string> descriptions)
+{
+    using namespace std;
+    // Check if either vector is empty
+    if (time_points.empty() || descriptions.empty())
+    {
+        cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+        return;
+    }
+
+    std::chrono::microseconds total_time = std::chrono::duration_cast<std::chrono::microseconds>(time_points.back() - time_points.front());
+    file << "\n\n----------------------------- Time Breakdown! -----------------------------" << endl;
+    file << "                                     mm:ss:ms" << endl;
+    // Time_points.size()-1 because we are comparing each time point to the next one meaning we need to stop at the second to last element
+    for (int i = 0; i < time_points.size() - 1; i++)
+    {
+        std::chrono::microseconds dur = std::chrono::duration_cast<std::chrono::microseconds>(time_points[i + 1] - time_points[i]);
+        print_duration(file, "... for " + descriptions[i], dur, total_time);
+    }
+    print_duration(file, "Total Time", total_time);
+    file << "---------------------------------------------------------------------------" << endl;
+}
+
+void remove_empty_elements(svec &input, const std::string &empty)
+{
+    for (int i = (int)input.size() - 1; i >= 0; i--)
+        if (input[i] == empty || input[i] == "")
+            input.erase(input.begin() + i);
+}
+
+std::chrono::high_resolution_clock::time_point get_time()
+{
+    // gets the current time using std chrono library
+    std::chrono::high_resolution_clock::time_point time = std::chrono::high_resolution_clock::now();
+    return time;
+}
+
+long long int get_musec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in microseconds
+    std::chrono::microseconds musec = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    return musec.count();
+}
+
+long long int get_msec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in milliseconds
+    std::chrono::milliseconds msec = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    return msec.count();
+}
+
+long long int get_sec(std::chrono::high_resolution_clock::time_point start, std::chrono::high_resolution_clock::time_point end)
+{
+    // gets the time difference in seconds
+    std::chrono::seconds sec = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+    return sec.count();
+}
+
+const int shell2function(const int &type, const int &prim)
+{
+    switch (type)
+    {
+    case (-5):
+        return -32 + prim;
+    case (-4):
+        return -21 + prim;
+    case (-3):
+        return -12 + prim;
+    case (-2):
+        return -5 + prim;
+    case (-1):
+        return 1 + prim;
+    case (0):
+        return 1;
+    case (1):
+        return 2 + prim;
+    case (2):
+        return 5 + prim;
+    case (3):
+        if (prim == 0)
+            return 11;
+        if (prim == 1)
+            return 12;
+        if (prim == 2)
+            return 13;
+        if (prim == 3)
+            return 17;
+        if (prim == 4)
+            return 14;
+        if (prim == 5)
+            return 15;
+        if (prim == 6)
+            return 18;
+        if (prim == 7)
+            return 19;
+        if (prim == 8)
+            return 16;
+        if (prim == 9)
+            return 20;
+        break;
+    case (4):
+        return 21 + prim;
+    case (5):
+        return 36 + prim;
+    default:
+        return 0;
+    }
+    return 0;
+}
+
+const int sht2nbas(const int &type)
+{
+    const int st2bas[6]{1, 3, 6, 10, 15, 21};
+    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
+    if (type >= 0)
+        return st2bas[type];
+    else
+        return nst2bas[5 + type];
+};
+
+char asciitolower(char in)
+{
+    if (in <= 'Z' && in >= 'A')
+        return in - ('Z' - 'z');
+    return in;
+}
+
+int vec_sum(const bvec &in)
+{
+    int sum = 0;
+    for (bool val : in)
+    {
+        sum += val;
+    }
+    return sum;
+}
+
+int vec_sum(const ivec &in)
+{
+    int sum = 0;
+    for (int val : in)
+    {
+        sum += val;
+    }
+    return sum;
+}
+
+double vec_sum(const vec &in)
+{
+    double sum = 0.0;
+    for (double val : in)
+    {
+        sum += val;
+    }
+    return sum;
+}
+
+cdouble vec_sum(const cvec &in)
+{
+    cdouble res = 0.0;
+    for (int i = 0; i < in.size(); i++)
+        res += in[i];
+    return res;
+}
+
+double vec_length(const vec &in)
+{
+    double sum = 0.0;
+    for (double val : in)
+    {
+        sum += val * val;
+    }
+    return sqrt(sum);
+}
+
+void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
+{
+    if (!condition)
+    {
+        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
+        log_file.flush();
+        std::cout.rdbuf(coutbuf); // reset to standard output again
+        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
+        exit(-1);
+    }
+};
+void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
+{
+    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
+    log_file.flush();
+    std::cout.rdbuf(coutbuf); // reset to standard output again
+    std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
+    exit(-1);
+};
+
+void sha::sha256_transform(uint32_t state[8], const uint8_t block[64])
+{
+    uint32_t w[64];
+    uint32_t a, b, c, d, e, f, g, h;
+
+    for (int i = 0; i < 16; ++i)
+    {
+        w[i] = (block[i * 4] << 24) | (block[i * 4 + 1] << 16) |
+               (block[i * 4 + 2] << 8) | (block[i * 4 + 3]);
+    }
+
+    for (int i = 16; i < 64; ++i)
+    {
+        w[i] = SIG1(w[i - 2]) + w[i - 7] + SIG0(w[i - 15]) + w[i - 16];
+    }
+
+    a = state[0];
+    b = state[1];
+    c = state[2];
+    d = state[3];
+    e = state[4];
+    f = state[5];
+    g = state[6];
+    h = state[7];
+
+    for (int i = 0; i < 64; ++i)
+    {
+        uint32_t temp1 = h + EP1(e) + CH(e, f, g) + k[i] + w[i];
+        uint32_t temp2 = EP0(a) + MAJ(a, b, c);
+        h = g;
+        g = f;
+        f = e;
+        e = d + temp1;
+        d = c;
+        c = b;
+        b = a;
+        a = temp1 + temp2;
+    }
+
+    state[0] += a;
+    state[1] += b;
+    state[2] += c;
+    state[3] += d;
+    state[4] += e;
+    state[5] += f;
+    state[6] += g;
+    state[7] += h;
+}
+
+// SHA-256 update function
+void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *data, size_t len, uint64_t &bitlen)
+{
+    for (size_t i = 0; i < len; ++i)
+    {
+        buffer[bitlen / 8 % 64] = data[i];
+        bitlen += 8;
+        if (bitlen % 512 == 0)
+        {
+            sha256_transform(state, buffer);
+        }
+    }
+}
+
+// SHA-256 padding and final hash computation
+void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, uint8_t hash[32])
+{
+    size_t i = bitlen / 8 % 64;
+
+    buffer[i++] = 0x80;
+    if (i > 56)
+    {
+        while (i < 64)
+        {
+            buffer[i++] = 0x00;
+        }
+        sha256_transform(state, buffer);
+        i = 0;
+    }
+
+    while (i < 56)
+    {
+        buffer[i++] = 0x00;
+    }
+
+    bitlen = custom_bswap_64(bitlen);
+    memcpy(buffer + 56, &bitlen, 8);
+    sha256_transform(state, buffer);
+
+    for (i = 0; i < 8; ++i)
+    {
+        state[i] = custom_bswap_32(state[i]);
+        memcpy(hash + i * 4, &state[i], 4);
+    }
+}
+
+// Function to calculate SHA-256 hash
+std::string sha::sha256(const std::string &input)
+{
+    uint32_t state[8] = {
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+        0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+
+    uint8_t buffer[64] = {0};
+    uint8_t hash[32];
+    uint64_t bitlen = 0;
+
+    sha256_update(state, buffer, reinterpret_cast<const uint8_t *>(input.c_str()), input.length(), bitlen);
+    sha256_final(state, buffer, bitlen, hash);
+
+    std::stringstream ss;
+    for (int i = 0; i < 32; ++i)
+    {
+        ss << std::hex << std::setw(2) << std::setfill('0') << (int)hash[i];
+    }
+
+    return ss.str();
+}
+
+/*
+#ifdef _WIN32
+// Function to convert a narrow string to a wide string
+std::wstring s2ws(const std::string &s)
+{
+    int len;
+    int slength = (int)s.length() + 1;
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+    std::wstring r(len, L'\0');
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
+    return r;
+}
+
+bool ExtractDLL(const std::filesystem::path &dllName)
+{
+    if (std::filesystem::exists(dllName))
+        return true; // DLL already exists
+
+    // Find the resource
+    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
+    if (!hRes)
+        return false;
+
+    // Load the resource
+    HGLOBAL hResLoad = LoadResource(NULL, hRes);
+    if (!hResLoad)
+        return false;
+
+    // Lock the resource to get a pointer to the data
+    void *pResData = LockResource(hResLoad);
+    if (!pResData)
+        return false;
+
+    // Get the size of the resource
+    DWORD resSize = SizeofResource(NULL, hRes);
+    if (resSize == 0)
+        return false;
+
+    // Write the resource data to a file
+    std::ofstream outFile(dllName, std::ios::binary);
+    if (!outFile)
+        return false;
+
+    outFile.write(reinterpret_cast<const char *>(pResData), resSize);
+    outFile.close();
+
+    return true;
+}
+
+bool check_OpenBLAS_DLL(const bool &debug)
+{
+    if (debug)
+        std::cout << "Checking for OpenBLAS DLL" << std::endl;
+    // Get the path of the executable
+    char tempPath[MAX_PATH];
+    GetModuleFileNameA(NULL, tempPath, MAX_PATH); // get path to NoSpherA2 executable
+    std::filesystem::path exeDir(tempPath);
+    exeDir = exeDir.parent_path();
+    if (debug)
+        std::cout << "Executable directory: " << exeDir << std::endl;
+
+    // Define the DLL name
+    std::filesystem::path dllName = exeDir / "libopenblas.dll";
+    if (debug)
+        std::cout << "DLL name: " << dllName << std::endl;
+    if (exists(dllName))
+        return true; // DLL already exists
+    else
+    {
+        if (debug)
+            std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+        // Extract the DLL if it does not exist
+        if (!ExtractDLL(dllName))
+        {
+            std::cout << "Failed to extract DLL" << std::endl;
+            return false;
+        }
+        if (debug)
+            std::cout << "DLL extracted successfully!" << std::endl;
+    }
+    return true;
+}
+#endif
+*/
+
+ProgressBar::~ProgressBar()
+{
+    progress_ = 100.0f;
+    write_progress();
+    std::cout << std::endl;
+#ifdef _WIN32
+    if (taskbarList_)
+    {
+        taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
+        taskbarList_->Release();
+    }
+#endif
+}
+
+void ProgressBar::write_progress(std::ostream &os)
+{
+    // No need to write once progress is 100%
+    if (progress_ > 100.0f)
+        return;
+
+    // Move cursor to the first position on the same line
+    // Check if os is a file stream
+    if (dynamic_cast<std::filebuf *>(std::cout.rdbuf()))
+    {
+        os.seekp(linestart); // Is a file stream
+    }
+    else
+    {
+        os << "\r" << std::flush; // Is not a file stream
+    }
+
+    // Start bar
+    os << "[";
+
+    const auto completed = static_cast<size_t>(progress_ * static_cast<float>(bar_width_) / 100.0);
+    for (size_t i = 0; i <= completed; ++i)
+    {
+        os << fill_;
+    }
+
+    // End bar
+    if (((progress_ < 100.0f) ? progress_ : 100.0f) == 100)
+    {
+        os << "] 100% " << std::flush;
+#ifdef _WIN32
+        if (taskbarList_)
+        {
+            taskbarList_->SetProgressValue(GetConsoleWindow(), 100, 100);
+            taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NOPROGRESS);
+        }
+#endif
+        return;
+    }
+
+    os << std::flush;
+
+#ifdef _WIN32
+    // Update taskbar progress
+    if (taskbarList_)
+    {
+        taskbarList_->SetProgressValue(GetConsoleWindow(), static_cast<ULONGLONG>(progress_), 100);
+    }
+#endif
+}
+
+#ifdef _WIN32
+void ProgressBar::initialize_taskbar_progress()
+{
+    if (SUCCEEDED(CoInitialize(nullptr)))
+    {
+        if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&taskbarList_))))
+        {
+            taskbarList_->HrInit();
+            taskbarList_->SetProgressState(GetConsoleWindow(), TBPF_NORMAL);
+        }
+    }
+}
+#endif

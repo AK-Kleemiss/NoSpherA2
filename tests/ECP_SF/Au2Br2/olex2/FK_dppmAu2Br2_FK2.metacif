@@ -1,0 +1,20 @@
+data_FK_dppmAu2Br2_FK2
+_olex2_submission_special_instructions 'No special instructions were received'
+_audit_creation_date              2024-05-09
+_audit_creation_method            
+;
+Olex2 1.5
+(compiled 2023.08.24 svn.re1ec1418 for OlexSys, GUI svn.r6817)
+;
+
+_computing_molecular_graphics     'Olex2 1.5 (Dolomanov et al., 2009)'
+_computing_publication_material   'Olex2 1.5 (Dolomanov et al., 2009)'
+_exptl_crystal_size_min           0.04
+_exptl_crystal_size_mid           0.06
+_exptl_crystal_size_max           0.1
+_publ_contact_author_email        ?
+_publ_contact_author_phone        ?
+_publ_contact_author_address      ?
+_publ_contact_author_id_orcid     ?
+_publ_contact_author_name         ''
+

@@ -9,6 +9,7 @@
 #include <vector>
 #include <fstream>
 #include "convenience.h"
+#include "SALTED_predictor.h"
 
 /**
  * @class WFN
@@ -31,15 +32,6 @@ class cell;
 struct options;
 
 /**
- * @brief Calculates the Thakkar scattering factors.
- * @param opt The options for calculations.
- * @param file The output stream to write the results to.
- * @param wave The wavefunction.
- * @return True if the calculation is successful, false otherwise.
- */
-bool thakkar_sfac(const options &opt, std::ostream &file, WFN &wave);
-
-/**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.
  * @param file The output stream to write the results to.
@@ -48,36 +40,12 @@ bool thakkar_sfac(const options &opt, std::ostream &file, WFN &wave);
  * @param nr The number of wavefunctions.
  * @return True if the calculation is successful, false otherwise.
  */
-itsc_block MTC_thakkar_sfac(options &opt, std::ostream &file, std::vector<std::string> &known_atoms, std::vector<WFN> &wave, const int &nr);
-
-/**
- * @brief Calculates the scattering factors for HF (Hartree-Fock) method.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_HF(const options &opt, WFN &wave, std::ostream &file);
-
-/**
- * @brief Calculates the scattering factors for RI (Resolution of Identity) method.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @param exp_coefs The number of expansion coefficients.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_RI(const options &opt, WFN &wave, std::ostream &file, const int exp_coefs);
-
-/**
- * @brief Calculates the scattering factors for RI (Resolution of Identity) method without Hydrogen atoms.
- * @param opt The options for scattering factors calculations.
- * @param wave The wavefunction.
- * @param file The output stream to write the results to.
- * @param exp_coefs The number of expansion coefficients.
- * @return True if the calculation is successful, false otherwise.
- */
-bool calculate_scattering_factors_RI_No_H(const options &opt, WFN &wave, std::ostream &file, const int exp_coefs);
+itsc_block thakkar_sfac(
+    options &opt,
+    std::ostream &file,
+    svec &known_atoms,
+    std::vector<WFN> &wave,
+    const int &nr);
 
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
@@ -89,7 +57,40 @@ bool calculate_scattering_factors_RI_No_H(const options &opt, WFN &wave, std::os
  * @param kpts The list of k-points.
  * @return The calculated scattering factors.
  */
-itsc_block calculate_scattering_factors_MTC(options &opt, std::vector<WFN> &wave, std::ostream &file, std::vector<std::string> &known_atoms, const int &nr, std::vector<vec> *kpts = NULL);
+itsc_block calculate_scattering_factors_SALTED(
+    options& opt,
+    SALTEDPredictor& SP,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts = NULL);
+
+
+itsc_block calculate_scattering_factors_RI_fit(
+    options& opt,
+    const std::vector<WFN> &wave,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts = NULL);
+
+/**
+ * @brief Calculates the MTC (Modified Thakkar) scattering factors.
+ * @param opt The options for scattering factors calculations.
+ * @param wave The list of wavefunctions.
+ * @param file The output stream to write the results to.
+ * @param known_atoms The list of known atoms.
+ * @param nr The number of wavefunctions.
+ * @param kpts The list of k-points.
+ * @return The calculated scattering factors.
+ */
+itsc_block calculate_scattering_factors(
+    options &opt,
+    const std::vector<WFN> &wave,
+    std::ostream &file,
+    svec &known_atoms,
+    const int &nr,
+    vec2 *kpts = NULL);
 
 /**
  * @brief Generates the hkl (Miller indices) list.
@@ -100,7 +101,22 @@ itsc_block calculate_scattering_factors_MTC(options &opt, std::vector<WFN> &wave
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void generate_hkl(const double &dmin, hkl_list &hkl, const std::vector<vec> &twin_law, cell &unit_cell, std::ostream &file, bool debug = false);
+void generate_hkl(
+    const double &dmin,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
+    bool debug = false);
+
+void generate_hkl(
+    const ivec2 &hkl_min_max,
+    hkl_list &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
+    bool debug = false,
+    bool ED = false);
 
 /**
  * @brief Generates the fractional hkl (Miller indices) list.
@@ -112,7 +128,14 @@ void generate_hkl(const double &dmin, hkl_list &hkl, const std::vector<vec> &twi
  * @param stepsize The step size for generating fractional hkl.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void generate_fractional_hkl(const double &dmin, hkl_list_d &hkl, const std::vector<vec> &twin_law, cell &unit_cell, std::ostream &file, double stepsize, bool debug);
+void generate_fractional_hkl(
+    const double &dmin,
+    hkl_list_d &hkl,
+    const vec2 &twin_law,
+    cell &unit_cell,
+    std::ostream &file,
+    double stepsize,
+    bool debug);
 
 /**
  * @brief Converts the scattering factor to the ED (Electron Density) single.
@@ -123,15 +146,11 @@ void generate_fractional_hkl(const double &dmin, hkl_list_d &hkl, const std::vec
  * @param charge The charge.
  * @return The converted ED single.
  */
-template <typename NumType>
-std::complex<double> convert_to_ED_single(const int &neutralcharge, std::complex<double> &sf, const double &k_vector, const NumType &charge = 0)
-{
-    const double h2 = pow(k_vector, 2);
-    std::complex<double> neutral(constants::ED_fact * (neutralcharge - sf.real()) / h2, -constants::ED_fact * sf.imag() / h2);
-    if (charge == 0)
-        return neutral;
-    return neutral + constants::ED_fact * charge / h2;
-};
+cdouble convert_to_ED_single(
+    const int &neutralcharge,
+    cdouble &sf,
+    const double &k_vector,
+    const int charge = 0);
 
 /**
  * @brief Reads atoms from CIF (Crystallographic Information File).
@@ -147,7 +166,20 @@ std::complex<double> convert_to_ED_single(const int &neutralcharge, std::complex
  * @param file The output stream to write the results to.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void read_atoms_from_CIF(std::ifstream &cif_input, const std::vector<int> &input_groups, const cell &unit_cell, WFN &wave, const std::vector<std::string> &known_atoms, std::vector<int> &atom_type_list, std::vector<int> &asym_atom_to_type_list, std::vector<int> &asym_atom_list, std::vector<bool> &needs_grid, std::ostream &file, const bool debug = false);
+svec read_atoms_from_CIF(
+    std::ifstream &cif_input,
+    const ivec &input_groups,
+    const cell &unit_cell,
+    const WFN &wave,
+    const svec &known_atoms,
+    ivec &atom_type_list,
+    ivec &asym_atom_to_type_list,
+    ivec &asym_atom_list,
+    bvec &needs_grid,
+    std::ostream &file,
+    bvec &constant_atoms,
+    const bool SALTED = false,
+    const bool debug = false);
 
 /**
  * @brief Makes Hirshfeld grids.
@@ -173,7 +205,24 @@ void read_atoms_from_CIF(std::ifstream &cif_input, const std::vector<int> &input
  * @param no_date Flag indicating whether to exclude the date from the output.
  * @return The number of Hirshfeld grids generated.
  */
-int make_hirshfeld_grids(const int &pbc, const int &accuracy, cell &unit_cell, const WFN &wave, const std::vector<int> &atom_type_list, const std::vector<int> &asym_atom_list, std::vector<bool> &needs_grid, std::vector<vec> &d1, std::vector<vec> &d2, std::vector<vec> &d3, std::vector<vec> &dens, std::ostream &file, time_point &start, time_point &end_becke, time_point &end_prototypes, time_point &end_spherical, time_point &end_prune, time_point &end_aspherical, bool debug = false, bool no_date = false);
+int make_hirshfeld_grids(
+    const int &pbc,
+    const int &accuracy,
+    cell &unit_cell,
+    const WFN &wave,
+    const ivec &atom_type_list,
+    const ivec &cif2wfn_list,
+    bvec &needs_grid,
+    vec2 &d1,
+    vec2 &d2,
+    vec2 &d3,
+    vec2 &dens,
+    const svec &labels,
+    std::ostream &file,
+    std::vector<_time_point> &time_points,
+    std::vector<std::string> &time_descriptions,
+    bool debug = false,
+    bool no_date = false);
 
 /**
  * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
@@ -186,7 +235,15 @@ int make_hirshfeld_grids(const int &pbc, const int &accuracy, cell &unit_cell, c
  * @param mode The mode for adding ECP contribution.
  * @param debug Flag indicating whether to enable debug mode.
  */
-static void add_ECP_contribution(const ivec &asym_atom_list, const WFN &wave, std::vector<cvec> &sf, const cell &cell, hkl_list &hkl, std::ostream &file, const int &mode = 0, const bool debug = false);
+static void add_ECP_contribution(
+    const ivec &asym_atom_list,
+    const WFN &wave,
+    cvec2 &sf,
+    const cell &cell,
+    hkl_list &hkl,
+    std::ostream &file,
+    const int &mode = 0,
+    const bool debug = false);
 
 /**
  * @brief Calculates the scattering factors.
@@ -202,7 +259,27 @@ static void add_ECP_contribution(const ivec &asym_atom_list, const WFN &wave, st
  * @param end1 The end time point.
  * @param debug Flag indicating whether to enable debug mode.
  */
-void calc_SF(const int &points, std::vector<vec> &k_pt, std::vector<vec> &d1, std::vector<vec> &d2, std::vector<vec> &d3, std::vector<vec> &dens, std::vector<cvec> &sf, std::ostream &file, time_point &start, time_point &end1, bool debug = false);
+void calc_SF(const int &points,
+             vec2 &k_pt,
+             vec2 &d1,
+             vec2 &d2,
+             vec2 &d3,
+             vec2 &dens,
+             cvec2 &sf,
+             std::ostream &file,
+             _time_point &start,
+             _time_point &end1,
+             bool debug,
+             bool no_date = false);
+
+double fourier_bessel_integral(
+    const primitive &p,
+    const double &H);
+
+cdouble sfac_bessel(
+    const primitive &p,
+    const double *k_point,
+    const vec &coefs);
 
 /**
  * @brief Calculates the diffuse scattering factors.

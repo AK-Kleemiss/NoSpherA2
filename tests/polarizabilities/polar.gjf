@@ -1,0 +1,81 @@
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) nosymm out=wfn 
+
+b3lyp/6-311++g(2d,2p)  example
+
+0 1
+C   0.000000    0.000000    0.598112
+C   0.000000    0.000000   -0.598112
+H   0.000000    0.000000   -1.659569
+H   0.000000    0.000000    1.659569
+
+zero.wfn        
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=x+50
+
+x=50
+
+0 1
+
+xp.wfn
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=x-50
+
+x=-50
+
+0 1
+
+xm.wfn
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=y+50
+
+y=50
+
+0 1
+
+yp.wfn
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=y-50
+
+y=-50
+
+0 1
+
+ym.wfn
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=z+50
+
+z=50
+
+0 1
+
+zp.wfn
+
+--link1--
+%chk=a.chk
+%Nproc=24
+#P b3lyp/6-311++g(2d,2p) chkbasis nosymm geom=checkpoint out=wfn field=z-50
+
+z=-50
+
+0 1
+
+zm.wfn
+
+

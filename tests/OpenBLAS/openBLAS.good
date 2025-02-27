@@ -1,0 +1,26 @@
+Running Openblas test
+Testing matrices directly
+Matrices have size 10x10
+Matrices have size 10x10
+Testing untransposed matrices
+Matrices have size 10x10
+Testing transpose A
+Matrices have size 10x10
+Testing transpose B
+Matrices have size 10x10
+Testing transpose A and B
+Matrices have size 10x10
+Testing C-matrices directly
+Matrices have size 10x10
+Matrices have size 10x10
+Testing untransposed C-matrices
+Matrices have size 10x10
+Testing transpose C
+Matrices have size 10x10
+Testing transpose D
+Matrices have size 10x10
+Testing transpose C and D
+Matrices have size 10x10
+Testing 2D x 1D matrix multiplication
+Matrices have size 12
+All BLAS tests passed!

@@ -6,23 +6,13 @@
                 /_/
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
-List of contributors of pieces of code or funcitonality:
-      Florian Kleemiss,
-      Emmanuel Hupf,
-      Alessandro Genoni,
-      and many more in communications or by feedback!
-NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.
-Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.
-Reading:                                   malbac.gbw done!
+This Software is published with BSD-2 clause license.
+Reading:                                 "malbac.gbw" done!
 Number of atoms in Wavefunction file: 52 Number of MOs: 1133
 Number of protons: 276
 Number of electrons: 248
 Number of ECP electrons: 28
-Reading:                                malbac.cif... done!
-Reading:                                   malbac.hkl done!
-Nr of reflections read from file: 15646
-Number of symmetry operations: 1
-Nr of reflections to be used: 9134
+Reading:                                 "malbac.cif" done!
 There are:
   52 atoms read from the wavefunction, of which 
   52 are identified as asymmetric unit atoms!
@@ -91,7 +81,12 @@ Table of Charges in electrons
        H34     0.133     0.080     0.062
 Total number of electrons in the wavefunction: 275.480
  and Hirshfeld electrons (asym unit): 275.391
+Reading:                                 "malbac.hkl" done!
+Nr of reflections read from file: 15646
+Number of symmetry operations: 1
+Nr of reflections to be used: 9134
 
 Number of k-points to evaluate: 9134 for 15728 gridpoints.
-Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+[                Calculating Scattering Factors                ]
+[=============================================================] 100% 
 Writing tsc file...  ... done!

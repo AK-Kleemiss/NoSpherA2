@@ -5,18 +5,45 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/NoSpherA2_Debug",
+            "args": [
+                "-blastest",
+                "-no-date"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/tests/OpenBLAS",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
+            ]
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
-        }
+        },
         {
             "name": "Python: Optimizer",
             "type": "python",
             "request": "launch",
-            "program": "D:\\git\\wfn2fchk\\tests\\ECP_SF\\Atomic_densities\\Rb_fit_minimize.py",
+            "program": "D:\\git\\NoSpherA2\\tests\\ECP_SF\\Atomic_densities\\Rb_fit_minimize.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "nodebug": true

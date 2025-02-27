@@ -1,33 +1,13 @@
+#include "pch.h"
 #include "convenience.h"
 #include "AtomGrid.h"
 #include "sphere_lebedev_rule.h"
+#include "constants.h"
 
 #ifdef _WIN32
-#define NOMIMAX
 #include <algorithm>
 #include <io.h>
 #endif
-
-int get_closest_num_angular(const int& n)
-{
-  int m = 0;
-
-  for (int i = 0; i < constants::max_LT; i++) {
-    m = constants::lebedev_table[i];
-    if (m >= n)
-      return m;
-  }
-  return -1;
-};
-
-int get_angular_order(const int& n)
-{
-  for (int i = 0; i < constants::max_LT; i++) {
-    if (constants::lebedev_table[i] == n)
-      return i;
-  }
-  return -1;
-};
 
 AtomGrid::AtomGrid(const double radial_precision,
   const int min_num_angular_points,
@@ -40,9 +20,9 @@ AtomGrid::AtomGrid(const double radial_precision,
 {
   using namespace std;
   const int min_num_angular_points_closest =
-    get_closest_num_angular(min_num_angular_points);
+    constants::get_closest_num_angular(min_num_angular_points);
   const int max_num_angular_points_closest =
-    get_closest_num_angular(max_num_angular_points);
+    constants::get_closest_num_angular(max_num_angular_points);
   err_checkf(min_num_angular_points_closest != -1 && max_num_angular_points_closest != -1, "No valid value for angular number found!", file);
 
   vec angular_x(constants::max_LT * constants::MAG, 0.0);
@@ -52,7 +32,7 @@ AtomGrid::AtomGrid(const double radial_precision,
   int angular_off;
   lebedev_sphere ls;
 
-  for (int i = get_angular_order(min_num_angular_points_closest); i < get_angular_order(max_num_angular_points_closest) + 1; i++) {
+  for (int i = constants::get_angular_order(min_num_angular_points_closest); i < constants::get_angular_order(max_num_angular_points_closest) + 1; i++) {
     angular_off = i * constants::MAG;
     ls.ld_by_order(constants::lebedev_table[i],
       angular_x.data() + angular_off,
@@ -73,16 +53,8 @@ AtomGrid::AtomGrid(const double radial_precision,
       //       << "l= " << l 
       //       << " r_inner: " << r_inner 
       //       << " alpha_min: " << alpha_min[l] << endl;
-      r_outer = std::max(r_outer,
-        get_r_outer(radial_precision,
-          alpha_min[l],
-          l,
-          4.0 * constants::bragg_angstrom[proton_charge])
-      );
-      h = std::min(h, get_h(radial_precision,
-        l,
-        0.1 * (r_outer - r_inner))
-      );
+      r_outer = (((r_outer) > (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge]))) ? (r_outer) : (get_r_outer(radial_precision, alpha_min[l], l, 4.0 * constants::bragg_angstrom[proton_charge])));
+      h = (((h) < (get_h(radial_precision, l, 0.1 * (r_outer - r_inner)))) ? (h) : (get_h(radial_precision, l, 0.1 * (r_outer - r_inner))));
     }
   }
 
@@ -116,13 +88,13 @@ AtomGrid::AtomGrid(const double radial_precision,
     if (radial_r < rb) {
       num_angular = static_cast<int>(max_num_angular_points_closest *
         (radial_r / rb));
-      num_angular = get_closest_num_angular(num_angular);
+      num_angular = constants::get_closest_num_angular(num_angular);
       err_checkf(num_angular != -1, "No valid value for angular number found!", file);
       if (num_angular < min_num_angular_points_closest)
         num_angular = min_num_angular_points_closest;
     }
 
-    angular_off = get_angular_order(num_angular) * constants::MAG;
+    angular_off = constants::get_angular_order(num_angular) * constants::MAG;
     err_checkf(angular_off != -constants::MAG, "Invalid angular order!", file);
     const int start = (int) atom_grid_x_bohr_.size();
     angular_off -= start;
@@ -167,7 +139,7 @@ void AtomGrid::get_grid(const int num_centers,
     {
       vec pa(num_centers);
       double temp;
-#pragma omp for schedule(dynamic)
+#pragma omp for
       for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
         grid_x_bohr[ipoint] = atom_grid_x_bohr_[ipoint] + x_coordinates_bohr[center_index];
         grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
@@ -345,6 +317,15 @@ void AtomGrid::get_radial_distances_omp(double grid_r_bohr[]) const
 constexpr double f3(const double& x)
 {
   double f = x;
+  f *= (1.5 - 0.5 * f * f); // First iteration
+  f *= (1.5 - 0.5 * f * f); // Second iteration
+  f *= (1.5 - 0.5 * f * f); // Third iteration
+  return f;
+}
+
+constexpr double f(const double& x)
+{
+  double f = x;
   for (int i = 0; i < constants::hardness; i++)
     f *= (1.5 - 0.5 * f * f);
   return f;
@@ -352,15 +333,15 @@ constexpr double f3(const double& x)
 
 // JCP 88, 2547 (1988)
 double get_becke_w(const int& num_centers,
-  const int proton_charges[],
-  const double x_coordinates_bohr[],
-  const double y_coordinates_bohr[],
-  const double z_coordinates_bohr[],
+  const int* proton_charges,
+  const double* x_coordinates_bohr,
+  const double* y_coordinates_bohr,
+  const double* z_coordinates_bohr,
   const int& center_index,
   const double& x,
   const double& y,
   const double& z,
-  vec& pa)
+  std::vector<double>& pa)
 {
   double R_a, R_b;
   double u_ab, a_ab, mu_ab, nu_ab;
@@ -411,7 +392,7 @@ double get_becke_w(const int& num_centers,
         // JCP 88, 2547 (1988), eq. A3
         if (a_ab > 0.5)
           a_ab = 0.5;
-        if (a_ab < -0.5)
+        else if (a_ab < -0.5)
           a_ab = -0.5;
 
         nu_ab = mu_ab + a_ab * (1.0 - mu_ab * mu_ab);
@@ -448,15 +429,13 @@ double get_becke_w(const int& num_centers,
 
 // TCA 106, 178 (2001), eq. 25
 // we evaluate r_inner for s functions
-double get_r_inner(const double& max_error, const double& alpha_inner)
+const double get_r_inner(const double& max_error, const double& alpha_inner)
 {
-  int m = 0;
   double d = 1.9;
 
-  double r = d - std::log(1.0 / max_error);
-  r = r * 2.0 / (m + 3.0);
-  r = std::exp(r) / (alpha_inner);
-  r = std::sqrt(r);
+  double r = (d - log(1.0 / max_error)) * 2./3.;
+  r = exp(r) / (alpha_inner);
+  r = constants::sqrt(r);
 
   return r;
 }

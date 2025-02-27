@@ -1,5 +1,7 @@
 #pragma once
 
+#include "constants.h"
+#include <filesystem>
 /**
  * @class cell
  * @brief Represents a crystal cell in three-dimensional space.
@@ -16,9 +18,7 @@ private:
     double cm[3][3];
     double upper;
     std::string crystal_system;
-    std::vector<std::vector<std::vector<int>>> sym;
-    const double PI = 3.14159265358979323846;
-    const double bohr2angs = 0.529177249;
+    std::vector<ivec2> sym;
 
 public:
     cell()
@@ -35,11 +35,11 @@ public:
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
     };
-    cell(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    cell(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
         if (debug)
             file << "starting to read cif!" << std::endl;
-        file << "Reading: " << std::setw(41) << filename << std::flush;
+        file << "Reading: " << std::setw(44) << filename << std::flush;
         sym.resize(3);
         for (int i = 0; i < 3; i++)
             sym[i].resize(3);
@@ -63,26 +63,26 @@ public:
             }
         }
     };
-    double get_as() { return as; };
-    double get_bs() { return bs; };
-    double get_cs() { return cs; };
-    double get_ca() { return ca; };
-    double get_cb() { return cb; };
-    double get_cg() { return cg; };
-    double get_sa() { return sa; };
-    double get_sb() { return sb; };
-    double get_sg() { return sg; };
-    double get_rcm(int i, int j) const { return rcm[i][j]; };
-    double get_cm(int i, int j) const { return cm[i][j]; };
-    double get_rcm_angs(int i, int j) const { return bohr2angs * rcm[i][j] / constants::TWO_PI; };
-    double get_cm_angs(int i, int j) const { return bohr2angs * cm[i][j] / constants::TWO_PI; };
-    double get_sym(int i, int j, int k) const { return sym[i][j][k]; };
-    std::vector<std::vector<std::vector<int>>> get_sym() const { return sym; };
+    double get_as() const { return as; };
+    double get_bs() const { return bs; };
+    double get_cs() const { return cs; };
+    double get_ca() const { return ca; };
+    double get_cb() const { return cb; };
+    double get_cg() const { return cg; };
+    double get_sa() const { return sa; };
+    double get_sb() const { return sb; };
+    double get_sg() const { return sg; };
+    double get_rcm(const int& i, const int& j) const { return rcm[i][j]; };
+    double get_cm(const int& i, const int& j) const { return cm[i][j]; };
+    double get_rcm_angs(const int& i, const int& j) const { return constants::bohr2ang(rcm[i][j] / constants::TWO_PI); };
+    double get_cm_angs(const int& i, const int& j) const { return constants::bohr2ang(cm[i][j] / constants::TWO_PI); };
+    double get_sym(const int& i, const int& j, const int& k) const { return sym[i][j][k]; };
+    std::vector<ivec2> get_sym() const { return sym; };
     double get_a() const { return a; };
     double get_b() const { return b; };
     double get_c() const { return c; };
     double get_V() const { return V; };
-    double get_angle(int i) const
+    double get_angle(const int& i) const
     {
         switch (i)
         {
@@ -167,12 +167,22 @@ public:
      * @return The d-spacing of the crystal lattice plane in Angstrom
      */
     template <typename numtype>
-    double get_d_of_hkl(const std::vector<numtype> hkl) const
+    double get_d_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // d will be in Angstrom
         // d = sqrt( (1 - cos^2(alpha) - cos^2 (beta) - cos^2 (gamma) + 2ca*cb*cg) / (h^2 /a^2 *sin^2 (alpha) + k^2 / b^2 * sin^2 (beta) + l^2 /c^2 * sin^2(gamma) + 2 kl/bc (cos(beta)cos(gamma) - cos(alpha)) + 2 hl/ac (cos(alpha)cos(gamma) - cos(beta)) + 2 hk/ab (cos(beta)cos(alpha) - cos(gamma))) )
-        double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
-        return sqrt(upper / lower);
+        double h = hkl[0];
+        double k = hkl[1];
+        double l = hkl[2];
+        double lower2 =
+            h * h * b * b * c * c * sa * sa +
+            k * k * a * a * c * c * sb * sb +
+            l * l * a * a * b * b * sg * sg +
+            2 * k * l * a * a * b * c * (cb * cg - ca) +
+            2 * h * l * a * b * b * c * (cg * ca - cb) +
+            2 * h * k * a * b * c * c * (ca * cb - cg);
+        //double lower = pow(hkl[0], 2) * pow(sa, 2) / pow(a, 2) + pow(hkl[1], 2) * pow(sb, 2) / pow(b, 2) + pow(hkl[2], 2) * pow(sg, 2) / pow(c, 2) + 2.0 * hkl[1] * hkl[2] / (b * c) * (cb * cg - ca) + 2.0 * hkl[0] * hkl[2] / (a * c) * (cg * ca - cb) + 2.0 * hkl[0] * hkl[1] / (a * b) * (ca * cb - cg);
+        return sqrt(V*V / lower2);
     }
 
     /**
@@ -182,7 +192,7 @@ public:
      * @return sin theta over lambda of the hkl plane
      */
     template <typename numtype>
-    double get_stl_of_hkl(const std::vector<numtype> hkl) const
+    double get_stl_of_hkl(const std::array<numtype, 3> hkl) const
     {
         // Result will be in Angstrom^-1
         return 1.0 / (2 * get_d_of_hkl(hkl));
@@ -216,9 +226,9 @@ public:
      * @param in_bohr flag to indicate if the coordinates are in Bohr
      * @return resulting Cartesian coordinates
      */
-    std::vector<double> get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
+    vec get_coords_cartesian(const double frac_x, const double frac_y, const double frac_z, const bool in_bohr = true) const
     {
-        std::vector<double> positions_cart{0., 0., 0.};
+        vec positions_cart{0., 0., 0.};
         positions_cart[0] = (a * frac_x + b * cg * frac_y + c * cb * frac_z);
         positions_cart[1] = (b * sg * frac_y + c * (ca - cb * cg) / sg * frac_z);
         positions_cart[2] = V / (a * b * sg) * frac_z;
@@ -237,15 +247,15 @@ public:
      * @return true if successful
      * @return false if unsuccessful
      */
-    bool read_CIF(const std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    bool read_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
-        std::vector<bool> found;
+        std::ifstream cif_input(filename, std::ios::in);
+        bvec found;
         found.resize(7);
         for (int k = 0; k < 7; k++)
             found[k] = false;
         double v = 0.0;
-        std::vector<std::string> cell_keywords;
+        svec cell_keywords;
         std::string line;
         cell_keywords.push_back("_cell_length_a");
         cell_keywords.push_back("_cell_length_b");
@@ -367,9 +377,9 @@ public:
      * @param file where to print output
      * @param debug flag to print debug information
      */
-    void read_symm_CIF(std::string filename, std::ostream &file = std::cout, const bool &debug = false)
+    void read_symm_CIF(const std::filesystem::path& filename, std::ostream &file = std::cout, const bool &debug = false)
     {
-        std::ifstream cif_input(filename.c_str(), std::ios::in);
+        std::ifstream cif_input(filename, std::ios::in);
         std::string line;
         cif_input.clear();
         cif_input.seekg(0, cif_input.beg);
@@ -404,12 +414,12 @@ public:
                         file << "Reading operation!" << line << std::endl;
                     symm_found = true;
                     std::stringstream s(line);
-                    std::vector<std::string> fields;
+                    svec fields;
                     fields.resize(count_fields);
                     int sym_from_cif[3][3]{0, 0, 0, 0, 0, 0, 0, 0, 0};
                     for (int i = 0; i < count_fields; i++)
                         s >> fields[i];
-                    std::vector<std::string> vectors;
+                    svec vectors;
                     vectors.resize(3);
                     int column = 0;
                     for (int c_ = 0; c_ < fields[operation_field].length(); c_++)

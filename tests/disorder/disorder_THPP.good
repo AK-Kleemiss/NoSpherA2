@@ -6,20 +6,14 @@
                 /_/
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
-List of contributors of pieces of code or funcitonality:
-      Florian Kleemiss,
-      Emmanuel Hupf,
-      Alessandro Genoni,
-      and many more in communications or by feedback!
-NoSpherA2 was published at  : Kleemiss et al. Chem.Sci., 2021, 12, 1675 - 1692.
-Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.
-Reading:                olex2/Wfn_job/Part_1/thpp.wfx done!
+This Software is published with BSD-2 clause license.
+Reading:              "olex2/Wfn_job/Part_1/thpp.wfx" done!
 Number of atoms in Wavefunction file: 26 Number of MOs: 58
-Reading:                olex2/Wfn_job/Part_2/thpp.wfx done!
+Reading:              "olex2/Wfn_job/Part_2/thpp.wfx" done!
 Number of atoms in Wavefunction file: 26 Number of MOs: 58
 Number of protons: 116
 Number of electrons: 116
-Reading:                                  thpp.cif... done!
+Reading:                                   "thpp.cif" done!
 There are:
   26 atoms read from the wavefunction, of which 
   26 are identified as asymmetric unit atoms!
@@ -62,16 +56,17 @@ Table of Charges in electrons
       H14C     0.111     0.074     0.065
 Total number of electrons in the wavefunction: 114.734
  and Hirshfeld electrons (asym unit): 116.040
-Reading:                                     thpp.hkl done!
+Reading:                                   "thpp.hkl" done!
 Nr of reflections read from file: 2975
 Number of symmetry operations: 2
 Nr of reflections to be used: 5832
 
 Number of k-points to evaluate: 5832 for 2208 gridpoints.
-Calculating scattering factors                       [  0%] Calculating scattering factors =                     [  5%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ==                    [ 10%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors ====                  [ 20%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors =====                 [ 25%] Calculating scattering factors ======                [ 30%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ========              [ 40%] Calculating scattering factors ========              [ 40%] Calculating scattering factors =========             [ 45%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors ===========           [ 55%] Calculating scattering factors ============          [ 60%] Calculating scattering factors ============          [ 60%] Calculating scattering factors =============         [ 65%] Calculating scattering factors ==============        [ 70%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ===============       [ 75%] Calculating scattering factors ================      [ 80%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ==================    [ 90%] Calculating scattering factors ===================   [ 95%] Calculating scattering factors ===================== [100%] 
+[                Calculating Scattering Factors                ]
+[=============================================================] 100% 
 Number of protons: 116
 Number of electrons: 116.000
-Reading:                                  thpp.cif... done!
+Reading:                                   "thpp.cif" done!
 There are:
   26 atoms read from the wavefunction, of which 
    6 are identified as asymmetric unit atoms!
@@ -94,6 +89,7 @@ Table of Charges in electrons
       H7BB     0.070     0.023     0.064
 Total number of electrons in the wavefunction: 15.379
  and Hirshfeld electrons (asym unit): 15.753
-Calculating scattering factors                       [  0%] Calculating scattering factors ===                   [ 15%] Calculating scattering factors =======               [ 35%] Calculating scattering factors ==========            [ 50%] Calculating scattering factors =============         [ 65%] Calculating scattering factors =================     [ 85%] Calculating scattering factors ===================== [100%] 
+[                Calculating Scattering Factors                ]
+[=============================================================] 100% 
 Final number of atoms in .tsc file: 32
 Writing tsc file...  ... done!

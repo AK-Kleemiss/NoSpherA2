@@ -1,0 +1,120 @@
+Testing l = 0
+Coefs: 1     |  m: 0
+m: 0 passed!
+l = 0 passed!
+
+Testing l = 1
+Coefs: 1 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 1 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 1     |  m: 1
+m: 1 passed!
+l = 1 passed!
+
+Testing l = 2
+Coefs: 1 0 0 0 0     |  m: -2
+m: -2 passed!
+Coefs: 0 1 0 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 0 1 0 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 0 1 0     |  m: 1
+m: 1 passed!
+Coefs: 0 0 0 0 1     |  m: 2
+m: 2 passed!
+l = 2 passed!
+
+Testing l = 3
+Coefs: 1 0 0 0 0 0 0     |  m: -3
+m: -3 passed!
+Coefs: 0 1 0 0 0 0 0     |  m: -2
+m: -2 passed!
+Coefs: 0 0 1 0 0 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 0 0 1 0 0 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 0 0 1 0 0     |  m: 1
+m: 1 passed!
+Coefs: 0 0 0 0 0 1 0     |  m: 2
+m: 2 passed!
+Coefs: 0 0 0 0 0 0 1     |  m: 3
+m: 3 passed!
+l = 3 passed!
+
+Testing l = 4
+Coefs: 1 0 0 0 0 0 0 0 0     |  m: -4
+m: -4 passed!
+Coefs: 0 1 0 0 0 0 0 0 0     |  m: -3
+m: -3 passed!
+Coefs: 0 0 1 0 0 0 0 0 0     |  m: -2
+m: -2 passed!
+Coefs: 0 0 0 1 0 0 0 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 0 0 0 1 0 0 0 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 0 0 0 1 0 0 0     |  m: 1
+m: 1 passed!
+Coefs: 0 0 0 0 0 0 1 0 0     |  m: 2
+m: 2 passed!
+Coefs: 0 0 0 0 0 0 0 1 0     |  m: 3
+m: 3 passed!
+Coefs: 0 0 0 0 0 0 0 0 1     |  m: 4
+m: 4 passed!
+l = 4 passed!
+
+Testing l = 5
+Coefs: 1 0 0 0 0 0 0 0 0 0 0     |  m: -5
+m: -5 passed!
+Coefs: 0 1 0 0 0 0 0 0 0 0 0     |  m: -4
+m: -4 passed!
+Coefs: 0 0 1 0 0 0 0 0 0 0 0     |  m: -3
+m: -3 passed!
+Coefs: 0 0 0 1 0 0 0 0 0 0 0     |  m: -2
+m: -2 passed!
+Coefs: 0 0 0 0 1 0 0 0 0 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 0 0 0 0 1 0 0 0 0 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 0 0 0 0 1 0 0 0 0     |  m: 1
+m: 1 passed!
+Coefs: 0 0 0 0 0 0 0 1 0 0 0     |  m: 2
+m: 2 passed!
+Coefs: 0 0 0 0 0 0 0 0 1 0 0     |  m: 3
+m: 3 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 1 0     |  m: 4
+m: 4 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 0 1     |  m: 5
+m: 5 passed!
+l = 5 passed!
+
+Testing l = 6
+Coefs: 1 0 0 0 0 0 0 0 0 0 0 0 0     |  m: -6
+m: -6 passed!
+Coefs: 0 1 0 0 0 0 0 0 0 0 0 0 0     |  m: -5
+m: -5 passed!
+Coefs: 0 0 1 0 0 0 0 0 0 0 0 0 0     |  m: -4
+m: -4 passed!
+Coefs: 0 0 0 1 0 0 0 0 0 0 0 0 0     |  m: -3
+m: -3 passed!
+Coefs: 0 0 0 0 1 0 0 0 0 0 0 0 0     |  m: -2
+m: -2 passed!
+Coefs: 0 0 0 0 0 1 0 0 0 0 0 0 0     |  m: -1
+m: -1 passed!
+Coefs: 0 0 0 0 0 0 1 0 0 0 0 0 0     |  m: 0
+m: 0 passed!
+Coefs: 0 0 0 0 0 0 0 1 0 0 0 0 0     |  m: 1
+m: 1 passed!
+Coefs: 0 0 0 0 0 0 0 0 1 0 0 0 0     |  m: 2
+m: 2 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 1 0 0 0     |  m: 3
+m: 3 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 0 1 0 0     |  m: 4
+m: 4 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 0 0 1 0     |  m: 5
+m: 5 passed!
+Coefs: 0 0 0 0 0 0 0 0 0 0 0 0 1     |  m: 6
+m: 6 passed!
+l = 6 passed!
+
+All tests passed!
