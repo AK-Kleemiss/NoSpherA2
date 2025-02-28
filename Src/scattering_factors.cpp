@@ -3063,7 +3063,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     if (nr != 0)
     {
         // We need coeffs for the atoms and coeff seperateley
-        int current_coef_index = coefs.size();
+        unsigned int current_coef_index = coefs.size();
         for (int i = constant_atoms.size() - 1; i >= 0; i--)
         {
             // Count up all coeffs for one atom

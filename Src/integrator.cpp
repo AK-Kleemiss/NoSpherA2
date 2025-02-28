@@ -13,9 +13,9 @@
 
 vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
 {
-    const int I = v1.extent(0);
-    const int J = v1.extent(1);
-    const int P = v1.extent(2);
+    const int I = (int)v1.extent(0);
+    const int J = (int)v1.extent(1);
+    const int P = (int)v1.extent(2);
     // Initialize the result vector
     vec rho(P, 0.0);
 
@@ -37,7 +37,7 @@ void solve_linear_system(const vec2 &A, vec &b)
 {
     err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     // LAPACK variables
-    const int n = A.size(); // The order of the matrix eri2c
+    const int n = (int) A.size(); // The order of the matrix eri2c
     const int nrhs = 1;     // Number of right-hand sides (columns of rho and )
     const int lda = n;      // Leading dimension of eri2c
     const int ldb = n;      // Leading dimension of rho

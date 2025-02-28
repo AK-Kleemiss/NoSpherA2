@@ -2493,7 +2493,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (const atom& _atom : atoms) {
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
             int temp_bas_idx = 0;
-            for (int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
+            for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
                 int type = basis[temp_bas_idx].get_type() - 1;
                 temp_bas_idx += _atom.get_shellcount(shell);
                 for (int m = -type; m <= type; m++) {
@@ -2502,7 +2502,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     if (operators == 2) {
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
-                        auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     }
                     
@@ -3082,7 +3082,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     return true;
 };
 
-bool WFN::write_xyz(const std::filesystem::path& fileName, const bool& debug)
+bool WFN::write_xyz(const std::filesystem::path& fileName)
 {
     using namespace std;
     try {
@@ -3498,7 +3498,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
         if (debug)
             cout << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug, false), "ERROR during reading of missing basis set!", cout);
+        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", cout);
     }
     else if (get_nr_basis_set_loaded() < get_ncen())
     {
@@ -4904,7 +4904,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     for (int i = 0; i < charges.size(); i++)
-        atoms[i].set_charge(charges[i]);
+        atoms[i].set_charge((int)charges[i]);
     vec coords;
     if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords))
     {

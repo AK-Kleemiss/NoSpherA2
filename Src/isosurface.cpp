@@ -445,7 +445,7 @@ std::vector<std::array<double, 3>> subdivideCube(const std::array<double, 3>& p1
 // --------------------------------------------------------------------------
 // Marching Cubes on a 3D array of double values to find isosurface = 0.5
 //
-std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal, const int subdivisionLevel)
+std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal)//, const int subdivisionLevel)
 {
     std::vector<Triangle> triangles;
 
