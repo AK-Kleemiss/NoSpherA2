@@ -28,14 +28,14 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
     for (int a = 0; a < wavy_in.get_ncen(); a++)
-        if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
+        if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
             i_know_all = false;
     if (!i_know_all)
     {
         std::cout << "WARNING: Not all species in the structure are known to the model. The following species are not known: ";
         for (int a = 0; a < wavy_in.get_ncen(); a++)
         {
-            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
+            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
             {
                 std::cout << constants::atnr2letter(wavy_in.get_atom_charge(a)) << " ";
             }
@@ -44,7 +44,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
         wavy = wavy_in; // make a copy of initial wavefunction, to leave the initial one untouched!
         for (int a = wavy_in.get_ncen() - 1; a >= 0; a--)
         {
-            if (find(config.neighspe1.begin(), config.neighspe1.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.neighspe1.end())
+            if (find(config.species.begin(), config.species.end(), std::string(constants::atnr2letter(wavy_in.get_atom_charge(a)))) == config.species.end())
             {
                 wavy.erase_atom(a);
             }
