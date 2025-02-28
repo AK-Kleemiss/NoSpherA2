@@ -1652,6 +1652,7 @@ void test_analytical_fourier(bool full)
 
         for (unsigned int l = 0; l < type * 2 + 1; l++)
         {
+			int m = static_cast<int>(l) - static_cast<int>(type);
             for (int i = 0; i < coefs.size(); i++)
             {
                 coefs[i] = 0.0;
@@ -1664,7 +1665,7 @@ void test_analytical_fourier(bool full)
             {
                 std::cout << coefs[i] << " ";
             }
-            std::cout << "    |  m: " << l - type << std::endl;
+            std::cout << "    |  m: " << m << std::endl;
 
             for (int i = 0; i < grid[0].size(); i++)
             {
@@ -1706,12 +1707,12 @@ void test_analytical_fourier(bool full)
             }
             if (!correct)
             {
-                std::cout << "Error at m: " << l - type << "   Max diff: " << std::setprecision(6) << max_diff << std::endl;
+                std::cout << "Error at m: " << m << "   Max diff: " << std::setprecision(6) << max_diff << std::endl;
                 correct = true;
             }
             else
             {
-                std::cout << "m: " << l - type << " passed!" << std::endl;
+                std::cout << "m: " << m << " passed!" << std::endl;
             }
         }
         if (!all_correct)
