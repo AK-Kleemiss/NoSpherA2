@@ -264,8 +264,8 @@ NNLSResult nnls(
     int maxiter,
     double tol)
 {
-    int m = A.extent(0);
-    int n = A.extent(1);
+    int m = (int)A.extent(0);
+    int n = (int)A.extent(1);
     if (has_BLAS)
     {
         // Define output Variables
@@ -340,7 +340,7 @@ NNLSResult nnls(
                     activeIndices.push_back(i);
             }
 
-            int activeCount = activeIndices.size();
+            int activeCount = (int)activeIndices.size();
 
             // Extract submatrix AtA[P, P] and Atb[P]
             for (int i = 0; i < activeCount; i++)

@@ -783,7 +783,7 @@ bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, cons
     {
         if (debug)
             file << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, wave, debug, false), "ERROR during reading of missing basis set!", file);
+        err_checkf(read_basis_set_vanilla(basis_set_path, wave, debug), "ERROR during reading of missing basis set!", file);
     }
     else if (wave.get_nr_basis_set_loaded() < wave.get_ncen())
     {
