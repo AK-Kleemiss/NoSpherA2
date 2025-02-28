@@ -449,9 +449,7 @@ void SALTEDPredictor::shrink_intermediate_vectors()
     lmax.clear();
     nmax.clear();
     Mspe.clear();
-    ;
     vfps.clear();
-    ;
     wigner3j.clear();
     av_coefs.clear();
     power_env_sparse.clear();
