@@ -115,7 +115,7 @@ public:
     bool read_gbw(const std::filesystem::path&filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
     bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied);
-    bool write_xyz(const std::filesystem::path& fileName, const bool& debug = false);
+    bool write_xyz(const std::filesystem::path& fileName);
     bool set_path(std::filesystem::path given_path)
     {
         path = given_path;

@@ -332,7 +332,7 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
  * @param manual A boolean flag indicating whether to manually input the basis set name.
  * @return Returns true if the basis set is successfully read and set, false otherwise.
  */
-bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug, bool manual)
+bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wave, const bool& debug)
 {
     using namespace std;
     string basis_set_name;
@@ -594,7 +594,6 @@ bool read_basis_set_missing(const std::filesystem::path &basis_set_path, WFN &wa
     using namespace std;
     filesystem::path temp_p;
     bool end = false;
-    bool manual = false;
     while (!end)
     {
         // assemble basis set name and look if file exists

@@ -280,8 +280,8 @@ template iMatrix2 transpose(const iMatrix2 &mat);
 template <typename T, typename T2>
 T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
 {
-    int m = Mat.extent(0);
-    int n = Mat.extent(1);
+    int m = (int)Mat.extent(0);
+    int n = (int)Mat.extent(1);
     using DataType = typename T2::element_type;
     std::vector<DataType> result(transp ? n : m, 0.0);
     if constexpr (std::is_same_v<DataType, double>)

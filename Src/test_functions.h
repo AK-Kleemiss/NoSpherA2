@@ -374,8 +374,7 @@ double calc_spherically_averaged_at_r(const WFN &wavy,
 double calc_grid_averaged_at_r(const WFN &wavy,
                                const double &r,
                                const int &min_angular = 60,
-                               const int &max_angular = 1000,
-                               const bool print = false)
+                               const int &max_angular = 1000)
 {
 
     const int min_num_angular_points_closest =
@@ -702,7 +701,6 @@ double subtract_dens_from_gbw(std::filesystem::path &wfn_name_1,
             MinMax[i + 3] = MinMax2[i + 3];
         steps[i] = (int)ceil(constants::bohr2ang(MinMax[i + 3] - MinMax[i]) / resol);
     }
-    int counter = 0;
 
     cube dens1(steps[0], steps[1], steps[2], wavy1.get_ncen(), true);
     cube dens2(steps[0], steps[1], steps[2], wavy2.get_ncen(), true);
@@ -1008,7 +1006,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     for (long long int _r = 1; _r < upper_r; _r++)
     {
         double r = _r * dr;
-        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800, opt.debug);
+        radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800);
         if (_r >= 1)
         {
             tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
@@ -1639,7 +1637,7 @@ void test_analytical_fourier(bool full)
 	bool correct = true; //Verify if the current m is correct
 
     cdouble max_diff, diff;
-    for (int type = 0; type <= max_l; type++)
+    for (unsigned int type = 0; type <= max_l; type++)
     {
         std::cout << "Testing l = " << type << std::endl;
         vec coefs(type * 2 + 1);
@@ -1652,7 +1650,7 @@ void test_analytical_fourier(bool full)
         primitive p(1, type, c_exp, vals[0]);
 
 
-        for (int l = 0; l < type * 2 + 1; l++)
+        for (unsigned int l = 0; l < type * 2 + 1; l++)
         {
             for (int i = 0; i < coefs.size(); i++)
             {

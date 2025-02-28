@@ -277,11 +277,11 @@ void SALTED_BINARY_FILE::populate_config(Config &config) {
 
     READ_BLOCK_STRING(string_out);
     config.neighspe1 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
-	config.nspe1 = config.neighspe1.size();
+	config.nspe1 = (int)config.neighspe1.size();
 
     READ_BLOCK_STRING(string_out);
 	config.neighspe2 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
-	config.nspe2 = config.neighspe2.size();
+	config.nspe2 = (int)config.neighspe2.size();
 
     READ_BLOCK_STRING(string_out);
 	config.dfbasis = std::string(string_out.begin(), string_out.end());

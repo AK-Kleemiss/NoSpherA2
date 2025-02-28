@@ -23,6 +23,7 @@ public:
     RGB get_colour() const { return colour; };
     void set_colour(const RGB& given) { colour = given; };
     void set_colour_index(const int& index) { colour_index = index; };
+    void set_colour_index(const size_t& index) { colour_index = (int)index; };
     int get_colour_index() const { return colour_index; };
     std::array<double, 3> get_v(const int& nr) const {
         if (nr == 1)
@@ -48,7 +49,7 @@ public:
         return { (v1[0] + v2[0] + v3[0]) / 3., (v1[1] + v2[1] + v3[1]) / 3., (v1[2] + v2[2] + v3[2]) / 3. };
     };
 };
-std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal, const int subdivisionLevel = 2);
+std::vector<Triangle> marchingCubes(const cube& volumeData, const double isoVal);//, const int subdivisionLevel = 2);
 bool writeObj(const std::filesystem::path& filename, const std::vector<Triangle>& triangles);
 bool writeColourObj(const std::filesystem::path& filename, std::vector<Triangle>& triangles);
 bool writeMTL(const std::string& mtlFilename, std::vector<Triangle>& triangles);
