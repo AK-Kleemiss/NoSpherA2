@@ -176,7 +176,7 @@ void SALTEDPredictor::read_model_data() {
 	for (std::string spe : config.species) {
 		for (int lam = 0; lam < lmax[spe] + 1; lam++) {
 			key = spe + std::to_string(lam);
-			if (lam == 0) Mspe[spe] = features[key].extent(0);
+			if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
 
             if (config.zeta == 1.0) {
 				power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix

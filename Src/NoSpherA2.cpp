@@ -103,7 +103,7 @@ int main(int argc, char **argv)
         Colourcode[1] = {255, 255, 255};
         Colourcode[2] = {0, 0, 255};
 
-        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5, 1);
+        std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);
         std::cout << "Found " << triangles_i.size() << " triangles!" << endl;
         auto triangles_e = triangles_i;
         double area = 0.0;
