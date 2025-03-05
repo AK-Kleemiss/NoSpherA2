@@ -2367,7 +2367,10 @@ void options::digest_options()
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
-                combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
+                if (arguments[i + n][0] == 'n')
+                    combined_tsc_calc_charge.push_back(-stoi(arguments[i + n].substr(1)));
+                else
+                    combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
                 n++;
             }
         }
