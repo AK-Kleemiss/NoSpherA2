@@ -64,7 +64,7 @@ BasisSetLibrary::BasisSetLibrary() {
 	basisSets["HGBSP3_7"] = BasisSet(HGBSP3_7);
 	basisSets["def2_qzvppd_rifit"] = BasisSet(def2_qzvppd_rifit);
 	basisSets["cc-TZVP_JKfit"] = BasisSet(CC_TZVP_JKfit);
-	basisSets["cc-pvqz-jkfit"] = BasisSet(CC_QZVP_JKfit);
+	basisSets["cc-PVQZ-Jkfit"] = BasisSet(CC_QZVP_JKfit);
 	basisSets["cc-PV5Z_JKfit"] = BasisSet(CC_PV5Z_JKfit);
 	basisSets["cc-PVQZ_F12_OPTRI"] = BasisSet(CC_PVQZ_F12_OPTRI);
 }
