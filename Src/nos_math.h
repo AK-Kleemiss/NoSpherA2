@@ -158,7 +158,7 @@ struct NNLSResult {
  * min ||Ax - B||_2 subject to x >= 0
  *
  * Parameters:
- * - A: Matrix A in Col-major order (vector of doubles)
+ * - A: Matrix A in ROW-major order (vector of doubles)
  * - m: Number of rows in matrix A
  * - n: Number of columns in matrix A
  * - B: Vector B (vector of doubles)
