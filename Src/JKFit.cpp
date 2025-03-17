@@ -57,16 +57,16 @@ const std::vector<primitive>& BasisSet::operator[](int element) const {
 
 
 BasisSetLibrary::BasisSetLibrary() {
-	basisSets["TESTING"] = BasisSet(TESTING);
+	basisSets["testing"] = BasisSet(TESTING);
 	basisSets["combo_basis_fit"] = BasisSet(combo_basis_fit);
-	basisSets["def2_universal_JKfit"] = BasisSet(def2_universal_JKfit);
-	basisSets["def2_SVP_JKfit"] = BasisSet(def2_SVP_JKfit);
-	basisSets["HGBSP3_7"] = BasisSet(HGBSP3_7);
+	basisSets["def2_universal_jkfit"] = BasisSet(def2_universal_JKfit);
+	basisSets["def2_svp_jkfit"] = BasisSet(def2_SVP_JKfit);
+	basisSets["hgbsp3_7"] = BasisSet(HGBSP3_7);
 	basisSets["def2_qzvppd_rifit"] = BasisSet(def2_qzvppd_rifit);
-	basisSets["cc-TZVP_JKfit"] = BasisSet(CC_TZVP_JKfit);
-	basisSets["cc-PVQZ-Jkfit"] = BasisSet(CC_QZVP_JKfit);
-	basisSets["cc-PV5Z_JKfit"] = BasisSet(CC_PV5Z_JKfit);
-	basisSets["cc-PVQZ_F12_OPTRI"] = BasisSet(CC_PVQZ_F12_OPTRI);
+	basisSets["cc-tzvp_jkfit"] = BasisSet(CC_TZVP_JKfit);
+	basisSets["cc-pvqz-jkfit"] = BasisSet(CC_QZVP_JKfit);
+	basisSets["cc-pv5z_jkfit"] = BasisSet(CC_PV5Z_JKfit);
+	basisSets["cc-pvqz_f12_optri"] = BasisSet(CC_PVQZ_F12_OPTRI);
 }
 
 BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
@@ -76,6 +76,9 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
 		std::cout << "No Basis Name Supplied! Aborting!!!" << std::endl;
 		exit(1);
 	}
+	//Cast basis_name to lowercase
+	std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::tolower);
+
 	for (auto const& [key, val] : basisSets) {
 		if (key.find(basis_name) != std::string::npos) {
 			found_basis = key;
