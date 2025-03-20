@@ -12,7 +12,6 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-bool has_BLAS = true;
 
 std::string help_message =
     ("\n----------------------------------------------------------------------------\n"
@@ -2040,6 +2039,44 @@ void options::digest_options()
             bondwise_laplacian_plots(wfn);
             exit(0);
         }
+        else if (temp == "-lukas_test") {
+            for (int l = 6; l < 10 ; l++)
+                for (int m = -l; m <= l; m++) {
+                    for (double r = 0.1; r < 2; r += 0.1) {
+                        double d[4] = {r, r*3+r, r*5*r, 0.0};
+						d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+						d[0] /= d[3]; d[1] /= d[3]; d[2] /= d[3];
+                        std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(d[0], d[1], d[2]);
+						double mine = constants::real_spherical(l, m, spherical.first, spherical.second);
+						double other_mine = constants::spherical_harmonic(l, m, d);
+						if (abs(mine - other_mine) > 1e-10) {
+							cout << "Error in P(" << l << "," << m << ") at " << r << " : " << mine << " vs " << other_mine << endl;
+						}
+                    }
+                }
+            for (int l = 0; l < 10; l++)
+                for (int m = -l; m <= l; m++) {
+					_time_point start = std::chrono::high_resolution_clock::now();
+                    for (double r = 0.1; r < 5; r += 0.000001) {
+                        double d[4] = { r, r * 3, r * 5, 0.0 };
+                        d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
+                        std::pair<double, double> spherical = constants::norm_cartesian_to_spherical(d[0] / d[4], d[1] / d[4], d[2] / d[4]);
+                        constants::real_spherical(l, m, spherical.first, spherical.second);
+                        //constants::real_spherical(l, m, d[0], d[1]);
+                        
+                    }
+					_time_point end_1 = std::chrono::high_resolution_clock::now();
+                    for (double r = 0.1; r < 5; r += 0.000001) {
+                        double d[4] = { r, r * 3, r * 5, 0.0 };
+                        constants::spherical_harmonic(l, m, d);
+                    }
+					_time_point end_2 = std::chrono::high_resolution_clock::now();
+					std::cout << "Time for P(" << l << "," << m << ") : " << std::chrono::duration_cast<std::chrono::milliseconds>(end_1 - start).count() << " vs " << std::chrono::duration_cast<std::chrono::milliseconds>(end_2 - end_1).count() << std::endl;
+                }
+					
+
+            exit(0);
+        }
         else if (temp == "-atom_dens")
         {
             cout << NoSpherA2_message() << endl;
@@ -2109,6 +2146,7 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
+			set_BLAS_threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
 #endif
@@ -2589,7 +2627,7 @@ void options::digest_options()
             if ("full" == arguments[i + 1]) {
 				full = true;
             }
-            test_analytical_fourier(full);
+			test_analytical_fourier(full);
             exit(0);
         }
         else if (temp == "-test_RI")
