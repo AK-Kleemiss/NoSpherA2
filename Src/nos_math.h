@@ -163,7 +163,6 @@ struct NNLSResult {
  * - n: Number of columns in matrix A
  * - B: Vector B (vector of doubles)
  * - maxiter: Maximum number of iterations (default is 3 * n)
- * - tol: Tolerance for convergence (default is 10 * max(m, n) * epsilon)
  *
  * Returns:
  * - NNLSResult: Struct containing the solution vector x, residual norm, and status code
@@ -177,10 +176,7 @@ struct NNLSResult {
  */
 NNLSResult nnls(
     dMatrix2& A, dMatrix1& B,
-    int maxiter = -1,
-    double tol = -1);
+    int maxiter = -1);
 
 
-
-void math_load_BLAS(int num_threads);
-void math_unload_BLAS();
+void set_BLAS_threads(int num_threads);

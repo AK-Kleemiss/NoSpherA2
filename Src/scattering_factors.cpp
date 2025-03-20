@@ -2512,29 +2512,23 @@ double fourier_bessel_integral(
     return p.normalization_constant() * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
+
 cdouble sfac_bessel(
-    const primitive &p,
-    const double *k_point,
-    const vec &coefs)
+    const primitive& p,
+    const double* k_point,
+    const vec& coefs)
 {
-    const double leng = sqrt(k_point[0] * k_point[0] + k_point[1] * k_point[1] + k_point[2] * k_point[2]);
-    std::pair<double, double> spherical;
-    if (leng == 0)
-        spherical = std::make_pair(0.0, 0.0);
-    else
-        // normalize the spherical harmonics k_point
-        spherical = constants::norm_cartesian_to_spherical(k_point[0] / leng, k_point[1] / leng, k_point[2] / leng);
-
     const int t = p.get_type();
-
-    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, leng) * p.get_coef();
+    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
     cdouble result(0.0, 0.0);
     for (int m = -t; m <= t; m++)
     {
-        result += radial * constants::real_spherical(t, m, spherical.first, spherical.second) * coefs[m + t];
+        //result += radial * constants::real_spherical(t, m, spherical.first, spherical.second) * coefs[m + t];
+        result += radial * constants::spherical_harmonic(t, m, k_point) * coefs[m + t];
     }
     return result;
 }
+
 
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
@@ -2555,7 +2549,12 @@ void calc_SF_SALTED(const vec2 &k_pt,
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
             int coef_count = 0;
-            double k_pt_local[3] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt]};
+            double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
+			k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+
+			//Normalize K-point
+			for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
+
             for (int iat = 0; iat < atom_list.size(); iat++)
             {
                 const int lim = (int)atom_list[iat].get_basis_set_size();

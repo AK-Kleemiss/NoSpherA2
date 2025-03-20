@@ -37,6 +37,7 @@ int main(int argc, char **argv)
 
     if (opt.threads != -1)
     {
+        set_BLAS_threads(4);
 #ifdef _OPENMP
         omp_set_num_threads(opt.threads);
 #endif
@@ -48,7 +49,6 @@ int main(int argc, char **argv)
     }
     log_file.flush();
 
-    math_load_BLAS(opt.threads);
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {

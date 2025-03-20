@@ -29,6 +29,11 @@ namespace constants
             ? sqrtNewtonRaphson(x, x, 0)
             : std::numeric_limits<double>::quiet_NaN();
     }
+	int constexpr const_abs(int x)
+	{
+		return x < 0 ? -x : x;
+	}
+    
     // Constants for later use
     constexpr double SQRT2 = sqrt(2.0);
     constexpr double SQRT3 = sqrt(3.0);
@@ -60,7 +65,6 @@ namespace constants
                                        146, 170, 194, 230, 266, 302, 350, 434,
                                        590, 770, 974, 1202, 1454, 1730, 2030, 2354,
                                        2702, 3074, 3470, 3890, 4334, 4802, 5294, 5810 };
-    constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
     constexpr long long int double_ft[25]{ 1, 1, 2, 3, 8, 15, 48, 105, 384, 945, 3840, 10395, 46080, 135135, 645120, 2027025, 10321920, 34459425, 185794560, 654729075, 3715891200, 13749310575, 81749606400, 316234143225, 1961990553600};
     constexpr double alpha_coef = 0.1616204596739954813316614;
     constexpr double c_13 = 1.0 / 3.0;
@@ -113,7 +117,7 @@ namespace constants
     constexpr double c_13_4p = sqrt(13.0 / (FOUR_PI));
     constexpr double c_15_4p = sqrt(15.0 / (FOUR_PI));
     constexpr double c_17_4p = sqrt(17.0 / (FOUR_PI));
-    constexpr double c_19_4p = sqrt(18.0 / (FOUR_PI));
+    constexpr double c_19_4p = sqrt(19.0 / (FOUR_PI));
     constexpr double c_5_16p = sqrt(5.0 / (16.0 * PI));
     constexpr double c_7_16p = sqrt(7.0 / (16.0 * PI));
     constexpr double c_9_256p = sqrt(9.0 / (256.0 * PI));
@@ -174,8 +178,19 @@ namespace constants
                                                     {10, {{-10,10}, {-9,11}, {-8,9}, {-7,12}, {-6,8}, {-5,13}, {-4,7}, {-3,14}, {-2,6}, {-1,15}, {0,5}, {1,16}, {2,4}, {3,17}, {4,3}, {5,18}, {6,2}, {7,19}, {8,1}, {9,20}, {10,0}}}
     };
 
+    //constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
+    static constexpr int MAX_FACTORIAL = 30;
+    constexpr std::array<size_t, MAX_FACTORIAL> factorial_const() {
+        std::array<size_t, MAX_FACTORIAL> ft{};
 
+        ft[0] = 1;
+        for (int i = 1; i < MAX_FACTORIAL; ++i) {
+            ft[i] = ft[i - 1] * i;
+        }
+        return ft;
+    }
 
+    static constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
 
     constexpr double log_approx(const double& x, int n = 25) {
         if (x <= 0.0) return -1.0; // log is not defined for non-positive values
@@ -531,11 +546,36 @@ namespace constants
     const double normgauss(const int& type, const double& exp);
 
     const double spherical_harmonic(const int& l, const int& m, const double* d);
-    
-    double associated_legendre_polynomial(const int &l, const int &m, const double &x);
+
+    static constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
+    using SphericalNormsArray = std::array<std::array<double, 2 * ASSOCIATED_LEGENDRE_MAX_L + 1>, ASSOCIATED_LEGENDRE_MAX_L + 1>;
+    // Define constexpr storage generator
+    constexpr SphericalNormsArray generate_spherical_norms() {
+        SphericalNormsArray norms = {};
+
+        // l = 0 case
+        norms[0][0] = constants::c_1_4p;
+        for (int l = 1; l <= ASSOCIATED_LEGENDRE_MAX_L; ++l) {
+            for (int m = -l; m <= l; ++m) {
+                norms[l][m + l] = sqrt(((2 * l + 1) * double(constants::ft[l - m])) / (constants::TWO_PI * double(constants::ft[l + m])));
+            }
+            norms[l][l] = sqrt(((2 * l + 1) / constants::FOUR_PI));
+        }
+        return norms;
+    }
+    static constexpr SphericalNormsArray spherical_norms = generate_spherical_norms();
+
+
+
+    //double associated_legendre_polynomial(const int& l, const int& m, const double& x);
     std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
     std::pair<double, double> norm_cartesian_to_spherical(const double& x, const double& y, const double& z);
-    double real_spherical(const int& l, const int& m, const double& theta, const double& phi);
+    //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
+    //I omitted the abs(m) in the factorial as most other sources do not include it
+    inline double real_spherical(const int& l, const int& m, const double& theta, const double& phi) {
+        //return constants::spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+        return constants::spherical_norms[l][l + m] * std::assoc_legendre(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+    }
 
     static double POLY_SMALLX_R0[] = {
         // nroots = 1
