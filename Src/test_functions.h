@@ -1259,13 +1259,6 @@ void calc_rho_cube(WFN &dummy)
     CubeRho.write_file(fn, false);
 };
 
-double s_value(double *d)
-{
-    primitive p_0(0, 0, 3.5, 1.0);
-    int m = 0;
-    return pow(gaussian_radial(p_0, d[3]) * constants::spherical_harmonic(p_0.get_type(), m, d), 2);
-}
-
 void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
 {
     std::vector<unsigned long> shape{};
@@ -1567,7 +1560,7 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 void test_openblas()
 {
     SALTEDPredictor SP;
-    math_load_BLAS(4);
+    set_BLAS_threads(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
 }
@@ -1578,7 +1571,7 @@ void test_analytical_fourier(bool full)
     vec2 kpts;
 
     for (int i = 1; i < 1000; i++) {
-		//Generate random k-points with values between -1 and 1
+        //Generate random k-points with values between -1 and 1
 		kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
     }
     vec2 grid;
@@ -1591,18 +1584,18 @@ void test_analytical_fourier(bool full)
     double radial_res = 1E-17;
     if (full) {
         max_l = 8;
-		radial_res = 1E-25;
+        radial_res = 1E-25;
     }
 
     double alpha_min[] = {0.5};
     AtomGrid griddy(radial_res,
-                    350,
-                    5000,
-                    1,
-                    c_exp,
-                    max_l,
-                    alpha_min,
-                    std::cout);
+        350,
+        5000,
+        1,
+        c_exp,
+        max_l,
+        alpha_min,
+        std::cout);
 
     double pos[] = {0};
     for (int i = 0; i < grid.size(); i++)
@@ -1618,7 +1611,7 @@ void test_analytical_fourier(bool full)
     sf_A[0].resize(kpts.size(), 0.0);
     sf_N[0].resize(kpts.size(), 0.0);
 
-    
+
 
     // double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     // int steps[3]{ 0, 0, 0 };
@@ -1633,8 +1626,8 @@ void test_analytical_fourier(bool full)
     // Calc_MO_spherical_harmonics(CubeMO, wavy, 18, std::cout, false);
     // CubeMO.path = "MO.cube";
     // CubeMO.write_file(true);
-	bool all_correct = true; //Veryfiy if all m for one l are correct break if one failed
-	bool correct = true; //Verify if the current m is correct
+    bool all_correct = true; //Veryfiy if all m for one l are correct break if one failed
+    bool correct = true; //Verify if the current m is correct
 
     cdouble max_diff, diff;
     for (unsigned int type = 0; type <= max_l; type++)
@@ -1682,15 +1675,14 @@ void test_analytical_fourier(bool full)
 #pragma omp parallel for
             for (int i = 0; i < kpts.size(); i++)
             {
-                double k_pt_local[3];
-                for (int d = 0; d < 3; d++)
-                {
-                    k_pt_local[d] = kpts[i][d] * 2 * constants::PI;
-                }
+				double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
+				k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+				for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
+
                 sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
 				//sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
-                {
+            {
                     double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
                     sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
@@ -1698,12 +1690,12 @@ void test_analytical_fourier(bool full)
                 if (abs(diff) > abs(max_diff))
                 {
                     max_diff = diff;
-                }
+            }
                 if (abs(diff) > 2E-5)
-                {
-					all_correct = false;
+            {
+                all_correct = false;
                     correct = false;
-                }
+            }
             }
             if (!correct)
             {
@@ -1717,8 +1709,7 @@ void test_analytical_fourier(bool full)
         }
         if (!all_correct)
             break;
-        std::cout << "l = " << type << " passed!\n"
-                  << std::endl;
+        std::cout << "l = " << type << " passed!\n" << std::endl;
     }
     if (!all_correct)
     {
@@ -1739,7 +1730,7 @@ void test_analytical_fourier(bool full)
         }
         result.flush();
         result.close();
-		std::cout << "Error in the calculations!" << std::endl;
+        std::cout << "Error in the calculations!" << std::endl;
         exit(1);
     }
     else
@@ -1810,7 +1801,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 #endif
     CubeMO.set_path("Oribital-lam" + std::to_string(lambda) + "-m-" + std::to_string(m) + ".cube");
     CubeMO.write_file();
-}
+};
 
 // Function to calculate a cubefile containing the electron density of a given wavefunction using the RI-Fit and the regular basis set
 // Also calculate the difference between the two densities
@@ -1987,13 +1978,11 @@ void test_NNLS()
         61.76354971, 61.20957227, 61.69339969, 94.37480785, 68.18202991,
         35.95079006, 43.70319538, 69.76311959, 6.02254716, 66.67667154,
         67.06378696, 21.03825611, 12.89262977, 31.54283509, 36.37107709};
-    // Dimensions
+     //Dimensions
     const int m = 10; // Number of rows
     const int n = 5;  // Number of columns
-    
-    // Right-hand side vector B
+     //Right-hand side vector B
     std::vector<double> B_in = {57.01967704, 43.86015135, 98.83738381, 10.20448107, 20.88767561, 16.13095179, 65.31083255, 25.32916025, 46.63107729, 24.4425592};
-
 
     dMatrix1 B(B_in.size());
     std::copy(B_in.begin(), B_in.end(), B.data());
@@ -2001,7 +1990,8 @@ void test_NNLS()
 	std::copy(A_in.begin(), A_in.end(), A.data());
     NNLSResult res = nnls(A, B);
 
-
+	//double sum = std::accumulate(res.x.begin(), res.x.end(), 0.0);
+	//std::cout << "Sum of coefficients: " << sum << std::endl;
 
     std::cout << "NNLS solution: " << std::endl;
     std::cout << "Mode: " << res.status << std::endl;

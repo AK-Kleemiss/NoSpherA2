@@ -61,5 +61,3 @@
 #include <termios.h>
 #include <cstring>
 #endif
-
-extern bool has_BLAS;
