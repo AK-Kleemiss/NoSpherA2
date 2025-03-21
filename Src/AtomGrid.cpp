@@ -435,7 +435,7 @@ const double get_r_inner(const double& max_error, const double& alpha_inner)
 
   double r = (d - log(1.0 / max_error)) * 2./3.;
   r = exp(r) / (alpha_inner);
-  r = constants::sqrt(r);
+  r = std::sqrt(r);
 
   return r;
 }

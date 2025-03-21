@@ -4,7 +4,7 @@ RM := rm -f
 COMP := g++
 C_COMP := gcc
 
-LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic
+LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic -ldl -lpthread
 ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../llvm-project/openmp/build/runtime/src/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
