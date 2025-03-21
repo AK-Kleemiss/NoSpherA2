@@ -12,7 +12,6 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-bool has_BLAS = true;
 
 std::string help_message =
     ("\n----------------------------------------------------------------------------\n"
@@ -2040,6 +2039,9 @@ void options::digest_options()
             bondwise_laplacian_plots(wfn);
             exit(0);
         }
+        else if (temp == "-lukas_test") {
+            exit(0);
+        }
         else if (temp == "-atom_dens")
         {
             cout << NoSpherA2_message() << endl;
@@ -2109,6 +2111,7 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
+			set_BLAS_threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
 #endif
@@ -2592,7 +2595,7 @@ void options::digest_options()
             if ("full" == arguments[i + 1]) {
 				full = true;
             }
-            test_analytical_fourier(full);
+			test_analytical_fourier(full);
             exit(0);
         }
         else if (temp == "-test_RI")

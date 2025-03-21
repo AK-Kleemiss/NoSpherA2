@@ -259,209 +259,430 @@ void _test_openblas()
     std::cout << "All BLAS tests passed!" << std::endl;
 }
 
-NNLSResult nnls(
-    dMatrix2 &A, dMatrix1 &B,
-    int maxiter,
-    double tol)
-{
-    int m = (int)A.extent(0);
-    int n = (int)A.extent(1);
-    if (has_BLAS)
-    {
-        // Define output Variables
-        vec X(n, 0);
-        double RNORM = 0.0;
-        int MODE = 0;
+NNLSResult nnls(dMatrix2& A,
+    dMatrix1& b,
+    int maxiter) {
 
-        // Check input dimensions
-        if (A.size() != m * n)
-        {
-            std::cerr << "Error: Matrix A has incorrect dimensions in NNLS.\n";
-            return NNLSResult{X, RNORM, 1};
+    int m = A.extent(0), n = A.extent(1);
+
+    if (maxiter == -1) maxiter = 3 * n;
+
+    ivec inds(n);
+    vec w(n), x(n), work(m), zz(m);
+
+    for (int i = 0; i < n; ++i) inds[i] = i;
+
+    int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
+    double tau = 0.0, unorm = 0.0, alpha, beta, cc, ss, wmax, T, tmp;
+    bool skip = false;
+
+    while (iz1 < n && nsetp < m) {
+        // simulating a goto from col independence check
+        if (skip) {
+            skip = false;
+        }
+        else {
+            std::fill(w.begin() + iz1, w.end(), 0.0);
+            for (int i = iz1; i < n; ++i) {
+                for (int j = nrow; j < m; ++j) {
+                    w[i] += b(j) * A(j, inds[i]);
+                }
+            }
         }
 
-        // Define workspace variables
-        std::vector<double> AtA(n * n, 0.0); // A^T * A
-        std::vector<double> Atb(n, 0.0);     // A^T * b
-        std::vector<double> W(n, 0.0);       // Dual vector
-        std::vector<double> S(n, 0.0);       // Trial solution
-        std::vector<bool> P(n, false);       // Active set (boolean)
+        //Find the largest w[j] and its index.
+        vec::iterator max_it = std::max_element(w.begin() + iz1, w.end());
+        wmax = *max_it;
+        int izmax = std::distance(w.begin(), max_it);
 
-        // Compute A^T * A (normal equations matrix)
-        cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-                    n, n, m, 1.0, A.data(), n, A.data(), n,
-                    0.0, AtA.data(), n);
+        int iz = izmax;
+        int j = inds[iz];
 
-        // Compute A^T * B (normal equations RHS)
-        cblas_dgemv(CblasRowMajor, CblasTrans, m, n,
-                    1.0, A.data(), n, B.data(), 1,
-                    0.0, Atb.data(), 1);
+        // If wmax <= 0.0, terminate since this is a KKT certificate.
+        if (wmax <= 0.0) break;
 
-        // Set max iterations
-        if (maxiter == -1)
-            maxiter = 3 * n;
-        if (tol == -1)
-            tol = 10 * std::max(m, n) * std::numeric_limits<double>::epsilon();
+        //# The sign of wmax is OK for j to be moved to set p.Begin the transformation
+        for (int i = nrow; i < m; ++i) {
+            work[i] = A(i, j);
+        }
+        int tmpint = m - nrow;
 
-        // Initialize W, S
-        W = Atb; // Projected residual W = A^T * B
-
-        int iter = 0;
-
-        // Initialize workspace variables
-        std::vector<double> AtA_active(n * n, 0.0);
-        std::vector<double> Atb_active(n, 0);
-        std::vector<int> ipiv(n);
-        while (iter < maxiter)
-        {
-            // Step B: Find most active coefficient
-            int k = -1;
-            double maxW = -1e12;
-            for (int i = 0; i < n; i++)
-            {
-                if (!P[i] && W[i] > tol && W[i] > maxW)
-                {
-                    k = i;
-                    maxW = W[i];
-                }
+        LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
+        beta = work[nrow];
+        work[nrow] = 1.0;
+        unorm = 0.0;
+        if (nsetp > 0) {
+            for (int i = 0; i < nsetp; ++i) {
+                unorm += A(i, j) * A(i, j);
             }
+            unorm = std::sqrt(unorm);
+        }
+		if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
+			// Column j is sufficiently independent.Copy b into zz and solve for
+			// ztest which is the new prospective value for x[j].
+			std::copy(b.data(), b.data() + m, zz.begin());
 
-            if (k == -1)
-                break; // No positive residuals, terminate.
+			LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+			if (zz[nrow] / beta <= 0.0) {
+				// reject column j as a candidate to be moved from set z to set p.
+				// Set w[j] to 0.0 and move to the next greatest entry in w.
+				w[j] = 0.0;
+				continue;
+			}
+		}
+        else {
+			// Column j is not numerically independent, reject column j
+            w[j] = 0.0;
+            continue;
+        }
+        // column j accepted
+        A(nrow, j) = beta;
+		std::copy(zz.begin(),zz.end(), b.data());
+        inds[iz] = inds[iz1];
+        inds[iz1] = j;
+        iz1 += 1;
+        nsetp += 1;
 
-            // Step B.3: Move k to active set
-            P[k] = true;
+		if (iz1 < n) {
+			for (int i = iz1; i < n; ++i) {
+				int col = inds[i];
+				for (int j = nrow; j < m; ++j) {
+					zz[j] = A(j, col);
+				}
+				LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+				for (int j = nrow; j < m; ++j) {
+					A(j, col) = zz[j];
+				}
+			}
+		}
+		nrow += 1;
 
-            // Solve least squares for active set (B.4)
-            std::vector<int> activeIndices;
-            for (int i = 0; i < n; i++)
-            {
-                if (P[i])
-                    activeIndices.push_back(i);
-            }
+        if (nsetp < m - 1) {
+			for (int i = nrow; i < m; ++i) {
+				A(i, j) = 0.0;
+			}
+        }
+        w[j] = 0.0;
 
-            int activeCount = (int)activeIndices.size();
+		std::copy(b.container().begin(), b.container().end(), zz.begin());
+		for (int k = 0; k < nsetp; ++k) {
+			int ip = nsetp - k - 1;
+			if (k != 0) {
+				for (int ii = 0; ii < ip + 1; ++ii) {
+					zz[ii] -= A(ii, jj) * zz[ip + 1];
+				}
+			}
+			jj = inds[ip];
+			zz[ip] /= A(ip, jj);
+		}
 
-            // Extract submatrix AtA[P, P] and Atb[P]
-            for (int i = 0; i < activeCount; i++)
-            {
-                int col = activeIndices[i];
-                for (int j = 0; j < activeCount; j++)
-                {
-                    int row = activeIndices[j];
-                    AtA_active[i * activeCount + j] = AtA[col * n + row];
-                }
-                Atb_active[i] = Atb[col];
-            }
+        while (true) {
+            iteration++;
+			if (iteration > maxiter) {
+				std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
+				return NNLSResult{ x, 0.0, 1 };
+			}
 
-            // Solve AtA_active * S[P] = Atb_active
-            int info = LAPACKE_dposv(LAPACK_COL_MAJOR, 'U', activeCount, 1, AtA_active.data(), activeCount, Atb_active.data(), activeCount);
-
-            if (info != 0)
-            {
-                std::cerr << "Warning: Ill-conditioned matrix detected in NNLS.\n";
-                std::cerr << "Error Code: " << info << std::endl;
-                MODE = 1;
-                break;
-            }
-
-            // Assign solution to S
-            for (int i = 0; i < activeCount; i++)
-            {
-                S[activeIndices[i]] = Atb_active[i];
-            }
-
-            // Step C: Check feasibility
-            while (iter < maxiter)
-            {
-                iter++;
-                double minS = 1e12;
-                int minIdx = -1;
-
-                for (int i = 0; i < activeCount; i++)
-                {
-                    if (S[activeIndices[i]] < 0 && S[activeIndices[i]] < minS)
-                    {
-                        minS = S[activeIndices[i]];
-                        minIdx = activeIndices[i];
+            alpha = 2.0;
+			for (int ip = 0; ip < nsetp; ++ip) {
+                int k = inds[ip];
+                if (zz[ip] <= 0.0) {
+					T = -x[k] / (zz[ip] - x[k]);
+                    if (alpha > T) {
+                        alpha = T;
+                        jj = ip;
                     }
                 }
+			}
+			if (alpha == 2.0) break;
 
-                if (minS >= 0)
-                    break; // All positive, proceed.
+            for (int i = 0; i < nsetp; ++i) {
+                x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
+            }
 
-                // Compute alpha to move back in feasible space
-                double alpha = 1.0;
-                for (int i = 0; i < activeCount; i++)
-                {
-                    int idx = activeIndices[i];
-                    if (S[idx] < 0)
-                    {
-                        alpha = std::min(alpha, X[idx] / (X[idx] - S[idx]));
+            // Modify A, B, and the indices to move coefficient
+            // i from set p to set z.While loop simulates a goto
+            int i = inds[jj];
+            while (true)
+            {
+                x[i] = 0.0;
+                if (jj != nsetp) {
+                    jj += 1;
+                    for (int j = jj; j < nsetp; ++j) {
+                        int ii = inds[j];
+                        inds[j - 1] = ii;
+                        LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        A(j, ii) = 0.0;
+                        for (int col = 0; col < n; ++col) {
+                            if (col != ii) {
+                                tmp = A(j - 1, col);
+                                A(j - 1, col) = cc * tmp + ss * A(j, col);
+                                A(j, col) = -ss * tmp + cc * A(j, col);
+                            }
+                        }
+                        tmp = b(j - 1);
+                        b(j - 1) = cc * tmp + ss * b(j);
+                        b(j) = -ss * tmp + cc * b(j);
                     }
                 }
-
-                // Adjust X and remove minIdx from active set
-                for (int i = 0; i < n; i++)
-                {
-                    X[i] = X[i] + alpha * (S[i] - X[i]);
+				nrow -= 1;
+				nsetp -= 1;
+				iz1 -= 1;
+				inds[iz1] = i;
+				bool loop_broken = false;
+                for (int jj = 0; jj < nsetp; ++jj) {
+                    i = inds[jj];
+                    if (x[i] <= 0.0) {
+						loop_broken = true;
+                        break;
+                    }
                 }
-                P[minIdx] = false; // Remove from active set
+                if (!loop_broken) break;
             }
-
-            // Assign final solution
-            for (int i = 0; i < n; i++)
-            {
-                X[i] = S[i];
+			std::copy(b.container().begin(), b.container().end(), zz.begin());
+            for (int k = 0; k < nsetp; ++k) {
+				int ip = nsetp - k - 1;
+                if (k != 0) {
+                    for (int ii = 0; ii < ip + 1; ++ii) {
+                        zz[ii] -= A(ii, jj) * zz[ip + 1];
+                    }
+                }
+				jj = inds[ip];
+				zz[ip] /= A(ip, jj);
             }
-            // Compute residual W = Atb - AtA @ X
-            cblas_dcopy(n, Atb.data(), 1, W.data(), 1);
-            cblas_dgemv(CblasColMajor, CblasNoTrans, n, n,
-                        -1.0, AtA.data(), n, X.data(), 1,
-                        1.0, W.data(), 1);
         }
+		for (int i = 0; i < nsetp; ++i) {
+			x[inds[i]] = zz[i];
+		}
 
-        // Compute residual norm ||A * X - B||
-        std::vector<double> Ax(m, 0.0);
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, m, n,
-                    1.0, A.data(), n, X.data(), 1,
-                    0.0, Ax.data(), 1);
-        double sum_sq = 0.0;
-        for (int i = 0; i < m; i++)
-        {
-            sum_sq += (Ax[i] - B(i)) * (Ax[i] - B(i));
-        }
-        sum_sq = std::sqrt(sum_sq);
-        NNLSResult resy({X, sum_sq, MODE});
-        return resy;
     }
-    else
-    {
-        std::cerr << "Error: NNLS requires LAPACKE and CBLAS.\n";
-        exit(1);
-    }
+    //Calculate the residual np.linalg.norm(b[nrow:])
+    double res = cblas_dnrm2(m - nrow, &b(nrow), 1);
+	return NNLSResult{ x, res, 0 };
 }
 
-void math_load_BLAS(int num_threads)
+//NNLSResult nnls(dMatrix2& A,
+//    dMatrix1& b,
+//    int maxiter, double tol) {
+//    int m = A.extent(0), n = A.extent(1);
+//
+//    if (maxiter == -1) maxiter = 3 * n;
+//
+//    std::vector<int> inds(n);
+//    std::vector<double> w(n, 0.0), x(n, 0.0), work(m, 0.0), zz(m, 0.0);
+//
+//    for (int i = 0; i < n; ++i) inds[i] = i;
+//
+//    int i = 0, ii = 0, ip = 0, iteration = 0, iz = 0, iz1 = 0, izmax = 0, j = 0, jj = 0, k = 0, col = 0, nrow = 0, nsetp = 0, one = 1, tmpint = 0;
+//    double tau = 0.0, unorm = 0.0, ztest, tmp, alpha, beta, cc, ss, wmax, T;
+//    bool skip = false;
+//
+//    while (iz1 < n && nsetp < m) {
+//        // simulating a goto from col independence check
+//        if (skip) {
+//            skip = false;
+//        }
+//        else {
+//            std::fill(w.begin() + iz1, w.end(), 0.0);
+//            for (int i = iz1; i < n; ++i) {
+//                for (int j = nrow; j < m; ++j) {
+//                    w[i] += b(j) * A(j, inds[i]);
+//                }
+//            }
+//        }
+//
+//        //Find the largest w[j] and its index.
+//        wmax = 0.0;
+//        for (int i = iz1; i < n; ++i) {
+//            if (w[i] > wmax) {
+//                wmax = w[i];
+//                izmax = i;
+//            }
+//        }
+//        iz = izmax;
+//        j = inds[iz];
+//
+//        // If wmax <= 0.0, terminate since this is a KKT certificate.
+//        if (wmax <= 0.0) break;
+//
+//        //# The sign of wmax is OK for j to be moved to set p.Begin the transformation
+//        for (int i = nrow; i < m; ++i) {
+//            work[i] = A(i, j);
+//        }
+//        int tmpint = m - nrow;
+//
+//        //DLARFGP(N, ALPHA, X, INCX, TAU)
+//        LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
+//        beta = work[nrow];
+//        work[nrow] = 1.0;
+//        unorm = 0.0;
+//        if (nsetp > 0) {
+//            for (int i = 0; i < nsetp; ++i) {
+//                unorm += A(i, j) * A(i, j);
+//            }
+//            unorm = std::sqrt(unorm);
+//        }
+//        if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
+//            // Column j is sufficiently independent.Copy b into zz and solve for
+//            // ztest which is the new prospective value for x[j].
+//            for (int i = 0; i < m; ++i) {
+//                zz[i] = b(i);
+//            }
+//            LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, one, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+//            ztest = zz[nrow] / beta;
+//            if (ztest <= 0.0) {
+//                // reject column j as a candidate to be moved from set z to set p.
+//                // Set w[j] to 0.0 and move to the next greatest entry in w.
+//                w[j] = 0.0;
+//                skip = true;
+//                continue;
+//            }
+//        }
+//        else {
+//            // Column j is not numerically independent, reject column j
+//            w[j] = 0.0;
+//            skip = true;
+//            continue;
+//        }
+//        // column j accepted
+//        A(nrow, j) = beta;
+//        std::copy(zz.begin(), zz.end(), b.data());
+//        inds[iz] = inds[iz1];
+//        inds[iz1] = j;
+//        iz1 += 1;
+//        nsetp += 1;
+//
+//        if (iz1 < n) {
+//            for (int i = iz1; i < n; ++i) {
+//                col = inds[i];
+//                for (int j = nrow; j < m; ++j) {
+//                    zz[j] = A(j, col);
+//                }
+//                LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, one, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+//                for (int j = nrow; j < m; ++j) {
+//                    A(j, col) = zz[j];
+//                }
+//            }
+//        }
+//        nrow += 1;
+//
+//        if (nsetp < m - 1) {
+//            for (int i = nrow; i < m; ++i) {
+//                A(i, j) = 0.0;
+//            }
+//        }
+//        w[j] = 0.0;
+//
+//        std::copy(b.container().begin(), b.container().end(), zz.begin());
+//        for (int k = 0; k < nsetp; ++k) {
+//            ip = nsetp - k - 1;
+//            if (k != 0) {
+//                for (int ii = 0; ii < ip + 1; ++ii) {
+//                    zz[ii] -= A(ii, jj) * zz[ip + 1];
+//                }
+//            }
+//            jj = inds[ip];
+//            zz[ip] /= A(ip, jj);
+//        }
+//        while (true) {
+//            iteration++;
+//            if (iteration > maxiter) {
+//                std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
+//                return NNLSResult{ x, 0.0, 1 };
+//            }
+//
+//            alpha = 2.0;
+//            for (int ip = 0; ip < nsetp; ++ip) {
+//                k = inds[ip];
+//                if (zz[ip] <= 0.0) {
+//                    T = -x[k] / (zz[ip] - x[k]);
+//                    if (alpha > T) {
+//                        alpha = T;
+//                        jj = ip;
+//                    }
+//                }
+//            }
+//            if (alpha == 2.0) break;
+//
+//            for (int i = 0; i < nsetp; ++i) {
+//                x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
+//            }
+//
+//            // Modify A, B, and the indices to move coefficient
+//            // i from set p to set z.While loop simulates a goto
+//            i = inds[jj];
+//            while (true)
+//            {
+//                x[i] = 0.0;
+//                if (jj != nsetp) {
+//                    jj += 1;
+//                    for (int j = jj; j < nsetp; ++j) {
+//                        ii = inds[j];
+//                        inds[j - 1] = ii;
+//                        LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+//                        A(j, ii) = 0.0;
+//                        for (int col = 0; col < n; ++col) {
+//                            if (col != ii) {
+//                                tmp = A(j - 1, col);
+//                                A(j - 1, col) = cc * tmp + ss * A(j, col);
+//                                A(j, col) = -ss * tmp + cc * A(j, col);
+//                            }
+//                        }
+//                        tmp = b(j - 1);
+//                        b(j - 1) = cc * tmp + ss * b(j);
+//                        b(j) = -ss * tmp + cc * b(j);
+//                    }
+//                }
+//                nrow -= 1;
+//                nsetp -= 1;
+//                iz1 -= 1;
+//                inds[iz1] = i;
+//                bool loop_broken = false;
+//                for (int jj = 0; jj < nsetp; ++jj) {
+//                    i = inds[jj];
+//                    if (x[i] <= 0.0) {
+//                        loop_broken = true;
+//                        break;
+//                    }
+//                }
+//                if (!loop_broken) break;
+//            }
+//            std::copy(b.container().begin(), b.container().end(), zz.begin());
+//            for (int k = 0; k < nsetp; ++k) {
+//                ip = nsetp - k - 1;
+//                if (k != 0) {
+//                    for (int ii = 0; ii < ip + 1; ++ii) {
+//                        zz[ii] -= A(ii, jj) * zz[ip + 1];
+//                    }
+//                }
+//                jj = inds[ip];
+//                zz[ip] /= A(ip, jj);
+//            }
+//        }
+//        for (int i = 0; i < nsetp; ++i) {
+//            x[inds[i]] = zz[i];
+//        }
+//
+//    }
+//    //Calculate the residual np.linalg.norm(b[nrow:])
+//    double res = 0.0;
+//    for (int i = nrow; i < m; ++i) {
+//        res += b(i) * b(i);
+//    }
+//    res = std::sqrt(res);
+//    return NNLSResult{ x, res, 0 };
+//}
+
+
+void set_BLAS_threads(int num_threads)
 {
-    if (has_BLAS)
-    {
-        return;
-    }
 #ifdef _WIN32
     _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
-    char *env = strdup(nums.c_str());
+    char* env = strdup(nums.c_str());
     putenv(env);
 #endif
-    has_BLAS = true;
-    return;
-}
-
-void math_unload_BLAS()
-{
-    has_BLAS = false;
 }
 
 // Remeaining functions which were separated for readibility

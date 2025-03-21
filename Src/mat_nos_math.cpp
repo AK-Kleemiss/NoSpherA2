@@ -334,16 +334,7 @@ T dot(const T2 &mat, const T &vec, bool transp)
     else
         err_checkf(mat_rows == vec_size, "Matrix dimensions do not match for multiplication", std::cout);
 
-    if (has_BLAS)
-    {
-        return dot_BLAS(mat, vec, transp);
-    }
-    else
-    {
-        std::cout << "Something went wrong, using dot fallback." << std::endl;
-        exit(-1);
-        // return self_dot(mat, vec, transp);
-    }
+    return dot_BLAS(mat, vec, transp);
 }
 template dMatrix1 dot(const dMatrix2 &mat, const dMatrix1 &vec, bool transp);
 template cMatrix1 dot(const cMatrix2 &mat, const cMatrix1 &vec, bool transp);
