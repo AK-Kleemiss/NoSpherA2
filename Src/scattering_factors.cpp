@@ -2520,14 +2520,11 @@ cdouble sfac_bessel(
 {
     const int t = p.get_type();
     const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
-    cdouble result(0.0, 0.0);
-    for (int m = -t; m <= t; m++)
-    {
-        //result += radial * constants::real_spherical(t, m, spherical.first, spherical.second) * coefs[m + t];
-        result += radial * constants::spherical_harmonic(t, m, k_point) * coefs[m + t];
-    }
+    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs.data());
     return result;
+
 }
+
 
 
 void calc_SF_SALTED(const vec2 &k_pt,

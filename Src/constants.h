@@ -179,7 +179,7 @@ namespace constants
     };
 
     //constexpr long long int ft[21]{ 1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800, 39916800, 479001600, 6227020800, 87178291200, 1307674368000, 20922789888000, 355687428096000, 6402373705728000, 121645100408832000, 2432902008176640000 };
-    static constexpr int MAX_FACTORIAL = 30;
+    constexpr int MAX_FACTORIAL = 30;
     constexpr std::array<size_t, MAX_FACTORIAL> factorial_const() {
         std::array<size_t, MAX_FACTORIAL> ft{};
 
@@ -190,7 +190,7 @@ namespace constants
         return ft;
     }
 
-    static constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
+    constexpr std::array<size_t, MAX_FACTORIAL> ft = factorial_const();
 
     constexpr double log_approx(const double& x, int n = 25) {
         if (x <= 0.0) return -1.0; // log is not defined for non-positive values
@@ -546,6 +546,7 @@ namespace constants
     const double normgauss(const int& type, const double& exp);
 
     const double spherical_harmonic(const int& l, const int& m, const double* d);
+    const double spherical_harmonic(const int& l, const double* d, const double* coefs);
 
     static constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
     using SphericalNormsArray = std::array<std::array<double, 2 * ASSOCIATED_LEGENDRE_MAX_L + 1>, ASSOCIATED_LEGENDRE_MAX_L + 1>;
@@ -563,18 +564,21 @@ namespace constants
         }
         return norms;
     }
-    static constexpr SphericalNormsArray spherical_norms = generate_spherical_norms();
+    constexpr SphericalNormsArray spherical_norms = generate_spherical_norms();
 
+    
 
-
-    //double associated_legendre_polynomial(const int& l, const int& m, const double& x);
+    double associated_legendre_polynomial(const int& l, const int& m, const double& x);
     std::vector<double> cartesian_to_spherical(const double& x, const double& y, const double& z);
     std::pair<double, double> norm_cartesian_to_spherical(const double& x, const double& y, const double& z);
     //Original implementation after P. Coppens DOI: 10.1107/97809553602060000759 Eq. 1.2.7.2b
     //I omitted the abs(m) in the factorial as most other sources do not include it
     inline double real_spherical(const int& l, const int& m, const double& theta, const double& phi) {
-        //return constants::spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+#ifndef __APPLE__
         return constants::spherical_norms[l][l + m] * std::assoc_legendre(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+#else
+        return constants::spherical_norms[l][l + m] * associated_legendre_polynomial(l, m, cos(theta)) * ((m >= 0) ? cos(m * phi) : sin(m * phi));
+#endif
     }
 
     static double POLY_SMALLX_R0[] = {
