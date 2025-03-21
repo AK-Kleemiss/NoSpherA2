@@ -40,13 +40,12 @@ namespace constants {
         int t1 = 2 * t[0], t2 = 2 * t[1], t3 = 2 * t[2];
         long long int temp2 = constants::ft[t1] * constants::ft[t2] * constants::ft[t3];
         double temp1 = 2 * exp / constants::PI;
-        temp1 = temp1 * temp1 * temp1;
-        temp1 = constants::sqrt(constants::sqrt(temp1));
+        temp1 = pow(temp1 * temp1 * temp1, 3.0/4.0);
         const int exponent = t[0] + t[1] + t[2];
         double temp_e = 1.0;
         for (int i = 0; i < exponent; i++)
             temp_e *= 8 * exp;
-        return temp1 * constants::sqrt(temp_e * temp / temp2);
+        return temp1 * std::sqrt(temp_e * temp / temp2);
     };
 
 

@@ -39,7 +39,7 @@ std::string help_message =
      "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
      "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
      "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
-     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
+     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
      "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
      "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
      "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
