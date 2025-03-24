@@ -2581,9 +2581,9 @@ void options::digest_options()
             std::filesystem::path name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
-            if (name.extension() == "tscb")
+            if (name.extension() == ".tscb")
                 blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
-            else if (name.extension() == "tsc")
+            else if (name.extension() == ".tsc")
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
             else
                 err_checkf(false, "Wrong file ending!", cout);
