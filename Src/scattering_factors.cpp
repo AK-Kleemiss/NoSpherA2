@@ -2739,15 +2739,23 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         if (debug)
             file << "Using a Thakkar core density" << endl;
         vector<Thakkar> temp;
-        for (int i = 0; i < asym_atom_list.size(); i++)
-        {
-            temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
-            if (debug && wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
+        if (debug) {
+            for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
-                     << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
+                {
+                    double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                    double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                    file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
+                        << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < asym_atom_list.size(); i++)
+            {
+                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
             }
         }
 
