@@ -459,7 +459,8 @@ inline bool merge_tscs(
     if (files[f].extension() == ".tscb")
     {
       std::filesystem::path name = files[f];
-      std::filesystem::path new_name = name.replace_extension(".tsc");
+      std::filesystem::path new_name = name;
+      new_name.replace_extension(".tsc");
       std::cout << "Converting to: " << new_name.string() << std::endl;
       tsc_block<int, cdouble> blocky(name);
       blocky.write_tsc_file(new_name, new_name);
