@@ -3903,7 +3903,7 @@ static void lflocke_jacobi_moments(int n, double t, long double *mus)
     long double t_inv = .5l / t;
     long double mu1 = 1.l; // DBL_EPSILON; // can be arbitrary number != 0
     long double mu2 = 0.l;
-    long double mu0, rn;
+    long double mu0 = 0.l, rn;
     int i;
 
     // Miller algorithm
