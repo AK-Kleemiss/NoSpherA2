@@ -217,7 +217,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -271,7 +271,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_MTC_Disorder|x64'">
-    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -acc 2 -v -mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 olex2/Wfn_job/Part_2/thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif thpp.cif -dmin 0.5 -v -mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 olex2/Wfn_job/Part_2/thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 0 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
