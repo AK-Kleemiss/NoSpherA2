@@ -1559,7 +1559,6 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 
 void test_openblas()
 {
-    SALTEDPredictor SP;
     set_BLAS_threads(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
@@ -1807,8 +1806,8 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 // Also calculate the difference between the two densities
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
-	const double radius = 2.5;
-	const double resolution = 0.1;
+	const double radius = 3.5;
+	const double resolution = 0.02;
 
     std::cout << "-------------------------------------DENSITY USING ORCA GBW-------------------------------------" << std::endl;
     double MinMax[6]{0, 0, 0, 0, 0, 0};
@@ -1830,7 +1829,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     }
     if (std::filesystem::exists(normal_cube_path))
     {
-        cube_normal.read_file(true, true);
+        //cube_normal.read_file(true, true);
     }
     else
     {
@@ -1856,32 +1855,45 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     
     cube_RI_FIT.give_parent_wfn(wavy_aux);
     //calc_cube_ML(ri_coefs, wavy_aux, -1, cube_RI_FIT);
-    cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
-    cube_RI_FIT.write_file(true);
+    //cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
+    //cube_RI_FIT.write_file(true);
 
-	std::cout << "------------------------------------RI Fit analytical integral------------------------------------" << std::endl;
+    std::cout << "-------------------------------------DIFFERENCE CUBE-------------------------------------" << std::endl;
+    //cube cube_diff = cube_normal - cube_RI_FIT;
+    //cube_diff.give_parent_wfn(wavy);
+    //cube_diff.set_comment1("Difference between RI-FIT and normal density");
+    //cube_diff.set_comment2("from " + wavy.get_path().string());
+    //cube_diff.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_diff.cube"));
+    //cube_diff.write_file(true);
+    //cube_diff.calc_dv();
+    //std::cout << "Number of electrons in difference cube: " << std::fixed << std::setprecision(5) << cube_diff.sum() << std::endl;
+    //std::cout << "RRS of difference cube: " << std::fixed << std::setprecision(5) << cube_normal.rrs(cube_RI_FIT) << std::endl;
+    
+
+    std::cout << "------------------------------------RI Fit analytical integral------------------------------------" << std::endl;
     vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), ri_coefs);
+
+    vec atom_elecs2(wavy_aux.get_ncen());
+    for (int i = 0; i < wavy_aux.get_ncen(); i++) {
+        cube_RI_FIT.set_zero();
+        calc_cube_ML(ri_coefs, wavy_aux, i, cube_RI_FIT);
+        atom_elecs2[i] = cube_RI_FIT.sum();
+        cube_RI_FIT.write_file(true);
+    }
+
+
     std::cout << "Table of Charges in electrons\n"
-        << "       Atom      ML" << std::endl;
+        << "       Atom  RI-Ana    NElec   NElec_calc" << std::endl;
 
     for (int i = 0; i < wavy_aux.get_ncen(); i++)
     {
         std::cout << std::setw(10) << wavy_aux.get_atom_label(i)
             << std::fixed << std::setw(10) << std::setprecision(3) << wavy_aux.get_atom_charge(i) - atom_elecs[i];
-            std::cout << " " << std::setw(4) << wavy_aux.get_atom_charge(i) << " " << std::fixed << std::setw(10) << std::setprecision(3) << atom_elecs[i];
+        std::cout << " " << std::setw(4) << wavy_aux.get_atom_charge(i) << " " << std::fixed << std::setw(10) << std::setprecision(10) << atom_elecs[i];
+        std::cout << " " << std::setw(10) << std::setprecision(10) << atom_elecs2[i];
         std::cout << std::endl;
     }
 
-    std::cout << "-------------------------------------DIFFERENCE CUBE-------------------------------------" << std::endl;
-    cube cube_diff = cube_normal - cube_RI_FIT;
-    cube_diff.give_parent_wfn(wavy);
-    cube_diff.set_comment1("Difference between RI-FIT and normal density");
-    cube_diff.set_comment2("from " + wavy.get_path().string());
-    cube_diff.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_diff.cube"));
-    cube_diff.write_file(true);
-    cube_diff.calc_dv();
-    std::cout << "Number of electrons in difference cube: " << std::fixed << std::setprecision(5) << cube_diff.sum() << std::endl;
-    std::cout << "RRS of difference cube: " << std::fixed << std::setprecision(5) << cube_normal.rrs(cube_RI_FIT) << std::endl;
     std::cout << "Done!" << std::endl;
 }
 
