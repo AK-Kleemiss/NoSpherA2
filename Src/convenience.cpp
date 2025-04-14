@@ -2072,6 +2072,11 @@ void options::digest_options()
             test_openblas();
             exit(0);
         }
+        else if (temp == "-lahvatest")
+        {
+            _test_lahva();
+            exit(0);
+        }
         else if (temp == "-Cation")
         {
             int n = 1;

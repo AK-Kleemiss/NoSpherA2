@@ -548,7 +548,7 @@ namespace constants
     const double spherical_harmonic(const int& l, const int& m, const double* d);
     const double spherical_harmonic(const int& l, const double* d, const double* coefs);
 
-    static constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
+    constexpr int ASSOCIATED_LEGENDRE_MAX_L = 12;
     using SphericalNormsArray = std::array<std::array<double, 2 * ASSOCIATED_LEGENDRE_MAX_L + 1>, ASSOCIATED_LEGENDRE_MAX_L + 1>;
     // Define constexpr storage generator
     constexpr SphericalNormsArray generate_spherical_norms() {
