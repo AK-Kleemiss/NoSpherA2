@@ -383,7 +383,7 @@ void WFN::change_center(const int &nr)
 
 bool WFN::set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value)
 {
-    err_checkf(nr_mo >= MOs.size(), "MO doesn't exist!", std::cout);
+    err_checkf(nr_mo <= MOs.size(), "MO doesn't exist!", std::cout);
     return MOs[nr_mo].set_coefficient(nr_primitive, value);
 };
 
@@ -4014,7 +4014,8 @@ int WFN::check_order(const bool &debug) const
             int type = get_shell_type(a, s);
             switch (type)
             {
-            case 1:
+            case 1: // S Orbital
+            {
                 for (int i = 0; i < get_atom_shell_primitives(a, s); i++)
                 {
                     if (types[primcounter] != 1)
@@ -4023,14 +4024,15 @@ int WFN::check_order(const bool &debug) const
                         if (debug)
                         {
                             std::cout << "This should not happen, the order of your file is not ok for S-types! Checked #:" << primcounter << std::endl;
-                            return -1;
                         }
                     }
                     else
                         primcounter++;
                 }
                 break;
-            case 2:
+            }
+            case 2: // P Orbital
+            {
                 if (order_found)
                 {
                     if (order == 1)
@@ -4043,7 +4045,6 @@ int WFN::check_order(const bool &debug) const
                                 {
                                     std::cout << "The found order does not match all type entries! primcounter: " << primcounter << std::endl;
                                 }
-                                return -1;
                             }
                             primcounter++;
                         }
@@ -4113,7 +4114,7 @@ int WFN::check_order(const bool &debug) const
                             if (debug)
                             {
                                 std::cout << "Either some error or this shell only has 1 p-primitive and "
-                                     << "i didn't find any order yet... assuming gaussian" << std::endl;
+                                    << "i didn't find any order yet... assuming gaussian" << std::endl;
                             }
                         }
                     }
@@ -4141,7 +4142,8 @@ int WFN::check_order(const bool &debug) const
                     s--;
                 }
                 break;
-            case 3:
+            }
+            case 3: // D Orbital
             {
                 if (order_found)
                 {
@@ -4163,7 +4165,6 @@ int WFN::check_order(const bool &debug) const
                                          << types[get_shell_start_in_primitives(a, s) + 3 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 4 * get_atom_shell_primitives(a, s) + i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 5 * get_atom_shell_primitives(a, s) + i] << std::endl;
-                                    return -1;
                                 }
                                 std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
@@ -4189,7 +4190,6 @@ int WFN::check_order(const bool &debug) const
                                          << types[get_shell_start_in_primitives(a, s) + 3 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 4 + 6 * i] << " "
                                          << types[get_shell_start_in_primitives(a, s) + 5 + 6 * i] << std::endl;
-                                    return -1;
                                 }
                                 std::cout << "Something seems to be wrong in the order of your D-Types..." << std::endl;
                             }
@@ -4224,6 +4224,7 @@ int WFN::check_order(const bool &debug) const
                                      << types[primcounter + 9] << std::endl
                                      << "Appears to be already okay..." << std::endl;
                             }
+                            primcounter += 10;
                         }
                         else if (types[primcounter] != 11 || types[primcounter + 1] != 12 || types[primcounter + 2] != 13 || types[primcounter + 3] != 14 || types[primcounter + 4] != 15 || types[primcounter + 5] != 17 || types[primcounter + 6] != 16 || types[primcounter + 7] != 18 || types[primcounter + 8] != 19 || types[primcounter + 9] != 20)
                         {
@@ -4236,7 +4237,6 @@ int WFN::check_order(const bool &debug) const
                                     << types[primcounter + 6] << " " << types[primcounter + 7] << " " << types[primcounter + 8] << " "
                                     << types[primcounter + 9] << "\n"
                                     << "Something seems to be wrong in the order of your F-Types..." << std::endl;
-                                return -1;
                             }
                         }
                         else
