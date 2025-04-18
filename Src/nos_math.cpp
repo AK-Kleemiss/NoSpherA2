@@ -259,23 +259,23 @@ void _test_openblas()
     std::cout << "All BLAS tests passed!" << std::endl;
 }
 
-#include <linalg.hpp>
-void _test_lahva() {
-    lahva::cpu::Vector<double> p(5, 2.0);
-
-    using namespace lahva::cpu;
-    // construct a 5 by 5 matrix, using the Shape struct and initializing the values to 1.0
-    Matrix<float> s(lahva::Shape(5, 5), 1.0);
-
-
-    //lahva::gpu::Vector<double> p(5, 2.0);
-
-    //using namespace lahva::gpu;
-    //// similar to the CPU Matrix, we have a quadratic 5 x 5 matrix
-    //// here we explicitly give the template parameters for the Allocators instead of relying on default values. 
-    //Matrix<float, CudaHostAllocator<float>, CudaDeviceAsyncAllocator<float>> s(5, 1.0);
-
-}
+//#include <linalg.hpp>
+//void _test_lahva() {
+//    lahva::cpu::Vector<double> p(5, 2.0);
+//
+//    using namespace lahva::cpu;
+//    // construct a 5 by 5 matrix, using the Shape struct and initializing the values to 1.0
+//    Matrix<float> s(lahva::Shape(5, 5), 1.0);
+//
+//
+//    //lahva::gpu::Vector<double> p(5, 2.0);
+//
+//    //using namespace lahva::gpu;
+//    //// similar to the CPU Matrix, we have a quadratic 5 x 5 matrix
+//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values. 
+//    //Matrix<float, CudaHostAllocator<float>, CudaDeviceAsyncAllocator<float>> s(5, 1.0);
+//
+//}
 
 
 NNLSResult nnls(dMatrix2& A,

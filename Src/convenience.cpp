@@ -2074,7 +2074,7 @@ void options::digest_options()
         }
         else if (temp == "-lahvatest")
         {
-            _test_lahva();
+            //_test_lahva();
             exit(0);
         }
         else if (temp == "-Cation")

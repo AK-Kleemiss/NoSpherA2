@@ -33,28 +33,37 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 }
 
 
-//const std::unordered_map<std::string, BasisSet> built_in_basis_sets = {
-//	{ "sto-3g", /* ... actual BasisSet value */ },
-//	{ "6-31g", /* ... */ }
+//const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> built_in_basis_sets = {
+//	{ "basis name",
+//		{{
+//			{ {0, 0, 1.0, 0.5}, {0, 1, 2.0, 0.4} }, For lines containing data
+//			{ },									For lines containing no data
+//			{ {0, 0, 1.0, 0.5}, {0, 1, 2.0, 0.4} },
+//			...
+//		}}
+//	}
 //};
 
 void write_basis_sets(const std::filesystem::path basis_dir, const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> basis_sets) {
     std::ofstream file(basis_dir / "auxiliary_basis.hpp");
 	//write a hpp file that contains the basis sets as unordered map
-    file << "const std::unordered_map<std::string, BasisSet> built_in_basis_sets = {\n";
-    for (const auto& [name, basis_set] : basis_sets) {
-        file << "    { \"" << name << "\", ";
-        file << "{ ";
-        for (int i = 0; i < 118; ++i) {
-            file << "{ ";
-            for (const auto& primitive : basis_set[i]) {
-                file << "{" << primitive.get_center() << ", " << primitive.get_type() << ", " << primitive.get_exp() << ", " << primitive.get_coef() << "}, ";
-            }
-            file << "},\n ";
-        }
-        file << "} },\n";
-    }
-    file << "};\n";
+	file << "#pragma once\n";
+	file << "#define P(c, t, e, coef) primitive(c, t, e, coef)\n";
+    file << "const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> built_in_basis_sets = {\n";
+	for (const auto& [basis_name, basis_set] : basis_sets) {
+		file << "\t{ \"" << basis_name << "\",\n";
+		file << "\t\tstd::array<std::vector<primitive>, 118>{ {\n";
+		for (int i = 0; i < 118; ++i) {
+			file << "\t\t\t{ ";
+			for (const auto& prim : basis_set[i]) {
+				file << "P" << "(" << prim.get_center() << ", " << prim.get_type() << ", " << prim.get_exp() << ", " << prim.get_coef() << "), ";
+			}
+			file << "},\n";
+		}
+		file << "\t\t} }\n";
+		file << "\t},\n";
+	}
+	file << "};\n";
 
     file.close();
 
