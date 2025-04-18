@@ -3708,3 +3708,53 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     tsc_block<double, cdouble> result(sf, labels, hkl);
     result.write_tsc_file_non_integer(opt.cif);
 }
+
+ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
+    grid.resize(wavy.get_ncen());
+    bvec needs_grid(wavy.get_ncen(), true);
+    const int nr_of_atoms = (wavy.get_ncen());
+    vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
+    ivec atom_z(nr_of_atoms);
+#pragma omp parallel for
+    for (int i = 0; i < wavy.get_ncen(); i++)
+        grid[i].resize(7);
+    // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
+    // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4= molecular becke weight, 5=total density, 6=RI density],
+    // p = point in this grid
+
+    fill_xyzc(x, y, z, atom_z, 0, wavy, cell());
+
+    ivec atom_types, nr_list;
+    // Make Prototype grids with only single atom weights for all elements
+    for (int atm_idx = 0; atm_idx < nr_of_atoms; atm_idx++) {
+        atom_types.push_back(wavy.get_atom_charge(atm_idx));
+        nr_list.push_back(atm_idx);
+    }
+
+    std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1);
+
+    ivec num_points = make_atomic_grids(
+        x,
+        y,
+        z,
+        atom_z,
+        needs_grid,
+        wavy,
+        0,
+        atom_types, 
+        nr_list,
+        Prototype_grids,
+        grid,
+        std::cout,
+        true);
+
+    Prototype_grids.clear();
+
+    int points = vec_sum(num_points);
+    
+    for (int a = 0; a < wavy.get_ncen(); a++) {
+        grid[a][6].resize(grid[a][5].size());
+    }
+
+    return num_points;
+}
