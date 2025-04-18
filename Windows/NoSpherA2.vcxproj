@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug_BasisSetConverter|x64">
+      <Configuration>Debug_BasisSetConverter</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="debug_Daniel|x64">
       <Configuration>debug_Daniel</Configuration>
       <Platform>x64</Platform>
@@ -224,6 +228,15 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Static</UseOfMfc>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -712,6 +725,9 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -870,6 +886,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -1101,7 +1121,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1112,6 +1132,44 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <OpenMPSupport>false</OpenMPSupport>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
     <ClCompile>
@@ -1133,7 +1191,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1165,7 +1223,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1197,7 +1255,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1229,7 +1287,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1261,7 +1319,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1293,7 +1351,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1329,7 +1387,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1366,7 +1424,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1404,7 +1462,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1476,7 +1534,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1513,7 +1571,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1550,7 +1608,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1586,7 +1644,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1623,7 +1681,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1660,7 +1718,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1697,7 +1755,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1734,7 +1792,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1771,7 +1829,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1808,7 +1866,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1845,7 +1903,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1884,7 +1942,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1922,7 +1980,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1960,7 +2018,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1997,7 +2055,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2034,7 +2092,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2071,7 +2129,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2108,7 +2166,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2145,7 +2203,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2182,7 +2240,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2218,7 +2276,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2255,7 +2313,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2292,7 +2350,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2331,7 +2389,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2364,7 +2422,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2427,7 +2485,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2460,7 +2518,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2493,7 +2551,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2526,7 +2584,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2559,7 +2617,7 @@
       <SupportJustMyCode>true</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2592,7 +2650,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2625,7 +2683,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2658,7 +2716,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2691,7 +2749,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2724,7 +2782,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2757,7 +2815,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2790,7 +2848,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2824,7 +2882,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2857,7 +2915,7 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2900,7 +2958,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2945,7 +3003,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2982,7 +3040,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -3018,7 +3076,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include;..\Src\basis_set_helper\basis_sets</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -3046,7 +3104,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3145,6 +3205,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3205,7 +3266,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3304,6 +3367,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3364,7 +3428,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3463,6 +3529,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3523,7 +3590,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3622,6 +3691,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3682,7 +3752,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3781,6 +3853,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3841,7 +3914,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3940,6 +4015,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4000,7 +4076,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4099,6 +4177,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4159,7 +4238,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4258,6 +4339,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4318,7 +4400,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4417,6 +4501,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4477,7 +4562,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4576,6 +4663,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4636,7 +4724,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4735,6 +4825,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4795,7 +4886,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4894,6 +4987,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4955,7 +5049,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5054,6 +5150,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5114,7 +5211,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5213,6 +5312,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5277,7 +5377,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5376,6 +5478,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5436,7 +5539,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5535,6 +5640,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5596,7 +5702,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5695,6 +5803,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5749,6 +5858,7 @@
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdcpp20</LanguageStandard>
@@ -5801,6 +5911,7 @@
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildStlModules>
+      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">true</BuildStlModules>
@@ -5853,6 +5964,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5905,6 +6017,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">Create</PrecompiledHeader>
@@ -5957,6 +6070,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">pch.h</PrecompiledHeaderFile>

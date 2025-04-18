@@ -2456,7 +2456,8 @@ void options::digest_options()
             // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
 
             // std::string aux_basis = arguments[i + 1];
-            gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
             //gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
 
             exit(0);

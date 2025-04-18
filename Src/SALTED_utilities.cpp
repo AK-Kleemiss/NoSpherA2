@@ -304,7 +304,6 @@ const double calc_density_ML(const double& x,
             bf = atoms[a].get_basis_set_entry(e);
             primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
             radial = gaussian_radial(p, d[3]) * p.get_coef();
-            //if (radial < 1E-10 || p.get_type() > 0) // For debuggin, remove p.get_type() > 0 after!!!
             if (radial < 1E-10)
             {
                 coef_counter += (2 * p.get_type() + 1);

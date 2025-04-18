@@ -133,7 +133,7 @@ vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem
 
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);
 
-    rho = reorder_p(rho, wavy_aux);
+    //rho = reorder_p(rho, wavy_aux);
 
     return rho;
 }
