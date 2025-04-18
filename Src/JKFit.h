@@ -32,7 +32,6 @@ public:
     BasisSet(const std::array<std::vector<primitive>, 6>& data);
     BasisSet(const std::array<std::vector<primitive>, 35>& data);
     BasisSet(const std::array<std::vector<primitive>, 86>& data);
-    BasisSet(const std::array<std::vector<primitive>, 118>& data);
     BasisSet(const std::array<std::vector<primitive>, 118>& data) : _data(data) {};
     //Empty constructor
     BasisSet() {};
@@ -43,8 +42,6 @@ public:
 private:
     std::array<std::vector<primitive>, 118> _data;
 };
-
-#include "auxiliary_basis.hpp"
 
 
 // BasisSetLibrary class definition

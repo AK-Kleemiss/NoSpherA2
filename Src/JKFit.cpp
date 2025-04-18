@@ -1,7 +1,9 @@
 #include "pch.h"
 #include "JKFit.h"
 
-// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+#include "auxiliary_basis.hpp"
+
+//// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
 BasisSet::BasisSet(const std::array<std::vector<primitive>, 1>& data) {
 	for (int i = 0; i < 1; i++) {
 		_data[i] = data[i];
@@ -40,10 +42,6 @@ BasisSet::BasisSet(const std::array<std::vector<primitive>, 86>& data) {
 	}
 }
 
-BasisSet::BasisSet(const std::array<std::vector<primitive>, 118>& data) {
-	_data = data;
-}
-
 
 const std::array<std::vector<primitive>, 118>& BasisSet::get_data(){
 	return _data;
@@ -69,6 +67,20 @@ BasisSetLibrary::BasisSetLibrary() {
 	basisSets["cc-pvqz-jkfit"] = BasisSet(CC_QZVP_JKfit);
 	basisSets["cc-pv5z_jkfit"] = BasisSet(CC_PV5Z_JKfit);
 	basisSets["cc-pvqz_f12_optri"] = BasisSet(CC_PVQZ_F12_OPTRI);
+	//BasisSet a{
+	//	{},
+	//	{ {0, 0, 1.0, 1.0} },
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//	{},
+	//};
 }
 
 BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
