@@ -32,6 +32,7 @@
 #include <source_location>
 #include <memory>
 #include <cstddef>
+#include <limits>
 #ifdef __SSE2__
 #include <emmintrin.h>
 #endif
