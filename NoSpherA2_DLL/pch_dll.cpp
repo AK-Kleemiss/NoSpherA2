@@ -53,7 +53,7 @@ std::vector<Triangle> DLL_EXPORT compute_Hirshfeld_suface_i(const std::filesyste
     Colourcode[1] = { 255, 255, 255 };
     Colourcode[2] = { 0, 0, 255 };
 
-    std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5, 1);
+    std::vector<Triangle> triangles_i = marchingCubes(Hirshfeld_weight, 0.5);//, 1);
     std::cout << "Found " << triangles_i.size() << " triangles!" << std::endl;
     double area = 0.0;
     double volume = 0.0;

@@ -20,8 +20,8 @@ OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set con
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_d)
-GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP
+GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math 
+GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math
 
 omp: 
 	@if [ ! -f $(LIBOMP) ]; then \
