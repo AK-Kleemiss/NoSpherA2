@@ -55,9 +55,9 @@ ifeq ($(NAME),MAC)
 endif
 
 test: 
-	cd tests && make all -k -B
+	make -C tests all -k -B
 tests: 
-	cd tests && make all -k -B
+	make -C tests all -k -B
 
 
 .PHONY: test tests NoSpherA2 all NoSpherA2_Debug OpenBLAS
