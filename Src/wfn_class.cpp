@@ -5380,8 +5380,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 exponents[k] = exp[iexp + l];
 				double ng = constants::normgauss(types[k], exponents[k]);
                 primconnorm[k] = contraction[iexp + l] * ng;
-                if (debug)
-                    log << std::setw(22) << std::setprecision(16) << ng << std::endl;
 #pragma omp parallel for
                 for (int mo = 0; mo < nmo; mo++)
                 {
