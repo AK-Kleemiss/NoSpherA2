@@ -259,7 +259,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">
-    <LocalDebuggerCommandArguments>-cif thpp_ptb.cif -dmin 0.6 -cpus 6 -acc 2 -v -mtc thpp_part1.xtb 0,1 thpp_part2.xtb 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -ECP 3</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif thpp_ptb.cif -dmin 0.6 -cpus 6 -acc 2 -v -mtc thpp_part1.xtb 0,1 thpp_part2.xtb 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 3 3</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

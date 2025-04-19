@@ -595,6 +595,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 2:
@@ -616,6 +617,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 3:
@@ -643,6 +645,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 4:
@@ -676,6 +679,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 5:
@@ -715,6 +719,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 6: 
@@ -760,6 +765,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 7: 
@@ -812,6 +818,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
             }
             break;
         case 8:
@@ -853,6 +860,7 @@ namespace constants {
 				return -(1.0 / 10321920.0) * pow(x * x - 1, 4.0);
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return INFINITE;
 			}
             break;
         default:
