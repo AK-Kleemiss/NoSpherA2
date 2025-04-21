@@ -2187,6 +2187,14 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     {
                         expected_coefs += 9;
                     }
+                    else if (atoms[a].get_basis_set_type(s) == 6)
+                    {
+                        expected_coefs += 11;
+                    }
+                    else if (atoms[a].get_basis_set_type(s) == 7)
+                    {
+                        expected_coefs += 13;
+                    }
                     current_shell++;
                 }
                 temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
@@ -4003,8 +4011,8 @@ int WFN::check_order(const bool &debug) const
         }
     }
     //---------------------------check if the wfn is in the right order----------------------
-    int order = 0;   // 1= gaussian (P=2222 3333 4444) 2= tonto (234 234 234 234) 3= ORCA (423 423 423 423)
-    int f_order = 0; // 1=gaussian (F=11 12 13 17 14 15 18 19 16 20) 2=tonto=ORCA 3=ORCA (11 12 13 14 15 17 16 18 19 20) 4 = natural (11 12 13 14 15 16 17 18 19 20)
+    int order = 0;   // 1=gaussian (P=2222 3333 4444) 2=tonto (234 234 234 234) 3=ORCA (423 423 423 423)
+    int f_order = 0; // 1=gaussian (F=11 12 13 17 14 15 18 19 16 20) 2=tonto=ORCA 3=ORCA (11 12 13 14 15 17 16 18 19 20) 4=natural (11 12 13 14 15 16 17 18 19 20)
     int primcounter = 0;
     bool order_found = false;
     for (int a = 0; a < get_ncen(); a++)
@@ -4861,26 +4869,17 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     }
     else if (line[10] == 'U') // Unrestricted
         r_u_ro_switch = 1;
-    int el, ael, bel;
-    el = read_fchk_integer(fchk, "Number of electrons", false);
+    const int el = read_fchk_integer(fchk, "Number of electrons", false);
     getline(fchk, line);
-    ael = read_fchk_integer(line);
+    const int ael = read_fchk_integer(line);
     getline(fchk, line);
-    bel = read_fchk_integer(line);
+    const int bel = read_fchk_integer(line);
     err_checkf(el == ael + bel, "Error in number of electrons!", log);
     if (ael != bel && r_u_ro_switch == 0)
         r_u_ro_switch = 1; // If U was not correctly recognized
     if (calculation_level.find("CASSCF") != std::string::npos && ael != bel)
         r_u_ro_switch = 2; // CASSCF requires open shell treatment
-    int nbas = read_fchk_integer(fchk, "Number of basis functions");
-    line = go_get_string(fchk, "Number of independent functions");
-    int indbas;
-    if (line == "")
-        indbas = read_fchk_integer(fchk, "Number of independant functions");
-    else
-        indbas = read_fchk_integer(line);
-    if (debug)
-        std::cout << "Number of independent functions: " << indbas << std::endl;
+    const int nbas = read_fchk_integer(fchk, "Number of basis functions");
     line = go_get_string(fchk, "Virial Ratio");
     if (line != "")
         virial_ratio = read_fchk_double(line);
@@ -4953,471 +4952,319 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         log << "Error reading Primitive exponents" << std::endl;
         return false;
     }
-    vec contraction;
-    if (!read_fchk_double_block(fchk, "Contraction coefficients", contraction))
+    vec con;
+    if (!read_fchk_double_block(fchk, "Contraction coefficients", con))
     {
         log << "Error reading Contraction coefficients" << std::endl;
         return false;
     }
-    vec acoef, bcoef;
-    vec MOocc, aMOene, bMOene;
+    vec2 coef(2);
+    vec2 MOocc(2), MOene(2);
     if (r_u_ro_switch == 0 || r_u_ro_switch == 2)
     { // Restricted or Restricted-Open-Shell
-        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene))
+        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
         {
             log << "Error during reading of Alpha Energies" << std::endl;
             return false;
         }
-        if (!read_fchk_double_block(fchk, "MO coefficients", acoef))
+        if (!read_fchk_double_block(fchk, "MO coefficients", coef[0]))
         {
             log << "Error during reading of Alpha MOs" << std::endl;
             return false;
         }
-        MOocc.resize(aMOene.size());
+        MOocc[0].resize(MOene[0].size());
         if (r_u_ro_switch == 0)
 #pragma omp parallel for
-            for (int i = 0; i < MOocc.size(); i++)
+            for (int i = 0; i < MOocc[0].size(); i++)
             {
                 if (i < ael)
-                    MOocc[i] = 2.0;
+                    MOocc[0][i] = 2.0;
                 else
-                    MOocc[i] = 0.0;
+                    MOocc[0][i] = 0.0;
             }
         else
 #pragma omp parallel for
-            for (int i = 0; i < MOocc.size(); i++)
+            for (int i = 0; i < MOocc[0].size(); i++)
             {
                 if (i < bel)
-                    MOocc[i] = 2.0;
+                    MOocc[0][i] = 2.0;
                 else if (i < ael)
-                    MOocc[i] = 1.0;
+                    MOocc[0][i] = 1.0;
                 else
-                    MOocc[i] = 0.0;
+                    MOocc[0][i] = 0.0;
             }
     }
     else
     { // Unrestricted
-        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", aMOene))
+        if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
         {
             log << "Error during reading of Alpha Energies" << std::endl;
             return false;
         }
-        if (!read_fchk_double_block(fchk, "Beta Orbital Energies", bMOene))
+        if (!read_fchk_double_block(fchk, "Beta Orbital Energies", MOene[1]))
         {
             log << "Error during reading of Beta Energies" << std::endl;
             return false;
         }
-        if (!read_fchk_double_block(fchk, "Alpha MO coefficients", acoef))
+        if (!read_fchk_double_block(fchk, "Alpha MO coefficients", coef[0]))
         {
             log << "Error during reading of Alpha MOs" << std::endl;
             return false;
         }
-        if (!read_fchk_double_block(fchk, "Beta MO coefficients", bcoef))
+        if (!read_fchk_double_block(fchk, "Beta MO coefficients", coef[1]))
         {
             log << "Error during reading of Beta MOs" << std::endl;
             return false;
         }
-        MOocc.resize(aMOene.size() + bMOene.size());
+        MOocc[0].resize(MOene[0].size());
+        MOocc[1].resize(MOene[1].size());
 #pragma omp parallel for
-        for (int i = 0; i < aMOene.size(); i++)
+        for (int i = 0; i < MOene[0].size(); i++)
         {
             if (i < ael)
-                MOocc[i] = 1.0;
+                MOocc[0][i] = 1.0;
             else
-                MOocc[i] = 0.0;
+                MOocc[0][i] = 0.0;
         }
 #pragma omp parallel for
-        for (int i = static_cast<int>(aMOene.size()); i < static_cast<int>(aMOene.size() + bMOene.size()); i++)
+        for (int i = static_cast<int>(MOene[0].size()); i < static_cast<int>(MOene[0].size() + MOene[1].size()); i++)
         {
-            if (i - aMOene.size() < bel)
-                MOocc[i] = 1.0;
+            if (i - MOene[0].size() < bel)
+                MOocc[1][i] = 1.0;
             else
-                MOocc[i] = 0.0;
+                MOocc[1][i] = 0.0;
         }
     }
     if (debug)
         log << "Finished reading the file! Transferring to WFN object!" << std::endl;
-    ivec shelltypesspherical;
-    int nbas5D(0);
-    nmo = nbas;
-    int nshell = (int)shell_types.size();
-    if (is_spherical)
-    {
-        shelltypesspherical.resize(shell_types.size());
-        if (debug)
-        {
-            log << "shelltype:" << std::endl;
-            for (int i = 0; i < nshell; i++)
-                log << std::setw(3) << shell_types[i] << std::endl;
-        }
-        shelltypesspherical = shell_types;
-        for (int i = 0; i < nshell; i++)
-            if (shell_types[i] <= -2)
-                shell_types[i] = -shell_types[i];
-        nbas5D = nbas;
-        nbas = 0;
-        for (int i = 0; i < nshell; i++)
-            nbas += sht2nbas(shell_types[i]);
-    }
-    if (debug)
-    {
-        log << "sizes" << std::endl;
-        log << std::setw(3) << nshell << std::endl;
-        log << std::setw(3) << nbas5D << std::endl;
-        log << std::setw(3) << nbas << std::endl;
-    }
-    ivec shelltypescartesian(size_t(shell_types.size()), 0);
-    shelltypescartesian = shell_types;
-    // int nbasCart = nbas;
-    int nprims = 0;
-    for (int i = 0; i < nshell; i++)
-        nprims += sht2nbas(shell_types[i]) * nr_prims_shell[i];
-    if (debug)
-    {
-        log << "nprim" << std::endl;
-        log << std::setw(3) << nprims << std::endl;
-        log << "amocoeff of MO:1";
-        for (int i = 0; i < 4; i++)
-        {
-            if (i % 2 == 0)
-                log << std::endl;
-            log << std::setprecision(8) << std::setw(16) << std::scientific << acoef[i];
-        }
-        log << std::endl
-            << "First of MOs 1-4:" << std::endl;
-        int temp = 0;
-        for (int i = 0; i < 4; i++)
-        {
-            if (i % 2 == 0)
-                log << std::endl;
-            if (is_spherical)
-                temp = i * nbas5D;
-            else
-                temp = i * nbas;
-            log << std::setprecision(8) << std::setw(16) << std::scientific << acoef[temp];
-        }
-    }
-    // vector<primitive> basis;
-    vec2 COa, COb, CObasa, CObasb, CObasa_spherical, CObasb_spherical;
-    // ivec basshell, bascen, bastype, basstart, basend, primstart, primend;
-    vec primconnorm;
-    // create arrays
-    // basshell.resize(nbas);
-    // bascen.resize(nbas);
-    // bastype.resize(nbas);
-    // primstart.resize(nbas);
-    // primend.resize(nbas);
-    primconnorm.resize(nprims);
-    // basstart.resize(ncen);
-    // basend.resize(nbas);
-    exponents.resize(nprims);
-    centers.resize(nprims);
-    types.resize(nprims);
-    COa.resize(nmo);
-#pragma omp parallel for
-    for (int i = 0; i < nmo; i++)
-        COa[i].resize(nprims);
-    CObasa.resize(nbas);
-#pragma omp parallel for
-    for (int i = 0; i < nbas; i++)
-        CObasa[i].resize(nbas);
-    if (r_u_ro_switch == 1)
-    {
-        COb.resize(nmo);
-#pragma omp parallel for
-        for (int i = 0; i < nmo; i++)
-            COb[i].resize(nprims);
-        CObasb.resize(nbas);
-#pragma omp parallel for
-        for (int i = 0; i < nbas; i++)
-            CObasb[i].resize(nbas);
-    }
 
-    if (is_spherical)
-    {
-        // NEEEEEEEEDS TO BE DONE!!!!!!!!
-        CObasa_spherical.resize(nbas5D);
-#pragma omp parallel for
-        for (int mo = 0; mo < nbas5D; mo++)
-            CObasa_spherical[mo].resize(nbas);
-#pragma omp parallel for
-        for (int mo = 0; mo < nbas5D; mo++)
-            for (int b = 0; b < nbas5D; b++)
-                CObasa_spherical[mo][b] = acoef[nbas5D * b + mo];
-        if (debug)
-        {
-            log << std::endl
-                << "CObasa5d";
-            int run = 0;
-            for (int i = 0; i < 2; i++)
-            {
-                for (int j = 0; j < nbas5D; j++)
-                {
-                    if (run % 2 == 0)
-                        log << std::endl;
-                    log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[i][j];
-                    run++;
-                }
-                log << std::endl;
-            }
-            log << std::endl;
-        }
-        if (r_u_ro_switch == 1)
-        {
-            CObasb_spherical.resize(nbas5D);
-#pragma omp parallel for
-            for (int mo = 0; mo < nbas5D; mo++)
-                CObasb_spherical[mo].resize(nbas5D);
-#pragma omp parallel for
-            for (int mo = 0; mo < nbas5D; mo++)
-                for (int b = 0; b < nbas5D; b++)
-                    CObasb_spherical[mo][b] = bcoef[nbas5D * b + mo];
-        }
-        int ipos_spher = 0, ipos_cart = 0;
-        for (int shell = 0; shell < nshell; shell++)
-        {
-            int temp_typ5D = shelltypesspherical[shell];
-            int temp_typ6D = shell_types[shell];
-            int shell_size5D = sht2nbas(temp_typ5D);
-            int shell_size6D = sht2nbas(temp_typ6D);
-            if (debug)
-            {
-                log << std::setw(3) << ipos_spher
-                    << std::setw(3) << ipos_cart
-                    << std::setw(3) << temp_typ5D
-                    << std::setw(3) << temp_typ6D
-                    << std::setw(3) << shell_size5D
-                    << std::setw(3) << shell_size6D
-                    << std::endl;
-            }
-            if (temp_typ5D >= -1)
-            { // S and P shells are fine!
-#pragma omp parallel for
-                for (int i = 0; i < nbas5D; i++)
-                    for (int j = 0; j < shell_size6D; j++)
-                        CObasa[ipos_cart + j][i] = CObasa_spherical[ipos_spher + j][i];
-                if (debug)
-                {
-                    int run = 0;
-                    for (int i = 0; i < nbas5D; i++)
-                    {
-                        if (run % 2 == 0)
-                            log << std::endl;
-                        log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[ipos_spher][i];
-                        run++;
-                    }
-                    log << std::endl;
-                    for (int i = 0; i < nbas; i++)
-                    {
-                        if (run % 2 == 0)
-                            log << std::endl;
-                        log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[ipos_cart][i];
-                        run++;
-                    }
-                    log << std::endl;
-                }
-                // if (debug) {
-                //	int run = 0;
-                //	for (int i = 0; i < nbas5D; i++) {
-                //		if (run % 2 == 0) log << endl;
-                //		log << setprecision(8) << setw(16) << scientific << CObasa_spherical[ipos_spher][i];
-                //		run++;
-                //	}
-                //	log << endl;
-                // }
-            }
-            else if (temp_typ5D == -2)
-            { // 5D -> 6D
-#pragma omp parallel for
-                for (int i = 0; i < nbas5D; i++)
-                    for (int j = 0; j < 6; j++)
-                        CObasa[ipos_cart + j][i] =
-                            mat_5d6d[j][0] * CObasa_spherical[ipos_spher][i] + mat_5d6d[j][1] * CObasa_spherical[ipos_spher + 1][i] + mat_5d6d[j][2] * CObasa_spherical[ipos_spher + 2][i] + mat_5d6d[j][3] * CObasa_spherical[ipos_spher + 3][i] + mat_5d6d[j][4] * CObasa_spherical[ipos_spher + 4][i];
-                if (debug)
-                {
-                    int run = 0;
-                    for (int j = 0; j < 5; j++)
-                        for (int i = 0; i < nbas5D; i++)
-                        {
-                            if (run % 2 == 0)
-                                log << std::endl;
-                            log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa_spherical[ipos_spher + j][i];
-                            run++;
-                        }
-                    log << std::endl;
-                }
-                if (debug)
-                {
-                    int run = 0;
-                    for (int j = 0; j < 6; j++)
-                    {
-                        for (int i = 0; i < nbas5D; i++)
-                        {
-                            if (run % 2 == 0)
-                                log << std::endl;
-                            log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[ipos_cart + j][i];
-                            run++;
-                        }
-                        log << std::endl;
-                    }
-                    log << std::endl;
-                }
-            }
-            else if (temp_typ5D == -3) // 7F -> 10F
-#pragma omp parallel for
-                for (int i = 0; i < nbas5D; i++)
-                    for (int j = 0; j < 10; j++)
-                        CObasa[ipos_cart + j][i] =
-                            mat_7f10f[j][0] * CObasa_spherical[ipos_spher][i] + mat_7f10f[j][1] * CObasa_spherical[ipos_spher + 1][i] + mat_7f10f[j][2] * CObasa_spherical[ipos_spher + 2][i] + mat_7f10f[j][3] * CObasa_spherical[ipos_spher + 3][i] + mat_7f10f[j][4] * CObasa_spherical[ipos_spher + 4][i] + mat_7f10f[j][5] * CObasa_spherical[ipos_spher + 5][i] + mat_7f10f[j][6] * CObasa_spherical[ipos_spher + 6][i];
-            else if (temp_typ5D == -4) // 9G -> 15G
-#pragma omp parallel for
-                for (int i = 0; i < nbas5D; i++)
-                    for (int j = 0; j < 15; j++)
-                        CObasa[ipos_cart + j][i] =
-                            mat_9g15g[j][0] * CObasa_spherical[ipos_spher][i] + mat_9g15g[j][1] * CObasa_spherical[ipos_spher + 1][i] + mat_9g15g[j][2] * CObasa_spherical[ipos_spher + 2][i] + mat_9g15g[j][3] * CObasa_spherical[ipos_spher + 3][i] + mat_9g15g[j][4] * CObasa_spherical[ipos_spher + 4][i] + mat_9g15g[j][5] * CObasa_spherical[ipos_spher + 5][i] + mat_9g15g[j][6] * CObasa_spherical[ipos_spher + 6][i] + mat_9g15g[j][7] * CObasa_spherical[ipos_spher + 7][i] + mat_9g15g[j][8] * CObasa_spherical[ipos_spher + 8][i];
-            else if (temp_typ5D == -5) // 11H -> 21H
-#pragma omp parallel for
-                for (int i = 0; i < nbas5D; i++)
-                    for (int j = 0; j < 21; j++)
-                        CObasa[ipos_cart + j][i] =
-                            mat_11h21h[j][0] * CObasa_spherical[ipos_spher][i] + mat_11h21h[j][1] * CObasa_spherical[ipos_spher + 1][i] + mat_11h21h[j][2] * CObasa_spherical[ipos_spher + 2][i] + mat_11h21h[j][3] * CObasa_spherical[ipos_spher + 3][i] + mat_11h21h[j][4] * CObasa_spherical[ipos_spher + 4][i] + mat_11h21h[j][5] * CObasa_spherical[ipos_spher + 5][i] + mat_11h21h[j][6] * CObasa_spherical[ipos_spher + 6][i] + mat_11h21h[j][7] * CObasa_spherical[ipos_spher + 7][i] + mat_11h21h[j][8] * CObasa_spherical[ipos_spher + 8][i] + mat_11h21h[j][9] * CObasa_spherical[ipos_spher + 9][i] + mat_11h21h[j][10] * CObasa_spherical[ipos_spher + 10][i];
-            if (r_u_ro_switch == 1)
-            {
-                if (temp_typ5D >= -1) // S and P shells are fine!
-#pragma omp parallel for
-                    for (int i = 0; i < nbas5D; i++)
-                        for (int j = 0; j < shell_size6D; j++)
-                            CObasb[ipos_cart + j][i] = CObasb_spherical[ipos_spher + j][i];
-                else if (temp_typ5D == -2) // 5D -> 6D
-#pragma omp parallel for
-                    for (int i = 0; i < nbas5D; i++)
-                        for (int j = 0; j < 6; j++)
-                            CObasb[ipos_cart + j][i] =
-                                mat_5d6d[j][0] * CObasb_spherical[ipos_spher][i] + mat_5d6d[j][1] * CObasb_spherical[ipos_spher + 1][i] + mat_5d6d[j][2] * CObasb_spherical[ipos_spher + 2][i] + mat_5d6d[j][3] * CObasb_spherical[ipos_spher + 3][i] + mat_5d6d[j][4] * CObasb_spherical[ipos_spher + 4][i];
-                else if (temp_typ5D == -3) // 7F -> 10F
-#pragma omp parallel for
-                    for (int i = 0; i < nbas5D; i++)
-                        for (int j = 0; j < 10; j++)
-                            CObasb[ipos_cart + j][i] =
-                                mat_7f10f[j][0] * CObasb_spherical[ipos_spher][i] + mat_7f10f[j][1] * CObasb_spherical[ipos_spher + 1][i] + mat_7f10f[j][2] * CObasb_spherical[ipos_spher + 2][i] + mat_7f10f[j][3] * CObasb_spherical[ipos_spher + 3][i] + mat_7f10f[j][4] * CObasb_spherical[ipos_spher + 4][i] + mat_7f10f[j][5] * CObasb_spherical[ipos_spher + 5][i] + mat_7f10f[j][6] * CObasb_spherical[ipos_spher + 6][i];
-                else if (temp_typ5D == -4) // 9G -> 15G
-#pragma omp parallel for
-                    for (int i = 0; i < nbas5D; i++)
-                        for (int j = 0; j < 15; j++)
-                            CObasb[ipos_cart + j][i] =
-                                mat_9g15g[j][0] * CObasb_spherical[ipos_spher][i] + mat_9g15g[j][1] * CObasb_spherical[ipos_spher + 1][i] + mat_9g15g[j][2] * CObasb_spherical[ipos_spher + 2][i] + mat_9g15g[j][3] * CObasb_spherical[ipos_spher + 3][i] + mat_9g15g[j][4] * CObasb_spherical[ipos_spher + 4][i] + mat_9g15g[j][5] * CObasb_spherical[ipos_spher + 5][i] + mat_9g15g[j][6] * CObasb_spherical[ipos_spher + 6][i] + mat_9g15g[j][7] * CObasb_spherical[ipos_spher + 7][i] + mat_9g15g[j][8] * CObasb_spherical[ipos_spher + 8][i];
-                else if (temp_typ5D == -5) // 11H -> 21H
-#pragma omp parallel for
-                    for (int i = 0; i < nbas5D; i++)
-                        for (int j = 0; j < 21; j++)
-                            CObasb[ipos_cart + j][i] =
-                                mat_11h21h[j][0] * CObasb_spherical[ipos_spher][i] + mat_11h21h[j][1] * CObasb_spherical[ipos_spher + 1][i] + mat_11h21h[j][2] * CObasb_spherical[ipos_spher + 2][i] + mat_11h21h[j][3] * CObasb_spherical[ipos_spher + 3][i] + mat_11h21h[j][4] * CObasb_spherical[ipos_spher + 4][i] + mat_11h21h[j][5] * CObasb_spherical[ipos_spher + 5][i] + mat_11h21h[j][6] * CObasb_spherical[ipos_spher + 6][i] + mat_11h21h[j][7] * CObasb_spherical[ipos_spher + 7][i] + mat_11h21h[j][8] * CObasb_spherical[ipos_spher + 8][i] + mat_11h21h[j][9] * CObasb_spherical[ipos_spher + 9][i] + mat_11h21h[j][10] * CObasb_spherical[ipos_spher + 10][i];
-            }
-            ipos_cart += shell_size6D;
-            ipos_spher += shell_size5D;
-        }
-        if (debug)
-        {
-            log << std::endl
-                << "CObasa";
-            int run = 0;
-            for (int i = 0; i < 10; i++)
-            {
-                run = 0;
-                for (int j = 0; j < nbas; j++)
-                {
-                    if (run % 2 == 0)
-                        log << std::endl;
-                    log << std::setprecision(8) << std::setw(16) << std::scientific << CObasa[i][j];
-                    run++;
-                }
-                log << std::endl;
-            }
-            log << std::endl;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        for (int mo = 0; mo < nbas; mo++)
-            for (int b = 0; b < nbas; b++)
-                CObasa[b][mo] = acoef[nbas * b + mo];
-        if (r_u_ro_switch == 1)
-#pragma omp parallel for
-            for (int mo = 0; mo < nbas; mo++)
-                for (int b = 0; b < nbas; b++)
-                    CObasb[b][mo] = bcoef[nbas * b + mo];
-    }
-    if (debug)
-    {
-        log << std::endl;
-        int run = 0;
-        for (int i = 0; i < contraction.size(); i++)
-        {
-            if (run % 2 == 0)
-                log << std::endl;
-            log << std::setprecision(8) << std::setw(16) << std::scientific << contraction[i];
-            run++;
-        }
-        log << std::flush;
-    }
-    int k = 0, iexp = 0, ibasis = 0;
-    // double tnormgau;
-    for (int i = 0; i < nshell; i++)
-    {
-        int j;
-        for (j = 0; j < nr_prims_shell[i] * sht2nbas(shell_types[i]); j++)
-            centers[k + j] = shell2atom[i];
-        int lim = sht2nbas(shell_types[i]);
-        for (j = 0; j < lim; j++)
-        {
-            int temp = shell2function(shell_types[i], j);
-#pragma omp parallel for
-            for (int l = 0; l < nr_prims_shell[i]; l++)
-                types[k + l] = temp;
-            for (int l = 0; l < nr_prims_shell[i]; l++)
-            {
-                exponents[k] = exp[iexp + l];
-				double ng = constants::normgauss(types[k], exponents[k]);
-                primconnorm[k] = contraction[iexp + l] * ng;
-#pragma omp parallel for
-                for (int mo = 0; mo < nmo; mo++)
-                {
-                    COa[mo][k] = CObasa[ibasis][mo] * primconnorm[k];
-                    if (r_u_ro_switch == 1) // R or RO
-                        COb[mo][k] = CObasb[ibasis][mo] * primconnorm[k];
-                }
-                k++;
-            }
-            ibasis++;
-        }
-        iexp += nr_prims_shell[i];
+    int nprims = 0;
+    int expected_coefs = 0;
+    int nshell = (int)shell_types.size();
+    for (int i = 0; i < nshell; i++) {
+        nprims += sht2nbas(abs(shell_types[i])) * nr_prims_shell[i];
     }
     nex = nprims;
-    if (r_u_ro_switch != 1)
-        MOs.resize(aMOene.size());
-    else
-        MOs.resize(aMOene.size() + bMOene.size());
-#pragma omp parallel for
-    for (int i = 0; i < MOs.size(); i++)
+    vec con_coefs;
+    int exp_run = 0;
+    for (int a = 0; a < shell_types.size(); a++)
     {
-        MOs[i].set_ener(aMOene[i]);
-        MOs[i].set_nr(i + 1);
-        MOs[i].set_occ(MOocc[i]);
-        MOs[i].assign_coefs(COa[i]);
-        MOs[i].set_op(0);
+         double confac = 1.0;
+         if (abs(shell_types[a]) == 0)
+         {
+             expected_coefs++;
+             for (int i = 0; i < nr_prims_shell[a]; i++)
+             {
+                 confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
+                 con_coefs.push_back(con[exp_run] * confac);
+                 push_back_exponent(exp[exp_run]);
+                 push_back_center(shell2atom[a]);
+                 push_back_type(abs(shell_types[a])+1);
+                 exp_run++;
+                 if (debug)
+                     log << "Adding " << con[a] * confac << " to the coefficient of atom " << shell2atom[a] << std::endl;
+             }
+         }
+         else if (abs(shell_types[a]) == 1)
+         {
+             expected_coefs += 3;
+             for (int cart = 0; cart < 3; cart++) {
+                 for (int i = 0; i < nr_prims_shell[a]; i++)
+                 {
+                     confac = pow(128 * pow(exp[exp_run + i], 5) / constants::PI3, 0.25);
+                     con_coefs.push_back(con[exp_run + i] * confac);
+                     push_back_exponent(exp[exp_run + i]);
+                     push_back_center(shell2atom[a]);
+                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                 }
+             }
+             exp_run += nr_prims_shell[a];
+         }
+         else if (abs(shell_types[a]) == 2)
+         {
+             expected_coefs += 5;
+             for (int cart = 0; cart < 6; cart++) {
+                 for (int i = 0; i < nr_prims_shell[a]; i++)
+                 {
+                     confac = pow(2048 * pow(exp[exp_run + i], 7) / (9 * constants::PI3), 0.25);
+                     con_coefs.push_back(con[exp_run + i] * confac);
+                     push_back_exponent(exp[exp_run + i]);
+                     push_back_center(shell2atom[a]);
+                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                 }
+             }
+             exp_run += nr_prims_shell[a];
+         }
+         else if (abs(shell_types[a]) == 3)
+         {
+             expected_coefs += 7;
+             for (int cart = 0; cart < 10; cart++) {
+                 for (int i = 0; i < nr_prims_shell[a]; i++)
+                 {
+                     confac = pow(32768 * pow(exp[exp_run + i], 9) / (255 * constants::PI3), 0.25);
+                     con_coefs.push_back(con[exp_run + i] * confac);
+                     push_back_exponent(exp[exp_run + i]);
+                     push_back_center(shell2atom[a]);
+                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                 }
+             }
+             exp_run += nr_prims_shell[a];
+         }
+         else if (abs(shell_types[a]) == 4)
+         {
+             expected_coefs += 9;
+             //to-do: Have to calcualte confac for higher l
+         }
+         else if (abs(shell_types[a]) == 5)
+         {
+             expected_coefs += 11;
+         }
+         else if (abs(shell_types[a]) == 6)
+         {
+             expected_coefs += 13;
+         }
+         
     }
-    if (r_u_ro_switch == 1)
-    {
-#pragma omp parallel for
-        for (int i = static_cast<int>(aMOene.size()); i < static_cast<int>(aMOene.size() + bMOene.size()); i++)
-        {
-            const int b_step = i - (int)aMOene.size();
-            MOs[i].set_ener(bMOene[b_step]);
-            MOs[i].set_nr(i + 1);
-            MOs[i].set_occ(MOocc[i]);
-            MOs[i].assign_coefs(COb[b_step]);
-            MOs[i].set_op(1);
+    int MO_run = 0;
+    vec2 p_pure_2_cart;
+    vec2 d_pure_2_cart;
+    vec2 f_pure_2_cart;
+    vec2 g_pure_2_cart;
+    err_checkf(generate_sph2cart_mat(p_pure_2_cart, d_pure_2_cart, f_pure_2_cart, g_pure_2_cart), "Error creating the conversion matrix", log);
+    if (debug)
+        log << "I read the basis of " << ncen << " atoms successfully" << std::endl;
+    for (int i = 0; i < 2; i++) {
+        if (MOocc[i].size() == 0)
+            break;
+        for (int j = 0; j < nbas; j++) {
+            push_back_MO(i * nbas + j + 1, MOocc[i][j], MOene[i][j], 0);
+            int p_run = 0;
+            vec2 p_temp(3);
+            int d_run = 0;
+            vec2 d_temp(5);
+            int f_run = 0;
+            vec2 f_temp(7);
+            int g_run = 0;
+            vec2 g_temp(9);
+            int cc_run = 0, coef_run = 0;
+            for (int p = 0; p < nr_prims_shell.size(); p++)
+            {
+                int sw = abs(shell_types[p]);
+                switch (sw)
+                {
+                case 0:
+                {
+                    for (int s = 0; s < nr_prims_shell[p]; s++)
+                    {
+                        push_back_MO_coef(j, coef[i][j * nbas + coef_run] * con_coefs[cc_run + s]);
+                    }
+                    coef_run++;
+                    cc_run += nr_prims_shell[p];
+                    break;
+                }
+                case 1:
+                {
+                    for (int cart = 0; cart < 3; cart++)
+                    {
+                        for (int s = 0; s < nr_prims_shell[p]; s++)
+                        {
+                            push_back_MO_coef(j, coef[i][j * nbas + coef_run + cart] * con_coefs[cc_run + s]);
+                        }
+                    }
+                    coef_run += 3;
+                    cc_run += 3 * nr_prims_shell[p];
+                    break;
+                }
+                case 2:
+                {
+                    double temp_coef = 0;
+                    for (int cart = 0; cart < 6; cart++)
+                    {
+                        temp_coef = 0;
+                        for (int spher = 0; spher < 5; spher++)
+                        {
+                            temp_coef += d_pure_2_cart[cart][spher] * coef[i][j * nbas + coef_run + spher] * sqrt(3); //This factor is empirical for now.... have to find the cause
+                        }
+                        for (int s = 0; s < nr_prims_shell[p]; s++)
+                        {
+                            push_back_MO_coef(j, temp_coef * con_coefs[cc_run + s]);
+                        }
+                    }
+                    coef_run += 5;
+                    cc_run += 6 * nr_prims_shell[p];
+                    break;
+                }
+                case 3:
+                {
+                    double temp_coef = 0;
+                    for (int cart = 0; cart < 10; cart++)
+                    {
+                        temp_coef = 0;
+                        for (int spher = 0; spher < 7; spher++)
+                        {
+                            temp_coef += f_pure_2_cart[cart][spher] * coef[i][j * nbas + coef_run + spher];
+                        }
+                        for (int s = 0; s < nr_prims_shell[p]; s++)
+                        {
+                            if (cart < 3)
+                                push_back_MO_coef(MO_run, temp_coef * con_coefs[cc_run + s]);
+                            else if (cart < 9)
+                                push_back_MO_coef(MO_run, temp_coef * con_coefs[cc_run + s] / sqrt(5.0));
+                            else 
+                                push_back_MO_coef(MO_run, temp_coef* con_coefs[cc_run + s] / sqrt(15.0));
+                        }
+                    }
+                    coef_run += 7;
+                    cc_run += 10 * nr_prims_shell[p];
+                    break;
+                    break;
+                }
+                case 4:
+                {
+                    if (g_run == 0)
+                    {
+                        for (int _i = 0; _i < 9; _i++)
+                        {
+                            g_temp[_i].resize(nr_prims_shell[p], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < nr_prims_shell[p]; s++)
+                    {
+                        g_temp[g_run][s] = coef[i][j + p * nbas] * con_coefs[p + s];
+                    }
+                    g_run++;
+                    if (g_run == 9)
+                    {
+                        for (int s = 0; s < nr_prims_shell[p]; s++)
+                        {
+                            double temp_coef = 0;
+                            for (int cart = 0; cart < 15; cart++)
+                            {
+                                temp_coef = 0;
+                                for (int spher = 0; spher < 9; spher++)
+                                {
+                                    temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
+                                }
+                                if (abs(temp_coef) < 1E-20)
+                                    temp_coef = 0;
+                                push_back_MO_coef(MO_run, temp_coef);
+                            }
+                        }
+                        g_run = 0;
+                    }
+                    break;
+                }
+                default:
+                {
+                    if (debug)
+                        log << "This is not supposed to happen!" << std::endl;
+                    err_not_impl_f("Types higher than g type in fchk", log);
+                    break;
+                }
+                }
+            }
+
+
         }
     }
     return true;

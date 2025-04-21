@@ -2895,12 +2895,12 @@ const int shell2function(const int &type, const int &prim)
 
 const int sht2nbas(const int &type)
 {
-    const int st2bas[6]{1, 3, 6, 10, 15, 21};
-    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
+    const int st2bas[9]{1, 3, 6, 10, 15, 21, 28, 36};
+    const int nst2bas[9]{17,15,13,11, 9, 7, 5, 4, 1};
     if (type >= 0)
         return st2bas[type];
     else
-        return nst2bas[5 + type];
+        return nst2bas[8 + type];
 };
 
 char asciitolower(char in)
