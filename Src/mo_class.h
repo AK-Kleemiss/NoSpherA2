@@ -44,7 +44,7 @@ public:
     return true;
   };
   const double get_coefficient(const int& _nr) const {
-    err_checkf(_nr < coefficients.size() && _nr > 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
+    err_checkf(_nr < coefficients.size() && _nr >= 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
     return coefficients[_nr];
   }; 
   const vec get_coefficients() const {
