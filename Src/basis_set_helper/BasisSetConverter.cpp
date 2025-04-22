@@ -34,6 +34,7 @@ int main(int argc, char** argv)
     for (const auto& file : files)
     {
         std::string basis_name = file.stem().string();
+        std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::tolower);
         std::array<std::vector<primitive>, 118> basis_set = read_basis_set(file);
         basis_sets[basis_name] = basis_set;
     }
