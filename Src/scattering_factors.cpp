@@ -2868,6 +2868,7 @@ tsc_block<int, cdouble> thakkar_sfac(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3006,6 +3007,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3253,6 +3255,7 @@ itsc_block calculate_scattering_factors_RI_fit(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3459,7 +3462,7 @@ tsc_block<int, cdouble> calculate_scattering_factors(
                                       needs_grid,
                                       file,
                                       constant_atoms,
-                                      false,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3634,6 +3637,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                                       needs_grid,
                                       std::cout,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
