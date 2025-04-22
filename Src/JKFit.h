@@ -12,6 +12,7 @@ extern const std::array<std::vector<primitive>, 6> TESTING;
 class BasisSet {
 public:
     BasisSet(const std::array<std::vector<primitive>, 118>& data) : _data(data) {};
+    BasisSet(const std::array<std::vector<primitive>, 6>& data);
     //Empty constructor
     BasisSet() = default;
 
@@ -27,7 +28,7 @@ private:
 class BasisSetLibrary {
 public:
     // Constructor
-    BasisSetLibrary() = default;
+    BasisSetLibrary();
 
     //Access basis set
     BasisSet& get_basis_set(std::string basis_name);

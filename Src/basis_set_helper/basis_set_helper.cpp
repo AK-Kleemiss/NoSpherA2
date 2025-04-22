@@ -49,10 +49,10 @@ void write_basis_sets(const std::filesystem::path basis_dir, const std::unordere
 	//write a hpp file that contains the basis sets as unordered map
 	file << "#pragma once\n";
 	file << "#define P(c, t, e, coef) primitive(c, t, e, coef)\n";
-    file << "const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> built_in_basis_sets = {\n";
+    file << "const std::unordered_map<std::string, BasisSet> built_in_basis_sets = {\n";
 	for (const auto& [basis_name, basis_set] : basis_sets) {
 		file << "\t{ \"" << basis_name << "\",\n";
-		file << "\t\tstd::array<std::vector<primitive>, 118>{ {\n";
+		file << "\t\tBasisSet({ {\n";
 		for (int i = 0; i < 118; ++i) {
 			file << "\t\t\t{ ";
 			for (const auto& prim : basis_set[i]) {
@@ -60,7 +60,7 @@ void write_basis_sets(const std::filesystem::path basis_dir, const std::unordere
 			}
 			file << "},\n";
 		}
-		file << "\t\t} }\n";
+		file << "\t\t} })\n";
 		file << "\t},\n";
 	}
 	file << "};\n";

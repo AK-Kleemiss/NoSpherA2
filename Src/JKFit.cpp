@@ -3,6 +3,17 @@
 
 #include "auxiliary_basis.hpp"
 
+// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
+BasisSet::BasisSet(const std::array<std::vector<primitive>, 6>& data) {
+	for (int i = 0; i < 6; i++) {
+		_data[i] = data[i];
+	}
+	for (int i = 6; i < 118; i++) {
+		_data[i] = {};
+	}
+}
+
+
 //// Every BasisSet ist defined for all 118 Elements, basis sets, that do not cover all elements, are padded with 0s
 const std::array<std::vector<primitive>, 118>& BasisSet::get_data(){
 	return _data;
@@ -33,6 +44,11 @@ BasisSet& BasisSetLibrary::get_basis_set(std::string basis_name) {
 	err_checkf(found_basis != "", "Basis set " + basis_name + " not defined in BasisSetLibrary!", std::cout);
 	std::cout << "Using basis set: " << found_basis << std::endl;
 	return basisSets[found_basis];
+}
+
+BasisSetLibrary::BasisSetLibrary() {
+	basisSets = built_in_basis_sets;
+	basisSets["TESTING"] = BasisSet(TESTING);
 }
 
 bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
