@@ -5031,7 +5031,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         log << "Finished reading the file! Transferring to WFN object!" << std::endl;
 
     int nprims = 0;
-    int expected_coefs = 0;
     int nshell = (int)shell_types.size();
     for (int i = 0; i < nshell; i++) {
         nprims += sht2nbas(abs(shell_types[i])) * nr_prims_shell[i];
@@ -5044,7 +5043,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          double confac = 1.0;
          if (abs(shell_types[a]) == 0)
          {
-             expected_coefs++;
              for (int i = 0; i < nr_prims_shell[a]; i++)
              {
                  confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
@@ -5057,7 +5055,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 1)
          {
-             expected_coefs += 3;
              for (int cart = 0; cart < 3; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
@@ -5072,7 +5069,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 2)
          {
-             expected_coefs += 5;
              for (int cart = 0; cart < 6; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
@@ -5087,7 +5083,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 3)
          {
-             expected_coefs += 7;
              for (int cart = 0; cart < 10; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
@@ -5102,7 +5097,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 4)
          {
-             expected_coefs += 9;
              for (int cart = 0; cart < 15; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
@@ -5117,7 +5111,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 5)
          {
-             expected_coefs += 11;
              for (int cart = 0; cart < 21; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
@@ -5132,12 +5125,10 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          }
          else if (abs(shell_types[a]) == 6)
          {
-             expected_coefs += 13;
              //to-do: Have to calcualte confac for higher l
          }
          
     }
-    int MO_run = 0;
     vec2 p_pure_2_cart;
     vec2 d_pure_2_cart;
     vec2 f_pure_2_cart;
@@ -5150,14 +5141,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
             break;
         for (int j = 0; j < nbas; j++) {
             push_back_MO(i * nbas + j + 1, MOocc[i][j], MOene[i][j], 0);
-            int p_run = 0;
-            vec2 p_temp(3);
-            int d_run = 0;
-            vec2 d_temp(5);
-            int f_run = 0;
-            vec2 f_temp(7);
-            int g_run = 0;
-            vec2 g_temp(9);
             int cc_run = 0, coef_run = 0;
             for (int p = 0; p < nr_prims_shell.size(); p++)
             {
