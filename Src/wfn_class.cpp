@@ -832,8 +832,8 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     while (!(line.compare(0, 3, "END") == 0) && !rf.eof())
     {
         if (monum == e_nmo)
-        {
-            // if (debug) file << "read all MOs I expected, finishing read...." << endl;
+        {            
+            file << "monum went higher than expected values in MO reading, thats suspicius, lets stop here...\n";
             break;
         }
         stringstream stream2(line);
@@ -841,11 +841,6 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         temp_nr = 0;
         temp_occ = -1.0;
         temp_ener = 0.0;
-        /*if(!orca_switch)
-            stream >> tmp >> temp_nr >> tmp >> tmp >> tmp >> tmp >> tmp >> temp_occ >> tmp >> tmp >> tmp >> temp_ener;
-        else
-            stream >> tmp >> temp_nr >> tmp >> tmp >> tmp >> temp_occ >> tmp >> tmp >> tmp >> temp_ener;
-        */
         if (temp_nr == 0)
         {
             length = line.copy(tempchar, 6, 2);
@@ -4842,9 +4837,6 @@ void WFN::delete_unoccupied_MOs()
 
 bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, const bool debug)
 {
-    vec2 mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h;
-    if (!generate_cart2sph_mat(mat_5d6d, mat_7f10f, mat_9g15g, mat_11h21h))
-        log << "Error during geenration of matrix" << std::endl;
     int r_u_ro_switch = 0;
     std::ifstream fchk(filename, std::ios::in);
     if (!fchk.is_open())
@@ -5061,8 +5053,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                  push_back_center(shell2atom[a]);
                  push_back_type(abs(shell_types[a])+1);
                  exp_run++;
-                 if (debug)
-                     log << "Adding " << con[a] * confac << " to the coefficient of atom " << shell2atom[a] << std::endl;
              }
          }
          else if (abs(shell_types[a]) == 1)
@@ -5075,7 +5065,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                      con_coefs.push_back(con[exp_run + i] * confac);
                      push_back_exponent(exp[exp_run + i]);
                      push_back_center(shell2atom[a]);
-                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                     push_back_type(2 + cart);
                  }
              }
              exp_run += nr_prims_shell[a];
@@ -5086,11 +5076,11 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
              for (int cart = 0; cart < 6; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
-                     confac = pow(2048 * pow(exp[exp_run + i], 7) / (9 * constants::PI3), 0.25);
+                     confac = pow(2048 * pow(exp[exp_run + i], 7) / constants::PI3, 0.25);
                      con_coefs.push_back(con[exp_run + i] * confac);
                      push_back_exponent(exp[exp_run + i]);
                      push_back_center(shell2atom[a]);
-                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                     push_back_type(5 + cart);
                  }
              }
              exp_run += nr_prims_shell[a];
@@ -5101,11 +5091,11 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
              for (int cart = 0; cart < 10; cart++) {
                  for (int i = 0; i < nr_prims_shell[a]; i++)
                  {
-                     confac = pow(32768 * pow(exp[exp_run + i], 9) / (255 * constants::PI3), 0.25);
+                     confac = pow(32768 * pow(exp[exp_run + i], 9) / constants::PI3, 0.25);
                      con_coefs.push_back(con[exp_run + i] * confac);
                      push_back_exponent(exp[exp_run + i]);
                      push_back_center(shell2atom[a]);
-                     push_back_type(abs(shell_types[a]) + 1 + cart);
+                     push_back_type(11 + cart);
                  }
              }
              exp_run += nr_prims_shell[a];
@@ -5113,15 +5103,37 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          else if (abs(shell_types[a]) == 4)
          {
              expected_coefs += 9;
-             //to-do: Have to calcualte confac for higher l
+             for (int cart = 0; cart < 15; cart++) {
+                 for (int i = 0; i < nr_prims_shell[a]; i++)
+                 {
+                     confac = pow(524288 * pow(exp[exp_run + i], 11) / constants::PI3, 0.25);
+                     con_coefs.push_back(con[exp_run + i] * confac);
+                     push_back_exponent(exp[exp_run + i]);
+                     push_back_center(shell2atom[a]);
+                     push_back_type(21 + cart);
+                 }
+             }
+             exp_run += nr_prims_shell[a];
          }
          else if (abs(shell_types[a]) == 5)
          {
              expected_coefs += 11;
+             for (int cart = 0; cart < 21; cart++) {
+                 for (int i = 0; i < nr_prims_shell[a]; i++)
+                 {
+                     confac = pow(8388608 * pow(exp[exp_run + i], 13) / constants::PI3, 0.25);
+                     con_coefs.push_back(con[exp_run + i] * confac);
+                     push_back_exponent(exp[exp_run + i]);
+                     push_back_center(shell2atom[a]);
+                     push_back_type(36 + cart);
+                 }
+             }
+             exp_run += nr_prims_shell[a];
          }
          else if (abs(shell_types[a]) == 6)
          {
              expected_coefs += 13;
+             //to-do: Have to calcualte confac for higher l
          }
          
     }
@@ -5183,7 +5195,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                         temp_coef = 0;
                         for (int spher = 0; spher < 5; spher++)
                         {
-                            temp_coef += d_pure_2_cart[cart][spher] * coef[i][j * nbas + coef_run + spher] * sqrt(3); //This factor is empirical for now.... have to find the cause
+                            temp_coef += d_pure_2_cart[cart][spher] * coef[i][j * nbas + coef_run + spher];
                         }
                         for (int s = 0; s < nr_prims_shell[p]; s++)
                         {
@@ -5206,52 +5218,30 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                         }
                         for (int s = 0; s < nr_prims_shell[p]; s++)
                         {
-                            if (cart < 3)
-                                push_back_MO_coef(MO_run, temp_coef * con_coefs[cc_run + s]);
-                            else if (cart < 9)
-                                push_back_MO_coef(MO_run, temp_coef * con_coefs[cc_run + s] / sqrt(5.0));
-                            else 
-                                push_back_MO_coef(MO_run, temp_coef* con_coefs[cc_run + s] / sqrt(15.0));
+                            push_back_MO_coef(j, temp_coef * con_coefs[cc_run + s]);
                         }
                     }
                     coef_run += 7;
                     cc_run += 10 * nr_prims_shell[p];
                     break;
-                    break;
                 }
                 case 4:
                 {
-                    if (g_run == 0)
+                    double temp_coef = 0;
+                    for (int cart = 0; cart < 15; cart++)
                     {
-                        for (int _i = 0; _i < 9; _i++)
+                        temp_coef = 0;
+                        for (int spher = 0; spher < 9; spher++)
                         {
-                            g_temp[_i].resize(nr_prims_shell[p], 0.0);
+                            temp_coef += g_pure_2_cart[cart][spher] * coef[i][j * nbas + coef_run + spher];
                         }
-                    }
-                    for (int s = 0; s < nr_prims_shell[p]; s++)
-                    {
-                        g_temp[g_run][s] = coef[i][j + p * nbas] * con_coefs[p + s];
-                    }
-                    g_run++;
-                    if (g_run == 9)
-                    {
                         for (int s = 0; s < nr_prims_shell[p]; s++)
                         {
-                            double temp_coef = 0;
-                            for (int cart = 0; cart < 15; cart++)
-                            {
-                                temp_coef = 0;
-                                for (int spher = 0; spher < 9; spher++)
-                                {
-                                    temp_coef += g_pure_2_cart[cart][spher] * g_temp[spher][s];
-                                }
-                                if (abs(temp_coef) < 1E-20)
-                                    temp_coef = 0;
-                                push_back_MO_coef(MO_run, temp_coef);
-                            }
+                            push_back_MO_coef(j, temp_coef * con_coefs[cc_run + s]);
                         }
-                        g_run = 0;
                     }
+                    coef_run += 9;
+                    cc_run += 15 * nr_prims_shell[p];
                     break;
                 }
                 default:
