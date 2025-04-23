@@ -1,0 +1,52 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                           "alanine.owf.fchk" done!
+Number of atoms in Wavefunction file: 13 Number of MOs: 284
+Number of protons: 48
+Number of electrons: 48
+Reading:                                "alanine.cif" done!
+There are:
+  13 atoms read from the wavefunction, of which 
+  13 are identified as asymmetric unit atoms!
+
+Making Becke Grids... ...                             done! Number of gridpoints: 31250
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 30938
+Calculating non-spherical densities...                done!
+Applying hirshfeld weights and integrating charges... done!
+Number of points evaluated: 30938 with  47.940844 electrons in Becke Grid in total.
+
+Table of Charges in electrons
+
+    Atom       Becke   Spherical Hirshfeld
+        C1    -0.154    -0.070     0.004
+        H1     0.119     0.062     0.064
+        C2    -0.271    -0.292     0.080
+        O3    -0.250     0.272    -0.385
+        O4    -0.232     0.274    -0.372
+        N5     0.160     0.237     0.066
+        C6    -0.145     0.089    -0.101
+       H6b     0.059     0.030     0.035
+       H6a     0.116     0.039     0.076
+       H6c     0.085     0.041     0.051
+       H5a     0.200     0.019     0.180
+       H5b     0.204     0.014     0.191
+       H5c     0.169     0.004     0.169
+Total number of electrons in the wavefunction: 47.941
+ and Hirshfeld electrons (asym unit): 47.941
+Generating hkl indices up to d=:              0.50... done!
+Nr of reflections generated:                 40700
+Number of symmetry operations:                   4
+Nr of reflections to be used:                28738
+
+Number of k-points to evaluate: 28738 for 30786 gridpoints.
+[                Calculating Scattering Factors                ]
+[=============================================================] 100% 
+Writing tsc file...  ... done!

@@ -71,7 +71,7 @@ for set_index in range(len(d_sph)):
     d_c = d_cart[set_index]
 
     for i,e in enumerate(d_exp):
-        n_fac = pow(2048*pow(e,7)/9/pow(np.pi,3),0.25)
+        n_fac = pow(2048*pow(e,7)/pow(np.pi,3),0.25)
         row = [n_fac * d_con[i] * sph for sph in d_s]
         all_d_sph_norm.append(row)
         all_d_cart.append(d_c[i])

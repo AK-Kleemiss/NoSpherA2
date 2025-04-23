@@ -1,6 +1,6 @@
 RM := rm
 
-ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED 
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED alanine_occ
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
@@ -17,6 +17,17 @@ endif
 all: $(ALL_TARGETS)
 
 all_tests: $(ALL_TARGETS) fourier_transform_full rubredoxin_cmtc_full fchk_conversion
+
+alanine_occ:
+	@echo 'Running test: $@'
+	@cd alanine_occ && $(BASE_PATH) \
+		-cif alanine.cif \
+		-dmin 0.5 \
+		-wfn alanine.owf.fchk \
+		-acc 1 \
+		-no-date \
+		&& ${MV} NoSpherA2.log $@.log \
+		&& ${DIFF} $@.log $@.good
 
 sucrose_SF:
 	@echo 'Running test: $@'
