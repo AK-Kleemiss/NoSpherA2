@@ -215,10 +215,6 @@ void write_timing_to_file(std::ostream &file, std::vector<_time_point> time_poin
 
 int CountWords(const char *str);
 
-// inline bool exists(const std::filesystem::path& name) {
-//     return std::filesystem::exists(name);
-// };
-
 void copy_file(std::filesystem::path &from, std::filesystem::path &to);
 std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
@@ -226,9 +222,9 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 bool check_bohr(WFN &wave, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
 
-/*bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
+bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
 bool save_file_dialog(std::string &path, bool debug, const svec &endings, const std::string &filename_given);
-bool save_file_dialog(std::string &path, bool debug, const svec &endings);*/
+bool save_file_dialog(std::string &path, bool debug, const svec &endings);
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 
@@ -418,6 +414,37 @@ void removeElement(std::vector<T> &vec, const T &x)
     // Erase the elements from the new end to the actual end
     vec.erase(new_end, vec.end());
 }
+
+void Enter(){
+	std::cout << "press ENTER to continue... " << std::flush;
+	std::cin.ignore();
+	std::cin.get();
+};
+
+void cls(){
+//   std::cout << string( 100, '\n' );
+#ifdef _WIN32
+	if(system("CLS")) std::cout << "this should not happen...!" << std::endl;
+#else
+	if(system("clear")) std::cout << "this should not happen...!" << std::endl;
+#endif
+};
+
+bool yesno(){
+	bool end=false;
+	while (!end) {
+		char dum ='?';
+		std::cout << "(Y/N)?";
+		std::cin >> dum;
+		if(dum == 'y'||dum == 'Y'){
+			std::cout << "Okay..." << std::endl;
+			 return true;
+		}
+		else if(dum == 'N'||dum == 'n') return false;
+		else std::cout << "Sorry, i did not understand that!" << std::endl;
+	}
+	return false;
+};
 
 class primitive
 {
