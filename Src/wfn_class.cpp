@@ -4604,7 +4604,7 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
 {
     has_ECPs = in;
     ECP_m = ECP_mode;
-    if (apply_to_atoms && ECP_mode == 1)
+    if (apply_to_atoms && ECP_mode == 1) // This is the def2 ECPs
     {
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
@@ -4615,7 +4615,7 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
             }
         }
     }
-    if (apply_to_atoms && ECP_mode == 2)
+	if (apply_to_atoms && ECP_mode == 2) // xTB ECPs
     {
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
@@ -4626,7 +4626,7 @@ void WFN::set_has_ECPs(const bool &in, const bool &apply_to_atoms, const int &EC
             }
         }
     }
-    if (apply_to_atoms && ECP_mode == 3)
+	if (apply_to_atoms && ECP_mode == 3) // pTB ECPs
     {
 #pragma omp parallel for
         for (int i = 0; i < ncen; i++)
@@ -5011,7 +5011,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         MOocc[0].resize(MOene[0].size());
         MOocc[1].resize(MOene[1].size());
 #pragma omp parallel for
-        for (int i = 0; i < MOene[0].size(); i++)
+        for (int i = 0; i < static_cast<int>(MOene[0].size()); i++)
         {
             if (i < ael)
                 MOocc[0][i] = 1.0;
@@ -5019,9 +5019,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 MOocc[0][i] = 0.0;
         }
 #pragma omp parallel for
-        for (int i = static_cast<int>(MOene[0].size()); i < static_cast<int>(MOene[0].size() + MOene[1].size()); i++)
+        for (int i = 0; i < static_cast<int>(MOene[1].size()); i++)
         {
-            if (i - MOene[0].size() < bel)
+            if (i < bel)
                 MOocc[1][i] = 1.0;
             else
                 MOocc[1][i] = 0.0;
