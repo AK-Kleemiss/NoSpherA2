@@ -53,10 +53,10 @@ cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &
     using namespace std;
     na = g_na;
     parent_wavefunction = new WFN(6);
-    cout << "Assigned Nr of Atoms" << endl;
+   std::cout << "Assigned Nr of Atoms" << endl;
     for (int i = 0; i < 3; i++)
     {
-        cout << i << ". dimension" << endl;
+       std::cout << i << ". dimension" << endl;
         size[i] = g_size[i];
         origin[i] = g_origin[i];
         for (int j = 0; j < 3; j++)
@@ -163,7 +163,7 @@ bool cube::read_values(std::ifstream& file) {
                     }
                 else
                 {
-                    cout << "This should not happen! Read a value outside of range!"
+                   std::cout << "This should not happen! Read a value outside of range!"
                         << " Run_x: " << run_x
                         << " Run_y: " << run_y
                         << " rest2: " << rest2
@@ -185,10 +185,10 @@ bool cube::read_values(std::ifstream& file) {
     }
     if (run_x != size[0] || run_y != size[1] || run_z != size[2])
     {
-        cout << "This file ended before i read all expected values!" << endl;
+       std::cout << "This file ended before i read all expected values!" << endl;
         if (file.eof())
-            cout << "ENCOUNTERED EOF!" << endl;
-        cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
+           std::cout << "ENCOUNTERED EOF!" << endl;
+       std::cout << "x,y,reads1,z: " << run_x << " " << run_y << " " << reads1 << "," << run_z << endl;
         return (false);
     }
     file.close();
@@ -320,7 +320,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
         of << "\n";
     }
     if (debug)
-        cout << "Finished atoms!" << endl;
+       std::cout << "Finished atoms!" << endl;
     if (get_loaded())
         for (int run_x = 0; run_x < size[0]; run_x++)
             for (int run_y = 0; run_y < size[1]; run_y++)
@@ -334,7 +334,7 @@ bool cube::write_file(const std::filesystem::path &given_path, bool debug)
                         of << "\n";
                 }
                 if (debug)
-                    cout << "Write Z-line!" << endl;
+                   std::cout << "Write Z-line!" << endl;
                 if (temp_write % 6 != 0)
                     of << "\n";
             }
@@ -384,7 +384,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
         of << " ATOM" << endl;
     }
     if (debug)
-        cout << "Finished atoms!" << endl;
+       std::cout << "Finished atoms!" << endl;
     of << "! Connections" << endl
        << "         0" << endl
        << "! Values" << endl;
@@ -402,7 +402,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
                     of << endl;
             }
             if (debug)
-                cout << "Write Y-line!" << endl;
+               std::cout << "Write Y-line!" << endl;
             if (temp_write % 6 != 0)
                 of << endl;
         }
@@ -1116,25 +1116,25 @@ std::filesystem::path cube::super_cube()
 {
     using namespace std;
     int m[3]{0, 0, 0};
-    cout << "How many times in X-direction? ";
+   std::cout << "How many times in X-direction? ";
     cin >> m[0];
     while (m[0] <= 0 || m[0] > 20)
     {
-        cout << "This is unreasonable, try again! (between 1-20): ";
+       std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[0];
     }
-    cout << "Y-direction? ";
+   std::cout << "Y-direction? ";
     cin >> m[1];
     while (m[1] <= 0 || m[1] > 20)
     {
-        cout << "This is unreasonable, try again! (between 1-20): ";
+       std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[1];
     }
-    cout << "Z-direction? ";
+   std::cout << "Z-direction? ";
     cin >> m[2];
     while (m[2] <= 0 || m[2] > 20)
     {
-        cout << "This is unreasonable, try again! (between 1-20): ";
+       std::cout << "This is unreasonable, try again! (between 1-20): ";
         cin >> m[2];
     }
     std::filesystem::path new_path(path);

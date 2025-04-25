@@ -628,10 +628,10 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 count_fields++;
             }
             if (label_field != 1000) {
-                err_checkf(position_field[0] != -1, "No x position found, impossible to continue!", cout);
-                err_checkf(position_field[1] != -1, "No y position found, impossible to continue!", cout);
-                err_checkf(position_field[2] != -1, "No z position found, impossible to continue!", cout);
-                err_checkf(type_field != -1, "No type found, impossible to continue!", cout);
+                err_checkf(position_field[0] != -1, "No x position found, impossible to continue!",std::cout);
+                err_checkf(position_field[1] != -1, "No y position found, impossible to continue!",std::cout);
+                err_checkf(position_field[2] != -1, "No z position found, impossible to continue!",std::cout);
+                err_checkf(type_field != -1, "No type found, impossible to continue!",std::cout);
             }
             while (trim(line).find("_") > 0 && line.length() > 3)
             {
