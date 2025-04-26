@@ -222,9 +222,8 @@ std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 bool check_bohr(WFN &wave, bool debug);
 int filetype_identifier(std::string &file, bool debug = false);
 
-bool open_file_dialog(std::string &path, bool debug, std::vector <std::string> filter);
-bool save_file_dialog(std::string &path, bool debug, const svec &endings, const std::string &filename_given);
-bool save_file_dialog(std::string &path, bool debug, const svec &endings);
+bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter);
+bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "");
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 
@@ -415,13 +414,13 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
-void Enter(){
+inline void Enter(){
 	std::cout << "press ENTER to continue... " << std::flush;
 	std::cin.ignore();
 	std::cin.get();
 };
 
-void cls(){
+inline void cls(){
 //   std::cout << string( 100, '\n' );
 #ifdef _WIN32
 	if(system("CLS")) std::cout << "this should not happen...!" << std::endl;
@@ -430,7 +429,7 @@ void cls(){
 #endif
 };
 
-bool yesno(){
+inline bool yesno(){
 	bool end=false;
 	while (!end) {
 		char dum ='?';
@@ -564,6 +563,7 @@ struct options
     pathvec pol_wfns;
     ivec cmo1;
     ivec cmo2;
+    ivec ignore;
     std::filesystem::path SALTED_DIR;
     std::string SALTED_DFBASIS;
     std::filesystem::path wfn;
@@ -582,7 +582,9 @@ struct options
     std::filesystem::path gaussian_path;
     std::filesystem::path turbomole_path;
     std::filesystem::path basis_set_path;
+    std::string cwd;
     bool debug = false;
+    bool rho = false;
     bool calc = false;
     bool eli = false;
     bool esp = false;
@@ -614,6 +616,7 @@ struct options
     bool ECP = false;
     bool RI_FIT = false;
     bool needs_Thakkar_fill = false;
+    bool qct = false;
     int hirsh_number = 0;
     int NbSteps[3]{0, 0, 0};
     int accuracy = 2;

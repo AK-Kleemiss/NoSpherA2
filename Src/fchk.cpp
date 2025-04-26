@@ -752,7 +752,7 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
     return std::stod(temp.substr(49, temp.length() - 49));
 };
 
-bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
 {
     using namespace std;
     int elcount = 0;

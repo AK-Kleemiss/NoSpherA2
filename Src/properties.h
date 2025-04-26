@@ -184,7 +184,7 @@ void Calc_Hirshfeld(
     cube &CubeRho,
     WFN &wavy,
     double radius,
-    int ignore,
+    int ignore_atom,
     std::ostream &file,
     bool wrap = true);
 /**

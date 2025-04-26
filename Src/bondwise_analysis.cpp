@@ -110,8 +110,8 @@ bond do_bonds(WFN &wavy,
 	int atom1, 
 	int atom2, 
 	int atom3, 
-	bool debug, 
-	bool bohr, 
+	const bool& debug, 
+	const bool& bohr, 
 	int runnumber, 
 	bool rho, 
 	bool rdg, 
@@ -128,16 +128,24 @@ bond do_bonds(WFN &wavy,
 	double ang2bohr;
 	if(bohr)ang2bohr=0.52917720859;
 	else ang2bohr=1.0;
-	if(debug) printf("recapitulation of input:\n sel: %d\n leng: ",mode_sel);
-	if(debug&&mode_leng==true) printf("true");
-	else if(debug&&mode_leng==false) printf("false");
-	if(debug) printf("\n mres:");
-	if(debug&&mode_res==true) printf("true");
-    else if(debug&&mode_res==false) printf("false");
-	if(debug) printf("\n res:%lf %lf %lf\n cub:",res[0],res[1],res[2]);
-	if(debug&&cub==true) printf("true");
-    else if(debug&&cub==false) printf("false");
-	if(debug) printf("\n boxsize1:%lf\n boxsize2:%lf\n boxsize3:%lf\n atom1:%d\n atom2:%d\n atom3:%d\n",boxsize[0],boxsize[1],boxsize[2],atom1,atom2,atom3);
+	if (debug) {
+		printf("recapitulation of input:\n sel: %d\n leng: ", mode_sel);
+		if (mode_leng == true)
+			printf("true");
+		else if (mode_leng == false)
+			printf("false");
+		printf("\n mres:");
+		if (mode_res == true)
+			printf("true");
+		else if (mode_res == false) 
+			printf("false");
+		printf("\n res:%lf %lf %lf\n cub:", res[0], res[1], res[2]);
+		if (cub == true)
+			printf("true");
+		else if (cub == false)
+			printf("false");
+		printf("\n boxsize1:%lf\n boxsize2:%lf\n boxsize3:%lf\n atom1:%d\n atom2:%d\n atom3:%d\n", boxsize[0], boxsize[1], boxsize[2], atom1, atom2, atom3);
+	}
 	na = wavy.get_ncen();
 	if(atom1<=0 || atom2<=0 || atom3<=0 || mode_sel<=0 || mode_sel> 4 || atom1>na || atom2>na || atom3>na || atom1==atom2 || atom2==atom3 || atom1==atom3)
 	{
@@ -145,9 +153,12 @@ bond do_bonds(WFN &wavy,
 		return(results);
 	}
 	if(debug) printf("No. of Atoms selected: %d %d %d\n",atom1,atom2,atom3);
-	for (int i=0; i<3; i++) coords1[i]=wavy.get_atom_coordinate(atom1-1,i,debug);
-	for (int i=0; i<3; i++) coords2[i]=wavy.get_atom_coordinate(atom2-1,i,debug);
-	for (int i=0; i<3; i++) coords3[i]=wavy.get_atom_coordinate(atom3-1,i,debug);
+	for (int i = 0; i < 3; i++)
+		coords1[i] = wavy.get_atom_coordinate(atom1 - 1, i);
+	for (int i = 0; i < 3; i++)
+		coords2[i] = wavy.get_atom_coordinate(atom2 - 1, i);
+	for (int i = 0; i < 3; i++)
+		coords3[i] = wavy.get_atom_coordinate(atom3 - 1, i);
 	label[0]=wavy.get_atom_label(atom1-1);
 	label[1]=wavy.get_atom_label(atom2-1);
 	label[2]=wavy.get_atom_label(atom3-1);
@@ -419,7 +430,7 @@ bond do_bonds(WFN &wavy,
 	return(results);
 }
 
-int autobonds(bool debug, WFN &wavy, std::filesystem::path inputfile, bool bohr){
+int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, const bool& bohr){
 	char inputFile[2048]="";
 	if (!exists(inputfile))
 	{

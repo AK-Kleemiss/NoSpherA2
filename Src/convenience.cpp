@@ -548,271 +548,6 @@ primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), 
         0.25);
 };
 
-/*bool open_file_dialog(string &path, bool debug, vector <string> filter){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA ofn;
-            ZeroMemory( &filename, sizeof( filename ) );
-            ZeroMemory( &ofn,      sizeof( ofn ) );
-            ofn.lStructSize  = sizeof( ofn );
-            ofn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-            ofn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-            ofn.lpstrFile    = filename;
-            ofn.nMaxFile     = 1024;
-            ofn.lpstrTitle   = "Select a File";
-            ofn.Flags        = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
-
-    if (GetOpenFileNameA( &ofn )){
-        if(debug)std::cout << "You chose the file \"" << filename << "\"\n";
-        if(exists(filename)){
-            path=filename;
-            return true;
-        }
-    }
-    else
-    {
-        // All this stuff below is to tell you exactly how you messed up above.
-        // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-        switch (CommDlgExtendedError())
-        {
-            case CDERR_DIALOGFAILURE   :std::cout << "CDERR_DIALOGFAILURE\n";   break;
-            case CDERR_FINDRESFAILURE  :std::cout << "CDERR_FINDRESFAILURE\n";  break;
-            case CDERR_INITIALIZATION  :std::cout << "CDERR_INITIALIZATION\n";  break;
-            case CDERR_LOADRESFAILURE  :std::cout << "CDERR_LOADRESFAILURE\n";  break;
-            case CDERR_LOADSTRFAILURE  :std::cout << "CDERR_LOADSTRFAILURE\n";  break;
-            case CDERR_LOCKRESFAILURE  :std::cout << "CDERR_LOCKRESFAILURE\n";  break;
-            case CDERR_MEMALLOCFAILURE :std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
-            case CDERR_MEMLOCKFAILURE  :std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
-            case CDERR_NOHINSTANCE     :std::cout << "CDERR_NOHINSTANCE\n";     break;
-            case CDERR_NOHOOK          :std::cout << "CDERR_NOHOOK\n";          break;
-            case CDERR_NOTEMPLATE      :std::cout << "CDERR_NOTEMPLATE\n";      break;
-            case CDERR_STRUCTSIZE      :std::cout << "CDERR_STRUCTSIZE\n";      break;
-            case FNERR_BUFFERTOOSMALL  :std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
-            case FNERR_INVALIDFILENAME :std::cout << "FNERR_INVALIDFILENAME\n"; break;
-            case FNERR_SUBCLASSFAILURE :std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
-            default                    :std::cout << "You cancelled.\n";
-        }
-    }
-    return false;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select a file to load\" --filename=\"";
-    command += current_path;
-    command += "/\"";
-    for(int i=0; i<filter.size(); i++){
-        command += " --file-filter=\"";
-        command += filter[i];
-        command += "\" ";
-    }
-    command += " 2> /dev/null";
-    FILE *f = popen(command.c_str(), "r");
-    if(!f){
-       std::cout << "ERROR" << endl;
-        return false;
-    }
-    if(fgets(file, 1024, f)==NULL) return false;
-    if (debug)std::cout << "Filename: " << file << endl;
-    path=file;
-    stringstream ss(path);
-    getline(ss, path);
-    if(pclose(f)!=0)std::cout << "Zenity returned non zero, whatever that means..." << endl;
-#endif
-    return true;
-};
-
-bool save_file_dialog(string &path, bool debug, const vector <string> &endings, const string &filename_given){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA sfn;
-     ZeroMemory( &filename, sizeof( filename ) );
-     ZeroMemory( &sfn,      sizeof( sfn ) );
-     sfn.lStructSize  = sizeof( sfn );
-     sfn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-     sfn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-     sfn.lpstrFile    = filename;
-     sfn.nMaxFile     = 1024;
-     sfn.lpstrTitle   = "Select a File, yo!";
-     sfn.Flags        = OFN_DONTADDTORECENT;
-    bool end=false;
-    while(!end){
-        if (GetSaveFileNameA( &sfn )){
-            if(debug)std::cout << "You chose the file \"" << filename << "\"\n";
-            if(exists(filename)){
-               std::cout << filename << " exists, do you want to overwrite it?";
-                if(yesno()){
-                    path=filename;
-                    bool found=false;
-                    for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                    if(found) end=true;
-                }
-                else return false;
-            }
-            else{
-                path=filename;
-                bool found=false;
-                for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                if(found) end=true;
-            }
-        }
-        else
-        {
-            // All this stuff below is to tell you exactly how you messed up above.
-            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-            switch (CommDlgExtendedError())
-            {
-                case CDERR_DIALOGFAILURE   :std::cout << "CDERR_DIALOGFAILURE\n";   break;
-                case CDERR_FINDRESFAILURE  :std::cout << "CDERR_FINDRESFAILURE\n";  break;
-                case CDERR_INITIALIZATION  :std::cout << "CDERR_INITIALIZATION\n";  break;
-                case CDERR_LOADRESFAILURE  :std::cout << "CDERR_LOADRESFAILURE\n";  break;
-                case CDERR_LOADSTRFAILURE  :std::cout << "CDERR_LOADSTRFAILURE\n";  break;
-                case CDERR_LOCKRESFAILURE  :std::cout << "CDERR_LOCKRESFAILURE\n";  break;
-                case CDERR_MEMALLOCFAILURE :std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
-                case CDERR_MEMLOCKFAILURE  :std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
-                case CDERR_NOHINSTANCE     :std::cout << "CDERR_NOHINSTANCE\n";     break;
-                case CDERR_NOHOOK          :std::cout << "CDERR_NOHOOK\n";          break;
-                case CDERR_NOTEMPLATE      :std::cout << "CDERR_NOTEMPLATE\n";      break;
-                case CDERR_STRUCTSIZE      :std::cout << "CDERR_STRUCTSIZE\n";      break;
-                case FNERR_BUFFERTOOSMALL  :std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
-                case FNERR_INVALIDFILENAME :std::cout << "FNERR_INVALIDFILENAME\n"; break;
-                case FNERR_SUBCLASSFAILURE :std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
-                default                    :std::cout << "You cancelled.\n";
-            }
-            return false;
-        }
-    }
-    return true;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select where to save\" --filename=\"";
-    command += current_path;
-    command += filename_given;
-    command += "/\" --save --confirm-overwrite 2> /dev/null";
-    bool end=false;
-    while(!end){
-        FILE *f = popen(command.c_str(), "r");
-        if(!f){
-           std::cout << "ERROR" << endl;
-            return false;
-        }
-        if(fgets(file, 1024, f)==NULL) return false;
-        if (debug)std::cout << "Filename: " << file << endl;
-        path=file;
-        stringstream ss(path);
-        getline(ss, path);
-        if(debug)std::cout << "Path: " << path << endl;
-        if(pclose(f)!=0)std::cout << "Zenity returned non zero, whatever that means..." << endl;
-        bool found=false;
-        for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-        if(found) end=true;
-    }
-#endif
-    return true;
-};
-
-bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA sfn;
-     ZeroMemory( &filename, sizeof( filename ) );
-     ZeroMemory( &sfn,      sizeof( sfn ) );
-     sfn.lStructSize  = sizeof( sfn );
-     sfn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-     sfn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-     sfn.lpstrFile    = filename;
-     sfn.nMaxFile     = 1024;
-     sfn.lpstrTitle   = "Select a File, yo!";
-     sfn.Flags        = OFN_DONTADDTORECENT;
-    bool end=false;
-    while(!end){
-        if (GetSaveFileNameA( &sfn )){
-            if(debug)std::cout << "You chose the file \"" << filename << "\"\n";
-            if(exists(filename)){
-               std::cout << filename << " exists, do you want to overwrite it?";
-                if(yesno()){
-                    path=filename;
-                    bool found=false;
-                    for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                    if(found) end=true;
-                }
-                else return false;
-            }
-            else{
-                path=filename;
-                bool found=false;
-                for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                if(found) end=true;
-            }
-        }
-        else
-        {
-            // All this stuff below is to tell you exactly how you messed up above.
-            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-            switch (CommDlgExtendedError())
-            {
-                case CDERR_DIALOGFAILURE   :std::cout << "CDERR_DIALOGFAILURE\n";   break;
-                case CDERR_FINDRESFAILURE  :std::cout << "CDERR_FINDRESFAILURE\n";  break;
-                case CDERR_INITIALIZATION  :std::cout << "CDERR_INITIALIZATION\n";  break;
-                case CDERR_LOADRESFAILURE  :std::cout << "CDERR_LOADRESFAILURE\n";  break;
-                case CDERR_LOADSTRFAILURE  :std::cout << "CDERR_LOADSTRFAILURE\n";  break;
-                case CDERR_LOCKRESFAILURE  :std::cout << "CDERR_LOCKRESFAILURE\n";  break;
-                case CDERR_MEMALLOCFAILURE :std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
-                case CDERR_MEMLOCKFAILURE  :std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
-                case CDERR_NOHINSTANCE     :std::cout << "CDERR_NOHINSTANCE\n";     break;
-                case CDERR_NOHOOK          :std::cout << "CDERR_NOHOOK\n";          break;
-                case CDERR_NOTEMPLATE      :std::cout << "CDERR_NOTEMPLATE\n";      break;
-                case CDERR_STRUCTSIZE      :std::cout << "CDERR_STRUCTSIZE\n";      break;
-                case FNERR_BUFFERTOOSMALL  :std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
-                case FNERR_INVALIDFILENAME :std::cout << "FNERR_INVALIDFILENAME\n"; break;
-                case FNERR_SUBCLASSFAILURE :std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
-                default                    :std::cout << "You cancelled.\n";
-            }
-            return false;
-        }
-    }
-    return true;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select where to save\" --filename=\"";
-    command += current_path;
-    command += "/\" --save --confirm-overwrite 2> /dev/null";
-    bool end=false;
-    while(!end){
-        FILE *f = popen(command.c_str(), "r");
-        if(!f){
-           std::cout << "ERROR" << endl;
-            return false;
-        }
-        if(fgets(file, 1024, f)==NULL) return false;
-        if (debug)std::cout << "Filename: " << file << endl;
-        path=file;
-        stringstream ss(path);
-        getline(ss, path);
-        if(debug)std::cout << "Path: " << path << endl;
-        if(pclose(f)!=0)std::cout << "Zenity returned non zero, whatever that means..." << endl;
-        bool found=false;
-        for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-        if(found) end=true;
-    }
-#endif
-    return true;
-};
-*/
-
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
@@ -2408,6 +2143,8 @@ void options::digest_options()
                         arguments[i + 6],
                         arguments[i + 7]};
         }
+        else if (temp == "-QCT" || temp == "-qct")
+            qct = true;
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
@@ -2894,17 +2631,17 @@ const int shell2function(const int &type, const int &prim)
 }
 
 bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter) {
-    char pwd[1024];
-    if (GetCurrentDir(pwd, 1024) == NULL) return false;
-    std::string current_path(pwd);
+    if (GetCurrentDir == NULL)
+        return false;
+    std::string current_path(GetCurrentDir);
 #ifdef _WIN32
-    std::filesystem::path filename;
+    char filename[1024];
 
     OPENFILENAMEA ofn;
     ZeroMemory(&filename, sizeof(filename));
     ZeroMemory(&ofn, sizeof(ofn));
     ofn.lStructSize = sizeof(ofn);
-    ofn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*\0";
+    ofn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
     ofn.lpstrFile = filename;
     ofn.nMaxFile = 1024;
     ofn.lpstrTitle = "Select a File";
@@ -2912,8 +2649,9 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
 
     if (GetOpenFileNameA(&ofn)) {
         if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
-        if (exists(filename)) {
-            path = filename;
+        auto p = std::filesystem::path(filename);
+        if (exists(p)) {
+            path = p;
             return true;
         }
     }
@@ -2965,6 +2703,100 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     stringstream ss(path);
     getline(ss, path);
     if (pclose(f) != 0) cout << "Zenity returned non zero, whatever that means..." << endl;
+#endif
+    return true;
+};
+
+bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given) {
+    if (GetCurrentDir == NULL) 
+        return false;
+    std::string current_path(GetCurrentDir);
+#ifdef _WIN32
+    char filename[1024];
+
+    OPENFILENAMEA sfn;
+    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&sfn, sizeof(sfn));
+    sfn.lStructSize = sizeof(sfn);
+    sfn.hwndOwner = NULL;  // If you have a window to center over, put its HANDLE here
+    sfn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
+    sfn.lpstrFile = filename;
+    sfn.nMaxFile = 1024;
+    sfn.lpstrTitle = "Select a File for saving!";
+    sfn.Flags = OFN_DONTADDTORECENT;
+    bool end = false;
+    while (!end) {
+        if (GetSaveFileNameA(&sfn)) {
+            if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
+            if (exists(std::filesystem::path(filename))) {
+                std::cout << filename << " exists, do you want to overwrite it?";
+                if (yesno()) {
+                    path = filename;
+                    bool found = false;
+                    for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
+                    if (found) end = true;
+                }
+                else return false;
+            }
+            else {
+                path = filename;
+                bool found = false;
+                for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
+                if (found) end = true;
+            }
+        }
+        else
+        {
+            // All this stuff below is to tell you exactly how you messed up above.
+            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
+            switch (CommDlgExtendedError())
+            {
+            case CDERR_DIALOGFAILURE: std::cout << "CDERR_DIALOGFAILURE\n";   break;
+            case CDERR_FINDRESFAILURE: std::cout << "CDERR_FINDRESFAILURE\n";  break;
+            case CDERR_INITIALIZATION: std::cout << "CDERR_INITIALIZATION\n";  break;
+            case CDERR_LOADRESFAILURE: std::cout << "CDERR_LOADRESFAILURE\n";  break;
+            case CDERR_LOADSTRFAILURE: std::cout << "CDERR_LOADSTRFAILURE\n";  break;
+            case CDERR_LOCKRESFAILURE: std::cout << "CDERR_LOCKRESFAILURE\n";  break;
+            case CDERR_MEMALLOCFAILURE: std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
+            case CDERR_MEMLOCKFAILURE: std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
+            case CDERR_NOHINSTANCE: std::cout << "CDERR_NOHINSTANCE\n";     break;
+            case CDERR_NOHOOK: std::cout << "CDERR_NOHOOK\n";          break;
+            case CDERR_NOTEMPLATE: std::cout << "CDERR_NOTEMPLATE\n";      break;
+            case CDERR_STRUCTSIZE: std::cout << "CDERR_STRUCTSIZE\n";      break;
+            case FNERR_BUFFERTOOSMALL: std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
+            case FNERR_INVALIDFILENAME: std::cout << "FNERR_INVALIDFILENAME\n"; break;
+            case FNERR_SUBCLASSFAILURE: std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
+            default: std::cout << "You cancelled.\n";
+            }
+            return false;
+        }
+    }
+    return true;
+#else
+    char file[1024];
+    string command;
+    command = "zenity --file-selection --title=\"Select where to save\" --filename=\"";
+    command += current_path;
+    command += filename_given;
+    command += "/\" --save --confirm-overwrite 2> /dev/null";
+    bool end = false;
+    while (!end) {
+        FILE* f = popen(command.c_str(), "r");
+        if (!f) {
+            cout << "ERROR" << endl;
+            return false;
+        }
+        if (fgets(file, 1024, f) == NULL) return false;
+        if (debug) cout << "Filename: " << file << endl;
+        path = file;
+        stringstream ss(path);
+        getline(ss, path);
+        if (debug) cout << "Path: " << path << endl;
+        if (pclose(f) != 0) cout << "Zenity returned non zero, whatever that means..." << endl;
+        bool found = false;
+        for (int i = 0; i < endings.size(); i++) if (path.find(endings[i]) != string::npos) found = true;
+        if (found) end = true;
+    }
 #endif
     return true;
 };
