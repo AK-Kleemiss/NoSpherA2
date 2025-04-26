@@ -35,7 +35,7 @@ else
   endef
   define RUN_TEST
     @echo 'Running test: $1'
-    eval $(TIME_START); cd $2 && $(BASE_PATH) $3 && \
+    @eval $(TIME_START); cd $2 && $(BASE_PATH) $3 && \
     if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
     $(DIFF) $1.log $1.good; eval $(TIME_END)
   endef
