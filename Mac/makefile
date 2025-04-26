@@ -5,7 +5,7 @@ all: NoSpherA2
 
 COMP := g++
 
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots qct b2c bondwise_analysis
 OBJS_arm64 := $(OBJ_NAMES:=.o_arm64)
 OBJS_arm64_d := $(OBJ_NAMES:=.o_arm64_d)
 OMP_BUILD_arm64 := ../llvm-project/openmp/build/runtime/src

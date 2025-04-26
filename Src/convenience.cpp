@@ -246,157 +246,6 @@ bool check_bohr(WFN &wave, bool debug)
     return (!(min_length < 2));
 };
 
-int filetype_identifier(std::string &file, bool debug)
-{
-    /*
-    List of filetypes and correpsonding values:
-                    -1: unreadable keyword
-    -i/o *.wfn 		2: wfn
-    -i/o *.ffn 		4: ffn
-    -i *.out 		1: crystal output
-    -c/o *.cub(e) 	3: cube file
-    -g/o *.grd      6: XDGraph grid file
-    -o *.(F)fc(C)hk 5: fchk
-    */
-    using namespace std;
-    if (debug)
-    {
-        std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
-                  << "Testing out:  " << file.find(".out") << std::endl
-                  << "Testing FFN:  " << file.find(".ffn") << std::endl
-                  << "Testing CUB:  " << file.find(".cub") << std::endl
-                  << "Testing CUBE: " << file.find(".cube") << std::endl
-                  << "Testing Grid: " << file.find(".grd") << std::endl
-                  << "Testing fchk: " << file.find(".fchk") << std::endl
-                  << "Testing FChk: " << file.find(".FChk") << std::endl
-                  << "Testing Fchk: " << file.find(".Fchk") << std::endl;
-        std::cout << "string::npos: " << std::string::npos << std::endl;
-    }
-    int temp_type = 0;
-    size_t found, temp;
-    temp = 0;
-    if (debug)
-        std::cout << "Temp before any checks: " << temp << std::endl;
-    svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
-    if (file.find(".wfn") != std::string::npos)
-    {
-        if (debug)
-            std::cout << "Checking for"
-                      << ".wfn" << std::endl;
-        temp_type = 2;
-        found = file.rfind(".wfn");
-        if (debug)
-            std::cout << "Found: " << found << std::endl;
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != std::string::npos)
-                temp = file.rfind(types[i]);
-        if (debug)
-           std::cout << "Temp: " << temp << endl;
-        if (temp == found)
-            return temp_type;
-        else
-        {
-            if (debug)
-               std::cout << "Moving on!" << endl;
-        }
-    }
-    if (file.find(".out") != string::npos)
-    {
-        if (debug)
-           std::cout << "Checking for"
-                 << ".out" << endl;
-        temp_type = 1;
-        found = file.rfind(".out");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".ffn") != string::npos)
-    {
-        if (debug)
-           std::cout << "Checking for"
-                 << ".ffn" << endl;
-        temp_type = 4;
-        found = file.rfind(".ffn");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".cub") != string::npos)
-    {
-        if (debug)
-           std::cout << "Checking for"
-                 << ".cub" << endl;
-        temp_type = 3;
-        found = file.rfind(".cub");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-        else
-        {
-            if (debug)
-               std::cout << "Moving on!" << endl;
-        }
-    }
-    if (file.find(".cube") != string::npos)
-    {
-        temp_type = 3;
-        found = file.rfind(".cube");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".grd") != string::npos)
-    {
-        temp_type = 6;
-        found = file.rfind(".grd");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".fchk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".fchk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".FChk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".FChk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".Fchk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".Fchk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    return -1;
-}
-
 std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
     if (rewind)
@@ -2637,10 +2486,7 @@ const int shell2function(const int &type, const int &prim)
     return 0;
 }
 
-bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter) {
-    if (GetCurrentDir == NULL)
-        return false;
-    std::string current_path(GetCurrentDir);
+bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter, const std::string& current_path) {
 #ifdef _WIN32
     char filename[1024];
 
@@ -2689,7 +2535,7 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     return false;
 #else
     char file[1024];
-    string command;
+    std::string command;
     command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
     command += current_path;
     command += "/\"";
@@ -2701,23 +2547,24 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     command += " 2> /dev/null";
     FILE* f = popen(command.c_str(), "r");
     if (!f) {
-        cout << "ERROR" << endl;
+        std::cout << "ERROR" << std::endl;
         return false;
     }
-    if (fgets(file, 1024, f) == NULL) return false;
-    if (debug) cout << "Filename: " << file << endl;
+    if (fgets(file, 1024, f) == NULL) 
+        return false;
+    if (debug) 
+        std::cout << "Filename: " << file << std::endl;
     path = file;
-    stringstream ss(path);
-    getline(ss, path);
-    if (pclose(f) != 0) cout << "Zenity returned non zero, whatever that means..." << endl;
-#endif
+    std::stringstream ss(path.string());
+    std::string name = path.string();
+    getline(ss, name);
+    if (pclose(f) != 0) 
+        std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
     return true;
+#endif
 };
 
-bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given) {
-    if (GetCurrentDir == NULL) 
-        return false;
-    std::string current_path(GetCurrentDir);
+bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
 #ifdef _WIN32
     char filename[1024];
 
@@ -2781,7 +2628,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
     return true;
 #else
     char file[1024];
-    string command;
+    std::string command;
     command = "zenity --file-selection --title=\"Select where to save\" --filename=\"";
     command += current_path;
     command += filename_given;
@@ -2790,19 +2637,25 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
     while (!end) {
         FILE* f = popen(command.c_str(), "r");
         if (!f) {
-            cout << "ERROR" << endl;
+            std::cout << "ERROR" << std::endl;
             return false;
         }
-        if (fgets(file, 1024, f) == NULL) return false;
-        if (debug) cout << "Filename: " << file << endl;
+        if (fgets(file, 1024, f) == NULL) 
+            return false;
+        if (debug) 
+            std::cout << "Filename: " << file << std::endl;
         path = file;
-        stringstream ss(path);
-        getline(ss, path);
-        if (debug) cout << "Path: " << path << endl;
-        if (pclose(f) != 0) cout << "Zenity returned non zero, whatever that means..." << endl;
+        std::stringstream ss(path);
+        std::string name = path.string();
+        getline(ss, name);
+        if (debug) std::cout << "Path: " << path << std::endl;
+        if (pclose(f) != 0) std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
         bool found = false;
-        for (int i = 0; i < endings.size(); i++) if (path.find(endings[i]) != string::npos) found = true;
-        if (found) end = true;
+        for (int i = 0; i < endings.size(); i++) 
+            if (path.string().find(endings[i]) != std::string::npos)
+                found = true;
+        if (found) 
+            end = true;
     }
 #endif
     return true;
