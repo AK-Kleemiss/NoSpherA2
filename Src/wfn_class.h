@@ -274,8 +274,23 @@ public:
     void push_back_cube(cube given) { cub.push_back(given); };
     void pop_back_cube();
     const cube get_cube(const int& nr) const { return cub[nr]; };
+    const cube* get_cube_ptr(const int& nr) { return &cub[nr]; };
     const int get_cube_count() const { return (int)cub.size(); };
     std::filesystem::path get_cube_path(const int& nr) const;
+    void write_cube_file(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
+    void write_cube_dgrid(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
+    void write_cube_xdgraph(const int& nr, const std::filesystem::path& filename, const bool& debug = false);
+    bool get_cube_loaded(const int& nr) const { return cub[nr].get_loaded(); };
+    bool read_cube(const int& nr, const bool& full, const bool& header, const bool& expert = false) { return cub[nr].read_file(full, header, expert); };
+    std::filesystem::path make_super_cube(const int& nr) { return cub[nr].super_cube(); };
+    bool apply_cube_thresh(const int& nr, const double& thresh) { return cub[nr].thresh(thresh); };
+    bool apply_cube_thresh(const int& nr, const cube& mask_cube, const double& thresh) { return cub[nr].thresh(thresh); };
+    bool apply_cube_mask(const int& nr, const cube& mask_cube) { return cub[nr].mask(mask_cube); };
+    bool apply_cube_negative_mask(const int& nr, const cube& mask_cube) { return cub[nr].negative_mask(mask_cube); };
+    bool cube_add (const int& nr, const cube& right) { return cub[nr] += right; };
+    bool cube_subtract(const int& nr, const cube& right) { return cub[nr] -= right; };
+    bool cube_multiply(const int& nr, const cube& right) { return cub[nr] *= right; };
+    bool cube_divide(const int& nr, const cube& right) { return cub[nr] /= right; };
     //-----------Pointer to members---------------------
     const int *get_ptr_types() { return &types[0]; };
     const int *get_ptr_centers() { return &centers[0]; };

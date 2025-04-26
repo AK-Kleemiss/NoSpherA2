@@ -5,7 +5,7 @@
 class WFN;
 class cube;
 
-bool b2c(cube &cub, std::vector<atom> &atoms, bool debug, bool bcp);
+bool b2c(const cube* cub, const std::vector<atom> &atoms, bool debug, bool bcp);
 
 #include "wfn_class.h"
 #include "cube.h"

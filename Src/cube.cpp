@@ -412,7 +412,7 @@ bool cube::write_xdgraph(const std::filesystem::path &given_path, bool debug)
     return (true);
 };
 
-bool cube::fractal_dimension(const double stepsize)
+bool cube::fractal_dimension(const double stepsize) const
 {
     double min = 100, max = -100;
     for (const auto& inner_vec : values) {
@@ -784,7 +784,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
     return totalEnergy;
 }
 
-void cube::operator=(cube &right)
+void cube::operator=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         size[i] = right.get_size(i);
@@ -818,18 +818,13 @@ void cube::operator=(cube &right)
     parent_wavefunction = right.parent_wavefunction;
 };
 
-cube cube::operator+(cube &right) const
+cube cube::operator+(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "+" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (!right.get_loaded()) {
-        std::ifstream file2(right.path, std::ios::in);
-        right.read_values(file2);
-    }
-
 #pragma omp parallel for
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
@@ -839,17 +834,13 @@ cube cube::operator+(cube &right) const
     return (res_cube);
 };
 
-cube cube::operator-(cube &right) const
+cube cube::operator-(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "-" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (!right.get_loaded()) {
-        std::ifstream file2(right.path, std::ios::in);
-        right.read_values(file2);
-    }
 #pragma omp parallel for
         for (int x = 0; x < size[0]; x++)
             for (int y = 0; y < size[1]; y++)
@@ -859,17 +850,13 @@ cube cube::operator-(cube &right) const
     return (res_cube);
 };
 
-cube cube::operator*(cube &right) const
+cube cube::operator*(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "*" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (!right.get_loaded()) {
-        std::ifstream file2(right.path, std::ios::in);
-        right.read_values(file2);
-    }
 #pragma omp parallel for
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
@@ -879,17 +866,13 @@ cube cube::operator*(cube &right) const
     return (res_cube);
 };
 
-cube cube::operator/(cube &right) const
+cube cube::operator/(const cube &right) const
 {
     cube res_cube(*this);
     res_cube.path = path.parent_path() / std::filesystem::path(path.stem().string() + "_" + right.get_path().stem().string() + ".cube");
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
             return (cube());
-    if (!right.get_loaded()) {
-        std::ifstream file2(right.path, std::ios::in);
-        right.read_values(file2);
-    }
     for (int x = 0; x < size[0]; x++)
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++) {
@@ -904,7 +887,7 @@ cube cube::operator/(cube &right) const
     return (res_cube);
 };
 
-bool cube::operator+=(cube &right)
+bool cube::operator+=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -917,7 +900,7 @@ bool cube::operator+=(cube &right)
     return (true);
 };
 
-bool cube::operator-=(cube &right)
+bool cube::operator-=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -930,7 +913,7 @@ bool cube::operator-=(cube &right)
     return (true);
 };
 
-bool cube::operator*=(cube &right)
+bool cube::operator*=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -943,7 +926,7 @@ bool cube::operator*=(cube &right)
     return (true);
 };
 
-bool cube::operator/=(cube &right)
+bool cube::operator/=(const cube &right)
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -956,7 +939,7 @@ bool cube::operator/=(cube &right)
     return (true);
 };
 
-bool cube::mask(cube &right)
+bool cube::mask(const cube &right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -969,7 +952,20 @@ bool cube::mask(cube &right)
     return (true);
 };
 
-bool cube::thresh(cube &right, double thresh)
+bool cube::thresh(const double& thresh)
+{
+    if (size[0] == 0 || size[1] == 0 || size[2] == 0)
+        return (false);
+#pragma omp parallel for
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++)
+                if (values[x][y][z] < thresh)
+                    values[x][y][z] = 0.0;
+    return (true);
+}
+
+bool cube::thresh(const cube &right, const double& thresh)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -982,7 +978,7 @@ bool cube::thresh(cube &right, double thresh)
     return (true);
 };
 
-bool cube::negative_mask(cube &right)
+bool cube::negative_mask(const cube &right)
 {
     if (size[0] != right.get_size(0) || size[1] != right.get_size(1) || size[2] != right.get_size(2))
         return (false);
@@ -995,7 +991,7 @@ bool cube::negative_mask(cube &right)
     return (true);
 };
 
-double cube::rrs(cube &right)
+double cube::rrs(const cube& right) const
 {
     for (int i = 0; i < 3; i++)
         if (size[i] != right.get_size(i))
@@ -1013,7 +1009,7 @@ double cube::rrs(cube &right)
     return (diff_neg / diff_pos); // RETURN Real Space R-value between this cube and the given one
 };
 
-double cube::sum()
+double cube::sum() const
 {
     for (int i = 0; i < 3; i++)
         if (size[i] == 0)
@@ -1028,7 +1024,7 @@ double cube::sum()
     return (_s * dv); // RETURN Sum of values inside the cube
 };
 
-double cube::diff_sum()
+double cube::diff_sum() const
 {
     for (int i = 0; i < 3; i++)
         if (size[i] == 0)
@@ -1043,7 +1039,7 @@ double cube::diff_sum()
     return (_s * dv); // RETURN Sum of values inside the cube
 };
 
-vec cube::double_sum()
+vec cube::double_sum() const
 {
     for (int i = 0; i < 3; i++)
     {
@@ -1061,10 +1057,7 @@ vec cube::double_sum()
                 _s2 += values[x][y][z];
             }
 
-    vec result;
-    result.resize(2);
-    result[0] = _s * dv;
-    result[1] = _s2 * dv;
+    vec result({ _s * dv, _s2 * dv });
     return (result); // RETURN Sums of values inside the cube
 };
 
@@ -1243,4 +1236,19 @@ void cube::set_zero()
     for (int i = 0; i < size[0]; i++)
         for (int j = 0; j < size[1]; j++)
             fill(values[i][j].begin(), values[i][j].end(), 0.0);
+};
+
+double cube::jaccard(const cube& right) const {
+    for (int i = 0; i < 3; i++)
+        if (size[i] != right.get_size(i))
+            return (-1);
+    double top = 0.0;
+    double bot = 0.0;
+    for (int x = 0; x < size[0]; x++)
+        for (int y = 0; y < size[1]; y++)
+            for (int z = 0; z < size[2]; z++) {
+                top += std::min(values[x][y][z], right.get_value(x, y, z));
+                bot += std::max(values[x][y][z], right.get_value(x, y, z));
+            }
+    return (top / bot); //RETURN Real Space R-value between this cube and the given one
 };

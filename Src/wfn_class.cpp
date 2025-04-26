@@ -7419,3 +7419,43 @@ std::filesystem::path WFN::get_cube_path(const int& nr) const
 {
     return cub[nr].get_path();
 };
+
+void WFN::write_cube_file(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_file(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}
+void WFN::write_cube_dgrid(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_file(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}
+void WFN::write_cube_xdgraph(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_xdgraph(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}

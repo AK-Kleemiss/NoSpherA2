@@ -12,6 +12,8 @@
 #include "isosurface.h"
 #include "nos_math.h"
 
+int QCT(options& opt);
+
 int main(int argc, char **argv)
 {
     using namespace std;
@@ -33,6 +35,7 @@ int main(int argc, char **argv)
     auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
+    opt.cwd = cwd;
     vector<WFN> wavy;
 
     if (opt.threads != -1)
@@ -49,6 +52,9 @@ int main(int argc, char **argv)
     }
     log_file.flush();
 
+    //Start QCT menu and leave
+    if (opt.qct)
+        return QCT(opt);
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
