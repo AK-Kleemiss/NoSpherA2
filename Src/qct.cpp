@@ -1369,7 +1369,7 @@ int QCT(options& opt)
 					temp[0]="Wavefunction files (wfn,ffn,fchk,wfx) | *.wfn *.ffn *.Fchk *.fchk *.FChk *.wfx *gbw *.molden *.molden.input *.xtb";
 					temp[1]="Cube files (cub, cube, grd) | *.cube *.cub *.grd";
 					temp[2]="All filetypes | *";
-					if(!open_file_dialog(filename,opt.debug,temp)){
+					if (!open_file_dialog(filename, opt.debug, temp, opt.cwd)) {
 						std::cout << "Error encountered!" << endl;
 						break;
 					}
@@ -1752,7 +1752,7 @@ int QCT(options& opt)
 							endings.push_back(".wfn");
 							endings.push_back(".ffn");
 							std::filesystem::path path;
-							if (!expert) save_file_dialog(path, opt.debug, endings);
+							if (!expert) save_file_dialog(path, opt.debug, endings, opt.cwd);
 							else {
 								std::cout << "Enter filename: ";
 								std::cin >> path;
@@ -1787,7 +1787,7 @@ int QCT(options& opt)
 							endings.push_back(".FChk");
 							std::filesystem::path outputname = wavy[activewave].get_path();
 							if (opt.debug)std::cout << "Loaded path..." << endl;
-							if (!expert) save_file_dialog(outputname, opt.debug, endings);
+							if (!expert) save_file_dialog(outputname, opt.debug, endings, opt.cwd);
 							else {
 								std::cout << "Enter filename: ";
 								std::cin >> outputname;
@@ -1872,7 +1872,7 @@ int QCT(options& opt)
 						endings.push_back(".cube");
 						endings.push_back(".cub");
 						if (!expert)
-							save_file_dialog(path, opt.debug, endings);
+							save_file_dialog(path, opt.debug, endings, opt.cwd);
 						else {
 							std::cout << "Give filepath please: ";
 							std::cin >> path;

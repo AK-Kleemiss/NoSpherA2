@@ -220,10 +220,9 @@ std::string shrink_string(std::string &input);
 std::string shrink_string_to_atom(std::string &input, const int &atom_number);
 //------------------Functions to work with configuration files--------------------------
 bool check_bohr(WFN &wave, bool debug);
-int filetype_identifier(std::string &file, bool debug = false);
 
-bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter);
-bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "");
+bool open_file_dialog(std::filesystem::path &path, bool debug, std::vector <std::string> filter, const std::string& current_path);
+bool save_file_dialog(std::filesystem::path &path, bool debug, const svec &endings, const std::string &filename_given = "", const std::string& current_path = "");
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes = 1, bool wfnonly = false, bool debug = false);
 bool unsaved_files(std::vector<WFN> &wavy);
 
