@@ -19,7 +19,7 @@ struct sel {
     std::string Oname;
     bool* selection2;
     int NbFiles = 1;
-    int Ligand[2];
+    double Ligand[2];
     std::vector<int> ignore;
 	int Frames;
 	int Output;
@@ -170,7 +170,7 @@ sel menu(
 		case 2: {
 			bool run = false;
 			int temp = 0;
-			float temp_r = 0;
+			double temp_r = 0;
 			while (!run) {
 				cout << "Please select one of the following molecule(s) to be considered as the ligand:" << endl;
 				for (int i = 0; i < res.NbFiles; i++)
@@ -179,7 +179,7 @@ sel menu(
 				if (temp >= res.NbFiles || temp < 0) cout << "ERROR, invalid choice of molecule" << endl;
 				else {
 					run = true;
-					res.Ligand[0] = (float)temp;
+					res.Ligand[0] = (double)temp;
 				}
 			}
 			run = false;
@@ -608,7 +608,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 			printf("  *                                                                       *\n");
 			printf("  *   NbFiles                   : %1d                                       *  \n", run.NbFiles);
 			for (int i = 0; i < run.NbFiles; i++)
-				printf("  *   MoleculeFile[%2d]          : %-20s / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename(), run.NbAtoms[i]);
+				printf("  *   MoleculeFile[%2d]          : %-20ls / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename().c_str(), run.NbAtoms[i]);
 			printf("  *   OutPut filename Prefix    : %-20s                    *\n", run.Oname.c_str());
 			printf("  *                                                                       *\n");
 
@@ -737,7 +737,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 				opt.radius,
 				opt.ignore[0],
 				std::cout,
-6
+                false
 			);
 
 		if (opt.esp)
@@ -909,19 +909,14 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 	return 0;
 }
 
-int QCT(options& opt)
+int QCT(options& opt, std::vector<WFN>& wavy)
 {
 	using namespace std;
     bool expert = false;
 	bool end = false;
-	vector<WFN> wavy;
 	int activewave=0;
-	int cpus = -1;
 	string wavename;
-	int ncpus=0;
-	float mem=0.0;
 	unsigned int counter = 0;
-	cls();
 	while(!end){
 		char sel;
 		std::cout << "This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n";
@@ -965,7 +960,7 @@ int QCT(options& opt)
 			else std::cout << "-) Work with cube files loaded" << endl;
 		}
 		std::cout << "E) Toggle Expert mode (Disable assumptions)" << endl
-			 << "L) Limit the number of CPUs being used. Current value (-1 corresponds to all): " << cpus << endl
+			 << "L) Limit the number of CPUs being used. Current value (-1 corresponds to all): " << opt.threads << endl
 			 << "Q) Quit the program" << endl;
 		std::cin >> sel;
 		cls();
@@ -1940,6 +1935,24 @@ int QCT(options& opt)
 						end=true;
 				}
 				break;
+			case 'l':
+			case 'L':
+                cout << "Please give the number of cpus to use (-1 = all): ";
+                int threads;
+                cin >> threads;
+                if (threads < -1 || threads == 0) {
+                    cout << "Sorry, that is not a valid number of threads!" << endl;
+                    break;
+                }
+                opt.threads = threads;
+				if (opt.threads != -1)
+				{
+#ifdef _OPENMP
+					omp_set_num_threads(opt.threads);
+#endif
+				}
+                std::cout << "Number of threads set to " << opt.threads << endl;
+                break;
 			case 'd':
 			case 'D':
 				opt.debug=true;
