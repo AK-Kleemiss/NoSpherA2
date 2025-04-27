@@ -1721,7 +1721,19 @@ void options::digest_options()
                 combined_tsc_calc_cifs.push_back(arguments[i + n]);
                 n++;
                 const string _temp = arguments[i + n];
+                if (_temp.find(delimiter) == string::npos) {
+                    if (debug)
+                        std::cout << "--Delimiter not found, using §" << endl;
+                    delimiter = "§";
+                }
                 groups.push_back(split_string<int>(_temp, delimiter));
+                if (debug)
+                {
+                    std::cout << "--Group: " << _temp << endl << "--";
+                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                        std::cout  << groups[groups.size() - 1][run] << " ";
+                    std::cout << endl;
+                }
                 n++;
             }
         }
@@ -1944,7 +1956,19 @@ void options::digest_options()
                 combined_tsc_calc_files.push_back(arguments[i + n]);
                 n++;
                 const string _temp = arguments[i + n];
+                if (_temp.find(delimiter) == string::npos) {
+                    if (debug)
+                        std::cout << "--Delimiter not found, using §" << endl;
+                    delimiter = "§";
+                }
                 groups.push_back(split_string<int>(_temp, delimiter));
+                if (debug)
+                {
+                    std::cout << "--Group: " << _temp << endl << "--";
+                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                        std::cout << groups[groups.size() - 1][run] << " ";
+                    std::cout << endl;
+                }
                 n++;
             }
         }
