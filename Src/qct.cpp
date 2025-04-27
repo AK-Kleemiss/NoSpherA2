@@ -608,7 +608,11 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 			printf("  *                                                                       *\n");
 			printf("  *   NbFiles                   : %1d                                       *  \n", run.NbFiles);
 			for (int i = 0; i < run.NbFiles; i++)
+#ifdef _WIN32
 				printf("  *   MoleculeFile[%2d]          : %-20ls / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename().c_str(), run.NbAtoms[i]);
+#else
+				printf("  *   MoleculeFile[%2d]          : %-20s / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename().c_str(), run.NbAtoms[i]);
+#endif
 			printf("  *   OutPut filename Prefix    : %-20s                    *\n", run.Oname.c_str());
 			printf("  *                                                                       *\n");
 
