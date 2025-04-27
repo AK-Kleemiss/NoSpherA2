@@ -49,8 +49,8 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
 	//opt.NbAtoms[0]=wavy.get_ncen();
 	printf("\n   .      ___________________________________________________________      .\n");
 	printf("  *.                                                                      *.\n");
-	printf("  *.  Wavefunction              : %-20s / %5d atoms      *.\n", wavy.get_path().filename(), wavy.get_ncen());
-	printf("  *.  OutPut filename Prefix    : %-40s*.\n", Oname);
+	printf("  *.  Wavefunction              : %-20s / %5d atoms      *.\n", wavy.get_path().filename().c_str(), wavy.get_ncen());
+	printf("  *.  OutPut filename Prefix    : %-40s*.\n", Oname.c_str());
 	printf("  *.                                                                      *.\n");
 	printf("  *.  gridBox Min               : %11.6f %11.6f %11.6f     *.\n", origin[0], origin[1], origin[2]);
 	printf("  *.  gridBox Max               : %11.6f %11.6f %11.6f     *.\n", origin[0] + gvector[0] * np[0] + gvector[3] * np[1] + gvector[6] * np[2],
