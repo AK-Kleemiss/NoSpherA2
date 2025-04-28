@@ -8,101 +8,178 @@ ifeq ($(OS),Windows_NT)
   BASE_PATH := ..\..\NoSpherA2.exe
   MV := move
   DIFF := fc /c
+  RM := del /q /f
+
+  define RUN_TEST
+    @echo 'Running test: $1'
+    @echo @echo off > run_test.bat
+    @echo cd $2 >> run_test.bat
+    @echo $(BASE_PATH) $3 >> run_test.bat
+    @call run_test.bat
+    @del run_test.bat
+    @if exist $2\NoSpherA2.log (cd $2 && $(MV) NoSpherA2.log $1.log && $(DIFF) $1.log $1.good)
+  endef
 else
+  RM := rm
   BASE_PATH := ../../NoSpherA2
   MV := mv
   DIFF := diff -q -i -b
+  define TIME_START
+    start_time=$$(date +%s.%N)
+  endef
+  
+  define TIME_END
+    end_time=$$(date +%s.%N); \
+    elapsed=$$(echo "$$end_time - $$start_time" | bc); \
+    printf "Time elapsed: %.3f seconds\n" $$elapsed
+  endef
+  define RUN_TEST
+    @echo 'Running test: $1'
+    @eval $(TIME_START); cd $2 && $(BASE_PATH) $3 && \
+    if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
+    $(DIFF) $1.log $1.good; eval $(TIME_END)
+  endef
 endif
+
 
 all: $(ALL_TARGETS)
 
 all_tests: $(ALL_TARGETS) fourier_transform_full rubredoxin_cmtc_full fchk_conversion
 
 alanine_occ:
-	@echo 'Running test: $@'
-	@cd alanine_occ && $(BASE_PATH) \
+	$(call RUN_TEST,$@,alanine_occ, \
 		-cif alanine.cif \
 		-dmin 0.5 \
 		-wfn alanine.owf.fchk \
 		-acc 1 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+		-no-date)
 
-sucrose_SF:
-	@echo 'Running test: $@'
-	@cd sucrose_fchk_SF && $(BASE_PATH) \
-		-cif sucrose.cif \
-		-hkl olex2/Wfn_job/sucrose.hkl \
-		-wfn olex2/Wfn_job/sucrose.wfx \
+disorder_THPP:
+	$(call RUN_TEST,$@,disorder, \
+		-cif thpp.cif \
+		-hkl thpp.hkl \
+		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0§1 \
+		olex2/Wfn_job/Part_2/thpp.wfx 0§2 \
+		-mtc_mult 1 1 \
+		-mtc_charge 0 0 \
+		-mtc_ECP 0 0 \
 		-acc 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+		-no-date)
 
-openBLAS:
-	@echo 'Running test: $@'
-	@cd OpenBLAS && $(BASE_PATH) \
-		-blastest \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+fchk_conversion:
+	$(call RUN_TEST,$@,NiP3_fchk, \
+		-b def2-TZVP -d ./ \
+		-wfn in.ffn -no-date)
+
+fourier_transform_full:
+	$(call RUN_TEST,$@,SALTED, \
+		-test_analytical full -no-date)
+
+fourier_transform:
+	$(call RUN_TEST,$@,SALTED, \
+		-test_analytical -no-date)
+
+fractal:
+	$(call RUN_TEST,$@,sucrose_fchk_SF, \
+		-fractal sucrose_diff.cube \
+		-no_date \
+		&& ${RM} NoSpherA2.log && ${MV} sucrose_diff.cube_fractal_plot $@.log)
+
+grown_water:
+	$(call RUN_TEST,$@,grown, \
+		-cif water.cif \
+		-hkl water.hkl \
+		-wfn water.wfx \
+		-acc 0 \
+		-no-date)
+
+Hybrid_mode:
+	$(call RUN_TEST,$@,Hybrid, \
+		-cif ZP2.cif \
+		-dmin 0.9 \
+		-acc 0 \
+		-mtc ZP2_part1.gbw 0§1 ZP2_part2.gbw 0§2 \
+		-mtc_mult 1 1 \
+		-mtc_charge 0 0 \
+		-mtc_ECP 0 0 \
+		-no-date)
 
 malbac_SF_ECP:
-	@echo 'Running test: $@'
-	@cd ECP_SF && $(BASE_PATH) \
+	$(call RUN_TEST,$@,ECP_SF, \
 		-cif malbac.cif \
 		-hkl malbac.hkl \
 		-wfn malbac.gbw \
 		-acc 0 \
 		-ECP 1 \
+		-no-date)
+
+openBLAS:
+	$(call RUN_TEST,$@,OpenBLAS, \
+		-blastest \
+		-no-date)
+
+properties:
+	$(call RUN_TEST,$@,sucrose_fchk_SF, \
+		-wfn olex2/Wfn_job/sucrose.wfx \
+		-cif sucrose.cif -lap -eli \
+		-resolution 0.5 -test \
 		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+		&& ${MV} NoSpherA2_cube.log $@.log)
+
+reading_SALTED:
+	$(call RUN_TEST,$@,SALTED, \
+		-test_reading_SALTED_binary)
+
+ri_fit:
+	$(call RUN_TEST,$@,epoxide_gbw, \
+		-wfn epoxide.gbw \
+		-cif epoxide.cif \
+		-dmin 0.4 \
+		-ri_fit \
+		-no-date)
+
+rubredoxin_cmtc:
+	$(call RUN_TEST,$@,rubredoxin_cmtc, \
+		-hkl 1yk4_h.hkl -acc 0 \
+		-cmtc residues/1.gbw residues/1.cif 0 \
+		residues/2.gbw residues/2.cif 0§1 \
+		residues/3.gbw residues/3.cif 0§2 \
+		residues/4.gbw residues/4.cif 0 \
+		-mtc_mult 1 1 1 1 \
+		-mtc_charge 0 0 0 0 \
+		-mtc_ECP 0 0 0 0 \
+		-no-date)
+
+rubredoxin_cmtc_full:
+	$(call RUN_TEST,$@,rubredoxin_cmtc, \
+		-hkl 1yk4_h_full.hkl -acc 0 \
+		-cmtc residues/1.gbw residues/1.cif 0 \
+		residues/2.gbw residues/2.cif 0§1 \
+		residues/3.gbw residues/3.cif 0§2 \
+		residues/4.gbw residues/4.cif 0 \
+		-mtc_mult 1 1 1 1 \
+		-mtc_charge 0 0 0 0 \
+		-mtc_ECP 0 0 0 0 \
+		-cpus 24 \
+		-no-date)
 
 SALTED:
-	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) \
+	$(call RUN_TEST,$@,SALTED, \
 		-SALTED Model \
 		-cif test_cysteine.cif \
 		-wfn test_cysteine.xyz \
 		-dmin 0.73 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-reading_SALTED:
-	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) \
-		-test_reading_SALTED_binary \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+		-no-date)
 
 sucrose_IAM:
-	@echo 'Running test: $@'
-	@cd sucrose_IAM_SF && $(BASE_PATH) \
+	$(call RUN_TEST,$@,sucrose_IAM_SF, \
 		-cif sucrose.cif \
 		-hkl sucrose.hkl \
 		-xyz sucrose.xyz -IAM\
-		-no-date\
-		&& ${MV} NoSpherA2.log $@.log\
-		&& ${DIFF} $@.log $@.good
-	
-sucrose_twin:
-	@echo 'Running test: $@'
-	@cd sucrose_fchk_SF && $(BASE_PATH) \
-		-cif sucrose.cif \
-		-hkl olex2/Wfn_job/sucrose.hkl \
-		-wfn olex2/Wfn_job/sucrose.wfx \
-		-acc 0 \
-		-twin 1 0 0 0 -1 0 0 1 -2 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
+		-no-date)
 
 sucrose_ptb:
-	@echo 'Running test: $@'
-	@cd sucrose_IAM_SF && $(BASE_PATH) \
+	$(call RUN_TEST,$@,sucrose_IAM_SF, \
 		-cif sucrose.cif \
 		-dmin 0.8 \
 		-wfn wfn.xtb \
@@ -110,141 +187,30 @@ sucrose_ptb:
 		-charge 0 \
 		-acc 0 \
 		-ECP 3 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log\
-		&& ${DIFF} $@.log $@.good
+		-no-date)
 
-disorder_THPP:
-	@echo 'Running test: $@'
-	@cd disorder && $(BASE_PATH) \
-		-cif thpp.cif \
-		-hkl thpp.hkl \
-		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0,1 \
-		olex2/Wfn_job/Part_2/thpp.wfx 0,2 \
-		-mtc_mult 1 1 \
-		-mtc_charge 0 0 \
-		-mtc_ECP 0 0 \
-		-acc 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-grown_water:
-	@echo 'Running test: $@'
-	@cd grown && $(BASE_PATH) \
-		-cif water.cif \
-		-hkl water.hkl \
-		-wfn water.wfx \
-		-acc 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-fourier_transform_full:
-	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) \
-		-test_analytical full -no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good 
-
-fourier_transform:
-	@echo 'Running test: $@'
-	@cd SALTED && $(BASE_PATH) \
-		-test_analytical -no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-fractal:
-	@echo 'Running test: $@'
-	@cd sucrose_fchk_SF && $(BASE_PATH) \
-		-fractal sucrose_diff.cube \
-		-no_date \
-		&& ${MV} sucrose_diff.cube_fractal_plot $@.log \
-		&& ${DIFF} $@.log $@.good
-	
-properties:
-	@echo 'Running test: $@'
-	@cd sucrose_fchk_SF && $(BASE_PATH) \
+sucrose_SF:
+	$(call RUN_TEST,$@,sucrose_fchk_SF, \
+		-cif sucrose.cif \
+		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-cif sucrose.cif -lap -eli \
-		-resolution 0.5 -test \
-		-no-date \
-		&& ${MV} NoSpherA2_cube.log $@.log \
-		&& ${DIFF} $@.log $@.good
-	
-rubredoxin_cmtc:
-	@echo 'Running test: $@'
-	@cd rubredoxin_cmtc && $(BASE_PATH) \
-		-hkl 1yk4_h.hkl -acc 0 \
-		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0,1 \
-		residues/3.gbw residues/3.cif 0,2 \
-		residues/4.gbw residues/4.cif 0 \
-		-mtc_mult 1 1 1 1 \
-		-mtc_charge 0 0 0 0 \
-		-mtc_ECP 0 0 0 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-rubredoxin_cmtc_full:
-	@echo 'Running test: $@'
-	@cd rubredoxin_cmtc && $(BASE_PATH) \
-		-hkl 1yk4_h_full.hkl -acc 0 \
-		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0,1 \
-		residues/3.gbw residues/3.cif 0,2 \
-		residues/4.gbw residues/4.cif 0 \
-		-mtc_mult 1 1 1 1 \
-		-mtc_charge 0 0 0 0 \
-		-mtc_ECP 0 0 0 0 \
-		-cpus 24 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-
-
-ri_fit:
-	@echo 'Running test: $@'
-	@cd epoxide_gbw && $(BASE_PATH) \
-	    -wfn epoxide.gbw \
-	    -cif epoxide.cif \
-	    -dmin 0.4 \
-	    -ri_fit \
-	    -no-date \
-	    && ${MV} NoSpherA2.log $@.log \
-	    && ${DIFF} $@.log $@.good
-
-Hybrid_mode:
-	@echo 'Running test: $@'
-	@cd Hybrid && $(BASE_PATH) \
-		-cif ZP2.cif \
-		-dmin 0.9 \
 		-acc 0 \
-		-mtc ZP2_part1.gbw 0,1 ZP2_part2.gbw 0,2 \
-		-mtc_mult 1 1 \
-		-mtc_charge 0 0 \
-		-mtc_ECP 0 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-	
+		-no-date)
+
+sucrose_twin:
+	$(call RUN_TEST,$@,sucrose_fchk_SF, \
+		-cif sucrose.cif \
+		-hkl olex2/Wfn_job/sucrose.hkl \
+		-wfn olex2/Wfn_job/sucrose.wfx \
+		-acc 0 \
+		-twin 1 0 0 0 -1 0 0 1 -2 \
+		-no-date)
+
 wfn_reading:
-	@echo 'Running test: $@'
-	@cd wfn_reading && $(BASE_PATH) \
+	$(call RUN_TEST,$@,wfn_reading, \
 		-hkl test.hkl -acc 0 \
 		-cif test.cif -wfn test.wfn \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-fchk_conversion:
-	@echo 'Running test: $@'
-	@cd NiP3_fchk && $(BASE_PATH) \
-                -b def2-TZVP -d ./ \
-		-wfn in.ffn -no-date \
-		&& ${DIFF} in.fchk good.fchk
+		-no-date)
 
 .PHONY: all clean dependents SALTED reading_SALTED
 .SECONDARY:
-
-
