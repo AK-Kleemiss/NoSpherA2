@@ -123,6 +123,9 @@
     <ClCompile Include="..\Src\pch.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\basis_set_helper\basis_sets\auxiliary_basis.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">

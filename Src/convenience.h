@@ -419,6 +419,14 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
+struct SimplePrimitive {
+    int center;     // Center index
+    int type;       // Primitive type (0=s, 1=p, 2=d, etc.)
+    double exp;     // Exponent
+    double coefficient; // Coefficient
+    int shell;
+};
+
 class primitive
 {
 private:
@@ -442,6 +450,7 @@ public:
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
+    primitive(const SimplePrimitive& p);
     bool operator==(const primitive &other) const
     {
         return center == other.center &&
@@ -628,10 +637,10 @@ struct options
     };
 };
 
-const double gaussian_radial(primitive &p, double &r);
+const double gaussian_radial(const primitive& p, const double& r);
 
 int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b);
-int load_basis_into_WFN(WFN &wavy, BasisSet &b);
+int load_basis_into_WFN(WFN &wavy, BasisSet b);
 
 double hypergeometric(double a, double b, double c, double x);
 

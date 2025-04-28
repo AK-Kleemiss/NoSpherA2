@@ -888,6 +888,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -1133,7 +1134,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1169,7 +1170,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
     </PreBuildEvent>
     <PreBuildEvent>
       <Message>Pregenerates the basis sets</Message>
@@ -1207,7 +1208,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1243,7 +1244,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1279,7 +1280,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1315,7 +1316,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1351,7 +1352,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1387,7 +1388,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1428,7 +1429,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1469,7 +1470,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1510,7 +1511,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1586,7 +1587,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1627,7 +1628,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1668,7 +1669,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1709,7 +1710,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1750,7 +1751,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1791,7 +1792,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1832,7 +1833,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1873,7 +1874,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1914,7 +1915,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1955,7 +1956,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -1996,7 +1997,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2038,7 +2039,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2080,7 +2081,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2122,7 +2123,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2163,7 +2164,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2204,7 +2205,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2245,7 +2246,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2286,7 +2287,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2327,7 +2328,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2367,7 +2368,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2408,7 +2409,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2449,7 +2450,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2491,7 +2492,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2533,7 +2534,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2568,7 +2569,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2638,7 +2639,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2675,7 +2676,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2712,7 +2713,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2749,7 +2750,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2786,7 +2787,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2823,7 +2824,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2860,7 +2861,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2897,7 +2898,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2934,7 +2935,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -2971,7 +2972,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3008,7 +3009,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3045,7 +3046,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3082,7 +3083,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3120,7 +3121,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3170,7 +3171,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3217,7 +3218,7 @@
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3260,7 +3261,7 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -3297,7 +3298,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>"$(TargetDir)..\$(Configuration)\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
       <Message>Pregenerates the basis sets</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -5246,6 +5247,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">stdclatest</LanguageStandard_C>
     </ClCompile>
+    <ClCompile Include="..\Src\basis_set_helper\basis_sets\auxiliary_basis.cpp" />
     <ClCompile Include="..\Src\cart2sph.cpp" />
     <ClCompile Include="..\Src\constants.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>

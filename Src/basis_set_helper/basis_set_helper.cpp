@@ -11,18 +11,23 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 	for (int elem_idx = 0; elem_idx < 118; elem_idx++) {   // loop over all elements
 
 		//std::cout << line << std::endl; // prints last line read before loop (visualization of elements) (shows last "omitted" line)
-
+        int basis_idx = -1;
 		while (true) {                   // loop over all primitives
 			std::getline(file, line);   // read line
 			if (line.empty()) break;    // delimiter between elements - empty lines
 
 			std::vector<double> res = split_string<double>(line, delimiter);    //splits line into components using delimiter
-
-			//basis_set[elem_idx].push_back(tmp);                 //introduce primitive inside of the according vectors of the array
-			basis_set[elem_idx].push_back({ static_cast<int>(res[0]),
-											static_cast<int>(res[1]),
-											 res[2],res[3] });
-			//std::cout << line << std::endl;                     //print every data line as it is processes (no lines lost??)
+            if (basis_idx == static_cast<int>(res[4])) {
+                basis_set[elem_idx][basis_set[elem_idx].size() - 1].exp.push_back(res[2]);
+                basis_set[elem_idx][basis_set[elem_idx].size() - 1].coefficient.push_back(res[3]);
+            }
+            else {
+                basis_set[elem_idx].push_back({ static_cast<int>(res[0]),
+                                static_cast<int>(res[1]),
+                                {res[2]},{res[3]} });
+            }
+        
+            basis_idx = static_cast<int>(res[4]);
 		}
 
 		std::getline(file, line);                               //after while-break, one line omitted (element line)
@@ -33,39 +38,78 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 }
 
 
-//const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> built_in_basis_sets = {
-//	{ "basis name",
-//		{{
-//			{ {0, 0, 1.0, 0.5}, {0, 1, 2.0, 0.4} }, For lines containing data
-//			{ },									For lines containing no data
-//			{ {0, 0, 1.0, 0.5}, {0, 1, 2.0, 0.4} },
-//			...
-//		}}
-//	}
+//constexpr Primitive sto3g_primitives[] = {
+//    // H
+//    {0, 13.01, 0.019685, 0},
+//    {0, 1.962, 0.137977, 0},
+//    {0, 0.4446, 0.478148, 0},
+//    // He
+//    {0, 38.36, 0.023766, 0},
+//    {0, 5.77, 0.154679, 0},
+//    {0, 1.24, 0.469630, 0}
+//};
+//
+//constexpr ElementRange sto3g_ranges[118] = {
+//    {0, 3},  // H
+//    {3, 3},  // He
+//    // Remaining are {0, 0}
+//};
+//
+//constexpr BasisSetMetadata sto3g_metadata = {
+//    "STO-3G",
+//    sto3g_primitives,
+//    std::size(sto3g_primitives),
+//    sto3g_ranges
 //};
 
-void write_basis_sets(const std::filesystem::path basis_dir, const std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> basis_sets) {
-    std::ofstream file(basis_dir / "auxiliary_basis.hpp");
-	//write a hpp file that contains the basis sets as unordered map
-	file << "#pragma once\n";
-	file << "#define P(c, t, e, coef) primitive(c, t, e, coef)\n";
-    file << "const std::unordered_map<std::string, BasisSet> built_in_basis_sets = {\n";
-	for (const auto& [basis_name, basis_set] : basis_sets) {
-		file << "\t{ \"" << basis_name << "\",\n";
-		file << "\t\tBasisSet({ {\n";
-		for (int i = 0; i < 118; ++i) {
-			file << "\t\t\t{ ";
-			for (const auto& prim : basis_set[i]) {
-				file << "P" << "(" << prim.get_center() << ", " << prim.get_type() << ", " << prim.get_exp() << ", " << prim.get_coef() << "), ";
-			}
-			file << "},\n";
-		}
-		file << "\t\t} })\n";
-		file << "\t},\n";
-	}
-	file << "};\n";
+std::string write_basis_set(std::ofstream& file, const std::string basis_name, std::array<std::vector<primitive>, 118> basis_set) {
+    //replace - with _ and delete ( and ) 
+    std::string basis_name_copy = basis_name;
+    std::replace(basis_name_copy.begin(), basis_name_copy.end(), '-', '_');
+    std::replace(basis_name_copy.begin(), basis_name_copy.end(), '(', '_');
+    std::replace(basis_name_copy.begin(), basis_name_copy.end(), ')', '_');
+    std::replace(basis_name_copy.begin(), basis_name_copy.end(), '+', 'P');
 
-    file.close();
+    //If basis_name_copy starts with numeric character, add a prefix
+    if (std::isdigit(basis_name_copy[0])) {
+        basis_name_copy = "basis_" + basis_name_copy;
+    }
 
+    file << "constexpr SimplePrimitive " << basis_name_copy << "_primitives[] = {\n";
+    for (int i = 0; i < 118; i++) {
+        int func = 0;
+        for (const auto& p : basis_set[i]) {
+            for (int j = 0; j < p.exp.size(); j++) {
+                file << "    {" << p.center << ", " << p.type << ", " << p.exp[j] << ", " << p.coefficient[j] << ", " << func << "},\n";
+            }
+            func++;
+        }
+    }
+    file << "};\n\n";
+    //file << "constexpr ElementRange " << basis_name_copy << "_ranges[118] = {";
+    file << "constexpr std::array<ElementRange, 118> " << basis_name_copy << "_ranges {{";
+	int running_idx = 0;
+    for (int i = 0; i < 118; i++) {
+        if (basis_set[i].size() == 0) {
+            file << "{},";
+            continue;
+        }
+        int s = 0;
+        for (int j = 0; j < basis_set[i].size(); j++) {
+            s += basis_set[i][j].exp.size();
+        }
+        file << "\n    {" << running_idx << ", " << s << "},";
+        running_idx += s;
+    }
+    file << "}};\n\n";
+
+
+    file << "constexpr BasisSetMetadata " << basis_name_copy << "_metadata = {\n";
+    file << "    \"" << basis_name << "\",\n";
+    file << "    " << basis_name_copy << "_primitives,\n";
+    file << "    std::size(" << basis_name_copy << "_primitives),\n";
+    file << "    " << basis_name_copy << "_ranges\n";
+    file << "};\n\n";
+    return basis_name_copy;
 }
 
