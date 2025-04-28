@@ -16,16 +16,6 @@ Int_Params::Int_Params(const WFN &wavy)
     calc_integration_parameters();
 }
 
-Int_Params::Int_Params(WFN &wavy, const std::string auxname)
-{
-    // Constructor, copying the atoms, but replacing the basis set with the aux basis set
-    load_basis_into_WFN(wavy, BasisSetLibrary().get_basis_set(auxname));
-    atoms = wavy.get_atoms();
-    wfn_origin = wavy.get_origin();
-    ncen = wavy.get_ncen();
-    calc_integration_parameters();
-}
-
 vec Int_Params::normalize_gto(vec coef, vec exp, int l)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
@@ -235,9 +225,9 @@ void Int_Params::populate_bas()
             _bas[index * 8 + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
             _bas[index * 8 + 2] = (int)basis.shellcount[shell];                  // nprim
             _bas[index * 8 + 3] = 1;                                     // ncentr    Not sure
-            _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the end of the _env vector
-            bas_ptr += _bas[index * 8 + 2];
-            _bas[index * 8 + 6] = bas_ptr;
+            _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the exponents of a shell
+            bas_ptr += (int)basis.shellcount[shell];                     // Add the number of contracted functions per shell to gain the pointer to the coefficient
+            _bas[index * 8 + 6] = bas_ptr;                               // Pointer to the coefficients of a shell
             //_bas 8 is set to 0
             bas_ptr += _bas[index * 8 + 2] * _bas[atom_idx * 8 + 3];
 

@@ -547,6 +547,13 @@ primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), 
         0.25);
 };
 
+primitive::primitive(const SimplePrimitive& other) : center(other.center), type(other.type), exp(other.exp), coefficient(other.coefficient)
+{
+    norm_const = pow(
+        pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
+        0.25);
+};
+
 /*bool open_file_dialog(string &path, bool debug, vector <string> filter){
     char pwd[1024];
     if(GetCurrentDir( pwd, 1024)==NULL) return false;
@@ -1753,7 +1760,7 @@ double get_lambda_1(double *a)
     }
 };
 
-const double gaussian_radial(primitive &p, double &r)
+const double gaussian_radial(const primitive &p, const double &r)
 {
     return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
@@ -1922,19 +1929,21 @@ int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118>
     return nr_coefs;
 }
 
-int load_basis_into_WFN(WFN &wavy, BasisSet &b)
+int load_basis_into_WFN(WFN &wavy, BasisSet b)
 {
     wavy.set_basis_set_ptr(b.get_data());
     int nr_coefs = 0;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         int current_charge = wavy.get_atom_charge(i) - 1;
-        const std::vector<primitive> &basis = b[current_charge];
-        int size = (int)b[current_charge].size();
+        const std::span<const SimplePrimitive>& basis = b[current_charge];
+        int size = (int)basis.size();
         for (int e = 0; e < size; e++)
         {
-            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
-            nr_coefs += 2 * basis[e].get_type() + 1;
+            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
+            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
+
+            nr_coefs += 2 * basis[e].type + 1;
         }
     }
     return nr_coefs;
@@ -2456,9 +2465,10 @@ void options::digest_options()
             // cube_from_coef_npy(arguments[i + 1], arguments[i + 2]);
 
             // std::string aux_basis = arguments[i + 1];
-            //gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
-            gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
-            //gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
+            gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
+            //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
+            //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
+            //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
 
             exit(0);
         }

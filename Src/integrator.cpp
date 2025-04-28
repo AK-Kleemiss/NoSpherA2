@@ -101,7 +101,7 @@ vec reorder_p(vec coefs_in, WFN aux_basis)
     return coefs_out;
 }
 
-vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem, const char metric)
+vec density_fit(const WFN &wavy, const WFN& wavy_aux, const double max_mem, const char metric)
 {
     vec eri2c;
     vec eri3c;
@@ -111,11 +111,7 @@ vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem
 
     Int_Params normal_basis(wavy);
 
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wavy.get_atoms());
-    wavy_aux.set_ncen(wavy.get_ncen());
-    wavy_aux.delete_basis_set();
-    Int_Params aux_basis(wavy_aux, auxname);
+    Int_Params aux_basis(wavy_aux);
 
     dMatrix2 dm = wavy.get_dm();
 
@@ -133,7 +129,7 @@ vec density_fit(const WFN &wavy, const std::string auxname, const double max_mem
 
     solve_linear_system(eri2c, aux_basis.get_nao(), rho);
 
-    //rho = reorder_p(rho, wavy_aux);
+    rho = reorder_p(rho, wavy_aux);
 
     return rho;
 }
@@ -147,8 +143,9 @@ int fixed_density_fit_test()
     wavy_aux.set_atoms(wavy_gbw.get_atoms());
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("TESTING"));
 
-    Int_Params aux_basis(wavy_aux, "TESTING");
+    Int_Params aux_basis(wavy_aux);
 
     //   normal_basis.print_data("normal_basis");
     // aux_basis.print_data("aux_basis");

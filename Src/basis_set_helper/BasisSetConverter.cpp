@@ -39,7 +39,23 @@ int main(int argc, char** argv)
         basis_sets[basis_name] = basis_set;
     }
 
-    write_basis_sets(basis_path, basis_sets);
+    std::ofstream aux_file(basis_path / "auxiliary_basis.cpp");
+    aux_file << "#include \"../../JKFit.h\"\n";
+    std::vector<std::string> basis_names_internal;
+    aux_file << "namespace {\n";
+    for (const auto& [basis_name, basis_set] : basis_sets)
+    {
+        basis_names_internal.push_back(write_basis_set(aux_file, basis_name, basis_set));
+    }
 
+    aux_file << "}\n";
+    aux_file << "constexpr BasisSetMetadata aux_basis_sets[] = {\n";
+    for (const std::string& name : basis_names_internal) {
+        aux_file << "\t" << name << "_metadata,\n";
+    }
+    aux_file << "};\n\n";
+    aux_file << "constexpr std::size_t aux_basis_set_count = std::size(aux_basis_sets);\n";
+
+    aux_file.close();
     log_file.close();
 }

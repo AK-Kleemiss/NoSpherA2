@@ -3261,17 +3261,18 @@ itsc_block calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
-    vec coefs = density_fit(wave[nr], opt.SALTED_DFBASIS, opt.mem, 'C');
-    file << setw(12 * 4 + 2) << "... done!\n"
-         << flush;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("RI-Fit");
 
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wave[nr].get_atoms());
     wavy_aux.set_ncen(wave[nr].get_ncen());
     wavy_aux.delete_basis_set();
     load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(opt.SALTED_DFBASIS));
+
+    vec coefs = density_fit(wave[nr], wavy_aux, opt.mem, 'C');
+    file << setw(12 * 4 + 2) << "... done!\n"
+         << flush;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("RI-Fit");
 
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
