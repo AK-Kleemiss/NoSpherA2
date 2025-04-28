@@ -122,9 +122,9 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 {
     std::ostringstream oss;
     oss << "{\n"
-        << "  \"cutoff\": {\n    \"radius\": " << params.cutoff << ",\n    \"smoothing\": {\"type: \"ShiftedCosine\", \"width\": " << params.cutoff_function.width << " }, \n  }, \n"
-        << "  \"density\": {\n    \"type\": \"Gaussian\",\n    \"width\": "<< params.atomic_gaussian_width << ",\n    \"center_atom_weight\": "<< params.center_atom_weight << ",\n  },\n"
-        << "  \"basis\": {\n    \"type\": \"TensorProduct\",\n    \"max_angular\": " << params.max_angular << ",\n    \"radial\": {\"type\": \"Gto\", \"max_radial\": " << params.max_radial << "},\n  },\n"
+        << "  \"cutoff\": {\n    \"radius\": " << params.cutoff << ",\n    \"smoothing\": {\"type: \"ShiftedCosine\", \"width\": " << params.cutoff_function.width << " }\n  }, \n"
+        << "  \"density\": {\n    \"type\": \"Gaussian\",\n    \"width\": "<< params.atomic_gaussian_width << ",\n    \"center_atom_weight\": "<< params.center_atom_weight << "\n  },\n"
+        << "  \"basis\": {\n    \"type\": \"TensorProduct\",\n    \"max_angular\": " << params.max_angular << ",\n    \"radial\": {\"type\": \"Gto\", \"max_radial\": " << params.max_radial << "}\n  }\n"
         << "}";
     return oss.str();
 }
