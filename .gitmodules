@@ -7,3 +7,6 @@
 [submodule "llvm-project"]
 	path = llvm-project
 	url = https://github.com/llvm/llvm-project.git
+[submodule "featomic"]
+	path = featomic
+	url = https://github.com/metatensor/featomic
