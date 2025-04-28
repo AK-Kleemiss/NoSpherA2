@@ -1,6 +1,3 @@
-#define WIN32_LEAN_AND_MEAN
-#ifdef _WIN32
-#endif
 #include "pch.h"
 #include "tsc_block.h"
 #include "convenience.h"
@@ -11,6 +8,8 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "nos_math.h"
+
+int QCT(options& opt, std::vector<WFN>& wavy);
 
 int main(int argc, char **argv)
 {
@@ -33,6 +32,7 @@ int main(int argc, char **argv)
     auto _coutbuf = std::cout.rdbuf(log_file.rdbuf()); // save and redirect
     options opt(argc, argv, log_file);
     opt.digest_options();
+    opt.cwd = cwd;
     vector<WFN> wavy;
 
     if (opt.threads != -1)
@@ -49,6 +49,14 @@ int main(int argc, char **argv)
     }
     log_file.flush();
 
+    //Start QCT menu and leave
+    if (opt.qct) {
+        //restore cout
+        std::cout.rdbuf(_coutbuf);
+        cls();
+        std::cout << "Starting QCT menu..." << endl;
+        return QCT(opt, wavy);
+    }
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {

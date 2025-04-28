@@ -1332,7 +1332,7 @@ void properties_calculation(options &opt)
         ESP.write_file(true);
         log2 << "  done!" << endl;
     }
-    // return output to cout
+    // return output tostd::cout
     std::cout.rdbuf(_coutbuf);
     log2.close();
     std::cout << "Properties calculation done!" << std::endl;
@@ -1344,8 +1344,8 @@ void do_combine_mo(options &opt)
     WFN wavy1(2);
     WFN wavy2(2);
     WFN wavy3(2);
-    wavy1.read_wfn(opt.combine_mo[0], false, cout);
-    wavy2.read_wfn(opt.combine_mo[1], false, cout);
+    wavy1.read_wfn(opt.combine_mo[0], false,std::cout);
+    wavy2.read_wfn(opt.combine_mo[1], false,std::cout);
     for (int i = 0; i < wavy1.get_ncen(); i++)
     {
         wavy3.push_back_atom(wavy1.get_atom(i));
@@ -1354,7 +1354,7 @@ void do_combine_mo(options &opt)
     {
         wavy3.push_back_atom(wavy2.get_atom(i));
     }
-    cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
+   std::cout << "In total we have " << wavy3.get_ncen() << " atoms" << endl;
 
     double MinMax1[6];
     int steps1[3];
@@ -1363,17 +1363,17 @@ void do_combine_mo(options &opt)
     int steps2[3];
     readxyzMinMax_fromWFN(wavy2, MinMax2, steps2, opt.radius, opt.resolution, true);
 
-    cout << "Read input\nCalculating for MOs ";
+   std::cout << "Read input\nCalculating for MOs ";
     for (int v1 = 0; v1 < opt.cmo1.size(); v1++)
     {
-        cout << opt.cmo1[v1] << " ";
+       std::cout << opt.cmo1[v1] << " ";
     }
-    cout << "of fragment 1 and MOs ";
+   std::cout << "of fragment 1 and MOs ";
     for (int v1 = 0; v1 < opt.cmo2.size(); v1++)
     {
-        cout << opt.cmo2[v1] << " ";
+       std::cout << opt.cmo2[v1] << " ";
     }
-    cout << "of fragment 2" << endl;
+   std::cout << "of fragment 2" << endl;
     double MinMax[6]{100, 100, 100, -100, -100, -100};
     int steps[3]{0, 0, 0};
     for (int i = 0; i < 3; i++)
@@ -1414,11 +1414,11 @@ void do_combine_mo(options &opt)
         for (int j = 0; j < opt.cmo2.size(); j++)
         {
             counter++;
-            cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
+           std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
             string filename("");
             MO2.set_zero();
             Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout);
-            cout << "writing files..." << flush;
+           std::cout << "writing files..." << flush;
             filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
             fns.push_back(filename);
             total.set_zero();
@@ -1431,7 +1431,7 @@ void do_combine_mo(options &opt)
             total = MO1;
             total -= MO2;
             total.write_file(filename, false);
-            cout << " ... done!" << endl;
+           std::cout << " ... done!" << endl;
         }
     }
     ofstream vmd("read_files.vmd");

@@ -628,7 +628,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
                 dum_center[exnum] = stoi(tempchar);
                 if (dum_center[exnum] > e_nuc)
                 {
-                    cout << "this center doesn't exist.. some weird problem!\n";
+                   std::cout << "this center doesn't exist.. some weird problem!\n";
                     return false;
                 }
                 exnum++;
@@ -2835,13 +2835,13 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     {
         if (std::filesystem::exists(fileName))
         {
-            cout << "File already existed!";
+           std::cout << "File already existed!";
             return false;
         }
         else
         {
             if (debug)
-                cout << "File didn't exist before, writing comment to it now." << endl;
+               std::cout << "File didn't exist before, writing comment to it now." << endl;
         }
     }
 
@@ -2849,17 +2849,17 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     string line;
     if (!rf.is_open())
     {
-        cout << "Sorry, can't open the file...\n";
+       std::cout << "Sorry, can't open the file...\n";
         return false;
     }
     rf << comment << endl;
     if (debug)
-        cout << "comment written, now for the header..\n";
+       std::cout << "comment written, now for the header..\n";
     rf << hdr(occupied);
     if (debug)
     {
-        cout << "header written, now for the centers..\n";
-        cout << "this is the header: \n"
+       std::cout << "header written, now for the centers..\n";
+       std::cout << "this is the header: \n"
              << hdr(occupied);
     }
     rf.flush();
@@ -2880,9 +2880,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << '\n';
     }
     if (debug)
-        cout << "centers written, now for the center_assignement..\n";
+       std::cout << "centers written, now for the center_assignement..\n";
     if (debug)
-        cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
+       std::cout << "ncen: " << ncen << " nex: " << nex << " nmo: " << nmo << endl;
     int run = 0;
     int exnum = 0;
     for (int i = 0; i < nex / 20; i++)
@@ -2893,9 +2893,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << centers[exnum];
             if (exnum > nex)
             {
-                cout << "run is too big in center writing";
+               std::cout << "run is too big in center writing";
                 if (debug)
-                    cout << "in 20er-lines...\n";
+                   std::cout << "in 20er-lines...\n";
                 return false;
             }
             exnum++;
@@ -2904,7 +2904,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         rf << '\n';
     }
     if (debug)
-        cout << "this should be the last line... \n";
+       std::cout << "this should be the last line... \n";
     if (exnum < nex)
     {
         rf << "CENTRE ASSIGNMENTS  ";
@@ -2913,9 +2913,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << centers[exnum];
             if (exnum > nex)
             {
-                cout << "run is too big in center writing";
+               std::cout << "run is too big in center writing";
                 if (debug)
-                    cout << " in last line... trying to access # " << exnum << "\n";
+                   std::cout << " in last line... trying to access # " << exnum << "\n";
                 return false;
             }
             exnum++;
@@ -2924,11 +2924,11 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run * 20 < nex / 20 - 1)
     {
-        cout << "Problem during writing of Centre assignments... stopping...\n";
+       std::cout << "Problem during writing of Centre assignments... stopping...\n";
         return false;
     }
     if (debug)
-        cout << "center assignements written, now for the types..\n";
+       std::cout << "center assignements written, now for the types..\n";
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 20; i++)
@@ -2939,7 +2939,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << types[exnum];
             if (exnum > nex)
             {
-                cout << "run is too big in types writing\n";
+               std::cout << "run is too big in types writing\n";
                 return false;
             }
             exnum++;
@@ -2956,23 +2956,23 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << setw(3) << types[exnum];
             if (exnum > nex)
             {
-                cout << "run is too big in types writing";
+               std::cout << "run is too big in types writing";
                 return false;
             }
             final_j = j;
             exnum++;
         }
         if (debug)
-            cout << "final_j: " << final_j << endl;
+           std::cout << "final_j: " << final_j << endl;
         rf << '\n';
     }
     if (run * 20 < nex / 20 - 1)
     {
-        cout << "Problem during writing of Type assignments... stopping...";
+       std::cout << "Problem during writing of Type assignments... stopping...";
         return false;
     }
     if (debug)
-        cout << "types assignements written, now for the exponents..\n";
+       std::cout << "types assignements written, now for the exponents..\n";
     run = 0;
     exnum = 0;
     for (int i = 0; i < nex / 5; i++)
@@ -2987,7 +2987,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << temp;
             if (exnum > nex)
             {
-                cout << "run is too big in exponents writing";
+               std::cout << "run is too big in exponents writing";
                 return false;
             }
             exnum++;
@@ -3007,7 +3007,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
             rf << temp;
             if (run > nex)
             {
-                cout << "run is too big in exponents writing";
+               std::cout << "run is too big in exponents writing";
                 return false;
             }
             exnum++;
@@ -3016,11 +3016,11 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run * 5 < nex / 5 - 1)
     {
-        cout << "Problem during writing of Exponents... stopping...";
+       std::cout << "Problem during writing of Exponents... stopping...";
         return false;
     }
     if (debug)
-        cout << "exponents assignements written, now for the MOs.." << endl
+       std::cout << "exponents assignements written, now for the MOs.." << endl
              << "For informational purposes: ncen "
              << ncen << " nmo " << nmo << " nex " << nex << endl;
     int mo_run = 1;
@@ -3043,7 +3043,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 rf << temp;
                 if (run > nex)
                 {
-                    cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
+                   std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
                     return false;
                 }
                 run++;
@@ -3053,7 +3053,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
         if (run < nex)
         {
             if (debug)
-                cout << "Still some left to write... going in % for loop...." << endl;
+               std::cout << "Still some left to write... going in % for loop...." << endl;
             for (int j = 0; j < nex % 5; j++)
             {
                 stringstream stream;
@@ -3063,7 +3063,7 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
                 rf << temp;
                 if (run > nex)
                 {
-                    cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
+                   std::cout << "run (" << run << ") is too big in MO ceofficients writing" << endl;
                     return false;
                 }
                 run++;
@@ -3074,9 +3074,9 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     if (run != nex)
     {
-        cout << "Problem during writing of MOs... stopping...";
+       std::cout << "Problem during writing of MOs... stopping...";
         if (debug)
-            cout << "run: " << run << endl;
+           std::cout << "run: " << run << endl;
         return false;
     }
     rf << "END DATA" << endl;
@@ -3107,7 +3107,7 @@ bool WFN::write_xyz(const std::filesystem::path& fileName)
         f.close();
     }
     catch (exception) {
-        err("Error writing the xyz file! Aborting!", cout);
+        err("Error writing the xyz file! Aborting!",std::cout);
         return false;
     }
     return true;
@@ -3458,14 +3458,14 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     using namespace std;
     int elcount = -get_charge();
     if (debug)
-        cout << "elcount: " << elcount << std::endl;
+       std::cout << "elcount: " << elcount << std::endl;
     for (int i = 0; i < ncen; i++)
     {
         elcount += get_atom_charge(i);
         elcount -= constants::ECP_electrons_pTB[get_atom_charge(i)];
     }
     if (debug)
-        cout << "elcount after: " << elcount << std::endl;
+       std::cout << "elcount after: " << elcount << std::endl;
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
@@ -3473,51 +3473,51 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         beta_els++;
         temp_els -= 2;
         if (debug)
-            cout << temp_els << std::endl;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", cout);
-        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!", cout);
-        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!", cout);
+           std::cout << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!",std::cout);
+        err_checkf(alpha_els + beta_els <= elcount, "Error setting alpha and beta electrons! Sum a + b > elcount!",std::cout);
+        err_checkf(temp_els > -elcount, "Error setting alpha and beta electrons! Ran below -elcount!",std::cout);
     }
     alpha_els += temp_els;
     if (debug)
-        cout << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+       std::cout << "al/be els:" << alpha_els << " " << beta_els << std::endl;
     const int mult = get_multi();
     int diff = 0;
     if (mult != 0)
         diff = get_multi() - 1;
     if (debug)
-        cout << "diff: " << diff << std::endl;
+       std::cout << "diff: " << diff << std::endl;
     while (alpha_els - beta_els != diff)
     {
         alpha_els++;
         beta_els--;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!", cout);
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons!",std::cout);
     }
     if (debug)
     {
-        cout << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
+       std::cout << "alpha, beta, elcount: " << setw(5) << alpha_els << setw(5) << beta_els << setw(5) << elcount << endl;
     }
     if (get_nr_basis_set_loaded() == 0)
     {
         if (debug)
-            cout << "No basis set loaded, will load a complete basis set now!" << endl;
-        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", cout);
+           std::cout << "No basis set loaded, will load a complete basis set now!" << endl;
+        err_checkf(read_basis_set_vanilla(basis_set_path, *this, debug), "ERROR during reading of missing basis set!",std::cout);
     }
     else if (get_nr_basis_set_loaded() < get_ncen())
     {
-        cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
-        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!", cout);
+       std::cout << "Not all atoms have a basis set loaded!\nLaoding the missing atoms..." << flush;
+        err_checkf(read_basis_set_missing(basis_set_path, *this, debug), "ERROR during reading of missing basis set!",std::cout);
     }
     else if (get_nr_basis_set_loaded() > get_ncen())
     {
-        err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!", cout);
+        err_checkf(false, "# of loaded > # atoms\nSorry, this should not happen... aborting!!!",std::cout);
     }
     // set_modified();
     vec CMO;
     vec CMO_beta;
     if (debug)
     {
-        cout << "Origin: " << get_origin() << endl;
+       std::cout << "Origin: " << get_origin() << endl;
     }
     if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
     {
@@ -3525,20 +3525,20 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         sort_wfn(check_order(debug), debug);
         //---------------normalize basis set---------------------------------
         if (debug)
-            cout << "starting to normalize the basis set" << endl;
+           std::cout << "starting to normalize the basis set" << endl;
         vec norm_const;
         //-----------debug output---------------------------------------------------------
         if (debug)
         {
-            cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
+           std::cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
             print_atom_long(0);
-            cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
-            cout << "Status report:" << endl;
-            cout << "size of norm_const: " << norm_const.size() << endl;
-            cout << "WFN MO counter: " << get_nmo() << endl;
-            cout << "Number of atoms: " << get_ncen() << endl;
-            cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
-            cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+           std::cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+           std::cout << "Status report:" << endl;
+           std::cout << "size of norm_const: " << norm_const.size() << endl;
+           std::cout << "WFN MO counter: " << get_nmo() << endl;
+           std::cout << "Number of atoms: " << get_ncen() << endl;
+           std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+           std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
         }
 
         //-------------------normalize the basis set shell wise into a copy vector---------
@@ -3564,12 +3564,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     temp_c = 32768 * pow(temp_c, 9) / (225 * constants::PI3);
                     break;
                 case -1:
-                    cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
+                   std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
                     break;
                 }
                 temp_c = pow(temp_c, 0.25) * get_atom_basis_set_coefficient(a, p);
                 if (debug)
-                    cout << "temp_c:" << temp_c << std::endl;
+                   std::cout << "temp_c:" << temp_c << std::endl;
                 basis_coefficients[a].push_back(temp_c);
             }
         }
@@ -3580,10 +3580,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             for (int s = 0; s < get_atom_shell_count(a); s++)
             {
                 int type_temp = get_shell_type(a, s);
-                err_chkf(type_temp != -1, "ERROR in type assignement!!", cout);
+                err_chkf(type_temp != -1, "ERROR in type assignement!!",std::cout);
                 if (debug)
                 {
-                    cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+                   std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
                         << "start: " << get_shell_start(a, s)
                         << " stop: " << get_shell_end(a, s) << endl
                         << "factor: ";
@@ -3606,12 +3606,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5);
                     if (debug)
-                        cout << factor << endl;
+                       std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -3635,12 +3635,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5);
                     if (debug)
-                        cout << factor << endl;
+                       std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -3665,12 +3665,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = (pow(factor, -0.5)) / sqrt(3);
                     if (debug)
-                        cout << factor << endl;
+                       std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -3697,12 +3697,12 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         return false;
                     factor = pow(factor, -0.5) / sqrt(15);
                     if (debug)
-                        cout << factor << endl;
+                       std::cout << factor << endl;
                     for (int i = get_shell_start(a, s); i <= get_shell_end(a, s); i++)
                     {
                         if (debug)
                         {
-                            cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
+                           std::cout << "Contraction coefficient before: " << get_atom_basis_set_coefficient(a, i)
                                 << " Contraction coefficient after:  " << factor * get_atom_basis_set_coefficient(a, i) << endl;
                         }
                         // contraction_coefficients[a][i] = factor * get_atom_basis_set_coefficient(a, i);
@@ -3716,21 +3716,21 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     break;
                 }
                 if (debug)
-                    cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
+                   std::cout << "This shell has: " << get_shell_end(a, s) - get_shell_start(a, s) + 1 << " primitives" << endl;
             }
         }
         //-----------debug output---------------------------------------------------------
         if (debug)
         {
-            cout << "exemplary output of the first atom with all it's properties: " << endl;
+           std::cout << "exemplary output of the first atom with all it's properties: " << endl;
             print_atom_long(0);
-            cout << "ended normalizing the basis set, now for the norm_cprims" << endl;
-            cout << "Status report:" << endl;
-            cout << "size of norm_const: " << norm_const.size() << endl;
-            cout << "WFN MO counter: " << get_nmo() << endl;
-            cout << "Number of atoms: " << get_ncen() << endl;
-            cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
-            cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
+           std::cout << "ended normalizing the basis set, now for the norm_cprims" << endl;
+           std::cout << "Status report:" << endl;
+           std::cout << "size of norm_const: " << norm_const.size() << endl;
+           std::cout << "WFN MO counter: " << get_nmo() << endl;
+           std::cout << "Number of atoms: " << get_ncen() << endl;
+           std::cout << "Primitive count of zero MO: " << get_MO_primitive_count(0) << endl;
+           std::cout << "Primitive count of first MO: " << get_MO_primitive_count(1) << endl;
         }
         //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
         int run = 0;
@@ -3738,7 +3738,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         changed_coefs.resize(get_nmo());
         if (debug)
         {
-            cout << "Opening norm_cprim!" << endl;
+           std::cout << "Opening norm_cprim!" << endl;
             ofstream norm_cprim("norm_prim.debug", ofstream::out);
             for (int m = 0; m < get_nmo(); m++)
             {
@@ -3748,7 +3748,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                 {
                     changed_coefs[m][p] = get_MO_coef(m, p) / norm_const[p];
                     if (m == 0)
-                        cout << p << ". primitive; " << m << ". MO "
+                       std::cout << p << ". primitive; " << m << ". MO "
                         << "norm nonst: " << norm_const[p]
                         << " temp after normalization: " << changed_coefs[m][p] << "\n";
                     norm_cprim << " " << changed_coefs[m][p] << endl;
@@ -3757,8 +3757,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             }
             norm_cprim.flush();
             norm_cprim.close();
-            cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
-            cout << "Total count in CPRIM: " << run << endl;
+           std::cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
+           std::cout << "Total count in CPRIM: " << run << endl;
         }
         else
         {
@@ -3803,25 +3803,25 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             {
                 for (int s = 0; s < get_atom_shell_count(a); s++)
                 {
-                    // if (debug) cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value\n"l;
+                    // if (debug)std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value\n"l;
                     switch (get_shell_type(a, s))
                     {
                     case 1:
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s)]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                            cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                           std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
                         break;
                     case 2:
                         for (int i = 0; i < 3; i++)
                             CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                            cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                           std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 3:
                         for (int i = 0; i < 6; i++)
                             CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                            cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                           std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     case 4:
                         // this hardcoded piece is due to the order of f-type functions in the fchk
@@ -3835,16 +3835,16 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
                         CMO.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
                         if (debug && get_atom_shell_primitives(a, s) != 1 && m == 0)
-                            cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                           std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                         break;
                     }
                     run_2++;
                 }
                 if (debug && m == 0)
-                    cout << "finished with atom!" << endl;
+                   std::cout << "finished with atom!" << endl;
             }
             if (debug)
-                cout << "finished with MO!" << endl;
+               std::cout << "finished with MO!" << endl;
             if (nshell != run_2)
                 nshell = run_2;
         }
@@ -3858,7 +3858,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     for (int s = 0; s < get_atom_shell_count(a); s++)
                     {
                         if (debug)
-                            cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
+                           std::cout << "Going to load the " << get_shell_start_in_primitives(a, s) << ". value" << endl;
                         switch (get_shell_type(a, s))
                         {
                         case 1:
@@ -3866,13 +3866,13 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             if (m == 0)
                                 nao++;
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                                cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
+                               std::cout << "Pushing back 1 coefficient for S shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << get_shell_start(a, s) << endl;
                             break;
                         case 2:
                             for (int i = 0; i < 3; i++)
                                 CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                                cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                               std::cout << "Pushing back 3 coefficients for P shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 3;
                             break;
@@ -3880,7 +3880,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             for (int i = 0; i < 6; i++)
                                 CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + i]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                                cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                               std::cout << "Pushing back 6 coefficient for D shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 6;
                             break;
@@ -3896,7 +3896,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                             CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 5]);
                             CMO_beta.push_back(changed_coefs[m][get_shell_start_in_primitives(a, s) + 9]);
                             if (debug && get_atom_shell_primitives(a, s) != 1)
-                                cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
+                               std::cout << "Pushing back 10 coefficient for F shell, this shell has " << get_atom_shell_primitives(a, s) << " primitives!" << endl;
                             if (m == 0)
                                 nao += 10;
                             break;
@@ -3904,10 +3904,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         run_2++;
                     }
                     if (debug)
-                        cout << "finished with atom!" << endl;
+                       std::cout << "finished with atom!" << endl;
                 }
                 if (debug)
-                    cout << "finished with MO!" << endl;
+                   std::cout << "finished with MO!" << endl;
                 if (nshell != run_2)
                     nshell = run_2;
             }
@@ -3927,10 +3927,10 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             }
             cmo.flush();
             cmo.close();
-            cout << CMO.size() << " Elements in CMO" << endl;
-            cout << norm_const.size() << " = nprim" << endl;
-            cout << nao << " = nao" << endl;
-            cout << nshell << " = nshell" << endl;
+           std::cout << CMO.size() << " Elements in CMO" << endl;
+           std::cout << norm_const.size() << " = nprim" << endl;
+           std::cout << nao << " = nao" << endl;
+           std::cout << nshell << " = nshell" << endl;
         }
         //------------------ make the DM -----------------------------
         int naotr = nao * (nao + 1) / 2;
@@ -3940,9 +3940,9 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             resize_SDM(naotr, 0.0);
         if (debug)
         {
-            cout << "I made kp!" << endl
+           std::cout << "I made kp!" << endl
                 << nao << " is the maximum for iu" << endl;
-            cout << "Making DM now!" << endl;
+           std::cout << "Making DM now!" << endl;
         }
         for (int iu = 0; iu < nao; iu++)
         {
@@ -3950,27 +3950,27 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             for (int iv = 0; iv <= iu; iv++)
             {
                 const int iuv = (iu * (iu + 1) / 2) + iv;
-                // if (debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
+                // if (debug)std::cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
                 double temp;
-                // if (debug) cout << "Working on MO: ";
+                // if (debug)std::cout << "Working on MO: ";
                 for (int m = 0; m < get_nmo(); m++)
                 {
-                    // if (debug && m == 0) cout << m << " " << flush;
-                    // else if (debug && m != get_nmo() - 1) cout << "." << flush;
-                    // else cout << get_nmo() - 1 << flush;
+                    // if (debug && m == 0)std::cout << m << " " << flush;
+                    // else if (debug && m != get_nmo() - 1)std::cout << "." << flush;
+                    // elsestd::cout << get_nmo() - 1 << flush;
                     if (alpha_els != beta_els)
                     {
                         if (m < alpha_els)
                         {
                             temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                            err_checkf(set_SDM(iuv, get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), cout);
-                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), cout);
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv),std::cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv),std::cout);
                         }
                         else
                         {
                             temp = get_MO_occ(m) * CMO_beta[iu + ((m - alpha_els) * nao)] * CMO_beta[iv + ((m - alpha_els) * nao)];
-                            err_checkf(set_SDM(iuv, get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), cout);
-                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), cout);
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv),std::cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv),std::cout);
                         }
                     }
                     else
@@ -3978,17 +3978,17 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         if (get_MO_occ(m) == 0.0)
                             continue;
                         temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                        err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM!", cout);
+                        err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM!",std::cout);
                     }
-                    // else if (debug) cout << "DM after: " << get_DM(iuv) << endl;
+                    // else if (debug)std::cout << "DM after: " << get_DM(iuv) << endl;
                 }
-                // if (debug) cout << endl;
+                // if (debug)std::cout << endl;
             }
         }
     }
     else
     {
-        cout << "Sorry, this origin is not supported yet!" << endl;
+       std::cout << "Sorry, this origin is not supported yet!" << endl;
         return false;
     }
     return true;
@@ -4263,7 +4263,7 @@ int WFN::check_order(const bool &debug) const
         }
     }
     /*if(debug){
-        cout << "Going to return " << f_order*10+order << endl;
+       std::cout << "Going to return " << f_order*10+order << endl;
         Enter();
     }*/
     return (f_order * 10 + order);
@@ -7422,3 +7422,43 @@ std::filesystem::path WFN::get_cube_path(const int& nr) const
 {
     return cub[nr].get_path();
 };
+
+void WFN::write_cube_file(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_file(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}
+void WFN::write_cube_dgrid(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_file(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}
+void WFN::write_cube_xdgraph(const int& nr, const std::filesystem::path& filename, const bool& debug) {
+    err_checkf(nr < cub.size(), "Wrong cube selected!", std::cout);
+    if (cub[nr].get_path() != filename) {
+        cub[nr].set_path(filename);
+    }
+    if (debug) {
+        std::cout << "Writing cube file to: " << filename << std::endl;
+    }
+    cub[nr].write_xdgraph(filename);
+    if (debug) {
+        std::cout << "Cube file written!" << std::endl;
+    }
+}

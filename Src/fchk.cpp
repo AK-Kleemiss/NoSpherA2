@@ -26,10 +26,10 @@ bool gaussian(const string &programPath, const bool &debug){
   string envshort=workpath;
   envshort.erase(envshort.find("/g09/g09")+4,4);
   if(debug_fchk){
-    cout << envbsd << endl;
-    cout << envlocal << endl;
-    cout << envextras << endl;
-    cout << envshort << endl;
+   std::cout << envbsd << endl;
+   std::cout << envlocal << endl;
+   std::cout << envextras << endl;
+   std::cout << envshort << endl;
   }
   string EXEDIR=("GAUSS_EXEDIR=");
   EXEDIR.append(envbsd);
@@ -39,19 +39,19 @@ bool gaussian(const string &programPath, const bool &debug){
   EXEDIR.append(envextras);
   EXEDIR.append(":");
   EXEDIR.append(envshort);
-  if(debug_fchk) cout << EXEDIR << endl;
+  if(debug_fchk)std::cout << EXEDIR << endl;
   string BSDDIR=("GAUSS_BSDDIR=");
   BSDDIR.append(envbsd);
-  if(debug_fchk) cout << BSDDIR << endl;
+  if(debug_fchk)std::cout << BSDDIR << endl;
   char *exedir = &EXEDIR[0u];
   char *bsddir = &BSDDIR[0u];
   cls();
-  cout << "Running gaussian... Please wait... " << endl;
+ std::cout << "Running gaussian... Please wait... " << endl;
   string execute_command;
   execute_command=workpath;
   execute_command.append(" gaussian.com");
-  if(system(execute_command.c_str())) cout << "Well system returned non 0... No idea what this means now..." << endl;
-  if(!debug) cout << "Finished gaussian!!" << endl;
+  if(system(execute_command.c_str()))std::cout << "Well system returned non 0... No idea what this means now..." << endl;
+  if(!debug)std::cout << "Finished gaussian!!" << endl;
   ifstream ifile("gaussian.log",ios::in);
   string line;
   string preline;
@@ -66,76 +66,76 @@ bool gaussian(const string &programPath, const bool &debug){
 
 string prepare_gaussian(const string& basis_set_path, const string& fchkname, WFN& wave, const int& ncpus, const float& mem, bool debug) {
   if (exists("gaussian.com")) {
-    cout << "gaussian.com already exists, do you want me to overwrite it?";
+   std::cout << "gaussian.com already exists, do you want me to overwrite it?";
     if (!yesno()) return "WRONG";
   }
   if (wave.get_modified()) {
-    cout << "The wavefunction has been modified after reading. Please make sure that you know what you are doing!" << endl;
-    cout << "Do you want to continue?" << flush;
+   std::cout << "The wavefunction has been modified after reading. Please make sure that you know what you are doing!" << endl;
+   std::cout << "Do you want to continue?" << flush;
     if (!yesno()) return "WRONG";
   }
   //-----------------READING BASIS SET--------------------------------
   if (wave.get_nr_basis_set_loaded() == 0) {
-    cout << "No basis set loaded, will load a complete basis set now!" << endl;
+   std::cout << "No basis set loaded, will load a complete basis set now!" << endl;
     if (!read_basis_set_vanilla(basis_set_path, wave, debug, false)) {
-      cout << "Problem during reading of the basis set!" << endl;
+     std::cout << "Problem during reading of the basis set!" << endl;
       return "WRONG";
     }
   }
   else if (wave.get_nr_basis_set_loaded() < wave.get_ncen()) {
-    cout << "Not all atoms have a basis set loaded!" << endl
+   std::cout << "Not all atoms have a basis set loaded!" << endl
       << "Do you want to laod the missing atoms?" << flush;
     if (!yesno()) {
-      cout << "Do you want to load a new basis set?" << flush;
+     std::cout << "Do you want to load a new basis set?" << flush;
       if (!yesno()) {
-        cout << "Okay, aborting then!!!" << endl;
+       std::cout << "Okay, aborting then!!!" << endl;
         return "WRONG";
       }
-      cout << "deleting old one..." << endl;
+     std::cout << "deleting old one..." << endl;
       if (!wave.delete_basis_set()) {
-        cout << "ERROR while deleting a basis set!" << endl;
+       std::cout << "ERROR while deleting a basis set!" << endl;
         return "WRONG";
       }
       else if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
-        cout << "ERROR during reading of the new basis set!" << endl;
+       std::cout << "ERROR during reading of the new basis set!" << endl;
         return "WRONG";
       }
     }
     else {
-      cout << "okay, loading the missing atoms.." << endl;
+     std::cout << "okay, loading the missing atoms.." << endl;
       if (!read_basis_set_missing(basis_set_path, wave, debug)) {
-        cout << "ERROR during reading of missing basis set!" << endl;
+       std::cout << "ERROR during reading of missing basis set!" << endl;
         return "WRONG";
       }
     }
   }
   else if (wave.get_nr_basis_set_loaded() == wave.get_ncen()) {
-    cout << "There already is a basis set loaded!" << endl
+   std::cout << "There already is a basis set loaded!" << endl
       << "Do you want me to delete the old one and load a new one?" << flush;
     if (!yesno()) {
-      cout << "Okay, continuing with the old one..." << endl;
+     std::cout << "Okay, continuing with the old one..." << endl;
     }
     else {
-      cout << "Deleting the old basis set!" << endl;
+     std::cout << "Deleting the old basis set!" << endl;
       if (!wave.delete_basis_set()) {
-        cout << "ERROR during deleting of the basis set!";
+       std::cout << "ERROR during deleting of the basis set!";
         return "WRONG";
       }
-      cout << "Going to load a new one now!" << endl;
+     std::cout << "Going to load a new one now!" << endl;
       if (!read_basis_set_vanilla(basis_set_path, wave, debug, true)) {
-        cout << "Problem during reading of the basis set!" << endl;
+       std::cout << "Problem during reading of the basis set!" << endl;
         return "WRONG";
       }
     }
   }
   else {
-    cout << "# of loaded > # atoms" << endl
+   std::cout << "# of loaded > # atoms" << endl
       << "Sorry, this should not happen... aborting!!!" << endl;
     return "WRONG";
   }
   //-----------------------check ordering and order accordingly----------------------
   if (!wave.sort_wfn(wave.check_order(debug), debug)) {
-    cout << "Could not order the wavefunction, aborting!" << endl;
+   std::cout << "Could not order the wavefunction, aborting!" << endl;
     return "WRONG";
   }
   //------------setting up the .com file with basis set---------------
@@ -145,13 +145,13 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   temp = "gaussian.chk";
   int run = 0;
   if (exists(temp)) {
-    cout << "Do you want me to overwrite gaussian.chk?";
+   std::cout << "Do you want me to overwrite gaussian.chk?";
     if (!yesno()) {
-      cout << "Then pelase give a new .chk filename: ";
+     std::cout << "Then pelase give a new .chk filename: ";
       string filename;
       cin >> filename;
       if (filename.find(".chk") == -1) {
-        cout << "this does not look like a .chk file! Please try again!";
+       std::cout << "this does not look like a .chk file! Please try again!";
         return "WRONG";
       }
     }
@@ -168,7 +168,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   //	com << wave.get_centers (false);
   com << endl;
   svec elements_list;
-  if (debug) cout << "elements_list.size()= " << elements_list.size() << endl;
+  if (debug)std::cout << "elements_list.size()= " << elements_list.size() << endl;
   for (int a = 0; a < wave.get_ncen(); a++) {
     string label_temp;
     label_temp = wave.get_atom_label(a);
@@ -177,13 +177,13 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
       for (int i = 0; i < elements_list.size(); i++) {
         if (elements_list[i].compare(label_temp) == 0) {
           found = true;
-          if (debug) cout << "Found " << label_temp << " in the elements_list!" << endl;
+          if (debug)std::cout << "Found " << label_temp << " in the elements_list!" << endl;
         }
       }
     }
     if (!found) {
       elements_list.push_back(label_temp);
-      if (debug) cout << "elements_list.size()= " << elements_list.size() << endl;
+      if (debug)std::cout << "elements_list.size()= " << elements_list.size() << endl;
       com << label_temp << " 0" << endl;
       int working_shell = -1;
       for (int p = 0; p < wave.get_atom_primitive_count(a); p++) {
@@ -217,7 +217,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   com.flush();
   com.close();
   if (debug) {
-    cout << "Wrote the gaussian Input! Please check it before i continue..." << endl;
+   std::cout << "Wrote the gaussian Input! Please check it before i continue..." << endl;
   }
   return temp;
 };
@@ -230,31 +230,31 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   int nshell = 0;
   int naotr = 0;
   if (debug) {
-    cout << "Origin: " << wave.get_origin() << endl;
+   std::cout << "Origin: " << wave.get_origin() << endl;
   }
   if (wave.get_origin() == 2 || wave.get_origin() == 4) {
     //-----------------READING BASIS SET--------------------------------
     if (read) {
       if (!read_basis_set_vanilla(basis_set_path, wave, debug, false)) {
-        cout << "Problem during reading of the basis set!" << endl;
+       std::cout << "Problem during reading of the basis set!" << endl;
         return false;
       }
     }
     double pi = 3.14159265358979;
     //---------------normalize basis set---------------------------------
-    if (debug) cout << "starting to normalize the basis set" << endl;
+    if (debug)std::cout << "starting to normalize the basis set" << endl;
     vec norm_const;
     //-----------debug output---------------------------------------------------------
     if (debug) {
-      cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
+     std::cout << "exemplary output before norm_const of the first atom with all it's properties: " << endl;
       wave.print_atom_long(0);
-      cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
-      cout << "Status report:" << endl;
-      cout << "size of norm_const: " << norm_const.size() << endl;
-      cout << "WFN MO counter: " << wave.get_nmo() << endl;
-      cout << "Number of atoms: " << wave.get_ncen() << endl;
-      cout << "Primitive count of zero MO: " << wave.get_MO_primitive_count(0) << endl;
-      cout << "Primitive count of first MO: " << wave.get_MO_primitive_count(1) << endl;
+     std::cout << "ended normalizing the basis set, now for the MO_coeffs" << endl;
+     std::cout << "Status report:" << endl;
+     std::cout << "size of norm_const: " << norm_const.size() << endl;
+     std::cout << "WFN MO counter: " << wave.get_nmo() << endl;
+     std::cout << "Number of atoms: " << wave.get_ncen() << endl;
+     std::cout << "Primitive count of zero MO: " << wave.get_MO_primitive_count(0) << endl;
+     std::cout << "Primitive count of first MO: " << wave.get_MO_primitive_count(1) << endl;
     }
     //-----------------------check ordering and order accordingly----------------------
     wave.sort_wfn(wave.check_order(debug), debug);
@@ -291,7 +291,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           wave.change_atom_basis_set_coefficient(a, p, temp);
           break;
         case -1:
-          cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
+         std::cout << "Sorry, the type reading went wrong somwhere, look where it may have gone crazy..." << endl;
           break;
         }
       }
@@ -302,10 +302,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
         int type_temp = wave.get_shell_type(a, s);
         if (type_temp == -1) {
-          cout << "ERROR in type assignement!!" << endl;
+         std::cout << "ERROR in type assignement!!" << endl;
         }
         if (debug) {
-          cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
+         std::cout << "Shell: " << s << " of atom: " << a << " Shell type: " << type_temp << endl
           << "start: " << wave.get_shell_start(a, s, false) << flush
           << " stop: " << wave.get_shell_end(a, s, false) << flush << endl
           << "factor: ";
@@ -323,10 +323,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           if (factor == 0) return false;
           factor = pow(factor, -0.5);
-          if (debug) cout << factor << endl;
+          if (debug)std::cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+             std::cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
@@ -346,10 +346,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           if (factor == 0) return false;
           factor = pow(factor, -0.5);
-          if (debug) cout << factor << endl;
+          if (debug)std::cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+             std::cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
@@ -369,10 +369,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           if (factor == 0) return false;
           factor = (pow(factor, -0.5)) / sqrt(3);
-          if (debug) cout << factor << endl;
+          if (debug)std::cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+             std::cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
@@ -393,10 +393,10 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           if (factor == 0) return false;
           factor = pow(factor, -0.5) / sqrt(15);
-          if (debug) cout << factor << endl;
+          if (debug)std::cout << factor << endl;
           for (int i = wave.get_shell_start(a, s, false); i <= wave.get_shell_end(a, s, false); i++) {
             if (debug) {
-              cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
+             std::cout << "Contraction coefficient before: " << wave.get_atom_basis_set_coefficient(a, i)
                 << " after:  " << factor * wave.get_atom_basis_set_coefficient(a, i) << endl;
             }
             wave.change_atom_basis_set_coefficient(a, i, factor * wave.get_atom_basis_set_coefficient(a, i));
@@ -406,20 +406,20 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           break;
         }
-        if (debug)	cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
+        if (debug)	std::cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
       }
     }
     //-----------debug output---------------------------------------------------------
     if (debug) {
-      cout << "exemplary output of the first atom with all it's properties: " << endl;
+     std::cout << "exemplary output of the first atom with all it's properties: " << endl;
       wave.print_atom_long(0);
-      cout << "ended normalizing the basis setnow for norm_cprim" << endl;
-      cout << "Status report:" << endl;
-      cout << "size of norm_const: " << norm_const.size() << endl;
-      cout << "WFN MO counter: " << wave.get_nmo() << endl;
-      cout << "Number of atoms: " << wave.get_ncen() << endl;
-      cout << "Primitive count of zero MO: " << wave.get_MO_primitive_count(0) << endl;
-      cout << "Primitive count of first MO: " << wave.get_MO_primitive_count(1) << endl;
+     std::cout << "ended normalizing the basis setnow for norm_cprim" << endl;
+     std::cout << "Status report:" << endl;
+     std::cout << "size of norm_const: " << norm_const.size() << endl;
+     std::cout << "WFN MO counter: " << wave.get_nmo() << endl;
+     std::cout << "Number of atoms: " << wave.get_ncen() << endl;
+     std::cout << "Primitive count of zero MO: " << wave.get_MO_primitive_count(0) << endl;
+     std::cout << "Primitive count of first MO: " << wave.get_MO_primitive_count(1) << endl;
     }
     //---------------------To not mix up anything start normalizing WFN_matrix now--------------------------
     int run = 0;
@@ -428,17 +428,17 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     for (int m = 0; m < wave.get_nmo(); m++) {
       if (debug) norm_cprim << m << ". MO:" << endl;
       for (int p = 0; p < wave.get_MO_primitive_count(m); p++) {
-        if (debug) cout << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
+        if (debug)std::cout << p << ". primitive; " << m << ". MO " << "norm nonst: " << norm_const[p] << endl;
         double temp = wave.get_MO_coef(m, p) / norm_const[p];
         if (debug) {
-          cout << " temp after normalization: " << temp << endl;
+         std::cout << " temp after normalization: " << temp << endl;
           norm_cprim << " " << temp << endl;
         }
         run++;
         if (!wave.change_MO_coef(m, p, temp)) {
-          cout << "ERROR in changing the coefficients after normalising!";
-          if (debug) cout << "m:" << m << " p: " << p << " temp:" << temp;
-          cout << endl;
+         std::cout << "ERROR in changing the coefficients after normalising!";
+          if (debug)std::cout << "m:" << m << " p: " << p << " temp:" << temp;
+         std::cout << endl;
           return false;
         }
       }
@@ -446,32 +446,32 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
     if (debug) {
       norm_cprim.flush();
       norm_cprim.close();
-      cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
-      cout << "Total count in CPRIM: " << run << endl;
+     std::cout << "See norm_cprim.debug for the CPRIM vectors" << endl;
+     std::cout << "Total count in CPRIM: " << run << endl;
     }
     //--------------Build CMO of alessandro from the first elements of each shell-------------
     for (int m = 0; m < wave.get_nmo(); m++) {
       int run_2 = 0;
       for (int a = 0; a < wave.get_ncen(); a++) {
         for (int s = 0; s < wave.get_atom_shell_count(a); s++) {
-          if (debug) cout << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value" << endl;
+          if (debug)std::cout << "Going to load the " << wave.get_shell_start_in_primitives(a, s) << ". value" << endl;
           switch (wave.get_shell_type(a, s)) {
           case 1:
             CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s)));
             if (m == 0) nao++;
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-              cout << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
+             std::cout << "Pushing back 1 coefficient for S shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives! Shell start is: " << wave.get_shell_start(a, s, false) << endl;
             break;
           case 2:
             for (int i = 0; i < 3; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-              cout << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+             std::cout << "Pushing back 3 coefficients for P shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 3;
             break;
           case 3:
             for (int i = 0; i < 6; i++) CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + i));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-              cout << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+             std::cout << "Pushing back 6 coefficient for D shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 6;
             break;
           case 4:
@@ -483,15 +483,15 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
             CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 5));
             CMO.push_back(wave.get_MO_coef(m, wave.get_shell_start_in_primitives(a, s) + 9));
             if (debug && wave.get_atom_shell_primitives(a, s) != 1)
-              cout << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
+             std::cout << "Pushing back 10 coefficient for F shell, this shell has " << wave.get_atom_shell_primitives(a, s) << " primitives!" << endl;
             if (m == 0) nao += 10;
             break;
           }
           run_2++;
         }
-        if (debug) cout << "finished with atom!" << endl;
+        if (debug)std::cout << "finished with atom!" << endl;
       }
-      if (debug) cout << "finished with MO!" << endl;
+      if (debug)std::cout << "finished with MO!" << endl;
       if (nshell != run_2) nshell = run_2;
     }
     if (debug) {
@@ -508,22 +508,22 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       }
       cmo.flush();
       cmo.close();
-      cout << CMO.size() << " Elements in CMO" << endl;
-      cout << norm_const.size() << " = nprim" << endl;
-      cout << nao << " = nao" << endl;
-      cout << nshell << " = nshell" << endl;
+     std::cout << CMO.size() << " Elements in CMO" << endl;
+     std::cout << norm_const.size() << " = nprim" << endl;
+     std::cout << nao << " = nao" << endl;
+     std::cout << nshell << " = nshell" << endl;
     }
     //------------------ make the DM -----------------------------
     naotr = nao * (nao + 1) / 2;
     vec kp;
     for (int i = 0; i < naotr; i++) wave.push_back_DM(0.0);
-    if (debug) cout << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
+    if (debug)std::cout << "I made kp!" << endl << nao << " is the maximum for iu" << endl;
     for (int iu = 0; iu < nao; iu++) {
       for (int iv = 0; iv <= iu; iv++) {
         int iuv = (iu * (iu + 1) / 2) + iv;
-        if (debug) cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
+        if (debug)std::cout << "iu: " << iu << " iv: " << iv << " iuv: " << iuv << " kp(iu): " << iu * (iu + 1) / 2 << endl;
         for (int m = 0; m < wave.get_nmo(); m++) {
-          //if(debug) cout << "DM before: " << wave.get_DM(iuv) << endl;
+          //if(debug)std::cout << "DM before: " << wave.get_DM(iuv) << endl;
           const int temp1 = iu + (m * nao);
           const int temp2 = iv + (m * nao);
           err_checkf(
@@ -534,12 +534,12 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
             to_string(CMO[temp1]) + "; CMO[" + to_string(temp2) + "] = " +
             to_string(CMO[temp2]) + " DM: " + to_string(wave.get_DM(iuv)) +
             "\nDM_size: " + to_string(wave.get_DM_size()), std::cout);
-          //else if (debug) cout << "DM after: " << wave.get_DM(iuv) << endl;
+          //else if (debug)std::cout << "DM after: " << wave.get_DM(iuv) << endl;
         }
       }
     }
     if (debug) {
-      cout << "DM is:" << endl;
+     std::cout << "DM is:" << endl;
       for (int p = 0; p < wave.get_DM_size(); p++) {
         string temp;
         for (int i = 0; i < 5; i++) {
@@ -548,22 +548,22 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           temp += stream.str();
         }
         p += 4;
-        cout << temp << endl;
+       std::cout << temp << endl;
       }
-      cout << wave.get_DM_size() << " Elements in DM" << endl;
+     std::cout << wave.get_DM_size() << " Elements in DM" << endl;
     }
   }
   // open fchk for copying
   string temp_fchk = fchk_name;
   temp_fchk.append(".fchk");
   if (!exists(temp_fchk)) {
-    cout << "This is worrysome... The fchk should be there.." << endl;
-    cout << "fchk_name: " << temp_fchk << endl;
+   std::cout << "This is worrysome... The fchk should be there.." << endl;
+   std::cout << "fchk_name: " << temp_fchk << endl;
     return false;
   }
   ifstream ifchk(temp_fchk.c_str());
   if (!ifchk.is_open()) {
-    cout << "ERROR while opening .fchk ifile!" << endl;
+   std::cout << "ERROR while opening .fchk ifile!" << endl;
     return false;
   }
   string tfn("temp.fchk");
@@ -574,7 +574,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   if (wave.get_origin() == 2 || wave.get_origin() == 4) {
     while (line.find("Alpha Orbital Energies") == -1 && !ifchk.eof()) {
       getline(ifchk, line);
-      if (debug) cout << "line: " << line << endl;
+      if (debug)std::cout << "line: " << line << endl;
       if (line.find("Alpha Orbital Energies") == -1) ofchk << line << endl;
       else {
         char tempchar[100];
@@ -583,7 +583,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
         tempchar[length] = '\0';
         dum_nao = stoi(tempchar);
         if (debug) {
-          cout << "nao read from fchk: " << dum_nao << " and from basis set: " << nao << endl;
+         std::cout << "nao read from fchk: " << dum_nao << " and from basis set: " << nao << endl;
         }
         ofchk << line << endl;
       }
@@ -644,7 +644,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   if (wave.get_origin() == 1) {
     while (line.find("Total SCF Density") == -1 && !ifchk.eof()) {
       getline(ifchk, line);
-      if (debug) cout << "line: " << line << endl;
+      if (debug)std::cout << "line: " << line << endl;
       if (line.find("Total SCF Density") == -1) ofchk << line << endl;
     }
     ofchk.flush();
@@ -654,11 +654,11 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   //now write the DM and skip lines in IFCHK
   for (int i = 0; i < wave.get_DM_size(); i++) {
     string temp = " ";
-    if (debug) cout << "i: " << i << " DM_size= " << wave.get_DM_size() << " Element ";
+    if (debug)std::cout << "i: " << i << " DM_size= " << wave.get_DM_size() << " Element ";
     for (int j = 0; j < 5; j++) {
       if (i + j < wave.get_DM_size()) {
         stringstream stream;
-        if (debug) cout << i + j << " ";
+        if (debug)std::cout << i + j << " ";
         stream << scientific << setw(15) << setprecision(8) << wave.get_DM(i + j) << " ";
         if (i + j < wave.get_DM_size()) {
           temp += stream.str();
@@ -667,7 +667,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
       }
     }
     i += 4;
-    if (debug) cout << endl;
+    if (debug)std::cout << endl;
     temp += '\n';
     ofchk << temp;
     getline(ifchk, line);
@@ -681,11 +681,11 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
   ofchk.close();
   ifchk.close();
   if (debug) {
-    cout << "Keeping the old fchk file and the new temp.fchk" << endl;
+   std::cout << "Keeping the old fchk file and the new temp.fchk" << endl;
     copy_file(tfn, temp_fchk);
   }
   else copy_file(tfn, temp_fchk);
-  if (remove("temp.fchk") != 0) cout << "error deleting temp.fchk!" << endl;
+  if (remove("temp.fchk") != 0)std::cout << "error deleting temp.fchk!" << endl;
   cls();
   return true;
 };
@@ -752,7 +752,7 @@ double read_fchk_double(std::ifstream& in, const char* search, bool rewind)
     return std::stod(temp.substr(49, temp.length() - 49));
 };
 
-bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
+bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const std::filesystem::path &basis_set_path, WFN &wave, bool &debug, bool force_overwrite)
 {
     using namespace std;
     int elcount = 0;
@@ -1222,7 +1222,7 @@ bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, cons
         {
             file << "I made kp!" << endl
                  << nao << " is the maximum for iu" << endl;
-            cout << "Making DM now!" << endl;
+           std::cout << "Making DM now!" << endl;
         }
         for (int iu = 0; iu < nao; iu++)
         {
@@ -1267,7 +1267,7 @@ bool free_fchk(std::ofstream &file, const std::filesystem::path &fchk_name, cons
         }
         if (debug)
         {
-            cout << "Done with DM!" << endl;
+           std::cout << "Done with DM!" << endl;
             ofstream dm("dm.debug", ofstream::out);
             file << "DM is in dm.debug" << endl;
             for (int p = 0; p < wave.get_DM_size(); p++)

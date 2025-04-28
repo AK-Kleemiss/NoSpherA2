@@ -4940,6 +4940,14 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">stdclatest</LanguageStandard_C>
     </ClCompile>
+    <ClCompile Include="..\Src\b2c.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+    </ClCompile>
+    <ClCompile Include="..\Src\bondwise_analysis.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\Src\cart2sph.cpp" />
     <ClCompile Include="..\Src\constants.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
@@ -6004,6 +6012,10 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">pch.h</PrecompiledHeaderFile>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">stdclatest</LanguageStandard_C>
     </ClCompile>
+    <ClCompile Include="..\Src\qct.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+    </ClCompile>
     <ClCompile Include="..\Src\rys_roots.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />
@@ -6024,6 +6036,8 @@
     <ClInclude Include="../Src/cell.h" />
     <ClInclude Include="../Src/CUDA_utilities.h" />
     <ClInclude Include="../Src/def2-ECPs_GA.h" />
+    <ClInclude Include="..\Src\b2c.h" />
+    <ClInclude Include="..\Src\bondwise_analysis.h" />
     <ClInclude Include="..\Src\cart2sph.h" />
     <ClInclude Include="..\Src\constants.h" />
     <ClInclude Include="..\Src\ECPs_corrections.h" />

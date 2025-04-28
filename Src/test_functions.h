@@ -956,9 +956,9 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     std::cout << "Reading wavefunction" << std::endl;
     using namespace std;
     WFN wavy(opt.wfn, opt.charge, opt.mult);
-    cout << "Number of MOs before: " << wavy.get_nmo() << endl;
+   std::cout << "Number of MOs before: " << wavy.get_nmo() << endl;
     wavy.delete_unoccupied_MOs();
-    cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
+   std::cout << "Number of occupied MOs before: " << wavy.get_nmo() << endl;
     bvec MOs_to_delete(wavy.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -969,7 +969,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
             // only delete if i is not an element of val_els
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
             {
-                cout << "Deleting from Alpha: " << i << endl;
+               std::cout << "Deleting from Alpha: " << i << endl;
                 wavy.delete_MO(i);
                 MOs_to_delete[i] = true;
                 deleted++;
@@ -978,20 +978,20 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         for (int i = wavy.get_nmo() - 1; i >= offset; i--)
             if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
             {
-                cout << "Deleting from Beta: " << i - offset << endl;
+               std::cout << "Deleting from Beta: " << i - offset << endl;
                 wavy.delete_MO(i);
                 MOs_to_delete[i + deleted] = true;
                 deleted++;
             }
     }
-    cout << "MOs deleted: " << deleted << endl;
-    cout << "MO map:" << endl;
+   std::cout << "MOs deleted: " << deleted << endl;
+   std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-        cout << i << " " << MOs_to_delete[i] << endl;
-    cout << "Number of MOs after: " << wavy.get_nmo() << endl;
-    cout << "\n\nEnergies after:" << endl;
+       std::cout << i << " " << MOs_to_delete[i] << endl;
+   std::cout << "Number of MOs after: " << wavy.get_nmo() << endl;
+   std::cout << "\n\nEnergies after:" << endl;
     for (int i = 0; i < wavy.get_nmo(); i++)
-        cout << wavy.get_MO_energy(i) << " " << wavy.get_MO_occ(i) << endl;
+       std::cout << wavy.get_MO_energy(i) << " " << wavy.get_MO_occ(i) << endl;
 
     // Make radial grids on logarithmic scale
     const double dr = 0.00008;
@@ -1000,7 +1000,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
     long double tot_int2 = 0;
     vec radial_dens2(upper_r, 0.0);
     ProgressBar *progress = new ProgressBar(upper_r, 85, "=", " ", "Calculating Densities");
-    cout << endl;
+   std::cout << endl;
 
 #pragma omp parallel for reduction(+ : tot_int2) num_threads(opt.threads)
     for (long long int _r = 1; _r < upper_r; _r++)
@@ -1014,7 +1014,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         progress->update();
     }
     delete (progress);
-    cout << "Start writing the file" << endl;
+   std::cout << "Start writing the file" << endl;
     string el = constants::atnr2letter(wavy.get_atom_charge(0));
     ofstream out(el + ".dat", ios::out);
     out << "Total Integral: " << setw(18) << scientific << setprecision(10) << tot_int2 << "\n";
@@ -1185,7 +1185,7 @@ void calc_rho_cube(WFN &dummy)
     cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
     dummy.delete_unoccupied_MOs();
     CubeRho.give_parent_wfn(dummy);
-    cout << "Starting work..." << endl;
+   std::cout << "Starting work..." << endl;
 
     for (int i = 0; i < 3; i++)
     {
@@ -1199,7 +1199,7 @@ void calc_rho_cube(WFN &dummy)
     _time_point start = get_time();
     const int s1 = CubeRho.get_size(0), s2 = CubeRho.get_size(1), s3 = CubeRho.get_size(2), total_size = s1 * s2 * s3;
     ;
-    cout << "Lets go into the loop! There is " << total_size << " points" << endl;
+   std::cout << "Lets go into the loop! There is " << total_size << " points" << endl;
     ProgressBar *progress = new ProgressBar(total_size, 50, "=", " ", "Calculating Rho");
 
     vec v1{
@@ -1288,7 +1288,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
         wavy.emplace_back("Co2.molden");
         opt.cif = "Co2.cif";
         opt.dmin = 0.5;
-        cout << "STARTING CALC" << endl;
+       std::cout << "STARTING CALC" << endl;
         svec empty = {};
         calculate_scattering_factors(
             opt,
@@ -1324,7 +1324,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(jorge);
     wavy_val_Au.delete_unoccupied_MOs();
-    cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
+   std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -1335,7 +1335,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
             // only delete if i is not an element of val_els
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
             {
-                cout << "Deleting from Alpha: " << i << endl;
+               std::cout << "Deleting from Alpha: " << i << endl;
                 wavy_val_Au.delete_MO(i);
                 MOs_to_delete[i] = true;
                 deleted++;
@@ -1344,19 +1344,19 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
         for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
             if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
             {
-                cout << "Deleting from Beta: " << i - offset << endl;
+               std::cout << "Deleting from Beta: " << i - offset << endl;
                 wavy_val_Au.delete_MO(i);
                 MOs_to_delete[i + deleted] = true;
             }
     }
-    cout << "MOs deleted: " << deleted << endl;
-    cout << "MO map:" << endl;
+   std::cout << "MOs deleted: " << deleted << endl;
+   std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-        cout << i << " " << MOs_to_delete[i] << endl;
-    cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-    cout << "\n\nEnergies / Occu after:" << endl;
+       std::cout << i << " " << MOs_to_delete[i] << endl;
+   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+   std::cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
+       std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     _time_point start = get_time();
 
@@ -1377,7 +1377,7 @@ void test_core_dens_corrected(double &precisison, int ncpus = 4, std::string ele
     }
     delete (progress);
     _time_point end = get_time();
-    cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
+   std::cout << "Time taken: " << round(get_sec(start, end) / 60) << " m " << get_sec(start, end) % 60 << " s " << get_msec(start, end) << " ms" << endl;
     ofstream dat_out(dat, ios::out);
     dat_out << scientific << setprecision(12) << setw(20);
     for (int i = 0; i < res[0].size(); i++)
@@ -1418,7 +1418,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     wavy_full_Au.delete_unoccupied_MOs();
     WFN wavy_val_Au(ele + "_jorge.gbw");
     wavy_val_Au.delete_unoccupied_MOs();
-    cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
+   std::cout << "Number of occupied MOs before: " << wavy_val_Au.get_nmo() << endl;
     bvec MOs_to_delete(wavy_val_Au.get_nmo(), false);
     int deleted = 0;
     if (val_els_alpha.size() > 0)
@@ -1429,7 +1429,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
             // only delete if i is not an element of val_els
             if (find(val_els_alpha.begin(), val_els_alpha.end(), i) == val_els_alpha.end())
             {
-                cout << "Deleting from Alpha: " << i << endl;
+               std::cout << "Deleting from Alpha: " << i << endl;
                 wavy_val_Au.delete_MO(i);
                 MOs_to_delete[i] = true;
                 deleted++;
@@ -1438,19 +1438,19 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
         for (int i = wavy_val_Au.get_nmo() - 1; i >= offset; i--)
             if (find(val_els_beta.begin(), val_els_beta.end(), i - offset) == val_els_beta.end())
             {
-                cout << "Deleting from Beta: " << i - offset << endl;
+               std::cout << "Deleting from Beta: " << i - offset << endl;
                 wavy_val_Au.delete_MO(i);
                 MOs_to_delete[i + deleted] = true;
             }
     }
-    cout << "MOs deleted: " << deleted << endl;
-    cout << "MO map:" << endl;
+   std::cout << "MOs deleted: " << deleted << endl;
+   std::cout << "MO map:" << endl;
     for (int i = 0; i < MOs_to_delete.size(); i++)
-        cout << i << " " << MOs_to_delete[i] << endl;
-    cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
-    cout << "\n\nEnergies / Occu after:" << endl;
+       std::cout << i << " " << MOs_to_delete[i] << endl;
+   std::cout << "Number of MOs after: " << wavy_val_Au.get_nmo() << endl;
+   std::cout << "\n\nEnergies / Occu after:" << endl;
     for (int i = 0; i < wavy_val_Au.get_nmo(); i++)
-        cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
+       std::cout << wavy_val_Au.get_MO_energy(i) << " / " << wavy_val_Au.get_MO_occ(i) << endl;
 
     std::vector<_time_point> time_points;
     std::vector<std::string> time_descriptions;
@@ -1473,7 +1473,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_ECP, d2_ECP, d3_ECP, dens_ECP,
                          labels,
-                         cout,
+                        std::cout,
                          time_points,
                          time_descriptions);
     make_hirshfeld_grids(0,
@@ -1485,7 +1485,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_all, d2_all, d3_all, dens_all,
                          labels,
-                         cout,
+                        std::cout,
                          time_points,
                          time_descriptions);
     make_hirshfeld_grids(0,
@@ -1497,7 +1497,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_val, d2_val, d3_val, dens_val,
                          labels,
-                         cout,
+                        std::cout,
                          time_points,
                          time_descriptions);
 
@@ -1520,7 +1520,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
 
     ofstream dat_out("core_sfac_" + ele + ".dat", ios::out);
     _time_point end = get_time();
-    cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
+   std::cout << "Time taken: " << get_sec(time_points.front(), time_points.back()) << " s " << get_msec(time_points.front(), time_points.back()) << " ms" << endl;
     dat_out << scientific << setprecision(12) << setw(20);
     double t = 0;
     for (int i = 0; i < res[0].size(); i++)

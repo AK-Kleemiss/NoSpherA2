@@ -46,7 +46,7 @@
 
 // Here are the system specific libaries
 #ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
+//#define WIN32_LEAN_AND_MEAN
 #include <direct.h>
 #define GetCurrentDir _getcwd(NULL, 0)
 #include <io.h>

@@ -24,22 +24,23 @@ public:
   cube(const cube& given);
   int get_size(int direction) const;
   bool get_loaded() const { return loaded; };
-  cube operator + (cube& right) const;
-  cube operator - (cube& right) const;
-  cube operator * (cube& right) const;
-  cube operator / (cube& right) const;
-  bool operator += (cube& right);
-  bool operator -= (cube& right);
-  bool operator *= (cube& right);
-  bool operator /= (cube& right);
-  void operator = (cube& right);
-  bool mask(cube& right);
-  bool thresh(cube& right, double thresh = -1234);
-  bool negative_mask(cube& right);
-  double rrs(cube& right);
-  double sum();
-  double diff_sum();
-  std::vector<double> double_sum();
+  cube operator + (const cube& right) const;
+  cube operator - (const cube& right) const;
+  cube operator * (const cube& right) const;
+  cube operator / (const cube& right) const;
+  bool operator += (const cube& right);
+  bool operator -= (const cube& right);
+  bool operator *= (const cube& right);
+  bool operator /= (const cube& right);
+  void operator = (const cube& right);
+  bool mask(const cube& right);
+  bool thresh(const cube& right, const double& thresh = -1234);
+  bool thresh(const double& thresh);
+  bool negative_mask(const cube& right);
+  double rrs(const cube& right) const;
+  double sum() const;
+  double diff_sum() const;
+  std::vector<double> double_sum() const;
   inline std::array<double, 3> get_pos(const int& i, const int& j, const int& k) const {
       return {
           i * vectors[0][0] + j * vectors[0][1] + k * vectors[0][2] + origin[0],
@@ -54,7 +55,7 @@ public:
   bool write_file(bool force = false, bool absolute = false);
   bool write_file(const std::filesystem::path& given_path, bool debug = false);
   bool write_xdgraph(const std::filesystem::path& given_path, bool debug = false);
-  bool fractal_dimension(const double stepsize);
+  bool fractal_dimension(const double stepsize) const;
   double get_vector(int i, int j) const;
   bool set_vector(int i, int j, double value);
   double get_origin(unsigned int i) const;
@@ -77,6 +78,7 @@ public:
   void set_path(const std::filesystem::path& given) { path = given; };
   std::vector<atom> get_parent_wfn_atoms() const;
   bool read_values(std::ifstream& file);
+  double jaccard(const cube& right) const;
 private:
   double dv;
   int na;
