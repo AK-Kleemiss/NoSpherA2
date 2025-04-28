@@ -206,6 +206,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 
     featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
+    calc_opts.use_native_system = true;
     // run the calculation
     metatensor::TensorMap descriptor = calculator.compute(system, calc_opts);
 
