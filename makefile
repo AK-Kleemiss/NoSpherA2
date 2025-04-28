@@ -10,7 +10,11 @@ else
   endif
 endif
 
-all: NoSpherA2
+# Check for Rust
+check_rust:
+	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install or winget install --id Rustlang.Rustup && exit 1)
+
+all: check_rust NoSpherA2
 
 OpenBLAS:
 ifeq ($(NAME),WINDOWS)
@@ -24,7 +28,16 @@ else
 	@echo "OpenBLAS built handled internally for $(NAME)"
 endif
 
-NoSpherA2_Debug: OpenBLAS
+featomic: check_rust
+ifeq ($(NAME),WINDOWS)
+	@echo "Building featomic for $(NAME)"
+	@cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install -fresh .. && make install
+else
+	@echo "Building featomic for $(NAME)"
+	@cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install
+endif
+
+NoSpherA2_Debug: featomic OpenBLAS
 	@echo Building NoSpherA2_Debug for $(NAME)
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
@@ -39,7 +52,7 @@ ifeq ($(NAME),MAC)
 	cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 
-NoSpherA2: OpenBLAS
+NoSpherA2: featomic OpenBLAS
 	@echo Building NoSpherA2 for $(NAME)
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
@@ -54,9 +67,9 @@ ifeq ($(NAME),MAC)
 	cd Mac && rm -f NoSpherA2 && make all -j
 endif
 
-test: 
+test: NoSpherA2
 	make -C tests all -k -B
-tests: 
+tests: NoSpherA2
 	make -C tests all -k -B
 
 
