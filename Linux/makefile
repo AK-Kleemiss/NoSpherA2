@@ -7,8 +7,8 @@ C_COMP := gcc
 LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic -ldl -lpthread
 ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../llvm-project/openmp/build/runtime/src/libgomp.a
-LIBRASCALINE := ../Lib/librascaline.a
-LIBRASCALINE += ../Lib/libmetatensor.a
+LIBRASCALINE := ../featomic/featomic_install/lib/librascaline.a
+LIBRASCALINE += ../featomic/featomic_install/lib/libmetatensor.a
 LIBOPENBLAS := ../OpenBLAS/installation/lib/libopenblas.a
 LIBOPENBLAS_I := -I../OpenBLAS/installation/include
 
@@ -46,13 +46,13 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../featomic/featomic_install -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
 %.o_d: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../featomic/featomic_install -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 NoSpherA2: ${OBJS} omp OpenBLAS

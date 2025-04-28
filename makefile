@@ -12,17 +12,17 @@ endif
 
 # Check for Rust
 check_rust:
-	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install or winget install --id Rustlang.Rustup && exit 1)
+	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install && exit 1)
 
 all: check_rust NoSpherA2
 
 OpenBLAS:
 ifeq ($(NAME),WINDOWS)
 	@if not exist OpenBLAS/build/lib/RELEASE/openblas.lib ( \
-		@echo "Building OpenBLAS for $(NAME)"; \
+		@echo Building OpenBLAS for $(NAME); \
 		cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake \
 	) else (\
-		@echo "OpenBLAS already built"; \
+		@echo OpenBLAS already built \
 	)
 else
 	@echo "OpenBLAS built handled internally for $(NAME)"
