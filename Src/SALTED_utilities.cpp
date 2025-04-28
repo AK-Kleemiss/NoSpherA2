@@ -4,6 +4,8 @@
 #include "atoms.h"
 #include "cube.h"
 #include "wfn_class.h"
+#include "../featomic/featomic_install/include/metatensor.hpp"
+#include "../featomic/featomic_install/include/featomic.hpp"
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
@@ -120,21 +122,9 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 {
     std::ostringstream oss;
     oss << "{\n"
-        << "  \"cutoff\": " << params.cutoff << ",\n"
-        << "  \"max_radial\": " << params.max_radial << ",\n"
-        << "  \"max_angular\": " << params.max_angular << ",\n"
-        << "  \"atomic_gaussian_width\": " << params.atomic_gaussian_width << ",\n"
-        << "  \"center_atom_weight\": " << params.center_atom_weight << ",\n"
-        << "  \"radial_basis\": {\n"
-        << "    \"Gto\": {\n"
-        << "      \"spline_accuracy\": " << params.radial_basis.spline_accuracy << "\n"
-        << "    }\n"
-        << "  },\n"
-        << "  \"cutoff_function\": {\n"
-        << "    \"ShiftedCosine\": {\n"
-        << "      \"width\": " << params.cutoff_function.width << "\n"
-        << "    }\n"
-        << "  }\n"
+        << "  \"cutoff\": {\n    \"radius\": " << params.cutoff << ",\n    \"smoothing\": {\"type: \"ShiftedCosine\", \"width\": " << params.cutoff_function.width << " }, \n  }, \n"
+        << "  \"density\": {\n    \"type\": \"Gaussian\",\n    \"width\": "<< params.atomic_gaussian_width << ",\n    \"center_atom_weight\": "<< params.center_atom_weight << ",\n  },\n"
+        << "  \"basis\": {\n    \"type\": \"TensorProduct\",\n    \"max_angular\": " << params.max_angular << ",\n    \"radial\": {\"type\": \"Gto\", \"max_radial\": " << params.max_radial << "},\n  },\n"
         << "}";
     return oss.str();
 }
@@ -212,7 +202,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
     // create the calculator with its name and parameters
-    featomic::Calculator calculator = featomic::Calculator("spherical_expansion", parameters);
+    auto calculator = featomic::Calculator("spherical_expansion", parameters);
 
     featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
