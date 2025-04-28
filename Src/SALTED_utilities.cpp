@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "atoms.h"
 #include "cube.h"
+#include "wfn_class.h"
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
@@ -175,7 +176,12 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
 // RASCALINE1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath.string());
+    featomic::SimpleSystem system;
+    WFN wfn = WFN(this->filepath.c_str());
+    for (const atom& a : *wfn.get_atoms_ptr())
+    {
+        system.add_atom(a.get_charge(), a.get_coords());
+    }
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
@@ -206,9 +212,9 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
     // create the calculator with its name and parameters
-    rascaline::Calculator calculator = rascaline::Calculator("spherical_expansion", parameters);
+    featomic::Calculator calculator = featomic::Calculator("spherical_expansion", parameters);
 
-    rascaline::CalculationOptions calc_opts;
+    featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
     // run the calculation
     metatensor::TensorMap descriptor = calculator.compute(system, calc_opts);

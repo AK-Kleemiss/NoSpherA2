@@ -78,6 +78,7 @@ public:
     void set_charge(const int& ch) { charge = ch; };
     void set_ECP_electrons(const int& ECP_els) { ECP_electrons = ECP_els; };
     void set_coordinate(const unsigned int& axis, const double& value);
+    std::array<double, 3> get_coords() const { return {x,y,z}; };
     void set_frac_coords(const std::array<double, 3>& frac);
     std::string get_label() const { return label; };
     int get_nr() const { return nr; };

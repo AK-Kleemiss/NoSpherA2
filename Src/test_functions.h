@@ -10,7 +10,7 @@
 #include "sphere_lebedev_rule.h"
 #include "integrator.h"
 #include "nos_math.h"
-#include "rascaline.hpp"
+#include "featomic.hpp"
 #include "metatensor.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
