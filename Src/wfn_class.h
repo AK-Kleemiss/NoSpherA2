@@ -230,6 +230,7 @@ public:
     std::string get_atom_label(const int& nr) const;
     void set_atom_label(const int& nr, const std::string& label) { atoms[nr].set_label(label); };
     std::vector<atom> get_atoms() const { return atoms; };
+    const std::vector<atom>* get_atoms_ptr() const { return &atoms; };
     void set_atoms(const std::vector<atom> given) { atoms = given; };
     int get_atom_ECP_electrons(const int& nr) const;
     void clear_atom_basis_set(const int& nr) { atoms[nr].clear_basis_set(); };
