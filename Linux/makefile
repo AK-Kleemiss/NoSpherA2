@@ -46,13 +46,13 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../featomic/featomic_install -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../featomic/featomic_install/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 # Pattern rule to compile all .cpp files
 %.o_d: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../featomic/featomic_install -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../featomic/featomic_install/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 NoSpherA2: ${OBJS} omp OpenBLAS
