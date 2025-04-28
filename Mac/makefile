@@ -22,14 +22,14 @@ ifeq ($(ARCH), arm64)
     GCC_OPTS += -mcpu=apple-m1
     GCC_OPTS_DEBUG += -mcpu=apple-m1
     TARGET_FLAG := -target aarch64-apple-macos14.0
-	LIBRASCALINE := ../Lib/librascaline_Mac.a
-	LIBRASCALINE += ../Lib/libmetatensor_Mac.a
+	LIBRASCALINE := ../featomic/featomic_install_arm/libfeatomic.a
+	LIBRASCALINE += ../featomic/featomic_install_arm/libmetatensor.a
 else ifeq ($(ARCH), x86_64)
-    GCC_OPTS += -march=native
-    GCC_OPTS_DEBUG += -march=native
+    GCC_OPTS += -march=x86_64
+    GCC_OPTS_DEBUG += -march=x86_64
     TARGET_FLAG := -target x86_64-apple-macos14.0
-	LIBRASCALINE := ../Lib/librascaline_Mac_x86_64.a
-	LIBRASCALINE += ../Lib/libmetatensor_Mac_x86_64.a
+	LIBRASCALINE := ../featomic/featomic_install_x86/libfeatomic.a
+	LIBRASCALINE += ../featomic/featomic_install_x86/libmetatensor.a
 else
     $(error Unsupported architecture: $(ARCH))
 endif

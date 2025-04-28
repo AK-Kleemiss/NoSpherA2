@@ -43,7 +43,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-mac
       with:
-        path: featomic/featomic/featomic_install
+        path: featomic/featomic_install
         key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           featomic-mac-${{ runner.os }}-
@@ -100,7 +100,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-linux
       with:
-        path: featomic/featomic/featomic_install  # Adjust if featomic installs elsewhere
+        path: featomic/featomic_install  # Adjust if featomic installs elsewhere
         key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           featomic-linux-${{ runner.os }}-
@@ -167,7 +167,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-windows
       with:
-        path: featomic/featomic/featomic_install  # Adjust if featomic installs elsewhere
+        path: featomic/featomic_install  # Adjust if featomic installs elsewhere
         key: featomic-windows-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           featomic-windows-${{ runner.os }}-
