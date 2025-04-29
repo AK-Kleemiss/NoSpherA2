@@ -8,7 +8,7 @@ all: NoSpherA2
 
 COMP := g++
 
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis qct
 OBJS := $(OBJ_NAMES:=.o_$(ARCH))
 OBJS_DEBUG := $(OBJ_NAMES:=.o_$(ARCH)_d)
 OMP_BUILD := ../llvm-project/openmp/build/runtime/src
@@ -22,14 +22,14 @@ ifeq ($(ARCH), arm64)
     GCC_OPTS += -mcpu=apple-m1
     GCC_OPTS_DEBUG += -mcpu=apple-m1
     TARGET_FLAG := -target aarch64-apple-macos14.0
-	LIBRASCALINE := ../featomic/featomic_install_arm/libfeatomic.a
-	LIBRASCALINE += ../featomic/featomic_install_arm/libmetatensor.a
+	LIBRASCALINE := ../featomic/featomic_install_arm/lib/libfeatomic.a
+	LIBRASCALINE += ../featomic/featomic_install_arm/lib/libmetatensor.a
 else ifeq ($(ARCH), x86_64)
     GCC_OPTS += -march=x86_64
     GCC_OPTS_DEBUG += -march=x86_64
     TARGET_FLAG := -target x86_64-apple-macos14.0
-	LIBRASCALINE := ../featomic/featomic_install_x86/libfeatomic.a
-	LIBRASCALINE += ../featomic/featomic_install_x86/libmetatensor.a
+	LIBRASCALINE := ../featomic/featomic_install_x86/lib/libfeatomic.a
+	LIBRASCALINE += ../featomic/featomic_install_x86/lib/libmetatensor.a
 else
     $(error Unsupported architecture: $(ARCH))
 endif
