@@ -895,7 +895,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -905,7 +905,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
@@ -917,7 +917,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -927,7 +927,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">
@@ -939,7 +939,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -949,7 +949,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
@@ -961,7 +961,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -971,7 +971,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
@@ -983,7 +983,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -993,7 +993,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|x64'">
@@ -1005,7 +1005,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1015,7 +1015,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">
@@ -1027,7 +1027,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1037,7 +1037,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">
@@ -1049,7 +1049,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1059,7 +1059,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">
@@ -1071,7 +1071,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1081,7 +1081,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|x64'">
@@ -1093,7 +1093,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1103,7 +1103,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_Rascaline|x64'">
@@ -1115,7 +1115,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1125,7 +1125,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
@@ -1137,7 +1137,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1147,7 +1147,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fourier_Transform|x64'">
@@ -1159,7 +1159,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1169,7 +1169,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">
@@ -1181,7 +1181,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1191,7 +1191,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|x64'">
@@ -1203,7 +1203,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1213,7 +1213,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">
@@ -1225,7 +1225,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1235,7 +1235,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">
@@ -1247,7 +1247,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1257,7 +1257,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|x64'">
@@ -1269,7 +1269,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1279,7 +1279,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">
@@ -1291,7 +1291,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1301,7 +1301,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">
@@ -1313,7 +1313,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -1323,7 +1323,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -1342,7 +1342,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <OpenMPSupport>true</OpenMPSupport>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic/featomic_install/include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
@@ -1352,7 +1352,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>../Lib/rascaline.lib;../Lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
+      <AdditionalDependencies>../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;..\OpenBlas\build\lib\RELEASE\openblas.lib;Comdlg32.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;ole32.lib;$(AdditionalLibraries)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -1449,6 +1449,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\Src\b2c.cpp" />
     <ClCompile Include="..\Src\basis_set.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">pch.h</PrecompiledHeaderFile>
@@ -1493,6 +1494,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\Src\bondwise_analysis.cpp" />
     <ClCompile Include="..\Src\cart2sph.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">pch.h</PrecompiledHeaderFile>
@@ -2197,6 +2199,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\Src\qct.cpp" />
     <ClCompile Include="..\Src\rys_roots.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">pch.h</PrecompiledHeaderFile>

@@ -122,6 +122,15 @@
     <ClCompile Include="..\Src\libCintMain.cpp">
       <Filter>Source Files\libCInt</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\bondwise_analysis.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\qct.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\b2c.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="NoSpherA2_DLL.rc">
