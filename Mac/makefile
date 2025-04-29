@@ -36,24 +36,24 @@ endif
 
 %.o_arm64: ../Src/%.cpp
 	@echo 'Building file: $<'
-	${COMP} ${GCC_OPTS} -I${OMP_BUILD} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas}/include -o "$@" "$<" ${TARGET_FLAG}
+	@${COMP} ${GCC_OPTS} -I${OMP_BUILD} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../featomic/featomic_install/include -I${blas}/include -o "$@" "$<" ${TARGET_FLAG}
 	@echo 'Finished building: $<'
 
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	${COMP} -o "$@" ${OMP_BUILD}/libomp.a ${blas}/lib/libopenblas.a ${OBJS} ${LIBRASCALINE} -I../ -I${blas}/include -L${OMP_BUILD} -L${blas}/lib -lcblas ${TARGET_FLAG}
+	@${COMP} -o "$@" ${OMP_BUILD}/libomp.a ${blas}/lib/libopenblas.a ${OBJS} ${LIBRASCALINE} -I../ -I${blas}/include -L${OMP_BUILD} -L${blas}/lib -lcblas ${TARGET_FLAG}
 	${RM} ${OBJS}
 	cp NoSpherA2 ../
 	@echo 'Finished building target: $@'
 
 %.o_arm64_d: ../Src/%.cpp
 	@echo 'Building file: $<'
-	${COMP} ${GCC_OPTS_DEBUG} -I${OMP_BUILD} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas}/include -o "$@" "$<" ${TARGET_FLAG}
+	@${COMP} ${GCC_OPTS_DEBUG} -I${OMP_BUILD} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../featomic/featomic_install/include -I${blas}/include -o "$@" "$<" ${TARGET_FLAG}
 	@echo 'Finished building: $<'
 
 NoSpherA2_Debug: ${OBJS_DEBUG}
 	@echo 'Building target: $@'
-	${COMP} -o "$@" ${OMP_BUILD}/libomp.a ${blas}/lib/libopenblas.a ${OBJS_DEBUG} ${LIBRASCALINE} -I../ -I${blas}/include -L${OMP_BUILD} -L${blas}/lib -lcblas ${TARGET_FLAG}
+	@${COMP} -o "$@" ${OMP_BUILD}/libomp.a ${blas}/lib/libopenblas.a ${OBJS_DEBUG} ${LIBRASCALINE} -I../ -I${blas}/include -L${OMP_BUILD} -L${blas}/lib -lcblas ${TARGET_FLAG}
 	${RM} ${OBJS_DEBUG}
 	cp NoSpherA2_Debug ../
 	@echo 'Finished building target: $@'

@@ -452,7 +452,15 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, con
 	std::string comment("!");
 	while(line.compare(0,1,comment)==0) getline(input,line);
 	int rho, rdg, eli, lap;
-	sscanf(line.c_str(), "%d %d %d %d", &rho, &rdg, &eli, &lap);
+	if (line.length() < 10) return 0;
+	else
+	{
+		std::istringstream iss(line);
+		if (!(iss >> rho >> rdg >> eli >> lap)) {
+			std::cerr << "Error parsing line for rho, rdg, eli, and lap values." << std::endl;
+			return 0; // Handle the error appropriately
+		}
+	}
 	int errorcount=0,runnumber=0;
 	do{
 		getline(input,line);
@@ -461,7 +469,14 @@ int autobonds(bool debug, WFN &wavy, const std::filesystem::path& inputfile, con
 		int sel=0, leng=0, cube=0, mres=0, a1=0, a2=0, a3=0;
 		double res[3],box[3];
 		bool bleng=false,bres=false,bcube=false;
-		sscanf(line.c_str(),"%d %d %d %lf %lf %lf %d %lf %lf %lf %d %d %d", &sel, &leng, &mres, &res[0], &res[1], &res[2], &cube, &box[0], &box[1], &box[2], &a1, &a2, &a3);
+		if(line.length() > 1)
+		{
+			std::istringstream iss(line);
+			if (!(iss >> sel >> leng >> mres >> res[0] >> res[1] >> res[2] >> cube >> box[0] >> box[1] >> box[2] >> a1 >> a2 >> a3)) {
+				std::cerr << "Error parsing line for bond parameters." << std::endl;
+				continue; // Skip this line and move to the next
+			}
+		}
 		if(leng==1){ bleng=true; if(debug) printf("leng=true\n");}
 		else { bleng=false; if(debug) printf("leng=false\n");}
 		if(cube==1){ bcube=true; if(debug) printf("cube=true\n");}
