@@ -40,13 +40,12 @@ namespace constants {
         int t1 = 2 * t[0], t2 = 2 * t[1], t3 = 2 * t[2];
         long long int temp2 = constants::ft[t1] * constants::ft[t2] * constants::ft[t3];
         double temp1 = 2 * exp / constants::PI;
-        temp1 = temp1 * temp1 * temp1;
-        temp1 = constants::sqrt(constants::sqrt(temp1));
+        temp1 = pow(temp1 * temp1 * temp1, 3.0/4.0);
         const int exponent = t[0] + t[1] + t[2];
         double temp_e = 1.0;
         for (int i = 0; i < exponent; i++)
             temp_e *= 8 * exp;
-        return temp1 * constants::sqrt(temp_e * temp / temp2);
+        return temp1 * std::sqrt(temp_e * temp / temp2);
     };
 
 
@@ -596,6 +595,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 2:
@@ -617,6 +617,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 3:
@@ -644,6 +645,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 4:
@@ -677,6 +679,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 5:
@@ -716,6 +719,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 6: 
@@ -761,6 +765,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 7: 
@@ -813,6 +818,7 @@ namespace constants {
                 break;
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
             }
             break;
         case 8:
@@ -854,6 +860,7 @@ namespace constants {
 				return -(1.0 / 10321920.0) * pow(x * x - 1, 4.0);
             default:
                 err_checkf(false, "This is impossible!", std::cout);
+                return std::numeric_limits<double>::infinity();
 			}
             break;
         default:
@@ -861,6 +868,7 @@ namespace constants {
             return std::assoc_legendre(l, m, x) * ((m < 0) ? ((m % 2 == 0) ? -1 : 1) : 1);
 #else
             err_checkf(false, "Legendre Polynomials l > 8 not implemented on APPLE yet!", std::cout);
+            return std::numeric_limits<double>::infinity();
 #endif
         }
     };

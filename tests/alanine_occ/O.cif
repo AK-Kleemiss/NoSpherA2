@@ -1,0 +1,76 @@
+_data B3+
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+1 z, y, -x
+2 y, x, -z
+3 x, z, -y
+4 z, x, -y
+5 y, z, -x
+6 x, y, -z
+7 z, -y, x
+8 y, -x, z
+9 x, -z, y
+10 z, -x, y
+11 y, -z, x
+12 x, -y, z
+13 -z, y, x
+14 -y, x, z
+15 -x, z, y
+16 -z, x, y
+17 -y, z, x
+18 -x, y, z
+19 -z, -y, -x
+20 -y, -x, -z
+21 -x, -z, -y
+22 -z, -x, -y
+23 -y, -z, -x
+24 -x, -y, -z
+25 -z, -y, x
+26 -y, -x, z
+27 -x, -z, y
+28 -z, -x, y
+29 -y, -z, x
+30 -x, -y, z
+31 -z, y, -x
+32 -y, x, -z
+33 -x, z, -y
+34 -z, x, -y
+35 -y, z, -x
+36 -x, y, -z
+37 z, -y, -x
+38 y, -x, -z
+39 x, -z, -y
+40 z, -x, -y
+41 y, -z, -x
+42 x, -y, -z
+43 z, y, x
+44 y, x, z
+45 x, z, y
+46 z, x, y
+47 y, z, x
+48 x, y, z
+
+_cell_length_a                     10.0000(4)
+_cell_length_b                     10.0000(3)
+_cell_length_c                     10.0000(5)
+_cell_angle_alpha                  90
+_cell_angle_beta                   90
+_cell_angle_gamma                  90
+_cell_volume                       1000.0(3)
+
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_refinement_flags_adp
+  _atom_site_refinement_flags_occupancy
+  _atom_site_disorder_group
+ O1 O 0.000(1) 0.000(1) 0.000(1) 0.02274(6) Uani 1.000000 . . . .
+

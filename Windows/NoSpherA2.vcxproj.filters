@@ -126,6 +126,15 @@
     <ClCompile Include="..\Src\auxiliary_basis.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\qct.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\b2c.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\bondwise_analysis.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -246,6 +255,12 @@
       <Filter>Headerdateien\libCint</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\nos_math.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\b2c.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\bondwise_analysis.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>

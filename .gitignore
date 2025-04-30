@@ -89,3 +89,4 @@ NoSpherA2_Debug
 BasisSetConverter
 auxiliary_basis.cpp
 checkpoint.txt
+tests/NiP3_fchk/in.fchk

@@ -19,11 +19,12 @@ std::string help_message =
      "----------------------------------------------------------------------------\n\n"
      ":::::::::::::::::::::: Defaults are highlighted by [] ::::::::::::::::::::::\n\n"
      "   -wfn            <FILENAME>.xxx           Read the following wavefunction file.\n"
-     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (UNTESTED!)\n"
-     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename\n"
+     "                                            Supported filetypes: .wfn/wfx/ffn; .molden; .xyz; .gbw; .xtb; fch* (tested for OCC)\n"
+     "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
      "   -b              <FILENAME>               Read this basis set\n"
      "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
      "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
      "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
      "                                            [1]: def2-ECP\n"
      "                                            [2]: xTB\n"
@@ -32,14 +33,15 @@ std::string help_message =
      "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
      "   -v2                                      Even more stuff\n"
      "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
+     "   -charge         <NUMBER>                 Input charge of wavefunction (otherwise attempted to be read from the wfn)\n"
      "   -method         <METHOD NAME>            Can be [RKS] or RHF to distinguish between DFT and HF\n"
      "   -cif            <FILENAME>.cif           CIF to get labels of atoms to use for calculation of scatteriung factors\n"
      "   -IAM                                     Make scattering factors based on Thakkar functions for atoms in CIF\n"
      "   -xyz            <FILENAME>.xyz           Read atom positions from this xyz file for IAM\n"
-     "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors.\n"
+     "   -hkl            <FILENAME>.hkl           hkl file (ideally merged) to use for calculation of form factors. Use is discouraged!\n"
      "   -group          <LIST OF INT NUMBERS>    Disorder groups to be read from the CIF for consideration as asym unit atoms (space separated).\n"
      "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
-     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes."
+     "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
      "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
      "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
      "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
@@ -48,15 +50,21 @@ std::string help_message =
      "   -merge_nocheck  <List of .tsc files>     Names/Paths to .tsc/.tscb files to be merged. They need to have identical hkl values.\n"
      "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
      "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
-     "                                            without spaces.\n   Typical use Examples:\n"
+     "                                            without spaces.\n"
      "   -salted         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
      "   -ri_fit         <Aux Basis> <BETA>       Uses RI-Fitting to partition the electron density. If Aux Basis == 'auto' a optinal beta value can be given.\n"
+     "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
+     "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
+     "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
+     "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
+     "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
+     "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
      "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
      "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
      "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
-     "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3\n"
+     "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
      "      fragHAR:      NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -cmtc 1.wfn 1.cif 0 2.wfn 2.cif 0 3_1.wfn 3_1.cif 0,1 3_2.wfn 3_2.cif 0,2\n"
-     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc\n"
+     "      merging tscs: NoSpherA2.exe -merge A.tsc B.tsc C.tsc (also works for tscb files)\n"
      "      merge tsc(2): NoSpherA2.exe -merge_nocheck A.tsc B.tsc C.tsc  (MAKE SURE THEY HAVE IDENTICAL HKL INIDCES!!)\n"
      "      convert tsc:  NoSpherA2.exe -tscb A.tscb\n"
      "      convert gbw:  NoSpherA2.exe -gbw2wfn -wfn A.gbw\n"
@@ -135,7 +143,7 @@ void cosinus_annaeherung::resize(size_t size)
     for (auto i = 0; i < mSize + 1; i++)  // Fuer einen Werte mehr die Stueststellen speichern
     {
         double y = cos((MPI2 * i) / mSize);
-        // cout << "resize: i="<<i<<" y=" << y << endl;
+        //std::cout << "resize: i="<<i<<" y=" << y << endl;
         mBase_values[i] = y;
     }
     mStepwidth = MPI2 / size;
@@ -238,157 +246,6 @@ bool check_bohr(WFN &wave, bool debug)
     }
     return (!(min_length < 2));
 };
-
-int filetype_identifier(std::string &file, bool debug)
-{
-    /*
-    List of filetypes and correpsonding values:
-                    -1: unreadable keyword
-    -i/o *.wfn 		2: wfn
-    -i/o *.ffn 		4: ffn
-    -i *.out 		1: crystal output
-    -c/o *.cub(e) 	3: cube file
-    -g/o *.grd      6: XDGraph grid file
-    -o *.(F)fc(C)hk 5: fchk
-    */
-    using namespace std;
-    if (debug)
-    {
-        std::cout << "Testing WFN:  " << file.find(".wfn") << std::endl
-                  << "Testing out:  " << file.find(".out") << std::endl
-                  << "Testing FFN:  " << file.find(".ffn") << std::endl
-                  << "Testing CUB:  " << file.find(".cub") << std::endl
-                  << "Testing CUBE: " << file.find(".cube") << std::endl
-                  << "Testing Grid: " << file.find(".grd") << std::endl
-                  << "Testing fchk: " << file.find(".fchk") << std::endl
-                  << "Testing FChk: " << file.find(".FChk") << std::endl
-                  << "Testing Fchk: " << file.find(".Fchk") << std::endl;
-        std::cout << "string::npos: " << std::string::npos << std::endl;
-    }
-    int temp_type = 0;
-    size_t found, temp;
-    temp = 0;
-    if (debug)
-        std::cout << "Temp before any checks: " << temp << std::endl;
-    svec types{".out", ".wfn", ".ffn", ".cub", ".cube", ".grd", ".fchk", ".Fchk", ".FChk"};
-    if (file.find(".wfn") != std::string::npos)
-    {
-        if (debug)
-            std::cout << "Checking for"
-                      << ".wfn" << std::endl;
-        temp_type = 2;
-        found = file.rfind(".wfn");
-        if (debug)
-            std::cout << "Found: " << found << std::endl;
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != std::string::npos)
-                temp = file.rfind(types[i]);
-        if (debug)
-            cout << "Temp: " << temp << endl;
-        if (temp == found)
-            return temp_type;
-        else
-        {
-            if (debug)
-                cout << "Moving on!" << endl;
-        }
-    }
-    if (file.find(".out") != string::npos)
-    {
-        if (debug)
-            cout << "Checking for"
-                 << ".out" << endl;
-        temp_type = 1;
-        found = file.rfind(".out");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".ffn") != string::npos)
-    {
-        if (debug)
-            cout << "Checking for"
-                 << ".ffn" << endl;
-        temp_type = 4;
-        found = file.rfind(".ffn");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".cub") != string::npos)
-    {
-        if (debug)
-            cout << "Checking for"
-                 << ".cub" << endl;
-        temp_type = 3;
-        found = file.rfind(".cub");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-        else
-        {
-            if (debug)
-                cout << "Moving on!" << endl;
-        }
-    }
-    if (file.find(".cube") != string::npos)
-    {
-        temp_type = 3;
-        found = file.rfind(".cube");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".grd") != string::npos)
-    {
-        temp_type = 6;
-        found = file.rfind(".grd");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".fchk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".fchk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".FChk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".FChk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    if (file.find(".Fchk") != string::npos)
-    {
-        temp_type = 5;
-        found = file.rfind(".Fchk");
-        for (int i = 0; i < types.size(); i++)
-            if (file.rfind(types[i]) >= found && file.rfind(types[i]) != string::npos)
-                temp = file.rfind(types[i]);
-        if (temp == found)
-            return temp_type;
-    }
-    return -1;
-}
 
 std::string go_get_string(std::ifstream &file, std::string search, bool rewind)
 {
@@ -555,313 +412,48 @@ primitive::primitive(const SimplePrimitive& other) : center(other.center), type(
         0.25);
 };
 
-/*bool open_file_dialog(string &path, bool debug, vector <string> filter){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA ofn;
-            ZeroMemory( &filename, sizeof( filename ) );
-            ZeroMemory( &ofn,      sizeof( ofn ) );
-            ofn.lStructSize  = sizeof( ofn );
-            ofn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-            ofn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-            ofn.lpstrFile    = filename;
-            ofn.nMaxFile     = 1024;
-            ofn.lpstrTitle   = "Select a File";
-            ofn.Flags        = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
-
-    if (GetOpenFileNameA( &ofn )){
-        if(debug) cout << "You chose the file \"" << filename << "\"\n";
-        if(exists(filename)){
-            path=filename;
-            return true;
-        }
-    }
-    else
-    {
-        // All this stuff below is to tell you exactly how you messed up above.
-        // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-        switch (CommDlgExtendedError())
-        {
-            case CDERR_DIALOGFAILURE   : cout << "CDERR_DIALOGFAILURE\n";   break;
-            case CDERR_FINDRESFAILURE  : cout << "CDERR_FINDRESFAILURE\n";  break;
-            case CDERR_INITIALIZATION  : cout << "CDERR_INITIALIZATION\n";  break;
-            case CDERR_LOADRESFAILURE  : cout << "CDERR_LOADRESFAILURE\n";  break;
-            case CDERR_LOADSTRFAILURE  : cout << "CDERR_LOADSTRFAILURE\n";  break;
-            case CDERR_LOCKRESFAILURE  : cout << "CDERR_LOCKRESFAILURE\n";  break;
-            case CDERR_MEMALLOCFAILURE : cout << "CDERR_MEMALLOCFAILURE\n"; break;
-            case CDERR_MEMLOCKFAILURE  : cout << "CDERR_MEMLOCKFAILURE\n";  break;
-            case CDERR_NOHINSTANCE     : cout << "CDERR_NOHINSTANCE\n";     break;
-            case CDERR_NOHOOK          : cout << "CDERR_NOHOOK\n";          break;
-            case CDERR_NOTEMPLATE      : cout << "CDERR_NOTEMPLATE\n";      break;
-            case CDERR_STRUCTSIZE      : cout << "CDERR_STRUCTSIZE\n";      break;
-            case FNERR_BUFFERTOOSMALL  : cout << "FNERR_BUFFERTOOSMALL\n";  break;
-            case FNERR_INVALIDFILENAME : cout << "FNERR_INVALIDFILENAME\n"; break;
-            case FNERR_SUBCLASSFAILURE : cout << "FNERR_SUBCLASSFAILURE\n"; break;
-            default                    : cout << "You cancelled.\n";
-        }
-    }
-    return false;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select a file to load\" --filename=\"";
-    command += current_path;
-    command += "/\"";
-    for(int i=0; i<filter.size(); i++){
-        command += " --file-filter=\"";
-        command += filter[i];
-        command += "\" ";
-    }
-    command += " 2> /dev/null";
-    FILE *f = popen(command.c_str(), "r");
-    if(!f){
-        cout << "ERROR" << endl;
-        return false;
-    }
-    if(fgets(file, 1024, f)==NULL) return false;
-    if (debug) cout << "Filename: " << file << endl;
-    path=file;
-    stringstream ss(path);
-    getline(ss, path);
-    if(pclose(f)!=0) cout << "Zenity returned non zero, whatever that means..." << endl;
-#endif
-    return true;
-};
-
-bool save_file_dialog(string &path, bool debug, const vector <string> &endings, const string &filename_given){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA sfn;
-     ZeroMemory( &filename, sizeof( filename ) );
-     ZeroMemory( &sfn,      sizeof( sfn ) );
-     sfn.lStructSize  = sizeof( sfn );
-     sfn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-     sfn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-     sfn.lpstrFile    = filename;
-     sfn.nMaxFile     = 1024;
-     sfn.lpstrTitle   = "Select a File, yo!";
-     sfn.Flags        = OFN_DONTADDTORECENT;
-    bool end=false;
-    while(!end){
-        if (GetSaveFileNameA( &sfn )){
-            if(debug) cout << "You chose the file \"" << filename << "\"\n";
-            if(exists(filename)){
-                cout << filename << " exists, do you want to overwrite it?";
-                if(yesno()){
-                    path=filename;
-                    bool found=false;
-                    for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                    if(found) end=true;
-                }
-                else return false;
-            }
-            else{
-                path=filename;
-                bool found=false;
-                for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                if(found) end=true;
-            }
-        }
-        else
-        {
-            // All this stuff below is to tell you exactly how you messed up above.
-            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-            switch (CommDlgExtendedError())
-            {
-                case CDERR_DIALOGFAILURE   : cout << "CDERR_DIALOGFAILURE\n";   break;
-                case CDERR_FINDRESFAILURE  : cout << "CDERR_FINDRESFAILURE\n";  break;
-                case CDERR_INITIALIZATION  : cout << "CDERR_INITIALIZATION\n";  break;
-                case CDERR_LOADRESFAILURE  : cout << "CDERR_LOADRESFAILURE\n";  break;
-                case CDERR_LOADSTRFAILURE  : cout << "CDERR_LOADSTRFAILURE\n";  break;
-                case CDERR_LOCKRESFAILURE  : cout << "CDERR_LOCKRESFAILURE\n";  break;
-                case CDERR_MEMALLOCFAILURE : cout << "CDERR_MEMALLOCFAILURE\n"; break;
-                case CDERR_MEMLOCKFAILURE  : cout << "CDERR_MEMLOCKFAILURE\n";  break;
-                case CDERR_NOHINSTANCE     : cout << "CDERR_NOHINSTANCE\n";     break;
-                case CDERR_NOHOOK          : cout << "CDERR_NOHOOK\n";          break;
-                case CDERR_NOTEMPLATE      : cout << "CDERR_NOTEMPLATE\n";      break;
-                case CDERR_STRUCTSIZE      : cout << "CDERR_STRUCTSIZE\n";      break;
-                case FNERR_BUFFERTOOSMALL  : cout << "FNERR_BUFFERTOOSMALL\n";  break;
-                case FNERR_INVALIDFILENAME : cout << "FNERR_INVALIDFILENAME\n"; break;
-                case FNERR_SUBCLASSFAILURE : cout << "FNERR_SUBCLASSFAILURE\n"; break;
-                default                    : cout << "You cancelled.\n";
-            }
-            return false;
-        }
-    }
-    return true;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select where to save\" --filename=\"";
-    command += current_path;
-    command += filename_given;
-    command += "/\" --save --confirm-overwrite 2> /dev/null";
-    bool end=false;
-    while(!end){
-        FILE *f = popen(command.c_str(), "r");
-        if(!f){
-            cout << "ERROR" << endl;
-            return false;
-        }
-        if(fgets(file, 1024, f)==NULL) return false;
-        if (debug) cout << "Filename: " << file << endl;
-        path=file;
-        stringstream ss(path);
-        getline(ss, path);
-        if(debug) cout << "Path: " << path << endl;
-        if(pclose(f)!=0) cout << "Zenity returned non zero, whatever that means..." << endl;
-        bool found=false;
-        for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-        if(found) end=true;
-    }
-#endif
-    return true;
-};
-
-bool save_file_dialog(string &path, bool debug, const vector <string> &endings){
-    char pwd[1024];
-    if(GetCurrentDir( pwd, 1024)==NULL) return false;
-    string current_path(pwd);
-#ifdef _WIN32
-    char filename[ 1024 ];
-
-    OPENFILENAMEA sfn;
-     ZeroMemory( &filename, sizeof( filename ) );
-     ZeroMemory( &sfn,      sizeof( sfn ) );
-     sfn.lStructSize  = sizeof( sfn );
-     sfn.hwndOwner    = NULL;  // If you have a window to center over, put its HANDLE here
-     sfn.lpstrFilter  = "wfn Files\0*.wfn\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0Any File\0*.*\0";
-     sfn.lpstrFile    = filename;
-     sfn.nMaxFile     = 1024;
-     sfn.lpstrTitle   = "Select a File, yo!";
-     sfn.Flags        = OFN_DONTADDTORECENT;
-    bool end=false;
-    while(!end){
-        if (GetSaveFileNameA( &sfn )){
-            if(debug) cout << "You chose the file \"" << filename << "\"\n";
-            if(exists(filename)){
-                cout << filename << " exists, do you want to overwrite it?";
-                if(yesno()){
-                    path=filename;
-                    bool found=false;
-                    for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                    if(found) end=true;
-                }
-                else return false;
-            }
-            else{
-                path=filename;
-                bool found=false;
-                for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-                if(found) end=true;
-            }
-        }
-        else
-        {
-            // All this stuff below is to tell you exactly how you messed up above.
-            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
-            switch (CommDlgExtendedError())
-            {
-                case CDERR_DIALOGFAILURE   : cout << "CDERR_DIALOGFAILURE\n";   break;
-                case CDERR_FINDRESFAILURE  : cout << "CDERR_FINDRESFAILURE\n";  break;
-                case CDERR_INITIALIZATION  : cout << "CDERR_INITIALIZATION\n";  break;
-                case CDERR_LOADRESFAILURE  : cout << "CDERR_LOADRESFAILURE\n";  break;
-                case CDERR_LOADSTRFAILURE  : cout << "CDERR_LOADSTRFAILURE\n";  break;
-                case CDERR_LOCKRESFAILURE  : cout << "CDERR_LOCKRESFAILURE\n";  break;
-                case CDERR_MEMALLOCFAILURE : cout << "CDERR_MEMALLOCFAILURE\n"; break;
-                case CDERR_MEMLOCKFAILURE  : cout << "CDERR_MEMLOCKFAILURE\n";  break;
-                case CDERR_NOHINSTANCE     : cout << "CDERR_NOHINSTANCE\n";     break;
-                case CDERR_NOHOOK          : cout << "CDERR_NOHOOK\n";          break;
-                case CDERR_NOTEMPLATE      : cout << "CDERR_NOTEMPLATE\n";      break;
-                case CDERR_STRUCTSIZE      : cout << "CDERR_STRUCTSIZE\n";      break;
-                case FNERR_BUFFERTOOSMALL  : cout << "FNERR_BUFFERTOOSMALL\n";  break;
-                case FNERR_INVALIDFILENAME : cout << "FNERR_INVALIDFILENAME\n"; break;
-                case FNERR_SUBCLASSFAILURE : cout << "FNERR_SUBCLASSFAILURE\n"; break;
-                default                    : cout << "You cancelled.\n";
-            }
-            return false;
-        }
-    }
-    return true;
-#else
-    char file[1024];
-    string command;
-    command="zenity --file-selection --title=\"Select where to save\" --filename=\"";
-    command += current_path;
-    command += "/\" --save --confirm-overwrite 2> /dev/null";
-    bool end=false;
-    while(!end){
-        FILE *f = popen(command.c_str(), "r");
-        if(!f){
-            cout << "ERROR" << endl;
-            return false;
-        }
-        if(fgets(file, 1024, f)==NULL) return false;
-        if (debug) cout << "Filename: " << file << endl;
-        path=file;
-        stringstream ss(path);
-        getline(ss, path);
-        if(debug) cout << "Path: " << path << endl;
-        if(pclose(f)!=0) cout << "Zenity returned non zero, whatever that means..." << endl;
-        bool found=false;
-        for(int i=0; i< endings.size(); i++) if (path.find(endings[i])!=string::npos) found=true;
-        if(found) end=true;
-    }
-#endif
-    return true;
-};
-*/
-
 void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector<WFN> &wavy, unsigned int nr_of_cubes, bool wfnonly, bool debug)
 {
     // asks which wfn to use, if wfnonly is set or whcih cubes up to nr of cubes to use
     // Returns values in selection[0][i] for iths selection of wavefunction and
     //  selection[1][i] for iths selection of cube
     using namespace std;
-    cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
+   std::cout << "Which of the following cubes to use? Need to select " << nr_of_cubes << " file";
     if (nr_of_cubes > 1)
-        cout << "s in total." << endl;
+       std::cout << "s in total." << endl;
     else
-        cout << "." << endl;
-    cout << endl
+       std::cout << "." << endl;
+   std::cout << endl
          << endl;
     for (int w = 0; w < wavy.size(); w++)
     {
         stringstream stream;
-        cout << "_____________________________________________________________" << endl;
-        cout << "WFN ";
+       std::cout << "_____________________________________________________________" << endl;
+       std::cout << "WFN ";
         stream << setw(2) << w;
-        cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
+       std::cout << stream.str() << ") " << wavy[w].get_path().stem() << endl;
         stream.str("");
         for (int c = 0; c < wavy[w].get_cube_count(); c++)
         {
             if (c == 0)
-                cout << "        |" << endl
+               std::cout << "        |" << endl
                      << "Cube    |" << endl;
             else
-                cout << "        |" << endl;
+               std::cout << "        |" << endl;
             if (!wfnonly)
             {
-                cout << setw(2) << w;
-                cout << ".";
-                cout << setw(2) << c;
+               std::cout << setw(2) << w;
+               std::cout << ".";
+               std::cout << setw(2) << c;
             }
             else
-                cout << "     ";
-            cout << "   |_ " << wavy[w].get_cube_path(c).stem();
+               std::cout << "     ";
+           std::cout << "   |_ " << wavy[w].get_cube_path(c).stem();
             if (!exists(wavy[w].get_cube_path(c)))
-                cout << " (MEM ONLY)";
-            cout << endl;
+               std::cout << " (MEM ONLY)";
+           std::cout << endl;
         }
-        cout << "_____________________________________________________________" << endl
+       std::cout << "_____________________________________________________________" << endl
              << endl
              << endl;
     }
@@ -869,30 +461,30 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
     unsigned int selected_cubes = 0;
     do
     {
-        cout << "Select " << selected_cubes + 1 << ". ";
+       std::cout << "Select " << selected_cubes + 1 << ". ";
         if (wfnonly)
-            cout << "WFN ";
+           std::cout << "WFN ";
         else
-            cout << "cube ";
-        cout << "please: ";
+           std::cout << "cube ";
+       std::cout << "please: ";
         string input;
         cin >> input;
         if (!wfnonly)
         {
             if (input.find('.') == string::npos)
             {
-                cout << "no . found in input!" << endl;
+               std::cout << "no . found in input!" << endl;
                 continue;
             }
         }
         else
         {
             if (input.find('.') == string::npos)
-                cout << "Ignoring the .!" << endl;
+               std::cout << "Ignoring the .!" << endl;
             unsigned int nr_wave = fromString<unsigned int>(input);
             if (nr_wave < 0 || nr_wave >= wavy.size())
             {
-                cout << "Invalid choice!" << endl;
+               std::cout << "Invalid choice!" << endl;
                 continue;
             }
             selected_cubes++;
@@ -904,20 +496,20 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         }
         if (debug)
         {
-            cout << "input: " << input << endl;
-            cout << "with . found at: " << input.find('.') << endl;
-            cout << "substr1: " << input.substr(0, input.find('.')) << endl;
-            cout << "substr2: " << input.substr(input.find('.') + 1) << endl;
+           std::cout << "input: " << input << endl;
+           std::cout << "with . found at: " << input.find('.') << endl;
+           std::cout << "substr1: " << input.substr(0, input.find('.')) << endl;
+           std::cout << "substr2: " << input.substr(input.find('.') + 1) << endl;
         }
         string wave(input.substr(0, input.find('.')));
         string cube(input.substr(input.find('.') + 1));
         unsigned int nr_wave = fromString<unsigned int>(wave);
         int nr_cube = fromString<int>(cube);
         if (debug)
-            cout << "Translated: " << nr_wave << " " << nr_cube << endl;
+           std::cout << "Translated: " << nr_wave << " " << nr_cube << endl;
         if (nr_wave < 0 || nr_wave >= wavy.size() || nr_cube < 0 || nr_cube >= wavy[nr_wave].get_cube_count())
         {
-            cout << "Invalid choice!" << endl;
+           std::cout << "Invalid choice!" << endl;
             continue;
         }
         selection[0][selected_cubes] = nr_wave;
@@ -926,7 +518,7 @@ void select_cubes(std::vector<std::vector<unsigned int>> &selection, std::vector
         if (selected_cubes == nr_of_cubes)
         {
             if (debug)
-                cout << "Going to return!" << endl;
+               std::cout << "Going to return!" << endl;
             return;
         }
     } while (true);
@@ -1995,14 +1587,14 @@ void options::digest_options()
     // Lets print what was the command line, for debugging
     if (debug)
     {
-        cout << " Recap of input:\nsize: " << arguments.size() << endl;
+       std::cout << " Recap of input:\nsize: " << arguments.size() << endl;
     }
     // This loop figures out command line options
     int argc = (int)arguments.size();
     for (int i = 0; i < arguments.size(); i++)
     {
         if (debug)
-            cout << arguments[i] << endl;
+           std::cout << arguments[i] << endl;
         string temp = arguments[i];
         if (temp.find("-") > 0)
             continue;
@@ -2013,7 +1605,7 @@ void options::digest_options()
             int n = 1;
             string store;
             if (debug)
-                cout << "Looking for Anions!" << endl;
+               std::cout << "Looking for Anions!" << endl;
             while (i + n < argc && string(arguments[i + n]).find("-") != 0)
             {
                 if (i + n - 1 > arguments.size())
@@ -2023,7 +1615,7 @@ void options::digest_options()
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
-                        cout << Z[r] << endl;
+                       std::cout << Z[r] << endl;
                     Anions.push_back(Z[r]);
                 }
                 n++;
@@ -2040,23 +1632,23 @@ void options::digest_options()
         }
         else if (temp == "-atom_dens")
         {
-            cout << NoSpherA2_message() << endl;
+           std::cout << NoSpherA2_message() << endl;
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist", cout);
+            err_checkf(std::filesystem::exists(wfn), "WFN doesn't exist",std::cout);
             ivec val_MOs;
             ivec val_MOs_beta;
             if (argc >= i + 3)
             {
                 val_MOs = split_string<int>(arguments[i + 2], ",");
-                cout << "Alpha MOs to keep: ";
+               std::cout << "Alpha MOs to keep: ";
                 for (int j = 0; j < val_MOs.size(); j++)
-                    cout << val_MOs[j] << " ";
-                cout << endl;
+                   std::cout << val_MOs[j] << " ";
+               std::cout << endl;
                 val_MOs_beta = split_string<int>(arguments[i + 3], ",");
-                cout << "Beta MOs to keep: ";
+               std::cout << "Beta MOs to keep: ";
                 for (int j = 0; j < val_MOs_beta.size(); j++)
-                    cout << val_MOs_beta[j] << " ";
-                cout << endl;
+                   std::cout << val_MOs_beta[j] << " ";
+               std::cout << endl;
             }
             spherically_averaged_density(*this, val_MOs, val_MOs_beta);
             exit(0);
@@ -2078,7 +1670,7 @@ void options::digest_options()
             int n = 1;
             string store;
             if (debug)
-                cout << "Looking for Cations!" << endl;
+               std::cout << "Looking for Cations!" << endl;
             while (i + n < argc && string(arguments[i + n]).find("-") != 0)
             {
                 if (i + n - 1 > arguments.size())
@@ -2088,7 +1680,7 @@ void options::digest_options()
                 for (int r = 0; r < Z.size(); r++)
                 {
                     if (debug)
-                        cout << Z[r] << endl;
+                       std::cout << Z[r] << endl;
                     Cations.push_back(Z[r]);
                 }
                 n++;
@@ -2101,13 +1693,13 @@ void options::digest_options()
         else if (temp == "-coef")
         {
             coef_file = arguments[i + 1];
-            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist", cout);
+            err_checkf(std::filesystem::exists(coef_file), "coef_file doesn't exist",std::cout);
             SALTED = true;
         }
         else if (temp == "-cif")
         {
             cif = arguments[i + 1];
-            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist", cout);
+            err_checkf(std::filesystem::exists(cif), "CIF doesn't exist",std::cout);
         }
         else if (temp == "-cpus")
         {
@@ -2130,7 +1722,19 @@ void options::digest_options()
                 combined_tsc_calc_cifs.push_back(arguments[i + n]);
                 n++;
                 const string _temp = arguments[i + n];
+                if (_temp.find(delimiter) == string::npos) {
+                    if (debug)
+                        std::cout << "--Delimiter not found, using §" << endl;
+                    delimiter = "§";
+                }
                 groups.push_back(split_string<int>(_temp, delimiter));
+                if (debug)
+                {
+                    std::cout << "--Group: " << _temp << endl << "--";
+                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                        std::cout  << groups[groups.size() - 1][run] << " ";
+                    std::cout << endl;
+                }
                 n++;
             }
         }
@@ -2280,7 +1884,7 @@ void options::digest_options()
         else if (temp == "-hkl")
         {
             hkl = arguments[i + 1];
-            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist", cout);
+            err_checkf(std::filesystem::exists(hkl), "hkl doesn't exist",std::cout);
         }
         else if (temp == "-hkl_min_max")
         {
@@ -2304,7 +1908,7 @@ void options::digest_options()
             double doubel_max_size = static_cast<double>(vec_max_size * sizeof(double)) * 1e-6;
             if (mem > doubel_max_size)
             {
-                cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
+               std::cout << "Max memory set to " << mem << " MB, which is larger than the maximum allowed size of " << doubel_max_size << " MB. Setting max memory to " << 50000 << " MB." << endl;
                 mem = 50000.0;
             }
         }
@@ -2353,7 +1957,19 @@ void options::digest_options()
                 combined_tsc_calc_files.push_back(arguments[i + n]);
                 n++;
                 const string _temp = arguments[i + n];
+                if (_temp.find(delimiter) == string::npos) {
+                    if (debug)
+                        std::cout << "--Delimiter not found, using §" << endl;
+                    delimiter = "§";
+                }
                 groups.push_back(split_string<int>(_temp, delimiter));
+                if (debug)
+                {
+                    std::cout << "--Group: " << _temp << endl << "--";
+                    for (int run = 0; run < groups[groups.size() - 1].size(); run++)
+                        std::cout << groups[groups.size() - 1][run] << " ";
+                    std::cout << endl;
+                }
                 n++;
             }
         }
@@ -2371,7 +1987,10 @@ void options::digest_options()
             int n = 1;
             while (i + n < argc && string(arguments[i + n]).find("-") > 0)
             {
-                combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
+                if (arguments[i + n][0] == 'n')
+                    combined_tsc_calc_charge.push_back(-stoi(arguments[i + n].substr(1)));
+                else
+                    combined_tsc_calc_charge.push_back(stoi(arguments[i + n]));
                 n++;
             }
         }
@@ -2405,6 +2024,8 @@ void options::digest_options()
                         arguments[i + 6],
                         arguments[i + 7]};
         }
+        else if (temp == "-QCT" || temp == "-qct")
+            qct = true;
         else if (temp == "-radius")
             radius = stod(arguments[i + 1]);
         else if (temp == "-resolution")
@@ -2416,12 +2037,12 @@ void options::digest_options()
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
-            cout << "Reading wavefunction: " << wfn_name << endl;
+           std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-            cout << "Assigning ECPs" << endl;
+           std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-            cout << "Starting cube calculation" << endl;
+           std::cout << "Starting cube calculation" << endl;
             calc_rho_cube(*wavy);
             delete (wavy);
             exit(0);
@@ -2524,7 +2145,7 @@ void options::digest_options()
                 outputFile << r << " " << dens << "\n";
             }
             outputFile.close();
-            cout << "Data written to output.dat" << endl;
+           std::cout << "Data written to output.dat" << endl;
             delete (wavy1);
             delete (wavy2);
             exit(0);
@@ -2532,12 +2153,12 @@ void options::digest_options()
         else if (temp == "-spherical_aver_hirsh")
         {
             string wfn_name = arguments[i + 1];
-            cout << "Reading wavefunction: " << wfn_name << endl;
+           std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-            cout << "Assigning ECPs" << endl;
+           std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-            cout << "Starting spherical averaging" << endl;
+           std::cout << "Starting spherical averaging" << endl;
             double dens;
 
             for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
@@ -2550,7 +2171,7 @@ void options::digest_options()
                 }
                 outputFile.close();
             }
-            cout << "Data written to output.dat" << endl;
+           std::cout << "Data written to output.dat" << endl;
             delete (wavy);
             exit(0);
         }
@@ -2560,10 +2181,10 @@ void options::digest_options()
             exit(0);
         }
         else if (temp == "-test")
-            cout << "Running in test mode!" << endl, test = true;
+           std::cout << "Running in test mode!" << endl, test = true;
         else if (temp == "-thakkar_d_plot")
         {
-            cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
+           std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
             exit(0);
         }
         else if (temp == "-twin")
@@ -2574,10 +2195,10 @@ void options::digest_options()
                 twin_law.back()[twl] = stod(arguments[i + 1 + twl]);
             if (debug)
             {
-                cout << "twin_law: ";
+               std::cout << "twin_law: ";
                 for (int twl = 0; twl < 9; twl++)
-                    cout << setw(7) << setprecision(2) << twin_law.back()[twl];
-                cout << endl;
+                   std::cout << setw(7) << setprecision(2) << twin_law.back()[twl];
+               std::cout << endl;
             }
             i += 9;
         }
@@ -2590,12 +2211,12 @@ void options::digest_options()
             std::filesystem::path name = arguments[i + 1];
             tsc_block<int, cdouble> blocky = tsc_block<int, cdouble>(name);
             string cif_name = "test.cif";
-            if (name.extension() == "tscb")
+            if (name.extension() == ".tscb")
                 blocky.write_tsc_file(cif_name, name.replace_extension(".tsc"));
-            else if (name.extension() == "tsc")
+            else if (name.extension() == ".tsc")
                 blocky.write_tscb_file(cif_name, name.replace_extension(".tscb"));
             else
-                err_checkf(false, "Wrong file ending!", cout);
+                err_checkf(false, "Wrong file ending!",std::cout);
             exit(0);
         }
         else if (temp == "-test_analytical")
@@ -2615,7 +2236,7 @@ void options::digest_options()
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!", cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!",std::cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2797,7 +2418,7 @@ void write_timing_to_file(std::ostream &file,
     // Check if either vector is empty
     if (time_points.empty() || descriptions.empty())
     {
-        cout << "Error: Empty vector passed to write_timing_to_file" << endl;
+       std::cout << "Error: Empty vector passed to write_timing_to_file" << endl;
         return;
     }
 
@@ -2901,14 +2522,189 @@ const int shell2function(const int &type, const int &prim)
     return 0;
 }
 
+bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std::string> filter, const std::string& current_path) {
+#ifdef _WIN32
+    char filename[1024];
+
+    OPENFILENAMEA ofn;
+    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = 1024;
+    ofn.lpstrTitle = "Select a File";
+    ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
+
+    if (GetOpenFileNameA(&ofn)) {
+        if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
+        auto p = std::filesystem::path(filename);
+        if (exists(p)) {
+            path = p;
+            return true;
+        }
+    }
+    else
+    {
+        // All this stuff below is to tell you exactly how you messed up above.
+        // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
+        switch (CommDlgExtendedError())
+        {
+        case CDERR_DIALOGFAILURE: std::cout << "CDERR_DIALOGFAILURE\n";   break;
+        case CDERR_FINDRESFAILURE: std::cout << "CDERR_FINDRESFAILURE\n";  break;
+        case CDERR_INITIALIZATION: std::cout << "CDERR_INITIALIZATION\n";  break;
+        case CDERR_LOADRESFAILURE: std::cout << "CDERR_LOADRESFAILURE\n";  break;
+        case CDERR_LOADSTRFAILURE: std::cout << "CDERR_LOADSTRFAILURE\n";  break;
+        case CDERR_LOCKRESFAILURE: std::cout << "CDERR_LOCKRESFAILURE\n";  break;
+        case CDERR_MEMALLOCFAILURE: std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
+        case CDERR_MEMLOCKFAILURE: std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
+        case CDERR_NOHINSTANCE: std::cout << "CDERR_NOHINSTANCE\n";     break;
+        case CDERR_NOHOOK: std::cout << "CDERR_NOHOOK\n";          break;
+        case CDERR_NOTEMPLATE: std::cout << "CDERR_NOTEMPLATE\n";      break;
+        case CDERR_STRUCTSIZE: std::cout << "CDERR_STRUCTSIZE\n";      break;
+        case FNERR_BUFFERTOOSMALL: std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
+        case FNERR_INVALIDFILENAME: std::cout << "FNERR_INVALIDFILENAME\n"; break;
+        case FNERR_SUBCLASSFAILURE: std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
+        default: std::cout << "You cancelled.\n";
+        }
+    }
+    return false;
+#else
+    char file[1024];
+    std::string command;
+    command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
+    command += current_path;
+    command += "/\"";
+    for (int i = 0; i < filter.size(); i++) {
+        command += " --file-filter=\"";
+        command += filter[i];
+        command += "\" ";
+    }
+    command += " 2> /dev/null";
+    FILE* f = popen(command.c_str(), "r");
+    if (!f) {
+        std::cout << "ERROR" << std::endl;
+        return false;
+    }
+    if (fgets(file, 1024, f) == NULL) 
+        return false;
+    if (debug) 
+        std::cout << "Filename: " << file << std::endl;
+    path = file;
+    std::stringstream ss(path.string());
+    std::string name = path.string();
+    getline(ss, name);
+    if (pclose(f) != 0) 
+        std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
+    return true;
+#endif
+};
+
+bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
+#ifdef _WIN32
+    char filename[1024];
+
+    OPENFILENAMEA sfn;
+    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&sfn, sizeof(sfn));
+    sfn.lStructSize = sizeof(sfn);
+    sfn.hwndOwner = NULL;  // If you have a window to center over, put its HANDLE here
+    sfn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
+    sfn.lpstrFile = filename;
+    sfn.nMaxFile = 1024;
+    sfn.lpstrTitle = "Select a File for saving!";
+    sfn.Flags = OFN_DONTADDTORECENT;
+    bool end = false;
+    while (!end) {
+        if (GetSaveFileNameA(&sfn)) {
+            if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
+            if (exists(std::filesystem::path(filename))) {
+                std::cout << filename << " exists, do you want to overwrite it?";
+                if (yesno()) {
+                    path = filename;
+                    bool found = false;
+                    for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
+                    if (found) end = true;
+                }
+                else return false;
+            }
+            else {
+                path = filename;
+                bool found = false;
+                for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
+                if (found) end = true;
+            }
+        }
+        else
+        {
+            // All this stuff below is to tell you exactly how you messed up above.
+            // Once you've got that fixed, you can often (not always!) reduce it to a 'user cancelled' assumption.
+            switch (CommDlgExtendedError())
+            {
+            case CDERR_DIALOGFAILURE: std::cout << "CDERR_DIALOGFAILURE\n";   break;
+            case CDERR_FINDRESFAILURE: std::cout << "CDERR_FINDRESFAILURE\n";  break;
+            case CDERR_INITIALIZATION: std::cout << "CDERR_INITIALIZATION\n";  break;
+            case CDERR_LOADRESFAILURE: std::cout << "CDERR_LOADRESFAILURE\n";  break;
+            case CDERR_LOADSTRFAILURE: std::cout << "CDERR_LOADSTRFAILURE\n";  break;
+            case CDERR_LOCKRESFAILURE: std::cout << "CDERR_LOCKRESFAILURE\n";  break;
+            case CDERR_MEMALLOCFAILURE: std::cout << "CDERR_MEMALLOCFAILURE\n"; break;
+            case CDERR_MEMLOCKFAILURE: std::cout << "CDERR_MEMLOCKFAILURE\n";  break;
+            case CDERR_NOHINSTANCE: std::cout << "CDERR_NOHINSTANCE\n";     break;
+            case CDERR_NOHOOK: std::cout << "CDERR_NOHOOK\n";          break;
+            case CDERR_NOTEMPLATE: std::cout << "CDERR_NOTEMPLATE\n";      break;
+            case CDERR_STRUCTSIZE: std::cout << "CDERR_STRUCTSIZE\n";      break;
+            case FNERR_BUFFERTOOSMALL: std::cout << "FNERR_BUFFERTOOSMALL\n";  break;
+            case FNERR_INVALIDFILENAME: std::cout << "FNERR_INVALIDFILENAME\n"; break;
+            case FNERR_SUBCLASSFAILURE: std::cout << "FNERR_SUBCLASSFAILURE\n"; break;
+            default: std::cout << "You cancelled.\n";
+            }
+            return false;
+        }
+    }
+    return true;
+#else
+    char file[1024];
+    std::string command;
+    command = "zenity --file-selection --title=\"Select where to save\" --filename=\"";
+    command += current_path;
+    command += filename_given;
+    command += "/\" --save --confirm-overwrite 2> /dev/null";
+    bool end = false;
+    while (!end) {
+        FILE* f = popen(command.c_str(), "r");
+        if (!f) {
+            std::cout << "ERROR" << std::endl;
+            return false;
+        }
+        if (fgets(file, 1024, f) == NULL) 
+            return false;
+        if (debug) 
+            std::cout << "Filename: " << file << std::endl;
+        path = file;
+        std::stringstream ss(path);
+        std::string name = path.string();
+        getline(ss, name);
+        if (debug) std::cout << "Path: " << path << std::endl;
+        if (pclose(f) != 0) std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
+        bool found = false;
+        for (int i = 0; i < endings.size(); i++) 
+            if (path.string().find(endings[i]) != std::string::npos)
+                found = true;
+        if (found) 
+            end = true;
+    }
+#endif
+    return true;
+};
+
 const int sht2nbas(const int &type)
 {
-    const int st2bas[6]{1, 3, 6, 10, 15, 21};
-    const int nst2bas[6]{11, 9, 7, 5, 4, 1};
+    const int st2bas[9]{1, 3, 6, 10, 15, 21, 28, 36};
+    const int nst2bas[9]{17,15,13,11, 9, 7, 5, 4, 1};
     if (type >= 0)
         return st2bas[type];
     else
-        return nst2bas[5 + type];
+        return nst2bas[8 + type];
 };
 
 char asciitolower(char in)
