@@ -40,33 +40,19 @@ OpenBLAS:
 	fi
 
 
-BASIS_OBJ_NAMES := basis_set_helper BasisSetConverter
-BASIS_OBJS := $(BASIS_OBJ_NAMES:=.o_basis)
-
-%.o_basis: ../Src/basis_set_helper/%.cpp 
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
 #Basis set converter
-basis_set_converter: ${BASIS_OBJS}
-	@if [ ! -f ../BasisSetConverter ]; then \
-		echo 'Building BasisSetConverter'; \
-		${COMP} -o "BasisSetConverter" ${BASIS_OBJS}; \
-		mv BasisSetConverter ../; \
-		echo 'Done building basis_set_helper'; \
-	else \
-		echo 'BasisSetConverter already exists'; \
-	fi
-
-#I Do not like, that i have to define the path like this, but in Visual Stuido i can only grab the windows path not the main directory
-prebuild: OpenBLAS omp basis_set_converter
-	./../BasisSetConverter ../Windows/
-	@echo "Prebuild done"
+basis_set_converter:
+	@make -f makefile_basis_set_converter
 	
 # Precompiled header
 pch.h.gch: ../Src/pch.h omp OpenBLAS
 	${COMP} -std=c++23 -x c++-header -o "$@" "$<"
+
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o'
 
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch omp OpenBLAS
@@ -80,23 +66,23 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-NoSpherA2: prebuild ${OBJS} 
+NoSpherA2: OpenBLAS omp ${OBJS}
 	@echo 'Building target: $@'
 	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2 ../
 	@echo 'Done building NoSpherA2'
 
-NoSpherA2_Debug: prebuild ${OBJS_d} 
+NoSpherA2_Debug: OpenBLAS omp ${OBJS_d} 
 	@echo 'Building target: $@'
 	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2_Debug ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
-	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ${OBJS} ${OBJS_d} ${BASIS_OBJS}
+	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} ${BASIS_OBJS}
 	-@echo ' '
 
-.PHONY: all clean
+.PHONY: all clean basis_set_converter
 .SECONDARY:
 
 
