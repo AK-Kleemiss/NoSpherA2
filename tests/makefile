@@ -135,7 +135,7 @@ ri_fit:
 		-wfn epoxide.gbw \
 		-cif epoxide.cif \
 		-dmin 0.4 \
-		-ri_fit \
+		-ri_fit combo_basis_fit\
 		-no-date)
 
 rubredoxin_cmtc:
@@ -198,57 +198,7 @@ sucrose_SF:
 		-resolution 0.5 -test \
 		-no-date \
 		&& ${MV} NoSpherA2_cube.log $@.log \
-		&& ${DIFF} $@.log $@.good
-	
-rubredoxin_cmtc:
-	@echo 'Running test: $@'
-	@cd rubredoxin_cmtc && $(BASE_PATH) \
-		-hkl 1yk4_h.hkl -acc 0 \
-		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0,1 \
-		residues/3.gbw residues/3.cif 0,2 \
-		residues/4.gbw residues/4.cif 0 \
-		-mtc_mult 1 1 1 1 \
-		-mtc_charge 0 0 0 0 \
-		-mtc_ECP 0 0 0 0 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-		&& ${DIFF} $@.log $@.good
-
-rubredoxin_cmtc_full:
-	@echo 'Running test: $@'
-	@cd rubredoxin_cmtc && $(BASE_PATH) \
-		-hkl 1yk4_h_full.hkl -acc 0 \
-		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0,1 \
-		residues/3.gbw residues/3.cif 0,2 \
-		residues/4.gbw residues/4.cif 0 \
-		-mtc_mult 1 1 1 1 \
-		-mtc_charge 0 0 0 0 \
-		-mtc_ECP 0 0 0 0 \
-		-cpus 24 \
-		-no-date \
-		&& ${MV} NoSpherA2.log $@.log \
-
-
-ri_fit:
-	@echo 'Running test: $@'
-	@cd epoxide_gbw && $(BASE_PATH) \
-	    -wfn epoxide.gbw \
-	    -cif epoxide.cif \
-	    -dmin 0.4 \
-	    -ri_fit combo_basis_fit\
-	    -no-date \
-	    && ${MV} NoSpherA2.log $@.log \
-	    && ${DIFF} $@.log $@.good
-
-Hybrid_mode:
-	@echo 'Running test: $@'
-	@cd Hybrid && $(BASE_PATH) \
-		-cif ZP2.cif \
-		-dmin 0.9 \
-		-acc 0 \
-		-no-date)
+		&& ${DIFF} $@.log $@.good)
 
 sucrose_twin:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
