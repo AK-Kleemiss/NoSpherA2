@@ -10,7 +10,6 @@ This Software is published with BSD-2 clause license.
 Reading:                          "test_cysteine.xyz" done!
 Number of atoms in Wavefunction file: 14 Number of MOs: 0
 Using "model.salted" for the prediction
-Using basis set: cc-pvqz-jkfit
 Number of protons: 64
 Reading:                          "test_cysteine.cif" done!
 Generating hkl indices up to d=:              0.73... done!
