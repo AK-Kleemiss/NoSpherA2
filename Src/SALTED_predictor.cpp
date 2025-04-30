@@ -317,8 +317,8 @@ vec SALTEDPredictor::predict()
                 // Check if Vmat[spe + to_string(l)][0] exists
                 if (Vmat[spe + to_string(l)].size() == 0)
                 {
-                    cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2." << endl;
-                    cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!" << endl;
+                   std::cout << "The projector for species " << spe << " and l = " << l << " does not exist. This is a problem with the model, not NoSpherA2." << endl;
+                   std::cout << "Continuing with the next species..., make sure there is no: " << spe << " in the structure you are trying to predict!!!!" << endl;
                     l = lmax[spe] + 1;
                     continue;
                 }
@@ -403,7 +403,7 @@ vec SALTEDPredictor::predict()
         }
     }
 
-    // cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
+    //std::cout << "          ... done!\nNumber of predicted coefficients: " << pred_coefs.size() << endl;
     // npy::npy_data<double> coeffs;
     // coeffs.data = pred_coefs;
     // coeffs.fortran_order = false;
@@ -418,7 +418,7 @@ vec SALTEDPredictor::gen_SALTED_densities()
     if (coef_file != "")
     {
         vec coefs{};
-        cout << "Reading coefficients from file: " << coef_file << endl;
+       std::cout << "Reading coefficients from file: " << coef_file << endl;
         read_npy<double>(coef_file, coefs);
         return coefs;
     }
@@ -449,9 +449,7 @@ void SALTEDPredictor::shrink_intermediate_vectors()
     lmax.clear();
     nmax.clear();
     Mspe.clear();
-    ;
     vfps.clear();
-    ;
     wigner3j.clear();
     av_coefs.clear();
     power_env_sparse.clear();

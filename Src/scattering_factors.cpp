@@ -576,11 +576,13 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                          const bool debug)
 {
     using namespace std;
+    if (debug)
+        file << "start working on cif" << endl;
     bool atoms_read = false;
     int count_fields = 0;
-    int group_field = 0;
-    int type_field = 0;
-    int position_field[3] = {0, 0, 0};
+    int group_field = -1;
+    int type_field = -1;
+    int position_field[3] = {-1, -1, -1};
     int label_field = 1000;
     string line;
     cif_input.clear();
@@ -588,6 +590,8 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
     svec labels(wave.get_ncen(), "");
     if (debug && input_groups.size() > 0)
         file << "Group size: " << input_groups.size() << endl;
+    else if (debug)
+        file << "Starting search loop" << endl;
     while (!cif_input.eof() && !atoms_read)
     {
         getline(cif_input, line);
@@ -623,6 +627,12 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 getline(cif_input, line);
                 count_fields++;
             }
+            if (label_field != 1000) {
+                err_checkf(position_field[0] != -1, "No x position found, impossible to continue!",std::cout);
+                err_checkf(position_field[1] != -1, "No y position found, impossible to continue!",std::cout);
+                err_checkf(position_field[2] != -1, "No z position found, impossible to continue!",std::cout);
+                err_checkf(type_field != -1, "No type found, impossible to continue!",std::cout);
+            }
             while (trim(line).find("_") > 0 && line.length() > 3)
             {
                 atoms_read = true;
@@ -654,14 +664,16 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 if (debug)
                     file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
-                if (fields[group_field].c_str()[0] == '.')
+                if (group_field == -1)
                 {
                     constant_atoms.push_back(true);
                 }
-                else
+                else if (fields[group_field].c_str()[0] != '.')
                 {
                     constant_atoms.push_back(false);
                 }
+                else
+                    constant_atoms.push_back(true);
 
                 bool old_atom = false;
 #pragma omp parallel for reduction(|| : old_atom)
@@ -669,7 +681,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 {
                     if (fields[label_field] == known_atoms[run])
                     {
-                        if (SALTED && fields[group_field].c_str()[0] == '.')
+                        if (SALTED && (group_field == -1 || fields[group_field].c_str()[0] == '.'))
                             continue;
                         old_atom = true;
                         if (debug)
@@ -715,6 +727,10 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                             bool yep = false;
                             for (int g = 0; g < input_groups.size(); g++)
                             {
+                                if (group_field == -1) {
+                                    yep = true;
+                                    break;
+                                }
                                 if (fields[group_field].c_str()[0] == '.' && input_groups[g] == 0)
                                 {
                                     if (debug)
@@ -2739,15 +2755,23 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         if (debug)
             file << "Using a Thakkar core density" << endl;
         vector<Thakkar> temp;
-        for (int i = 0; i < asym_atom_list.size(); i++)
-        {
-            temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
-            if (debug && wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
+        if (debug) {
+            for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
-                file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
-                     << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
+                {
+                    double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                    double k_1 = temp[i].get_core_form_factor(constants::FOUR_PI * constants::bohr2ang(1.0), wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                    file << "Atom nr: " << wave.get_atom_charge(asym_atom_list[i]) << " number of ECP electrons: " << wave.get_atom_ECP_electrons(asym_atom_list[i]) << " core f(0) : "
+                        << scientific << setw(14) << setprecision(8) << k_0001 << " and at 1 Ang: " << k_1 << endl;
+                }
+            }
+        }
+        else {
+            for (int i = 0; i < asym_atom_list.size(); i++)
+            {
+                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
             }
         }
 
@@ -2844,6 +2868,7 @@ tsc_block<int, cdouble> thakkar_sfac(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -2982,6 +3007,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3229,6 +3255,7 @@ itsc_block calculate_scattering_factors_RI_fit(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3422,6 +3449,8 @@ tsc_block<int, cdouble> calculate_scattering_factors(
     ivec asym_atom_list;
     bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
+    if (opt.debug)
+        file << "Reading atoms!!!!" << endl;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[nr],
@@ -3434,6 +3463,7 @@ tsc_block<int, cdouble> calculate_scattering_factors(
                                       needs_grid,
                                       file,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();
@@ -3608,6 +3638,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                                       needs_grid,
                                       std::cout,
                                       constant_atoms,
+                                      opt.SALTED,
                                       opt.debug);
 
     cif_input.close();

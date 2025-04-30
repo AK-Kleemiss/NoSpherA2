@@ -4,7 +4,7 @@ RM := rm -f
 COMP := g++
 C_COMP := gcc
 
-LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic
+LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic -ldl -lpthread
 ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../llvm-project/openmp/build/runtime/src/libgomp.a
 LIBRASCALINE := ../Lib/librascaline.a
@@ -15,13 +15,13 @@ LIBOPENBLAS_I := -I../OpenBLAS/installation/include
 all: NoSpherA2 
 
 # List of object file names without extensions
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots auxiliary_basis
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots auxiliary_basis qct b2c bondwise_analysis
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_d)
-GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP
+GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math 
+GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP -msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math
 
 omp: 
 	@if [ ! -f $(LIBOMP) ]; then \
