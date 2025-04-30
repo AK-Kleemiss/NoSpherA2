@@ -60,6 +60,12 @@ auxiliary_basis.o: basis_set_converter
 	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o_d: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_DEBUG} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o_d'
+
 # Pattern rule to compile all .cpp files
 %.o_d: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
