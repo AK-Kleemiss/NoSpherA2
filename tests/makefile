@@ -198,7 +198,7 @@ ri_fit:
 	    -wfn epoxide.gbw \
 	    -cif epoxide.cif \
 	    -dmin 0.4 \
-	    -ri_fit \
+	    -ri_fit combo_basis_fit\
 	    -no-date \
 	    && ${MV} NoSpherA2.log $@.log \
 	    && ${DIFF} $@.log $@.good
