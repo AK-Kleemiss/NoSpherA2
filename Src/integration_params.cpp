@@ -16,7 +16,7 @@ Int_Params::Int_Params(const WFN &wavy)
     calc_integration_parameters();
 }
 
-vec Int_Params::normalize_gto(vec coef, vec exp, int l)
+vec Int_Params::normalize_gto(vec coef, const vec exp, const int l)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++)

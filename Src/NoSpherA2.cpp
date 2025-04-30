@@ -283,12 +283,13 @@ int main(int argc, char **argv)
             {
                 // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-                BasisSetLibrary basis_library;
+
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[i], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                load_basis_into_WFN(temp_pred->wavy, basis_library.get_basis_set(df_basis_name));
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                load_basis_into_WFN(temp_pred->wavy, aux_basis);
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
@@ -465,12 +466,13 @@ int main(int argc, char **argv)
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-                BasisSetLibrary basis_library;
+               
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                load_basis_into_WFN(temp_pred->wavy, basis_library.get_basis_set(df_basis_name));
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name); 
+                load_basis_into_WFN(temp_pred->wavy, aux_basis);
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;

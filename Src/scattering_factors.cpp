@@ -3266,7 +3266,7 @@ itsc_block calculate_scattering_factors_RI_fit(
     wavy_aux.set_atoms(wave[nr].get_atoms());
     wavy_aux.set_ncen(wave[nr].get_ncen());
     wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(opt.SALTED_DFBASIS));
+    load_basis_into_WFN(wavy_aux, opt.aux_basis);
 
     vec coefs = density_fit(wave[nr], wavy_aux, opt.mem, 'C');
     file << setw(12 * 4 + 2) << "... done!\n"

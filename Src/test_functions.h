@@ -1269,7 +1269,8 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     WFN dummy(xyzfile);
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
-    const int nr_coefs = load_basis_into_WFN(dummy, BasisSetLibrary().get_basis_set("cc-pvqz-jkfit"));
+    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("cc-pvqz-jkfit");
+    const int nr_coefs = load_basis_into_WFN(dummy, aux_basis);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
     cube res = calc_cube_ML(data, dummy);
     res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
@@ -1811,16 +1812,14 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     wavy_aux.set_atoms(wavy.get_atoms());
     wavy_aux.set_ncen(wavy.get_ncen());
     wavy_aux.delete_basis_set();
-    //load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
-    double n = 8;
-    BasisSet aux_basis_set = BasisSetLibrary().gen_aux(wavy, n);
-    //BasisSet aux_basis_set = BasisSetLibrary().get_basis_set("basis");
+    double beta = 2.5;
+    std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
+
     //BasisSet aux_basis_set = BasisSetLibrary().get_basis_set("def2-TZVP-RIFIT");
     load_basis_into_WFN(wavy_aux, aux_basis_set);
 
-
-    
     vec ri_coefs = density_fit(wavy, wavy_aux, (*opt).mem, 'C');
+
 
     vec3 grid;
     ivec pointy = fuckery(wavy, grid, 1.0);

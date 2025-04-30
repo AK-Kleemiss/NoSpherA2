@@ -143,7 +143,8 @@ int fixed_density_fit_test()
     wavy_aux.set_atoms(wavy_gbw.get_atoms());
     wavy_aux.set_ncen(wavy_gbw.get_ncen());
     wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set("TESTING"));
+    std::shared_ptr<BasisSet> aux_basis_set = BasisSetLibrary().get_basis_set("TESTING");
+    load_basis_into_WFN(wavy_aux, aux_basis_set);
 
     Int_Params aux_basis(wavy_aux);
 

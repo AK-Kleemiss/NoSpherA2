@@ -86,29 +86,30 @@ std::string write_basis_set(std::ofstream& file, const std::string basis_name, s
         }
     }
     file << "};\n\n";
-    //file << "constexpr ElementRange " << basis_name_copy << "_ranges[118] = {";
-    file << "constexpr std::array<ElementRange, 118> " << basis_name_copy << "_ranges {{";
+    file << "constexpr std::array<int, 118> " << basis_name_copy << "_counts {{";
 	int running_idx = 0;
     for (int i = 0; i < 118; i++) {
         if (basis_set[i].size() == 0) {
-            file << "{},";
+            file << "0,";
             continue;
         }
         int s = 0;
         for (int j = 0; j < basis_set[i].size(); j++) {
             s += basis_set[i][j].exp.size();
         }
-        file << "\n    {" << running_idx << ", " << s << "},";
+        file << "\n    " << s << ",";
         running_idx += s;
     }
     file << "}};\n\n";
 
+    file << "constexpr std::array<int, 118> " << basis_name_copy << "_offsets = " << "compute_prefix_sum( " <<  basis_name_copy << "_counts );\n\n";
 
     file << "constexpr BasisSetMetadata " << basis_name_copy << "_metadata = {\n";
     file << "    \"" << basis_name << "\",\n";
     file << "    " << basis_name_copy << "_primitives,\n";
     file << "    std::size(" << basis_name_copy << "_primitives),\n";
-    file << "    " << basis_name_copy << "_ranges\n";
+    file << "    " << basis_name_copy << "_counts,\n";
+    file << "    " << basis_name_copy << "_offsets\n";
     file << "};\n\n";
     return basis_name_copy;
 }
