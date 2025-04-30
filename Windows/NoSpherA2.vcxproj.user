@@ -222,7 +222,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

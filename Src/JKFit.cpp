@@ -38,6 +38,7 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
         const int nuc_charge = atm.get_charge();
         //Check if the element is already in the seen_elements vector
         if (std::find(seen_elements.begin(), seen_elements.end(), nuc_charge) != seen_elements.end()) continue;
+        err_chekf(atm.get_basis_set().size() != 0, "Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(nuc_charge) + " is not defined!", std::cout);
         seen_elements.push_back(nuc_charge);
 
         std::array<int, 4> configuration = constants::GROUND_STATE_CONFIGURATION[nuc_charge];
@@ -137,7 +138,6 @@ std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set(std::string basis_name)
         }
     }
     err_checkf(found_basis != "", "Basis set " + basis_name + " not defined in BasisSetLibrary!", std::cout);
-    std::cout << "Using basis set: " << found_basis << std::endl;
     return std::make_shared<BasisSet>(aux_basis_sets[selected_idx]);
 }
 
