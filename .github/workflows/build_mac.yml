@@ -1,0 +1,48 @@
+name: compile_mac
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_Mac:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # Cache OpenBLAS
+    - name: Cache OpenBLAS Build
+      uses: actions/cache@v4
+      id: cache-openblas-mac
+      with:
+        path: OpenBLAS/installation
+        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        restore-keys: |
+          openblas-mac-${{ runner.os }}-
+
+    - name: make_OpenMP
+      run: >
+          cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
+
+    - name: make_OpenBLAS
+      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
+      run: >
+          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+
+    - name: make_MacOS
+      run: >
+          cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
+
+    - name: tmate session if tests fail
+      if: failure() && github.event_name == 'workflow_dispatch'
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: false
+
+    - name: Archive executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: executable_MacOS
+        path: NoSpherA2_Mac
