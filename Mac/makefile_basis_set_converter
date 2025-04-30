@@ -7,7 +7,7 @@ all: basis_set_converter
 
 # Define the two separate lists with appropriate endings
 OBJS_arm64 := $(OBJ_NAMES:=.o_arm64)
-GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -MMD -MP -mcpu=apple-m1
+GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -mcpu=apple-m1
 
 
 BASIS_OBJ_NAMES := basis_set_helper BasisSetConverter
