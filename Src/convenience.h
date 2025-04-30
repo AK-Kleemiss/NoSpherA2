@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "pch.h"
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
@@ -546,8 +547,8 @@ struct options
     pathvec pol_wfns;
     ivec cmo1;
     ivec cmo2;
-    std::filesystem::path SALTED_DIR;
-    std::string SALTED_DFBASIS;
+    std::filesystem::path salted_model_dir;
+    std::shared_ptr<BasisSet> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
     std::filesystem::path fchk;
@@ -639,8 +640,7 @@ struct options
 
 const double gaussian_radial(const primitive& p, const double& r);
 
-int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b);
-int load_basis_into_WFN(WFN &wavy, BasisSet b);
+int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 
 double hypergeometric(double a, double b, double c, double x);
 

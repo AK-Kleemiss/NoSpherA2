@@ -83,3 +83,5 @@ Mac/NoSpherA2_Debug
 NoSpherA2_Debug
 *NoSpherA2_DLL.dll
 *NoSpherA2_DLL.res
+/tests/RI_Test_2
+/lahva
