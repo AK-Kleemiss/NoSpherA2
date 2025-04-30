@@ -1,0 +1,38 @@
+#Makefile for basis_set_converter on MAC
+RM := rm
+
+COMP := g++
+
+all: basis_set_converter 
+
+# Define the two separate lists with appropriate endings
+OBJS_arm64 := $(OBJ_NAMES:=.o_arm64)
+GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -static -MMD -MP -mcpu=apple-m1
+
+
+BASIS_OBJ_NAMES := basis_set_helper BasisSetConverter
+BASIS_OBJS_arm64 := $(BASIS_OBJ_NAMES:=.o_arm64_basis)
+
+
+%.o_arm64_basis: ../Src/basis_set_helper/%.cpp 
+	@echo 'Building file: $<'
+	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" -target aarch64-apple-macos14.0
+	@echo 'Finished building: $<'
+
+#Basis set converter
+basis_set_converter: ${BASIS_OBJS_arm64}
+	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_arm64} -target aarch64-apple-macos14.0
+	@mv BasisSetConverter ../
+	./../BasisSetConverter ../Windows/
+	@echo 'Done building basis_set_helper'
+
+clean:
+	@echo "Cleaning up"
+	@${RM} $(BASIS_OBJS_arm64) ../BasisSetConverter ../Src/auxiliary_basis.cpp ../Src/checkpoint.txt
+	@echo "Cleaned up"
+
+
+.PHONY: all clean basis_set_converter 
+.SECONDARY:
+
+
