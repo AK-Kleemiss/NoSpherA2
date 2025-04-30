@@ -6,7 +6,7 @@
 #include <vector>
 #include <array>
 #include <string>
-#include <sstream>
+#include <algorithm>
 #include <unordered_map>
 
 class primitive

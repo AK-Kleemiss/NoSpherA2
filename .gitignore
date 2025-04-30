@@ -13,6 +13,7 @@
 *.d
 *.o
 *.o_d
+*.o_basis
 *.idb
 *.ilk
 *.tsc
@@ -85,3 +86,6 @@ NoSpherA2_Debug
 *NoSpherA2_DLL.res
 /tests/RI_Test_2
 /lahva
+BasisSetConverter
+auxiliary_basis.cpp
+checkpoint.txt

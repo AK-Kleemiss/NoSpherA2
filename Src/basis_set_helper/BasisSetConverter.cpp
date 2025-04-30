@@ -102,12 +102,13 @@ int main(int argc, char** argv)
     log_file << "Number of files found: " << files.size() << std::endl;
 
 
-    if (!needs_rewrite(basis_path, files, log_file)) {
+    std::filesystem::path src_path = basis_path.parent_path().parent_path().parent_path();
+    if (!needs_rewrite(src_path, files, log_file)) {
         log_file << "No need to rewrite auxiliary_basis.cpp, exiting..." << std::endl;
         return 0;
     }
 
-    write_checkpoint_file(basis_path, files);
+    write_checkpoint_file(src_path, files);
 
     std::unordered_map<std::string, std::array<std::vector<primitive>, 118>> basis_sets;
     //Read all files and convert them to the new format
@@ -121,9 +122,8 @@ int main(int argc, char** argv)
 
 
     //Write the basis sets to a file
-
-    std::ofstream aux_file(basis_path / "auxiliary_basis.cpp");
-    aux_file << "#include \"../../JKFit.h\" \n";
+    std::ofstream aux_file(src_path / "auxiliary_basis.cpp");
+    aux_file << "#include \"JKFit.h\" \n";
     std::vector<std::string> basis_names_internal;
     aux_file << "namespace {\n";
 
@@ -142,7 +142,7 @@ int main(int argc, char** argv)
         basis_names_internal.push_back(write_basis_set(aux_file, basis_name, basis_set));
     }
 
-    aux_file << "}" << std::endl;
+    aux_file << "}\n";
     aux_file << "constexpr BasisSetMetadata aux_basis_sets[] = {\n";
     for (const std::string& name : basis_names_internal) {
         aux_file << "\t" << name << "_metadata,\n";
