@@ -107,16 +107,6 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
 std::shared_ptr<BasisSet> BasisSetLibrary::get_basis_set(std::string basis_name) {
     //Check if the supplied basis name is contained in part of a given basis set name
     std::string found_basis = "";
