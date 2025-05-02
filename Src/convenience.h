@@ -414,8 +414,6 @@ void removeElement(std::vector<T> &vec, const T &x)
     vec.erase(new_end, vec.end());
 }
 
-
-
 inline void Enter(){
 	std::cout << "press ENTER to continue... " << std::flush;
 	std::cin.ignore();
