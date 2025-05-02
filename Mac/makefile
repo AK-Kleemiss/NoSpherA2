@@ -23,7 +23,7 @@ basis_set_converter:
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_arm64: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@${COMP} ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
 	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_arm64: ../Src/%.cpp
@@ -41,7 +41,7 @@ NoSpherA2: ${OBJS_arm64}
 # Ensure auxiliary_basis.o_d depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_arm64_d: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@${COMP} ${GCC_OPTS_DEBUG} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
 	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_arm64_d: ../Src/%.cpp
