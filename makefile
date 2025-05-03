@@ -25,20 +25,21 @@ ifeq ($(NAME),WINDOWS)
 		@echo OpenBLAS already built \
 	)
 else
-	@echo "OpenBLAS built handled internally for $(NAME)"
+	@echo OpenBLAS built handled internally for $(NAME)
 endif
 
 featomic: check_rust
 ifeq ($(NAME),WINDOWS)
-	@echo "Building featomic for $(NAME)"
-	@cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install -fresh .. && make install
+	@echo Building featomic for $(NAME)
+	@cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install
+endif
 ifeq ($(NAME),MAC)
 	@cd featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install
 	@export CARGO_BUILD_TARGET=x86_64-apple-darwin
 	@rustup target add x86_64-apple-darwin
 	@cd .. && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
 else
-	@echo "Building featomic for $(NAME)"
+	@echo Building featomic for $(NAME)
 	@cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install
 endif
 
@@ -48,12 +49,12 @@ ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
 endif
 ifeq ($(NAME),LINUX)
-	@echo "Start making Linux executable for NoSpherA2_Debug"
+	@echo Start making Linux executable for NoSpherA2_Debug
 	rm -f NoSpherA2_Debug
 	cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 ifeq ($(NAME),MAC)
-	@echo "Start making Mac executable for NoSpherA2_Debug"
+	@echo Start making Mac executable for NoSpherA2_Debug
 	cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 
@@ -63,13 +64,14 @@ ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
 endif
 ifeq ($(NAME),LINUX)
-	@echo "Start making Linux executable"
-	rm -f NoSpherA2
-	cd Linux && rm -f NoSpherA2 && make all -j
+	@echo Start making Linux executable
+	@rm -f NoSpherA2
+	@cd Linux && rm -f NoSpherA2 && make all -j
 endif
 ifeq ($(NAME),MAC)
-	@echo "Start making Mac executable"
-	cd Mac && rm -f NoSpherA2 && make all -j
+	@echo Start making Mac executable
+	@rm -f NoSpherA2
+	@cd Mac && rm -f NoSpherA2 && make all -j
 endif
 
 test: NoSpherA2
