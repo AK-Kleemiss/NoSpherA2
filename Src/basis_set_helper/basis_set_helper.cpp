@@ -18,6 +18,7 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 
 			std::vector<double> res = split_string<double>(line, delimiter);    //splits line into components using delimiter
             if (basis_idx == static_cast<int>(res[4])) {
+                assert(!basis_set[elem_idx].empty() && "Attempting to access the last element of an empty vector.");
                 basis_set[elem_idx][basis_set[elem_idx].size() - 1].exp.push_back(res[2]);
                 basis_set[elem_idx][basis_set[elem_idx].size() - 1].coefficient.push_back(res[3]);
             }
