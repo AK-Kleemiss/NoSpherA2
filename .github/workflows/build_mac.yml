@@ -26,14 +26,23 @@ jobs:
       run: >
           cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
 
+    - name: make_OpenMP_x86_64
+      run: >
+          cd llvm-project/openmp && mkdir build_x86_64 && cd build_x86_64 && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
+
     - name: make_OpenBLAS
       if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
       run: >
           cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
 
+    - name: make_OpenBLAS_x86_64
+      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
+      run: >
+          cd OpenBLAS && mkdir installationx86_64 && make -j && make PREFIX=installationx86_64 install
+
     - name: make_MacOS
       run: >
-          cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
+          make all && mv NoSpherA2 ../NoSpherA2_Mac
 
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'
