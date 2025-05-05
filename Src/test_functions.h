@@ -1269,8 +1269,8 @@ void cube_from_coef_npy(std::string &coef_fn, std::string &xyzfile)
     WFN dummy(xyzfile);
 
     // const std::vector<std::vector<primitive>> basis(TZVP_JKfit.begin(), TZVP_JKfit.end());
-
-    const int nr_coefs = load_basis_into_WFN(dummy, BasisSetLibrary().get_basis_set("cc-pvqz-jkfit"));
+    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set("cc-pvqz-jkfit");
+    const int nr_coefs = load_basis_into_WFN(dummy, aux_basis);
     std::cout << data.size() << " vs. " << nr_coefs << " ceofficients" << std::endl;
     cube res = calc_cube_ML(data, dummy);
     res.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_PySCF_COEFS_rho.cube");
@@ -1559,7 +1559,6 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 
 void test_openblas()
 {
-    SALTEDPredictor SP;
     set_BLAS_threads(4);
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
@@ -1807,82 +1806,88 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 // Also calculate the difference between the two densities
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
-	const double radius = 2.5;
-	const double resolution = 0.1;
-
-    std::cout << "-------------------------------------DENSITY USING ORCA GBW-------------------------------------" << std::endl;
-    double MinMax[6]{0, 0, 0, 0, 0, 0};
-    int steps[3]{0, 0, 0};
-    readxyzMinMax_fromWFN(wavy, MinMax, steps, radius, resolution, true);
-    cube cube_normal(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
-    cube cube_RI_FIT(steps[0], steps[1], steps[2], wavy.get_ncen(), true);
-
-
-    std::filesystem::path normal_cube_path = std::filesystem::path(wavy.get_path().stem().string() + "_normal_rho.cube");
-    cube_normal.set_path(normal_cube_path);
-    // Check if the cube file already exists, if so read it
-    for (int i = 0; i < 3; i++)
-    {
-        cube_normal.set_origin(i, MinMax[i]);
-		cube_RI_FIT.set_origin(i, MinMax[i]);
-        cube_normal.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-		cube_RI_FIT.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
-    }
-    if (std::filesystem::exists(normal_cube_path))
-    {
-        cube_normal.read_file(true, true);
-    }
-    else
-    {
-        cube_normal.give_parent_wfn(wavy);
-        cube_normal.set_comment1("Calculated density using NoSpherA2");
-        cube_normal.set_comment2("from " + wavy.get_path().string());
-        Calc_Rho(cube_normal, wavy, radius, std::cout, false);
-        cube_normal.write_file(true);
-    }
-    cube_normal.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_normal.sum() << std::endl;
-
-    std::cout << "-------------------------------------RI Fit-------------------------------------" << std::endl;
-    vec ri_coefs = density_fit(wavy, aux_basis, (*opt).mem, 'C');
-    std::cout << "Calculating RI-FIT cube" << std::endl;
+    using namespace std;
 
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wavy.get_atoms());
     wavy_aux.set_ncen(wavy.get_ncen());
     wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, BasisSetLibrary().get_basis_set(aux_basis));
+    double beta = 2.5;
+    std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
 
-    
-    cube_RI_FIT.give_parent_wfn(wavy_aux);
-    //calc_cube_ML(ri_coefs, wavy_aux, -1, cube_RI_FIT);
-    cube_RI_FIT.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_RI_FIT_rho.cube"));
-    cube_RI_FIT.write_file(true);
+    //BasisSet aux_basis_set = BasisSetLibrary().get_basis_set("def2-TZVP-RIFIT");
+    load_basis_into_WFN(wavy_aux, aux_basis_set);
 
-	std::cout << "------------------------------------RI Fit analytical integral------------------------------------" << std::endl;
-    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), ri_coefs);
-    std::cout << "Table of Charges in electrons\n"
-        << "       Atom      ML" << std::endl;
+    vec ri_coefs = density_fit(wavy, wavy_aux, (*opt).mem, 'C');
 
-    for (int i = 0; i < wavy_aux.get_ncen(); i++)
+
+    vec3 grid;
+    ivec pointy = fuckery(wavy, grid, 1.0);
+#pragma omp parallel
     {
-        std::cout << std::setw(10) << wavy_aux.get_atom_label(i)
-            << std::fixed << std::setw(10) << std::setprecision(3) << wavy_aux.get_atom_charge(i) - atom_elecs[i];
-            std::cout << " " << std::setw(4) << wavy_aux.get_atom_charge(i) << " " << std::fixed << std::setw(10) << std::setprecision(3) << atom_elecs[i];
-        std::cout << std::endl;
+        vec2 d_temp(16);
+        for (int i = 0; i < 16; i++)
+        {
+            d_temp[i].resize(wavy.get_ncen(), 0.0);
+        }
+        vec phi_temp(wavy.get_nmo(), 0.0);
+
+        for (int a = 0; a < wavy.get_ncen(); a++) {
+#pragma omp for
+            for (int i = 0; i < pointy[a]; i++)
+            {
+                grid[a][4][i] = wavy.compute_dens(
+                    grid[a][0][i],
+                    grid[a][1][i],
+                    grid[a][2][i],
+                    d_temp,
+                    phi_temp) * grid[a][5][i];
+                //grid[a][6][i] = calc_density_ML(
+                //    grid[a][0][i],
+                //    grid[a][1][i],
+                //    grid[a][2][i],
+                //    ri_coefs,
+                //    wavy_aux.get_atoms(),
+                //    a) * grid[a][3][i];
+                grid[a][6][i] = calc_density_ML(
+                    grid[a][0][i],
+                    grid[a][1][i],
+                    grid[a][2][i],
+                    ri_coefs,
+                    wavy_aux.get_atoms()) * grid[a][5][i];
+            }
+        }
+        for (int i = 0; i < 16; i++)
+            shrink_vector<double>(d_temp[i]);
+        shrink_vector<vec>(d_temp);
+        shrink_vector<double>(phi_temp);
+    }
+    vec elecs_DFT(wavy.get_ncen(), 0.0);
+    vec elecs_RI(wavy.get_ncen(), 0.0);
+    for (int a = 0; a < wavy.get_ncen(); a++)
+    {
+        elecs_DFT[a] = vec_sum(grid[a][4]);
+        elecs_RI[a] = vec_sum(grid[a][6]);
+    }
+    vec analytic_RI = calc_atomic_density(wavy_aux.get_atoms(), ri_coefs);
+
+    std::cout << "Table of Charges in electrons\n"
+        << "       Atom  DFT     RI      Diff" << std::endl;
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        std::cout << std::setw(10) << wavy.get_atom_label(i)
+            << std::fixed << std::setw(10) << std::setprecision(4) << elecs_DFT[i]
+            << std::fixed << std::setw(10) << std::setprecision(4) << elecs_RI[i]
+                << std::fixed << std::setw(10) << std::setprecision(4) << analytic_RI[i]
+                << std::fixed << std::setw(10) << std::setprecision(4) << elecs_DFT[i] - elecs_RI[i]
+                    << std::endl;
     }
 
-    std::cout << "-------------------------------------DIFFERENCE CUBE-------------------------------------" << std::endl;
-    cube cube_diff = cube_normal - cube_RI_FIT;
-    cube_diff.give_parent_wfn(wavy);
-    cube_diff.set_comment1("Difference between RI-FIT and normal density");
-    cube_diff.set_comment2("from " + wavy.get_path().string());
-    cube_diff.set_path(std::filesystem::path(wavy.get_path().stem().string() + "_diff.cube"));
-    cube_diff.write_file(true);
-    cube_diff.calc_dv();
-    std::cout << "Number of electrons in difference cube: " << std::fixed << std::setprecision(5) << cube_diff.sum() << std::endl;
-    std::cout << "RRS of difference cube: " << std::fixed << std::setprecision(5) << cube_normal.rrs(cube_RI_FIT) << std::endl;
-    std::cout << "Done!" << std::endl;
+    std::cout << "SUM OF CHARGES: " << std::endl;
+    std::cout << "DFT: " << std::fixed << std::setprecision(4) << vec_sum(elecs_DFT) << std::endl;
+    std::cout << "RI:  " << std::fixed << std::setprecision(4) << vec_sum(elecs_RI) << std::endl;
+    std::cout << "Analytic:  " << std::fixed << std::setprecision(4) << vec_sum(analytic_RI) << std::endl;
+   
 }
 
 void test_reading_SALTED_binary_file() {
