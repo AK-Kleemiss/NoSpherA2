@@ -341,7 +341,7 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_xTB_molden|x64.ActiveCfg = D_xTB_molden|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_BasisSetConverter|ARM64.ActiveCfg = Debug_BasisSetConverter|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_BasisSetConverter|ARM64.Build.0 = Debug_BasisSetConverter|ARM64
-		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_BasisSetConverter|x64.ActiveCfg = Debug_BasisSetConverter|Win32
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_BasisSetConverter|x64.ActiveCfg = Debug_BasisSetConverter|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.debug_Daniel|ARM64.ActiveCfg = debug_Daniel|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.debug_Daniel|ARM64.Build.0 = debug_Daniel|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.debug_Daniel|x64.ActiveCfg = debug_Daniel|x64
