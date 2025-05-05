@@ -4,8 +4,8 @@
 #include "atoms.h"
 #include "cube.h"
 #include "wfn_class.h"
-#include "../featomic/featomic_install/include/metatensor.hpp"
-#include "../featomic/featomic_install/include/featomic.hpp"
+#include "metatensor.hpp"
+#include "featomic.hpp"
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
