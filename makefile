@@ -30,7 +30,7 @@ endif
 
 featomic: check_rust
 ifeq ($(NAME),WINDOWS)
-    @if not exist featomic\featomic_install\lib\metatensor.lib ( \
+	@if not exist featomic\featomic_install\lib\metatensor.lib ( \
 		@echo Building featomic for $(NAME) && \
 		cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install \
 	) else ( \
