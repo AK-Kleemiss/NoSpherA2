@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_Mac:
+  build_Mac_arm:
     runs-on: macos-latest
 
     steps:
@@ -18,25 +18,68 @@ jobs:
       id: cache-openblas-mac
       with:
         path: OpenBLAS/installation
-        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        key: openblas-arm-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
         restore-keys: |
-          openblas-mac-${{ runner.os }}-
+          openblas-arm-mac-${{ runner.os }}-
 
     - name: make_OpenMP
       run: >
           cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
 
+    - name: make_OpenBLAS
+      if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
+      run: >
+          cd OpenBLAS && make -j && make PREFIX=OpenBLAS_installation install
+
+    # Cache featomic
+    - name: Cache featomic Build
+      uses: actions/cache@v4
+      id: cache-featomic-mac
+      with:
+        path: featomic/featomic_install
+        key: featomic-arm-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        restore-keys: |
+          featomic-arm-mac-${{ runner.os }}-
+  
+    - name: make_featomic
+      if: steps.cache-featomic-arm-mac.outputs.cache-hit != 'true'
+      run: >
+          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install
+    
+    - name: make_MacOS
+      run: >
+          cd Mac && make NoSpherA2_arm && mv NoSpherA2 ../NoSpherA2_Mac_arm
+
+    - name: Archive executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: executable_MacOS_arm
+        path: NoSpherA2_Mac_arm
+
+  build_Mac_x86:
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # Cache OpenBLAS
+    - name: Cache OpenBLAS Build
+      uses: actions/cache@v4
+      id: cache-openblas-mac
+      with:
+        path: OpenBLAS/installation
+        key: openblas-x86-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        restore-keys: |
+          openblas-x86-mac-${{ runner.os }}-
+
     - name: make_OpenMP_x86_64
       run: >
           cd llvm-project/openmp && mkdir build_x86_64 && cd build_x86_64 && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
 
-    - name: make_OpenBLAS
-      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && make -j && make PREFIX=OpenBLAS_installation install
-
     - name: make_OpenBLAS_x86_64
-      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
+      if: steps.cache-openblas-x86-mac.outputs.cache-hit != 'true'
       run: >
           cd OpenBLAS && make TARGET=NEHALEM NO_AVX=1 NOFORTRAN=1 BIANRY=64 CC="cc -arch x86_64" -j && make PREFIX=OpenBLAS_installationx86_64 install
 
@@ -46,26 +89,45 @@ jobs:
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
-        key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        key: featomic-x86-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
-          featomic-mac-${{ runner.os }}-
-  
-    - name: make_featomic
-      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
-      run: >
-          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install && export CARGO_BUILD_TARGET=x86_64-apple-darwin && rustup target add x86_64-apple-darwin && cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
+          featomic-x86-mac-${{ runner.os }}-
 
     - name: make_featomic_x86
-      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
+      if: steps.cache-featomic-x86-mac.outputs.cache-hit != 'true'
       run: >
           rustup target add x86_64-apple-darwin && cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
     
     - name: make_MacOS
       run: >
-          make all && mv NoSpherA2 ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_x86 && mv NoSpherA2 ../NoSpherA2_Mac_x86
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
       with:
-        name: executable_MacOS
+        name: executable_MacOS_x86
+        path: NoSpherA2_Mac_x86
+
+  combine:
+    runs-on: macos-latest
+    needs: [build_Mac_arm, build_Mac_x86]
+
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: executable_MacOS_arm
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: executable_MacOS_x86
+    - name: Combine artifacts
+      run: |
+        lipo -create -output NoSpherA2_Mac NoSpherA2_arm NoSpherA2_x86
+    - name: Archive combined executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: NoSpherA2_Mac_combined  
         path: NoSpherA2_Mac
+
+        
