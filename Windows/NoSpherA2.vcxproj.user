@@ -1,8 +1,13 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif alanine.cif -wfn .\alanine.owf.fchk -dmin 0.5</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>../tests/alanine_occ</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-cpus 16 -wfn Iron_Komplex.gbw -RI_CUBE -v -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
+    <LocalDebuggerCommandArguments>-cpus 16 -v </LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\BasisSetConverter</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
@@ -49,8 +54,8 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">
-    <LocalDebuggerCommandArguments>-ML_test</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\reading_SALTED</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-SALTED D:\Models\Combo_v6 -cif test_cysteine.cif -wfn test_cysteine.xyz -dmin 0.73 -v</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\SALTED</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
@@ -217,7 +222,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
@@ -349,9 +354,9 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>..\tests\sfac_scan\</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-sfac_scan 2.0 epoxide.cif epoxide.gbw -acc 3</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-lukas_test</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
     <LocalDebuggerWorkingDirectory>..\tests\NiP3_fchk\</LocalDebuggerWorkingDirectory>

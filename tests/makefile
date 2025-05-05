@@ -135,7 +135,7 @@ ri_fit:
 		-wfn epoxide.gbw \
 		-cif epoxide.cif \
 		-dmin 0.4 \
-		-ri_fit \
+		-ri_fit combo_basis_fit\
 		-no-date)
 
 rubredoxin_cmtc:
@@ -194,8 +194,11 @@ sucrose_SF:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-acc 0 \
-		-no-date)
+		-cif sucrose.cif -lap -eli \
+		-resolution 0.5 -test \
+		-no-date \
+		&& ${MV} NoSpherA2_cube.log $@.log \
+		&& ${DIFF} $@.log $@.good)
 
 sucrose_twin:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \

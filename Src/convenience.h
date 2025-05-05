@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "pch.h"
+
 // Pre-definition of classes included later
 class WFN;
 class cell;
@@ -444,6 +445,14 @@ inline bool yesno(){
 	return false;
 };
 
+struct SimplePrimitive {
+    int center;     // Center index
+    int type;       // Primitive type (0=s, 1=p, 2=d, etc.)
+    double exp;     // Exponent
+    double coefficient; // Coefficient
+    int shell;
+};
+
 class primitive
 {
 private:
@@ -467,6 +476,7 @@ public:
     }
     primitive() : center(0), type(0), exp(0.0), coefficient(0.0) {};
     primitive(int c, int t, double e, double coef);
+    primitive(const SimplePrimitive& p);
     bool operator==(const primitive &other) const
     {
         return center == other.center &&
@@ -563,8 +573,8 @@ struct options
     ivec cmo1;
     ivec cmo2;
     ivec ignore;
-    std::filesystem::path SALTED_DIR;
-    std::string SALTED_DFBASIS;
+    std::filesystem::path salted_model_dir;
+    std::shared_ptr<BasisSet> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
     std::filesystem::path fchk;
@@ -657,10 +667,9 @@ struct options
     };
 };
 
-const double gaussian_radial(primitive &p, double &r);
+const double gaussian_radial(const primitive& p, const double& r);
 
-int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b);
-int load_basis_into_WFN(WFN &wavy, BasisSet &b);
+int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 
 double hypergeometric(double a, double b, double c, double x);
 

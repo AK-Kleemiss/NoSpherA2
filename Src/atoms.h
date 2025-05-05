@@ -85,6 +85,7 @@ public:
     void set_label(const std::string& l) { label = l; };
     void set_nr(const int& n) { nr = n; };
     void clear_basis_set() { basis_set.clear(); };
+    void set_basis_set(std::vector<basis_set_entry> new_basis) { basis_set = new_basis; };
     int get_basis_set_size() const { return (int)basis_set.size(); };
     double get_basis_set_exponent(const int& _nr) const { return basis_set[_nr].get_exponent(); };
     double get_basis_set_coefficient(const int& _nr) const { return basis_set[_nr].get_coefficient(); };

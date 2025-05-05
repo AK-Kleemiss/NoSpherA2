@@ -162,7 +162,7 @@ private:
     void populate_bas();
     void populate_env();
 
-    vec normalize_gto(vec coef, vec exp, int l);
+    vec normalize_gto(vec coef, const vec exp, const int l);
     double gaussian_int(int n, double exp) {
         double n1 = (n + 1) * 0.5;
         return std::tgamma(n1) / (2.0 * pow(exp, n1));
@@ -170,7 +170,6 @@ private:
 public:
     Int_Params();
     Int_Params(const WFN& wavy);
-    Int_Params(WFN& wavy, const std::string auxname);
     Int_Params operator+(const Int_Params& other);
 
     // Getters

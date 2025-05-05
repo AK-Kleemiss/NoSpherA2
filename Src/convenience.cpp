@@ -51,10 +51,11 @@ std::string help_message =
      "   -mtc            <List of .wfns + parts>  Performs calculation for a list of wavefunctions (=Multi-Tsc-Calc), where asymmetric unit is.\n"
      "                                            taken from given CIF. Also disorder groups are required per file as comma separated list\n"
      "                                            without spaces.\n"
+     "   -salted         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
+     "   -ri_fit         <Aux Basis> <BETA>       Uses RI-Fitting to partition the electron density. If Aux Basis == 'auto' a optinal beta value can be given.\n"
      "   -mtc_mult       <List of multiplicity>   Matching multiplicity for -cmtc and -mtc wavefucntions\n"
      "   -mtc_charge     <List of charges>        Matching charges for -cmtc and -mtc wavefucntions\n"
      "   -mtc_ECP        <List of ECP modes>      Matching ECP modes for -cmtc and -mtc wavefucntions\n"
-     "   -SALTED         <Path to Model folder>   Uses a provided SALTED-ML Model to predict the electron densitie of a xyz-file\n"
      "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
      "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
      "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
@@ -398,6 +399,13 @@ bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
 }
 
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
+{
+    norm_const = pow(
+        pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
+        0.25);
+};
+
+primitive::primitive(const SimplePrimitive& other) : center(other.center), type(other.type), exp(other.exp), coefficient(other.coefficient)
 {
     norm_const = pow(
         pow(2, 7 + 4 * type) * pow(exp, 3 + 2 * type) / constants::PI / pow(doublefactorial(2 * type + 1), 2),
@@ -1345,7 +1353,7 @@ double get_lambda_1(double *a)
     }
 };
 
-const double gaussian_radial(primitive &p, double &r)
+const double gaussian_radial(const primitive &p, const double &r)
 {
     return pow(r, p.get_type()) * std::exp(-p.get_exp() * r * r) * p.normalization_constant();
 }
@@ -1496,41 +1504,29 @@ double bessel_first_kind(const int l, const double x)
     }
 }
 
-int load_basis_into_WFN(WFN &wavy, const std::array<std::vector<primitive>, 118> &b)
+int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
 {
-    wavy.set_basis_set_ptr(b);
+    //If no basis is yet loaded, assume a auto aux should be generated
+    if ((*b).get_primitive_count() == 0) (*b).gen_aux(wavy);
+
+    wavy.set_basis_set_ptr((*b).get_data());
     int nr_coefs = 0;
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         int current_charge = wavy.get_atom_charge(i) - 1;
-        const primitive *basis = b[current_charge].data();
-        int size = (int)b[current_charge].size();
+        const std::span<const SimplePrimitive> basis = (*b)[current_charge];
+        int size = (int)basis.size();
         for (int e = 0; e < size; e++)
         {
-            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
-            nr_coefs += 2 * basis[e].get_type() + 1;
+            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
+            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
+
+            nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
         }
     }
     return nr_coefs;
 }
 
-int load_basis_into_WFN(WFN &wavy, BasisSet &b)
-{
-    wavy.set_basis_set_ptr(b.get_data());
-    int nr_coefs = 0;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        int current_charge = wavy.get_atom_charge(i) - 1;
-        const std::vector<primitive> &basis = b[current_charge];
-        int size = (int)b[current_charge].size();
-        for (int e = 0; e < size; e++)
-        {
-            wavy.push_back_atom_basis_set(i, basis[e].get_exp(), 1.0, basis[e].get_type(), e);
-            nr_coefs += 2 * basis[e].get_type() + 1;
-        }
-    }
-    return nr_coefs;
-}
 
 double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
@@ -1662,6 +1658,11 @@ void options::digest_options()
         else if (temp == "-blastest")
         {
             test_openblas();
+            exit(0);
+        }
+        else if (temp == "-lahvatest")
+        {
+            //_test_lahva();
             exit(0);
         }
         else if (temp == "-Cation")
@@ -2052,17 +2053,30 @@ void options::digest_options()
             // Check if next argument is a valid basis set name or a new argument starting with "-"
             if (i + 1 < argc && arguments[i + 1].find("-") != 0)
             {
-                SALTED_DFBASIS = arguments[i + 1];
-                if (!BasisSetLibrary().check_basis_set_exists(SALTED_DFBASIS))
+
+                if (arguments[i + 1] == "auto") {
+                    double beta = 2.0;
+                    //Check if the next argument is a valid double
+                    if (i + 2 < argc && arguments[i + 2].find("-") != 0) {
+                        double beta = std::stod(arguments[i + 2]);
+                    }
+                    if (debug) cout << "Using automatic basis set selection with beta: " << beta << endl;
+                    aux_basis = std::make_shared<BasisSet>(beta);
+                    continue;
+                }
+
+
+                if (!BasisSetLibrary().check_basis_set_exists(arguments[i + 1]))
                 {
-                   std::cout << "Basis set " << SALTED_DFBASIS << " not found in the library. Exiting." << endl;
+                    cout << "Basis set " << arguments[i + 1] << " not found in the library. Exiting." << endl;
                     exit(0);
                 }
+                aux_basis = BasisSetLibrary().get_basis_set(arguments[i + 1]);
             }
             else
             {
-               std::cout << "No basis set specified. Using fallback 'combo_basis_fit'!" << endl;
-                SALTED_DFBASIS = "combo_basis_fit";
+                cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
+                aux_basis = std::make_shared<BasisSet>(2.0);
             }
         }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
@@ -2073,7 +2087,9 @@ void options::digest_options()
 
             // std::string aux_basis = arguments[i + 1];
             gen_CUBE_for_RI(wavy, "def2_qzvppd_rifit", this);
-            //gen_CUBE_for_RI(wavy, "combo_basis_fit", this);
+            //gen_CUBE_for_RI(wavy, "def2_universal_jkfit", this);
+            //gen_CUBE_for_RI(wavy, "combo-basis-fit", this);
+            //gen_CUBE_for_RI(wavy, "cc-pvqz-jkfit", this);
 
             exit(0);
         }
@@ -2083,11 +2099,7 @@ void options::digest_options()
         else if (temp == "-SALTED" || temp == "-salted")
         {
             SALTED = true;
-            SALTED_DIR = arguments[i + 1];
-        }
-        else if (temp == "-DFBASIS" || temp == "-dfbasis")
-        {
-            SALTED_DFBASIS = arguments[i + 1];
+            salted_model_dir = arguments[i + 1];
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
@@ -2750,23 +2762,23 @@ double vec_length(const vec &in)
     return sqrt(sum);
 }
 
-void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
+void error_check(const bool condition, const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
     if (!condition)
     {
-        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
+        log_file << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
-        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << std::endl;
+        std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << std::endl;
         exit(-1);
     }
 };
-void not_implemented(const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file)
+void not_implemented(const std::source_location loc, const std::string &error_message, std::ostream &log_file)
 {
-    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
+    log_file << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
     log_file.flush();
     std::cout.rdbuf(coutbuf); // reset to standard output again
-    std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_mesasge << " not yet implemented!" << std::endl;
+    std::cout << "Error in " << loc.function_name() << " at: " << loc.file_name() << " : " << loc.line() << " " << error_message << " not yet implemented!" << std::endl;
     exit(-1);
 };
 

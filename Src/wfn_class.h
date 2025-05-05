@@ -47,7 +47,7 @@ private:
     vec UT_DensityMatrix;
     vec UT_SpinDensityMatrix;
     dMatrix2 DM;
-    const std::array<std::vector<primitive>, 118> *basis_set;
+    std::shared_ptr<std::array<std::vector<primitive>, 118>> basis_set;
 
     bool erase_center(const int &g_nr);
     bool erase_type(const int &nr);
@@ -187,8 +187,8 @@ public:
      * @return Returns true if the basis set information was successfully deleted, false otherwise.
      */
     bool delete_basis_set();
-    void set_basis_set_ptr(const std::array<std::vector<primitive>, 118> &given) { basis_set = &given; };
-    const std::array<std::vector<primitive>, 118> *get_basis_set_ptr() const { return basis_set; };
+    void set_basis_set_ptr(std::shared_ptr<std::array<std::vector<primitive>, 118>> given) { basis_set = given; };
+    const std::shared_ptr<std::array<std::vector<primitive>, 118>> get_basis_set_ptr() const { return basis_set; };
     //-------------------atom handling--------------------------------------------------------------
     const double get_atom_coordinate(const unsigned int &nr, const unsigned int &axis) const;
     const std::string get_atom_label(const unsigned int &nr) const;

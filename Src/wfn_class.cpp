@@ -2049,6 +2049,42 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     return true;
 };
 
+template<typename T>
+void move_columns(T& matrix, int dimension, int from_col, int num_cols, int to_col) {
+    if (from_col == to_col || num_cols == 0) return;
+
+    int block_size = num_cols * dimension;
+    T tmp_block(block_size);
+
+    // Copy the block to be moved
+    std::copy(matrix.data() + from_col * dimension,
+        matrix.data() + (from_col + num_cols) * dimension,
+        tmp_block.data());
+
+    if (from_col < to_col) {
+        // Shift the intermediate block leftward
+        std::copy(matrix.data() + (from_col + num_cols) * dimension,
+            matrix.data() + to_col * dimension,
+            matrix.data() + from_col * dimension);
+
+        // Insert the moved block
+        std::copy(tmp_block.begin(),
+            tmp_block.end(),
+            matrix.data() + (to_col - num_cols) * dimension);
+    }
+    else {
+        // Shift the intermediate block rightward
+        std::copy_backward(matrix.data() + to_col * dimension,
+            matrix.data() + from_col * dimension,
+            matrix.data() + (from_col + num_cols) * dimension);
+        // Insert the moved block
+        std::copy(tmp_block.begin(),
+            tmp_block.end(),
+            matrix.data() + to_col * dimension);
+    }
+}
+
+
 bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, const bool debug, const bool _has_ECPs)
 {
     using namespace std;
@@ -2507,20 +2543,50 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
                         reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
-                    }
-                    
+                    } 
                 }
                 index += 2 * type + 1;
             }
         }
 
+        //Map to collect the end index of every type
+        index = 0;
+        for (atom& _atom : atoms) {
+            std::map<int, int> type_end;
+            std::vector<basis_set_entry> basis = _atom.get_basis_set();
+            int temp_bas_idx = 0;
+            for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
+                int type = basis[temp_bas_idx].get_type() - 1;
+                temp_bas_idx += _atom.get_shellcount(shell);
+                if (type_end.find(type + 1) == type_end.end()) {
+                    type_end[type] = index + 2 * type + 1;
+                }
+                else {
+                    std::cout << "function of type " << type << " is out of line!" << std::endl;
+                    move_columns(reorderd_coefs_s1.container(), dimension, index, 2 * type + 1, type_end[type]);
+
+                    if (operators == 2) {
+                        move_columns(reorderd_coefs_s2.container(), dimension, index, 2 * type + 1, type_end[type]);
+                    }
+
+                    //Add one to each value in the map
+                    for (int i = type; i <= type + 1; i++) {
+                        type_end[i] += 2 * type + 1;
+                    }
+                }
+                index += 2 * type + 1;
+            }
+        }
+
+
+
 		int n_occ = 0;
 		for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
         
-        dMatrix2 coeff_mo_s1(dimension, n_occ), coeff_small_s1(dimension, n_occ);
+        dMatrix2 coeff_mo_s1(dimension, dimension), coeff_small_s1(dimension, dimension);
         dMatrix2 coeff_mo_s2, coeff_small_s2;
-        if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, n_occ); coeff_small_s2 = dMatrix2(dimension, n_occ);
-
+        if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, dimension); coeff_small_s2 = dMatrix2(dimension, dimension);
+        
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
@@ -2532,22 +2598,17 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             }
         }
 
-
         if (operators == 1) {
 			DM = dot(coeff_mo_s1, coeff_small_s1, false, true);
         }
         else {
             dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, false, true);
             dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, false, true);
+            
+            std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
-            for (int i = 0; i < DM_s1.extent(0); i++) {
-                for (int j = 0; j < DM_s1.extent(1); j++) {
-                    DM_s1(i,j) += DM_s2(i,j);
-                }
-            }
             DM = DM_s1;
         }
-
 
         if (debug)
         {

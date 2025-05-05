@@ -9,14 +9,14 @@
 
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {
-    std::filesystem::path _path = opt_in.SALTED_DIR;
-    SALTED_DIR = opt_in.SALTED_DIR;
+    std::filesystem::path _path = opt_in.salted_model_dir;
+    SALTED_DIR = opt_in.salted_model_dir;
     debug = opt_in.debug;
 
-    config.salted_filename = find_first_salted_file(opt_in.SALTED_DIR);
+    config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
 	if (config.salted_filename == "") {
-        std::cout << "No SALTED binary file found in directory: " << opt_in.SALTED_DIR << std::endl;
+        std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
         exit(1);
     }
 
@@ -94,7 +94,7 @@ void calculateConjugate(std::vector<std::vector<std::vector<std::vector<std::com
 
 void SALTEDPredictor::setup_atomic_environment()
 {
-    const std::array<std::vector<primitive>, 118> *bs = wavy.get_basis_set_ptr();
+    const std::shared_ptr<std::array<std::vector<primitive>, 118>> bs = wavy.get_basis_set_ptr();
     SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
     for (int i = 0; i < wavy.get_ncen(); i++)

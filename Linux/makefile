@@ -15,7 +15,7 @@ LIBOPENBLAS_I := -I../OpenBLAS/installation/include
 all: NoSpherA2 
 
 # List of object file names without extensions
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots qct b2c bondwise_analysis
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots auxiliary_basis qct b2c bondwise_analysis
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
@@ -39,9 +39,20 @@ OpenBLAS:
 		echo 'Skipping OpenBLAS build, $(LIBOPENBLAS) already exists'; \
 	fi
 
+
+#Basis set converter
+basis_set_converter:
+	@make -f makefile_basis_set_converter
+	
 # Precompiled header
 pch.h.gch: ../Src/pch.h omp OpenBLAS
 	${COMP} -std=c++23 -x c++-header -o "$@" "$<"
+
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o'
 
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch omp OpenBLAS
@@ -49,29 +60,35 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../featomic/featomic_install/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o_d: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o_d'
+
 # Pattern rule to compile all .cpp files
 %.o_d: ../Src/%.cpp pch.h.gch omp OpenBLAS
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../featomic/featomic_install/include -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-NoSpherA2: ${OBJS} omp OpenBLAS
+NoSpherA2: OpenBLAS omp ${OBJS}
 	@echo 'Building target: $@'
 	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2 ../
 	@echo 'Done building NoSpherA2'
 
-NoSpherA2_Debug: ${OBJS_d} omp OpenBLAS
+NoSpherA2_Debug: OpenBLAS omp ${OBJS_d} 
 	@echo 'Building target: $@'
 	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
 	cp NoSpherA2_Debug ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
-	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ${OBJS} ${OBJS_d}
+	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} ${BASIS_OBJS}
 	-@echo ' '
 
-.PHONY: all clean
+.PHONY: all clean basis_set_converter
 .SECONDARY:
 
 

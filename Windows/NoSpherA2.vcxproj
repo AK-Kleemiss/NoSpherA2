@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug_BasisSetConverter|x64">
+      <Configuration>Debug_BasisSetConverter</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="debug_Daniel|x64">
       <Configuration>debug_Daniel</Configuration>
       <Platform>x64</Platform>
@@ -220,6 +224,15 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseOfMfc>Static</UseOfMfc>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
@@ -699,6 +712,9 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -854,6 +870,11 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -1081,7 +1102,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1092,6 +1113,48 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <OpenMPSupport>false</OpenMPSupport>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../Lib/rascaline.lib;../Lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+    </PreBuildEvent>
+    <PreBuildEvent>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
     <ClCompile>
@@ -1113,7 +1176,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1124,6 +1187,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|x64'">
     <ClCompile>
@@ -1145,7 +1212,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1156,6 +1223,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_gbw2wfn|x64'">
     <ClCompile>
@@ -1177,7 +1248,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1188,6 +1259,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">
     <ClCompile>
@@ -1209,7 +1284,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1220,6 +1295,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">
     <ClCompile>
@@ -1241,7 +1320,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1252,6 +1331,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_merge_tscs|x64'">
     <ClCompile>
@@ -1273,7 +1356,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -1284,6 +1367,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">
     <ClCompile>
@@ -1309,7 +1396,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1321,6 +1408,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">
     <ClCompile>
@@ -1346,7 +1437,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1358,6 +1449,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">
     <ClCompile>
@@ -1384,7 +1479,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1395,6 +1490,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|x64'">
     <ClCompile>
@@ -1456,7 +1555,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1467,6 +1566,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">
     <ClCompile>
@@ -1493,7 +1596,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1504,6 +1607,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">
     <ClCompile>
@@ -1530,7 +1637,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1541,6 +1648,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">
     <ClCompile>
@@ -1566,7 +1677,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1578,6 +1689,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_OpenShell_gbw|x64'">
     <ClCompile>
@@ -1603,7 +1718,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1615,6 +1730,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_ECP|x64'">
     <ClCompile>
@@ -1640,7 +1759,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1652,6 +1771,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|x64'">
     <ClCompile>
@@ -1677,7 +1800,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1689,6 +1812,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">
     <ClCompile>
@@ -1714,7 +1841,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1726,6 +1853,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">
     <ClCompile>
@@ -1751,7 +1882,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1763,6 +1894,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_tscb|x64'">
     <ClCompile>
@@ -1788,7 +1923,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1800,6 +1935,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_grown|x64'">
     <ClCompile>
@@ -1825,7 +1964,7 @@
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -1837,6 +1976,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Molden|x64'">
     <ClCompile>
@@ -1864,7 +2007,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1875,6 +2018,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">
     <ClCompile>
@@ -1902,7 +2049,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1913,6 +2060,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|x64'">
     <ClCompile>
@@ -1940,7 +2091,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1951,6 +2102,51 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_Rascaline|x64'">
+    <ClCompile>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>false</SDLCheck>
+      <PreprocessorDefinitions>_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <OpenMPSupport>true</OpenMPSupport>
+      <FloatingPointModel>Fast</FloatingPointModel>
+      <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <SupportJustMyCode>false</SupportJustMyCode>
+      <LanguageStandard_C>stdclatest</LanguageStandard_C>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <AdditionalIncludeDirectories>..\Lib;..\OpenBLAS\build\install\include\openblas;..\lahva\include</AdditionalIncludeDirectories>
+      <FloatingPointExceptions>false</FloatingPointExceptions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>Comdlg32.lib;ole32.lib;../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;Shlwapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+    </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
     <ClCompile>
@@ -1977,7 +2173,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -1988,6 +2184,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_UNKNOWN|x64'">
     <ClCompile>
@@ -2014,7 +2214,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2025,6 +2225,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fourier_Transform|x64'">
     <ClCompile>
@@ -2051,7 +2255,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2062,6 +2266,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
     <ClCompile>
@@ -2088,7 +2296,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2099,6 +2307,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">
     <ClCompile>
@@ -2125,7 +2337,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -2135,6 +2347,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|x64'">
     <ClCompile>
@@ -2161,7 +2377,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2172,6 +2388,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_BLAS|x64'">
     <ClCompile>
@@ -2198,7 +2418,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2209,6 +2429,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">
     <ClCompile>
@@ -2235,7 +2459,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2247,6 +2471,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|x64'">
     <ClCompile>
@@ -2274,7 +2502,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2285,6 +2513,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|x64'">
     <ClCompile>
@@ -2307,7 +2539,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2316,6 +2548,10 @@
       <AdditionalDependencies>Comdlg32.lib;ole32.lib;../featomic/featomic_install/lib/featomic.lib;../featomic/featomic_install/lib/metatensor.lib;../OpenBLAS/build/lib/RELEASE/openblas.lib;Ws2_32.lib;Userenv.lib;Bcrypt.lib;Ntdll.lib;Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">
     <ClCompile>
@@ -2370,7 +2606,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2382,6 +2618,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
     <ClCompile>
@@ -2403,7 +2643,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2415,6 +2655,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_MTC_Disorder|x64'">
     <ClCompile>
@@ -2436,7 +2680,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2448,6 +2692,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SF_Hybrid|x64'">
     <ClCompile>
@@ -2469,7 +2717,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2481,6 +2729,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_SF_CMTC|x64'">
     <ClCompile>
@@ -2502,7 +2754,7 @@
       <SupportJustMyCode>true</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2514,6 +2766,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_kpts_file|x64'">
     <ClCompile>
@@ -2535,7 +2791,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2547,6 +2803,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_tsc_merge|x64'">
     <ClCompile>
@@ -2568,7 +2828,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2580,6 +2840,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_IAM_SF|x64'">
     <ClCompile>
@@ -2601,7 +2865,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2613,6 +2877,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
     <ClCompile>
@@ -2634,7 +2902,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2646,6 +2914,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_properties|x64'">
     <ClCompile>
@@ -2667,7 +2939,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2679,6 +2951,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_ESP|x64'">
     <ClCompile>
@@ -2700,7 +2976,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2712,6 +2988,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_fchk_generation|x64'">
     <ClCompile>
@@ -2733,7 +3013,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2745,6 +3025,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|x64'">
     <ClCompile>
@@ -2767,7 +3051,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2778,6 +3062,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PDF|x64'">
     <ClCompile>
@@ -2800,7 +3088,7 @@
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2812,6 +3100,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -2843,7 +3135,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2858,6 +3150,10 @@
       <Command>
       </Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|x64'">
     <ClCompile>
@@ -2888,7 +3184,7 @@
       <IntelJCCErratum>true</IntelJCCErratum>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
     <Link>
@@ -2901,6 +3197,10 @@
     <PostBuildEvent>
       <Command>copy "$(OutputPath)NoSpherA2.exe" D:\devel\rundir-py3\NoSpherA2.exe</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">
     <ClCompile>
@@ -2925,7 +3225,7 @@
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2940,6 +3240,10 @@
       <Command>
       </Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB_reader|x64'">
     <ClCompile>
@@ -2961,7 +3265,7 @@
       <SupportJustMyCode>false</SupportJustMyCode>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <LanguageStandard_C>stdclatest</LanguageStandard_C>
-      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\featomic\featomic_install\include;..\OpenBLAS\build\install\include\openblas;..\lahva\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FloatingPointExceptions>false</FloatingPointExceptions>
     </ClCompile>
@@ -2973,6 +3277,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
+      <Message>Pregenerates the basis sets</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="../Src/AtomGrid.cpp">
@@ -2987,7 +3295,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3085,6 +3395,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3143,7 +3454,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3241,6 +3554,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3299,7 +3613,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3397,6 +3713,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3455,7 +3772,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3553,6 +3872,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3611,7 +3931,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3709,6 +4031,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3767,7 +4090,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -3865,6 +4190,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -3923,7 +4249,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4021,6 +4349,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4079,7 +4408,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4177,6 +4508,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4235,7 +4567,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4333,6 +4667,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4391,7 +4726,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4489,6 +4826,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4547,7 +4885,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4645,6 +4985,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4703,7 +5044,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4801,6 +5144,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -4847,14 +5191,9 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">stdclatest</LanguageStandard_C>
     </ClCompile>
-    <ClCompile Include="..\Src\b2c.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
-    </ClCompile>
-    <ClCompile Include="..\Src\bondwise_analysis.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
-    </ClCompile>
+    <ClCompile Include="..\Src\auxiliary_basis.cpp" />
+    <ClCompile Include="..\Src\b2c.cpp" />
+    <ClCompile Include="..\Src\bondwise_analysis.cpp" />
     <ClCompile Include="..\Src\cart2sph.cpp" />
     <ClCompile Include="..\Src\constants.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
@@ -4868,7 +5207,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -4966,6 +5307,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5024,7 +5366,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5122,6 +5466,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5184,7 +5529,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5282,6 +5629,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5340,7 +5688,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5438,6 +5788,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5497,7 +5848,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Use</PrecompiledHeader>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Use</PrecompiledHeader>
@@ -5595,6 +5948,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5648,6 +6002,7 @@
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
+      <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdcpp20</LanguageStandard>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdcpp20</LanguageStandard>
@@ -5699,6 +6054,7 @@
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</BuildStlModules>
+      <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">true</BuildStlModules>
       <BuildStlModules Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">true</BuildStlModules>
@@ -5750,6 +6106,7 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdclatest</LanguageStandard_C>
+      <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">stdclatest</LanguageStandard_C>
@@ -5801,6 +6158,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">Create</PrecompiledHeader>
@@ -5852,6 +6210,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|x64'">pch.h</PrecompiledHeaderFile>
@@ -5899,10 +6258,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">pch.h</PrecompiledHeaderFile>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|x64'">stdclatest</LanguageStandard_C>
     </ClCompile>
-    <ClCompile Include="..\Src\qct.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
-      <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">pch.h</PrecompiledHeaderFile>
-    </ClCompile>
+    <ClCompile Include="..\Src\qct.cpp" />
     <ClCompile Include="..\Src\rys_roots.cpp" />
     <ClCompile Include="..\Src\SALTED_equicomb.cpp" />
     <ClCompile Include="..\Src\SALTED_io.cpp" />

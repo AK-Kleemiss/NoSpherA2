@@ -1,4 +1,3 @@
-No basis set specified. Using fallback 'combo_basis_fit'!
     _   __     _____       __              ___   ___
    / | / /___ / ___/____  / /_  ___  _____/   | |__ \
   /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
@@ -19,11 +18,9 @@ Number of symmetry operations:                   2
 Nr of reflections to be used:                16275
 
 Generating densities... 
-Using basis set: combo_basis_fit
 Preallocating: 4.87862 MB
 Memory needed for rho: 4.87862 MB
                                         ... done!
-Using basis set: combo_basis_fit
 
 Generating k-points...                            ... done!
 Number of k - points to evaluate : 16275
