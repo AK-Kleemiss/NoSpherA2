@@ -141,7 +141,7 @@ vec2 elementWiseExponentiation(const vec2 &matrix, double exponent);
 dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 
 void _test_openblas();
-
+void _test_lahva();
 
 
 //Small implementation of the non-negative least squares problem

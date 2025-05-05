@@ -5,7 +5,7 @@ all: NoSpherA2
 
 COMP := g++
 
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis qct
+OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis qct auxiliary_basis
 OBJS_a := $(OBJ_NAMES:=.o_arm64)
 OBJS_DEBUG_a := $(OBJ_NAMES:=.o_arm64_d)
 
@@ -34,6 +34,16 @@ LIBFEATOMIC_x := ../featomic/featomic_install_x86/lib/libfeatomic.a
 LIBFEATOMIC_x += ../featomic/featomic_install_x86/lib/libmetatensor.a
 LIBFEATOMIC_x_inc += ../featomic/featomic_install_x86/include
 
+#Basis set converter
+basis_set_converter:
+	@make -f makefile_basis_set_converter
+
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o_arm64: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@echo 'Finished building: auxiliary_basis.o'
+
 %.o_arm64: ../Src/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../featomic/featomic_install/include -I${blas_a}/include -o "$@" "$<" ${TARGET_FLAG_a}
@@ -44,6 +54,12 @@ NoSpherA2_arm: ${OBJS}
 	@${COMP} -o "$@" ${OMP_BUILD_a}/libomp.a ${blas_a}/lib/libopenblas.a ${OBJS} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
 	${RM} ${OBJS}
 	@echo 'Finished building target: $@'
+
+# Ensure auxiliary_basis.o_d depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o_arm64_d: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_DEBUG} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_arm64_d: ../Src/%.cpp
 	@echo 'Building file: $<'
@@ -94,7 +110,7 @@ clean:
 	-${RM} NoSpherA2
 	-@echo ' '
 
-.PHONY: all clean dependents
+.PHONY: all clean dependents basis_set_converter
 .SECONDARY:
 
 

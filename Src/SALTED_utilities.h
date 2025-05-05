@@ -70,12 +70,20 @@ private:
     cvec4 get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer);
 };
 
+
+//Calc density from RI fit coefficients
+const double calc_density_ML(const double& x,
+                            const double& y,
+                            const double& z,
+                            const vec& coefficients,
+                            const std::vector<atom>& atoms);
+//Perform the calculation for only one atom
 const double calc_density_ML(const double &x,
                              const double &y,
                              const double &z,
                              const vec &coefficients,
                              const std::vector<atom> &atoms,
-                             const int &atom_nr = -1);
+                             const int &atom_nr);
 
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs);
 
