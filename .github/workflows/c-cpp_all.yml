@@ -12,18 +12,12 @@ on:
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
-defaults:
-  run:
-    shell: bash
 
 jobs:
   build_Mac:
     runs-on: macos-latest
     strategy:
       fail-fast: true
-      matrix:
-        os: [ macos-latest ]
-        arch: [ arm64, x86_64 ]
 
     steps:
     - uses: actions/checkout@v4
