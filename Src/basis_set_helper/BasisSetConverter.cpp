@@ -45,7 +45,8 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
     if (nr_files != static_cast<int>(files.size())) {
         return true;
     }
-
+    
+    std::filesystem::path basis_sets_loc = basis_path / "basis_set_helper" / "basis_sets";
     for (int i = 0; i < nr_files; ++i) {
         if (!std::getline(checkpoint_file, line)) {
             log_file << "Unexpected end of checkpoint.txt.\n";
@@ -56,7 +57,7 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
         const std::string file_name = line.substr(0, sep);
         int expected_size = std::stoi(line.substr(sep + 1));
 
-        const auto file_path = basis_path / file_name;
+        const auto file_path = basis_sets_loc / file_name;
 
         //Check if file_path is in files
         if (std::find(files.begin(), files.end(), file_path) == files.end()) {
