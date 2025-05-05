@@ -108,7 +108,7 @@ jobs:
         name: executable_MacOS_x86
         path: NoSpherA2_Mac_x86
 
-  combine:
+  combine_and_test:
     runs-on: macos-latest
     needs: [build_Mac_arm, build_Mac_x86]
 
@@ -129,5 +129,10 @@ jobs:
       with:
         name: NoSpherA2_Mac_combined  
         path: NoSpherA2_Mac
+    - name: Test combined executable
+      run: |
+        chmod +x NoSpherA2_Mac
+        cp NoSpherA2_Mac NoSpherA2
+        make tests
 
         
