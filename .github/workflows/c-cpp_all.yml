@@ -10,9 +10,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  concurrency:
+    group: build-${{ github.ref }}
+    cancel-in-progress: true
+
+  defaults:
+    run:
+      shell: bash
+  
+  strategy:
+    fail-fast: true
+    matrix:
+      os: [ubuntu-latest, macos-latest, windows-2022]
+      include:
+        - os: ubuntu-latest
+          arch: x86_64
+        - os: macos-latest
+          arch: arm64
+        - os: windows-2022
+          arch: x86_64
+        - os: macos-latest
+          arch: x86_64
+
   build_Mac:
     runs-on: macos-latest
-    needs: [build_Linux]
 
     steps:
     - uses: actions/checkout@v4
@@ -25,12 +46,12 @@ jobs:
       id: cache-openblas-mac
       with:
         path: OpenBLAS/installation
-        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        key: openblas-arm-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
         restore-keys: |
-          openblas-mac-${{ runner.os }}-
+          openblas-arm-mac-${{ runner.os }}-
     
     - name: make_OpenBLAS
-      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
+      if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
       run: >
           cd OpenBLAS && mkdir -p installation && make -j && make PREFIX=installation install
 
@@ -44,19 +65,14 @@ jobs:
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
-        key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        key: featomic-arm-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
-          featomic-mac-${{ runner.os }}-
+          featomic-arm-mac-${{ runner.os }}-
 
     - name: make_featomic
-      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
+      if: steps.cache-featomic-arm-mac.outputs.cache-hit != 'true'
       run: >
           cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install
-
-    - name: make_featomic_x86
-      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
-      run: >
-          rustup target add x86_64-apple-darwin && cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
 
     - name: make_MacOS
       run: >
@@ -123,7 +139,6 @@ jobs:
 
   build_windows:
     runs-on: windows-2022
-    needs: [build_Linux]
 
     steps:
     - uses: actions/checkout@v4
