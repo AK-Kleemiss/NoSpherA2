@@ -253,5 +253,6 @@ jobs:
         name: executables
         path: |
           NoSpherA2
-          NoSpherA2.exe
+          output/NoSpherA2_x64.exe
+          output/NoSpherA2_arm64.exe
           NoSpherA2_Mac
