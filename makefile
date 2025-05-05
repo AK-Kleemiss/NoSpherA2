@@ -65,6 +65,8 @@ ifeq ($(NAME),MAC)
 		echo 'Skipping featomic build, featomic/featomic_install_x86/lib/libfeatomic.a already exists'; \
 	fi
 else
+	@echo "No need for cross compile on non-MacOS systems"
+endif
 
 NoSpherA2_Debug: featomic featomic_x86 OpenBLAS
 	@echo Building NoSpherA2_Debug for $(NAME)
