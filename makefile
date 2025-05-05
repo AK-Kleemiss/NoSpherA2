@@ -10,11 +10,11 @@ else
   endif
 endif
 
+all: check_rust NoSpherA2
+
 # Check for Rust
 check_rust:
 	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install && exit 1)
-
-all: check_rust NoSpherA2
 
 OpenBLAS:
 ifeq ($(NAME),WINDOWS)
@@ -30,17 +30,30 @@ endif
 
 featomic: check_rust
 ifeq ($(NAME),WINDOWS)
-	@echo Building featomic for $(NAME)
-	@cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install
+    @if not exist featomic\featomic_install\lib\metatensor.lib ( \
+		@echo Building featomic for $(NAME) && \
+		cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install
+	) else (\
+		@echo featomic already built \
+	)
 endif
 ifeq ($(NAME),MAC)
-	@cd /Users/runner/work/NoSpherA2/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install
-	@export CARGO_BUILD_TARGET=x86_64-apple-darwin
-	@rustup target add x86_64-apple-darwin
-	@cd /Users/runner/work/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
+	@if [ ! -f featomic/featomic_install_x86/lib/libfeatomic.a ]; then \
+		echo 'Building OpenMP, since featomic/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
+		cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install; \
+		export CARGO_BUILD_TARGET=x86_64-apple-darwin; \
+		rustup target add x86_64-apple-darwin; \
+		cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install; \
+	else \
+		echo 'Skipping featomic build, featomic/featomic_install_x86/lib/libfeatomic.a already exists'; \
+	fi
 else
-	@echo Building featomic for $(NAME)
-	@cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install
+	@if [ ! -f featomic/featomic_install/lib/libfeatomic.a ]; then \
+		echo 'Building OpenMP, since featomic/featomic_install/lib/libfeatomic.a doesnt exist'; \
+		cd cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install \
+	else \
+		echo 'Skipping featomic build, featomic/featomic_install/lib/libfeatomic.a already exists'; \
+	fi
 endif
 
 NoSpherA2_Debug: featomic OpenBLAS
