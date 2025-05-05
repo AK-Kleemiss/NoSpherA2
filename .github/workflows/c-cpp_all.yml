@@ -62,12 +62,6 @@ jobs:
       run: >
           cd Mac && make NoSpherA2_arm && mv NoSpherA2 ../NoSpherA2_Mac
 
-    - name: tmate session if tests fail
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: false
-
     - name: Archive executable
       uses: actions/upload-artifact@v4
       with:
@@ -98,7 +92,7 @@ jobs:
     - name: Build OpenBLAS
       if: steps.cache-openblas-linux.outputs.cache-hit != 'true'
       run: >
-          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+          cd OpenBLAS && mkdir -p installation && make -j && make PREFIX=installation install
 
     # Cache featomic
     - name: Cache featomic Build
@@ -118,12 +112,6 @@ jobs:
     - name: make_Linux
       run: make
 
-    - name: tmate session if tests fail build
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: false
-
     - name: Archive executable
       uses: actions/upload-artifact@v4
       with:
@@ -132,10 +120,6 @@ jobs:
 
     - name: Run Tests
       run: chmod +x NoSpherA2 && cd tests && make all -k
-
-    - name: tmate session if tests fail tests
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
 
   build_windows:
     runs-on: windows-2022
