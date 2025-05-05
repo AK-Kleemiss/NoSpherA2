@@ -42,7 +42,8 @@ ifeq ($(NAME),MAC)
 	@if [ ! -f featomic/featomic_install_x86/lib/libfeatomic.a ]; then \
 		echo 'Building OpenMP, since featomic/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install; \
-		export CARGO_BUILD_TARGET=x86_64-apple-darwin; \
+		rustup toolchain install stable-x86_64-apple-darwin --force-non-host; \
+		rustup default stable-x86_64-apple-darwin; \
 		rustup target add x86_64-apple-darwin; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install; \
 	else \
