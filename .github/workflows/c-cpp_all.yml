@@ -52,12 +52,19 @@ jobs:
     
     - name: make_OpenBLAS
       if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && mkdir -p installation && make -j && make PREFIX=installation install
+      run: |
+          cd OpenBLAS 
+          mkdir -p installation 
+          make -j 
+          make PREFIX=installation install
 
     - name: make_OpenMP
-      run: >
-          cd llvm-project/openmp && mkdir -p build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
+      run: |
+          cd llvm-project/openmp 
+          mkdir -p build 
+          cd build 
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
+          make
 
     # Cache featomic
     - name: Cache featomic Build
@@ -71,8 +78,12 @@ jobs:
 
     - name: make_featomic
       if: steps.cache-featomic-arm-mac.outputs.cache-hit != 'true'
-      run: >
-          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install
+      run: |
+          cd featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. 
+          make install
 
     - name: make_MacOS
       run: >
@@ -107,8 +118,11 @@ jobs:
 
     - name: Build OpenBLAS
       if: steps.cache-openblas-linux.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && mkdir -p installation && make -j && make PREFIX=installation install
+      run: |
+          cd OpenBLAS 
+          mkdir -p installation 
+          make -j 
+          make PREFIX=installation install
 
     # Cache featomic
     - name: Cache featomic Build
@@ -122,8 +136,12 @@ jobs:
   
     - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
-      run: >
-          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install
+      run: |
+          cd featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          make install
 
     - name: make_Linux
       run: make
@@ -161,9 +179,14 @@ jobs:
     # Build OpenBLAS only if cache is missing
     - name: make_OpenBLAS
       if: steps.cache-openblas-windows.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && if not exist build mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. &&
-          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m &&
+      run: |
+          cd OpenBLAS 
+          if not exist build ( 
+            mkdir build 
+          ) 
+          cd build
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
+          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
 
     # Cache featomic build
@@ -179,8 +202,14 @@ jobs:
     # Build featomic only if cache is missing
     - name: make_featomic
       if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
-      run: >
-          cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install -fresh .. && make install
+      run: |
+          cd featomic\featomic 
+          if not exist build ( 
+            mkdir build 
+          ) 
+          cd build
+          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          make install
 
     - name: make_Windows
       run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
