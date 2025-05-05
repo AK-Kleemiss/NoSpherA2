@@ -160,24 +160,30 @@ jobs:
     # Cache OpenBLAS build
     - name: Cache OpenBLAS Build
       uses: actions/cache@v4
-      id: cache-openblas-windows_${{ matrix.arch }}
+      id: cache-openblas-windows
       with:
-        path: OpenBLAS/build  # Adjust if OpenBLAS installs elsewhere
-        key: openblas-windows-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        path: OpenBLAS/build_${{ matrix.arch }}  # Adjust if OpenBLAS installs elsewhere
+        key: openblas-windows-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('OpenBLAS/**') }}
         restore-keys: |
-          openblas-windows-${{ runner.os }}-
+          openblas-windows-${{ runner.os }}-${{ matrix.arch }}-
 
     # Build OpenBLAS only if cache is missing
     - name: make_OpenBLAS
       if: steps.cache-openblas-windows_${{ matrix.arch }}.outputs.cache-hit != 'true'
+      shell: pwsh
       run: |
           cd OpenBLAS 
-          if (-not (Test-Path "build")) {
-            mkdir build
+          $buildDir = "build_${{ matrix.arch }}"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
           }
-          cd build
+          cd $buildDir
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
-          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m
+          if ("${{ matrix.arch }}" -eq "arm64") {
+            msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=ARM64 -m
+          } else {
+            msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
+          }
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
 
     # Cache featomic build
@@ -185,30 +191,34 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-windows
       with:
-        path: featomic/featomic_install  # Adjust if featomic installs elsewhere
-        key: featomic-windows-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        path: featomic/featomic_install_${{ matrix.arch }}  # Adjust if featomic installs elsewhere
+        key: featomic-windows-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
-          featomic-windows-${{ runner.os }}-
+          featomic-windows-${{ runner.os }}-${{ matrix.arch }}-
 
     # Build featomic only if cache is missing
     - name: make_featomic
       if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
       run: |
-          cd featomic\featomic 
-          if (-not (Test-Path "build")) {
-            mkdir build
+          cd featomic\featomic
+          $buildDir = "build_${{ matrix.arch }}"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
           }
-          cd build
-          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cd $buildDir
+          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_${{ matrix.arch }} ..
           make install
 
     - name: make_Windows
       run: |
         cd Windows 
-        msbuild NoSpherA2.sln -nologo -p:Configuration=Release
         if ("${{ matrix.arch }}" -eq "arm64") {
+          cp -r ../featomic/featomic_install_arm ../featomic_install
+          cp -r ../OpenBLAS/build_arm64 ../OpenBLAS/build
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
         } else {
+          cp -r ../featomic/featomic_install_x64 ../featomic_install
+          cp -r ../OpenBLAS/build_x64 ../OpenBLAS/build
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
         }
 
@@ -242,9 +252,9 @@ jobs:
     - name: Rename Windows executables by architecture
       run: |
         mkdir -p output
-        cp windows_exes/executable_Windows_x86_64/NoSpherA2.exe output/NoSpherA2_x64.exe
-        if [ -f "windows_exes/executable_Windows_arm64/NoSpherA2.exe" ]; then
-          cp windows_exes/executable_Windows_arm64/NoSpherA2.exe output/NoSpherA2_arm64.exe
+        cp windows_executables/executable_Windows_x86_64/NoSpherA2.exe output/NoSpherA2_x64.exe
+        if [ -f "windows_executables/executable_Windows_arm64/NoSpherA2.exe" ]; then
+          cp windows_executables/executable_Windows_arm64/NoSpherA2.exe output/NoSpherA2_arm64.exe
         fi
 
     - name: Archive all executable
