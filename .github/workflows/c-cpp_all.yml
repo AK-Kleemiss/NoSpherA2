@@ -147,7 +147,7 @@ jobs:
       fail-fast: true
       matrix:
         os: [ windows-2022 ]
-        arch: [ x86_64, arm64 ]
+        arch: [ x86_64 ]
 
     steps:
     - uses: actions/checkout@v4
@@ -180,7 +180,7 @@ jobs:
           cd $buildDir
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
           if ("${{ matrix.arch }}" -eq "arm64") {
-            msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=ARM64 -m
+            msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform="Any CPU" -m
           } else {
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
           }
