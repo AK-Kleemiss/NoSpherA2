@@ -39,26 +39,34 @@ ifeq ($(NAME),WINDOWS)
 endif
 ifeq ($(NAME),MAC)
 	MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-	@if [ ! -f featomic/featomic_install_x86/lib/libfeatomic.a ]; then \
-		echo 'Building OpenMP, since featomic/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install; \
-		rustup toolchain install stable-x86_64-apple-darwin --force-non-host; \
-		rustup default stable-x86_64-apple-darwin; \
-		rustup target add x86_64-apple-darwin; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install; \
+	@if [ ! -f featomic/featomic_install_arm/lib/libfeatomic.a ]; then \
+		echo 'Building featomic, since featomic/featomic_install_arm/lib/libfeatomic.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install\
 	else \
-		echo 'Skipping featomic build, featomic/featomic_install_x86/lib/libfeatomic.a already exists'; \
+		echo 'Skipping featomic build, featomic/featomic_install_arm/lib/libfeatomic.a already exists'; \
 	fi
 else
 	@if [ ! -f featomic/featomic_install/lib/libfeatomic.a ]; then \
-		echo 'Building OpenMP, since featomic/featomic_install/lib/libfeatomic.a doesnt exist'; \
+		echo 'Building featomic, since featomic/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install \
 	else \
 		echo 'Skipping featomic build, featomic/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
 endif
 
-NoSpherA2_Debug: featomic OpenBLAS
+featomic_x86: check_rust
+ifeq ($(NAME),MAC)
+	MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+	@if [ ! -f featomic/featomic_install_x86/lib/libfeatomic.a ]; then \
+		echo 'Building featomic, since featomic/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
+		rustup target add x86_64-apple-darwin; \
+		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && make install; \
+	else \
+		echo 'Skipping featomic build, featomic/featomic_install_x86/lib/libfeatomic.a already exists'; \
+	fi
+else
+
+NoSpherA2_Debug: featomic featomic_x86 OpenBLAS
 	@echo Building NoSpherA2_Debug for $(NAME)
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
@@ -73,7 +81,7 @@ ifeq ($(NAME),MAC)
 	cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 
-NoSpherA2: featomic OpenBLAS
+NoSpherA2: featomic featomic_x86 OpenBLAS
 	@echo Building NoSpherA2 for $(NAME)
 ifeq ($(NAME),WINDOWS)
 	cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
@@ -87,6 +95,13 @@ ifeq ($(NAME),MAC)
 	@echo Start making Mac executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make all -j
+endif
+
+NoSpherA2_arm: featomic OpenBLAS
+ifeq ($(NAME),MAC)
+	@echo Start making Mac executable
+	@rm -f NoSpherA2
+	@cd Mac && rm -f NoSpherA2 && make NoSpherA2_arm -j && cp NoSpherA2_arm ../NoSpherA2
 endif
 
 test: NoSpherA2
