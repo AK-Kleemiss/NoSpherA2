@@ -49,10 +49,10 @@ auxiliary_basis.o_arm64: basis_set_converter
 	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../featomic/featomic_install/include -I${blas_a}/include -o "$@" "$<" ${TARGET_FLAG_a}
 	@echo 'Finished building: $<'
 
-NoSpherA2_arm: ${OBJS}
+NoSpherA2_arm: ${OBJS_a}
 	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_a}/libomp.a ${blas_a}/lib/libopenblas.a ${OBJS} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
-	${RM} ${OBJS}
+	@${COMP} -o "$@" ${OMP_BUILD_a}/libomp.a ${blas_a}/lib/libopenblas.a ${OBJS_a} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
+	${RM} ${OBJS_a}
 	@echo 'Finished building target: $@'
 
 # Ensure auxiliary_basis.o_d depends on basis_set_converter to ensure proper sequence
@@ -77,10 +77,10 @@ NoSpherA2_Debug_arm: ${OBJS_DEBUG_a}
 	@${COMP} ${GCC_OPTS_x} -I${OMP_BUILD_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../featomic/featomic_install/include -I${blas_x}/include -o "$@" "$<" ${TARGET_FLAG_x}
 	@echo 'Finished building: $<'
 
-NoSpherA2_x86: ${OBJS}
+NoSpherA2_x86: ${OBJS_x}
 	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_x}/libomp.a ${blas_x}/lib/libopenblas.a ${OBJS} ${LIBFEATOMIC_x} -I../ -I${blas_x}/include -L${OMP_BUILD_x} -L${blas_x}/lib -lcblas ${TARGET_FLAG_x}
-	${RM} ${OBJS}
+	@${COMP} -o "$@" ${OMP_BUILD_x}/libomp.a ${blas_x}/lib/libopenblas.a ${OBJS_x} ${LIBFEATOMIC_x} -I../ -I${blas_x}/include -L${OMP_BUILD_x} -L${blas_x}/lib -lcblas ${TARGET_FLAG_x}
+	${RM} ${OBJS_x}
 	@echo 'Finished building target: $@'
 
 %.o_x86_d: ../Src/%.cpp
