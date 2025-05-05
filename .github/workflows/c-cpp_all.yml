@@ -160,7 +160,7 @@ jobs:
     # Cache OpenBLAS build
     - name: Cache OpenBLAS Build
       uses: actions/cache@v4
-      id: cache-openblas-windows
+      id: cache-openblas-windows_${{ matrix.arch }}
       with:
         path: OpenBLAS/build  # Adjust if OpenBLAS installs elsewhere
         key: openblas-windows-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
@@ -169,7 +169,7 @@ jobs:
 
     # Build OpenBLAS only if cache is missing
     - name: make_OpenBLAS
-      if: steps.cache-openblas-windows.outputs.cache-hit != 'true'
+      if: steps.cache-openblas-windows_${{ matrix.arch }}.outputs.cache-hit != 'true'
       run: |
           cd OpenBLAS 
           if (-not (Test-Path "build")) {
@@ -203,13 +203,20 @@ jobs:
           make install
 
     - name: make_Windows
-      run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+      run: |
+        cd Windows 
+        msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+        if ("${{ matrix.arch }}" -eq "arm64") {
+          msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
+        } else {
+          msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
+        }
 
     - name: Upload .exe
       uses: actions/upload-artifact@v4
       with:
-        name: executable_Windows
-        path: Windows/x64/Release/NoSpherA2.exe
+        name: executable_Windows_${{ matrix.arch }}
+        path: ${{ matrix.arch == 'arm64' && 'Windows/ARM64/Release/NoSpherA2.exe' || 'Windows/x64/Release/NoSpherA2.exe' }}
 
   combine_all:
     runs-on: ubuntu-latest
@@ -229,7 +236,16 @@ jobs:
     - name: gather executables Windows
       uses: actions/download-artifact@v4
       with:
-        name: executable_Windows
+        pattern: executable_Windows_*
+        path: windows_executables
+
+    - name: Rename Windows executables by architecture
+      run: |
+        mkdir -p output
+        cp windows_exes/executable_Windows_x86_64/NoSpherA2.exe output/NoSpherA2_x64.exe
+        if [ -f "windows_exes/executable_Windows_arm64/NoSpherA2.exe" ]; then
+          cp windows_exes/executable_Windows_arm64/NoSpherA2.exe output/NoSpherA2_arm64.exe
+        fi
 
     - name: Archive all executable
       uses: actions/upload-artifact@v4
