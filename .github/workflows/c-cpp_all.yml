@@ -51,11 +51,16 @@ jobs:
     - name: make_featomic
       if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
       run: >
-          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install && export CARGO_BUILD_TARGET=x86_64-apple-darwin && rustup target add x86_64-apple-darwin && cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
+          cd featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install
+
+    - name: make_featomic_x86
+      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
+      run: >
+          rustup target add x86_64-apple-darwin && cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic && mkdir -p build_x86_64 && cd build_x86_64 && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. && make install
 
     - name: make_MacOS
       run: >
-          cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_arm && mv NoSpherA2 ../NoSpherA2_Mac
 
     - name: tmate session if tests fail
       if: failure() && github.event_name == 'workflow_dispatch'

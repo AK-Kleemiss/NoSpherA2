@@ -17,7 +17,7 @@ GCC_OPTS_DEBUG := -std=c++2a -Og -g -c -fmessage-length=0 -Xpreprocessor -MP
 
 # Add architecture-specific flags
 OMP_BUILD_a := ../llvm-project/openmp/build/runtime/src
-blas_a := ../OpenBLAS/installation/
+blas_a := ../OpenBLAS_installation/
 GCC_OPTS_a := ${GCC_OPTS} -mcpu=apple-m1
 GCC_OPTS_DEBUG_a := ${GCC_OPTS_DEBUG} -mcpu=apple-m1
 TARGET_FLAG_a := -target aarch64-apple-macos13.0
@@ -26,7 +26,7 @@ LIBFEATOMIC_a += ../featomic/featomic_install_arm/lib/libmetatensor.a
 LIBFEATOMIC_a_inc += ../featomic/featomic_install_arm/include
 
 OMP_BUILD_x := ../llvm-project/openmp/build_x86_64/runtime/src
-blas_x := ../OpenBLAS/installationx86_64/
+blas_x := ../OpenBLAS_installationx86_64/
 GCC_OPTS_x := ${GCC_OPTS} -march=x86_64
 GCC_OPTS_DEBUG_x := ${GCC_OPTS_DEBUG} -march=x86_64
 TARGET_FLAG_x := -target x86_64-apple-macos13.0
