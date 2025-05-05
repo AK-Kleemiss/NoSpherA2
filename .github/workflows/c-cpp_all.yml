@@ -32,11 +32,11 @@ jobs:
     - name: make_OpenBLAS
       if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
       run: >
-          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+          cd OpenBLAS && mkdir -p installation && make -j && make PREFIX=installation install
 
     - name: make_OpenMP
       run: >
-          cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
+          cd llvm-project/openmp && mkdir -p build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
 
     # Cache featomic
     - name: Cache featomic Build
@@ -60,7 +60,7 @@ jobs:
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2_arm && mv NoSpherA2 ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_arm && mv NoSpherA2_arm ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
@@ -147,7 +147,7 @@ jobs:
     - name: make_OpenBLAS
       if: steps.cache-openblas-windows.outputs.cache-hit != 'true'
       run: >
-          cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. &&
+          cd OpenBLAS && if not exist build mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. &&
           msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m &&
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
 
