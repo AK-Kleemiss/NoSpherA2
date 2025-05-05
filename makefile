@@ -10,8 +10,6 @@ else
   endif
 endif
 
-MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-
 all: check_rust NoSpherA2
 
 # Check for Rust
@@ -34,12 +32,13 @@ featomic: check_rust
 ifeq ($(NAME),WINDOWS)
     @if not exist featomic\featomic_install\lib\metatensor.lib ( \
 		@echo Building featomic for $(NAME) && \
-		cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install
-	) else (\
+		cd featomic\featomic && if not exist build mkdir build && cd build && cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install --fresh .. && make install \
+	) else ( \
 		@echo featomic already built \
 	)
 endif
 ifeq ($(NAME),MAC)
+	MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 	@if [ ! -f featomic/featomic_install_x86/lib/libfeatomic.a ]; then \
 		echo 'Building OpenMP, since featomic/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install; \
