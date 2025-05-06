@@ -51,7 +51,7 @@ pch.h.gch: ../Src/pch.h omp OpenBLAS
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: auxiliary_basis.o'
 
 # Pattern rule to compile all .cpp files
@@ -63,7 +63,7 @@ auxiliary_basis.o: basis_set_converter
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_d: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: auxiliary_basis.o_d'
 
 # Pattern rule to compile all .cpp files
