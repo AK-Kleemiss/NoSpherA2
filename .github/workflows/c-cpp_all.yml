@@ -206,8 +206,9 @@ jobs:
             mkdir $buildDir
           }
           cd $buildDir
-          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_${{ matrix.arch }} ..
-          make install
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\featomic_install_${{ matrix.arch }}" ..
+          msbuild -nologo .\featomic.sln -p:Configuration=Release
+          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
 
     - name: make_Windows
       run: |
