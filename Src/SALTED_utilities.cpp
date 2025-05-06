@@ -375,6 +375,7 @@ const double calc_density_ML(const double& x,
         }
         return dens;
     }
+    return -1;
 }
 
 

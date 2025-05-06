@@ -296,7 +296,7 @@ void SALTED_BINARY_FILE::read_dataset(std::vector<T>& data, std::vector<size_t>&
     for (int i = 0; i < ndims; i++) {
         file.read((char*)&dims[i], 4);
     }
-    int size = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
+    int size = static_cast<int>(std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<size_t>()));
     data.resize(size);
     file.read((char*)data.data(), size * sizeof(T));
 }

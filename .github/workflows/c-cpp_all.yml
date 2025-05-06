@@ -214,11 +214,11 @@ jobs:
       run: |
         cd Windows 
         if ("${{ matrix.arch }}" -eq "arm64") {
-          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic_install
+          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic/featomic_install
           mv ../OpenBLAS/build_${{ matrix.arch }}/install_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
         } else {
-          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic_install
+          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic/featomic_install
           mv ../OpenBLAS/build_${{ matrix.arch }}/install_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
         }

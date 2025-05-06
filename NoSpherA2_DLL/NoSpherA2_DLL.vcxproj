@@ -1764,6 +1764,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|ARM64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\Src\auxiliary_basis.cpp" />
     <ClCompile Include="..\Src\b2c.cpp" />
     <ClCompile Include="..\Src\basis_set.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">Use</PrecompiledHeader>
