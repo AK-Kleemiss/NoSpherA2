@@ -43,14 +43,14 @@ ifeq ($(NAME),MAC)
 	
 	@if [ ! -f featomic/featomic_install_arm/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since featomic/featomic_install_arm/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install\
+		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build_arm && cd build_arm && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. && make install; \
 	else \
 		echo 'Skipping featomic build, featomic/featomic_install_arm/lib/libfeatomic.a already exists'; \
 	fi
 else
 	@if [ ! -f featomic/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since featomic/featomic_install/lib/libfeatomic.a doesnt exist'; \
-		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install \
+		cd $(MAKEFILE_DIR)/featomic/featomic && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. && make install; \
 	else \
 		echo 'Skipping featomic build, featomic/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
