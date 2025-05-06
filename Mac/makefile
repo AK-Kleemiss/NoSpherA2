@@ -36,12 +36,15 @@ LIBFEATOMIC_x_inc += ../featomic/featomic_install_x86/include
 
 #Basis set converter
 basis_set_converter:
-	@make -f makefile_basis_set_converter
+	@make -f makefile_basis_set_converter basis_set_converter
+
+basis_set_converter_x86:
+	@make -f makefile_basis_set_converter basis_set_converter_x86
 
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_arm64: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_a}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_a}
 	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_arm64: ../Src/%.cpp
@@ -58,7 +61,7 @@ NoSpherA2_arm: ${OBJS_a}
 # Ensure auxiliary_basis.o_d depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_arm64_d: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@${COMP} ${GCC_OPTS_DEBUG_a} -I${OMP_BUILD_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_a}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_a}
 	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_arm64_d: ../Src/%.cpp
@@ -71,6 +74,16 @@ NoSpherA2_Debug_arm: ${OBJS_DEBUG_a}
 	@${COMP} -o "$@" ${OMP_BUILD_a}/libomp.a ${blas_a}/lib/libopenblas.a ${OBJS_DEBUG_a} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
 	@${RM} ${OBJS_DEBUG_a}
 	@echo 'Finished building target: $@'
+
+auxiliary_basis.o_x86: basis_set_converter_x86
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_x} -I${OMP_BUILD_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_x}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_x}
+	@echo 'Finished building: auxiliary_basis.o'
+
+auxiliary_basis.o_x86_d: basis_set_converter_x86
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_DEBUG_x} -I${OMP_BUILD_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_x}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_x}
+	@echo 'Finished building: auxiliary_basis.o'
 
 %.o_x86: ../Src/%.cpp
 	@echo 'Building file: $<'
