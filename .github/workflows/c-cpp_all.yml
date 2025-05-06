@@ -71,7 +71,7 @@ jobs:
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2_arm && mv NoSpherA2_arm ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_arm -j && mv NoSpherA2_arm ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
@@ -184,7 +184,7 @@ jobs:
           } else {
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
           }
-          cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
+          cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install_${{ matrix.arch }} -P cmake_install.cmake
 
     # Cache featomic build
     - name: Cache featomic Build
@@ -214,12 +214,12 @@ jobs:
       run: |
         cd Windows 
         if ("${{ matrix.arch }}" -eq "arm64") {
-          cp -r ../featomic/featomic_install_arm ../featomic_install
-          cp -r ../OpenBLAS/build_arm64 ../OpenBLAS/build
+          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic_install
+          mv ../OpenBLAS/installation_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
         } else {
-          cp -r ../featomic/featomic_install_x64 ../featomic_install
-          cp -r ../OpenBLAS/build_x64 ../OpenBLAS/build
+          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic_install
+          mv ../OpenBLAS/installation_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
         }
 
