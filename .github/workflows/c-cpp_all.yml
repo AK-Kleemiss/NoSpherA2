@@ -111,6 +111,17 @@ jobs:
           mkdir -p installation 
           make -j 
           make PREFIX=installation install
+    
+
+    - name: make_OpenMP
+      run: |
+        cd llvm-project/openmp 
+        mkdir -p build 
+        cd build 
+        cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DLIBOMP_ENABLE_SHARED=OFF .. 
+        make -j
+        cd runtime/src
+        cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
 
     # Cache featomic
     - name: Cache featomic Build
