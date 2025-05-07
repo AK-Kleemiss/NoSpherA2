@@ -117,7 +117,7 @@ else ifeq ($(NAME),MAC)
 		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
 		make install || true && \
-		cp target/${FOLDER}/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a; \
+		cp target/${FOLDER}/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a || true; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
