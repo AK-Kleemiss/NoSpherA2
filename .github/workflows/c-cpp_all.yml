@@ -47,7 +47,7 @@ jobs:
           cd llvm-project/openmp 
           mkdir -p build 
           cd build 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 .. 
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 .. 
           make -j
           cd runtime/src
           cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
@@ -69,7 +69,8 @@ jobs:
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
-          make install
+          make install || true && \
+          cp target/aarch64-apple-darwin/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a
 
     - name: make_MacOS
       run: >
@@ -175,11 +176,8 @@ jobs:
       shell: pwsh
       run: |
           cd OpenBLAS 
-          $buildDir = "build"
-          if (-not (Test-Path $buildDir)) {
-            mkdir $buildDir
-          }
-          cd $buildDir
+          mkdir build
+          cd build
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
           if ("${{ matrix.arch }}" -eq "arm64") {
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform="Any CPU" -m
@@ -187,7 +185,7 @@ jobs:
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
           }
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
-          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E >nul
+          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E || IF %ERRORLEVEL% LEQ 7 EXIT 0
 
     # Cache featomic build
     - name: Cache featomic Build
