@@ -26,6 +26,11 @@ BASIS_OBJS_native := $(BASIS_OBJ_NAMES:=.o_native_basis)
 	@${COMP} ${GCC_OPTS_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_a}
 	@echo 'Finished building: $<'
 
+%.o_native_basis: ../Src/basis_set_helper/%.cpp 
+	@echo 'Building file: $<'
+	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
+	@echo 'Finished building: $<'
+
 %.o_x86_basis: ../Src/basis_set_helper/%.cpp 
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_x}
