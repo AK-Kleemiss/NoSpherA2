@@ -109,13 +109,18 @@ ifeq ($(NAME),WINDOWS)
 		echo featomic already built \
 	)
 else ifeq ($(NAME),MAC)
+    # Detect architecture
+    ARCH ?= $(shell uname -m)
+    #If we are on arm64, it is called aarch64-apple-darwin, else x86_64-apple-darwin
+    FOLDER := $(shell if [ "$(ARCH)" = "arm64" ]; then echo "aarch64-apple-darwin"; else echo "x86_64-apple-darwin"; fi)
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		mkdir -p build_arm && \
-		cd build_arm && \
+		mkdir -p build && \
+		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install; \
+		make install || true && \
+		cp target/${FOLDER}/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
@@ -165,7 +170,7 @@ ifeq ($(NAME),MAC)
 	@cd Mac && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
 endif
 
-NoSpherA2: featomic featomic_x86 OpenBLAS omp
+NoSpherA2: featomic OpenBLAS omp
 	@echo Building NoSpherA2 for $(NAME)
 ifeq ($(NAME),WINDOWS)
 	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
@@ -178,7 +183,7 @@ endif
 ifeq ($(NAME),MAC)
 	@echo Start making Mac executable
 	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2 && make all -j
+	@cd Mac && rm -f NoSpherA2_native && make all -j
 endif
 
 NoSpherA2_arm: featomic OpenBLAS omp
@@ -188,11 +193,18 @@ ifeq ($(NAME),MAC)
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2_arm -j && cp NoSpherA2_arm ../NoSpherA2
 endif
 
-NoSpherA2_native: featomic OpenBLAS omp
+NoSpherA2_x86: featomic_x86 OpenBLAS omp
 ifeq ($(NAME),MAC)
 	@echo Start making Mac executable
 	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2_native && make NoSpherA2_native -j && cp NoSpherA2_native ../NoSpherA2
+	@cd Mac && rm -f NoSpherA2 && make NoSpherA2_x86 -j && cp NoSpherA2_x86 ../NoSpherA2
+endif
+
+NoSpherA2_lipo: featomic OpenBLAS omp featomic_x86 OpenBLAS_x86 omp_x86
+ifeq ($(NAME),MAC)
+	@echo Start making Mac executable
+	@rm -f NoSpherA2
+	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j && cp NoSpherA2 ../NoSpherA2
 endif
 
 test: NoSpherA2
