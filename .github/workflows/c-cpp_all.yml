@@ -195,7 +195,7 @@ jobs:
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
           }
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
-          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E || IF %ERRORLEVEL% LEQ 7 EXIT 0
+          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E ; if ($LASTEXITCODE -le 7) { $global:LASTEXITCODE = 0 }
 
     # Cache featomic build
     - name: Cache featomic Build
