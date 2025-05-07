@@ -1,6 +1,8 @@
 #THIS IS THE MACOS MAKEFILE!#
 RM := rm
 
+COMP := g++
+
 all: NoSpherA2
 
 OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis qct auxiliary_basis
