@@ -9,13 +9,16 @@ all: basis_set_converter
 GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0
 
 GCC_OPTS_a := ${GCC_OPTS} -mcpu=apple-m1
-TARGET_FLAG_a := -target aarch64-apple-macos13.0
 GCC_OPTS_x := ${GCC_OPTS} -march=x86_64
+TARGET_FLAG_a := -target aarch64-apple-macos13.0
 TARGET_FLAG_x := -target x86_64-apple-macos13.0
 
-BASIS_OBJ_NAMES := basis_set_helper BasisSetConverter
-BASIS_OBJS_arm64 := $(BASIS_OBJ_NAMES:=.o_arm64_basis)
-BASIS_OBJS_x86 := $(BASIS_OBJ_NAMES:=.o_x86_basis)
+GCC_OPTS_x := ${GCC_OPTS} -march=native -mcpu=native
+
+BASIS_OBJ_NAMES   := basis_set_helper BasisSetConverter
+BASIS_OBJS_arm64  := $(BASIS_OBJ_NAMES:=.o_arm64_basis)
+BASIS_OBJS_x86    := $(BASIS_OBJ_NAMES:=.o_x86_basis)
+BASIS_OBJS_native := $(BASIS_OBJ_NAMES:=.o_native_basis)
 
 
 %.o_arm64_basis: ../Src/basis_set_helper/%.cpp 
@@ -37,6 +40,12 @@ basis_set_converter: ${BASIS_OBJS_arm64}
 
 basis_set_converter_x86: ${BASIS_OBJS_x86}
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_x86} ${TARGET_FLAG_x}
+	@mv BasisSetConverter ../
+	./../BasisSetConverter ../Windows/
+	@echo 'Done building basis_set_helper'
+
+basis_set_converter_native: ${BASIS_OBJS_native}
+	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_antive}
 	@mv BasisSetConverter ../
 	./../BasisSetConverter ../Windows/
 	@echo 'Done building basis_set_helper'

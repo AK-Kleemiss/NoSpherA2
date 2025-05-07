@@ -57,6 +57,9 @@ basis_set_converter:
 basis_set_converter_x86:
 	@make -f makefile_basis_set_converter basis_set_converter_x86
 
+basis_set_converter_native:
+	@make -f makefile_basis_set_converter basis_set_converter_native
+
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o_arm64: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
@@ -128,7 +131,12 @@ NoSpherA2_Debug_x86: ${OBJS_DEBUG_x}
 	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_native_inc} -I${blas_native}/include -o "$@" "$<" ${TARGET_FLAG_native}
 	@echo 'Finished building: $<'
 
-NoSpherA2_native:
+auxiliary_basis.o_native: basis_set_converter_native
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_native}/include -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o'
+
+NoSpherA2_native: ${OBJS_native}
 	@echo 'Building target: $@'
 	@${COMP} -o "$@" ${OMP_BUILD_native}/libomp.a ${blas_native}/lib/libopenblas.a ${OBJS_native} ${LIBFEATOMIC_native} -I../ -I${blas_native}/include -L${OMP_BUILD_native} -L${blas_native}/lib -lcblas
 	${RM} ${OBJS_native}
