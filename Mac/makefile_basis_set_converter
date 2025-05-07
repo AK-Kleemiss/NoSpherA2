@@ -50,7 +50,7 @@ basis_set_converter_x86: ${BASIS_OBJS_x86}
 	@echo 'Done building basis_set_helper'
 
 basis_set_converter_native: ${BASIS_OBJS_native}
-	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_antive}
+	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_native}
 	@mv BasisSetConverter ../
 	./../BasisSetConverter ../Windows/
 	@echo 'Done building basis_set_helper'
