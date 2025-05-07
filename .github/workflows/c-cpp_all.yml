@@ -30,25 +30,27 @@ jobs:
       id: cache-openblas-mac
       with:
         path: OpenBLAS/installation
-        key: openblas-arm-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
-          openblas-arm-mac-${{ runner.os }}-
+          openblas-mac-${{ runner.os }}-
     
     - name: make_OpenBLAS
-      if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
+      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
       run: |
           cd OpenBLAS 
           mkdir -p installation 
           make -j 
-          make PREFIX=installation install
+          make PREFIX=../Lib/OpenBLAS_build/ install
 
     - name: make_OpenMP
       run: |
           cd llvm-project/openmp 
           mkdir -p build 
           cd build 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
-          make
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 .. 
+          make -j
+          cd runtime/src
+          cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
 
     # Cache featomic
     - name: Cache featomic Build
@@ -56,22 +58,22 @@ jobs:
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
-        key: featomic-arm-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
-          featomic-arm-mac-${{ runner.os }}-
+          featomic-mac-${{ runner.os }}-
 
     - name: make_featomic
-      if: steps.cache-featomic-arm-mac.outputs.cache-hit != 'true'
+      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
       run: |
           cd featomic/featomic 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
           make install
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2_arm -j && mv NoSpherA2_arm ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_native -j && mv NoSpherA2_native ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
@@ -97,8 +99,8 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-linux
       with:
-        path: OpenBLAS/installation
-        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        path: Lib/OpenBLAS_build
+        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-linux-${{ runner.os }}-
 
@@ -115,8 +117,8 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-linux
       with:
-        path: featomic/featomic_install  # Adjust if featomic installs elsewhere
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**') }}
+        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
+        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
           featomic-linux-${{ runner.os }}-
   
@@ -162,8 +164,8 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-windows
       with:
-        path: OpenBLAS/build_${{ matrix.arch }}  # Adjust if OpenBLAS installs elsewhere
-        key: openblas-windows-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('OpenBLAS/**') }}
+        path: Lib/OpenBLAS_build  # Adjust if OpenBLAS installs elsewhere
+        key: openblas-windows-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-windows-${{ runner.os }}-${{ matrix.arch }}-
 
@@ -173,7 +175,7 @@ jobs:
       shell: pwsh
       run: |
           cd OpenBLAS 
-          $buildDir = "build_${{ matrix.arch }}"
+          $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
           }
@@ -184,29 +186,30 @@ jobs:
           } else {
             msbuild -nologo OpenBLAS.sln -p:Configuration=Release -p:Platform=x64 -m
           }
-          cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install_${{ matrix.arch }} -P cmake_install.cmake
+          cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
+          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E >nul
 
     # Cache featomic build
     - name: Cache featomic Build
       uses: actions/cache@v4
       id: cache-featomic-windows
       with:
-        path: featomic/featomic_install_${{ matrix.arch }}  # Adjust if featomic installs elsewhere
-        key: featomic-windows-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('featomic/**') }}
+        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
+        key: featomic-windows-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
-          featomic-windows-${{ runner.os }}-${{ matrix.arch }}-
+          featomic-windows-${{ runner.os }}-
 
     # Build featomic only if cache is missing
     - name: make_featomic
       if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
       run: |
           cd featomic\featomic
-          $buildDir = "build_${{ matrix.arch }}"
+          $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
           }
           cd $buildDir
-          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\featomic_install_${{ matrix.arch }}" ..
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
           msbuild -nologo .\featomic.sln -p:Configuration=Release
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
 
@@ -214,12 +217,8 @@ jobs:
       run: |
         cd Windows 
         if ("${{ matrix.arch }}" -eq "arm64") {
-          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic/featomic_install
-          mv ../OpenBLAS/build_${{ matrix.arch }}/install_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
         } else {
-          mv ../featomic/featomic_install_${{ matrix.arch }} ../featomic/featomic_install
-          mv ../OpenBLAS/build_${{ matrix.arch }}/install_${{ matrix.arch }} ../OpenBLAS/installation
           msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
         }
 
