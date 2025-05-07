@@ -69,8 +69,7 @@ jobs:
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
-          make install || true && \
-          cp target/aarch64-apple-darwin/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a
+          make install
 
     - name: make_MacOS
       run: >
