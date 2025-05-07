@@ -57,7 +57,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-featomic-mac
       with:
-        path: featomic/featomic_install
+        path: Lib/featomic_install
         key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
           featomic-mac-${{ runner.os }}-
@@ -217,17 +217,13 @@ jobs:
     - name: make_Windows
       run: |
         cd Windows 
-        if ("${{ matrix.arch }}" -eq "arm64") {
-          msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=ARM64
-        } else {
-          msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
-        }
+        msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
 
     - name: Upload .exe
       uses: actions/upload-artifact@v4
       with:
-        name: executable_Windows_${{ matrix.arch }}
-        path: ${{ matrix.arch == 'arm64' && 'Windows/ARM64/Release/NoSpherA2.exe' || 'Windows/x64/Release/NoSpherA2.exe' }}
+        name: executable_Windows
+        path: 'Windows/x64/Release/NoSpherA2.exe'
 
   combine_all:
     runs-on: ubuntu-latest
@@ -247,16 +243,7 @@ jobs:
     - name: gather executables Windows
       uses: actions/download-artifact@v4
       with:
-        pattern: executable_Windows_*
-        path: windows_executables
-
-    - name: Rename Windows executables by architecture
-      run: |
-        mkdir -p output
-        cp windows_executables/executable_Windows_x86_64/NoSpherA2.exe output/NoSpherA2_x64.exe
-        if [ -f "windows_executables/executable_Windows_arm64/NoSpherA2.exe" ]; then
-          cp windows_executables/executable_Windows_arm64/NoSpherA2.exe output/NoSpherA2_arm64.exe
-        fi
+        name: executable_Windows
 
     - name: Archive all executable
       uses: actions/upload-artifact@v4
@@ -264,6 +251,5 @@ jobs:
         name: executables
         path: |
           NoSpherA2
-          output/NoSpherA2_x64.exe
-          output/NoSpherA2_arm64.exe
+          NoSpherA2.exe
           NoSpherA2_Mac
