@@ -27,18 +27,14 @@ ifeq ($(NAME),WINDOWS)
 	@if not exist Lib/OpenBLAS_build/lib/openblas.lib ( \
 		echo Building OpenBLAS for $(NAME) && \
 		cd OpenBLAS && \
-		if exist build ( \
-			echo Cleaning build directory... ; \
-			del /Q build\*.* 2>nul \
-		) else ( \
-			mkdir build \
-		) && \
+		(if exist build rd /s /q build) && \
+		mkdir build && \
 		echo Starting build && \
 		cd build && \
 		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. && \
 		msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m && \
 		cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake && \
-		robocopy ./install/ ../../Lib/OpenBLAS_build\ /E >nul \
+		robocopy ./install/ ../../Lib/OpenBLAS_build\ /E || IF %ERRORLEVEL% LEQ 7 EXIT 0 \
 	) else ( \
 		echo OpenBLAS already built \
 	)
@@ -99,7 +95,8 @@ ifeq ($(NAME),WINDOWS)
 	@if not exist Lib\featomic_install\lib\metatensor.lib ( \
 		echo Building featomic for $(NAME) && \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
-		if exist build ( echo Cleaning build directory... & del /Q build\*.* 2>nul & for /D %%d in (build\*) do rmdir /S /Q %%d ) else ( mkdir build ) && \
+		(if exist build rd /s /q build) && \
+		mkdir build && \
 		cd build && \
 		echo Starting build && \
 		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
