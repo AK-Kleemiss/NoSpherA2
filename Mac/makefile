@@ -134,7 +134,7 @@ NoSpherA2_Debug_x86: ${OBJS_DEBUG_x}
 
 %.o_native: ../Src/%.cpp
 	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_I_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_native_inc} -I${blas_native}/include -o "$@" "$<" ${TARGET_FLAG_native}
+	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_I_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_native_inc} -I${blas_native}/include -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 auxiliary_basis.o_native: basis_set_converter_native
