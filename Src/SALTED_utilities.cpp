@@ -3,6 +3,9 @@
 #include "constants.h"
 #include "atoms.h"
 #include "cube.h"
+#include "wfn_class.h"
+#include "metatensor.hpp"
+#include "featomic.hpp"
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
@@ -119,21 +122,9 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 {
     std::ostringstream oss;
     oss << "{\n"
-        << "  \"cutoff\": " << params.cutoff << ",\n"
-        << "  \"max_radial\": " << params.max_radial << ",\n"
-        << "  \"max_angular\": " << params.max_angular << ",\n"
-        << "  \"atomic_gaussian_width\": " << params.atomic_gaussian_width << ",\n"
-        << "  \"center_atom_weight\": " << params.center_atom_weight << ",\n"
-        << "  \"radial_basis\": {\n"
-        << "    \"Gto\": {\n"
-        << "      \"spline_accuracy\": " << params.radial_basis.spline_accuracy << "\n"
-        << "    }\n"
-        << "  },\n"
-        << "  \"cutoff_function\": {\n"
-        << "    \"ShiftedCosine\": {\n"
-        << "      \"width\": " << params.cutoff_function.width << "\n"
-        << "    }\n"
-        << "  }\n"
+        << "  \"cutoff\": {\n    \"radius\": " << params.cutoff << ",\n    \"smoothing\": {\"type\": \"ShiftedCosine\", \"width\": " << params.cutoff_function.width << " }\n  }, \n"
+        << "  \"density\": {\n    \"type\": \"Gaussian\",\n    \"width\": "<< params.atomic_gaussian_width << ",\n    \"center_atom_weight\": "<< params.center_atom_weight << "\n  },\n"
+        << "  \"basis\": {\n    \"type\": \"TensorProduct\",\n    \"max_angular\": " << params.max_angular << ",\n    \"radial\": {\"type\": \"Gto\", \"max_radial\": " << params.max_radial << "}\n  }\n"
         << "}";
     return oss.str();
 }
@@ -175,7 +166,12 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
 // RASCALINE1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    rascaline::BasicSystems system = rascaline::BasicSystems(this->filepath.string());
+    featomic::SimpleSystem system;
+    WFN wfn = WFN(this->filepath.c_str());
+    for (const atom& a : *wfn.get_atoms_ptr())
+    {
+        system.add_atom(a.get_charge(), a.get_coords());
+    }
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
     const char *parameters = temp_p.c_str();
@@ -206,10 +202,11 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     metatensor::Labels keys_selection(names, flattened_keys.data(), flattened_keys.size() / names.size());
 
     // create the calculator with its name and parameters
-    rascaline::Calculator calculator = rascaline::Calculator("spherical_expansion", parameters);
+    auto calculator = featomic::Calculator("spherical_expansion", parameters);
 
-    rascaline::CalculationOptions calc_opts;
+    featomic::CalculationOptions calc_opts;
     calc_opts.selected_keys = keys_selection;
+    calc_opts.use_native_system = true;
     // run the calculation
     metatensor::TensorMap descriptor = calculator.compute(system, calc_opts);
 
@@ -378,6 +375,9 @@ const double calc_density_ML(const double& x,
         }
         return dens;
     }
+    //This should never happen, but just in case
+    std::cout << "Atom number " << atom_nr << " not found in the list of atoms." << std::endl;
+    return -1;
 }
 
 
