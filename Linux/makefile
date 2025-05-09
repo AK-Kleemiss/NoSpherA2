@@ -4,7 +4,7 @@ RM := rm -f
 COMP := g++
 C_COMP := gcc
 
-LIBS := -static-libgcc -Wl,-Bstatic -static-libstdc++ -Wl,-Bstatic -ldl -lpthread
+LIBS := -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lm -lc
 ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../Lib/OpenMP_build/lib/libomp.a
 LIBRASCALINE := ../Lib/featomic_install/lib/libfeatomic.a
@@ -30,7 +30,11 @@ basis_set_converter:
 	
 # Precompiled header
 pch.h.gch: ../Src/pch.h
-	${COMP} -std=c++23 -x c++-header -o "$@" "$<"
+	@${COMP} ${GCC_OPTS} -x c++-header -o "$@" "$<"
+
+# Precompiled header for debug
+pch.h.gch_d: ../Src/pch.h
+	@${COMP} ${GCC_OPTS_DEBUG} -x c++-header -o "$@" "$<"
 
 # Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
 auxiliary_basis.o: basis_set_converter
@@ -51,20 +55,20 @@ auxiliary_basis.o_d: basis_set_converter
 	@echo 'Finished building: auxiliary_basis.o_d'
 
 # Pattern rule to compile all .cpp files
-%.o_d: ../Src/%.cpp pch.h.gch
+%.o_d: ../Src/%.cpp pch.h.gch_d
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_DEBUG} ${LIBOPENBLAS_I} -I${LIBRASCALINE_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
 NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
+	@${COMP} -o "NoSpherA2" ${OBJS} ${LIBOMP} ${LIBRASCALINE} ${LIBOPENBLAS} ${LIBS}
 	cp NoSpherA2 ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d} 
 	@echo 'Building target: $@'
-	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBS} ${LIBOPENBLAS}
+	@${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBOMP} ${LIBRASCALINE} ${LIBOPENBLAS} ${LIBS}
 	cp NoSpherA2_Debug ../
 	@echo 'Done building Debug version of NoSpherA2'
 
