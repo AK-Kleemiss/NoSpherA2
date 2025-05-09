@@ -29,37 +29,27 @@ git submodule update --init --recursive
 ### Windows Build Instructions
 #### **Prerequisites**
 - **Visual Studio 2022** with C++ build tools
-
-#### **Building OpenBLAS**
-Navigate to the OpenBLAS subdirectory, open a **Developer PowerShell**, and execute:
-
-```ps
-cd OpenBLAS
-mkdir build ; cd build
-cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
-msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m
-cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
-```
+- GNU Make for Windows
+- cargo for compilation of rust (required for featomic): https://www.rust-lang.org/tools/install
 
 #### **Building NoSpherA2**
-Navigate to the Windows subdirectory and run:
+Navigate to the Windows subdirectory and run inside a developers command prompt or power shell:
 
 ```ps
-cd ..\..\Windows
-msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+make
 ```
 
-✅ **The executable will be located at:** `NoSpherA2\Windows\x64\Release`.
+✅ **The executable will be located in the main folder:** `NoSpherA2.exe`.
 
 ---
 
 ### Linux Build Instructions
 
 #### **Prerequisites**
-Ensure `build-essential` is installed:
+Ensure `build-essential` and `cargo` are installed (select package manager according to your distro):
 
 ```sh
-sudo apt update && sudo apt install -y build-essential
+sudo <apt/dnf/yum> update && sudo <apt/dnf/yum> install -y build-essential cargo
 ```
 
 #### **Building NoSpherA2**
@@ -78,33 +68,14 @@ make
 #### **Prerequisites**
 - **Xcode Command Line Tools**
 - **CMake** (install via Homebrew if needed: `brew install cmake`)
-
-#### **Building OpenMP**
-
-```sh
-cd llvm-project/openmp
-mkdir build && cd build
-cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 ..
-make
-```
-
-#### **Building OpenBLAS**
-
-```sh
-cd ../../../../OpenBLAS
-mkdir installation
-make -j
-make PREFIX=installation install
-```
+- **rustup** (install via Homebrew: `brew install rustup-init && rustup-init`; might requrie restarting the terminal to load properly)
 
 #### **Building NoSpherA2**
 
 ```sh
-cd Mac
 make
-mv NoSpherA2 ../NoSpherA2_Mac
 ```
 
-✅ **The executable will be located at:** `NoSpherA2_Mac`.
+✅ **The executable will be located at:** `Mac/NoSpherA2`.
 
 
