@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include "JKFit.h"
 #include "integration_params.h"
 

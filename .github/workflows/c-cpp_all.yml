@@ -2,17 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [ master, Mac_Test ]
+    branches: [ master ]
   pull_request:
     branches: [ master ]
   schedule:
     - cron: '0 0 * * 0' # Run every Sunday at midnight
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build_Mac:
     runs-on: macos-latest
-    needs: [build_Linux]
+    strategy:
+      fail-fast: true
 
     steps:
     - uses: actions/checkout@v4
@@ -24,29 +29,51 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-mac
       with:
-        path: OpenBLAS/installation
-        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        path: Lib/OpenBLAS_build
+        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-mac-${{ runner.os }}-
-
-    - name: make_OpenMP
-      run: >
-          cd llvm-project/openmp && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. && make
-
+    
     - name: make_OpenBLAS
       if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+      run: |
+          cd OpenBLAS 
+          mkdir -p installation 
+          make -j 
+          make PREFIX=../Lib/OpenBLAS_build/ install
+
+    - name: make_OpenMP
+      run: |
+          cd llvm-project/openmp 
+          mkdir -p build 
+          cd build 
+          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 .. 
+          make -j
+          cd runtime/src
+          cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
+
+    # Cache featomic
+    - name: Cache featomic Build
+      uses: actions/cache@v4
+      id: cache-featomic-mac
+      with:
+        path: Lib/featomic_install
+        key: featomic-mac-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
+        restore-keys: |
+          featomic-mac-${{ runner.os }}-
+
+    - name: make_featomic
+      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
+      run: |
+          cd featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
+          make install
 
     - name: make_MacOS
       run: >
-          cd Mac && make && mv NoSpherA2 ../NoSpherA2_Mac
-
-    - name: tmate session if tests fail
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: false
+          cd Mac && make NoSpherA2_native -j && mv NoSpherA2_native ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
@@ -56,6 +83,8 @@ jobs:
 
   build_Linux:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
 
     steps:
     - uses: actions/checkout@v4
@@ -70,24 +99,51 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-linux
       with:
-        path: OpenBLAS/installation
-        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        path: Lib/OpenBLAS_build
+        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-linux-${{ runner.os }}-
 
     - name: Build OpenBLAS
       if: steps.cache-openblas-linux.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && mkdir installation && make -j && make PREFIX=installation install
+      run: |
+          cd OpenBLAS 
+          mkdir -p installation 
+          make -j 
+          make PREFIX=installation install
+    
+
+    - name: make_OpenMP
+      run: |
+        cd llvm-project/openmp 
+        mkdir -p build 
+        cd build 
+        cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DLIBOMP_ENABLE_SHARED=OFF .. 
+        make -j
+        cd runtime/src
+        cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
+
+    # Cache featomic
+    - name: Cache featomic Build
+      uses: actions/cache@v4
+      id: cache-featomic-linux
+      with:
+        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
+        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
+        restore-keys: |
+          featomic-linux-${{ runner.os }}-
+  
+    - name: Build featomic
+      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
+      run: |
+          cd featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          make install
 
     - name: make_Linux
       run: make
-
-    - name: tmate session if tests fail build
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: false
 
     - name: Archive executable
       uses: actions/upload-artifact@v4
@@ -98,13 +154,10 @@ jobs:
     - name: Run Tests
       run: chmod +x NoSpherA2 && cd tests && make all -k
 
-    - name: tmate session if tests fail tests
-      if: failure() && github.event_name == 'workflow_dispatch'
-      uses: mxschmitt/action-tmate@v3
-
   build_windows:
     runs-on: windows-2022
-    needs: [build_Linux]
+    strategy:
+      fail-fast: true
 
     steps:
     - uses: actions/checkout@v4
@@ -119,27 +172,58 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-windows
       with:
-        path: OpenBLAS/build  # Adjust if OpenBLAS installs elsewhere
-        key: openblas-windows-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
+        path: Lib/OpenBLAS_build  # Adjust if OpenBLAS installs elsewhere
+        key: openblas-windows-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-windows-${{ runner.os }}-
 
     # Build OpenBLAS only if cache is missing
     - name: make_OpenBLAS
       if: steps.cache-openblas-windows.outputs.cache-hit != 'true'
-      run: >
-          cd OpenBLAS && mkdir build && cd build && cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON .. &&
-          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m &&
+      shell: pwsh
+      run: |
+          cd OpenBLAS 
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
+          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m
           cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
+          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E ; if ($LASTEXITCODE -le 7) { $global:LASTEXITCODE = 0 }
+
+    # Cache featomic build
+    - name: Cache featomic Build
+      uses: actions/cache@v4
+      id: cache-featomic-windows
+      with:
+        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
+        key: featomic-windows-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
+        restore-keys: |
+          featomic-windows-${{ runner.os }}-
+
+    # Build featomic only if cache is missing
+    - name: make_featomic
+      if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
+      run: |
+          cd featomic\featomic
+          $buildDir = "build"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
+          }
+          cd $buildDir
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+          msbuild -nologo .\featomic.sln -p:Configuration=Release
+          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
 
     - name: make_Windows
-      run: cd Windows && msbuild NoSpherA2.sln -nologo -p:Configuration=Release
+      run: |
+        cd Windows 
+        msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
 
     - name: Upload .exe
       uses: actions/upload-artifact@v4
       with:
         name: executable_Windows
-        path: Windows/x64/Release/NoSpherA2.exe
+        path: 'Windows/x64/Release/NoSpherA2.exe'
 
   combine_all:
     runs-on: ubuntu-latest

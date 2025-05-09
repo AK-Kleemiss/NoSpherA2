@@ -33,6 +33,9 @@
     },
     "terminal.integrated.defaultProfile.windows": "PowerShell",
     "files.associations": {
-        "functional": "cpp"
+        "functional": "cpp",
+        "vector": "cpp",
+        "iostream": "cpp"
     },
+    "C_Cpp.default.cppStandard": "c++20",
 }

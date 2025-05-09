@@ -2,7 +2,7 @@
 
 #include "convenience.h"
 #include "cube.h"
-#include "rascaline.hpp"
+#include "featomic.hpp"
 #include "metatensor.h"
 
 namespace SALTED_Utils
