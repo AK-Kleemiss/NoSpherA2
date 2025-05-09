@@ -29,7 +29,7 @@ jobs:
       uses: actions/cache@v4
       id: cache-openblas-mac
       with:
-        path: OpenBLAS/installation
+        path: Lib/OpenBLAS_build
         key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
         restore-keys: |
           openblas-mac-${{ runner.os }}-
