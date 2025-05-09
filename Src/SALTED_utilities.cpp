@@ -375,6 +375,8 @@ const double calc_density_ML(const double& x,
         }
         return dens;
     }
+    //This should never happen, but just in case
+    std::cout << "Atom number " << atom_nr << " not found in the list of atoms." << std::endl;
     return -1;
 }
 
