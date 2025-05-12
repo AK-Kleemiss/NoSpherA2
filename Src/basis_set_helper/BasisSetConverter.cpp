@@ -45,7 +45,7 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
     if (nr_files != static_cast<int>(files.size())) {
         return true;
     }
-
+    
     std::filesystem::path basis_sets_loc = basis_path / "basis_set_helper" / "basis_sets";
     for (int i = 0; i < nr_files; ++i) {
         if (!std::getline(checkpoint_file, line)) {

@@ -5717,9 +5717,9 @@ int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double
     int32_t NZC = std::max(1, n);
     int32_t ISUPPZ[MXRYSROOTS * 2];
     int32_t TRYRAC = 1;
-    double WORK[MXRYSROOTS * 18];
+    //double WORK[MXRYSROOTS * 18];
     int32_t LWORK = MXRYSROOTS * 18;
-    int32_t IWORK[MXRYSROOTS * 10];
+    //int32_t IWORK[MXRYSROOTS * 10];
     int32_t LIWORK = MXRYSROOTS * 10;
     /*
         int matrix_layout, char jobz, char range,

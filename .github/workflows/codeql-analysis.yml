@@ -26,13 +26,20 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        source-root: ./Src
+
     - name: Build
       run: make
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
+      with:
+        output: 'codeql-results.sarif'  # Specify output file for CodeQL results
+
     - name: Upload analysis results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{github.workspace}}/codeql-results.sarif
 
 
   flawfinder:
@@ -50,7 +57,7 @@ jobs:
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.19
         with:
-          arguments: '--sarif ./'
+          arguments: '--sarif ./Src'
           output: 'flawfinder_results.sarif'
       - name: Archive executable
         uses: actions/upload-artifact@v4
