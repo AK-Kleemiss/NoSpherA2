@@ -133,7 +133,7 @@ std::string Rascaline_Descriptors::gen_parameters()
 {
     HyperParametersDensity hyper_parameters_density = {
         this->rcut,                           // cutoff
-        this->nrad,                           // max_radial
+        this->nrad -1,                        // max_radial    //DO NOT ASK ME WHY 1-
         this->nang,                           // max_angular
         this->atomic_gaussian_width,          // atomic_gaussian_width
         this->center_atom_weight,             // center_atom_weight
@@ -163,14 +163,17 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
     this->nspe = (int)neighspe.size();
 }
 
-// RASCALINE1
+// FEATOMIC1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
     featomic::SimpleSystem system;
     WFN wfn = WFN(this->filepath.c_str());
     for (const atom& a : *wfn.get_atoms_ptr())
     {
-        system.add_atom(a.get_charge(), a.get_coords());
+        std::array<double, 3> xyz = {constants::bohr2ang(a.get_coordinate(0)),
+                                     constants::bohr2ang(a.get_coordinate(1)),
+                                     constants::bohr2ang(a.get_coordinate(2)) };
+        system.add_atom(a.get_charge(), xyz);
     }
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
@@ -220,7 +223,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     return descriptor;
 }
 
-// RASCALINE2
+// FEATOMIC2
 cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
 {
 
