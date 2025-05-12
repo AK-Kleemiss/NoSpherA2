@@ -52,11 +52,11 @@ void solve_linear_system(const vec2 &A, vec &b)
     }
 }
 
-void solve_linear_system(const vec &A, const int &size_A, vec &b)
+void solve_linear_system(const vec &A, const unsigned long long &size_A, vec &b)
 {
     err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     // LAPACK variables
-    const int n = size_A; // The order of the matrix eri2c
+    const int n = (int)size_A; // The order of the matrix eri2c
     const int nrhs = 1;   // Number of right-hand sides (columns of rho and )
     const int lda = n;    // Leading dimension of eri2c
     const int ldb = n;    // Leading dimension of rho

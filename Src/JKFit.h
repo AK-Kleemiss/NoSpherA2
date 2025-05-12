@@ -8,7 +8,7 @@
 
 
 //struct ElementRange {
-//    uint32_t start = 0;  // Start index in this basis set’s primitive array
+//    uint32_t start = 0;  // Start index in this basis setÂ’s primitive array
 //    uint32_t count = 0;  // Number of primitives for the element
 //};
 
