@@ -99,7 +99,7 @@ ifeq ($(NAME),WINDOWS)
 		mkdir build && \
 		cd build && \
 		echo Starting build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
 		msbuild -nologo .\featomic.sln -p:Configuration=Release && \
 		msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release \
 	) else ( \
