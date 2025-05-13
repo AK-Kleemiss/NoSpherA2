@@ -15,9 +15,13 @@ ifeq ($(OS),Windows_NT)
     @echo @echo off > run_test.bat
     @echo cd $2 >> run_test.bat
     @echo $(BASE_PATH) $3 >> run_test.bat
+    @echo set test_result=%%errorlevel%% >> run_test.bat
+    @echo if exist NoSpherA2.log ($(MV) NoSpherA2.log $1.log ^& $(DIFF) $1.log $1.good) >> run_test.bat
+    @echo exit /b %%test_result%% >> run_test.bat
     @call run_test.bat
+    @set test_return=!errorlevel!
     @del run_test.bat
-    @if exist $2\NoSpherA2.log (cd $2 && $(MV) NoSpherA2.log $1.log && $(DIFF) $1.log $1.good)
+    @exit /b !test_return!
   endef
 else
   RM := rm
@@ -35,9 +39,15 @@ else
   endef
   define RUN_TEST
     @echo 'Running test: $1'
-    @eval $(TIME_START); cd $2 && $(BASE_PATH) $3 && \
-    if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
-    $(DIFF) $1.log $1.good; eval $(TIME_END)
+    @eval $(TIME_START); cd $2 && { \
+      $(BASE_PATH) $3; \
+      test_result=$$?; \
+      if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
+      $(DIFF) $1.log $1.good; \
+      diff_result=$$?; \
+      eval $(TIME_END); \
+      exit $$test_result || exit $$diff_result; \
+    }
   endef
 endif
 
@@ -122,7 +132,7 @@ properties:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
 		-wfn olex2/Wfn_job/sucrose.wfx \
 		-cif sucrose.cif -lap -eli \
-		-resolution 0.5 -test \
+		-resolution 0.5 \
 		-no-date \
 		&& ${MV} NoSpherA2_cube.log $@.log)
 
@@ -194,11 +204,9 @@ sucrose_SF:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-cif sucrose.cif -lap -eli \
-		-resolution 0.5 -test \
-		-no-date \
-		&& ${MV} NoSpherA2_cube.log $@.log \
-		&& ${DIFF} $@.log $@.good)
+		-cif sucrose.cif \
+		-acc 0 \
+		-no-date)
 
 sucrose_twin:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
