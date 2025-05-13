@@ -4,6 +4,7 @@ RM := rm -f
 COMP := g++
 C_COMP := gcc
 
+#link statically c++ and pthread and dynamically c and m, since they are 
 LIBS := -Wl,-Bstatic -lstdc++ -lpthread -Wl,-Bdynamic -lm -lc
 ver := $(shell expr `${COMP} -dumpversion`)
 LIBOMP := ../Lib/OpenMP_build/lib/libomp.a
