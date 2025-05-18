@@ -180,7 +180,7 @@ endif
 ifeq ($(NAME),MAC)
 	@echo Start making Mac executable
 	@rm -f NoSpherA2
-	@cd Mac && rm -f NoSpherA2_native && make all -j
+	@cd Mac && rm -f NoSpherA2_native && make NoSpherA2_native -j
 endif
 
 NoSpherA2_arm: featomic OpenBLAS omp
