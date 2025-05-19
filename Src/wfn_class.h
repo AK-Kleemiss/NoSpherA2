@@ -285,7 +285,7 @@ public:
     bool read_cube(const int& nr, const bool& full, const bool& header, const bool& expert = false) { return cub[nr].read_file(full, header, expert); };
     std::filesystem::path make_super_cube(const int& nr) { return cub[nr].super_cube(); };
     bool apply_cube_thresh(const int& nr, const double& thresh) { return cub[nr].thresh(thresh); };
-    bool apply_cube_thresh(const int& nr, const cube& mask_cube, const double& thresh) { return cub[nr].thresh(thresh); };
+    bool apply_cube_thresh(const int& nr, const cube& mask_cube, const double& thresh) { return cub[nr].thresh(mask_cube,thresh); };
     bool apply_cube_mask(const int& nr, const cube& mask_cube) { return cub[nr].mask(mask_cube); };
     bool apply_cube_negative_mask(const int& nr, const cube& mask_cube) { return cub[nr].negative_mask(mask_cube); };
     bool cube_add (const int& nr, const cube& right) { return cub[nr] += right; };
