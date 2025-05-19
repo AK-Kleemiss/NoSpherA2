@@ -65,8 +65,8 @@ void equicomb(int natoms, int nrad1, int nrad2,
                     const cdouble* cvec_ptr;
                     for (i = 0; i < l21; ++i)
                     {
-						preal = 0.0;
-						cvec_ptr = c2r[i].data();
+                        preal = 0.0;
+                        cvec_ptr = c2r[i].data();
                         for (j = 0; j < l21; ++j)
                         {
                             preal += real(cvec_ptr[j] * pcmplx[j]);

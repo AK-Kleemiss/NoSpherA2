@@ -35,7 +35,7 @@ void compute2c_Overlap(Int_Params& param1,
 void computeRho_Coulomb(Int_Params& param1,
     Int_Params& param2,
     const dMatrix2& dm,
-	vec& rho,
+    vec& rho,
     double max_mem);
 
 /*

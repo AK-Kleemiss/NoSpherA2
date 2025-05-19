@@ -1702,7 +1702,7 @@ int CINT3c1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
         std::cout << "CINT3c1e_drv: unknown int_type" << std::endl;
         exit(1);
         int *atm = envs->atm;
-        int i;
+        //int i;
         double fac;
         double *buf;
         MALLOC_INSTACK(gctr, nc * n_comp);

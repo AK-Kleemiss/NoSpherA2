@@ -193,24 +193,24 @@ std::vector<std::string> Config::parseVector(const std::string &value)
 
 
 std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int lengh) {
-	std::vector<char> string_out(lengh, '\0');
-	file.read(string_out.data(), lengh);
-	//Remove null characters from the string
-	string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
-	return std::string(string_out.begin(), string_out.end());
+    std::vector<char> string_out(lengh, '\0');
+    file.read(string_out.data(), lengh);
+    //Remove null characters from the string
+    string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
+    return std::string(string_out.begin(), string_out.end());
 }
 
 void SALTED_BINARY_FILE::open_file() {
     //Check if file exists and if it is already open
-	err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
-	err_checkf(!file.is_open(), "File already open, leaving", std::cout);
-	file.open(filepath, std::ios::in | std::ios::binary);
-	err_checkf(file.is_open(), "Couldn't open file: " + filepath.string(), std::cout);
+    err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
+    err_checkf(!file.is_open(), "File already open, leaving", std::cout);
+    file.open(filepath, std::ios::in | std::ios::binary);
+    err_checkf(file.is_open(), "Couldn't open file: " + filepath.string(), std::cout);
 }
 
 bool SALTED_BINARY_FILE::read_header() {
     // Read and verify magic number
-	file.seekg(0, std::ios::beg);
+    file.seekg(0, std::ios::beg);
     char magic[HEADER_SIZE];
     file.read(magic, HEADER_SIZE);
     if (std::string(magic, HEADER_SIZE) != MAGIC_NUMBER) {
@@ -221,24 +221,24 @@ bool SALTED_BINARY_FILE::read_header() {
     file.read((char*)&version, sizeof(int));
     if (debug) std::cout << "File Version: " << version << std::endl;
 
-	//Read number of blocks
-	file.read((char*)&numBlocks, sizeof(int));
+    //Read number of blocks
+    file.read((char*)&numBlocks, sizeof(int));
     if (debug) std::cout << "Number of blocks: " << numBlocks << std::endl;
 
-	//Now follows (Chunkname (5b str), location (4b int)) * numBlocks
+    //Now follows (Chunkname (5b str), location (4b int)) * numBlocks
     // Chunknames that are not 5 bytes long are padded with ' '
-	for (int i = 0; i < numBlocks; i++) {
+    for (int i = 0; i < numBlocks; i++) {
         std::string chunkname = read_string_remove_NULL(5);
-		int location;
-		file.read((char*)&location, sizeof(int));
-		table_of_contents[chunkname] = location;
+        int location;
+        file.read((char*)&location, sizeof(int));
+        table_of_contents[chunkname] = location;
         if (debug) std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
-	}
+    }
 
 
-	header_end = file.tellg();
+    header_end = file.tellg();
 
-	return true;
+    return true;
 }
 
 //Small macro to read a block of data
@@ -253,38 +253,38 @@ void SALTED_BINARY_FILE::populate_config(Config &config) {
     file.seekg(table_of_contents["CONFG"], std::ios::beg);
 
     // Read config data
-	READ_BLOCK(&config.average, 1); //Bool data
-	READ_BLOCK(&config.field, 1); 
-	READ_BLOCK(&config.sparsify, 1); 
-	READ_BLOCK(&config.ncut, 4); //Int data
-	READ_BLOCK(&config.nang1, 4); 
-	READ_BLOCK(&config.nang2, 4);
-	READ_BLOCK(&config.nrad1, 4); 
-	READ_BLOCK(&config.nrad2, 4); 
-	READ_BLOCK(&config.Menv, 4); 
-	READ_BLOCK(&config.Ntrain, 4);
-	READ_BLOCK(&config.rcut1, 8);  //Double data
-	READ_BLOCK(&config.rcut2, 8);
-	READ_BLOCK(&config.sig1, 8);
-	READ_BLOCK(&config.sig2, 8);
-	READ_BLOCK(&config.zeta, 8);
-	READ_BLOCK(&config.trainfrac, 8);
+    READ_BLOCK(&config.average, 1); //Bool data
+    READ_BLOCK(&config.field, 1); 
+    READ_BLOCK(&config.sparsify, 1); 
+    READ_BLOCK(&config.ncut, 4); //Int data
+    READ_BLOCK(&config.nang1, 4); 
+    READ_BLOCK(&config.nang2, 4);
+    READ_BLOCK(&config.nrad1, 4); 
+    READ_BLOCK(&config.nrad2, 4); 
+    READ_BLOCK(&config.Menv, 4); 
+    READ_BLOCK(&config.Ntrain, 4);
+    READ_BLOCK(&config.rcut1, 8);  //Double data
+    READ_BLOCK(&config.rcut2, 8);
+    READ_BLOCK(&config.sig1, 8);
+    READ_BLOCK(&config.sig2, 8);
+    READ_BLOCK(&config.zeta, 8);
+    READ_BLOCK(&config.trainfrac, 8);
 
     int string_size;
     std::vector<char> string_out;
-	READ_BLOCK_STRING(string_out);
+    READ_BLOCK_STRING(string_out);
     config.species = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
 
     READ_BLOCK_STRING(string_out);
     config.neighspe1 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
-	config.nspe1 = (int)config.neighspe1.size();
+    config.nspe1 = (int)config.neighspe1.size();
 
     READ_BLOCK_STRING(string_out);
-	config.neighspe2 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
-	config.nspe2 = (int)config.neighspe2.size();
+    config.neighspe2 = split_string<std::string>(std::string(string_out.begin(), string_out.end()), " ");
+    config.nspe2 = (int)config.neighspe2.size();
 
     READ_BLOCK_STRING(string_out);
-	config.dfbasis = std::string(string_out.begin(), string_out.end());
+    config.dfbasis = std::string(string_out.begin(), string_out.end());
 }
 
 
@@ -382,10 +382,10 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_
                 std::vector<size_t> dims;
                 vec data;
                 read_dataset(data, dims);
-				//container.emplace(std::piecewise_construct, std::forward_as_tuple(element + std::to_string(lam)), std::forward_as_tuple(dims[0], dims[1]));
+                //container.emplace(std::piecewise_construct, std::forward_as_tuple(element + std::to_string(lam)), std::forward_as_tuple(dims[0], dims[1]));
                 //dMatrix2 A = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
-				//std::copy(data.begin(), data.end(), container[element + std::to_string(lam)].data());
-				container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
+                //std::copy(data.begin(), data.end(), container[element + std::to_string(lam)].data());
+                container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
             }
         }
     );

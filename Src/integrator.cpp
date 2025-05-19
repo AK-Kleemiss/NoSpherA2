@@ -159,11 +159,11 @@ int fixed_density_fit_test()
     // std::ofstream file("eri2c_nospherA2.txt");
     // if (file.is_open())
     //{
-    //	for (int i = 0; i < eri2c.size(); i++)
-    //	{
-    //		file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c[i] << std::endl;
-    //	}
-    //	file.close();
+    //    for (int i = 0; i < eri2c.size(); i++)
+    //    {
+    //        file << std::fixed << std::showpoint << std::setprecision(12) <<eri2c[i] << std::endl;
+    //    }
+    //    file.close();
     // }
     // std::ofstream file2("eri3c_nospherA2.txt");
     // if (file2.is_open())

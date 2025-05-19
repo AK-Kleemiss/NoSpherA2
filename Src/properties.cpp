@@ -108,7 +108,7 @@ void Calc_Static_Def(
     ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     vector<Thakkar> atoms;
-	atoms.reserve(wavy.get_ncen());
+    atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.emplace_back(wavy.get_atom_charge(a));
 
@@ -275,7 +275,7 @@ void Calc_Hirshfeld(
     ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
-	atoms.reserve(wavy.get_ncen());
+    atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
         atoms.emplace_back(wavy.get_atom_charge(a));
 
@@ -1639,7 +1639,7 @@ void dipole_moments(options &opt, std::ostream &log2)
     Calc_Spherical_Dens(SPHER, wavy, opt.radius, log2);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
-	dipole_moments.reserve(wavy.get_ncen());
+    dipole_moments.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         Hirsh[i].calc_dv();

@@ -9,7 +9,7 @@
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
-	const double sqrt_2 = sqrt(2.0);
+    const double sqrt_2 = sqrt(2.0);
     using namespace std;
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
@@ -306,7 +306,7 @@ const double calc_density_ML(const double& x,
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
             }
@@ -362,7 +362,7 @@ const double calc_density_ML(const double& x,
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
             }
@@ -405,7 +405,6 @@ double helper_even(const int l) {
  */
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
 {
-    int e = 0, size;
     double radial;
     basis_set_entry bf;
 
@@ -416,7 +415,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
     {
 
         int type = -1, prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
             type = atoms[a].get_basis_set_entry(prim).get_type();
             if (type != 0)
@@ -425,7 +424,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
                 continue;
             }
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
                 radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.normalization_constant() * p.get_coef();

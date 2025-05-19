@@ -15,7 +15,7 @@ class primitive
 
 public:
     primitive(int c, int t, std::vector<double> e, std::vector<double> coef) : center(c), type(t), exp(e), coefficient(coef) {};
-	primitive(int c, int t, double e, double coef) : center(c), type(t), exp({e}), coefficient({coef}) {};
+    primitive(int c, int t, double e, double coef) : center(c), type(t), exp({e}), coefficient({coef}) {};
 
     int center, type;
     std::vector<double> exp, coefficient;

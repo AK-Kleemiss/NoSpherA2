@@ -15,15 +15,15 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 
     config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
-	if (config.salted_filename == "") {
+    if (config.salted_filename == "") {
         std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
         exit(1);
     }
 
     if (opt_in.debug) std::cout << "Using SALTED Binary file: " << config.salted_filename << std::endl;
     _path = _path / config.salted_filename;
-	SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
-	file.populate_config(config);
+    SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_path);
+    file.populate_config(config);
 
     bool i_know_all = true;
 #pragma omp parallel for reduction(&& : i_know_all)
@@ -97,7 +97,7 @@ void SALTEDPredictor::setup_atomic_environment()
     const std::shared_ptr<std::array<std::vector<primitive>, 118>> bs = wavy.get_basis_set_ptr();
     SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
-	atomic_symbols.reserve(wavy.get_ncen());
+    atomic_symbols.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         atomic_symbols.emplace_back(wavy.get_atom_label(i));
@@ -165,28 +165,28 @@ void SALTEDPredictor::read_model_data() {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
     weights = file.read_weights();
-	wigner3j = file.read_wigners();
+    wigner3j = file.read_wigners();
 
     if (config.average) av_coefs = file.read_averages();
-	if (config.sparsify) vfps = file.read_fps();
+    if (config.sparsify) vfps = file.read_fps();
 
 
-	std::unordered_map<std::string, dMatrix2> features = file.read_features();
+    std::unordered_map<std::string, dMatrix2> features = file.read_features();
     Vmat = file.read_projectors();
     std::string key;
-	for (std::string spe : config.species) {
-		for (int lam = 0; lam < lmax[spe] + 1; lam++) {
-			key = spe + std::to_string(lam);
-			if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
+    for (std::string spe : config.species) {
+        for (int lam = 0; lam < lmax[spe] + 1; lam++) {
+            key = spe + std::to_string(lam);
+            if (lam == 0) Mspe[spe] = (int)features[key].extent(0);
 
             if (config.zeta == 1.0) {
-				power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
-			}
+                power_env_sparse[key] = dot(Vmat[key], features[key], true, false); //Transpose the first matrix
+            }
             else {
                 power_env_sparse[key] = features[key];
             }
-		}
-	}
+        }
+    }
 }
 
 
@@ -229,13 +229,13 @@ vec SALTEDPredictor::predict()
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-			p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
+            p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
             featsize[lam] = nfps;
         }
         else
         {
-			p.assign(natoms * (2 * lam + 1) * featsize[lam], 0.0);
+            p.assign(natoms * (2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
         pvec[lam] = p;
@@ -262,9 +262,9 @@ vec SALTEDPredictor::predict()
             double* pvec_ptr = pvec_lam.data();
             for (const int idx : atom_idx[spe])
             {
-				auto _temp = Kokkos::submdspan(_pvec, idx, Kokkos::full_extent);
-				std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
-				pvec_ptr += row_size;
+                auto _temp = Kokkos::submdspan(_pvec, idx, Kokkos::full_extent);
+                std::copy(_temp.data_handle(), _temp.data_handle() + row_size, pvec_ptr);
+                pvec_ptr += row_size;
             }
             dMatrix2 kernel_nm = dot(pvec_lam, power_env_sparse[spe + to_string(lam)], false, true);
 
@@ -285,9 +285,9 @@ vec SALTEDPredictor::predict()
                     {
                         for (size_t i2 = 0; i2 < Mspe[spe]; ++i2)
                         {
-							double scale_factor = pow(kernell0_nm(i1, i2), config.zeta - 1);
-							size_t base_i = i1 * lam2_1;
-							size_t base_j = i2 * lam2_1;
+                            double scale_factor = pow(kernell0_nm(i1, i2), config.zeta - 1);
+                            size_t base_i = i1 * lam2_1;
+                            size_t base_j = i2 * lam2_1;
                             for (size_t i = 0; i < lam2_1; ++i)
                             {
                                 for (size_t j = 0; j < lam2_1; ++j)
@@ -343,7 +343,7 @@ vec SALTEDPredictor::predict()
                 err_chekf(isize + Mcut <= weights.size(), "isize + Mcut > weights.size()", std::cout);
 
                 dMatrix1 weights_subset(Mcut);
-				std::copy(weights.data() + isize, weights.data() + isize + Mcut, weights_subset.data());
+                std::copy(weights.data() + isize, weights.data() + isize + Mcut, weights_subset.data());
 
                 C[spe + to_string(l) + to_string(n)] = dot(psi_nm[spe_idx][l], weights_subset, false);
 

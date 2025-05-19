@@ -23,7 +23,7 @@ std::string help_message =
      "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
      "   -b              <FILENAME>               Read this basis set\n"
      "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-     "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -dmin             <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
      "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
      "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
      "                                            [1]: def2-ECP\n"
@@ -1704,7 +1704,7 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
-			set_BLAS_threads(threads);
+            set_BLAS_threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
 #endif
@@ -2058,7 +2058,7 @@ void options::digest_options()
                     double beta = 2.0;
                     //Check if the next argument is a valid double
                     if (i + 2 < argc && arguments[i + 2].find("-") != 0) {
-                        double beta = std::stod(arguments[i + 2]);
+                        beta = std::stod(arguments[i + 2]);
                     }
                     if (debug) cout << "Using automatic basis set selection with beta: " << beta << endl;
                     aux_basis = std::make_shared<BasisSet>(beta);
@@ -2103,7 +2103,7 @@ void options::digest_options()
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
-			exit(0);
+            exit(0);
         }
         else if (temp == "-skpts")
             save_k_pts = true;
@@ -2221,11 +2221,11 @@ void options::digest_options()
         }
         else if (temp == "-test_analytical")
         {
-			bool full = false;
+            bool full = false;
             if ("full" == arguments[i + 1]) {
-				full = true;
+                full = true;
             }
-			test_analytical_fourier(full);
+            test_analytical_fourier(full);
             exit(0);
         }
         else if (temp == "-test_RI")
@@ -2661,7 +2661,6 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
             return false;
         }
     }
-    return true;
 #else
     char file[1024];
     std::string command;

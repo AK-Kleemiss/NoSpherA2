@@ -415,34 +415,34 @@ void removeElement(std::vector<T> &vec, const T &x)
 }
 
 inline void Enter(){
-	std::cout << "press ENTER to continue... " << std::flush;
-	std::cin.ignore();
-	std::cin.get();
+    std::cout << "press ENTER to continue... " << std::flush;
+    std::cin.ignore();
+    std::cin.get();
 };
 
 inline void cls(){
 //   std::cout << string( 100, '\n' );
 #ifdef _WIN32
-	if(system("CLS")) std::cout << "this should not happen...!" << std::endl;
+    if(system("CLS")) std::cout << "this should not happen...!" << std::endl;
 #else
-	if(system("clear")) std::cout << "this should not happen...!" << std::endl;
+    if(system("clear")) std::cout << "this should not happen...!" << std::endl;
 #endif
 };
 
 inline bool yesno(){
-	bool end=false;
-	while (!end) {
-		char dum ='?';
-		std::cout << "(Y/N)?";
-		std::cin >> dum;
-		if(dum == 'y'||dum == 'Y'){
-			std::cout << "Okay..." << std::endl;
-			 return true;
-		}
-		else if(dum == 'N'||dum == 'n') return false;
-		else std::cout << "Sorry, i did not understand that!" << std::endl;
-	}
-	return false;
+    bool end=false;
+    while (!end) {
+        char dum ='?';
+        std::cout << "(Y/N)?";
+        std::cin >> dum;
+        if(dum == 'y'||dum == 'Y'){
+            std::cout << "Okay..." << std::endl;
+             return true;
+        }
+        else if(dum == 'N'||dum == 'n') return false;
+        else std::cout << "Sorry, i did not understand that!" << std::endl;
+    }
+    return false;
 };
 
 struct SimplePrimitive {

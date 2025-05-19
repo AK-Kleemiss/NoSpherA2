@@ -1,22 +1,22 @@
 #include "basis_set_helper.h"
 
 const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::path basis_path) {
-	std::array<std::vector<primitive>, 118> basis_set; // creates an array composed of 118 vectors composed of primitives
-	//open file
-	std::ifstream file(basis_path);          // data
-	std::string line, delimiter = ",";             // data delimiter
+    std::array<std::vector<primitive>, 118> basis_set; // creates an array composed of 118 vectors composed of primitives
+    //open file
+    std::ifstream file(basis_path);          // data
+    std::string line, delimiter = ",";             // data delimiter
 
-	std::getline(file, line); // first line read before beginning (H)
+    std::getline(file, line); // first line read before beginning (H)
 
-	for (int elem_idx = 0; elem_idx < 118; elem_idx++) {   // loop over all elements
+    for (int elem_idx = 0; elem_idx < 118; elem_idx++) {   // loop over all elements
 
-		//std::cout << line << std::endl; // prints last line read before loop (visualization of elements) (shows last "omitted" line)
+        //std::cout << line << std::endl; // prints last line read before loop (visualization of elements) (shows last "omitted" line)
         int basis_idx = -1;
-		while (true) {                   // loop over all primitives
-			std::getline(file, line);   // read line
-			if (line.empty()) break;    // delimiter between elements - empty lines
+        while (true) {                   // loop over all primitives
+            std::getline(file, line);   // read line
+            if (line.empty()) break;    // delimiter between elements - empty lines
 
-			std::vector<double> res = split_string<double>(line, delimiter);    //splits line into components using delimiter
+            std::vector<double> res = split_string<double>(line, delimiter);    //splits line into components using delimiter
             if (basis_idx == static_cast<int>(res[4])) {
                 basis_set[elem_idx][basis_set[elem_idx].size() - 1].exp.emplace_back(res[2]);
                 basis_set[elem_idx][basis_set[elem_idx].size() - 1].coefficient.emplace_back(res[3]);
@@ -30,13 +30,13 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
             }
         
             basis_idx = static_cast<int>(res[4]);
-		}
+        }
 
-		std::getline(file, line);                               //after while-break, one line omitted (element line)
+        std::getline(file, line);                               //after while-break, one line omitted (element line)
 
-	}
-	file.close();
-	return basis_set;
+    }
+    file.close();
+    return basis_set;
 }
 
 
@@ -89,13 +89,13 @@ std::string write_basis_set(std::ofstream& file, const std::string basis_name, s
     }
     file << "};\n\n";
     file << "constexpr std::array<int, 118> " << basis_name_copy << "_counts {{";
-	int running_idx = 0;
+    int running_idx = 0;
     for (int i = 0; i < 118; i++) {
         if (basis_set[i].size() == 0) {
             file << "0,";
             continue;
         }
-        int s = 0;
+        unsigned int s = 0;
         for (int j = 0; j < basis_set[i].size(); j++) {
             s += basis_set[i][j].exp.size();
         }

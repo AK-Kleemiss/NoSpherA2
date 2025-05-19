@@ -66,8 +66,8 @@ private:
     int32_t version;
     int32_t numBlocks;
     std::map<std::string, size_t> table_of_contents;
-	int conf_location = 0; //Initialized after gen_config was called
-	int header_end = -1;
+    int conf_location = 0; //Initialized after gen_config was called
+    int header_end = -1;
 
     void open_file();
     bool read_header();

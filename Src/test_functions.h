@@ -1571,7 +1571,7 @@ void test_analytical_fourier(bool full)
 
     for (int i = 1; i < 1000; i++) {
         //Generate random k-points with values between -1 and 1
-		kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
+        kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
     }
     vec2 grid;
     grid.resize(5); // x, y, z, dens, atomic_weight
@@ -1644,7 +1644,7 @@ void test_analytical_fourier(bool full)
 
         for (unsigned int l = 0; l < type * 2 + 1; l++)
         {
-			int m = static_cast<int>(l) - static_cast<int>(type);
+            int m = static_cast<int>(l) - static_cast<int>(type);
             for (int i = 0; i < coefs.size(); i++)
             {
                 coefs[i] = 0.0;
@@ -1674,12 +1674,12 @@ void test_analytical_fourier(bool full)
 #pragma omp parallel for
             for (int i = 0; i < kpts.size(); i++)
             {
-				double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
-				k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
-				for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
+                double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
+                k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+                for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
 
                 sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
-				//sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
+                //sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
             {
                     double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
@@ -1896,61 +1896,61 @@ void test_reading_SALTED_binary_file() {
     Config config;
     file.populate_config(config);
     std::unordered_map<int, std::vector<int64_t>> fps = file.read_fps();
-	std::unordered_map<std::string, vec> averages = file.read_averages();
+    std::unordered_map<std::string, vec> averages = file.read_averages();
     std::unordered_map<int, vec> wigners = file.read_wigners();
     vec weights = file.read_weights();
-	std::unordered_map<std::string, dMatrix2> feats = file.read_features();
+    std::unordered_map<std::string, dMatrix2> feats = file.read_features();
     std::unordered_map<std::string, dMatrix2> proj = file.read_projectors();
 
-	// TEST if both configs are the same
-	std::cout << "Comparing configs" << std::endl;
-	std::cout << "Average:" << config.average << std::endl;
-	std::cout << "Field:" << config.field << std::endl;
-	std::cout << "Sparsify:" << config.sparsify << std::endl;
-	std::cout << "Ncut:" << config.ncut << std::endl;
-	std::cout << "Ntrain:" << config.Ntrain << std::endl;
-	std::cout << "Menv:" << config.Menv << std::endl;
-	std::cout << "trainfrac:" << config.trainfrac << std::endl;
+    // TEST if both configs are the same
+    std::cout << "Comparing configs" << std::endl;
+    std::cout << "Average:" << config.average << std::endl;
+    std::cout << "Field:" << config.field << std::endl;
+    std::cout << "Sparsify:" << config.sparsify << std::endl;
+    std::cout << "Ncut:" << config.ncut << std::endl;
+    std::cout << "Ntrain:" << config.Ntrain << std::endl;
+    std::cout << "Menv:" << config.Menv << std::endl;
+    std::cout << "trainfrac:" << config.trainfrac << std::endl;
     std::cout << "Rcut1:" << config.rcut1 << std::endl;
-	std::cout << "Rcut2:" << config.rcut2 << std::endl;
-	std::cout << "nang1:" << config.nang1 << std::endl;
-	std::cout << "nang2:" << config.nang2 << std::endl;
-	std::cout << "sig1:" << config.sig1 << std::endl;
-	std::cout << "sig2:" << config.sig2 << std::endl;
-	std::cout << "zeta:" << config.zeta << std::endl;
-	std::cout << "neighspe size:" << config.neighspe1.size() << std::endl;
+    std::cout << "Rcut2:" << config.rcut2 << std::endl;
+    std::cout << "nang1:" << config.nang1 << std::endl;
+    std::cout << "nang2:" << config.nang2 << std::endl;
+    std::cout << "sig1:" << config.sig1 << std::endl;
+    std::cout << "sig2:" << config.sig2 << std::endl;
+    std::cout << "zeta:" << config.zeta << std::endl;
+    std::cout << "neighspe size:" << config.neighspe1.size() << std::endl;
     for (int i = 0; i < config.neighspe1.size(); i++)
     {
-		std::cout << "neighspe1[" << i << "]:" << config.neighspe1[i] << std::endl;
-	}
-	std::cout << "neighspe2 size:" << config.neighspe2.size() << std::endl;
-	for (int i = 0; i < config.neighspe2.size(); i++)
-	{
-		std::cout << "neighspe2[" << i << "]:"  << config.neighspe2[i] << std::endl;
-	}
-	std::cout << "dfBasis:" << config.dfbasis << std::endl;
+        std::cout << "neighspe1[" << i << "]:" << config.neighspe1[i] << std::endl;
+    }
+    std::cout << "neighspe2 size:" << config.neighspe2.size() << std::endl;
+    for (int i = 0; i < config.neighspe2.size(); i++)
+    {
+        std::cout << "neighspe2[" << i << "]:"  << config.neighspe2[i] << std::endl;
+    }
+    std::cout << "dfBasis:" << config.dfbasis << std::endl;
 
-	std::cout << "Comparing wigners" << std::endl;
-	for (int i = 0; i < wigners.size(); i++)
-	{
-		for (int j = 0; j < wigners[i].size(); j+=10)
-		{
-			std::cout << wigners[i][j] << " ";
-		}
-		std::cout << std::endl;
-	}
-
-	std::cout << "Comparing FPS" << std::endl;
-	for (int i = 0; i < fps.size(); i++)
-	{
-		for (int j = 0; j < fps[i].size(); j+=10)
-		{
-			std::cout << fps[i][j] << " ";
-		}
+    std::cout << "Comparing wigners" << std::endl;
+    for (int i = 0; i < wigners.size(); i++)
+    {
+        for (int j = 0; j < wigners[i].size(); j+=10)
+        {
+            std::cout << wigners[i][j] << " ";
+        }
         std::cout << std::endl;
-	}
+    }
 
-	std::cout << "All tests passed!" << std::endl;
+    std::cout << "Comparing FPS" << std::endl;
+    for (int i = 0; i < fps.size(); i++)
+    {
+        for (int j = 0; j < fps[i].size(); j+=10)
+        {
+            std::cout << fps[i][j] << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    std::cout << "All tests passed!" << std::endl;
 }
 
 
@@ -1992,11 +1992,11 @@ void test_NNLS()
     dMatrix1 B(B_in.size());
     std::copy(B_in.begin(), B_in.end(), B.data());
     dMatrix2 A(m, n);
-	std::copy(A_in.begin(), A_in.end(), A.data());
+    std::copy(A_in.begin(), A_in.end(), A.data());
     NNLSResult res = nnls(A, B);
 
-	//double sum = std::accumulate(res.x.begin(), res.x.end(), 0.0);
-	//std::cout << "Sum of coefficients: " << sum << std::endl;
+    //double sum = std::accumulate(res.x.begin(), res.x.end(), 0.0);
+    //std::cout << "Sum of coefficients: " << sum << std::endl;
 
     std::cout << "NNLS solution: " << std::endl;
     std::cout << "Mode: " << res.status << std::endl;
@@ -2105,12 +2105,12 @@ void test_NNLS()
 // cdouble C_n_recursion(int n, double H, double b);
 // For the case J_l(H) = int_0^inf j_l(Hr) * R_l(r)^2 * r^2 dr    |   Wave Functions!!
 // cdouble S_0(double H, double b) {
-//	using namespace std::complex_literals;
+//    using namespace std::complex_literals;
 //     double two_32 = pow(2.0, 1.5);
-//	return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8. * b))) / (two_32 * sqrt(b));
+//    return -(cerf((1.0i * H) / (two_32 * sqrt(b))) * constants::sqr_pi * 1.0i * exp(-H * H / (8. * b))) / (two_32 * sqrt(b));
 // }
 // double C_0(double H, double b) {
-//	return  (constants::sqr_pi * exp(-H * H / (8. * b))) / (pow(2., 1.5) * sqrt(b));
+//    return  (constants::sqr_pi * exp(-H * H / (8. * b))) / (pow(2., 1.5) * sqrt(b));
 // }
 ////Following 1/(4b) * ((n-1)C_(n-2) - H*S_(n-1)) = C_n
 // cdouble C_n_recursion(int n, double H, double b) {

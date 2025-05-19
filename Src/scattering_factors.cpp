@@ -55,7 +55,7 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
     for(int i = 0; i < 3; i++)
     {
         k_pt[i].reserve(nr[0]);
-	}
+    }
     hkl_t hkl_;
     for (int run = 0; run < nr[0]; run++)
     {
@@ -1050,7 +1050,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
              //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
              << setw(4) << cif2wfn_list.size() << " are identified as asymmetric unit atoms!" << endl;
     vector<AtomGrid> res;
-	res.reserve(atom_type_list.size());
+    res.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
     {
         if (debug)
@@ -1809,18 +1809,18 @@ int make_hirshfeld_grids(
         shrink_vector<double>(phi_temp);
     }
     // if (debug) {
-    //	//Copy grid from GPU to print:
-    //	// Dimensions: [c] [p]
-    //	// p = the number of gridpoint
-    //	// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    //	ofstream grid("grid.file", ios::out);
-    //	for (int i = 0; i < total_grid[0].size(); i++) {
-    //		for (int j = 0; j < 7; j++)
-    //			grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
-    //		grid << "\n";
-    //	}
-    //	grid.flush();
-    //	grid.close();
+    //    //Copy grid from GPU to print:
+    //    // Dimensions: [c] [p]
+    //    // p = the number of gridpoint
+    //    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    //    ofstream grid("grid.file", ios::out);
+    //    for (int i = 0; i < total_grid[0].size(); i++) {
+    //        for (int j = 0; j < 7; j++)
+    //            grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
+    //        grid << "\n";
+    //    }
+    //    grid.flush();
+    //    grid.close();
     // }
     if (pbc != 0)
     {
@@ -2125,7 +2125,7 @@ static int make_hirshfeld_grids_ML(
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        //	int diff = end - start;
+        //    int diff = end - start;
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
@@ -2568,10 +2568,10 @@ void calc_SF_SALTED(const vec2 &k_pt,
         {
             int coef_count = 0;
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
-			k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+            k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
-			//Normalize K-point
-			for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
+            //Normalize K-point
+            for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
 
             for (int iat = 0; iat < atom_list.size(); iat++)
             {
@@ -2911,7 +2911,7 @@ tsc_block<int, cdouble> thakkar_sfac(
     }
 
     vector<Thakkar> spherical_atoms;
-	spherical_atoms.reserve(atom_type_list.size());
+    spherical_atoms.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
         spherical_atoms.emplace_back(atom_type_list[i]);
 
@@ -3763,8 +3763,8 @@ ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
     fill_xyzc(x, y, z, atom_z, 0, wavy, cell());
 
     ivec atom_types, nr_list;
-	atom_types.reserve(nr_of_atoms);
-	nr_list.reserve(nr_of_atoms);
+    atom_types.reserve(nr_of_atoms);
+    nr_list.reserve(nr_of_atoms);
     // Make Prototype grids with only single atom weights for all elements
     for (int atm_idx = 0; atm_idx < nr_of_atoms; atm_idx++) {
         atom_types.emplace_back(wavy.get_atom_charge(atm_idx));

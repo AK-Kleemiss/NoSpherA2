@@ -165,7 +165,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   com << "TITLE" << endl << endl;
   com << wave.get_charge() << " " << wave.get_multi() << endl;
   com << wave.get_centers(check_bohr(wave, true, debug));
-  //	com << wave.get_centers (false);
+  //    com << wave.get_centers (false);
   com << endl;
   svec elements_list;
   if (debug)std::cout << "elements_list.size()= " << elements_list.size() << endl;
@@ -406,7 +406,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           break;
         }
-        if (debug)	std::cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
+        if (debug)    std::cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
       }
     }
     //-----------debug output---------------------------------------------------------

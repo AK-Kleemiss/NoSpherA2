@@ -16,13 +16,13 @@ std::shared_ptr<std::array<std::vector<primitive>, 118>> BasisSet::get_data() {
 };
 
 const std::span<const SimplePrimitive> BasisSet::operator[](const int& element) const {
-	err_checkf(_elementCounts[element] != 0, "Basis set for element " + std::to_string(element) + " is not defined!", std::cout);
+    err_checkf(_elementCounts[element] != 0, "Basis set for element " + std::to_string(element) + " is not defined!", std::cout);
     return { _primitives + _elementOffsets[element], static_cast<std::size_t>(_elementCounts[element])};
 }
 
-double primitve_normalization(const double exp, const int l) {
-    double numerator = std::pow(2 * exp / constants::PI, 3.0 / 2.0) * std::pow(4 * exp, l);
-    double denominator = ((l == 0) ? 1 : constants::double_ft[2 * l - 1]);
+long double primitve_normalization(const double exp, const int l) {
+    long double numerator = std::pow(2 * exp / constants::PI, 3.0 / 2.0) * std::pow(4 * exp, l);
+    long double denominator = ((l == 0) ? 1 : constants::double_ft[2 * l - 1]);
     return std::sqrt(numerator / denominator);
 }
 
@@ -54,7 +54,7 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
             double exp = p.get_exponent();
             double coef = p.get_coefficient() / primitve_normalization(exp, l);
 
-            // Skip if the angular momentum is not in the range of 0 to max_shells	
+            // Skip if the angular momentum is not in the range of 0 to max_shells    
             if (l >= max_shells + 1) continue;
             if (std::abs(coef) < 1e-3) continue;
 

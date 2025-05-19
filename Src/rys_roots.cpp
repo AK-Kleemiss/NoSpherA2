@@ -5733,9 +5733,9 @@ int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double
     // Transpose vec of size n x n
     // Original version usess COL_MAJOR version but this just does not seem to work here?
     // for (int i = 0; i < n; i++) {
-    //	for (int j = i +1; j < n; j++) {
+    //    for (int j = i +1; j < n; j++) {
     //           std::swap(vec[i * n + j], vec[j * n + i]);
-    //	}
+    //    }
     //}
     return INFO;
 }
