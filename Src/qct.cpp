@@ -920,7 +920,6 @@ int QCT(options& opt, std::vector<WFN>& wavy)
     bool end = false;
     int activewave=0;
     string wavename;
-    unsigned int counter = 0;
     while(!end){
         char sel;
         std::cout << "This Executable was built on: " + string(__DATE__) + " " + string(__TIME__) + "\n";
@@ -1802,15 +1801,15 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                             string basis_temp = wavy[activewave].get_basis_set_name();
                             if (basis_temp.length() < 3) {
                                 int tries = 0;
-                                bool end = false;
+                                bool _end = false;
                                 string temp;
-                                while (!end && tries != 3) {
+                                while (!_end && tries != 3) {
                                     std::cout << "Please give the name of the basis set you want to use: ";
                                     std::cin >> temp;
                                     std::filesystem::path basis_set_file(opt.basis_set_path);
                                     basis_set_file.append(temp);
                                     if (opt.debug)std::cout << "looking for: " << basis_set_file << endl;
-                                    if (exists(basis_set_file)) end = true;
+                                    if (exists(basis_set_file)) _end = true;
                                     else tries++;
                                 }
                                 if (tries == 3) {
@@ -1820,7 +1819,6 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                 }
                                 wavy[activewave].change_basis_set_name(temp);
                             }
-                            bool read = false;
                             if (expert) {
                                 std::cout << "What is the charge of your molecule?" << endl;
                                 int temp = 0;
@@ -1917,10 +1915,10 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                     cls();
                     break;
                 }
-                vector < vector < unsigned int > > selection;
-                selection.resize(1);
-                select_cubes(selection,wavy,1,true);
-                activewave=selection[0][0];
+                vector < vector < unsigned int > > _selection;
+                _selection.resize(1);
+                select_cubes(_selection,wavy,1,true);
+                activewave=_selection[0][0];
                 cls();
                 break;
             }

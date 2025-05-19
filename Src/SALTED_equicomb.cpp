@@ -113,8 +113,6 @@ void equicomb(int natoms, int nrad1, int nrad2,
         cvec pcmplx(l21, constants::cnull);
         vec preal(l21, 0.0);
         inner = 0.0;
-        int comp = 0;
-
         ifeat = 0;
         for (n1 = 0; n1 < nrad1; ++n1)
         {

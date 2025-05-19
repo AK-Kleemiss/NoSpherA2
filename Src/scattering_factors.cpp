@@ -3092,7 +3092,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     {
         // We need coeffs for the atoms and coeff seperateley
         unsigned int current_coef_index = coefs.size();
-        for (int i = constant_atoms.size() - 1; i >= 0; i--)
+        for (unsigned int i = constant_atoms.size() - 1; i >= 0; i--)
         {
             // Count up all coeffs for one atom
             const int lim = (int)SP.wavy.get_atom_basis_set_size(i);

@@ -276,7 +276,7 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial;
     int coef_counter = 0;
-    int e = 0, size = 0;
+    unsigned int e = 0, size = 0;
     basis_set_entry bf;
     primitive p;
 
@@ -301,7 +301,7 @@ const double calc_density_ML(const double& x,
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
             d[e] /= d[3];
-        int type = -1, prim = 0;
+        int prim = 0;
         for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
@@ -357,10 +357,10 @@ const double calc_density_ML(const double& x,
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
             d[e] /= d[3];
-        int type = -1, prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        unsigned int prim = 0;
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
-            int type = atoms[a].get_basis_set_entry(prim).get_type();
+            unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
 
             for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
