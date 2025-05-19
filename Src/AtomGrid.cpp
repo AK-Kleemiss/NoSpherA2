@@ -102,18 +102,18 @@ AtomGrid::AtomGrid(const double radial_precision,
     angular_off -= start;
     const int size = start + num_angular;
     int p = 0;
-    atom_grid_x_bohr_.reserve(size);
-    atom_grid_y_bohr_.reserve(size);
-    atom_grid_z_bohr_.reserve(size);
-    atom_grid_w_.reserve(size);
+    atom_grid_x_bohr_.resize(size);
+    atom_grid_y_bohr_.resize(size);
+    atom_grid_z_bohr_.resize(size);
+    atom_grid_w_.resize(size);
 #pragma omp parallel for private(p)
     for (int iang = start; iang < size; iang++) {
       p = angular_off + iang;
-      atom_grid_x_bohr_.emplace_back(angular_x[p] * radial_r);
-      atom_grid_y_bohr_.emplace_back(angular_y[p] * radial_r);
-      atom_grid_z_bohr_.emplace_back(angular_z[p] * radial_r);
+      atom_grid_x_bohr_[iang] = angular_x[p] * radial_r;
+      atom_grid_y_bohr_[iang] = angular_y[p] * radial_r;
+      atom_grid_z_bohr_[iang] = angular_z[p] * radial_r;
 
-      atom_grid_w_.emplace_back(constants::FOUR_PI * angular_w[p] * radial_w);
+      atom_grid_w_[iang] = constants::FOUR_PI * angular_w[p] * radial_w;
     }
   }
 }
