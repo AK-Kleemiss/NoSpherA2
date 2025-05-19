@@ -1300,7 +1300,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
 							}
 							if(wavy.size() == 0){
 								activewave=0;
-								wavy.push_back(WFN(path));
+								wavy.emplace_back(path);
 							}
 							wavy[activewave].push_back_cube(cube(path, false, wavy[activewave], std::cout, expert));
 							cls();
@@ -1339,8 +1339,8 @@ int QCT(options& opt, std::vector<WFN>& wavy)
 								}
 								else if(wavy.size()==0||activewave==wavy.size()||new_wfn) {
 									if(opt.debug) std::cout << "Making a new wavefunction!" << endl;
-									if(path.find(".wfn")!=-1) wavy.push_back(WFN(2));
-									else wavy.push_back(WFN(4));
+									if(path.find(".wfn")!=-1) wavy.emplace_back(2);
+									else wavy.emplace_back(4);
 									if(wavy.size()>1) activewave++;
 									if(opt.debug) std::cout << "Size: " << wavy.size() << " active: " << activewave << endl;
 								}

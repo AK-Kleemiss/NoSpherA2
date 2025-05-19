@@ -97,9 +97,10 @@ void SALTEDPredictor::setup_atomic_environment()
     const std::shared_ptr<std::array<std::vector<primitive>, 118>> bs = wavy.get_basis_set_ptr();
     SALTED_Utils::set_lmax_nmax(lmax, nmax, *bs, config.species);
 
+	atomic_symbols.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
-        atomic_symbols.push_back(wavy.get_atom_label(i));
+        atomic_symbols.emplace_back(wavy.get_atom_label(i));
     }
     // # Define system excluding atoms that belong to species not listed in SALTED input
     atomic_symbols = SALTED_Utils::filter_species(atomic_symbols, config.species);

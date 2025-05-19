@@ -60,7 +60,7 @@ public:
     }
 
     void add_owned_primitive(const SimplePrimitive& primitive) {
-        _ownedPrimitives.push_back(primitive);
+        _ownedPrimitives.emplace_back(primitive);
         _primitives = _ownedPrimitives.data();
         _primitiveCount++;
     }

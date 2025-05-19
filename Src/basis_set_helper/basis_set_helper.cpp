@@ -18,13 +18,15 @@ const std::array<std::vector<primitive>, 118> read_basis_set(std::filesystem::pa
 
 			std::vector<double> res = split_string<double>(line, delimiter);    //splits line into components using delimiter
             if (basis_idx == static_cast<int>(res[4])) {
-                basis_set[elem_idx][basis_set[elem_idx].size() - 1].exp.push_back(res[2]);
-                basis_set[elem_idx][basis_set[elem_idx].size() - 1].coefficient.push_back(res[3]);
+                basis_set[elem_idx][basis_set[elem_idx].size() - 1].exp.emplace_back(res[2]);
+                basis_set[elem_idx][basis_set[elem_idx].size() - 1].coefficient.emplace_back(res[3]);
             }
             else {
-                basis_set[elem_idx].push_back({ static_cast<int>(res[0]),
-                                static_cast<int>(res[1]),
-                                {res[2]},{res[3]} });
+                basis_set[elem_idx].emplace_back(
+                    static_cast<int>(res[0]),
+                    static_cast<int>(res[1]),
+                    res[2], 
+                    res[3]);
             }
         
             basis_idx = static_cast<int>(res[4]);

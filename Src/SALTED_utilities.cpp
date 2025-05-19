@@ -188,7 +188,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
             for (const std::string &speneigh : this->neighspe)
             {
                 // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1});
+                keys_array.emplace_back(std::vector<int32_t>{ l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1 });
             }
         }
     }

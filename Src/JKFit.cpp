@@ -39,7 +39,7 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
         //Check if the element is already in the seen_elements vector
         if (std::find(seen_elements.begin(), seen_elements.end(), nuc_charge) != seen_elements.end()) continue;
         err_chekf(atm.get_basis_set().size() != 0, "Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(nuc_charge) + " is not defined!", std::cout);
-        seen_elements.push_back(nuc_charge);
+        seen_elements.emplace_back(nuc_charge);
 
         std::array<int, 4> configuration = constants::GROUND_STATE_CONFIGURATION[nuc_charge];
         int max_shells = 4 - std::count(configuration.begin(), configuration.end(), 0);

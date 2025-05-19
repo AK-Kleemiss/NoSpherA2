@@ -122,10 +122,10 @@ bool WFN::push_back_atom(const std::string &label, const double &x, const double
 {
     ncen++;
     if (_charge >= 1)
-        atoms.push_back(atom(label, ID, ncen, x, y, z, _charge));
+        atoms.emplace_back(label, ID, ncen, x, y, z, _charge);
     else
     {
-        atoms.push_back(atom());
+        atoms.emplace_back();
         return false;
     }
     return true;
@@ -4830,7 +4830,7 @@ bool WFN::guess_multiplicity(std::ostream &file)
 
 bool WFN::push_back_cube(const std::string &filepath, const bool &full, const bool &expert)
 {
-    cub.push_back(cube(filepath, full, *this, std::cout, expert));
+    cub.emplace_back(filepath, full, *this, std::cout, expert);
     return true;
 };
 

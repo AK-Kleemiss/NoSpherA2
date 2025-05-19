@@ -90,11 +90,11 @@ void atom::print_values_long() const {
 
 bool atom::push_back_basis_set(const double& exponent, const double& coefficient, const int& type, const int& shell) {
 	if (shell == shellcount.size())
-		shellcount.push_back((unsigned int)1);
+		shellcount.emplace_back((unsigned int)1);
 	else
 		shellcount[shell]++;
 	if (type >= 0 && shell >= 0) {
-		basis_set.push_back(basis_set_entry(coefficient, exponent, type, shell));
+		basis_set.emplace_back(coefficient, exponent, type, shell);
 		return true;
 	}
 	else {

@@ -25,7 +25,7 @@ public:
     op = oper;
   };
   void push_back_coef(const double &val){
-    coefficients.push_back(val);
+    coefficients.emplace_back(val);
   };
   const bool erase_coef(const int &_nr, const int &nex) {
     // Check, if Element (nr) is a valid Vector-Entry

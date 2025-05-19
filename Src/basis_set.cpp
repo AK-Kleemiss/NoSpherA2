@@ -68,7 +68,7 @@ bool read_basis_set(const std::string &basis_set_path, WFN &wave, bool debug)
         }
         if (!found)
         {
-            elements_list.push_back(wave.get_atom_label(i));
+            elements_list.emplace_back(wave.get_atom_label(i));
             if (debug)
                std::cout << "Added an atom which was not there yet!" << wave.get_atom_label(i) << endl;
         }
@@ -377,7 +377,7 @@ bool read_basis_set_vanilla(const std::filesystem::path& basis_set_path, WFN& wa
         }
         if (!found)
         {
-            elements_list.push_back(wave.get_atom_label(i));
+            elements_list.emplace_back(wave.get_atom_label(i));
             if (debug)
                std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << "!" << endl;
         }
@@ -632,7 +632,7 @@ bool read_basis_set_missing(const std::filesystem::path &basis_set_path, WFN &wa
         }
         if (!found)
         {
-            elements_list.push_back(wave.get_atom_label(i));
+            elements_list.emplace_back(wave.get_atom_label(i));
             if (debug)
                std::cout << "Added an atom which was not there yet! " << wave.get_atom_label(i) << endl;
         }

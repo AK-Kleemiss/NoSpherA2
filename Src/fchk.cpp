@@ -896,7 +896,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         }
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
-                        norm_const.push_back(basis_coefficients[a][i]);
+                        norm_const.emplace_back(basis_coefficients[a][i]);
                     }
                     break;
                 case 2:
@@ -926,7 +926,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                     }
                     break;
                 case 3:
@@ -956,9 +956,9 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(sqrt(3) * basis_coefficients[a][i]);
+                            norm_const.emplace_back(sqrt(3) * basis_coefficients[a][i]);
                     }
                     break;
                 case 4:
@@ -988,10 +988,10 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int l = 0; l < 3; l++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                         for (int l = 0; l < 6; l++)
-                            norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
-                        norm_const.push_back(sqrt(15) * basis_coefficients[a][i]);
+                            norm_const.emplace_back(sqrt(5) * basis_coefficients[a][i]);
+                        norm_const.emplace_back(sqrt(15) * basis_coefficients[a][i]);
                     }
                     break;
                 }

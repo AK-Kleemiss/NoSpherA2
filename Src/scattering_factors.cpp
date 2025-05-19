@@ -52,13 +52,17 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
     double temp[1]{0.0};
     int hkl_temp[1]{0};
     k_pt.resize(3);
+    for(int i = 0; i < 3; i++)
+    {
+        k_pt[i].reserve(nr[0]);
+	}
     hkl_t hkl_;
     for (int run = 0; run < nr[0]; run++)
     {
         for (int i = 0; i < 3; i++)
         {
             k_points_file.read((char *)&temp, sizeof(temp));
-            k_pt[i].push_back(temp[0]);
+            k_pt[i].emplace_back(temp[0]);
             k_points_file.read((char *)&hkl_temp, sizeof(hkl_temp));
             hkl_[i] = hkl_temp[0];
         }
@@ -1046,6 +1050,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
              //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
              << setw(4) << cif2wfn_list.size() << " are identified as asymmetric unit atoms!" << endl;
     vector<AtomGrid> res;
+	res.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
     {
         if (debug)
@@ -1169,14 +1174,14 @@ std::vector<AtomGrid> make_Prototype_atoms(
                 radial_acc = 1e-15;
             }
         }
-        res.push_back(AtomGrid(radial_acc,
-                               lebedev_low,
-                               lebedev_high,
-                               atom_type_list[i],
-                               alpha_max_temp,
-                               max_l_temp,
-                               alpha_min_temp.data(),
-                               file));
+        res.emplace_back(radial_acc,
+                         lebedev_low,
+                         lebedev_high,
+                         atom_type_list[i],
+                         alpha_max_temp,
+                         max_l_temp,
+                         alpha_min_temp.data(),
+                         file);
     }
     if (debug)
         file << "max_l_overall: " << max_l_overall << endl;
@@ -1269,7 +1274,7 @@ double make_sphericals(
     const double lincr = log(incr);
     vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
     for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.push_back(Thakkar(atom_type_list[i])); // push_back is like a copy without making a copy
+        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
     // Make radial grids
     if (debug)
     {
@@ -2758,7 +2763,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         if (debug) {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                temp.emplace_back(wave.get_atom_charge(asym_atom_list[i]), mode);
                 if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
                 {
                     double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
@@ -2771,7 +2776,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         else {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                temp.emplace_back(wave.get_atom_charge(asym_atom_list[i]), mode);
             }
         }
 
@@ -2906,8 +2911,9 @@ tsc_block<int, cdouble> thakkar_sfac(
     }
 
     vector<Thakkar> spherical_atoms;
+	spherical_atoms.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
-        spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+        spherical_atoms.emplace_back(atom_type_list[i]);
 
     const int imax = (int)asym_atom_list.size();
 
@@ -3173,7 +3179,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         vector<WFN> tempy;
-        tempy.push_back(WFN(opt.wfn));
+        tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
         blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
@@ -3757,10 +3763,12 @@ ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
     fill_xyzc(x, y, z, atom_z, 0, wavy, cell());
 
     ivec atom_types, nr_list;
+	atom_types.reserve(nr_of_atoms);
+	nr_list.reserve(nr_of_atoms);
     // Make Prototype grids with only single atom weights for all elements
     for (int atm_idx = 0; atm_idx < nr_of_atoms; atm_idx++) {
-        atom_types.push_back(wavy.get_atom_charge(atm_idx));
-        nr_list.push_back(atm_idx);
+        atom_types.emplace_back(wavy.get_atom_charge(atm_idx));
+        nr_list.emplace_back(atm_idx);
     }
 
     std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1);
