@@ -3294,6 +3294,8 @@ itsc_block calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
+    //If no basis is yet loaded, assume a auto aux should be generated
+    if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(wave[nr]);
 
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wave[nr].get_atoms());

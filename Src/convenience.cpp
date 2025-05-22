@@ -1506,9 +1506,6 @@ double bessel_first_kind(const int l, const double x)
 
 int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
 {
-    //If no basis is yet loaded, assume a auto aux should be generated
-    if ((*b).get_primitive_count() == 0) (*b).gen_aux(wavy);
-
     wavy.set_basis_set_ptr((*b).get_data());
     int nr_coefs = 0;
     for (int i = 0; i < wavy.get_ncen(); i++)
