@@ -106,18 +106,13 @@ ifeq ($(NAME),WINDOWS)
 		echo featomic already built \
 	)
 else ifeq ($(NAME),MAC)
-    # Detect architecture
-    ARCH ?= $(shell uname -m)
-    #If we are on arm64, it is called aarch64-apple-darwin, else x86_64-apple-darwin
-    FOLDER := $(shell if [ "$(ARCH)" = "arm64" ]; then echo "aarch64-apple-darwin"; else echo "x86_64-apple-darwin"; fi)
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build && \
 		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install || true && \
-		cp target/${FOLDER}/release/libfeatomic.a ../../../Lib/featomic_install/lib/libfeatomic.a || true; \
+		make install || true;
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
