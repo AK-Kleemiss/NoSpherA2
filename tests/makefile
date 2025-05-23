@@ -204,7 +204,6 @@ sucrose_SF:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-cif sucrose.cif \
 		-acc 0 \
 		-no-date)
 
