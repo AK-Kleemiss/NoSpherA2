@@ -749,8 +749,7 @@ void Calc_Prop(
                     continue;
 
                 if (CubeESP.get_loaded() && !CubeRDG.get_loaded())
-                    Rho = wavy.compute_dens(
-                        PosGrid[0], PosGrid[1], PosGrid[2]);
+                    Rho = wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2]);
 
                 if (CubeRDG.get_loaded() && CubeLap.get_loaded() && (CubeElf.get_loaded() || CubeEli.get_loaded()))
                     wavy.computeValues(

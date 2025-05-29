@@ -520,7 +520,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         run.Increments[0],
         false);
     run.Oname = wavy[run.MoleculeFiles[0]].get_path().filename().string();
-    cube CubeRho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.rho),
+    cube CubeRho(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.rho || opt.eli || opt.lap),
         CubeDEF(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.def),
         CubeRDG(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.rdg),
         CubeElf(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.elf),
@@ -528,6 +528,15 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         CubeLap(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.lap),
         CubeESP(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.esp),
         CubeHDEF(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.hdef);
+    CubeRho.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeDEF.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeRDG.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeElf.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeEli.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeLap.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeESP.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+    CubeHDEF.give_parent_wfn(wavy[run.MoleculeFiles[0]]);
+
     //CubeHirsh(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[opt.MoleculeFiles[0]].get_ncen(), opt.dohirsh);
 
     persistant_cube_rho = new cube(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[run.MoleculeFiles[0]].get_ncen(), opt.rho && run.Frames > 1);
@@ -881,7 +890,8 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                 CubeRho.write_file(true, true);
                 CubeRDG.write_file(true);
             }
-            if (opt.elf || opt.eli) CubeElf.write_file(true);
+            if (opt.elf) CubeElf.write_file(true);
+            if (opt.eli) CubeEli.write_file(true);
             if (opt.lap) CubeLap.write_file(true);
             if (opt.esp) CubeESP.write_file(true);
             if (opt.hdef) CubeHDEF.write_file(true);
@@ -1372,7 +1382,16 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         break;
                     }
                     else{
-                        wavy[activewave].read_known_wavefunction_format(filename, std::cout, opt.debug);
+                        if (wavy.size() > activewave && wavy.size() > 0) {
+                            std::cout << "This will delete the previously loaded wavefunction " << wavy[activewave].get_path() << "! Are you sure?";
+                            if(!yesno()){
+                                std::cout << "Do you want to load it as a new wavefunction? " << endl;
+                                if(yesno()) activewave++;
+                                else continue;
+                            }
+                            wavy.erase(wavy.begin()+activewave);
+                        }
+                        wavy.emplace(wavy.begin() + activewave, filename, opt.debug );
                     }
                 }
                 break;
