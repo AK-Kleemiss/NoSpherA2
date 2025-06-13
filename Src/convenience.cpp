@@ -2966,7 +2966,7 @@ bool check_OpenBLAS_DLL(const bool &debug)
     else
     {
         if (debug)
-            std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+            std::cout << "DLL does not exist, extracting it from the executable!" << std::endl;
         // Extract the DLL if it does not exist
         if (!ExtractDLL(dllName))
         {
