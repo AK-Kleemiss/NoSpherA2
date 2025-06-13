@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import os
+from pathlib import Path
 
-os.chdir("tests/partition/")
+# Determine the path to the data file relative to this script
+data_path = Path(__file__).resolve().parent / "densities.dat"
 
-# Load the data
-data = pd.read_table("densities.dat", sep="\s+", header=None)
+# Load the data using the explicit path
+data = pd.read_table(data_path, sep="\s+", header=None)
 data.columns = ["x", "HF", "DFT", "C_dens", "H_dens", "total_dens", "B_weight_C", "B_weight_H"]
 
 # calculate weights for each
