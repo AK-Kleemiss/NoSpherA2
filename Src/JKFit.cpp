@@ -41,24 +41,20 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
         err_chekf(atm.get_basis_set().size() != 0, "Can not generate auto-aux! Orbital Basis for Element: " + std::to_string(nuc_charge) + " is not defined!", std::cout);
         seen_elements.push_back(nuc_charge);
 
-        std::array<int, 4> configuration = constants::GROUND_STATE_CONFIGURATION[nuc_charge];
-        int max_shells = 4 - std::count(configuration.begin(), configuration.end(), 0);
         std::unordered_map<int, std::pair<double, double>> angular_momentum_exponents;  //Min, Max exponents per angular momentum
 
         int l_max = 0;
 
         for (const basis_set_entry& p : atm.get_basis_set()) {
             int l = p.get_type() - 1;
-
+            l_max = std::max(l_max, l);
 
             double exp = p.get_exponent();
             double coef = p.get_coefficient() / primitve_normalization(exp, l);
 
             // Skip if the angular momentum is not in the range of 0 to max_shells	
-            if (l >= max_shells + 1) continue;
             if (std::abs(coef) < 1e-3) continue;
 
-            l_max = std::max(l_max, l);
             auto& [min_exp, max_exp] = angular_momentum_exponents[l];
             if (min_exp == 0.0 && max_exp == 0.0) min_exp = max_exp = exp;
             else {
@@ -66,6 +62,10 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
                 max_exp = std::max(max_exp, exp);
             }
         }
+
+        std::array<int, 4> configuration = constants::GROUND_STATE_CONFIGURATION[nuc_charge];
+        int max_shells = 4 - std::count(configuration.begin(), configuration.end(), 0);
+        int l_max_aux = std::min(l_max, max_shells) * 2;
 
         // Traverse upper triangle of matrix of exponents in a sideways fashion to determine the lowest and highest exponent per angular momentum
         // Example:
@@ -75,19 +75,19 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
         // l=3:       10
         // Then the algorithm will traverse the matrix like this:
         // 1, 2, 35, 46, 78, 9, 10
-        ivec n_functions(l_max * 2 + 1);
+        ivec n_functions(l_max_aux + 1);
         std::unordered_map<int, std::pair<double, double>> angular_exponent_ranges;  //ranges to produce the auxiliary function from
-        for (int ll = 0; ll <= l_max * 2; ll++) {
+        for (int ll = 0; ll <= l_max_aux; ll++) {
             int i = (ll <= l_max) ? 0 : ll - l_max;
             int j = (ll <= l_max) ? ll : l_max;
+
             auto& [min_exp, max_exp] = angular_exponent_ranges[ll];
             min_exp = std::numeric_limits<double>::max(), max_exp = std::numeric_limits<double>::min();
             while (i <= j) {
-                min_exp = std::min(min_exp, std::sqrt(angular_momentum_exponents[i].first * angular_momentum_exponents[j].first));
-                max_exp = std::max(max_exp, std::sqrt(angular_momentum_exponents[i].second * angular_momentum_exponents[j].second));
+                min_exp = std::min(min_exp, (angular_momentum_exponents[i].first + angular_momentum_exponents[j].first));
+                max_exp = std::max(max_exp, (angular_momentum_exponents[i].second + angular_momentum_exponents[j].second));
                 i++, j--;
             }
-            min_exp *= 2, max_exp *= 2;
 
             //Calculate number of neccecary exponents in aux basis
             n_functions[ll] = std::ceil(std::log((min_exp + max_exp) / min_exp) / std::log(_beta));
@@ -96,6 +96,7 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
         //Set index of new basis set
         set_count_for_element(nuc_charge - 1, std::accumulate(n_functions.begin(), n_functions.end(), 0));
 
+        std::cout << "-Element: " << nuc_charge << " Max_Lam: " << l_max << " Max_aux_lam: " << l_max_aux << " Max_shells: " << max_shells << std::endl;
         //Generate exponents following:
         //e = e_min * \beta^{i-1} for i = 1 .. n
         int shell = 0;
@@ -103,6 +104,7 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
             for (int i = n_functions[lam] - 1; i >= 0; i--, shell++) {
                 add_owned_primitive({ 0, lam, angular_exponent_ranges[lam].first * std::pow(_beta, i), 1.0, shell });
             }
+            std::cout << "Element: " << atm.get_charge() << " Shell: " << shell << " Angular Momentum: " << lam << " Exponents: " << n_functions[lam] << std::endl;
         }
     }
 }
