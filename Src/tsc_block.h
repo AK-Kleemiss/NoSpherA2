@@ -1,6 +1,7 @@
 #pragma once
 
 #include "convenience.h"
+#include <unordered_set>
 template <typename numtype_index, typename numtype>
 class tsc_block
 {
@@ -310,18 +311,22 @@ public:
     for (int i = 0; i < rhs.reflection_size(); i++)
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
-    unsigned int new_scatterers = 0;
-    bvec is_new(rhs.scatterer_size(), true);
-#pragma omp parallel for reduction(+ : new_scatterers)
-    for (int s = 0; s < rhs.scatterer_size(); s++)
+
+    std::unordered_set<std::string> existing_set(scatterer.begin(), scatterer.end());
+    bvec is_new(rhs.scatterer_size(), false);
+    std::atomic<int> new_scatterers(0);
+#pragma omp parallel for
+    for (int s = 0; s < rhs.scatterer_size(); ++s)
     {
-      for (int run = 0; run < scatterer_size(); run++)
-        if (rhs.get_scatterer(s) == scatterer[run])
-          is_new[s] = false;
-      if (is_new[s] == false)
-        continue;
-      new_scatterers++;
+        const std::string& name = rhs.get_scatterer(s);
+
+        if (existing_set.find(name) == existing_set.end())
+        {
+            is_new[s] = true;
+            new_scatterers++;
+        }
     }
+
     const unsigned int old_size = (int)sf.size();
     sf.resize(old_size + new_scatterers);
     scatterer.resize(old_size + new_scatterers);
