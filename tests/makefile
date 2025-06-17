@@ -68,8 +68,8 @@ disorder_THPP:
 	$(call RUN_TEST,$@,disorder, \
 		-cif thpp.cif \
 		-hkl thpp.hkl \
-		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0§1 \
-		olex2/Wfn_job/Part_2/thpp.wfx 0§2 \
+		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0.1 \
+		olex2/Wfn_job/Part_2/thpp.wfx 0.2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
 		-mtc_ECP 0 0 \
@@ -108,7 +108,7 @@ Hybrid_mode:
 		-cif ZP2.cif \
 		-dmin 0.9 \
 		-acc 0 \
-		-mtc ZP2_part1.gbw 0§1 ZP2_part2.gbw 0§2 \
+		-mtc ZP2_part1.gbw 0.1 ZP2_part2.gbw 0.2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
 		-mtc_ECP 0 0 \
@@ -152,8 +152,8 @@ rubredoxin_cmtc:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
 		-hkl 1yk4_h.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0§1 \
-		residues/3.gbw residues/3.cif 0§2 \
+		residues/2.gbw residues/2.cif 0.1 \
+		residues/3.gbw residues/3.cif 0.2 \
 		residues/4.gbw residues/4.cif 0 \
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
@@ -164,8 +164,8 @@ rubredoxin_cmtc_full:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
 		-hkl 1yk4_h_full.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0§1 \
-		residues/3.gbw residues/3.cif 0§2 \
+		residues/2.gbw residues/2.cif 0.1 \
+		residues/3.gbw residues/3.cif 0.2 \
 		residues/4.gbw residues/4.cif 0 \
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \

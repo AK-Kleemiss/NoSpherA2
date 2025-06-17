@@ -1,6 +1,7 @@
 #pragma once
 
 #include "convenience.h"
+#include <unordered_set>
 template <typename numtype_index, typename numtype>
 class tsc_block
 {
@@ -269,7 +270,7 @@ public:
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
     int new_scatterers = 0;
     bvec is_new(rhs.scatterer_size(), true);
-#pragma omp parallel for reduction(+ : new_scatterers)
+//#pragma omp parallel for reduction(+ : new_scatterers)
     for (int s = 0; s < (int)rhs.scatterer_size(); s++)
     {
       for (int run = 0; run < scatterer_size(); run++)
@@ -295,6 +296,14 @@ public:
         scatterer[new_nr] = rhs.get_scatterer(s, log);
       }
     }
+    int sc_sf = sf.size();
+    int nr_hkl_sf = sf[0].size();
+    for(int i=0; i<sf.size(); i++) {
+      if (sf[i].size() != nr_hkl_sf) {
+        std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append" << std::endl;
+        return;
+      }
+    }
   };
   void append(tsc_block rhs, std::ostream &log)
   {
@@ -310,18 +319,22 @@ public:
     for (int i = 0; i < rhs.reflection_size(); i++)
       for (int dim = 0; dim < 3; dim++)
         err_checkf(index[dim][i] == rhs.get_index(dim, i), "Mismatch in indices in append!", log);
-    unsigned int new_scatterers = 0;
-    bvec is_new(rhs.scatterer_size(), true);
-#pragma omp parallel for reduction(+ : new_scatterers)
-    for (int s = 0; s < rhs.scatterer_size(); s++)
+
+    std::unordered_set<std::string> existing_set(scatterer.begin(), scatterer.end());
+    bvec is_new(rhs.scatterer_size(), false);
+    std::atomic<int> new_scatterers(0);
+//#pragma omp parallel for
+    for (int s = 0; s < rhs.scatterer_size(); ++s)
     {
-      for (int run = 0; run < scatterer_size(); run++)
-        if (rhs.get_scatterer(s) == scatterer[run])
-          is_new[s] = false;
-      if (is_new[s] == false)
-        continue;
-      new_scatterers++;
+        const std::string& name = rhs.get_scatterer(s);
+
+        if (existing_set.find(name) == existing_set.end())
+        {
+            is_new[s] = true;
+            new_scatterers++;
+        }
     }
+
     const unsigned int old_size = (int)sf.size();
     sf.resize(old_size + new_scatterers);
     scatterer.resize(old_size + new_scatterers);
@@ -336,6 +349,14 @@ public:
             new_nr++;
         sf[new_nr] = rhs.get_sf_for_scatterer(s, log);
         scatterer[new_nr] = rhs.get_scatterer(s, log);
+      }
+    }
+    int sc_sf = sf.size();
+    int nr_hkl_sf = sf[0].size();
+    for(int i=0; i<sf.size(); i++) {
+      if (sf[i].size() != nr_hkl_sf) {
+        std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append2" << std::endl;
+        return;
       }
     }
   };
@@ -401,34 +422,145 @@ public:
   }
   void write_tscb_file(std::filesystem::path cif_name = "test.cif", std::filesystem::path name = "experimental.tscb")
   {
-    std::ofstream tsc_file(name.c_str(), std::ios::out | std::ios::binary | std::ios::trunc);
-
-    int head[1] = {static_cast<int>(header.size())};
-    tsc_file.write((char *)&head, sizeof(head));
-    tsc_file.write(header.c_str(), head[0] * sizeof(char));
-    std::string sc = scatterers_string();
-    head[0] = (int)sc.size();
-    tsc_file.write((char *)&head, sizeof(head));
-    tsc_file.write(sc.c_str(), head[0] * sizeof(char));
-
-    int nr_hkl[1] = {static_cast<int>(index[0].size())};
-    tsc_file.write((char *)&nr_hkl, sizeof(nr_hkl));
-    const int scat_size = scatterer_size();
-
-    for (int run = 0; run < *nr_hkl; run++)
-    {
-      for (int i = 0; i < 3; i++)
-      {
-        tsc_file.write((char *)&(index[i][run]), sizeof(numtype_index));
+    try {  // Wrap in try-catch to help identify where segfaults occur
+      std::cerr << "Starting writing of tscb file!" << std::endl;
+      
+      // Remove the file if it exists
+      if (std::filesystem::exists(name)) {
+        std::filesystem::remove(name);
       }
-      for (int i = 0; i < scat_size; i++)
-      {
-        tsc_file.write((char *)&(sf[i][run]), sizeof(std::complex<double>));
+      
+      // Set to ensure buffering doesn't cause issues with I/O operations
+      std::ios_base::sync_with_stdio(true);
+      
+      std::ofstream tsc_file(name.c_str(), std::ios::out | std::ios::binary);
+      
+      // Check if file was opened successfully
+      err_checkf(tsc_file.is_open(), "Failed to open file for writing", std::cout);
+      
+      int head[1] = {static_cast<int>(header.size())};
+      tsc_file.write((char *)&head, sizeof(head));
+      tsc_file.flush(); 
+      err_checkf(tsc_file.good(), "Problem with tsc file writing header size", std::cout);
+      
+      tsc_file.write(header.c_str(), head[0] * sizeof(char));
+      tsc_file.flush();
+      err_checkf(tsc_file.good(), "Problem with tsc file writing header content", std::cout);
+      
+      // Safely get scatterers string
+      std::string sc;
+      try {
+        sc = scatterers_string();
+        std::cerr << "Got scatterers string, length: " << sc.size() << std::endl;
+      } catch (const std::exception& e) {
+        std::cerr << "Exception in scatterers_string(): " << e.what() << std::endl;
+        tsc_file.close();
+        return;
       }
+      
+      // Check if scatterers string is valid
+      if (sc.empty()) {
+        std::cerr << "Warning: Empty scatterers string" << std::endl;
+      }
+      
+      head[0] = static_cast<int>(sc.size());
+      tsc_file.write((char *)&head, sizeof(head));
+      tsc_file.flush();
+      err_checkf(tsc_file.good(), "Problem with tsc file writing scatterers size", std::cout);
+      
+      tsc_file.write(sc.c_str(), head[0] * sizeof(char));
+      tsc_file.flush();
+      err_checkf(tsc_file.good(), "Problem with tsc file writing scatterers content", std::cout);
+
+      // Check if index vector is valid
+      if (index.empty() || index[0].empty()) {
+        std::cerr << "Error: Empty or invalid index vector" << std::endl;
+        tsc_file.close();
+        return;
+      }
+      
+      // Validate index dimensions
+      if (index.size() < 3) {
+        std::cerr << "Error: Index vector has incorrect dimensions" << std::endl;
+        tsc_file.close();
+        return;
+      }
+      
+      int nr_hkl[1] = {static_cast<int>(index[0].size())};
+      std::cerr << "Number of HKL indices: " << nr_hkl[0] << std::endl;
+      
+      tsc_file.write((char *)&nr_hkl, sizeof(nr_hkl));
+      tsc_file.flush();
+      err_checkf(tsc_file.good(), "Problem with tsc file writing nr_hkl", std::cout);
+      
+      // Safely get scatterer size
+      const int scat_size = scatterer_size();
+      std::cerr << "Scatterer size: " << scat_size << std::endl;
+      
+
+      int sc_sf = sf.size();
+      int nr_hkl_sf = sf[0].size();
+      for(int i=0; i<sf.size(); i++) {
+        if (sf[i].size() != nr_hkl_sf) {
+          std::cerr << "Error: Inconsistent size in sf for scatterer " << i << std::endl;
+          tsc_file.close();
+          return;
+        }
+      }
+      // Validate sf dimensions
+      if (sf.empty() || sc_sf < scat_size || nr_hkl_sf < nr_hkl[0]) {
+        std::cerr << "Error: Structure factor array has invalid dimensions" << std::endl;
+        tsc_file.close();
+        return;
+      }
+
+      for (int run = 0; run < nr_hkl[0]; run++)
+      {
+        for (int i = 0; i < 3; i++)
+        {
+          if (i < index.size() && run < index[i].size()) {  // Bounds check
+            tsc_file.write((char *)&(index[i][run]), sizeof(numtype_index));
+          } else {
+            std::cerr << "Error: Index array bounds exceeded at i=" << i << ", run=" << run << std::endl;
+            tsc_file.close();
+            return;
+          }
+        }
+        
+        for (int i = 0; i < scat_size; i++)
+        {
+          if (i < sf.size() && run < sf[i].size()) {  // Bounds check
+            tsc_file.write((char *)&(sf[i][run]), sizeof(std::complex<double>));
+          } else {
+            std::cerr << "Error: SF array bounds exceeded at i=" << i << ", run=" << run << std::endl;
+            tsc_file.close();
+            return;
+          }
+        }
+        
+        // Add periodic flush to prevent buffer issues
+        if (run % 1000 == 0) {
+          tsc_file.flush();
+        }
+      }
+      
+      // Final flush and close
+      tsc_file.flush();
+      tsc_file.close();
+      std::cerr << "File closed successfully" << std::endl;
+      
+      // Verify the file was written correctly
+      if (std::filesystem::exists(name)) {
+        std::cerr << "Successfully wrote " << std::filesystem::file_size(name) << " bytes to " << name << std::endl;
+      } else {
+        std::cerr << "Error: File not created successfully" << std::endl;
+      }
+      
+    } catch (const std::exception& e) {
+      std::cerr << "Exception in write_tscb_file: " << e.what() << std::endl;
+    } catch (...) {
+      std::cerr << "Unknown exception in write_tscb_file" << std::endl;
     }
-    tsc_file.flush();
-    tsc_file.close();
-    err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
 };
 

@@ -1721,8 +1721,8 @@ void options::digest_options()
                 const string _temp = arguments[i + n];
                 if (_temp.find(delimiter) == string::npos) {
                     if (debug)
-                        std::cout << "--Delimiter not found, using §" << endl;
-                    delimiter = "§";
+                        std::cout << "--Delimiter not found, using ." << endl;
+                    delimiter = ".";
                 }
                 groups.push_back(split_string<int>(_temp, delimiter));
                 if (debug)
@@ -1956,8 +1956,8 @@ void options::digest_options()
                 const string _temp = arguments[i + n];
                 if (_temp.find(delimiter) == string::npos) {
                     if (debug)
-                        std::cout << "--Delimiter not found, using §" << endl;
-                    delimiter = "§";
+                        std::cout << "--Delimiter not found, using ." << endl;
+                    delimiter = ".";
                 }
                 groups.push_back(split_string<int>(_temp, delimiter));
                 if (debug)
