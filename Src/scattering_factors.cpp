@@ -649,9 +649,9 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
                 if (debug)
                     file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
-                         << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
-                         << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
-                         << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
                 vec position = unit_cell.get_coords_cartesian(
                     stod(fields[position_field[0]]),
                     stod(fields[position_field[1]]),
@@ -714,7 +714,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                         transform(type.begin(), type.end(), type.begin(), asciitolower);
                         if (debug)
                         {
-                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
+                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                             wfn cart. pos: "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
