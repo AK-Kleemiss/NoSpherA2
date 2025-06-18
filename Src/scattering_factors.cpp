@@ -603,13 +603,12 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
         //     file << "line: " << line << endl;
         if (line.find("loop_") != string::npos)
         {
+            count_fields = 0;
             getline(cif_input, line);
             if (debug)
                 file << "line in loop field definition: " << trim(line) << endl;
             while (trim(line).find("_") == 0)
             {
-                if (debug)
-                    file << "line in loop field definition: " << trim(line) << endl;
                 if (line.find("label") != string::npos)
                     label_field = count_fields;
                 else if (line.find("type_symbol") != string::npos)
@@ -719,7 +718,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
-                            if (input_groups.size() > 0)
+                            if (input_groups.size() > 0 && group_field != -1)
                             {
                                 file << " checking disorder group: " << fields[group_field] << " vs. ";
                                 for (int g = 0; g < input_groups.size(); g++)
