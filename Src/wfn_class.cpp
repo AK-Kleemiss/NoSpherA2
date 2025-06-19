@@ -2098,11 +2098,27 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     if (rf.good())
         path = filename;
     string line;
+    int geo_start_bit = 8;
+    int basis_start_bit = 16;
+    int MO_start_bit = 24;
+    int soi = constants::soi; 
+    int geo_int_lim = 5;
+
     try
     {
+        rf.seekg(0, ios::beg);
+        int64_t magic = 0;
+        rf.read((char *)&magic, sizeof(magic));
+        if (magic == -1){
+            geo_start_bit += 24;
+            basis_start_bit += 24;
+            MO_start_bit += 24;
+            soi = 8;
+            geo_int_lim = 1;
+        }
         // Reading geometry
-        rf.seekg(8, ios::beg);
-        long int geo_start = 0;
+        rf.seekg(geo_start_bit, ios::beg);
+        int64_t geo_start = 0;
         rf.read((char *)&geo_start, sizeof(geo_start));
         err_checkf(geo_start != 0, "Could not read geometry information location from GBW file!", file);
         if (debug)
@@ -2119,9 +2135,9 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 rf.read((char *)&(geo_vals[i]), constants::sod);
                 err_checkf(rf.good(), "Error reading geo_val", file);
             }
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < geo_int_lim; i++)
             {
-                rf.read((char *)&(geo_ints[i]), 4);
+                rf.read((char *)&(geo_ints[i]), soi);
                 err_checkf(rf.good(), "Error reading geo_int", file);
             }
             string temp = constants::atnr2letter(geo_ints[0]);
@@ -2136,8 +2152,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         if (debug)
             file << "I read the geometry of " << at << " atoms successfully" << endl;
 
-        rf.seekg(16, ios::beg);
-        long int basis_start = 0;
+        rf.seekg(basis_start_bit, ios::beg);
+        int64_t basis_start = 0;
         rf.read((char *)&basis_start, constants::soli);
         err_checkf(basis_start != 0, "Could not read beasis information location from GBW file!", file);
         if (debug)
@@ -2245,8 +2261,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         if (debug)
             file << "I read the basis of " << atoms2 << " atoms successfully" << endl;
 
-        rf.seekg(24, ios::beg);
-        long int MOs_start = 0;
+        rf.seekg(MO_start_bit, ios::beg);
+        int64_t MOs_start = 0;
         rf.read((char *)&MOs_start, constants::soli);
         err_checkf(rf.good(), "Error reading MO_start", file);
         err_checkf(MOs_start != 0, "Could not read MO information location from GBW file!", file);
@@ -2256,7 +2272,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         int operators = 0, dimension = 0;
         rf.read((char *)&operators, constants::soi);
         err_checkf(rf.good(), "Error reading operators", file);
-        rf.read((char *)&dimension, constants::soi);
+        rf.read((char *)&dimension, soi);
         err_checkf(rf.good(), "Error reading dimnesion", file);
         size_t coef_nr = size_t(dimension) * size_t(dimension);
         vec2 coefficients(operators);
@@ -4024,14 +4040,14 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                         if (m < alpha_els)
                         {
                             temp = get_MO_occ(m) * CMO[iu + (m * nao)] * CMO[iv + (m * nao)];
-                            err_checkf(set_SDM(iuv, get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv),std::cout);
-                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv),std::cout);
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) + temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), std::cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), std::cout);
                         }
                         else
                         {
                             temp = get_MO_occ(m) * CMO_beta[iu + ((m - alpha_els) * nao)] * CMO_beta[iv + ((m - alpha_els) * nao)];
-                            err_checkf(set_SDM(iuv, get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv),std::cout);
-                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv),std::cout);
+                            err_checkf(set_SDM(iuv, get_SDM(iuv) - temp), "Something went wrong while writing the SDM! iuv=" + to_string(iuv), std::cout);
+                            err_checkf(set_DM(iuv, get_DM(iuv) + temp), "Something went wrong while writing the DM! iuv=" + to_string(iuv), std::cout);
                         }
                     }
                     else
@@ -4886,7 +4902,7 @@ const int WFN::get_MO_op(const int &nr) const
 
 void WFN::delete_unoccupied_MOs()
 {
-    for (int i = (int)MOs.size() - 1; i >= 0; i--)
+    for (int i = static_cast<int>(MOs.size()) - 1; i >= 0; i--)
     {
         if (get_MO_occ(i) == 0.0)
         {
@@ -4945,7 +4961,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         log << "Error reading atnbrs" << std::endl;
         return false;
     }
-    ncen = (int)atnbrs.size();
+    ncen = static_cast<int>(atnbrs.size());
     atoms.resize(ncen);
     for (int i = 0; i < ncen; i++)
         atoms[i].set_label(constants::atnr2letter(atnbrs[i]));
@@ -4956,7 +4972,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         return false;
     }
     for (int i = 0; i < charges.size(); i++)
-        atoms[i].set_charge((int)charges[i]);
+        atoms[i].set_charge(static_cast<int>(charges[i]));
     vec coords;
     if (!read_fchk_double_block(fchk, "Current cartesian coordinates", coords))
     {
@@ -5027,6 +5043,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
         }
         MOocc[0].resize(MOene[0].size());
         if (r_u_ro_switch == 0)
+        {
 #pragma omp parallel for
             for (int i = 0; i < MOocc[0].size(); i++)
             {
@@ -5035,7 +5052,9 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 else
                     MOocc[0][i] = 0.0;
             }
+        }
         else
+        {
 #pragma omp parallel for
             for (int i = 0; i < MOocc[0].size(); i++)
             {
@@ -5046,6 +5065,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 else
                     MOocc[0][i] = 0.0;
             }
+        }
     }
     else
     { // Unrestricted
@@ -7361,9 +7381,9 @@ const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const 
             for (int l = 0; l <= l_i[0] + l_j[0]; l++)
             {
                 if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // *factorial[l];
+                    fjtmp = fj(l, l_i[0], l_j[0], Pi[0], Pj[0]);
                 else
-                    fjtmp = -fj(l, l_i[0], l_j[0], Pi[0], Pj[0]); // * factorial[l];
+                    fjtmp = -fj(l, l_i[0], l_j[0], Pi[0], Pj[0]);
                 for (int r = 0; r <= l / 2; r++)
                     for (int s = 0; s <= (l - 2 * r) / 2; s++)
                     {
@@ -7376,9 +7396,9 @@ const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const 
             for (int l = 0; l <= l_i[1] + l_j[1]; l++)
             {
                 if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // *factorial[l];
+                    fjtmp = fj(l, l_i[1], l_j[1], Pi[1], Pj[1]);
                 else
-                    fjtmp = -fj(l, l_i[1], l_j[1], Pi[1], Pj[1]); // * factorial[l];
+                    fjtmp = -fj(l, l_i[1], l_j[1], Pi[1], Pj[1]);
                 for (int r = 0; r <= l / 2; r++)
                     for (int s = 0; s <= (l - 2 * r) / 2; s++)
                     {
@@ -7391,9 +7411,9 @@ const double WFN::computeESP_noCore(const std::array<double, 3>& PosGrid, const 
             for (int l = 0; l <= l_i[2] + l_j[2]; l++)
             {
                 if (l % 2 != 1)
-                    fjtmp = fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // *factorial[l];
+                    fjtmp = fj(l, l_i[2], l_j[2], Pi[2], Pj[2]);
                 else
-                    fjtmp = -fj(l, l_i[2], l_j[2], Pi[2], Pj[2]); // * factorial[l];
+                    fjtmp = -fj(l, l_i[2], l_j[2], Pi[2], Pj[2]);
                 for (int r = 0; r <= l / 2; r++)
                     for (int s = 0; s <= (l - 2 * r) / 2; s++)
                     {

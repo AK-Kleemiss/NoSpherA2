@@ -95,7 +95,7 @@ std::string write_basis_set(std::ofstream& file, const std::string basis_name, s
             file << "0,";
             continue;
         }
-        unsigned int s = 0;
+        unsigned long long int s = 0;
         for (int j = 0; j < basis_set[i].size(); j++) {
             s += basis_set[i][j].exp.size();
         }
