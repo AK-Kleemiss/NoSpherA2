@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
-        wavy.push_back(WFN(6));
+        wavy.emplace_back(6);
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
@@ -76,8 +76,8 @@ int main(int argc, char **argv)
             std::cout << "Resetting Radius to at least 2.5!" << endl;
             opt.radius = 2.5;
         }
-        wavy.push_back(WFN(opt.hirshfeld_surface, opt.debug));
-        wavy.push_back(WFN(opt.hirshfeld_surface2, opt.debug));
+        wavy.emplace_back(opt.hirshfeld_surface, opt.debug);
+        wavy.emplace_back(opt.hirshfeld_surface2, opt.debug);
         readxyzMinMax_fromWFN(wavy[0], opt.MinMax, opt.NbSteps, opt.radius, opt.resolution);
         cube Hirshfeld_grid(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[0].get_ncen(), true);
         cube Hirshfeld_grid2(opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2], wavy[1].get_ncen(), true);
@@ -164,8 +164,8 @@ int main(int argc, char **argv)
     // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (!opt.wfn2.empty())
     {
-        wavy.push_back(WFN(opt.wfn, opt.debug));
-        wavy.push_back(WFN(opt.wfn2, opt.debug));
+        wavy.emplace_back(opt.wfn, opt.debug);
+        wavy.emplace_back(opt.wfn2, opt.debug);
         if (opt.debug)
             std::cout << opt.wfn << opt.wfn2 << endl;
         wavy[0].delete_unoccupied_MOs();

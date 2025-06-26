@@ -23,7 +23,7 @@ std::string help_message =
      "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
      "   -b              <FILENAME>               Read this basis set\n"
      "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-     "   -dmin		     <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -dmin             <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
      "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
      "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
      "                                            [1]: def2-ECP\n"
@@ -1506,9 +1506,6 @@ double bessel_first_kind(const int l, const double x)
 
 int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
 {
-    //If no basis is yet loaded, assume a auto aux should be generated
-    if ((*b).get_primitive_count() == 0) (*b).gen_aux(wavy);
-
     wavy.set_basis_set_ptr((*b).get_data());
     int nr_coefs = 0;
     for (int i = 0; i < wavy.get_ncen(); i++)
@@ -1704,7 +1701,7 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
-			set_BLAS_threads(threads);
+            set_BLAS_threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
 #endif
@@ -1724,8 +1721,8 @@ void options::digest_options()
                 const string _temp = arguments[i + n];
                 if (_temp.find(delimiter) == string::npos) {
                     if (debug)
-                        std::cout << "--Delimiter not found, using §" << endl;
-                    delimiter = "§";
+                        std::cout << "--Delimiter not found, using ." << endl;
+                    delimiter = ".";
                 }
                 groups.push_back(split_string<int>(_temp, delimiter));
                 if (debug)
@@ -1959,8 +1956,8 @@ void options::digest_options()
                 const string _temp = arguments[i + n];
                 if (_temp.find(delimiter) == string::npos) {
                     if (debug)
-                        std::cout << "--Delimiter not found, using §" << endl;
-                    delimiter = "§";
+                        std::cout << "--Delimiter not found, using ." << endl;
+                    delimiter = ".";
                 }
                 groups.push_back(split_string<int>(_temp, delimiter));
                 if (debug)
@@ -2058,7 +2055,7 @@ void options::digest_options()
                     double beta = 2.0;
                     //Check if the next argument is a valid double
                     if (i + 2 < argc && arguments[i + 2].find("-") != 0) {
-                        double beta = std::stod(arguments[i + 2]);
+                        beta = std::stod(arguments[i + 2]);
                     }
                     if (debug) cout << "Using automatic basis set selection with beta: " << beta << endl;
                     aux_basis = std::make_shared<BasisSet>(beta);
@@ -2103,7 +2100,7 @@ void options::digest_options()
         }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
-			exit(0);
+            exit(0);
         }
         else if (temp == "-skpts")
             save_k_pts = true;
@@ -2221,11 +2218,11 @@ void options::digest_options()
         }
         else if (temp == "-test_analytical")
         {
-			bool full = false;
+            bool full = false;
             if ("full" == arguments[i + 1]) {
-				full = true;
+                full = true;
             }
-			test_analytical_fourier(full);
+            test_analytical_fourier(full);
             exit(0);
         }
         else if (temp == "-test_RI")
@@ -2661,7 +2658,6 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
             return false;
         }
     }
-    return true;
 #else
     char file[1024];
     std::string command;
@@ -2970,7 +2966,7 @@ bool check_OpenBLAS_DLL(const bool &debug)
     else
     {
         if (debug)
-            std::cout << "DLL does not exist, extracting it form teh executable!" << std::endl;
+            std::cout << "DLL does not exist, extracting it from the executable!" << std::endl;
         // Extract the DLL if it does not exist
         if (!ExtractDLL(dllName))
         {

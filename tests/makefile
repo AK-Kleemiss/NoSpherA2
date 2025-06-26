@@ -15,9 +15,13 @@ ifeq ($(OS),Windows_NT)
     @echo @echo off > run_test.bat
     @echo cd $2 >> run_test.bat
     @echo $(BASE_PATH) $3 >> run_test.bat
+    @echo set test_result=%%errorlevel%% >> run_test.bat
+    @echo if exist NoSpherA2.log ($(MV) NoSpherA2.log $1.log ^& $(DIFF) $1.log $1.good) >> run_test.bat
+    @echo exit /b %%test_result%% >> run_test.bat
     @call run_test.bat
+    @set test_return=!errorlevel!
     @del run_test.bat
-    @if exist $2\NoSpherA2.log (cd $2 && $(MV) NoSpherA2.log $1.log && $(DIFF) $1.log $1.good)
+    @exit /b !test_return!
   endef
 else
   RM := rm
@@ -35,9 +39,15 @@ else
   endef
   define RUN_TEST
     @echo 'Running test: $1'
-    @eval $(TIME_START); cd $2 && $(BASE_PATH) $3 && \
-    if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
-    $(DIFF) $1.log $1.good; eval $(TIME_END)
+    @eval $(TIME_START); cd $2 && { \
+      $(BASE_PATH) $3; \
+      test_result=$$?; \
+      if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
+      $(DIFF) $1.log $1.good; \
+      diff_result=$$?; \
+      eval $(TIME_END); \
+      exit $$test_result || exit $$diff_result; \
+    }
   endef
 endif
 
@@ -58,8 +68,8 @@ disorder_THPP:
 	$(call RUN_TEST,$@,disorder, \
 		-cif thpp.cif \
 		-hkl thpp.hkl \
-		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0§1 \
-		olex2/Wfn_job/Part_2/thpp.wfx 0§2 \
+		-mtc olex2/Wfn_job/Part_1/thpp.wfx 0.1 \
+		olex2/Wfn_job/Part_2/thpp.wfx 0.2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
 		-mtc_ECP 0 0 \
@@ -98,7 +108,7 @@ Hybrid_mode:
 		-cif ZP2.cif \
 		-dmin 0.9 \
 		-acc 0 \
-		-mtc ZP2_part1.gbw 0§1 ZP2_part2.gbw 0§2 \
+		-mtc ZP2_part1.gbw 0.1 ZP2_part2.gbw 0.2 \
 		-mtc_mult 1 1 \
 		-mtc_charge 0 0 \
 		-mtc_ECP 0 0 \
@@ -122,7 +132,7 @@ properties:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \
 		-wfn olex2/Wfn_job/sucrose.wfx \
 		-cif sucrose.cif -lap -eli \
-		-resolution 0.5 -test \
+		-resolution 0.5 \
 		-no-date \
 		&& ${MV} NoSpherA2_cube.log $@.log)
 
@@ -142,8 +152,8 @@ rubredoxin_cmtc:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
 		-hkl 1yk4_h.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0§1 \
-		residues/3.gbw residues/3.cif 0§2 \
+		residues/2.gbw residues/2.cif 0.1 \
+		residues/3.gbw residues/3.cif 0.2 \
 		residues/4.gbw residues/4.cif 0 \
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
@@ -154,8 +164,8 @@ rubredoxin_cmtc_full:
 	$(call RUN_TEST,$@,rubredoxin_cmtc, \
 		-hkl 1yk4_h_full.hkl -acc 0 \
 		-cmtc residues/1.gbw residues/1.cif 0 \
-		residues/2.gbw residues/2.cif 0§1 \
-		residues/3.gbw residues/3.cif 0§2 \
+		residues/2.gbw residues/2.cif 0.1 \
+		residues/3.gbw residues/3.cif 0.2 \
 		residues/4.gbw residues/4.cif 0 \
 		-mtc_mult 1 1 1 1 \
 		-mtc_charge 0 0 0 0 \
@@ -194,11 +204,8 @@ sucrose_SF:
 		-cif sucrose.cif \
 		-hkl olex2/Wfn_job/sucrose.hkl \
 		-wfn olex2/Wfn_job/sucrose.wfx \
-		-cif sucrose.cif -lap -eli \
-		-resolution 0.5 -test \
-		-no-date \
-		&& ${MV} NoSpherA2_cube.log $@.log \
-		&& ${DIFF} $@.log $@.good)
+		-acc 0 \
+		-no-date)
 
 sucrose_twin:
 	$(call RUN_TEST,$@,sucrose_fchk_SF, \

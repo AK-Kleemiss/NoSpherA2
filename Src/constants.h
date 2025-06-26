@@ -29,10 +29,10 @@ namespace constants
             ? sqrtNewtonRaphson(x, x, 0)
             : std::numeric_limits<double>::quiet_NaN();
     }
-	int constexpr const_abs(int x)
-	{
-		return x < 0 ? -x : x;
-	}
+    int constexpr const_abs(int x)
+    {
+        return x < 0 ? -x : x;
+    }
 
     template <typename K, typename V, std::size_t N>
     struct ConstexprMap {

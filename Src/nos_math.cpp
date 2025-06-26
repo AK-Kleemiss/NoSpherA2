@@ -289,7 +289,8 @@ NNLSResult nnls(dMatrix2& A,
     ivec inds(n);
     vec w(n), x(n), work(m), zz(m);
 
-    for (int i = 0; i < n; ++i) inds[i] = i;
+    for (int i = 0; i < n; ++i) 
+        inds[i] = i;
 
     int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
     double tau = 0.0, unorm = 0.0, alpha, beta, cc, ss, wmax, T, tmp;
@@ -336,84 +337,84 @@ NNLSResult nnls(dMatrix2& A,
             }
             unorm = std::sqrt(unorm);
         }
-		if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
-			// Column j is sufficiently independent.Copy b into zz and solve for
-			// ztest which is the new prospective value for x[j].
-			std::copy(b.data(), b.data() + m, zz.begin());
+        if (unorm + std::abs(beta) * 0.01 - unorm > 0.0) {
+            // Column j is sufficiently independent.Copy b into zz and solve for
+            // ztest which is the new prospective value for x[j].
+            std::copy(b.data(), b.data() + m, zz.begin());
 
-			LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-			if (zz[nrow] / beta <= 0.0) {
-				// reject column j as a candidate to be moved from set z to set p.
-				// Set w[j] to 0.0 and move to the next greatest entry in w.
-				w[j] = 0.0;
-				continue;
-			}
-		}
+            LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+            if (zz[nrow] / beta <= 0.0) {
+                // reject column j as a candidate to be moved from set z to set p.
+                // Set w[j] to 0.0 and move to the next greatest entry in w.
+                w[j] = 0.0;
+                continue;
+            }
+        }
         else {
-			// Column j is not numerically independent, reject column j
+            // Column j is not numerically independent, reject column j
             w[j] = 0.0;
             continue;
         }
         // column j accepted
         A(nrow, j) = beta;
-		std::copy(zz.begin(),zz.end(), b.data());
+        std::copy(zz.begin(),zz.end(), b.data());
         inds[iz] = inds[iz1];
         inds[iz1] = j;
         iz1 += 1;
         nsetp += 1;
 
-		if (iz1 < n) {
-			for (int i = iz1; i < n; ++i) {
-				int col = inds[i];
-				for (int j = nrow; j < m; ++j) {
-					zz[j] = A(j, col);
-				}
-				LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
-				for (int j = nrow; j < m; ++j) {
-					A(j, col) = zz[j];
-				}
-			}
-		}
-		nrow += 1;
+        if (iz1 < n) {
+            for (int i = iz1; i < n; ++i) {
+                int col = inds[i];
+                for (int _j = nrow; _j < m; ++_j) {
+                    zz[_j] = A(_j, col);
+                }
+                LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+                for (int _j = nrow; _j < m; ++_j) {
+                    A(_j, col) = zz[_j];
+                }
+            }
+        }
+        nrow += 1;
 
         if (nsetp < m - 1) {
-			for (int i = nrow; i < m; ++i) {
-				A(i, j) = 0.0;
-			}
+            for (int i = nrow; i < m; ++i) {
+                A(i, j) = 0.0;
+            }
         }
         w[j] = 0.0;
 
-		std::copy(b.container().begin(), b.container().end(), zz.begin());
-		for (int k = 0; k < nsetp; ++k) {
-			int ip = nsetp - k - 1;
-			if (k != 0) {
-				for (int ii = 0; ii < ip + 1; ++ii) {
-					zz[ii] -= A(ii, jj) * zz[ip + 1];
-				}
-			}
-			jj = inds[ip];
-			zz[ip] /= A(ip, jj);
-		}
+        std::copy(b.container().begin(), b.container().end(), zz.begin());
+        for (int k = 0; k < nsetp; ++k) {
+            int ip = nsetp - k - 1;
+            if (k != 0) {
+                for (int ii = 0; ii < ip + 1; ++ii) {
+                    zz[ii] -= A(ii, jj) * zz[ip + 1];
+                }
+            }
+            jj = inds[ip];
+            zz[ip] /= A(ip, jj);
+        }
 
         while (true) {
             iteration++;
-			if (iteration > maxiter) {
-				std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
-				return NNLSResult{ x, 0.0, 1 };
-			}
+            if (iteration > maxiter) {
+                std::cerr << "NNLS did not converge after " << maxiter << " iterations.\n";
+                return NNLSResult{ x, 0.0, 1 };
+            }
 
             alpha = 2.0;
-			for (int ip = 0; ip < nsetp; ++ip) {
+            for (int ip = 0; ip < nsetp; ++ip) {
                 int k = inds[ip];
                 if (zz[ip] <= 0.0) {
-					T = -x[k] / (zz[ip] - x[k]);
+                    T = -x[k] / (zz[ip] - x[k]);
                     if (alpha > T) {
                         alpha = T;
                         jj = ip;
                     }
                 }
-			}
-			if (alpha == 2.0) break;
+            }
+            if (alpha == 2.0) break;
 
             for (int i = 0; i < nsetp; ++i) {
                 x[inds[i]] = (1 - alpha) * x[inds[i]] + alpha * zz[i];
@@ -444,40 +445,40 @@ NNLSResult nnls(dMatrix2& A,
                         b(j) = -ss * tmp + cc * b(j);
                     }
                 }
-				nrow -= 1;
-				nsetp -= 1;
-				iz1 -= 1;
-				inds[iz1] = i;
-				bool loop_broken = false;
-                for (int jj = 0; jj < nsetp; ++jj) {
-                    i = inds[jj];
+                nrow -= 1;
+                nsetp -= 1;
+                iz1 -= 1;
+                inds[iz1] = i;
+                bool loop_broken = false;
+                for (int _jj = 0; _jj < nsetp; ++_jj) {
+                    i = inds[_jj];
                     if (x[i] <= 0.0) {
-						loop_broken = true;
+                        loop_broken = true;
                         break;
                     }
                 }
                 if (!loop_broken) break;
             }
-			std::copy(b.container().begin(), b.container().end(), zz.begin());
+            std::copy(b.container().begin(), b.container().end(), zz.begin());
             for (int k = 0; k < nsetp; ++k) {
-				int ip = nsetp - k - 1;
+                int ip = nsetp - k - 1;
                 if (k != 0) {
                     for (int ii = 0; ii < ip + 1; ++ii) {
                         zz[ii] -= A(ii, jj) * zz[ip + 1];
                     }
                 }
-				jj = inds[ip];
-				zz[ip] /= A(ip, jj);
+                jj = inds[ip];
+                zz[ip] /= A(ip, jj);
             }
         }
-		for (int i = 0; i < nsetp; ++i) {
-			x[inds[i]] = zz[i];
-		}
+        for (int i = 0; i < nsetp; ++i) {
+            x[inds[i]] = zz[i];
+        }
 
     }
     //Calculate the residual np.linalg.norm(b[nrow:])
     double res = cblas_dnrm2(m - nrow, &b(nrow), 1);
-	return NNLSResult{ x, res, 0 };
+    return NNLSResult{ x, res, 0 };
 }
 
 //NNLSResult nnls(dMatrix2& A,

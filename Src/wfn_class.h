@@ -34,7 +34,7 @@ private:
     // 1                                            = S,
     // 2,3,4                                        = X,Y,Z
     // 5,6,7,8,9,10                                 = XX, YY, ZZ, XY, XZ, YZ
-    // 11,12,13,14,15,16,17,118,19,20               = XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ etc..
+    // 11,12,13,14,15,16,17,18,19,20                = XXX, YYY, ZZZ, XXY, XXZ, YYZ, XYY, XZZ, YZZ, XYZ etc..
     // 21,22,23,24,25,26,27,28,29,30,31,32,33,34,35 = XXXX YYYY ZZZZ XXXY XXXZ XYYY YYYZ XZZZ YZZZ XXYY XXZZ YYZZ XXYZ XYYZ XYZZ
     //                                                0     1     2   3     4   5     6   7     8   9     10  11  12    13    14
     // for sphericals the order is:
@@ -61,7 +61,7 @@ private:
     bool d_f_switch; // true if spherical harmonics are used for the basis set
     bool distance_switch;
     bool has_ECPs;
-	bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
+    bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
     // precomputed factors and helper functions for ESP calc
     long long int pre[9][5][5][9];
     void fill_pre();
@@ -130,7 +130,7 @@ public:
     void set_charge(const int &in) { charge = in; };
     const int get_nex() const { return nex; };
     const int get_ncen() const { return ncen; };
-	const void set_ncen(const int& in) { ncen = in; };
+    const void set_ncen(const int& in) { ncen = in; };
     const int get_nmo() const { return nmo; };
     const int get_nmo(const bool &only_occ) const;
     const int get_origin() const { return origin; };
@@ -285,7 +285,7 @@ public:
     bool read_cube(const int& nr, const bool& full, const bool& header, const bool& expert = false) { return cub[nr].read_file(full, header, expert); };
     std::filesystem::path make_super_cube(const int& nr) { return cub[nr].super_cube(); };
     bool apply_cube_thresh(const int& nr, const double& thresh) { return cub[nr].thresh(thresh); };
-    bool apply_cube_thresh(const int& nr, const cube& mask_cube, const double& thresh) { return cub[nr].thresh(thresh); };
+    bool apply_cube_thresh(const int& nr, const cube& mask_cube, const double& thresh) { return cub[nr].thresh(mask_cube, thresh); };
     bool apply_cube_mask(const int& nr, const cube& mask_cube) { return cub[nr].mask(mask_cube); };
     bool apply_cube_negative_mask(const int& nr, const cube& mask_cube) { return cub[nr].negative_mask(mask_cube); };
     bool cube_add (const int& nr, const cube& right) { return cub[nr] += right; };

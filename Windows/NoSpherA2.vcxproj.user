@@ -5,7 +5,17 @@
     <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'">
+    <LocalDebuggerCommandArguments>-QCT</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <LocalDebuggerCommandArguments>-cpus 16 -wfn Iron_Komplex.gbw -RI_CUBE -v -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|ARM64'">
     <LocalDebuggerCommandArguments>-cpus 16 -wfn Iron_Komplex.gbw -RI_CUBE -v -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>

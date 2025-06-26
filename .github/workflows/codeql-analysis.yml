@@ -3,6 +3,9 @@ name: "CodeChecks"
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   analyze:
     name: Analyze
@@ -22,13 +25,67 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
         source-root: ./Src
 
-    - name: Build
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gfortran libopenblas-dev clang build-essential
+
+    # Cache OpenBLAS
+    - name: Cache OpenBLAS Build
+      uses: actions/cache@v4
+      id: cache-openblas-linux
+      with:
+        path: Lib/OpenBLAS_build
+        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
+        restore-keys: |
+          openblas-linux-${{ runner.os }}-
+
+    - name: Build OpenBLAS
+      if: steps.cache-openblas-linux.outputs.cache-hit != 'true'
+      run: |
+          cd OpenBLAS 
+          mkdir -p installation 
+          make -j 
+          make PREFIX=installation install
+    
+
+    - name: make_OpenMP
+      run: |
+        cd llvm-project/openmp 
+        mkdir -p build 
+        cd build 
+        cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DLIBOMP_ENABLE_SHARED=OFF .. 
+        make -j
+        cd runtime/src
+        cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
+
+    # Cache featomic
+    - name: Cache featomic Build
+      uses: actions/cache@v4
+      id: cache-featomic-linux
+      with:
+        path: Lib/featomic_install  # Adjust if featomic installs elsewhere
+        key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
+        restore-keys: |
+          featomic-linux-${{ runner.os }}-
+  
+    - name: Build featomic
+      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
+      run: |
+          cd featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          make install
+
+    - name: make_Linux
       run: make
 
     - name: Perform CodeQL Analysis
@@ -40,6 +97,7 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
+        category: codeql
 
 
   flawfinder:
@@ -54,17 +112,21 @@ jobs:
         uses: actions/checkout@v4
         with:
             submodules: recursive
+
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.19
         with:
           arguments: '--sarif ./Src'
           output: 'flawfinder_results.sarif'
+
       - name: Archive executable
         uses: actions/upload-artifact@v4
         with:
           name: flawfinder_result
           path: 'flawfinder_results.sarif'
+          
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
+          category: flawfinder

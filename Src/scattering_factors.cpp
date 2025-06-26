@@ -51,13 +51,17 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
     double temp[1]{0.0};
     int hkl_temp[1]{0};
     k_pt.resize(3);
+    for(int i = 0; i < 3; i++)
+    {
+        k_pt[i].reserve(nr[0]);
+    }
     hkl_t hkl_;
     for (int run = 0; run < nr[0]; run++)
     {
         for (int i = 0; i < 3; i++)
         {
             k_points_file.read((char *)&temp, sizeof(temp));
-            k_pt[i].push_back(temp[0]);
+            k_pt[i].emplace_back(temp[0]);
             k_points_file.read((char *)&hkl_temp, sizeof(hkl_temp));
             hkl_[i] = hkl_temp[0];
         }
@@ -598,13 +602,12 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
         //     file << "line: " << line << endl;
         if (line.find("loop_") != string::npos)
         {
+            count_fields = 0;
             getline(cif_input, line);
             if (debug)
                 file << "line in loop field definition: " << trim(line) << endl;
             while (trim(line).find("_") == 0)
             {
-                if (debug)
-                    file << "line in loop field definition: " << trim(line) << endl;
                 if (line.find("label") != string::npos)
                     label_field = count_fields;
                 else if (line.find("type_symbol") != string::npos)
@@ -645,9 +648,9 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 fields[type_field].erase(remove_if(fields[type_field].begin(), fields[type_field].end(), ::isspace), fields[type_field].end());
                 if (debug)
                     file << "label: " << setw(8) << fields[label_field] << " type: " << fields[type_field] << " frac. pos: "
-                         << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
-                         << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
-                         << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[0]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[0]]) << " "
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[1]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[1]]) << " "
+                         << setw(6) << fixed << setprecision(3) << stod(fields[position_field[2]]) << "+/-" << get_decimal_precision_from_CIF_number(fields[position_field[2]]) << " " << flush;
                 vec position = unit_cell.get_coords_cartesian(
                     stod(fields[position_field[0]]),
                     stod(fields[position_field[1]]),
@@ -710,11 +713,11 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                         transform(type.begin(), type.end(), type.begin(), asciitolower);
                         if (debug)
                         {
-                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                          wfn cart. pos: "
+                            file << "ASYM:  " << setw(8) << element << " charge: " << setw(17) << wave.get_atom_charge(i) << "                             wfn cart. pos: "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 0) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 1) << " "
                                  << fixed << setprecision(3) << setw(16) << wave.get_atom_coordinate(i, 2) << flush;
-                            if (input_groups.size() > 0)
+                            if (input_groups.size() > 0 && group_field != -1)
                             {
                                 file << " checking disorder group: " << fields[group_field] << " vs. ";
                                 for (int g = 0; g < input_groups.size(); g++)
@@ -1045,6 +1048,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
              //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
              << setw(4) << cif2wfn_list.size() << " are identified as asymmetric unit atoms!" << endl;
     vector<AtomGrid> res;
+    res.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
     {
         if (debug)
@@ -1168,14 +1172,14 @@ std::vector<AtomGrid> make_Prototype_atoms(
                 radial_acc = 1e-15;
             }
         }
-        res.push_back(AtomGrid(radial_acc,
-                               lebedev_low,
-                               lebedev_high,
-                               atom_type_list[i],
-                               alpha_max_temp,
-                               max_l_temp,
-                               alpha_min_temp.data(),
-                               file));
+        res.emplace_back(radial_acc,
+                         lebedev_low,
+                         lebedev_high,
+                         atom_type_list[i],
+                         alpha_max_temp,
+                         max_l_temp,
+                         alpha_min_temp.data(),
+                         file);
     }
     if (debug)
         file << "max_l_overall: " << max_l_overall << endl;
@@ -1268,7 +1272,7 @@ double make_sphericals(
     const double lincr = log(incr);
     vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
     for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.push_back(Thakkar(atom_type_list[i])); // push_back is like a copy without making a copy
+        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
     // Make radial grids
     if (debug)
     {
@@ -1803,18 +1807,18 @@ int make_hirshfeld_grids(
         shrink_vector<double>(phi_temp);
     }
     // if (debug) {
-    //	//Copy grid from GPU to print:
-    //	// Dimensions: [c] [p]
-    //	// p = the number of gridpoint
-    //	// c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    //	ofstream grid("grid.file", ios::out);
-    //	for (int i = 0; i < total_grid[0].size(); i++) {
-    //		for (int j = 0; j < 7; j++)
-    //			grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
-    //		grid << "\n";
-    //	}
-    //	grid.flush();
-    //	grid.close();
+    //    //Copy grid from GPU to print:
+    //    // Dimensions: [c] [p]
+    //    // p = the number of gridpoint
+    //    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
+    //    ofstream grid("grid.file", ios::out);
+    //    for (int i = 0; i < total_grid[0].size(); i++) {
+    //        for (int j = 0; j < 7; j++)
+    //            grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
+    //        grid << "\n";
+    //    }
+    //    grid.flush();
+    //    grid.close();
     // }
     if (pbc != 0)
     {
@@ -2119,7 +2123,7 @@ static int make_hirshfeld_grids_ML(
         for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
             file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
 
-        //	int diff = end - start;
+        //    int diff = end - start;
         if (dur < 1)
             file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
         else
@@ -2562,10 +2566,10 @@ void calc_SF_SALTED(const vec2 &k_pt,
         {
             int coef_count = 0;
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
-			k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
+            k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
-			//Normalize K-point
-			for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
+            //Normalize K-point
+            for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
 
             for (int iat = 0; iat < atom_list.size(); iat++)
             {
@@ -2757,7 +2761,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         if (debug) {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                temp.emplace_back(wave.get_atom_charge(asym_atom_list[i]), mode);
                 if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
                 {
                     double k_0001 = temp[i].get_core_form_factor(0, wave.get_atom_ECP_electrons(asym_atom_list[i]));
@@ -2770,7 +2774,7 @@ static void add_ECP_contribution(const ivec &asym_atom_list,
         else {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                temp.push_back(Thakkar(wave.get_atom_charge(asym_atom_list[i]), mode));
+                temp.emplace_back(wave.get_atom_charge(asym_atom_list[i]), mode);
             }
         }
 
@@ -2905,8 +2909,9 @@ tsc_block<int, cdouble> thakkar_sfac(
     }
 
     vector<Thakkar> spherical_atoms;
+    spherical_atoms.reserve(atom_type_list.size());
     for (int i = 0; i < atom_type_list.size(); i++)
-        spherical_atoms.push_back(Thakkar(atom_type_list[i]));
+        spherical_atoms.emplace_back(atom_type_list[i]);
 
     const int imax = (int)asym_atom_list.size();
 
@@ -3083,7 +3088,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     {
         // We need coeffs for the atoms and coeff seperateley
         unsigned int current_coef_index = coefs.size();
-        for (int i = constant_atoms.size() - 1; i >= 0; i--)
+        for (unsigned int i = constant_atoms.size() - 1; i >= 0; i--)
         {
             // Count up all coeffs for one atom
             const int lim = (int)SP.wavy.get_atom_basis_set_size(i);
@@ -3170,7 +3175,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         vector<WFN> tempy;
-        tempy.push_back(WFN(opt.wfn));
+        tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
         blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
@@ -3285,6 +3290,8 @@ itsc_block calculate_scattering_factors_RI_fit(
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
+    //If no basis is yet loaded, assume a auto aux should be generated
+    if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(wave[nr]);
 
     WFN wavy_aux(0);
     wavy_aux.set_atoms(wave[nr].get_atoms());
@@ -3754,10 +3761,12 @@ ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
     fill_xyzc(x, y, z, atom_z, 0, wavy, cell());
 
     ivec atom_types, nr_list;
+    atom_types.reserve(nr_of_atoms);
+    nr_list.reserve(nr_of_atoms);
     // Make Prototype grids with only single atom weights for all elements
     for (int atm_idx = 0; atm_idx < nr_of_atoms; atm_idx++) {
-        atom_types.push_back(wavy.get_atom_charge(atm_idx));
-        nr_list.push_back(atm_idx);
+        atom_types.emplace_back(wavy.get_atom_charge(atm_idx));
+        nr_list.emplace_back(atm_idx);
     }
 
     std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1);

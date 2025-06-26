@@ -9,7 +9,7 @@
 
 std::vector<cvec2> SALTED_Utils::complex_to_real_transformation(std::vector<int> sizes)
 {
-	const double sqrt_2 = sqrt(2.0);
+    const double sqrt_2 = sqrt(2.0);
     using namespace std;
     vector<cvec2> matrices{};
     for (int i = 0; i < sizes.size(); i++)
@@ -167,7 +167,7 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
     this->nspe = (int)neighspe.size();
 }
 
-// RASCALINE1
+// FEATOMIC1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
     //featomic::SimpleSystem
@@ -176,8 +176,8 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     for (const atom& a : *wfn.get_atoms_ptr())
     {
         std::array<double, 3> xyz = { constants::bohr2ang(a.get_coordinate(0)),
-                                     constants::bohr2ang(a.get_coordinate(1)),
-                                     constants::bohr2ang(a.get_coordinate(2)) };
+                                      constants::bohr2ang(a.get_coordinate(1)),
+                                      constants::bohr2ang(a.get_coordinate(2)) };
         system.add_atom(a.get_charge(), xyz);
     }
     // Construct the parameters for the calculator from the inputs given
@@ -193,7 +193,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
             for (const std::string &speneigh : this->neighspe)
             {
                 // Directly emplace back initializer_lists into keys_array
-                keys_array.emplace_back(std::vector<int32_t>{l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1});
+                keys_array.emplace_back(std::vector<int32_t>{ l, 1, constants::get_Z_from_label(specen.c_str()) + 1, constants::get_Z_from_label(speneigh.c_str()) + 1 });
             }
         }
     }
@@ -228,7 +228,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     return descriptor;
 }
 
-// RASCALINE2
+// FEATOMIC2
 cvec4 Rascaline_Descriptors::get_expansion_coeffs(std::vector<uint8_t> descriptor_buffer)
 {
 
@@ -281,7 +281,7 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial;
     int coef_counter = 0;
-    int e = 0, size = 0;
+    unsigned int e = 0, size = 0;
     basis_set_entry bf;
     primitive p;
 
@@ -306,12 +306,12 @@ const double calc_density_ML(const double& x,
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
             d[e] /= d[3];
-        int type = -1, prim = 0;
+        int prim = 0;
         for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
             }
@@ -362,12 +362,12 @@ const double calc_density_ML(const double& x,
         // normalize distances for spherical harmonic
         for (e = 0; e < 3; e++)
             d[e] /= d[3];
-        int type = -1, prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        unsigned int prim = 0;
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
-            int type = atoms[a].get_basis_set_entry(prim).get_type();
+            unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 radial += gaussian_radial(bf.get_primitive(), d[3]) * bf.get_coefficient();
             }
@@ -410,7 +410,6 @@ double helper_even(const int l) {
  */
 vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
 {
-    int e = 0, size;
     double radial;
     basis_set_entry bf;
 
@@ -421,7 +420,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
     {
 
         int type = -1, prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
             radial = 0;
             type = atoms[a].get_basis_set_entry(prim).get_type();
             if (type != 0)
@@ -430,7 +429,7 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
                 continue;
             }
 
-            for (int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
+            for (unsigned int e = 0; e < atoms[a].get_shellcount()[shell]; e++, prim++) {
                 bf = atoms[a].get_basis_set_entry(prim);
                 primitive p(a, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
                 radial += constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.normalization_constant() * p.get_coef();

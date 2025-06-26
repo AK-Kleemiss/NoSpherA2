@@ -29,32 +29,20 @@ LIBFEATOMIC_a_inc += ../Lib/featomic_install/include
 OMP_BUILD_x := ../Lib/OpenMP_build_x86/lib/libomp.a
 OMP_BUILD_I_x := ../Lib/OpenMP_build_x86/include
 blas_x := ../Lib/OpenBLAS_build_x86_64/
-GCC_OPTS_x := ${GCC_OPTS} -march=x86_64
-GCC_OPTS_DEBUG_x := ${GCC_OPTS_DEBUG} -march=x86_64
+GCC_OPTS_x := ${GCC_OPTS} -march=x86-64
+GCC_OPTS_DEBUG_x := ${GCC_OPTS_DEBUG} -march=x86-64
 TARGET_FLAG_x := -target x86_64-apple-macos13.0
-LIBFEATOMIC_x := ../featomic/featomic_install_x86/lib/libfeatomic.a
-LIBFEATOMIC_x += ../featomic/featomic_install_x86/lib/libmetatensor.a
-LIBFEATOMIC_x_inc += ../featomic/featomic_install_x86/include
+LIBFEATOMIC_x := ../Lib/featomic_install_x86/lib/libfeatomic.a
+LIBFEATOMIC_x += ../Lib/featomic_install_x86/lib/libmetatensor.a
+LIBFEATOMIC_x_inc += ../Lib/featomic_install_x86/include
 
-# Detect architecture
-ARCH ?= $(shell uname -m)
-
-ifeq ($(ARCH),arm64)
 LIBFEATOMIC_native     := $(LIBFEATOMIC_a)
 LIBFEATOMIC_native_inc := $(LIBFEATOMIC_a_inc)
 OMP_BUILD_I_native     := $(OMP_BUILD_I_a)
 OMP_BUILD_native       := $(OMP_BUILD_a)
 blas_native            := $(blas_a)
-else ifeq ($(ARCH),x86_64)
-LIBFEATOMIC_native     := $(LIBFEATOMIC_x)
-LIBFEATOMIC_native_inc := $(LIBFEATOMIC_x_inc)
-OMP_BUILD_I_native     := $(OMP_BUILD_I_x)
-OMP_BUILD_native       := $(OMP_BUILD_x)
-blas_native            := $(blas_x)
-endif
-
-OBJS_native     := $(OBJ_NAMES:=.o_native)
-GCC_OPTS_native := ${GCC_OPTS} -mcpu=native -march=native
+OBJS_native            := $(OBJ_NAMES:=.o_native)
+GCC_OPTS_native        := ${GCC_OPTS} -mcpu=native -march=native
 
 #Basis set converter
 basis_set_converter:

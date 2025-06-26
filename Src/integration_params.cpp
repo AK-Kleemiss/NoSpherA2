@@ -92,7 +92,7 @@ void Int_Params::collect_basis_data()
         else if (wfn_origin == 0)
         {
             int coef_idx = 0;
-            for (int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
+            for (unsigned int shell = 0; shell < atoms[atom_idx].get_shellcount_size(); shell++)
             {
                 vec shell_coefs(coefficients.begin() + coef_idx, coefficients.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
                 vec shell_exp(exponents.begin() + coef_idx, exponents.begin() + atoms[atom_idx].get_shellcount(shell) + coef_idx);
@@ -126,9 +126,9 @@ void Int_Params::collect_basis_data()
         vec coefficients_new(coefficients.size(), 0.0), exponents_new(exponents.size(), 0.0);
         ivec shellcount_new, shelltype;
         size_t pos_in_new_coeffs = 0;
-        for (int l = 0; l <= max_l; l++) {
-			int n_funcs = 0;
-            for (int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
+        for (unsigned int l = 0; l <= max_l; l++) {
+            int n_funcs = 0;
+            for (unsigned int shell_idx = 0; shell_idx < atoms[atom_idx].get_shellcount_size(); shell_idx++) {
                 int curr_funcs = (int)atoms[atom_idx].get_shellcount()[shell_idx];
 
                 if (((basis[n_funcs].get_type()-1 != l) && (wfn_origin == 9 || wfn_origin == 6))  || ((basis[n_funcs].get_type() != l) && (wfn_origin == 0))) { //Sort functions regarding the angular momentum
@@ -137,11 +137,11 @@ void Int_Params::collect_basis_data()
                     continue;
                 }
 
-				std::copy(coefficients.begin() + n_funcs, coefficients.begin() + n_funcs + curr_funcs, coefficients_new.begin() + pos_in_new_coeffs);
-				std::copy(exponents.begin() + n_funcs, exponents.begin() + n_funcs + curr_funcs, exponents_new.begin() + pos_in_new_coeffs);
-				shellcount_new.push_back(curr_funcs);
-				shelltype.push_back(l);
-				pos_in_new_coeffs += curr_funcs;
+                std::copy(coefficients.begin() + n_funcs, coefficients.begin() + n_funcs + curr_funcs, coefficients_new.begin() + pos_in_new_coeffs);
+                std::copy(exponents.begin() + n_funcs, exponents.begin() + n_funcs + curr_funcs, exponents_new.begin() + pos_in_new_coeffs);
+                shellcount_new.push_back(curr_funcs);
+                shelltype.push_back(l);
+                pos_in_new_coeffs += curr_funcs;
                 n_funcs += curr_funcs;
 
 
@@ -184,9 +184,9 @@ void Int_Params::populate_env()
     int bas_ptr = _env.size();
     for (int charge = 1; charge < 118; charge++) {
         //Check if charge is key in basis_sets
-		if (basis_sets.find(charge) == basis_sets.end()) {
-			continue;
-		}
+        if (basis_sets.find(charge) == basis_sets.end()) {
+            continue;
+        }
 
         basis_sets[charge].env_idx = (double)bas_ptr;
 
@@ -264,7 +264,7 @@ Int_Params Int_Params::operator+(const Int_Params &other)
     std::copy(other._env.begin(), other._env.end(), combined._env.begin() + _env.size());
 
     // Update the pointers in the second object to point to the correct place in the combined _env vector
-    int off = _env.size();
+    unsigned int off = _env.size();
     int natm_off = _atm.size() / 6;
     ivec atm2 = other._atm;
     ivec bas2 = other._bas;
@@ -288,27 +288,27 @@ Int_Params Int_Params::operator+(const Int_Params &other)
 }
 
 void Int_Params::print_data(std::string name) {
-	std::cout << "Printing data for " << name << std::endl;
-	std::ofstream file(name + ".txt");
-	file << "ATM:" << std::endl;
-	for (int a = 0; a < _atm.size()/6; a++) {
-		for (int i = 0; i < 6; i++) {
+    std::cout << "Printing data for " << name << std::endl;
+    std::ofstream file(name + ".txt");
+    file << "ATM:" << std::endl;
+    for (int a = 0; a < _atm.size()/6; a++) {
+        for (int i = 0; i < 6; i++) {
             file << _atm[a * 6 + i] << " ";
-		}
-		file << std::endl;
-	}
-	file << "\n\nBAS:" << std::endl;
-	for (int b = 0; b < _bas.size() / 8; b++) {
-		for (int i = 0; i < 8; i++) {
-			file << _bas[b * 8 + i] << " ";
-		}
-		file << std::endl;
-	}
-	file << "\n\nENV:" << std::endl;
-	for (int e = 0; e < _env.size(); e++) {
-		file << _env[e] << " ";
-	}
-	file.close();
+        }
+        file << std::endl;
+    }
+    file << "\n\nBAS:" << std::endl;
+    for (int b = 0; b < _bas.size() / 8; b++) {
+        for (int i = 0; i < 8; i++) {
+            file << _bas[b * 8 + i] << " ";
+        }
+        file << std::endl;
+    }
+    file << "\n\nENV:" << std::endl;
+    for (int e = 0; e < _env.size(); e++) {
+        file << _env[e] << " ";
+    }
+    file.close();
 }
 
 

@@ -15,6 +15,7 @@ class primitive
 
 public:
     primitive(int c, int t, std::vector<double> e, std::vector<double> coef) : center(c), type(t), exp(e), coefficient(coef) {};
+    primitive(int c, int t, double e, double coef) : center(c), type(t), exp({e}), coefficient({coef}) {};
 
     int center, type;
     std::vector<double> exp, coefficient;
@@ -38,7 +39,7 @@ std::vector<T> split_string(const std::string& input, const std::string delimite
     size_t pos = 0;
     while ((pos = input_copy.find(delimiter)) != std::string::npos)
     {
-        result.push_back(fromString<T>(input_copy.substr(0, pos)));
+        result.emplace_back(fromString<T>(input_copy.substr(0, pos)));
         input_copy.erase(0, pos + delimiter.length());
     }
     return result;

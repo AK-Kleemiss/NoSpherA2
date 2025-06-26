@@ -165,7 +165,7 @@ string prepare_gaussian(const string& basis_set_path, const string& fchkname, WF
   com << "TITLE" << endl << endl;
   com << wave.get_charge() << " " << wave.get_multi() << endl;
   com << wave.get_centers(check_bohr(wave, true, debug));
-  //	com << wave.get_centers (false);
+  //    com << wave.get_centers (false);
   com << endl;
   svec elements_list;
   if (debug)std::cout << "elements_list.size()= " << elements_list.size() << endl;
@@ -406,7 +406,7 @@ bool modify_fchk(const string& fchk_name, const string& basis_set_path, WFN& wav
           }
           break;
         }
-        if (debug)	std::cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
+        if (debug)    std::cout << "This shell has: " << wave.get_shell_end(a, s, false) - wave.get_shell_start(a, s, false) + 1 << " primitives" << endl;
       }
     }
     //-----------debug output---------------------------------------------------------
@@ -896,7 +896,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         }
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
-                        norm_const.push_back(basis_coefficients[a][i]);
+                        norm_const.emplace_back(basis_coefficients[a][i]);
                     }
                     break;
                 case 2:
@@ -926,7 +926,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                     }
                     break;
                 case 3:
@@ -956,9 +956,9 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                         for (int k = 0; k < 3; k++)
-                            norm_const.push_back(sqrt(3) * basis_coefficients[a][i]);
+                            norm_const.emplace_back(sqrt(3) * basis_coefficients[a][i]);
                     }
                     break;
                 case 4:
@@ -988,10 +988,10 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                         // contraction_coefficients[a][i] = factor * wave.get_atom_basis_set_coefficient(a, i);
                         basis_coefficients[a][i] *= factor;
                         for (int l = 0; l < 3; l++)
-                            norm_const.push_back(basis_coefficients[a][i]);
+                            norm_const.emplace_back(basis_coefficients[a][i]);
                         for (int l = 0; l < 6; l++)
-                            norm_const.push_back(sqrt(5) * basis_coefficients[a][i]);
-                        norm_const.push_back(sqrt(15) * basis_coefficients[a][i]);
+                            norm_const.emplace_back(sqrt(5) * basis_coefficients[a][i]);
+                        norm_const.emplace_back(sqrt(15) * basis_coefficients[a][i]);
                     }
                     break;
                 }

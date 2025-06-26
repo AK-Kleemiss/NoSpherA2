@@ -257,13 +257,13 @@ public:
         double v = 0.0;
         svec cell_keywords;
         std::string line;
-        cell_keywords.push_back("_cell_length_a");
-        cell_keywords.push_back("_cell_length_b");
-        cell_keywords.push_back("_cell_length_c");
-        cell_keywords.push_back("_cell_angle_alpha");
-        cell_keywords.push_back("_cell_angle_beta");
-        cell_keywords.push_back("_cell_angle_gamma");
-        cell_keywords.push_back("_cell_volume");
+        cell_keywords.emplace_back("_cell_length_a");
+        cell_keywords.emplace_back("_cell_length_b");
+        cell_keywords.emplace_back("_cell_length_c");
+        cell_keywords.emplace_back("_cell_angle_alpha");
+        cell_keywords.emplace_back("_cell_angle_beta");
+        cell_keywords.emplace_back("_cell_angle_gamma");
+        cell_keywords.emplace_back("_cell_volume");
         if (debug)
             file << "\nStarting while !.eof()" << std::endl;
         while (!cif_input.eof())

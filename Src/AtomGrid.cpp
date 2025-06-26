@@ -69,6 +69,8 @@ AtomGrid::AtomGrid(const double radial_precision,
   const double rb = constants::bragg_angstrom[proton_charge] / (5.0E10 * constants::a0);
   const double c = r_inner / (exp(h) - 1.0);
   const int num_radial = int(log(1.0 + (r_outer / c)) / h);
+  radial_atom_grid_r_bohr_.reserve(num_radial);
+  radial_atom_grid_w_.reserve(num_radial);
 
   //if (debug)
   //  file << "ATOM GRID: "
@@ -80,8 +82,8 @@ AtomGrid::AtomGrid(const double radial_precision,
     double radial_r = c * (exp(static_cast<double>(irad + 1.0) * h) - 1.0);
     double radial_w = (radial_r + c) * radial_r * radial_r * h;
 
-    radial_atom_grid_r_bohr_.push_back(radial_r);
-    radial_atom_grid_w_.push_back(radial_w);
+    radial_atom_grid_r_bohr_.emplace_back(radial_r);
+    radial_atom_grid_w_.emplace_back(radial_w);
     num_radial_grid_points_++;
 
     int num_angular = max_num_angular_points_closest;

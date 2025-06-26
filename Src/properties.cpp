@@ -19,7 +19,7 @@ void Calc_Spherical_Dens(
 
     vector<Thakkar> atoms;
     for (int a = 0; a < 92; a++) {
-        atoms.push_back(Thakkar(a));
+        atoms.emplace_back(a);
         atoms[a].make_interpolator(1.005*1.005*1.005, 1E-7);
     }
 
@@ -108,8 +108,9 @@ void Calc_Static_Def(
     ProgressBar *progress = new ProgressBar(CubeDEF.get_size(0), 50, "=", " ", "Calculating Deformation");
 
     vector<Thakkar> atoms;
+    atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
-        atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
+        atoms.emplace_back(wavy.get_atom_charge(a));
 
     const int low_i = wrap ? -CubeDEF.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeDEF.get_size(0) : CubeDEF.get_size(0);
@@ -274,8 +275,9 @@ void Calc_Hirshfeld(
     ProgressBar *progress = new ProgressBar(CubeHDEF.get_size(0), 50, "=", " ", "Calculating Values");
 
     vector<Thakkar> atoms;
+    atoms.reserve(wavy.get_ncen());
     for (int a = 0; a < wavy.get_ncen(); a++)
-        atoms.push_back(Thakkar(wavy.get_atom_charge(a)));
+        atoms.emplace_back(wavy.get_atom_charge(a));
 
     const int low_i = wrap ? -CubeHDEF.get_size(0) : 0;
     const int high_i = wrap ? 2 * CubeHDEF.get_size(0) : CubeHDEF.get_size(0);
@@ -747,8 +749,7 @@ void Calc_Prop(
                     continue;
 
                 if (CubeESP.get_loaded() && !CubeRDG.get_loaded())
-                    Rho = wavy.compute_dens(
-                        PosGrid[0], PosGrid[1], PosGrid[2]);
+                    Rho = wavy.compute_dens(PosGrid[0], PosGrid[1], PosGrid[2]);
 
                 if (CubeRDG.get_loaded() && CubeLap.get_loaded() && (CubeElf.get_loaded() || CubeEli.get_loaded()))
                     wavy.computeValues(
@@ -1414,11 +1415,11 @@ void do_combine_mo(options &opt)
         for (int j = 0; j < opt.cmo2.size(); j++)
         {
             counter++;
-           std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
+            std::cout << "Running: " << counter << " of " << opt.cmo2.size() * opt.cmo1.size() << endl;
             string filename("");
             MO2.set_zero();
             Calc_MO(MO2, opt.cmo2[j] - 1, wavy2, 40, std::cout);
-           std::cout << "writing files..." << flush;
+            std::cout << "writing files..." << flush;
             filename = wavy1.get_path().stem().string() + "_" + std::to_string(opt.cmo1[v1]) + "+" + wavy2.get_path().stem().string() + "_" + std::to_string(opt.cmo2[j]) + ".cube";
             fns.push_back(filename);
             total.set_zero();
@@ -1431,7 +1432,7 @@ void do_combine_mo(options &opt)
             total = MO1;
             total -= MO2;
             total.write_file(filename, false);
-           std::cout << " ... done!" << endl;
+            std::cout << " ... done!" << endl;
         }
     }
     ofstream vmd("read_files.vmd");
@@ -1637,6 +1638,7 @@ void dipole_moments(options &opt, std::ostream &log2)
     Calc_Spherical_Dens(SPHER, wavy, opt.radius, log2);
     log2 << " ...done!" << endl;
     vec2 dipole_moments;
+    dipole_moments.reserve(wavy.get_ncen());
     for (int i = 0; i < wavy.get_ncen(); i++)
     {
         Hirsh[i].calc_dv();
@@ -1648,7 +1650,7 @@ void dipole_moments(options &opt, std::ostream &log2)
         log2 << "..done!" << endl;
     }
     for (int i = 0; i < wavy.get_ncen(); i++)
-        dipole_moments.push_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
+        dipole_moments.emplace_back(calc_dipole_for_atom(wavy, i, Hirsh[i], charges));
     log2 << " atom   |  dipole moment x,        y,         z" << endl
          << "======================================" << endl;
     for (int i = 0; i < wavy.get_ncen(); i++)
@@ -1719,7 +1721,7 @@ void polarizabilities(options &opt, std::ostream &log2)
     std::vector<WFN> wavy;
     for (int i = 0; i < 7; i++)
     {
-        wavy.push_back(WFN(0));
+        wavy.emplace_back(0);
         wavy[i].read_known_wavefunction_format(opt.pol_wfns[i], log2, opt.debug);
     }
 
