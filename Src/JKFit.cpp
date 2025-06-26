@@ -52,8 +52,6 @@ void BasisSet::gen_aux(const WFN& orbital_wfn) {
             double exp = p.get_exponent();
             double coef = p.get_coefficient() / primitve_normalization(exp, l);
 
-            // Skip if the angular momentum is not in the range of 0 to max_shells	
-            if (l >= max_shells + 1) continue;
             if (std::abs(coef) < 1e-3) continue;
 
             auto& [min_exp, max_exp] = angular_momentum_exponents[l];
