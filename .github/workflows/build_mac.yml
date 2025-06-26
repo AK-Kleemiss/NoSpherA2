@@ -3,6 +3,9 @@ name: compile_mac
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build_Mac_arm:
     runs-on: macos-latest
