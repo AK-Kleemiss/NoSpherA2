@@ -22,6 +22,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
@@ -93,6 +94,7 @@ jobs:
       uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
+        category: codeql
 
 
   flawfinder:
@@ -107,17 +109,21 @@ jobs:
         uses: actions/checkout@v4
         with:
             submodules: recursive
+
       - name: flawfinder_scan
         uses: david-a-wheeler/flawfinder@2.0.19
         with:
           arguments: '--sarif ./Src'
           output: 'flawfinder_results.sarif'
+
       - name: Archive executable
         uses: actions/upload-artifact@v4
         with:
           name: flawfinder_result
           path: 'flawfinder_results.sarif'
+          
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
+          category: flawfinder
