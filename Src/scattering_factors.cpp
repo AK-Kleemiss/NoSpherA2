@@ -25,7 +25,6 @@
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
-#include "SALTED_utilities.h"
 
 /**
  * @brief Reads k-points from a binary file and stores them in provided vectors.
@@ -3057,8 +3056,6 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
         }
         current_index++;
     }
-    // We need tp write a new xyz-file as rascaline needs one for the calculation
-    SP.wavy.write_xyz("temp_rascaline.xyz");
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;

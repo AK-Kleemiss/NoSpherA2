@@ -43,6 +43,12 @@ auxiliary_basis.o: basis_set_converter
 	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
 	@echo 'Finished building: auxiliary_basis.o'
 
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS} ${LIBOPENBLAS_I} -I../Lib/ -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
+	@echo 'Finished building: auxiliary_basis.o'
+
 # Pattern rule to compile all .cpp files
 %.o: ../Src/%.cpp pch.h.gch
 	@echo 'Building file: $<'

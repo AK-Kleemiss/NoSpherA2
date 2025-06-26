@@ -15,7 +15,15 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 
     config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
-    if (config.salted_filename == "") {
+	  if (config.salted_filename == "") {
+        if (opt_in.coef_file != "") {
+            std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
+            config.dfbasis = "cc-pvqz-jkfit";
+            config.salted_filename = "coefficient file";
+            coef_file = opt_in.coef_file;
+            wavy = wavy_in;
+            return;
+        }
         std::cout << "No SALTED binary file found in directory: " << opt_in.salted_model_dir << std::endl;
         exit(1);
     }
@@ -418,10 +426,15 @@ vec SALTEDPredictor::gen_SALTED_densities()
     using namespace std;
     if (coef_file != "")
     {
-        vec coefs{};
-       std::cout << "Reading coefficients from file: " << coef_file << endl;
-        read_npy<double>(coef_file, coefs);
-        return coefs;
+        std::vector<float> coefs{};
+        std::cout << "Reading coefficients from file: " << coef_file << endl;
+        read_npy<float>(coef_file, coefs);
+        vec double_coefs(coefs.size());
+        for (int i = 0; i < coefs.size(); i++)
+        {
+            double_coefs[i] = static_cast<double>(coefs[i]);
+        }
+        return double_coefs;
     }
 
     // Run generation of tsc file

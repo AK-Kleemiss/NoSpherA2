@@ -1812,10 +1812,10 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
     wavy_aux.set_atoms(wavy.get_atoms());
     wavy_aux.set_ncen(wavy.get_ncen());
     wavy_aux.delete_basis_set();
-    double beta = 2.5;
-    std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
+    double beta = 2.0;
+    //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
+    std::shared_ptr<BasisSet> aux_basis_set = BasisSetLibrary().get_basis_set("def2-universal-jkfit");
 
-    //BasisSet aux_basis_set = BasisSetLibrary().get_basis_set("def2-TZVP-RIFIT");
     load_basis_into_WFN(wavy_aux, aux_basis_set);
 
     vec ri_coefs = density_fit(wavy, wavy_aux, (*opt).mem, 'C');

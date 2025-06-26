@@ -60,6 +60,16 @@ auxiliary_basis.o_arm64: basis_set_converter
 	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_a}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_a}
 	@echo 'Finished building: auxiliary_basis.o'
 
+#Basis set converter
+basis_set_converter:
+	@make -f makefile_basis_set_converter
+
+# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
+auxiliary_basis.o_arm64: basis_set_converter
+	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
+	@${COMP} ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
+	@echo 'Finished building: auxiliary_basis.o'
+
 %.o_arm64: ../Src/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_a_inc} -I${blas_a}/include -o "$@" "$<" ${TARGET_FLAG_a}

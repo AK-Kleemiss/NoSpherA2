@@ -122,9 +122,13 @@ std::string Rascaline_Descriptors::to_json(const HyperParametersDensity &params)
 {
     std::ostringstream oss;
     oss << "{\n"
-        << "  \"cutoff\": {\n    \"radius\": " << params.cutoff << ",\n    \"smoothing\": {\"type\": \"ShiftedCosine\", \"width\": " << params.cutoff_function.width << " }\n  }, \n"
-        << "  \"density\": {\n    \"type\": \"Gaussian\",\n    \"width\": "<< params.atomic_gaussian_width << ",\n    \"center_atom_weight\": "<< params.center_atom_weight << "\n  },\n"
-        << "  \"basis\": {\n    \"type\": \"TensorProduct\",\n    \"max_angular\": " << params.max_angular << ",\n    \"radial\": {\"type\": \"Gto\", \"max_radial\": " << params.max_radial << "}\n  }\n"
+        << "  \"cutoff\": {  \
+                    \"radius\": " << params.cutoff << " , \"smoothing\": \
+                                  {\"type\": \"" << params.cutoff_function.type << "\", \"width\": " << params.cutoff_function.width << "} }, \n"
+        << "  \"density\": { \
+                    \"type\": \"Gaussian\", \"width\": " << params.atomic_gaussian_width << ", \"center_atom_weight\": " << params.center_atom_weight << "},\n"
+        << "  \"basis\": { \
+                    \"type\": \"TensorProduct\", \"max_angular\": " << params.max_angular << ", \"radial\": {\"type\":  \"" << params.radial_basis.type << "\", \"max_radial\": " << params.max_radial << "} , \"spline_accuracy\": " << params.radial_basis.spline_accuracy << "}\n"
         << "}";
     return oss.str();
 }
@@ -166,13 +170,14 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
 // FEATOMIC1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
+    //featomic::SimpleSystem
     featomic::SimpleSystem system;
     WFN wfn = WFN(this->filepath.c_str());
     for (const atom& a : *wfn.get_atoms_ptr())
     {
-        std::array<double, 3> xyz = {constants::bohr2ang(a.get_coordinate(0)),
-                                     constants::bohr2ang(a.get_coordinate(1)),
-                                     constants::bohr2ang(a.get_coordinate(2)) };
+        std::array<double, 3> xyz = { constants::bohr2ang(a.get_coordinate(0)),
+                                      constants::bohr2ang(a.get_coordinate(1)),
+                                      constants::bohr2ang(a.get_coordinate(2)) };
         system.add_atom(a.get_charge(), xyz);
     }
     // Construct the parameters for the calculator from the inputs given
