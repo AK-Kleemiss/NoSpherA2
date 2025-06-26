@@ -350,6 +350,7 @@ jobs:
   flawfinder:
     name: flawfinder
     runs-on: ubuntu-latest
+    needs: build_Linux
     permissions:
       actions: read
       contents: read
