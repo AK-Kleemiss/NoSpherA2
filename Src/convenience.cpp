@@ -2567,33 +2567,97 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     }
     return false;
 #else
-    char file[1024];
+    char file[1024] = {0};
     std::string command;
-    command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
-    command += current_path;
-    command += "/\"";
-    for (int i = 0; i < filter.size(); i++) {
-        command += " --file-filter=\"";
-        command += filter[i];
-        command += "\" ";
+    bool use_zenity = (system("which zenity > /dev/null 2>&1") == 0);
+    bool use_kdialog = false;
+
+    if (use_zenity) {
+        command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
+        command += current_path;
+        command += "/\"";
+        for (const auto& f : filter) {
+            command += " --file-filter='";
+            command += f;
+            command += "'";
+        }
+        command += " 2> /dev/null";
+    } else {
+        use_kdialog = (system("which kdialog > /dev/null 2>&1") == 0);
+        if (use_kdialog) {
+            command = "kdialog --getopenfilename \"";
+            command += current_path;
+            command += "/\" '";
+            for (const auto& f : filter) {
+                command += f;
+                command += " ";
+            }
+            command += "'";
+            command += " --title \"Select a file to load\" 2> /dev/null";
+        } else {
+            std::cout << "No suitable file dialog tool found (zenity/kdialog)." << std::endl;
+            std::cout << "Please enter the full path to the file: " << std::flush;
+            std::string input_path;
+            std::getline(std::cin, input_path);
+
+            // Trim leading/trailing whitespace
+            input_path.erase(0, input_path.find_first_not_of(" \t\n\r"));
+            input_path.erase(input_path.find_last_not_of(" \t\n\r") + 1);
+
+            if (input_path.empty()) {
+                if (debug) std::cout << "No path entered." << std::endl;
+                return false;
+            }
+
+            path = input_path;
+            if (std::filesystem::exists(path)) {
+                if (debug) std::cout << "Selected file via manual input: " << path << std::endl;
+                return true;
+            } else {
+                std::cerr << "Error: File not found at path: " << path << std::endl;
+                return false;
+            }
+        }
     }
-    command += " 2> /dev/null";
+
+    if (debug) {
+        std::cout << "Executing command: " << command << std::endl;
+    }
+
     FILE* f = popen(command.c_str(), "r");
     if (!f) {
-        std::cout << "ERROR" << std::endl;
+        std::cerr << "Error: Failed to execute file dialog command." << std::endl;
         return false;
     }
-    if (fgets(file, 1024, f) == NULL) 
+
+    if (fgets(file, sizeof(file), f) == NULL) {
+        if (debug) std::cout << "File selection cancelled." << std::endl;
+        pclose(f);
         return false;
-    if (debug) 
-        std::cout << "Filename: " << file << std::endl;
-    path = file;
-    std::stringstream ss(path.string());
-    std::string name = path.string();
-    getline(ss, name);
-    if (pclose(f) != 0) 
-        std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
-    return true;
+    }
+
+    int pclose_status = pclose(f);
+    if (pclose_status != 0) {
+        if (debug) std::cout << (use_zenity ? "Zenity" : "KDialog") << " returned non-zero status: " << pclose_status << ". User might have cancelled." << std::endl;
+        // This can happen on cancel, so we check if a file was actually returned.
+        if (strlen(file) == 0) return false;
+    }
+
+    // Clean up the path string which might have a newline
+    std::string file_str = file;
+    file_str.erase(file_str.find_last_not_of(" \n\r\t")+1);
+
+    if (file_str.empty()) {
+        if (debug) std::cout << "File selection cancelled or returned empty path." << std::endl;
+        return false;
+    }
+
+    path = file_str;
+    if (debug) {
+        std::cout << "Selected file: " << path << std::endl;
+    }
+
+    return std::filesystem::exists(path);
 #endif
 };
 
