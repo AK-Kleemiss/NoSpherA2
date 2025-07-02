@@ -100,14 +100,14 @@ make
     - Open the `makefile` in the test subdirectory.
     - Add your test executable or call to the list of tests, as appropriate.
     - Example (add your test to the `TESTS` variable):
-      ```makefile
-sucrose_SF:
-	$(call RUN_TEST,$@,sucrose_fchk_SF, \
-		-cif sucrose.cif \
-		-hkl olex2/Wfn_job/sucrose.hkl \
-		-wfn olex2/Wfn_job/sucrose.wfx \
-		-acc 0 \
-		-no-date)
+      ```
+        sucrose_SF:
+            $(call RUN_TEST,$@,sucrose_fchk_SF, \
+                -cif sucrose.cif \
+                -hkl olex2/Wfn_job/sucrose.hkl \
+                -wfn olex2/Wfn_job/sucrose.wfx \
+                -acc 0 \
+                -no-date)
       ```
 4. **Run `make test`** to ensure your test compiles and runs.
 5. **Document your test** if needed, and mention it in your Pull Request.
