@@ -99,7 +99,7 @@ make
 3. **Register your test in the `makefile`:**
     - Open the `makefile` in the test subdirectory.
     - Add your test executable or call to the list of tests, as appropriate.
-    - Example (add your test to the `TESTS` variable):
+    - Example (a test calcualting a tsc file for sucrose reading in an hkl file wnd wfn):
       ```
         sucrose_SF:
             $(call RUN_TEST,$@,sucrose_fchk_SF, \
