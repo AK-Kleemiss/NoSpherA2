@@ -208,8 +208,20 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    std::string home = getenv("HOME");
-    return home;
+    const char* home_env = getenv("HOME");
+    if (home_env == nullptr) {
+        std::cerr << "Warning: HOME environment variable not set." << std::endl;
+        return std::filesystem::path("/tmp"); // Fallback to /tmp
+    }
+    
+    std::string home = home_env;
+    // Basic validation: check if it's a valid path and not empty
+    if (home.empty() || home.find_first_of('\0') != std::string::npos) {
+        std::cerr << "Warning: Invalid HOME environment variable." << std::endl;
+        return std::filesystem::path("/tmp"); // Fallback to /tmp
+    }
+    
+    return std::filesystem::path(home);
 #endif
 }
 
@@ -2567,7 +2579,6 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     }
     return false;
 #else
-    char file[1024] = {0};
     std::string command;
     bool use_zenity = (system("which zenity > /dev/null 2>&1") == 0);
     bool use_kdialog = false;
@@ -2630,21 +2641,23 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
         return false;
     }
 
-    if (fgets(file, sizeof(file), f) == NULL) {
+    std::string file_str;
+    char buffer[1024];
+    if (fgets(buffer, sizeof(buffer), f) == NULL) {
         if (debug) std::cout << "File selection cancelled." << std::endl;
         pclose(f);
         return false;
     }
+    file_str = buffer;
 
     int pclose_status = pclose(f);
     if (pclose_status != 0) {
         if (debug) std::cout << (use_zenity ? "Zenity" : "KDialog") << " returned non-zero status: " << pclose_status << ". User might have cancelled." << std::endl;
         // This can happen on cancel, so we check if a file was actually returned.
-        if (strlen(file) == 0) return false;
+        if (file_str.empty()) return false;
     }
 
     // Clean up the path string which might have a newline
-    std::string file_str = file;
     file_str.erase(file_str.find_last_not_of(" \n\r\t")+1);
 
     if (file_str.empty()) {

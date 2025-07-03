@@ -192,9 +192,22 @@ std::vector<std::string> Config::parseVector(const std::string &value)
 }
 
 
-std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int lengh) {
-    std::vector<char> string_out(lengh, '\0');
-    file.read(string_out.data(), lengh);
+std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int length) {
+    // Validate input length
+    if (length <= 0 || length > 1000) { // Reasonable upper limit for string length
+        std::cerr << "Invalid string length: " << length << std::endl;
+        return std::string();
+    }
+    
+    std::vector<char> string_out(length, '\0');
+    file.read(string_out.data(), length);
+    
+    // Check if the read operation succeeded
+    if (!file.good()) {
+        std::cerr << "Error reading string data from file!" << std::endl;
+        return std::string();
+    }
+    
     //Remove null characters from the string
     string_out.erase(std::remove(string_out.begin(), string_out.end(), '\0'), string_out.end());
     return std::string(string_out.begin(), string_out.end());
@@ -203,6 +216,7 @@ std::string SALTED_BINARY_FILE::read_string_remove_NULL(const int lengh) {
 void SALTED_BINARY_FILE::open_file() {
     //Check if file exists and if it is already open
     err_checkf(std::filesystem::exists(filepath), "Couldn't open or find " + filepath.string() + ", leaving", std::cout);
+    err_checkf(std::filesystem::is_regular_file(filepath), "Refusing to open non-regular file: " + filepath.string(), std::cout);
     err_checkf(!file.is_open(), "File already open, leaving", std::cout);
     file.open(filepath, std::ios::in | std::ios::binary);
     err_checkf(file.is_open(), "Couldn't open file: " + filepath.string(), std::cout);
@@ -223,14 +237,35 @@ bool SALTED_BINARY_FILE::read_header() {
 
     //Read number of blocks
     file.read((char*)&numBlocks, sizeof(int));
+    if (!file.good()) {
+        std::cerr << "Error reading number of blocks from file!" << std::endl;
+        return false;
+    }
+    
+    // Validate numBlocks to prevent excessive memory usage or infinite loops
+    if (numBlocks < 0 || numBlocks > 10000) { // Reasonable upper limit
+        std::cerr << "Invalid number of blocks: " << numBlocks << std::endl;
+        return false;
+    }
+    
     if (debug) std::cout << "Number of blocks: " << numBlocks << std::endl;
 
     //Now follows (Chunkname (5b str), location (4b int)) * numBlocks
     // Chunknames that are not 5 bytes long are padded with ' '
     for (int i = 0; i < numBlocks; i++) {
         std::string chunkname = read_string_remove_NULL(5);
+        if (!file.good()) {
+            std::cerr << "Error reading chunk name at block " << i << std::endl;
+            return false;
+        }
+        
         int location;
         file.read((char*)&location, sizeof(int));
+        if (!file.good()) {
+            std::cerr << "Error reading location at block " << i << std::endl;
+            return false;
+        }
+        
         table_of_contents[chunkname] = location;
         if (debug) std::cout << "Chunk: " << chunkname << " at location: " << location << std::endl;
     }

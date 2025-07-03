@@ -594,7 +594,6 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
     CubeLap.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
     CubeESP.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
     CubeHDEF.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
-    CubeDEF.set_comment2("from " + wavy[run.MoleculeFiles[0]].get_path().string());
     CubeRho.set_path(run.Oname + "_rho.cube");
     CubeRDG.set_path(run.Oname + "_rdg.cube");
     CubeElf.set_path(run.Oname + "_elf.cube");
@@ -606,35 +605,47 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
 
     for (int iframe = 0; iframe < run.Frames; iframe++)
     {
-        printf("  *                                                                       *\n");
-        printf("  *   Working on Frame          : %5d /%5d                            * \n", iframe + 1, run.Frames);
+        std::cout << "  *                                                                       *" << std::endl;
+        std::cout << "  *   Working on Frame          : " << std::setw(5) << iframe + 1 << " /" << std::setw(5) << run.Frames << "                            * " << std::endl;
         /*Read file(s) .xyz and find min and max*/
 
         string filenames[2];
 
         if (iframe == 0) { //print Header
-            printf("\n          ___________________________________________________________\n");
-            printf("  *                                                                       *\n");
-            printf("  *   NbFiles                   : %1d                                       *  \n", run.NbFiles);
-            for (int i = 0; i < run.NbFiles; i++)
+            std::cout << "\n          ___________________________________________________________" << std::endl;
+            std::cout << "  *                                                                       *" << std::endl;
+            std::cout << "  *   NbFiles                   : " << std::setw(1) << run.NbFiles << "                                       *  " << std::endl;
+            for (int i = 0; i < run.NbFiles; i++) {
 #ifdef _WIN32
-                printf("  *   MoleculeFile[%2d]          : %-20ls / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename().c_str(), run.NbAtoms[i]);
+                std::wcout << L"  *   MoleculeFile[" << std::setw(2) << i << L"]          : " << std::left << std::setw(20) << wavy[run.MoleculeFiles[i]].get_path().filename().c_str() << L" / " << std::setw(5) << run.NbAtoms[i] << L" atoms      *" << std::endl;
 #else
-                printf("  *   MoleculeFile[%2d]          : %-20s / %5d atoms      *\n", i, wavy[run.MoleculeFiles[i]].get_path().filename().c_str(), run.NbAtoms[i]);
+                std::cout << "  *   MoleculeFile[" << std::setw(2) << i << "]          : " << std::left << std::setw(20) << wavy[run.MoleculeFiles[i]].get_path().filename().string() << " / " << std::setw(5) << run.NbAtoms[i] << " atoms      *" << std::endl;
 #endif
-            printf("  *   OutPut filename Prefix    : %-20s                    *\n", run.Oname.c_str());
-            printf("  *                                                                       *\n");
+            }
+            std::cout << "  *   OutPut filename Prefix    : " << std::setw(20) << run.Oname << "                    *" << std::endl;
+            std::cout << "  *                                                                       *" << std::endl;
 
-            printf("  *   gridBox Min               : %11.6f %11.6f %11.6f     *\n", coordMinMax[0], coordMinMax[1], coordMinMax[2]);
-            printf("  *   gridBox Max               : %11.6f %11.6f %11.6f     *\n", coordMinMax[3], coordMinMax[4], coordMinMax[5]);
-            printf("  *   Increments(bohr)          : %11.6f %11.6f %11.6f     *\n", run.Increments[0], run.Increments[1], run.Increments[2]);
-            printf("  *   NbSteps                   : %11d %11d %11d     *\n", opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2]);
-            printf("  *                                                                       * \n");
+            std::cout << "  *   gridBox Min               : " << std::fixed << std::setprecision(6)
+                << std::setw(11) << coordMinMax[0] << " "
+                << std::setw(11) << coordMinMax[1] << " "
+                << std::setw(11) << coordMinMax[2] << "     *" << std::endl;
+            std::cout << "  *   gridBox Max               : " << std::fixed << std::setprecision(6)
+                << std::setw(11) << coordMinMax[3] << " "
+                << std::setw(11) << coordMinMax[4] << " "
+                << std::setw(11) << coordMinMax[5] << "     *" << std::endl;
+            std::cout << "  *   Increments(bohr)          : " << std::fixed << std::setprecision(6)
+                << std::setw(11) << run.Increments[0] << " "
+                << std::setw(11) << run.Increments[1] << " "
+                << std::setw(11) << run.Increments[2] << "     *" << std::endl;
+            std::cout << "  *   NbSteps                   : " << std::setw(11) << opt.NbSteps[0] << " "
+                << std::setw(11) << opt.NbSteps[1] << " "
+                << std::setw(11) << opt.NbSteps[2] << "     *" << std::endl;
+            std::cout << "  *                                                                       * " << std::endl;
             if (run.NbFiles == 2)
-                printf("  *   Intermolecular            :%5.2f                                    * \n", run.Intermolecular);
+                std::cout << "  *   Intermolecular            :" << std::fixed << std::setprecision(2) << std::setw(5) << run.Intermolecular << "                                    * " << std::endl;
             if (!promolecular) {
-                printf("  *   Number of primitives      :     %5d                               * \n", wavy[run.MoleculeFiles[0]].get_nex());
-                printf("  *   Number of MOs             :     %5d                               * \n", wavy[run.MoleculeFiles[0]].get_nmo());
+                std::cout << "  *   Number of primitives      :     " << std::setw(5) << wavy[run.MoleculeFiles[0]].get_nex() << "                               * " << std::endl;
+                std::cout << "  *   Number of MOs             :     " << std::setw(5) << wavy[run.MoleculeFiles[0]].get_nmo() << "                               * " << std::endl;
             }
             if (run.Frames > 1) {
                 ignore_RDG.resize(opt.NbSteps[0]);
@@ -788,11 +799,11 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                         if (opt.esp) persistant_cube_ESP[0].set_value(x, y, z, persistant_cube_ESP[0].get_value(x, y, z) + CubeESP.get_value(x, y, z));
                         //if (opt.dodef) persistant_cube_def[i] += CubeDEF[i];
                     }
-            if (opt.debug) printf("\nFinished frame %d, count_100= %d, count_0= %d\n", iframe, counter_100, z_counter);
+            if (opt.debug) std::cout << "\nFinished frame " << iframe << ", count_100= " << counter_100 <<", count_0= " << z_counter << "\n";
         }
     } //END FRAMES
 
-    if (opt.debug) printf("Finished with all frames!\n");
+    if (opt.debug) std::cout <<"Finished with all frames!\n";
     if (run.Frames > 1) {
         if (opt.debug) cout << "Now making averages and RDG from calculated rho and gradients\n" << endl;
         for (int x = 0; x < opt.NbSteps[0]; x++)
@@ -819,8 +830,7 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
                     //if (opt.doef) persistant_cube_EF[i] /= opt.Frames;
                     //if (opt.dodef) persistant_cube_def[i] /= opt.Frames;
                 }
-        if (opt.debug) printf("\n\n100_counter= %d, points in vector= %d, frames= %d, negative signs= %d\n",
-            counter_100, opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2], run.Frames, negative_signs);
+        if (opt.debug) std::cout << "\n\n100_counter= " << counter_100 << ", points in vector= " << opt.NbSteps[0] * opt.NbSteps[1] * opt.NbSteps[2] << ", frames= " << run.Frames << ", negative signs= "<< negative_signs << "\n";
         if (opt.rdg)
             for (int x = 0; x < opt.NbSteps[0]; x++)
                 for (int y = 0; y < opt.NbSteps[1]; y++)
@@ -839,8 +849,8 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
     /*if (opt.Output == 1 || opt.Output == 3)
     {
         if(opt.dorho && opt.dordg){
-            printf("  *                                                                       *\n");
-            printf("  *   Writing .dat file ...                                               *\n");
+            std::cout << "  *                                                                       *\n";
+            std::cout << "  *   Writing .dat file ...                                               *\n";
             if(opt.Frames>1)
                 outdat(opt.Oname.c_str(),
                         opt.Cutoffs,
@@ -857,8 +867,8 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
     }*/
     if (run.Output == 2 || run.Output == 3)
     {
-        printf("  *                                                                       *\n");
-        printf("  *   Writing .cube files ...                                             *\n");
+        std::cout << "  *                                                                       *\n";
+        std::cout << "  *   Writing .cube files ...                                             *\n";
         if (run.Frames > 1) {
             if (opt.rho && !opt.rdg) {
                 persistant_cube_rho[0].set_path(run.Oname + "_rho.cube");
@@ -917,9 +927,9 @@ int acu_nci(std::vector<WFN>& wavy, options& opt) {
         //if(opt.dodef) wavy[opt.MoleculeFiles[0]].push_back_cube(opt.Oname + "-def.cube", false, false);
     }
 
-    printf("  *                                                                       *\n");
-    printf("  *                                                                       *\n");
-    printf("          __________________________________________________________\n\n\n\n");
+    std::cout << "  *                                                                       *" << std::endl;
+    std::cout << "  *                                                                       *" << std::endl;
+    std::cout << "          __________________________________________________________" << std::endl << std::endl << std::endl;
     return 0;
 }
 
@@ -1727,7 +1737,22 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                 selection.resize(2);
                                 selection[0].resize(1);
                                 selection[1].resize(1);
-                                select_cubes(selection, wavy, 1);
+                                if (!expert) select_cubes(selection, wavy, 1);
+                                else {
+                                    int nr1 = 0;
+                                    for (int i = 0; i < wavy[selection[0][0]].get_cube_count(); i++) {
+                                        std::cout << " " << i << ") " << wavy[activewave].get_cube_path(i);
+                                        if (!exists(wavy[activewave].get_cube_path(i)))std::cout << " (MEM ONLY)";
+                                        std::cout << endl;
+                                    }
+                                    std::cout << "Cube 1: "; cin >> nr1;
+                                    while (nr1 >= wavy[activewave].get_cube_count() || nr1 < 0) {
+                                        std::cout << "Invalid choice, select again: ";
+                                        std::cin >> nr1;
+                                    }
+                                    selection[0][0] = activewave;
+                                    selection[1][0] = nr1;
+                                }
                             }
                             std::filesystem::path path = wavy[selection[0][0]].get_cube_path(selection[1][0]);
                             if (!wavy[selection[0][0]].get_cube_loaded(selection[1][0]))
@@ -1742,7 +1767,22 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                 selection.resize(2);
                                 selection[0].resize(1);
                                 selection[1].resize(1);
-                                select_cubes(selection, wavy, 1);
+                                if (!expert) select_cubes(selection, wavy, 1);
+                                else {
+                                    int nr1 = 0;
+                                    for (int i = 0; i < wavy[selection[0][0]].get_cube_count(); i++) {
+                                        std::cout << " " << i << ") " << wavy[activewave].get_cube_path(i);
+                                        if (!exists(wavy[activewave].get_cube_path(i)))std::cout << " (MEM ONLY)";
+                                        std::cout << endl;
+                                    }
+                                    std::cout << "Cube 1: "; cin >> nr1;
+                                    while (nr1 >= wavy[activewave].get_cube_count() || nr1 < 0) {
+                                        std::cout << "Invalid choice, select again: ";
+                                        std::cin >> nr1;
+                                    }
+                                    selection[0][0] = activewave;
+                                    selection[1][0] = nr1;
+                                }
                             }
                             std::filesystem::path path = wavy[selection[0][0]].get_cube_path(selection[1][0]);
                             if (!wavy[selection[0][0]].get_cube_loaded(selection[1][0]))
