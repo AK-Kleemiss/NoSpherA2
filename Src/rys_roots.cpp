@@ -3784,8 +3784,7 @@ static int rys_wheeler_partial(int n, double *alpha, double *beta, double *momen
             // very likely we will get numerical issues
             if (!first_seen || b[i] < 0.)
             {
-                fprintf(stderr, "libcint rys_wheeler singular value n=%d i=%d b=%g\n",
-                        n, i, b[i]);
+                std::cerr << "libcint rys_wheeler singular value n=" << n << " i=" << i << " b=" << b[i] << "\n";
                 for (i = 0; i < n; i++)
                 {
                     roots[i] = 0;
@@ -3992,8 +3991,7 @@ static int lrys_wheeler_partial(int n, long double *alpha, long double *beta, lo
             // very likely we will get numerical issues
             if (!first_seen || b[i] < 0.)
             {
-                fprintf(stderr, "libcint lrys_wheeler singular value n=%d i=%d b=%g\n",
-                        n, i, (double)b[i]);
+                std::cerr << "libcint lrys_wheeler singular value n=" << n << " i=" << i << " b=" << (double)b[i] << "\n";
                 for (i = 0; i < n; i++)
                 {
                     roots[i] = 0;
@@ -4648,7 +4646,7 @@ static int _dlasq2(int n, double *work, double *diag, double *diag_off)
 
         if (qmin < 0 || emax < 0)
         {
-            fprintf(stderr, "dlasq2: qmin < 0 or emax < 0");
+            std::cerr << "dlasq2: qmin < 0 or emax < 0" << std::endl;
             return 1;
         }
 
@@ -4756,7 +4754,7 @@ static int _dlasq2(int n, double *work, double *diag, double *diag_off)
         if (iwhilb == nbig)
         {
             // TODO: not converged. raise error
-            fprintf(stderr, "dlasq2: Maximum number of iterations exceeded");
+            std::cerr << "dlasq2: Maximum number of iterations exceeded" << std::endl;
             return 2;
         }
     }
@@ -4994,7 +4992,7 @@ static int _compute_eigenvalues(int n, double *diag, double *diag_off1,
         {
             if (work[i] < 0.)
             {
-                fprintf(stderr, "dlarre: negative eigenvalues\n");
+                std::cerr << "dlarre: negative eigenvalues\n";
                 return -6;
             }
         }
@@ -5072,7 +5070,7 @@ static int _dlarrf(int n, double *diag, double *diag_off1, double *ld, int clstr
 
     if (max1 > FAIL_THRESHOLD)
     {
-        fprintf(stderr, "dlarrf max1 = %g", max1);
+        std::cerr << "dlarrf max1 = " << max1 << std::endl;
         return 1;
     }
     return 0;
@@ -5784,8 +5782,7 @@ static int R_dnode(double *a, double *roots, int order)
         }
         if (p0 * p1init > 0)
         {
-            fprintf(stderr, "ROOT NUMBER %d WAS NOT FOUND FOR POLYNOMIAL OF ORDER %d\n",
-                    m, order);
+            std::cerr << "ROOT NUMBER " << m << " WAS NOT FOUND FOR POLYNOMIAL OF ORDER " << order << "\n";
             return 1;
         }
         if (x0 <= x1init)
@@ -5821,7 +5818,7 @@ static int R_dnode(double *a, double *roots, int order)
             n++;
             if (n > 200)
             {
-                fprintf(stderr, "libcint::rys_roots NO CONV. IN R_dnode\n");
+                std::cerr << "libcint::rys_roots NO CONV. IN R_dnode\n";
                 return 1;
             }
             POLYNOMIAL_VALUE1(pi, a, order, xi);
@@ -6012,7 +6009,7 @@ static int _hessenberg_qr(double *A, int nroots)
             {
                 if (n1 == 2)
                 {
-                    fprintf(stderr, "hessenberg_qr: failed to find real roots\n");
+                    std::cerr << "hessenberg_qr: failed to find real roots\n";
                     return 1;
                 }
                 shift = t * .5;
@@ -6021,12 +6018,12 @@ static int _hessenberg_qr(double *A, int nroots)
             _qr_step(A, nroots, n0, n1, shift);
             if (its > maxits)
             {
-                fprintf(stderr, "hessenberg_qr: failed to converge after %d steps\n", its);
+                std::cerr << "hessenberg_qr: failed to converge after " << its << " steps\n";
                 return 1;
             }
         }
     }
-    fprintf(stderr, "hessenberg_qr failed\n");
+    std::cerr << "hessenberg_qr failed\n";
     return 1;
 }
 
@@ -6191,8 +6188,7 @@ void CINTrys_roots(int nroots, double x, double *u, double *w)
     }
     if (err)
     {
-        fprintf(stderr, "rys_roots fails: nroots=%d x=%g\n",
-                nroots, x);
+        std::cerr << "rys_roots fails: nroots=" << nroots << " x=" << x << "\n";
 #ifndef KEEP_GOING
         exit(err);
 #endif
@@ -6380,15 +6376,14 @@ void CINTsr_rys_roots(int nroots, double x, double lower, double *u, double *w)
         err = segment_solve1(nroots, x, lower, u, w, 0.25, 0.35, 60, CINTqrys_jacobi, CINTqrys_laguerre, CINTqrys_jacobi);
         break;
     default:
-        fprintf(stderr, "libcint SR-rys_roots does not support nroots=%d\n", nroots);
+        std::cerr << "libcint SR-rys_roots does not support nroots=" << nroots << "\n";
 #ifndef KEEP_GOING
         exit(1);
 #endif
     }
     if (err)
     {
-        fprintf(stderr, "sr_rys_roots fails: nroots=%d x=%.15g lower=%.15g\n",
-                nroots, x, lower);
+        std::cerr << "sr_rys_roots fails: nroots=" << nroots << " x=" << x << " lower=" << lower << "\n";
 #ifndef KEEP_GOING
         exit(err);
 #endif
@@ -9917,7 +9912,7 @@ static int R_dsmit(double *cs, double *fmt_ints, int n)
     tmp = fmt_ints[2] + fac * fmt_ints[1];
     if (tmp <= 0)
     {
-        fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=1)\n", n - 1);
+        std::cerr << "libcint::rys_roots negative value in sqrt for roots " << n - 1 << " (j=1)\n";
         SET_ZERO(cs, n, 1);
         return 1;
     }
@@ -9955,7 +9950,7 @@ static int R_dsmit(double *cs, double *fmt_ints, int n)
             {
                 return 0;
             }
-            fprintf(stderr, "libcint::rys_roots negative value in sqrt for roots %d (j=%d)\n", n - 1, j);
+            std::cerr << "libcint::rys_roots negative value in sqrt for roots " << n - 1 << " (j=" << j << ")\n";
             return j;
         }
         fac = 1 / sqrt(fac);
@@ -10093,7 +10088,7 @@ int R_lsmit(long double *cs, long double *fmt_ints, int n)
     tmp = fmt_ints[2] + fac * fmt_ints[1];
     if (tmp <= 0)
     {
-        fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=1)\n", n - 1);
+        std::cerr << "libcint::rys_roots negative value in sqrtl for roots " << n - 1 << " (j=1)\n";
         SET_ZERO(cs, n, 1);
         return 1;
     }
@@ -10131,7 +10126,7 @@ int R_lsmit(long double *cs, long double *fmt_ints, int n)
             {
                 return 0;
             }
-            fprintf(stderr, "libcint::rys_roots negative value in sqrtl for roots %d (j=%d)\n", n - 1, j);
+            std::cerr << "libcint::rys_roots negative value in sqrtl for roots " << n - 1 << " (j=" << j << ")\n";
             return j;
         }
         fac = 1 / SQRTL(fac);

@@ -1464,7 +1464,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -2639,6 +2639,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             rf.seekg(32, ios::beg);
             long int ECP_start = 0;
             rf.read((char *)&ECP_start, sizeof(ECP_start));
+            err_checkf(rf.good(), "Error reading center in ECPs", file);
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
                 file << "I read the pointer of ECP successfully" << endl;
@@ -2648,6 +2649,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             const int soi = 4;
             const int sod = 8;
             rf.read((char *)&i1, 8);
+            err_checkf(rf.good(), "Error reading center in ECPs", file);
             file << "First line: " << i1 << endl;
             for (int i = 0; i < i1; i++)
             {
@@ -2664,28 +2666,51 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 double e = 0;
                 double c = 0;
                 rf.read((char *)&Z, soi);
+                err_checkf(Z > 0, "Error reading Z in ECPs", file);
+                err_checkf(rf.good(), "Error reading Z in ECPs", file);
                 rf.read((char *)&temp_0, soi);
+                err_checkf(temp_0 > 0, "Error reading temp_0 in ECPs", file);
+                err_checkf(rf.good(), "Error reading temp_0 in ECPs", file);
                 char *temp_c = new char[temp_0];
                 rf.read(temp_c, temp_0);
+                err_checkf(rf.good(), "Error reading temp_c in ECPs", file);
                 rf.read((char *)&nr_core, soi);
+                err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
+                err_checkf(rf.good(), "Error reading nr_core in ECPs", file);
                 atoms[i].set_ECP_electrons(nr_core);
                 rf.read((char *)&max_contract, soi);
+                err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
+                err_checkf(rf.good(), "Error reading max_contract in ECPs", file);
                 rf.read((char *)&max_angular, soi);
+                err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
+                err_checkf(rf.good(), "Error reading max_angular in ECPs", file);
                 rf.read((char *)&center, soi);
+                err_checkf(center > 0, "Error reading center in ECPs", file);
+                err_checkf(rf.good(), "Error reading center in ECPs", file);
                 file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
                 for (int l = 0; l < max_angular; l++)
                 {
                     rf.read((char *)&exps, soi);
+                    err_checkf(exps > 0, "Error reading exps in ECPs", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     rf.read((char *)&type, soi);
+                    err_checkf(type >= 0, "Error reading type in ECPs", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     err_checkf(type < 200, "This type will give me a headache...", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     file << "There are " << exps << " exponents of type " << type << " for angular momentum " << l << endl;
                     for (int fun = 0; fun < exps; fun++)
                     {
 
                         rf.read((char *)&n, sod);
-                        rf.read((char *)&c, sod);
-                        rf.read((char *)&e, sod);
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
+                        rf.read((char *)&c, sod);
+                        err_checkf(c < 200, "This Coefficient will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
+                        rf.read((char *)&e, sod);
+                        err_checkf(e < 200, "This Exponent will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
                         file << fun << " " << c << " " << e << " " << n << endl;
                         ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
                     }

@@ -61,8 +61,10 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
         for (int i = 0; i < 3; i++)
         {
             k_points_file.read((char *)&temp, sizeof(temp));
+            err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
             k_pt[i].emplace_back(temp[0]);
             k_points_file.read((char *)&hkl_temp, sizeof(hkl_temp));
+            err_checkf(!k_points_file.bad(), "Error reading hkl values from k-points file!", file);
             hkl_[i] = hkl_temp[0];
         }
         hkl.emplace(hkl_);

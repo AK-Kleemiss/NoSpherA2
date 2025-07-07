@@ -52,14 +52,12 @@ int compute_dens(WFN& wavy, bool debug, int* np, double* origin, double* gvector
     std::cout << "  *.  OutPut filename Prefix    : " << std::setw(40) << Oname << "*.\n";
     std::cout << "  *.                                                                      *.\n";
     std::cout << "  *.  gridBox Min               : " << std::setw(11) << std::setprecision(6) << origin[0] << std::setw(12) << origin[1] << origin[2] << "     *.\n";
-    std::cout << "  *.  gridBox Max               : %11.6f %11.6f %11.6f     *.\n", origin[0] + gvector[0] * np[0] + gvector[3] * np[1] + gvector[6] * np[2], origin[1] + gvector[1] * np[0] + gvector[4] * np[1] + gvector[7] * np[2], origin[2] + gvector[2] * np[0] + gvector[5] * np[1] + gvector[8] * np[2];
-    printf("  *.  Increments(bohr)          : %11.6f %11.6f %11.6f     *.\n", sqrt(pow(gvector[0], 2) + pow(gvector[1], 2) + pow(gvector[2], 2)),
-        sqrt(pow(gvector[3], 2) + pow(gvector[4], 2) + pow(gvector[5], 2)),
-        sqrt(pow(gvector[6], 2) + pow(gvector[7], 2) + pow(gvector[8], 2)));
-    printf("  *.  NbSteps                   : %11d %11d %11d     *.\n", opt.NbSteps[0], opt.NbSteps[1], opt.NbSteps[2]);
+    std::cout << "  *.  gridBox Max               : " << std::setw(11) << std::setprecision(6) << (origin[0] + gvector[0] * np[0] + gvector[3] * np[1] + gvector[6] * np[2]) << std::setw(12) << (origin[1] + gvector[1] * np[0] + gvector[4] * np[1] + gvector[7] * np[2]) << (origin[2] + gvector[2] * np[0] + gvector[5] * np[1] + gvector[8] * np[2]) << "     *.\n";
+    std::cout << "  *.  Increments(bohr)          : " << std::setw(11) << std::setprecision(6) << sqrt(pow(gvector[0], 2) + pow(gvector[1], 2) + pow(gvector[2], 2)) << std::setw(12) << sqrt(pow(gvector[3], 2) + pow(gvector[4], 2) + pow(gvector[5], 2)) << std::setw(12) << sqrt(pow(gvector[6], 2) + pow(gvector[7], 2) + pow(gvector[8], 2)) << "     *.\n";
+    std::cout << "  *.  NbSteps                   : " << std::setw(11) << opt.NbSteps[0] << std::setw(12) << opt.NbSteps[1] << std::setw(12) << opt.NbSteps[2] << "     *.\n";
     std::cout << "  *.                                                                      *.\n";
-    printf("  *.  Number of primitives      :     %5d                               *.\n", wavy.get_nex());
-    printf("  *.  Number of MOs             :       %3d                               *.\n", wavy.get_nmo());
+    std::cout << "  *.  Number of primitives      :     " << std::setw(5) << wavy.get_nex() << "                               *.\n";
+    std::cout << "  *.  Number of MOs             :       " << std::setw(3) << wavy.get_nmo() << "                               *.\n";
 
     cube dummy(0,0,0);
     Calc_Prop(
@@ -182,10 +180,10 @@ bond do_bonds(WFN &wavy,
     }
     if(debug)
     {
-        std:: cout << "Your three vectors are:\n";
-        printf("X= %f %f %f\n",x[0],x[1],x[2]);
-        printf("Y= %f %f %f\n",y[0],y[1],y[2]);
-        printf("Z= %f %f %f\n",z[0],z[1],z[2]);
+        std::cout << "Your three vectors are:\n";
+        std::cout << "X= " << x[0] << " " << x[1] << " " << x[2] << "\n";
+        std::cout << "Y= " << y[0] << " " << y[1] << " " << y[2] << "\n";
+        std::cout << "Z= " << z[0] << " " << z[1] << " " << z[2] << "\n";
         std::cout << "From here on mode_leng and cub are used\n";
     }
     for(int r=0;r<3;r++)
