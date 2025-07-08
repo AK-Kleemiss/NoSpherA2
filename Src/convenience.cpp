@@ -2736,7 +2736,6 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
         }
     }
 #else
-    char file[1024];
     std::string command;
     command = "zenity --file-selection --title=\"Select where to save\" --filename=\"";
     command += current_path;
@@ -2749,7 +2748,12 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
             std::cout << "ERROR" << std::endl;
             return false;
         }
-        if (fgets(file, 1024, f) == NULL) 
+        std::string file;
+        char buf[256];
+        while (fgets(buf, sizeof(buf), f)) {
+            file += buf;
+        }
+        if (file.empty())
             return false;
         if (debug) 
             std::cout << "Filename: " << file << std::endl;
@@ -2909,7 +2913,12 @@ void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *da
 {
     for (size_t i = 0; i < len; ++i)
     {
-        buffer[bitlen / 8 % 64] = data[i];
+        size_t buf_idx = (bitlen / 8) % 64;
+        if (buf_idx >= 64) {
+            std::cerr << "Buffer overflow detected in sha256_update!" << std::endl;
+            return;
+        }
+        buffer[buf_idx] = data[i];
         bitlen += 8;
         if (bitlen % 512 == 0)
         {
@@ -2923,11 +2932,19 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 {
     size_t i = bitlen / 8 % 64;
 
+    if (i >= 64) {
+        std::cerr << "Buffer overflow detected in sha256_final (initial)!" << std::endl;
+        return;
+    }
     buffer[i++] = 0x80;
     if (i > 56)
     {
         while (i < 64)
         {
+            if (i >= 64) {
+                std::cerr << "Buffer overflow detected in sha256_final (padding)!" << std::endl;
+                return;
+            }
             buffer[i++] = 0x00;
         }
         sha256_transform(state, buffer);
@@ -2936,15 +2953,24 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 
     while (i < 56)
     {
+        if (i >= 64) {
+            std::cerr << "Buffer overflow detected in sha256_final (final padding)!" << std::endl;
+            return;
+        }
         buffer[i++] = 0x00;
     }
 
+    // memcpy to buffer + 56 is safe as buffer is 64 bytes
     bitlen = custom_bswap_64(bitlen);
     memcpy(buffer + 56, &bitlen, 8);
     sha256_transform(state, buffer);
 
     for (i = 0; i < 8; ++i)
     {
+        if ((i * 4 + 4) > 32) {
+            std::cerr << "Buffer overflow detected in sha256_final (hash write)!" << std::endl;
+            return;
+        }
         state[i] = custom_bswap_32(state[i]);
         memcpy(hash + i * 4, &state[i], 4);
     }
