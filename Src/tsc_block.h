@@ -296,9 +296,9 @@ public:
         scatterer[new_nr] = rhs.get_scatterer(s, log);
       }
     }
-    int sc_sf = sf.size();
-    int nr_hkl_sf = sf[0].size();
-    for(int i=0; i<sf.size(); i++) {
+    size_t sc_sf = sf.size();
+    size_t nr_hkl_sf = sf[0].size();
+    for(size_t i=0; i<sc_sf; i++) {
       if (sf[i].size() != nr_hkl_sf) {
         std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append" << std::endl;
         return;
@@ -351,9 +351,9 @@ public:
         scatterer[new_nr] = rhs.get_scatterer(s, log);
       }
     }
-    int sc_sf = sf.size();
-    int nr_hkl_sf = sf[0].size();
-    for(int i=0; i<sf.size(); i++) {
+    int64_t sc_sf = sf.size();
+    int64_t nr_hkl_sf = sf[0].size();
+    for(int64_t i=0; i<sc_sf; i++) {
       if (sf[i].size() != nr_hkl_sf) {
         std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append2" << std::endl;
         return;
@@ -423,7 +423,7 @@ public:
   void write_tscb_file(std::filesystem::path cif_name = "test.cif", std::filesystem::path name = "experimental.tscb")
   {
     try {  // Wrap in try-catch to help identify where segfaults occur
-      std::cerr << "Starting writing of tscb file!" << std::endl;
+      //std::cerr << "Starting writing of tscb file!" << std::endl;
       
       // Remove the file if it exists
       if (std::filesystem::exists(name)) {
@@ -451,7 +451,7 @@ public:
       std::string sc;
       try {
         sc = scatterers_string();
-        std::cerr << "Got scatterers string, length: " << sc.size() << std::endl;
+        //std::cerr << "Got scatterers string, length: " << sc.size() << std::endl;
       } catch (const std::exception& e) {
         std::cerr << "Exception in scatterers_string(): " << e.what() << std::endl;
         tsc_file.close();
@@ -487,7 +487,7 @@ public:
       }
       
       int nr_hkl[1] = {static_cast<int>(index[0].size())};
-      std::cerr << "Number of HKL indices: " << nr_hkl[0] << std::endl;
+      //std::cerr << "Number of HKL indices: " << nr_hkl[0] << std::endl;
       
       tsc_file.write((char *)&nr_hkl, sizeof(nr_hkl));
       tsc_file.flush();
@@ -495,23 +495,22 @@ public:
       
       // Safely get scatterer size
       const int scat_size = scatterer_size();
-      std::cerr << "Scatterer size: " << scat_size << std::endl;
+      //std::cerr << "Scatterer size: " << scat_size << std::endl;
       
-
-      int sc_sf = sf.size();
-      int nr_hkl_sf = sf[0].size();
-      for(int i=0; i<sf.size(); i++) {
-        if (sf[i].size() != nr_hkl_sf) {
-          std::cerr << "Error: Inconsistent size in sf for scatterer " << i << std::endl;
-          tsc_file.close();
-          return;
-        }
-      }
+      int64_t sc_sf = sf.size();
+      int64_t nr_hkl_sf = sf[0].size();
       // Validate sf dimensions
       if (sf.empty() || sc_sf < scat_size || nr_hkl_sf < nr_hkl[0]) {
         std::cerr << "Error: Structure factor array has invalid dimensions" << std::endl;
         tsc_file.close();
         return;
+      }
+      for(int64_t i=0; i<sc_sf; i++) {
+        if (sf[i].size() != nr_hkl_sf) {
+          std::cerr << "Error: Inconsistent size in sf for scatterer " << i << std::endl;
+          tsc_file.close();
+          return;
+        }
       }
 
       for (int run = 0; run < nr_hkl[0]; run++)
@@ -547,11 +546,11 @@ public:
       // Final flush and close
       tsc_file.flush();
       tsc_file.close();
-      std::cerr << "File closed successfully" << std::endl;
+      //std::cerr << "File closed successfully" << std::endl;
       
       // Verify the file was written correctly
       if (std::filesystem::exists(name)) {
-        std::cerr << "Successfully wrote " << std::filesystem::file_size(name) << " bytes to " << name << std::endl;
+        //std::cerr << "Successfully wrote " << std::filesystem::file_size(name) << " bytes to " << name << std::endl;
       } else {
         std::cerr << "Error: File not created successfully" << std::endl;
       }

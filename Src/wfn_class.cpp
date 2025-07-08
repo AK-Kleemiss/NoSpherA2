@@ -1759,7 +1759,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -2210,7 +2210,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (int a = 0; a < ncen; a++)
         {
             int current_shell = -1;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -3274,7 +3274,7 @@ double WFN::count_nr_electrons(void) const
 
 const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_exponent(nr_prim);
     else
         return -1;
@@ -3282,7 +3282,7 @@ const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_
 
 const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_coefficient(nr_prim);
     else
         return -1;
@@ -3290,7 +3290,7 @@ const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &
 
 bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
     {
         atoms[nr_atom].set_basis_set_exponent(nr_prim, value);
         set_modified();
@@ -3302,7 +3302,7 @@ bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim,
 
 bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
+    err_checkf(nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
     atoms[nr_atom].set_basis_set_coefficient(nr_prim, value);
     set_modified();
     return true;
@@ -3328,7 +3328,7 @@ const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned i
 
 const int WFN::get_atom_primitive_type(const int& nr_atom, const int& nr_prim) const
 {
-    if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].get_basis_set_size() && nr_prim >= 0)
+    if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < (int)atoms[nr_atom].get_basis_set_size() && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_type(nr_prim);
     else
         return -1;
@@ -3390,8 +3390,8 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
         int primitive_counter = 0;
-        for (int a = 0; a < static_cast<int>(nr_atom); a++)
-            for (int s = 0; s < atoms[a].get_shellcount_size(); s++)
+        for (unsigned int a = 0; a < nr_atom; a++)
+            for (unsigned int s = 0; s < atoms[a].get_shellcount_size(); s++)
                 switch (get_shell_type(a, s))
                 {
                 case 1:
@@ -3407,7 +3407,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
                     primitive_counter += (10 * atoms[a].get_shellcount(s));
                     break;
                 }
-        for (int s = 0; s < static_cast<int>(nr_shell); s++)
+        for (unsigned int s = 0; s < nr_shell; s++)
         {
             switch (get_shell_type(nr_atom, s))
             {
@@ -7036,7 +7036,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         ss << "]\n";
         ss << "    'exponent_unit': 'a.u.'\n";
         ss << "    'primitive_exponents': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
+        for (unsigned int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
             ss << atoms[atoms_with_type[i]].get_basis_set_exponent(j);
             if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)
@@ -7046,7 +7046,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         }
         ss << "]\n";
         ss << "    'primitive_coefficients': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
+        for (unsigned int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
             ss << atoms[atoms_with_type[i]].get_basis_set_coefficient(j);
             if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)

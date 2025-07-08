@@ -983,7 +983,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
             const atom ai = wave.get_atom(i);
             alpha_max[i] = 0.0;
             max_l[i] = 0;
-            for (int b = 0; b < ai.get_basis_set_size(); b++)
+            for (unsigned int b = 0; b < ai.get_basis_set_size(); b++)
             {
                 if (ai.get_basis_set_exponent(b) > alpha_max[i])
                     alpha_max[i] = ai.get_basis_set_exponent(b) * 2;
@@ -1021,7 +1021,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
         for (int i = 0; i < wave.get_ncen(); i++)
         {
             const atom ai = wave.get_atom(i);
-            for (int b = 0; b < ai.get_basis_set_size(); b++)
+            for (unsigned int b = 0; b < ai.get_basis_set_size(); b++)
             {
                 int l = ai.get_basis_set_type(b);
                 if (ai.get_basis_set_exponent(b) < alpha_min[i][l])
@@ -3088,9 +3088,11 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     // Remove all unneccecary atoms from wavy only if it is not the first calculation
     if (nr != 0)
     {
+        err_checkf(constant_atoms.size() <= SP.wavy.get_ncen(),
+                   "There are more constant atoms than atoms in the wavefunction! This should not happen!", file);
         // We need coeffs for the atoms and coeff seperateley
-        unsigned int current_coef_index = coefs.size();
-        for (unsigned int i = constant_atoms.size() - 1; i >= 0; i--)
+        size_t current_coef_index = coefs.size();
+        for (int i = static_cast<int>(constant_atoms.size()) - 1; i >= 0; i--)
         {
             // Count up all coeffs for one atom
             const int lim = (int)SP.wavy.get_atom_basis_set_size(i);
@@ -3747,7 +3749,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     result.write_tsc_file_non_integer(opt.cif);
 }
 
-ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
+ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
     grid.resize(wavy.get_ncen());
     bvec needs_grid(wavy.get_ncen(), true);
     const int nr_of_atoms = (wavy.get_ncen());
