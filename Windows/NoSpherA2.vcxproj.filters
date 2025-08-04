@@ -263,6 +263,9 @@
     <ClInclude Include="..\Src\bondwise_analysis.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
+    <ClInclude Include="..\Src\scatterer_id.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml">

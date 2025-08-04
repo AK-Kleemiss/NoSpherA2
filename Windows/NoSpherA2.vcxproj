@@ -12782,6 +12782,7 @@
     <ClInclude Include="..\Src\SALTED_io.h" />
     <ClInclude Include="..\Src\SALTED_predictor.h" />
     <ClInclude Include="..\Src\SALTED_utilities.h" />
+    <ClInclude Include="..\Src\scatterer_id.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\.github\workflows\c-cpp_all.yml" />
