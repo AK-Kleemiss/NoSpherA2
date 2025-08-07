@@ -3012,9 +3012,16 @@ tsc_block<int, cdouble> thakkar_sfac(
         file << endl
              << "SFs are made, now just write them!" << endl;
 
+    //Use better IDs for labels
+    svec better_labels(labels.size());
+    for (int i = 0; i < labels.size(); i++)
+    {
+        better_labels[i] = std::to_string(better_IDs[i]);
+    }
+
     tsc_block<int, cdouble> blocky(
         sf,
-        labels,
+        better_labels,
         hkl);
 
     return blocky;
@@ -3252,7 +3259,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
         vector<WFN> tempy;
         tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
-        tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
+        tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, better_labels, tempy, 0);
         blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
@@ -3450,10 +3457,18 @@ itsc_block calculate_scattering_factors_RI_fit(
                       unit_cell,
                       hkl);
     }
+    
+    //Use better IDs for labels
+    svec better_labels(labels.size());
+    for (int i = 0; i < labels.size(); i++)
+    {
+        better_labels[i] = std::to_string(better_IDs[i]);
+    }
+
 
     tsc_block<int, cdouble> blocky(
         sf,
-        labels,
+        better_labels,
         hkl);
 
     time_points.push_back(get_time());
@@ -3656,9 +3671,16 @@ tsc_block<int, cdouble> calculate_scattering_factors(
                       hkl);
     }
 
+    //Use better IDs for labels
+    svec better_labels(labels.size());
+    for (int i = 0; i < labels.size(); i++)
+    {
+        better_labels[i] = std::to_string(better_IDs[i]);
+    }
+
     tsc_block<int, cdouble> blocky(
         sf,
-        labels,
+        better_labels,
         hkl);
 
     time_points.push_back(get_time());
@@ -3822,7 +3844,13 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
         }
     }
     delete (progress);
-    tsc_block<double, cdouble> result(sf, labels, hkl);
+    //Use better IDs for labels
+    svec better_labels(labels.size());
+    for (int i = 0; i < labels.size(); i++)
+    {
+        better_labels[i] = std::to_string(better_IDs[i]);
+    }
+    tsc_block<double, cdouble> result(sf, better_labels, hkl);
     result.write_tsc_file_non_integer(opt.cif);
 }
 
