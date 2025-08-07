@@ -345,7 +345,7 @@ public:
       {
         unsigned int new_nr = old_size;
         for (int run = 0; run < s; run++)
-          if (is_new[s])
+          if (is_new[run])
             new_nr++;
         sf[new_nr] = rhs.get_sf_for_scatterer(s, log);
         scatterer[new_nr] = rhs.get_scatterer(s, log);
@@ -440,10 +440,12 @@ public:
       
       int head[1] = {static_cast<int>(header.size())};
       tsc_file.write((char *)&head, sizeof(head));
+      size_t test = sizeof(head);
       tsc_file.flush(); 
       err_checkf(tsc_file.good(), "Problem with tsc file writing header size", std::cout);
       
       tsc_file.write(header.c_str(), head[0] * sizeof(char));
+      test = head[0] * sizeof(char);
       tsc_file.flush();
       err_checkf(tsc_file.good(), "Problem with tsc file writing header content", std::cout);
       
@@ -465,10 +467,12 @@ public:
       
       head[0] = static_cast<int>(sc.size());
       tsc_file.write((char *)&head, sizeof(head));
+      test = sizeof(head);
       tsc_file.flush();
       err_checkf(tsc_file.good(), "Problem with tsc file writing scatterers size", std::cout);
       
       tsc_file.write(sc.c_str(), head[0] * sizeof(char));
+      test = head[0] * sizeof(char);
       tsc_file.flush();
       err_checkf(tsc_file.good(), "Problem with tsc file writing scatterers content", std::cout);
 

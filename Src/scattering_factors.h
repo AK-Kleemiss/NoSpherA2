@@ -176,6 +176,7 @@ svec read_atoms_from_CIF(
     ivec &asym_atom_to_type_list,
     ivec &asym_atom_list,
     bvec &needs_grid,
+    std::vector<uint64_t>& better_IDs,
     std::ostream &file,
     bvec &constant_atoms,
     const bool SALTED = false,

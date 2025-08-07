@@ -127,6 +127,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
+    std::vector<uint64_t> better_IDs;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[0],
@@ -137,6 +138,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+                                      better_IDs,
                                       std::cout,
                                       constant_atoms,
                                       opt.debug);

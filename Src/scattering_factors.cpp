@@ -551,6 +551,64 @@ void generate_fractional_hkl(const double &dmin,
     file << "Nr of reflections to be used: " << setw(20) << hkl.size() << endl;
 }
 
+
+/*
+* Helper function to calculate a scatterer ID based on the element and fractional coordinates
+*/
+struct scatterer_id_masks_d2 {
+    const static uint64_t
+        z_mask = 0x00000000000000FF,
+        a_mask = 0x0000000001FFFF00,
+        b_mask = 0x000003FFFE000000,
+        c_mask = 0x07FFFC0000000000,
+        a_sig = 0x0800000000000000,
+        b_sig = 0x1000000000000000,
+        c_sig = 0x2000000000000000,
+        d_mask = 0xC000000000000000,
+        mask_m = 0x000000000001FFFF; // max crd value
+    const static int a_shift = 17;
+};
+
+//  0-8 - z, 8-25, 25-42, 42-59 - a, b c, 59-61 - signs, 62-64 - dat precision : ~0.0000077
+uint64_t calculate_better_ID(const int& charge, const double &frac_x, const double& frac_y, const double& frac_z, const int& dat = 0) {
+    const int cell_m = 1; // magic number for the cell size, can be changed to 16 or 1, if interested read for yourself
+    const double multiplier = 1; // multiplier for the precision of the coordinates
+
+    uint64_t better_ID = ((uint64_t)charge) & scatterer_id_masks_d2::z_mask;
+    static const int64_t k = scatterer_id_masks_d2::mask_m / cell_m;
+    int64_t coord_val = multiplier == 1 ? (int64_t)(frac_x * k)
+        : ((int64_t)round(frac_x * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        better_ID |= scatterer_id_masks_d2::a_sig;
+        better_ID |= (((-coord_val) << 8) & scatterer_id_masks_d2::a_mask);
+    }
+    else {
+        better_ID |= ((std::abs(coord_val) << 8) & scatterer_id_masks_d2::a_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_y * k)
+        : ((int64_t)round(frac_y * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        better_ID |= scatterer_id_masks_d2::b_sig;
+        better_ID |= (((-coord_val) << (8 + scatterer_id_masks_d2::a_shift)) & scatterer_id_masks_d2::b_mask);
+    }
+    else {
+        better_ID |= ((coord_val << (8 + scatterer_id_masks_d2::a_shift)) & scatterer_id_masks_d2::b_mask);
+    }
+    coord_val = multiplier == 1 ? (int64_t)(frac_z * k)
+        : ((int64_t)round(frac_z * multiplier)) / multiplier * k;
+    if (coord_val < 0) {
+        better_ID |= scatterer_id_masks_d2::c_sig;
+        better_ID |= (((-coord_val) << (8 + scatterer_id_masks_d2::a_shift * 2)) & scatterer_id_masks_d2::c_mask);
+    }
+    else {
+        better_ID |= ((coord_val << (8 + scatterer_id_masks_d2::a_shift * 2)) & scatterer_id_masks_d2::c_mask);
+    }
+    better_ID |= (((int64_t)dat << (8 + scatterer_id_masks_d2::a_shift * 3) + 3) & scatterer_id_masks_d2::d_mask);
+    return better_ID;
+}
+
+
+
 /**
  * Reads atoms from a CIF file and performs necessary operations.
  *
@@ -575,6 +633,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                          ivec &asym_atom_to_type_list,
                          ivec &asym_atom_list,
                          bvec &needs_grid,
+                         std::vector<uint64_t>& better_IDs,
                          std::ostream &file,
                          bvec &constant_atoms,
                          const bool SALTED,
@@ -706,6 +765,7 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                     }
                     if (is_similar_abs(position[0], wave.get_atom_coordinate(i, 0), tolerances[0]) && is_similar_abs(position[1], wave.get_atom_coordinate(i, 1), tolerances[1]) && is_similar_abs(position[2], wave.get_atom_coordinate(i, 2), tolerances[2]))
                     {
+                        better_IDs.push_back(calculate_better_ID(wave.get_atom_charge(i), stod(fields[position_field[0]]), stod(fields[position_field[1]]), stod(fields[position_field[2]])));
                         string element = constants::atnr2letter(wave.get_atom_charge(i));
                         err_checkf(element != "PROBLEM", "Problem identifying atoms!", std::cout);
                         string label = fields[label_field];
@@ -2861,6 +2921,7 @@ tsc_block<int, cdouble> thakkar_sfac(
     ivec asym_atom_list;
     bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
+    std::vector<uint64_t> better_IDs;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[nr],
@@ -2871,6 +2932,7 @@ tsc_block<int, cdouble> thakkar_sfac(
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+                                      better_IDs,
                                       file,
                                       constant_atoms,
                                       opt.SALTED,
@@ -3001,6 +3063,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     ivec asym_atom_list;
     bvec constant_atoms;
     bvec needs_grid(SP.wavy.get_ncen(), false);
+    std::vector<uint64_t> better_IDs;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[nr],
@@ -3011,6 +3074,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+                                      better_IDs,
                                       file,
                                       constant_atoms,
                                       opt.SALTED,
@@ -3167,9 +3231,16 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
                       hkl);
     }
 
+    //Use better IDs for labels
+    svec better_labels(labels.size());
+    for (int i = 0; i < labels.size(); i++)
+    {
+        better_labels[i] = std::to_string(better_IDs[i]);
+	}
+
     tsc_block<int, cdouble> blocky(
         sf,
-        labels,
+        better_labels,
         hkl);
 
     time_points.push_back(get_time());
@@ -3249,6 +3320,7 @@ itsc_block calculate_scattering_factors_RI_fit(
     ivec asym_atom_list;
     bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
+    std::vector<uint64_t> better_IDs;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[0],
@@ -3259,6 +3331,7 @@ itsc_block calculate_scattering_factors_RI_fit(
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+                                      better_IDs,
                                       file,
                                       constant_atoms,
                                       opt.SALTED,
@@ -3457,6 +3530,7 @@ tsc_block<int, cdouble> calculate_scattering_factors(
     ivec asym_atom_list;
     bvec constant_atoms;
     bvec needs_grid(wave[nr].get_ncen(), false);
+    std::vector<uint64_t> better_IDs;
     if (opt.debug)
         file << "Reading atoms!!!!" << endl;
 
@@ -3469,6 +3543,7 @@ tsc_block<int, cdouble> calculate_scattering_factors(
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+		                              better_IDs,
                                       file,
                                       constant_atoms,
                                       opt.SALTED,
@@ -3634,6 +3709,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     bvec constant_atoms;
     bvec needs_grid(wavy[0].get_ncen(), false);
     svec known_atoms;
+    std::vector<uint64_t> better_IDs;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[0],
@@ -3644,6 +3720,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                                       asym_atom_to_type_list,
                                       asym_atom_list,
                                       needs_grid,
+                                      better_IDs,
                                       std::cout,
                                       constant_atoms,
                                       opt.SALTED,
