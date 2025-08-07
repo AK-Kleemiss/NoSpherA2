@@ -2,6 +2,7 @@
 
 #include "convenience.h"
 #include <unordered_set>
+#include <utility>
 template <typename numtype_index, typename numtype>
 class tsc_block
 {
@@ -290,7 +291,7 @@ public:
       {
         unsigned int new_nr = old_size;
         for (int run = 0; run < s; run++)
-          if (is_new[s])
+          if (is_new[run])
             new_nr++;
         sf[new_nr] = rhs.get_sf_for_scatterer(s, log);
         scatterer[new_nr] = rhs.get_scatterer(s, log);
@@ -305,11 +306,11 @@ public:
       }
     }
   };
-  void append(tsc_block rhs, std::ostream &log)
+  void append(tsc_block &&rhs, std::ostream &log)
   {
     if (reflection_size() == 0)
     {
-      *this = rhs;
+      *this = std::move(rhs);
       return;
     }
     // Appends the scatterers of rhs to the current set assuming same size of reflections.
@@ -345,17 +346,18 @@ public:
       {
         unsigned int new_nr = old_size;
         for (int run = 0; run < s; run++)
-          if (is_new[s])
+          if (is_new[run])
             new_nr++;
-        sf[new_nr] = rhs.get_sf_for_scatterer(s, log);
-        scatterer[new_nr] = rhs.get_scatterer(s, log);
+        // Use move semantics to transfer data from rhs
+        sf[new_nr] = std::move(rhs.sf[s]);
+        scatterer[new_nr] = std::move(rhs.scatterer[s]);
       }
     }
     int64_t sc_sf = sf.size();
     int64_t nr_hkl_sf = sf[0].size();
     for(int64_t i=0; i<sc_sf; i++) {
       if (sf[i].size() != nr_hkl_sf) {
-        std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append2" << std::endl;
+        std::cerr << "Error: Inconsistent size in sf for scatterer " << i << "in append_move" << std::endl;
         return;
       }
     }

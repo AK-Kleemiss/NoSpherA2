@@ -3182,7 +3182,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
         tempy.emplace_back(opt.wfn);
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
-        blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
+        blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
     }
