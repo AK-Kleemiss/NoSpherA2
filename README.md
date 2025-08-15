@@ -2,6 +2,7 @@
 
 ![Build](https://github.com/AK-Kleemiss/NoSpherA2/actions/workflows/c-cpp_all.yml/badge.svg)
 [![DOI](https://img.shields.io/badge/DOI-10.1039/D0SC05526C-blue.svg)](https://doi.org/10.1039/D0SC05526C)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/10849/badge)](https://www.bestpractices.dev/projects/10849)
 
 This repository exists for NoSpherA2, a software to calculate a .tsc file and property grid files form a given wavefunction. The .tsc file is a format to be used in olex2.refine for the use of non-spherical scattering- or form-factors during the refinement, enabling refinemnts like HAR (Hirshfeld-Atom-Refinement).
 
@@ -33,10 +34,10 @@ git submodule update --init --recursive
 - cargo for compilation of rust (required for featomic): https://www.rust-lang.org/tools/install
 
 #### **Building NoSpherA2**
-Navigate to the Windows subdirectory and run inside a developers command prompt or power shell:
+Run inside a developers command prompt or power shell (amking sure make.exe is on your PATH):
 
 ```ps
-make
+make.exe
 ```
 
 ✅ **The executable will be located in the main folder:** `NoSpherA2.exe`.
@@ -59,7 +60,7 @@ Inside the NoSpherA2 directory, simply run:
 make
 ```
 
-✅ **The executable will be located inside the NoSpherA2 directory.**
+✅ **The executable will be located in the main folder:** `NoSpherA2`.
 
 ---
 
@@ -76,6 +77,41 @@ make
 make
 ```
 
-✅ **The executable will be located at:** `Mac/NoSpherA2`.
+✅ **The executable will be located in the main folder:** `NoSpherA2`.
+
+---
+
+## Contributing: Pull Requests & Adding Tests
+
+### Creating a Pull Request
+
+1. **Fork the repository** and create a new branch for your feature or bugfix.
+2. **Write clear, concise commit messages** describing your changes.
+3. **Ensure your code builds and passes all tests** on your platform.
+4. **Push your branch** to your fork and open a Pull Request (PR) against the `main` branch of this repository.
+5. In your PR description, explain the purpose of your changes and reference any related issues.
+6. Be responsive to review feedback and update your PR as needed.
+
+### Adding a Test for New Features
+
+1. **Locate the appropriate test file or directory** (commonly in the `tests/` folder or as specified in the codebase).
+2. **Add your test** following the style of existing tests. For C++ code, this may be a new `.cpp` file or a new function in `Src/test_functions.h` file.
+3. **Register your test in the `makefile`:**
+    - Open the `makefile` in the test subdirectory.
+    - Add your test executable or call to the list of tests, as appropriate.
+    - Example (a test calcualting a tsc file for sucrose reading in an hkl file wnd wfn):
+      ```
+        sucrose_SF:
+            $(call RUN_TEST,$@,sucrose_fchk_SF, \
+                -cif sucrose.cif \
+                -hkl olex2/Wfn_job/sucrose.hkl \
+                -wfn olex2/Wfn_job/sucrose.wfx \
+                -acc 0 \
+                -no-date)
+      ```
+4. **Run `make test`** to ensure your test compiles and runs.
+5. **Document your test** if needed, and mention it in your Pull Request.
+
+---
 
 

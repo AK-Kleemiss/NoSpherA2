@@ -170,15 +170,14 @@ Rascaline_Descriptors::Rascaline_Descriptors(const std::filesystem::path &filepa
 // FEATOMIC1
 metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
 {
-    //featomic::SimpleSystem
-    featomic::SimpleSystem system;
+    featomic::SimpleSystem featomic_system;
     WFN wfn = WFN(this->filepath.c_str());
     for (const atom& a : *wfn.get_atoms_ptr())
     {
         std::array<double, 3> xyz = { constants::bohr2ang(a.get_coordinate(0)),
                                       constants::bohr2ang(a.get_coordinate(1)),
                                       constants::bohr2ang(a.get_coordinate(2)) };
-        system.add_atom(a.get_charge(), xyz);
+        featomic_system.add_atom(a.get_charge(), xyz);
     }
     // Construct the parameters for the calculator from the inputs given
     std::string temp_p = gen_parameters();
@@ -216,7 +215,7 @@ metatensor::TensorMap Rascaline_Descriptors::get_feats_projs()
     calc_opts.selected_keys = keys_selection;
     calc_opts.use_native_system = true;
     // run the calculation
-    metatensor::TensorMap descriptor = calculator.compute(system, calc_opts);
+    metatensor::TensorMap descriptor = calculator.compute(featomic_system, calc_opts);
 
     // The descriptor is a metatensor `TensorMap`, containing multiple blocks.
     // We can transform it to a single block containing a dense representation,

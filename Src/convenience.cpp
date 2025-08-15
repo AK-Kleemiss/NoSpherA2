@@ -208,8 +208,20 @@ std::filesystem::path get_home_path(void)
     temp1.append(temp2);
     return temp1;
 #else
-    std::string home = getenv("HOME");
-    return home;
+    const char* home_env = getenv("HOME");
+    if (home_env == nullptr) {
+        std::cerr << "Warning: HOME environment variable not set." << std::endl;
+        return std::filesystem::path("/tmp"); // Fallback to /tmp
+    }
+    
+    std::string home = home_env;
+    // Basic validation: check if it's a valid path and not empty
+    if (home.empty() || home.find_first_of('\0') != std::string::npos) {
+        std::cerr << "Warning: Invalid HOME environment variable." << std::endl;
+        return std::filesystem::path("/tmp"); // Fallback to /tmp
+    }
+    
+    return std::filesystem::path(home);
 #endif
 }
 
@@ -2598,33 +2610,98 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
     }
     return false;
 #else
-    char file[1024];
     std::string command;
-    command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
-    command += current_path;
-    command += "/\"";
-    for (int i = 0; i < filter.size(); i++) {
-        command += " --file-filter=\"";
-        command += filter[i];
-        command += "\" ";
+    bool use_zenity = (system("which zenity > /dev/null 2>&1") == 0);
+    bool use_kdialog = false;
+
+    if (use_zenity) {
+        command = "zenity --file-selection --title=\"Select a file to load\" --filename=\"";
+        command += current_path;
+        command += "/\"";
+        for (const auto& f : filter) {
+            command += " --file-filter='";
+            command += f;
+            command += "'";
+        }
+        command += " 2> /dev/null";
+    } else {
+        use_kdialog = (system("which kdialog > /dev/null 2>&1") == 0);
+        if (use_kdialog) {
+            command = "kdialog --getopenfilename \"";
+            command += current_path;
+            command += "/\" '";
+            for (const auto& f : filter) {
+                command += f;
+                command += " ";
+            }
+            command += "'";
+            command += " --title \"Select a file to load\" 2> /dev/null";
+        } else {
+            std::cout << "No suitable file dialog tool found (zenity/kdialog)." << std::endl;
+            std::cout << "Please enter the full path to the file: " << std::flush;
+            std::string input_path;
+            std::getline(std::cin, input_path);
+
+            // Trim leading/trailing whitespace
+            input_path.erase(0, input_path.find_first_not_of(" \t\n\r"));
+            input_path.erase(input_path.find_last_not_of(" \t\n\r") + 1);
+
+            if (input_path.empty()) {
+                if (debug) std::cout << "No path entered." << std::endl;
+                return false;
+            }
+
+            path = input_path;
+            if (std::filesystem::exists(path)) {
+                if (debug) std::cout << "Selected file via manual input: " << path << std::endl;
+                return true;
+            } else {
+                std::cerr << "Error: File not found at path: " << path << std::endl;
+                return false;
+            }
+        }
     }
-    command += " 2> /dev/null";
+
+    if (debug) {
+        std::cout << "Executing command: " << command << std::endl;
+    }
+
     FILE* f = popen(command.c_str(), "r");
     if (!f) {
-        std::cout << "ERROR" << std::endl;
+        std::cerr << "Error: Failed to execute file dialog command." << std::endl;
         return false;
     }
-    if (fgets(file, 1024, f) == NULL) 
+
+    std::string file_str;
+    char buffer[1024];
+    if (fgets(buffer, sizeof(buffer), f) == NULL) {
+        if (debug) std::cout << "File selection cancelled." << std::endl;
+        pclose(f);
         return false;
-    if (debug) 
-        std::cout << "Filename: " << file << std::endl;
-    path = file;
-    std::stringstream ss(path.string());
-    std::string name = path.string();
-    getline(ss, name);
-    if (pclose(f) != 0) 
-        std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
-    return true;
+    }
+    file_str = buffer;
+
+    int pclose_status = pclose(f);
+    if (pclose_status != 0) {
+        if (debug) std::cout << (use_zenity ? "Zenity" : "KDialog") << " returned non-zero status: " << pclose_status << ". User might have cancelled." << std::endl;
+        // This can happen on cancel, so we check if a file was actually returned.
+        if (file_str.empty()) return false;
+    }
+
+    // Clean up the path string which might have a newline
+    file_str.erase(file_str.find_last_not_of(" \n\r\t")+1);
+
+    if (file_str.empty()) {
+        if (debug) std::cout << "File selection cancelled or returned empty path." << std::endl;
+        return false;
+    }
+
+    path = file_str;
+    if (debug) {
+        std::cout << "Selected file: " << path << std::endl;
+    }
+
+    return std::filesystem::exists(path);
 #endif
 };
 
@@ -2690,7 +2767,6 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
         }
     }
 #else
-    char file[1024];
     std::string command;
     command = "zenity --file-selection --title=\"Select where to save\" --filename=\"";
     command += current_path;
@@ -2703,7 +2779,12 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
             std::cout << "ERROR" << std::endl;
             return false;
         }
-        if (fgets(file, 1024, f) == NULL) 
+        std::string file;
+        char buf[256];
+        while (fgets(buf, sizeof(buf), f)) {
+            file += buf;
+        }
+        if (file.empty())
             return false;
         if (debug) 
             std::cout << "Filename: " << file << std::endl;
@@ -2863,7 +2944,12 @@ void sha::sha256_update(uint32_t state[8], uint8_t buffer[64], const uint8_t *da
 {
     for (size_t i = 0; i < len; ++i)
     {
-        buffer[bitlen / 8 % 64] = data[i];
+        size_t buf_idx = (bitlen / 8) % 64;
+        if (buf_idx >= 64) {
+            std::cerr << "Buffer overflow detected in sha256_update!" << std::endl;
+            return;
+        }
+        buffer[buf_idx] = data[i];
         bitlen += 8;
         if (bitlen % 512 == 0)
         {
@@ -2877,11 +2963,19 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 {
     size_t i = bitlen / 8 % 64;
 
+    if (i >= 64) {
+        std::cerr << "Buffer overflow detected in sha256_final (initial)!" << std::endl;
+        return;
+    }
     buffer[i++] = 0x80;
     if (i > 56)
     {
         while (i < 64)
         {
+            if (i >= 64) {
+                std::cerr << "Buffer overflow detected in sha256_final (padding)!" << std::endl;
+                return;
+            }
             buffer[i++] = 0x00;
         }
         sha256_transform(state, buffer);
@@ -2890,15 +2984,24 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 
     while (i < 56)
     {
+        if (i >= 64) {
+            std::cerr << "Buffer overflow detected in sha256_final (final padding)!" << std::endl;
+            return;
+        }
         buffer[i++] = 0x00;
     }
 
+    // memcpy to buffer + 56 is safe as buffer is 64 bytes
     bitlen = custom_bswap_64(bitlen);
     memcpy(buffer + 56, &bitlen, 8);
     sha256_transform(state, buffer);
 
     for (i = 0; i < 8; ++i)
     {
+        if ((i * 4 + 4) > 32) {
+            std::cerr << "Buffer overflow detected in sha256_final (hash write)!" << std::endl;
+            return;
+        }
         state[i] = custom_bswap_32(state[i]);
         memcpy(hash + i * 4, &state[i], 4);
     }

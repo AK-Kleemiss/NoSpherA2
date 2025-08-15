@@ -1464,7 +1464,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -1759,7 +1759,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
         {
             int current_shell = -1;
             // int l = 0;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -2210,7 +2210,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         for (int a = 0; a < ncen; a++)
         {
             int current_shell = -1;
-            for (int s = 0; s < atoms[a].get_basis_set_size(); s++)
+            for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
             {
                 if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
                 {
@@ -2639,6 +2639,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             rf.seekg(32, ios::beg);
             long int ECP_start = 0;
             rf.read((char *)&ECP_start, sizeof(ECP_start));
+            err_checkf(rf.good(), "Error reading center in ECPs", file);
             err_checkf(ECP_start != 0, "Could not read ECP information location from GBW file!", file);
             if (debug)
                 file << "I read the pointer of ECP successfully" << endl;
@@ -2648,6 +2649,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             const int soi = 4;
             const int sod = 8;
             rf.read((char *)&i1, 8);
+            err_checkf(rf.good(), "Error reading center in ECPs", file);
             file << "First line: " << i1 << endl;
             for (int i = 0; i < i1; i++)
             {
@@ -2664,28 +2666,51 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 double e = 0;
                 double c = 0;
                 rf.read((char *)&Z, soi);
+                err_checkf(Z > 0, "Error reading Z in ECPs", file);
+                err_checkf(rf.good(), "Error reading Z in ECPs", file);
                 rf.read((char *)&temp_0, soi);
+                err_checkf(temp_0 > 0, "Error reading temp_0 in ECPs", file);
+                err_checkf(rf.good(), "Error reading temp_0 in ECPs", file);
                 char *temp_c = new char[temp_0];
                 rf.read(temp_c, temp_0);
+                err_checkf(rf.good(), "Error reading temp_c in ECPs", file);
                 rf.read((char *)&nr_core, soi);
+                err_checkf(nr_core >= 0, "Error reading nr_core in ECPs", file);
+                err_checkf(rf.good(), "Error reading nr_core in ECPs", file);
                 atoms[i].set_ECP_electrons(nr_core);
                 rf.read((char *)&max_contract, soi);
+                err_checkf(max_contract > 0, "Error reading max_contract in ECPs", file);
+                err_checkf(rf.good(), "Error reading max_contract in ECPs", file);
                 rf.read((char *)&max_angular, soi);
+                err_checkf(max_angular > 0, "Error reading max_angular in ECPs", file);
+                err_checkf(rf.good(), "Error reading max_angular in ECPs", file);
                 rf.read((char *)&center, soi);
+                err_checkf(center > 0, "Error reading center in ECPs", file);
+                err_checkf(rf.good(), "Error reading center in ECPs", file);
                 file << "I read " << Z << " " << temp_0 << " " << nr_core << " " << max_contract << " " << max_angular << endl;
                 for (int l = 0; l < max_angular; l++)
                 {
                     rf.read((char *)&exps, soi);
+                    err_checkf(exps > 0, "Error reading exps in ECPs", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     rf.read((char *)&type, soi);
+                    err_checkf(type >= 0, "Error reading type in ECPs", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     err_checkf(type < 200, "This type will give me a headache...", file);
+                    err_checkf(rf.good(), "Error reading center in ECPs", file);
                     file << "There are " << exps << " exponents of type " << type << " for angular momentum " << l << endl;
                     for (int fun = 0; fun < exps; fun++)
                     {
 
                         rf.read((char *)&n, sod);
-                        rf.read((char *)&c, sod);
-                        rf.read((char *)&e, sod);
                         err_checkf(n < 200, "This Exponent will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
+                        rf.read((char *)&c, sod);
+                        err_checkf(c < 200, "This Coefficient will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
+                        rf.read((char *)&e, sod);
+                        err_checkf(e < 200, "This Exponent will give me a headache...", file);
+                        err_checkf(rf.good(), "Error reading center in ECPs", file);
                         file << fun << " " << c << " " << e << " " << n << endl;
                         ECP_prims.push_back(ECP_primitive(center, type, e, c, static_cast<int>(n)));
                     }
@@ -3249,7 +3274,7 @@ double WFN::count_nr_electrons(void) const
 
 const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_exponent(nr_prim);
     else
         return -1;
@@ -3257,7 +3282,7 @@ const double WFN::get_atom_basis_set_exponent(const int &nr_atom, const int &nr_
 
 const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim) const
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_coefficient(nr_prim);
     else
         return -1;
@@ -3265,7 +3290,7 @@ const double WFN::get_atom_basis_set_coefficient(const int &nr_atom, const int &
 
 bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    if (nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
+    if (nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0)
     {
         atoms[nr_atom].set_basis_set_exponent(nr_prim, value);
         set_modified();
@@ -3277,7 +3302,7 @@ bool WFN::change_atom_basis_set_exponent(const int &nr_atom, const int &nr_prim,
 
 bool WFN::change_atom_basis_set_coefficient(const int &nr_atom, const int &nr_prim, const double &value)
 {
-    err_checkf(nr_atom <= ncen && nr_atom >= 0 && atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
+    err_checkf(nr_atom <= ncen && nr_atom >= 0 && (int)atoms[nr_atom].get_basis_set_size() >= nr_prim && nr_prim >= 0, "Wrong input!", std::cout);
     atoms[nr_atom].set_basis_set_coefficient(nr_prim, value);
     set_modified();
     return true;
@@ -3303,7 +3328,7 @@ const int WFN::get_basis_set_shell(const unsigned int &nr_atom, const unsigned i
 
 const int WFN::get_atom_primitive_type(const int& nr_atom, const int& nr_prim) const
 {
-    if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < atoms[nr_atom].get_basis_set_size() && nr_prim >= 0)
+    if (nr_atom < atoms.size() && nr_atom >= 0 && nr_prim < (int)atoms[nr_atom].get_basis_set_size() && nr_prim >= 0)
         return atoms[nr_atom].get_basis_set_type(nr_prim);
     else
         return -1;
@@ -3365,8 +3390,8 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
     if (static_cast<int>(nr_atom) <= ncen && nr_shell <= atoms[nr_atom].get_shellcount_size() - 1)
     {
         int primitive_counter = 0;
-        for (int a = 0; a < static_cast<int>(nr_atom); a++)
-            for (int s = 0; s < atoms[a].get_shellcount_size(); s++)
+        for (unsigned int a = 0; a < nr_atom; a++)
+            for (unsigned int s = 0; s < atoms[a].get_shellcount_size(); s++)
                 switch (get_shell_type(a, s))
                 {
                 case 1:
@@ -3382,7 +3407,7 @@ const int WFN::get_shell_start_in_primitives(const unsigned int &nr_atom, const 
                     primitive_counter += (10 * atoms[a].get_shellcount(s));
                     break;
                 }
-        for (int s = 0; s < static_cast<int>(nr_shell); s++)
+        for (unsigned int s = 0; s < nr_shell; s++)
         {
             switch (get_shell_type(nr_atom, s))
             {
@@ -7011,7 +7036,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         ss << "]\n";
         ss << "    'exponent_unit': 'a.u.'\n";
         ss << "    'primitive_exponents': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
+        for (unsigned int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
             ss << atoms[atoms_with_type[i]].get_basis_set_exponent(j);
             if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)
@@ -7021,7 +7046,7 @@ const std::string WFN::get_basis_set_CIF(const int nr) const
         }
         ss << "]\n";
         ss << "    'primitive_coefficients': [";
-        for (int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
+        for (unsigned int j = 0; j < atoms[atoms_with_type[i]].get_basis_set_size(); j++)
         {
             ss << atoms[atoms_with_type[i]].get_basis_set_coefficient(j);
             if (j < atoms[atoms_with_type[i]].get_basis_set_size() - 1)

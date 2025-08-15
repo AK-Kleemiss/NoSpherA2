@@ -420,14 +420,15 @@ inline void Enter(){
     std::cin.get();
 };
 
-inline void cls(){
-//   std::cout << string( 100, '\n' );
+inline void cls() {
 #ifdef _WIN32
-    if(system("CLS")) std::cout << "this should not happen...!" << std::endl;
+    // On modern Windows 10+ terminals, ANSI codes are often supported.
+    std::cout << "\033[2J\033[H";
 #else
-    if(system("clear")) std::cout << "this should not happen...!" << std::endl;
+    std::cout << "\033[2J\033[H";
 #endif
-};
+    std::cout.flush();
+}
 
 inline bool yesno(){
     bool end=false;

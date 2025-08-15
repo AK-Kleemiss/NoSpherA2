@@ -288,7 +288,7 @@ cdouble sfac_bessel(
  */
 void calc_sfac_diffuse(const options &opt, std::ostream &log_file);
 
-ivec fuckery(WFN& wavy, vec3& grid, const double accuracy);
+ivec fuckery(WFN& wavy, vec3& grid, const int accuracy);
 
 #include "wfn_class.h"
 #include "tsc_block.h"

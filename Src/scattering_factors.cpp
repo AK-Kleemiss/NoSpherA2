@@ -61,8 +61,10 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
         for (int i = 0; i < 3; i++)
         {
             k_points_file.read((char *)&temp, sizeof(temp));
+            err_checkf(!k_points_file.bad(), "Error reading k-points file!", file);
             k_pt[i].emplace_back(temp[0]);
             k_points_file.read((char *)&hkl_temp, sizeof(hkl_temp));
+            err_checkf(!k_points_file.bad(), "Error reading hkl values from k-points file!", file);
             hkl_[i] = hkl_temp[0];
         }
         hkl.emplace(hkl_);
@@ -982,7 +984,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
             const atom ai = wave.get_atom(i);
             alpha_max[i] = 0.0;
             max_l[i] = 0;
-            for (int b = 0; b < ai.get_basis_set_size(); b++)
+            for (unsigned int b = 0; b < ai.get_basis_set_size(); b++)
             {
                 if (ai.get_basis_set_exponent(b) > alpha_max[i])
                     alpha_max[i] = ai.get_basis_set_exponent(b) * 2;
@@ -1020,7 +1022,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
         for (int i = 0; i < wave.get_ncen(); i++)
         {
             const atom ai = wave.get_atom(i);
-            for (int b = 0; b < ai.get_basis_set_size(); b++)
+            for (unsigned int b = 0; b < ai.get_basis_set_size(); b++)
             {
                 int l = ai.get_basis_set_type(b);
                 if (ai.get_basis_set_exponent(b) < alpha_min[i][l])
@@ -3088,10 +3090,11 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     // Remove all atoms and coefficients when doing the n+1 th run during a Disorder calulation
     if (nr != 0)
     {
-        int test = vec_sum(coefs_per_atom);
+        err_checkf(constant_atoms.size() <= SP.wavy.get_ncen(),
+                   "There are more constant atoms than atoms in the wavefunction! This should not happen!", file);
         // We need coeffs for the atoms and coeff seperateley
-        int current_coef_index = coefs.size();
-        for (int i = constant_atoms.size() - 1; i >= 0; i--)
+        size_t current_coef_index = coefs.size();
+        for (int i = static_cast<int>(constant_atoms.size()) - 1; i >= 0; i--)
         {
             current_coef_index -= coefs_per_atom[i];
             // Remove atoms and coeffs from list if they are constant atoms
@@ -3211,7 +3214,7 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
 
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
-        blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
+        blocky.append(std::move(blocky_thakkar), file);
         time_points.push_back(get_time());
         time_descriptions.push_back("Spherical Atoms");
     }
@@ -3856,7 +3859,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     result.write_tsc_file_non_integer(opt.cif);
 }
 
-ivec fuckery(WFN& wavy, vec3 &grid, const double accuracy) {
+ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
     grid.resize(wavy.get_ncen());
     bvec needs_grid(wavy.get_ncen(), true);
     const int nr_of_atoms = (wavy.get_ncen());

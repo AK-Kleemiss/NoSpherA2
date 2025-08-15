@@ -2093,9 +2093,7 @@ void CINTg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
     case 0b10010000: _g0_2d4d_2100(g, bc, envs); return;
     case 0b11000000: _g0_2d4d_3000(g, bc, envs); return;
     }
-    fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
-        (int)envs->li_ceil, (int)envs->lk_ceil,
-        (int)envs->ll_ceil, (int)envs->lj_ceil);
+    std::cerr <<  "Dimension error for CINTg0_2e_lj2d4d: iklj = " << (int)envs->li_ceil << " " << (int)envs->lk_ceil << " " << (int)envs->ll_ceil << " " << (int)envs->lj_ceil << std::endl;
 }
 
 
@@ -4395,9 +4393,7 @@ void CINTsrg0_2e_2d4d_unrolled(double* g, Rys2eT* bc, CINTEnvVars* envs)
     case 0b10010000: _srg0_2d4d_2100(g, bc, envs); return;
     case 0b11000000: _srg0_2d4d_3000(g, bc, envs); return;
     }
-    fprintf(stderr, "Dimension error for CINTg0_2e_lj2d4d: iklj = %d %d %d %d",
-        (int)envs->li_ceil, (int)envs->lk_ceil,
-        (int)envs->ll_ceil, (int)envs->lj_ceil);
+    std::cerr <<  "Dimension error for CINTg0_2e_lj2d4d: iklj = " << (int)envs->li_ceil << " " << (int)envs->lk_ceil << " " << (int)envs->ll_ceil << " " << (int)envs->lj_ceil << std::endl;
 }
 
 

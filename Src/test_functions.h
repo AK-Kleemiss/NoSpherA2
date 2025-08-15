@@ -1822,7 +1822,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 
 
     vec3 grid;
-    ivec pointy = fuckery(wavy, grid, 1.0);
+    ivec pointy = fuckery(wavy, grid, 1);
 #pragma omp parallel
     {
         vec2 d_temp(16);

@@ -3,18 +3,26 @@ name: compile_mac
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build_Mac_arm:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         submodules: recursive
 
     # Cache OpenBLAS
     - name: Cache OpenBLAS Build
-      uses: actions/cache@v4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       id: cache-openblas-mac
       with:
         path: OpenBLAS/installation
@@ -39,7 +47,7 @@ jobs:
 
     # Cache featomic
     - name: Cache featomic Build
-      uses: actions/cache@v4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
@@ -63,7 +71,7 @@ jobs:
           mv NoSpherA2 ../NoSpherA2_Mac_arm
 
     - name: Archive executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: executable_MacOS_arm
         path: NoSpherA2_Mac_arm
@@ -72,13 +80,18 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         submodules: recursive
 
     # Cache OpenBLAS
     - name: Cache OpenBLAS Build
-      uses: actions/cache@v4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       id: cache-openblas-mac
       with:
         path: OpenBLAS/installation
@@ -103,7 +116,7 @@ jobs:
 
     # Cache featomic
     - name: Cache featomic Build
-      uses: actions/cache@v4
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
       id: cache-featomic-mac
       with:
         path: featomic/featomic_install
@@ -128,7 +141,7 @@ jobs:
           mv NoSpherA2 ../NoSpherA2_Mac_x86
 
     - name: Archive executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: executable_MacOS_x86
         path: NoSpherA2_Mac_x86
@@ -138,19 +151,24 @@ jobs:
     needs: [build_Mac_arm, build_Mac_x86]
 
     steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@ec9f2d5744a09debf3a187a3f4f675c53b671911 # v2.13.0
+      with:
+        egress-policy: audit
+
     - name: Download artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
       with:
         name: executable_MacOS_arm
     - name: Download artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
       with:
         name: executable_MacOS_x86
     - name: Combine artifacts
       run: |
         lipo -create -output NoSpherA2_Mac NoSpherA2_arm NoSpherA2_x86
     - name: Archive combined executable
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: NoSpherA2_Mac_combined  
         path: NoSpherA2_Mac
