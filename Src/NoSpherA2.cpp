@@ -35,11 +35,11 @@ int main(int argc, char **argv)
     opt.cwd = cwd;
     vector<WFN> wavy;
 
-    if (opt.threads != -1)
+    if (opt.threads == -1)
     {
         set_BLAS_threads(4);
 #ifdef _OPENMP
-        omp_set_num_threads(opt.threads);
+        omp_set_num_threads(4);
 #endif
     }
     log_file << NoSpherA2_message(opt.no_date);

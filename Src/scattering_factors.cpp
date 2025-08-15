@@ -666,17 +666,6 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 if (debug)
                     file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
-                if (group_field == -1)
-                {
-                    constant_atoms.push_back(true);
-                }
-                else if (fields[group_field].c_str()[0] != '.')
-                {
-                    constant_atoms.push_back(false);
-                }
-                else
-                    constant_atoms.push_back(true);
-
                 bool old_atom = false;
 #pragma omp parallel for reduction(|| : old_atom)
                 for (int run = 0; run < known_atoms.size(); run++)
@@ -793,6 +782,18 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                                 }
                             }
                         }
+
+                        if (group_field == -1)
+                        {
+                            constant_atoms.push_back(true);
+                        }
+                        else if (fields[group_field].c_str()[0] != '.')
+                        {
+                            constant_atoms.push_back(false);
+                        }
+                        else
+                            constant_atoms.push_back(true);
+
                         labels[i] = fields[label_field];
                         asym_atom_list.push_back(i);
                         needs_grid[i] = true;
@@ -2552,6 +2553,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
+
     ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
 #pragma omp parallel shared(pb, sf)
     {
@@ -2573,10 +2575,11 @@ void calc_SF_SALTED(const vec2 &k_pt,
 
             for (int iat = 0; iat < atom_list.size(); iat++)
             {
-                const int lim = (int)atom_list[iat].get_basis_set_size();
+                const atom& atom = atom_list[iat];
+                const int lim = atom.get_basis_set_size();
                 for (int i_basis = 0; i_basis < lim; i_basis++)
                 {
-                    basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
+                    basis = atom.get_basis_set_entry(i_basis).get_primitive();
                     vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.get_type() + 1);
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
                     coef_count += 2 * basis.get_type() + 1;
@@ -3041,94 +3044,120 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     if (opt.debug)
         file << "made it post CIF now make grids!" << endl;
 
-    // Remove all unneccecary atoms from wavy
-    int current_index = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (opt.debug)
-            std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
-
-        if (!needs_grid[i])
-        {
-            SP.wavy.erase_atom(current_index);
-            constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
-            current_index--;
-        }
-        current_index++;
-    }
 
     // Generation of SALTED density coefficients
     file << "\nGenerating densities... " << endl;
     vec coefs = SP.gen_SALTED_densities();
     file << setw(13 * 4) << "... done!" << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("SALTED prediction");
     SP.shrink_intermediate_vectors();
 
-    vec2 k_pt;
-    make_k_pts(
-        opt.read_k_pts,
-        opt.save_k_pts,
-        0,
-        unit_cell,
-        hkl,
-        k_pt,
-        file,
-        opt.debug);
 
-    file << "                          ... done!\n"
-         << flush;
-    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
+    int iat = 0;
+    ivec coefs_per_atom(SP.wavy.get_ncen());
+    for (const atom atm : SP.wavy.get_atoms()) {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < atm.get_shellcount().size(); shell++) {
+            int type = atm.get_basis_set_entry(prim).get_type();
+            coefs_per_atom[iat] += (2 * type + 1); prim += atm.get_shellcount()[shell];
+        }
+        iat++;
+    }
 
-    time_points.push_back(get_time());
-    time_descriptions.push_back("k-points preparation");
 
-    // Remove all unneccecary atoms from wavy only if it is not the first calculation
+    //Remove all atoms and corresponding coefficients corresponding to not needed parts of a grown structure
+    int current_coef_index = coefs.size();
+    for (int i = needs_grid.size() - 1; i >= 0; i--)
+    {
+        if (opt.debug)
+            std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+
+
+        current_coef_index -= coefs_per_atom[i];
+        const atom& atom = SP.wavy.get_atom(i);
+        if (!needs_grid[i])
+        {
+            SP.wavy.erase_atom(i);
+            // Remove the coefficients for this atom
+            coefs.erase(coefs.begin() + current_coef_index, coefs.begin() + current_coef_index + coefs_per_atom[i]);
+            coefs_per_atom.erase(coefs_per_atom.begin() + i);
+        }
+        
+    }
+
+
+    // Remove all atoms and coefficients when doing the n+1 th run during a Disorder calulation
     if (nr != 0)
     {
+        int test = vec_sum(coefs_per_atom);
         // We need coeffs for the atoms and coeff seperateley
-        unsigned int current_coef_index = coefs.size();
-        for (unsigned int i = constant_atoms.size() - 1; i >= 0; i--)
+        int current_coef_index = coefs.size();
+        for (int i = constant_atoms.size() - 1; i >= 0; i--)
         {
-            // Count up all coeffs for one atom
-            const int lim = (int)SP.wavy.get_atom_basis_set_size(i);
-            int coef_count = 0;
-            for (int i_basis = 0; i_basis < lim; i_basis++)
-            {
-                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i, i_basis).get_primitive().get_type() + 1;
-            }
-
+            current_coef_index -= coefs_per_atom[i];
             // Remove atoms and coeffs from list if they are constant atoms
             if (constant_atoms[i])
             {
-                labels.erase(labels.begin() + i, labels.begin() + i + 1);
+                labels.erase(labels.begin() + i);
                 SP.wavy.erase_atom(i);
-                coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
+                coefs.erase(coefs.begin() + current_coef_index, coefs.begin() + current_coef_index + coefs_per_atom[i]);
+                coefs_per_atom.erase(coefs_per_atom.begin() + i);
             }
-            current_coef_index -= coef_count;
         };
     }
-
-    // SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
-    // calc_cube_ML(coefs,SP.wavy);
 
     vec atom_elecs = calc_atomic_density(SP.wavy.get_atoms(), coefs);
     file << "Table of Charges in electrons\n"
          << "       Atom      ML" << endl;
 
-    for (int i = 0; i < SP.wavy.get_ncen(); i++)
-    {
+    time_points.push_back(get_time());
+    time_descriptions.push_back("SALTED prediction");
 
-        file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(i) - atom_elecs[i];
-        if (opt.debug)
-            file << " " << setw(4) << SP.wavy.get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
-        file << endl;
+    double elec_sum = 0;
+    for (int iat = 0; iat < SP.wavy.get_ncen(); iat++)
+    {
+        file << setw(10) << labels[iat]
+            << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(iat) - atom_elecs[iat];
+            if (opt.debug)
+                file << " " << setw(4) << SP.wavy.get_atom_charge(iat) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[iat];
+            file << endl;
+            elec_sum += atom_elecs[iat];
     }
-    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+
+    file << setprecision(4) << "Total number of analytical Electrons: " << elec_sum << endl;
+
     time_points.push_back(get_time());
     time_descriptions.push_back("Calculation of Charges");
+
+    vec2 k_pt;
+    if (kpts == NULL || kpts->size() == 0)
+    {
+        make_k_pts(
+            nr != 0 && hkl.size() == 0,
+            opt.save_k_pts,
+            0,
+            unit_cell,
+            hkl,
+            k_pt,
+            file,
+            opt.debug);
+        if (kpts != NULL)
+        {
+            *kpts = k_pt;
+        }
+    }
+    else
+    {
+        k_pt = *kpts;
+    }
+
+    file << "                          ... done!\n"
+        << flush;
+    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("k-points preparation");
+
+
 
     cvec2 sf;
     calc_SF_SALTED(
@@ -3175,7 +3204,11 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     {
         file << "Performing the remaining calculation of spherical atoms..." << std::endl;
         vector<WFN> tempy;
-        tempy.emplace_back(opt.wfn);
+        //Ugly hack to handle that opt.wfn does not contain the current path to the wfn if mtc is selected:
+        if (opt.wfn == "") {
+            tempy.emplace_back(opt.combined_tsc_calc_files[nr]);
+        }else{ tempy.emplace_back(opt.wfn);}
+
         opt.m_hkl_list = hkl;
         tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
         blocky.append(tsc_block<int, cdouble>(blocky_thakkar), file);
@@ -3238,8 +3271,14 @@ itsc_block calculate_scattering_factors_RI_fit(
     vector<string> time_descriptions;
     time_points.push_back(get_time());
 
-    cell unit_cell(opt.cif, file, opt.debug);
-    ifstream cif_input(opt.cif.c_str(), std::ios::in);
+    filesystem::path cif;
+    if (opt.cif_based_combined_tsc_calc)
+        cif = opt.combined_tsc_calc_cifs[nr];
+    else
+        cif = opt.cif;
+
+    cell unit_cell(cif, file, opt.debug);
+    ifstream cif_input(cif.c_str(), std::ios::in);
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
@@ -3266,7 +3305,104 @@ itsc_block calculate_scattering_factors_RI_fit(
     time_descriptions.push_back("CIF reading");
 
     if (opt.debug)
-        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
+        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_list.size() << " atoms in total" << endl;
+
+    // Generation of SALTED density coefficients
+    file << "\nGenerating densities... " << endl;
+    //If no basis is yet loaded, assume a auto aux should be generated
+    if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_etb_aux(wave[nr]);
+
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(wave[nr].get_atoms());
+    wavy_aux.set_ncen(wave[nr].get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, opt.aux_basis);
+
+
+    //vec coefs = density_fit_hybrid(wave[nr], wavy_aux, opt.mem, 'C',
+    //    0.0001,     // restraint strength
+    //    1e-6,      // tikhonov lambda
+    //    "mulliken_estimate", // charge scheme
+    //    false);
+
+    vec coefs = density_fit_unrestrained(wave[nr], wavy_aux, opt.mem, 'C');
+    file << setw(12 * 4 + 2) << "... done!\n"
+        << flush;
+
+    int iat = 0;
+    ivec coefs_per_atom(wavy_aux.get_ncen());
+    for (const atom atm : wavy_aux.get_atoms()) {
+        int prim = 0;
+        for (unsigned int shell = 0; shell < atm.get_shellcount().size(); shell++) {
+            int type = atm.get_basis_set_entry(prim).get_type();
+            coefs_per_atom[iat] += (2 * type + 1); prim += atm.get_shellcount()[shell];
+        }
+        iat++;
+    }
+
+
+    //Remove all atoms and corresponding coefficients corresponding to not needed parts of a grown structure
+    int current_coef_index = coefs.size();
+    for (int i = needs_grid.size() - 1; i >= 0; i--)
+    {
+        if (opt.debug)
+            std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+
+
+        current_coef_index -= coefs_per_atom[i];
+        const atom& atom = wavy_aux.get_atom(i);
+        if (!needs_grid[i])
+        {
+            wavy_aux.erase_atom(i);
+            // Remove the coefficients for this atom
+            coefs.erase(coefs.begin() + current_coef_index, coefs.begin() + current_coef_index + coefs_per_atom[i]);
+            coefs_per_atom.erase(coefs_per_atom.begin() + i);
+        }
+
+    }
+
+    // Remove all atoms and coefficients when doing the n+1 th run during a Disorder calulation
+    if (nr != 0)
+    {
+        int test = vec_sum(coefs_per_atom);
+        // We need coeffs for the atoms and coeff seperateley
+        int current_coef_index = coefs.size();
+        for (int i = constant_atoms.size() - 1; i >= 0; i--)
+        {
+            current_coef_index -= coefs_per_atom[i];
+            // Remove atoms and coeffs from list if they are constant atoms
+            if (constant_atoms[i])
+            {
+                labels.erase(labels.begin() + i);
+                wavy_aux.erase_atom(i);
+                coefs.erase(coefs.begin() + current_coef_index, coefs.begin() + current_coef_index + coefs_per_atom[i]);
+                coefs_per_atom.erase(coefs_per_atom.begin() + i);
+            }
+        };
+    }
+
+    time_points.push_back(get_time());
+    time_descriptions.push_back("RI-Fit");
+
+    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
+    file << "Table of Charges in electrons\n"
+        << "       Atom      ML" << endl;
+
+    double elec_sum = 0;
+    for (int iat = 0; iat < wavy_aux.get_ncen(); iat++)
+    {
+        file << setw(10) << labels[iat]
+            << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(iat) - atom_elecs[iat];
+            if (opt.debug)
+                file << " " << setw(4) << wavy_aux.get_atom_charge(iat) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[iat];
+            file << endl;
+            elec_sum += atom_elecs[iat];
+    }
+
+    file << setprecision(4) << "Total number of analytical Electrons: " << elec_sum << endl;
+    time_points.push_back(get_time());
+    time_descriptions.push_back("Calculation of Charges");
+
 
     hkl_list hkl;
     if (!opt.read_k_pts)
@@ -3288,59 +3424,34 @@ itsc_block calculate_scattering_factors_RI_fit(
     time_points.push_back(get_time());
     time_descriptions.push_back("Generating hkl");
 
-    // Generation of SALTED density coefficients
-    file << "\nGenerating densities... " << endl;
-    //If no basis is yet loaded, assume a auto aux should be generated
-    if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(wave[nr]);
-
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wave[nr].get_atoms());
-    wavy_aux.set_ncen(wave[nr].get_ncen());
-    wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, opt.aux_basis);
-
-    vec coefs = density_fit(wave[nr], wavy_aux, opt.mem, 'C');
-    file << setw(12 * 4 + 2) << "... done!\n"
-         << flush;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("RI-Fit");
-
     file << "\nGenerating k-points...  " << flush;
     vec2 k_pt;
-    make_k_pts(
-        opt.read_k_pts,
-        opt.save_k_pts,
-        0,
-        unit_cell,
-        hkl,
-        k_pt,
-        file,
-        opt.debug);
+    if (kpts == NULL || kpts->size() == 0)
+    {
+        make_k_pts(
+            nr != 0 && hkl.size() == 0,
+            opt.save_k_pts,
+            0,
+            unit_cell,
+            hkl,
+            k_pt,
+            file,
+            opt.debug);
+        if (kpts != NULL)
+        {
+            *kpts = k_pt;
+        }
+    }
+    else
+    {
+        k_pt = *kpts;
+    }
     file << "                          ... done!\n"
          << flush;
     file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
-
-    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
-    file << "Table of Charges in electrons\n"
-         << "       Atom      ML" << endl;
-
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        int a = asym_atom_list[i];
-        file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
-        if (opt.debug)
-            file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
-        file << endl;
-    }
-
-    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Calculation of Charges");
 
     cvec2 sf;
     calc_SF_SALTED(
