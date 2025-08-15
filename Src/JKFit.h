@@ -37,11 +37,11 @@ public:
     //Constructor for the generation of a basis set from a given WFN and beta value
     BasisSet(const WFN& wavy, const double beta) : BasisSet() {
         _beta = beta;
-        gen_aux(wavy);
+        gen_etb_aux(wavy);
     }
 
     //Constructor for the initialization of a auto_aux basis set
-    //By calling the gen_aux function on this object, the basis set will be generated
+    //By calling the gen_etb_aux function on this object, the basis set will be generated
     BasisSet(const double beta) : BasisSet()  {
         _beta = beta;
     }
@@ -73,7 +73,8 @@ public:
         return _primitives;
     }
     
-    void gen_aux(const WFN& orbital_wfn);
+    void gen_etb_aux(const WFN& orbital_wfn);
+    void gen_auto_aux(const WFN& orbital_wfn);
     
 private:
     std::vector<SimplePrimitive> _ownedPrimitives;

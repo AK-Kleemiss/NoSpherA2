@@ -1829,6 +1829,10 @@ void options::digest_options()
             calc = eli = true;
         else if (temp == "-elf")
             calc = elf = true;
+        else if (temp == "-equi_bench") {
+            benchmark_equicomb(1000);
+            exit(0);
+        }
         else if (temp == "-esp")
             calc = esp = true;
         else if (temp == "-ewal_sum")
@@ -2051,13 +2055,13 @@ void options::digest_options()
             if (i + 1 < argc && arguments[i + 1].find("-") != 0)
             {
 
-                if (arguments[i + 1] == "auto") {
+                if (arguments[i + 1] == "auto_aux") {
                     double beta = 2.0;
                     //Check if the next argument is a valid double
                     if (i + 2 < argc && arguments[i + 2].find("-") != 0) {
                         beta = std::stod(arguments[i + 2]);
                     }
-                    if (debug) cout << "Using automatic basis set selection with beta: " << beta << endl;
+                    if (debug) cout << "Using automatic basis set generation with beta: " << beta << endl;
                     aux_basis = std::make_shared<BasisSet>(beta);
                     continue;
                 }
@@ -2227,7 +2231,34 @@ void options::digest_options()
         }
         else if (temp == "-test_RI")
         {
-            fixed_density_fit_test();
+            //Check that wfn is not empty
+            if (wfn.empty())
+            {
+                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
+                exit(1);
+            }
+
+            WFN wavy(wfn);
+            aux_basis = std::make_shared<BasisSet>(wavy, 2.0);
+
+            WFN wavy_aux(0);
+            wavy_aux.set_atoms(wavy.get_atoms());
+            wavy_aux.set_ncen(wavy.get_ncen());
+            wavy_aux.delete_basis_set();
+            load_basis_into_WFN(wavy_aux, aux_basis);
+            demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+
+
+            aux_basis = std::make_shared<BasisSet>();
+            aux_basis->gen_auto_aux(wavy);
+
+            WFN wavy_aux2(0);
+            wavy_aux2.set_atoms(wavy.get_atoms());
+            wavy_aux2.set_ncen(wavy.get_ncen());
+            wavy_aux2.delete_basis_set();
+            load_basis_into_WFN(wavy_aux2, aux_basis);
+            demonstrate_enhanced_density_fitting(wavy, wavy_aux2);
+
             exit(0);
         }
         else if (temp == "-wfn")
