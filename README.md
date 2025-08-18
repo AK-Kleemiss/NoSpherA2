@@ -30,11 +30,11 @@ git submodule update --init --recursive
 ### Windows Build Instructions
 #### **Prerequisites**
 - **Visual Studio 2022** with C++ build tools
-- GNU Make for Windows
-- cargo for compilation of rust (required for featomic): https://www.rust-lang.org/tools/install
+- GNU Make for Windows (for example from [here](https://gnuwin32.sourceforge.net/packages/make.htm))
+- cargo for compilation of rust (required for featomic) [download](https://www.rust-lang.org/tools/install)
 
 #### **Building NoSpherA2**
-Run inside a developers command prompt or power shell (amking sure make.exe is on your PATH):
+Run inside a developers command prompt or power shell (making sure make.exe is on your PATH):
 
 ```ps
 make.exe
