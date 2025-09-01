@@ -1678,10 +1678,10 @@ void test_analytical_fourier(bool full)
                 k_pt_local[3] = sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
                 for (int d = 0; d < 3; d++) k_pt_local[d] /= k_pt_local[3];
 
-                sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs);
+                sf_A[0][i] = sfac_bessel(p, k_pt_local, coefs.data());
                 //sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
-            {
+                {
                     double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
                     sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
@@ -1691,10 +1691,10 @@ void test_analytical_fourier(bool full)
                     max_diff = diff;
             }
                 if (abs(diff) > 2E-5)
-            {
-                all_correct = false;
+                {
+                    all_correct = false;
                     correct = false;
-            }
+                }
             }
             if (!correct)
             {

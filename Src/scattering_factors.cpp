@@ -2537,11 +2537,11 @@ double fourier_bessel_integral(
 cdouble sfac_bessel(
     const primitive& p,
     const double* k_point,
-    const vec& coefs)
+    const double* coefs)
 {
     const int t = p.get_type();
     const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
-    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs.data());
+    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs);
     return result;
 
 }
@@ -2567,20 +2567,23 @@ void calc_SF_SALTED(const vec2 &k_pt,
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
             int coef_count = 0;
+			const int num_atoms = (int)atom_list.size();
+            const double* coef_slice_ptr = NULL;
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
             //Normalize K-point
-            for (int i = 0; i < 3; i++) k_pt_local[i] /= k_pt_local[3];
+            for (int i = 0; i < 3; i++) 
+                k_pt_local[i] /= k_pt_local[3];
 
-            for (int iat = 0; iat < atom_list.size(); iat++)
+            for (int iat = 0; iat < num_atoms; iat++)
             {
                 const int lim = (int)atom_list[iat].get_basis_set_size();
                 for (int i_basis = 0; i_basis < lim; i_basis++)
                 {
                     basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
-                    vec coef_slice(coefs.begin() + coef_count, coefs.begin() + coef_count + 2 * basis.get_type() + 1);
-                    sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice);
+                    coef_slice_ptr = coefs.data() + coef_count;
+                    sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
                     coef_count += 2 * basis.get_type() + 1;
                 }
             }
