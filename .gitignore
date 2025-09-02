@@ -93,3 +93,6 @@ tests/NiP3_fchk/in.fchk
 Lib/OpenBLAS_build
 Lib/featomic_install
 Lib/OpenMP_build
+Windows/packages*
+*tbb*.dll
+*libomp*.dll

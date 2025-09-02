@@ -1,11 +1,13 @@
 #include "pch.h"
+#include <execution>
 #include "nos_math.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
-#include <execution>
+//#define lapack_complex_float std::complex<float>
+//#define lapack_complex_double std::complex<double>
+//#include "mkl_lapacke.h" // for LAPACKE_xxx
+//#include "mkl_cblas.h"
+#include "mkl.h"
+
 
 template <typename T>
 T conj(const T &val)
@@ -257,6 +259,48 @@ void _test_openblas()
     compare_matrices(dot(matF, matE, false), self_dot(F, E));
 
     std::cout << "All BLAS tests passed!" << std::endl;
+}
+
+
+void solve_linear_system(const vec2& A, vec& b)
+{
+    err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    // LAPACK variables
+    const int n = (int)A.size(); // The order of the matrix eri2c
+    const int nrhs = 1;     // Number of right-hand sides (columns of rho and )
+    const int lda = n;      // Leading dimension of eri2c
+    const int ldb = n;      // Leading dimension of rho
+    ivec ipiv(n, 0);        // Pivot indices
+    vec temp = flatten<double>(transpose(A));
+    // Call LAPACK function to solve the system
+    int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
+
+    if (info != 0)
+    {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
+}
+
+void solve_linear_system(const vec& A, const unsigned long long& size_A, vec& b)
+{
+    err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    // LAPACK variables
+    const int n = (int)size_A; // The order of the matrix eri2c
+    const int nrhs = 1;   // Number of right-hand sides (columns of rho and )
+    const int lda = n;    // Leading dimension of eri2c
+    const int ldb = n;    // Leading dimension of rho
+    ivec ipiv(n, 0);      // Pivot indices
+
+    // Manually transpose the flattened matrix in A of size(size_A, size_A)
+    vec temp = transpose(A, n, n);
+
+    // Call LAPACK function to solve the system
+    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
+
+    if (info != 0)
+    {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
 }
 
 //#include <linalg.hpp>
@@ -697,7 +741,8 @@ NNLSResult nnls(dMatrix2& A,
 void set_BLAS_threads(int num_threads)
 {
 #ifdef _WIN32
-    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
+    //_putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
+	_putenv_s("OMP_NUM_THREADS", std::to_string(num_threads).c_str());
 #else
     std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
     char* env = strdup(nums.c_str());

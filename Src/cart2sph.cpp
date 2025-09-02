@@ -13,7 +13,8 @@
 #include <stdlib.h>
 #include <complex.h>
 #include "cart2sph.h"
-#include "cblas.h"
+//#include "mkl_cblas.h"
+#include "mkl.h"
 
 #define MALLOC_ALIGN8_INSTACK(var, n)                                 \
         var = (double *)(((uintptr_t)cache + 63) & (~(uintptr_t)63)); \

@@ -15,10 +15,11 @@
 #include "convenience.h"
 #include "constants.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-#include "lapacke.h"
-#include "cblas.h"
+//#define lapack_complex_float std::complex<float>
+//#define lapack_complex_double std::complex<double>
+//#include "mkl_lapacke.h"
+//#include "mkl_cblas.h"
+#include "mkl.h"
 /*
  * This code computes incomplete gamma function.  It is based on Xin
  * Wu's implementation.

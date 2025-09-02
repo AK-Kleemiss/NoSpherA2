@@ -1667,6 +1667,7 @@ void options::digest_options()
         else if (temp == "-blastest")
         {
             test_openblas();
+            test_solve_linear_equations();
             exit(0);
         }
         else if (temp == "-lahvatest")

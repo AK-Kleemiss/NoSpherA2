@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "nos_math.h"
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
+#include "mkl_lapacke.h" // for LAPACKE_xxx
+#include "mkl_cblas.h"
 
 // Flatten Vectors 2D
 template <typename T>
@@ -278,9 +278,9 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
-        const openblas_complex_double t = conjugate ? cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1)
-                                                    : cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1);
-        result = cdouble(t.real, t.imag);
+        conjugate ? cblas_zdotu_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result)
+                  : cblas_zdotc_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result);
+        //result = cdouble(t.real, t.imag);
     }
     else
     {

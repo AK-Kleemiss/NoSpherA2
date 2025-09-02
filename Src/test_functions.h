@@ -12,6 +12,7 @@
 #include "nos_math.h"
 #include "featomic.hpp"
 #include "metatensor.h"
+#include "nos_math.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif
@@ -1967,6 +1968,65 @@ std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int
         }
     }
     return colMajorMatrix;
+}
+
+void test_solve_linear_equations() {
+    // Small, well-conditioned 3x3 test (precomputed)
+    // A * x_expected = b
+    const vec2 A = {
+        {3.0,  2.0, -1.0},
+        {2.0, -2.0,  4.0},
+        {-1.0, 0.5, -1.0}
+    };
+
+    // Precomputed true solution
+    const vec x_expected = { 1.0, -2.0, -2.0 };
+
+    // Build right-hand side b = A * x_expected
+    vec b(3, 0.0);
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            b[i] += A[i][j] * x_expected[j];
+
+    // Keep original RHS for logging if the test fails
+    vec b_orig = b;
+
+    // Call the solver -- it replaces b with the solution x (in-place)
+    solve_linear_system(A, b);
+
+    // Validate result
+    const double tol = 1e-9;
+    bool ok = true;
+    for (int i = 0; i < 3; ++i) {
+        if (std::abs(b[i] - x_expected[i]) > tol) {
+            std::cout << "test_solve_linear_equations: mismatch at index " << i
+                << " -> got " << std::setprecision(12) << b[i]
+                << " expected " << x_expected[i] << std::endl;
+            ok = false;
+        }
+    }
+
+    if (ok) {
+        std::cout << "test_solve_linear_equations: PASSED" << std::endl;
+    }
+    else {
+        std::cout << "test_solve_linear_equations: FAILED\n";
+        std::cout << "Matrix A:\n";
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j)
+                std::cout << std::setw(12) << A[i][j];
+            std::cout << std::endl;
+        }
+		std::cout << "Target   b: " << b_orig[0] << " " << b_orig[1] << " " << b_orig[2] << std::endl;
+        std::cout << "Original x: ";
+        for (double v : x_expected) std::cout << v << " ";
+        std::cout << std::endl;
+        std::cout << "Returned x: ";
+        for (double v : b) std::cout << v << " ";
+        std::cout << std::endl;
+        // Make test harness detect failure
+        exit(1);
+    }
 }
 
 void test_NNLS()

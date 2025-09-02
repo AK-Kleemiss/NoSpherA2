@@ -1,7 +1,8 @@
 #include "pch.h"
 #include "nos_math.h"
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
+//#include "mkl_lapacke.h" // for LAPACKE_xxx
+//#include "mkl_cblas.h"
+#include "mkl.h"
 
 template <typename mat_t, typename vec_t, typename Shape_t>
 mat_t reshape(vec_t& vec_in, const Shape_t size)

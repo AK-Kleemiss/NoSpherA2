@@ -6,7 +6,8 @@
 #include "int_g2e.h"
 
 #include "nos_math.h"
-#include "cblas.h"
+//#include "mkl_cblas.h"
+#include "mkl.h"
 
 #define gctrg gout
 #define gctrm gctr
