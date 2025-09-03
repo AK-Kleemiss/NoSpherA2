@@ -95,4 +95,4 @@ Lib/featomic_install
 Lib/OpenMP_build
 Windows/packages*
 *tbb*.dll
-*libomp*.dll
+*libiomp*.dll
