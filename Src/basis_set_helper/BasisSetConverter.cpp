@@ -45,7 +45,7 @@ bool needs_rewrite(const std::filesystem::path& basis_path, const std::vector<st
     if (nr_files != static_cast<int>(files.size())) {
         return true;
     }
-    
+
     std::filesystem::path basis_sets_loc = basis_path / "basis_set_helper" / "basis_sets";
     for (int i = 0; i < nr_files; ++i) {
         if (!std::getline(checkpoint_file, line)) {
@@ -91,8 +91,16 @@ int main(int argc, char** argv)
 {
     //--------------------Extract Directory form input----------------
     std::ofstream log_file("test.log");
-    log_file << "Starting BasisSetConverter..." << std::endl; 
+    log_file << "Starting BasisSetConverter..." << std::endl;
     std::filesystem::path basis_path(argv[1]);
+    std::filesystem::path src_path;
+    if (argc >= 3)
+    {
+        src_path = std::filesystem::path(argv[2]);
+    }
+    else {
+        src_path = basis_path.parent_path().parent_path().parent_path();
+    }
     basis_path = basis_path.parent_path().parent_path();
     basis_path /= std::filesystem::path("Src/basis_set_helper/basis_sets/");
     basis_path.make_preferred();
@@ -103,7 +111,6 @@ int main(int argc, char** argv)
     log_file << "Number of files found: " << files.size() << std::endl;
 
 
-    std::filesystem::path src_path = basis_path.parent_path().parent_path().parent_path();
     if (!needs_rewrite(src_path, files, log_file)) {
         log_file << "No need to rewrite auxiliary_basis.cpp, exiting..." << std::endl;
         return 0;

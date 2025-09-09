@@ -2,6 +2,7 @@
 #include "cube.h"
 #include "convenience.h"
 #include "constants.h"
+#include <array>
 
 cube::cube()
 {
@@ -539,7 +540,7 @@ double cube::get_interpolated_value(double x, double y, double z) const
     double c1 = c01 * (1 - y1) + c11 * y1;
     return (c0 * (1 - z1) + c1 * z1);
 };
-    
+
 double cube::get_value(int x, int y, int z) const
 {
     if (x < size[0] && y < size[1] && z < size[2] && x >= 0 && y >= 0 && z >= 0)
@@ -568,7 +569,8 @@ void cube::calc_dv() {
 
 // Function to compute dot product
 template <typename T>
-inline const double dot(const T& a, const T& b) {
+inline const double dot(const T& a, const T& b)
+{
     double result = 0;
     for (int i = 0; i < a.size(); i++) {
         result += a[i] * b[i];
@@ -655,8 +657,8 @@ double cube::ewald_sum(const int kMax, const double conv) {
     for (int i = 0; i < 3; i++) {
         std::cout << std::setw(10) << reciprocalLattice[i][0] << std::setw(10) << reciprocalLattice[i][1] << std::setw(10) << reciprocalLattice[i][2] << std::endl;
     }
-    
-    
+
+
     std::vector<std::array<double, 3>> ri(grid_points);
     std::vector<std::vector<std::array<double, 3>>> rij(grid_points);
     for (int i = 0; i < size[0]; i++) {
@@ -668,9 +670,9 @@ double cube::ewald_sum(const int kMax, const double conv) {
                     for (int m = 0; m < size[1]; m++) {
                         for (int n = 0; n < size[2]; n++) {
                             std::array<double, 3> rj = get_pos(l, m, n);
-                            rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n] = 
-                            { ri[i * size[1] * size[2] + j * size[2] + k][0] - rj[0], 
-                              ri[i * size[1] * size[2] + j * size[2] + k][1] - rj[1], 
+                            rij[i * size[1] * size[2] + j * size[2] + k][l * size[1] * size[2] + m * size[2] + n] =
+                            { ri[i * size[1] * size[2] + j * size[2] + k][0] - rj[0],
+                              ri[i * size[1] * size[2] + j * size[2] + k][1] - rj[1],
                               ri[i * size[1] * size[2] + j * size[2] + k][2] - rj[2]};
                         }
                     }
@@ -846,7 +848,7 @@ cube cube::operator-(const cube &right) const
             for (int y = 0; y < size[1]; y++)
                 for (int z = 0; z < size[2]; z++)
                     res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) - right.get_value(x, y, z));
- 
+
     return (res_cube);
 };
 
@@ -862,7 +864,7 @@ cube cube::operator*(const cube &right) const
         for (int y = 0; y < size[1]; y++)
             for (int z = 0; z < size[2]; z++)
                 res_cube.set_value(x, y, z, res_cube.get_value(x, y, z) + right.get_value(x, y, z));
-    
+
     return (res_cube);
 };
 
@@ -883,7 +885,7 @@ cube cube::operator/(const cube &right) const
                 else
                     res_cube.set_value(x, y, z, 0);
             }
- 
+
     return (res_cube);
 };
 

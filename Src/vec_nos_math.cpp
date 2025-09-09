@@ -2,6 +2,7 @@
 #include "nos_math.h"
 #include "lapacke.h" // for LAPACKE_xxx
 #include "cblas.h"
+#include <complex>
 
 // Flatten Vectors 2D
 template <typename T>
@@ -235,7 +236,7 @@ T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
-            result += conj(vec1[i]) * vec2[i];
+            result += (std::conj(vec1[i]) * vec2[i]).real(); // Fine because complex conj is always real.
         }
     }
     else
@@ -280,7 +281,9 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     {
         const openblas_complex_double t = conjugate ? cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1)
                                                     : cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1);
-        result = cdouble(t.real, t.imag);
+
+        const auto p = reinterpret_cast<const double *>(&t);
+        result = cdouble(p[0], p[1]);
     }
     else
     {

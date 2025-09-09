@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <vector>
-
+#include <filesystem>
 #include "convenience.h"
 #include "molecule.h"
 using namespace std;
@@ -31,7 +31,7 @@ using namespace std;
 
 bool molecule::read_molecule(std::string path)
 {
-    if (!exists(path))
+    if (!filesystem::exists(path))
     {
         cout << "ERROR: Could not open file for reading!" << endl;
         return false;
