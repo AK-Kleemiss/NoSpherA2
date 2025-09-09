@@ -5711,11 +5711,11 @@ static int _dlaev2(double *eig, double *vec, double *diag, double *diag_off1)
 
 int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double *vec)
 {
-    int32_t M = n;
+    lapack_int M = n;
     int32_t LDZ = std::max(1, n);
     int32_t NZC = std::max(1, n);
-    int32_t ISUPPZ[MXRYSROOTS * 2];
-    int32_t TRYRAC = 1;
+    lapack_int ISUPPZ[MXRYSROOTS * 2];
+    lapack_int TRYRAC = 1;
     //double WORK[MXRYSROOTS * 18];
     int32_t LWORK = MXRYSROOTS * 18;
     //int32_t IWORK[MXRYSROOTS * 10];
@@ -5723,7 +5723,7 @@ int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double
     /*
         int matrix_layout, char jobz, char range,
         lapack_int n, double* d, double* e, double vl,
-        double vu, lapack_int il, lapack_int iu,
+        double vu, lapack_int il, lapack_int iu,lapack_int
         lapack_int* m, double* w, double* z, lapack_int ldz,
         lapack_int nzc, lapack_int* isuppz,
         lapack_logical* tryrac

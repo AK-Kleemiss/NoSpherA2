@@ -12,6 +12,7 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+#include "mkl.h"
 #ifdef _OPENMP
 #include <omp.h>
 #endif

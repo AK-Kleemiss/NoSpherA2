@@ -2,11 +2,8 @@
 #include <execution>
 #include "nos_math.h"
 
-//#define lapack_complex_float std::complex<float>
-//#define lapack_complex_double std::complex<double>
-//#include "mkl_lapacke.h" // for LAPACKE_xxx
-//#include "mkl_cblas.h"
 #include "mkl.h"
+#include "omp.h"
 
 
 template <typename T>
@@ -265,37 +262,23 @@ void _test_openblas()
 void solve_linear_system(const vec2& A, vec& b)
 {
     err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    // LAPACK variables
-    const int n = (int)A.size(); // The order of the matrix eri2c
-    const int nrhs = 1;     // Number of right-hand sides (columns of rho and )
-    const int lda = n;      // Leading dimension of eri2c
-    const int ldb = n;      // Leading dimension of rho
-    ivec ipiv(n, 0);        // Pivot indices
-    vec temp = flatten<double>(transpose(A));
-    // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
-
-    if (info != 0)
-    {
-        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
-    }
+    vec temp = flatten<double>(A);
+    solve_linear_system(temp, A.size(), b);
 }
 
-void solve_linear_system(const vec& A, const unsigned long long& size_A, vec& b)
+void solve_linear_system(vec& A, const size_t& size_A, vec& b)
 {
+
     err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
     // LAPACK variables
-    const int n = (int)size_A; // The order of the matrix eri2c
-    const int nrhs = 1;   // Number of right-hand sides (columns of rho and )
-    const int lda = n;    // Leading dimension of eri2c
-    const int ldb = n;    // Leading dimension of rho
-    ivec ipiv(n, 0);      // Pivot indices
-
-    // Manually transpose the flattened matrix in A of size(size_A, size_A)
-    vec temp = transpose(A, n, n);
+    const lapack_int n = (int)size_A; // The order of the matrix eri2c
+    const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
+    const lapack_int lda = n;    // Leading dimension of eri2c
+    const lapack_int ldb = 1;    // Leading dimension of rho
+    ivec ipiv(n, 0);              // Pivot indices
 
     // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
+    int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
 
     if (info != 0)
     {
@@ -736,19 +719,6 @@ NNLSResult nnls(dMatrix2& A,
 //    res = std::sqrt(res);
 //    return NNLSResult{ x, res, 0 };
 //}
-
-
-void set_BLAS_threads(int num_threads)
-{
-#ifdef _WIN32
-    //_putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
-	_putenv_s("OMP_NUM_THREADS", std::to_string(num_threads).c_str());
-#else
-    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
-    char* env = strdup(nums.c_str());
-    putenv(env);
-#endif
-}
 
 // Remeaining functions which were separated for readibility
 #include "mat_nos_math.cpp"

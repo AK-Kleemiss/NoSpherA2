@@ -1560,7 +1560,10 @@ double calc_pot_by_integral(vec3 &grid, const double &r, const double &cube_dist
 
 void test_openblas()
 {
-    set_BLAS_threads(4);
+    MKL_Set_Num_Threads(4);
+#ifdef _OPENMP
+    omp_set_num_threads(4);
+#endif
     std::cout << "Running Openblas test" << std::endl;
     _test_openblas();
 }

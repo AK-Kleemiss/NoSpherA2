@@ -30,6 +30,7 @@ std::string help_message =
      "                                            [2]: xTB\n"
      "                                            [3]: pTB\n"
      "   --help/-help/--h                         print this help\n"
+     "   -cpus           <NUMBER>                 Sets the number of available threads to use. Defaults to all available CPUs"
      "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
      "   -v2                                      Even more stuff\n"
      "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
@@ -1714,9 +1715,11 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
-            set_BLAS_threads(threads);
+            MKL_Set_Num_Threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
+            omp_set_dynamic(0);
+
 #endif
         }
         else if (temp == "-cmtc")
