@@ -13020,6 +13020,20 @@
     <Import Project="packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets" Condition="Exists('packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets')" />
     <Import Project="packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets" Condition="Exists('packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets')" />
   </ImportGroup>
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ProjectCapability Include="PackageReferences" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <!-- Tell NuGet/MSBuild this is a native project -->
+    <NuGetTargetMoniker Condition="'$(NuGetTargetMoniker)' == ''">native,Version=v0.0</NuGetTargetMoniker>
+    <!-- Optional: list RIDs so restore generates runtime graph if needed -->
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == ''">win;win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="intelmkl.static.win-x64" Version="2025.2.0.627" />
+	<PackageReference Include="intelopenmp.devel.win" Version="2025.2.1.1000" />
+	<PackageReference Include="intelopenmp.redist.win" Version="2025.2.1.1000" />
+</ItemGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
