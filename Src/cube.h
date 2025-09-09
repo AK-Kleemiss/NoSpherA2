@@ -59,6 +59,7 @@ public:
   double get_vector(int i, int j) const;
   bool set_vector(int i, int j, double value);
   double get_origin(unsigned int i) const;
+  // double dot(std::array<std::array<double, 3>, 3>::value_type a, const std::array<double, 3> b);
   double ewald_sum(const int kMax = 15, const double conv = 5E-3);
   void calc_dv();
   double get_dv() const { return dv; };
