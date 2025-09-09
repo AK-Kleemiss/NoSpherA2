@@ -83,3 +83,4 @@ target_link_libraries(NoSpherA2 PUBLIC
     -ldl
     -lpthread
 )
+
