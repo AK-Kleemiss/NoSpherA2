@@ -15,7 +15,7 @@ target_include_directories(basis_set_helper PUBLIC
 )
 message(WARNING ${CMAKE_SOURCE_DIR})
 add_custom_command(
-    OUTPUT ${CMAKE_BINARY_DIR}/auxiliary_basis.cpp
+    OUTPUT ${CMAKE_BINARY_DIR}/Src/auxiliary_basis.cpp
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
     DEPENDS BasisSetConverter
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -24,6 +24,6 @@ add_custom_command(
 )
 
 add_custom_target(generate_auxiliary_basis
-    DEPENDS ${CMAKE_BINARY_DIR}/auxiliary_basis.cpp
+    DEPENDS ${CMAKE_BINARY_DIR}/Src/auxiliary_basis.cpp
 )
 
