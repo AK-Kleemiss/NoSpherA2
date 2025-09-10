@@ -18,9 +18,20 @@ MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 all: check_rust NoSpherA2
 
-# Check for Rust
+# --- Cross-platform rust check ---
+ifeq ($(OS),Windows_NT)
 check_rust:
-	@rustc --version >nul 2>&1 || (echo Rust is not installed. Please install Rust from https://www.rust-lang.org/tools/install && exit 1)
+	@where rustc >NUL 2>&1 && ( \
+	  for /f "usebackq delims=" %%V in (`rustc --version`) do @echo Found: %%V \
+	) || ( \
+	  echo Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install & exit /b 1 \
+	)
+else
+check_rust:
+	@command -v rustc >/dev/null 2>&1 || { \
+	  echo "Rust is not installed or not on PATH. Install via https://www.rust-lang.org/tools/install"; exit 1; }; \
+	echo "Found: $$(rustc --version)"
+endif
 
 featomic: check_rust
 ifeq ($(NAME),WINDOWS)
