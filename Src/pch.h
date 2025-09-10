@@ -12,7 +12,15 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
-#include "mkl.h"
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif

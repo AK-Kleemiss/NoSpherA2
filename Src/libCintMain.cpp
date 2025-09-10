@@ -6,8 +6,14 @@
 #include "int_g2e.h"
 
 #include "nos_math.h"
-//#include "mkl_cblas.h"
-#include "mkl.h"
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 #define gctrg gout
 #define gctrm gctr

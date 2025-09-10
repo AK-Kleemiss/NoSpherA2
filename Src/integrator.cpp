@@ -5,7 +5,13 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 
-#include "mkl.h"
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
 {

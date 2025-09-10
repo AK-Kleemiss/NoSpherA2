@@ -15,11 +15,13 @@
 #include "convenience.h"
 #include "constants.h"
 
-//#define lapack_complex_float std::complex<float>
-//#define lapack_complex_double std::complex<double>
-//#include "mkl_lapacke.h"
-//#include "mkl_cblas.h"
-#include "mkl.h"
+#if defined(__APPLE__)
+ // On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+ // Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 /*
  * This code computes incomplete gamma function.  It is based on Xin
  * Wu's implementation.

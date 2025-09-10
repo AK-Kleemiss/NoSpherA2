@@ -1,7 +1,14 @@
 #include "pch.h"
 #include "SALTED_equicomb.h"
-//#include "mkl_cblas.h"
-#include "mkl.h"
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+
 #include "constants.h"
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
