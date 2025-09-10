@@ -1,10 +1,10 @@
 include(ExternalProject)
-#CPMAddPackage(
-#    NAME Ccache.cmake
-#    GITHUB_REPOSITORY TheLartians/Ccache.cmake
-#    VERSION 1.2.5
-#)
-#
+CPMAddPackage(
+    NAME Ccache.cmake
+    GITHUB_REPOSITORY TheLartians/Ccache.cmake
+    VERSION 1.2.5
+)
+
 CPMAddPackage(
     NAME mdspan
     GITHUB_REPOSITORY "kokkos/mdspan"
