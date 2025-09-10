@@ -4,16 +4,16 @@ RM := rm -f
 COMP := g++
 C_COMP := gcc
 
-all: basis_set_converter 
+all: basis_set_converter
 
 # Define the two separate lists with appropriate endings
 OBJS := $(OBJ_NAMES:=.o)
-GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP
+GCC_OPTS := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP -I../mdspan/include
 
 
 BASIS_OBJ_NAMES := basis_set_helper BasisSetConverter
 BASIS_OBJS := $(BASIS_OBJ_NAMES:=.o_basis)
-%.o_basis: ../Src/basis_set_helper/%.cpp 
+%.o_basis: ../Src/basis_set_helper/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
@@ -31,7 +31,7 @@ clean:
 	@echo "Cleaned up"
 
 
-.PHONY: all clean basis_set_converter 
+.PHONY: all clean basis_set_converter
 .SECONDARY:
 
 
