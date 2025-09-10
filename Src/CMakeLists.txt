@@ -84,5 +84,6 @@ target_link_libraries(NoSpherA2 PUBLIC
     featomic_static
     -ldl
     -lpthread
+    -latomic
 )
 
