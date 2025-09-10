@@ -55,7 +55,7 @@ else ifeq ($(NAME),MAC)
 		mkdir -p build && \
 		cd build && \
 		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
-		make install || true;
+		make install || true; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
@@ -95,7 +95,8 @@ IntelMKL:
 ifeq ($(NAME),WINDOWS)
 	MSBuild .\Windows\NoSpherA2.sln /t:Restore -p:RestorePackagesConfig=true
 else ifeq ($(NAME),MAC)
-	echo 'Not implemented'
+	@brew list --versions libomp >/dev/null 2>&1 || \
+	  { echo "Installing libomp (arm64)…"; brew install libomp; }
 else
 	@if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then \
 		wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh; \
