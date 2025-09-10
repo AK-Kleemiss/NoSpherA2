@@ -1,8 +1,14 @@
 #include "pch.h"
 #include "nos_math.h"
-//#include "mkl_lapacke.h" // for LAPACKE_xxx
-//#include "mkl_cblas.h"
-#include "mkl.h"
+
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 template <typename mat_t, typename vec_t, typename Shape_t>
 mat_t reshape(vec_t& vec_in, const Shape_t size)

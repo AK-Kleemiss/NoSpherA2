@@ -16,6 +16,7 @@
 #if defined(__APPLE__)
 // On macOS we’re using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
+#define lapack_int int
 #else
 // Linux/Windows with oneMKL
 #include <mkl.h>

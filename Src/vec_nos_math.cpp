@@ -1,7 +1,13 @@
 #include "pch.h"
 #include "nos_math.h"
-#include "mkl_lapacke.h" // for LAPACKE_xxx
-#include "mkl_cblas.h"
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 // Flatten Vectors 2D
 template <typename T>
