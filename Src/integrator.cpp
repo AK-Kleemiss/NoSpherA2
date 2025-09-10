@@ -5,11 +5,6 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-
-//#include "mkl_lapacke.h"
-//#include "mkl_cblas.h"
 #include "mkl.h"
 
 vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
