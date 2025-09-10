@@ -4,13 +4,13 @@ from subprocess import run
 import sys
 
 if __name__ == "__main__":
-    run(sys.argv[1:])
-    name = os.path.abspath(os.path.basename("."))
-    with open(f"{name}.good") as f:
-        good = f.read()
+    run(sys.argv[2], shell=True)
+    name = sys.argv[1]
+    with open(f"{name}") as f:
+        good = f.read().strip()
 
-    with open(f"{name}.log") as f:
-        log = f.read()
+    with open("NoSpherA2.log") as f:
+        log = f.read().strip()
 
     if good != log:
         raise Exception("Test failed")

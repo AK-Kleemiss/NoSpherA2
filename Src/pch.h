@@ -52,7 +52,7 @@
 #endif
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 #define MDSPAN_USE_PAREN_OPERATOR 1
-#include "../mdspan/include/mdspan/mdarray.hpp"
+#include "mdspan/mdarray.hpp"
 
 
 // Here are the system specific libaries

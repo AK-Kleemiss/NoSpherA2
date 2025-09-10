@@ -1,7 +1,9 @@
 add_subdirectory(basis_set_helper)
 
+set(GENERATED_AUX_CPP "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp")
+set_source_files_properties(${GENERATED_AUX_CPP} PROPERTIES GENERATED TRUE)
 add_executable(NoSpherA2
-    "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp"
+    "${GENERATED_AUX_CPP}"
     "${CMAKE_CURRENT_SOURCE_DIR}/wfn_class.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/atoms.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/properties.cpp"
