@@ -17,7 +17,7 @@ EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
               ../Lib/featomic_install/lib/libmetatensor.a
 
 # Sources - exclude files that are included in other source files
-SRCS := $(filter-out $(SRC_DIR)/SALTED_predictor.cpp $(SRC_DIR)/SALTED_io.cpp $(SRC_DIR)/SALTED_equicomb.cpp, $(wildcard $(SRC_DIR)/*.cpp))
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
