@@ -104,12 +104,14 @@ NoSpherA2: ${OBJS}
 	@echo 'Building target: $@'
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
 	cp NoSpherA2 ../
+	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
 	@echo 'Done building NoSpherA2'
 
 NoSpherA2_Debug: ${OBJS_d}
 	@echo 'Building target: $@'
 	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
 	cp NoSpherA2_Debug ../
+	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
 	@echo 'Done building Debug version of NoSpherA2'
 
 clean:
