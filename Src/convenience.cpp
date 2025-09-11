@@ -89,7 +89,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
         t.append("      and many more in communications or by feedback!\n");
-        t.append("NoSpherA2 uses featomic, Metatensor, and the OpenBLAS library.\n");
+        t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
         t.append("Please see, respectively:\n");
         t.append("   https://github.com/Luthaf/featomic\n");
@@ -3015,77 +3015,6 @@ std::wstring s2ws(const std::string &s)
     MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
     return r;
 }
-
-bool ExtractDLL(const std::filesystem::path &dllName)
-{
-    if (std::filesystem::exists(dllName))
-        return true; // DLL already exists
-
-    // Find the resource
-    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
-    if (!hRes)
-        return false;
-
-    // Load the resource
-    HGLOBAL hResLoad = LoadResource(NULL, hRes);
-    if (!hResLoad)
-        return false;
-
-    // Lock the resource to get a pointer to the data
-    void *pResData = LockResource(hResLoad);
-    if (!pResData)
-        return false;
-
-    // Get the size of the resource
-    DWORD resSize = SizeofResource(NULL, hRes);
-    if (resSize == 0)
-        return false;
-
-    // Write the resource data to a file
-    std::ofstream outFile(dllName, std::ios::binary);
-    if (!outFile)
-        return false;
-
-    outFile.write(reinterpret_cast<const char *>(pResData), resSize);
-    outFile.close();
-
-    return true;
-}
-
-bool check_OpenBLAS_DLL(const bool &debug)
-{
-    if (debug)
-        std::cout << "Checking for OpenBLAS DLL" << std::endl;
-    // Get the path of the executable
-    char tempPath[MAX_PATH];
-    GetModuleFileNameA(NULL, tempPath, MAX_PATH); // get path to NoSpherA2 executable
-    std::filesystem::path exeDir(tempPath);
-    exeDir = exeDir.parent_path();
-    if (debug)
-        std::cout << "Executable directory: " << exeDir << std::endl;
-
-    // Define the DLL name
-    std::filesystem::path dllName = exeDir / "libopenblas.dll";
-    if (debug)
-        std::cout << "DLL name: " << dllName << std::endl;
-    if (exists(dllName))
-        return true; // DLL already exists
-    else
-    {
-        if (debug)
-            std::cout << "DLL does not exist, extracting it from the executable!" << std::endl;
-        // Extract the DLL if it does not exist
-        if (!ExtractDLL(dllName))
-        {
-            std::cout << "Failed to extract DLL" << std::endl;
-            return false;
-        }
-        if (debug)
-            std::cout << "DLL extracted successfully!" << std::endl;
-    }
-    return true;
-}
-#endif
 */
 
 ProgressBar::~ProgressBar()

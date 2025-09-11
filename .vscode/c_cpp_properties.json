@@ -23,7 +23,6 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/OpenBLAS/installation/include"
             ],
             "defines": [],
             "macFrameworkPath": [

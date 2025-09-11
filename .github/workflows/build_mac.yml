@@ -20,31 +20,6 @@ jobs:
       with:
         submodules: recursive
 
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-openblas-mac
-      with:
-        path: OpenBLAS/installation
-        key: openblas-arm-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
-        restore-keys: |
-          openblas-arm-mac-${{ runner.os }}-
-
-    - name: make_OpenBLAS
-      if: steps.cache-openblas-arm-mac.outputs.cache-hit != 'true'
-      run: |
-          cd OpenBLAS 
-          make -j 
-          make PREFIX=installation install
-
-    - name: make_OpenMP
-      run: |
-          cd llvm-project/openmp 
-          mkdir build 
-          cd build 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=aarch64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
-          make
-
     # Cache featomic
     - name: Cache featomic Build
       uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
@@ -88,31 +63,6 @@ jobs:
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         submodules: recursive
-
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-openblas-mac
-      with:
-        path: OpenBLAS/installation
-        key: openblas-x86-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**') }}
-        restore-keys: |
-          openblas-x86-mac-${{ runner.os }}-
-
-    - name: make_OpenMP_x86_64
-      run: |
-          cd llvm-project/openmp 
-          mkdir build_x86_64 
-          cd build_x86_64 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ARCH=x86_64 -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=14.0 .. 
-          make
-
-    - name: make_OpenBLAS_x86_64
-      if: steps.cache-openblas-x86-mac.outputs.cache-hit != 'true'
-      run: |
-          cd OpenBLAS 
-          make TARGET=NEHALEM NO_AVX=1 NOFORTRAN=1 BIANRY=64 CC="cc -arch x86_64" -j 
-          make PREFIX=installationx86_64 install
 
     # Cache featomic
     - name: Cache featomic Build

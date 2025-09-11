@@ -1564,7 +1564,7 @@ void test_openblas()
 #ifdef _OPENMP
     omp_set_num_threads(4);
 #endif
-    std::cout << "Running Openblas test" << std::endl;
+    std::cout << "Running MKL/Accelerate test" << std::endl;
     _test_openblas();
 }
 
