@@ -313,7 +313,7 @@ jobs:
     - name: make_Linux
       run: |
           cd Linux
-          make -j
+          make -j1
       continue-on-error: true
 
     - name: Perform CodeQL Analysis
