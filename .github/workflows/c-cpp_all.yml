@@ -134,15 +134,6 @@ jobs:
     - name: make_Linux
       run: cd Linux && make -j
 
-    - name: Archive objects/dependencies
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-      with:
-        name: compiled_files_Linux
-        path: |
-            Linux/*.o
-            Linux/*.d
-            Linux/NoSpherA2
-
     - name: Archive executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
@@ -319,10 +310,8 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
           make install
 
-    - name: get_compiled_files_Linux
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-      with:
-        name: compiled_files_Linux
+    - name: Build project
+      run: cd Linux && make -j1
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@2d92b76c45b91eb80fc44c74ce3fce0ee94e8f9d # v3.30.0
