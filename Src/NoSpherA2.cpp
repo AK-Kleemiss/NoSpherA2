@@ -236,7 +236,8 @@ int main(int argc, char **argv)
         }
         err_checkf(opt.combined_tsc_calc_mult.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and mults impossible!", log_file);
         err_checkf(opt.combined_tsc_calc_charge.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and charges impossible!", log_file);
-        err_checkf(opt.combined_tsc_calc_ECP.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and ECPs impossible!", log_file);
+        if (opt.combined_tsc_calc_ECP.size() > 0)
+            err_checkf(opt.combined_tsc_calc_ECP.size() == opt.combined_tsc_calc_files.size(), "Unequal number of WFNs and ECPs impossible!", log_file);
 
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
@@ -252,14 +253,18 @@ int main(int argc, char **argv)
             {
                 log_file << "\nmult: " << opt.combined_tsc_calc_mult[i] << endl;
                 log_file << "charge: " << opt.combined_tsc_calc_charge[i] << "\n";
-                log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
+                if (opt.combined_tsc_calc_ECP.size() > 0)
+                    log_file << "ECP: " << opt.combined_tsc_calc_ECP[i] << "\n";
             }
             wavy[i].set_multi(opt.combined_tsc_calc_mult[i]);
             wavy[i].set_charge(opt.combined_tsc_calc_charge[i]);
             wavy[i].read_known_wavefunction_format(opt.combined_tsc_calc_files[i], log_file, opt.debug);
-            if (opt.combined_tsc_calc_ECP[i] != 0)
+            if (opt.combined_tsc_calc_ECP.size() > 0)
             {
-                wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                if (opt.combined_tsc_calc_ECP[i] != 0)
+                {
+                    wavy[i].set_has_ECPs(true, true, opt.combined_tsc_calc_ECP[i]);
+                }
             }
             log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[i].get_ncen() << " Number of MOs: " << wavy[i].get_nmo() << endl;
         }
@@ -468,12 +473,12 @@ int main(int argc, char **argv)
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-               
+
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name); 
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
                 load_basis_into_WFN(temp_pred->wavy, aux_basis);
 
                 if (opt.debug)
@@ -484,7 +489,7 @@ int main(int argc, char **argv)
                     log_file,
                     empty,
                     0);
-                
+
                 delete temp_pred;
             }
             log_file << "Writing tsc file... " << flush;
