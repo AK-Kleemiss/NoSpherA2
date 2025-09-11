@@ -16,8 +16,10 @@ INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
 			  ../Lib/featomic_install/lib/libmetatensor.a
 
-# Sources - exclude files that are included in other source files
-SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(SRC_DIR)/auxiliary_basis.cpp
+# Sources - automatically discover all .cpp files in SRC_DIR
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
+  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
 
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))

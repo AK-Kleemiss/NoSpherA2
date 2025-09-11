@@ -50,7 +50,9 @@ MKL_LINK_FLAGS = \
 
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
-SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(SRC_DIR)/auxiliary_basis.cpp
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
+  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
 
 # Convert sources to object names (extract basename without path/extension)
 OBJ_NAMES := $(basename $(notdir $(SRCS)))
