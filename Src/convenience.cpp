@@ -94,7 +94,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("Please see, respectively:\n");
         t.append("   https://github.com/Luthaf/featomic\n");
         t.append("   https://github.com/lab-cosmo/metatensor\n");
-        t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
+        t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     }
@@ -2050,12 +2050,12 @@ void options::digest_options()
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
-           std::cout << "Reading wavefunction: " << wfn_name << endl;
+            std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-           std::cout << "Assigning ECPs" << endl;
+            std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-           std::cout << "Starting cube calculation" << endl;
+            std::cout << "Starting cube calculation" << endl;
             calc_rho_cube(*wavy);
             delete (wavy);
             exit(0);
@@ -2158,7 +2158,7 @@ void options::digest_options()
                 outputFile << r << " " << dens << "\n";
             }
             outputFile.close();
-           std::cout << "Data written to output.dat" << endl;
+            std::cout << "Data written to output.dat" << endl;
             delete (wavy1);
             delete (wavy2);
             exit(0);
@@ -2166,12 +2166,12 @@ void options::digest_options()
         else if (temp == "-spherical_aver_hirsh")
         {
             string wfn_name = arguments[i + 1];
-           std::cout << "Reading wavefunction: " << wfn_name << endl;
+            std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-           std::cout << "Assigning ECPs" << endl;
+            std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-           std::cout << "Starting spherical averaging" << endl;
+            std::cout << "Starting spherical averaging" << endl;
             double dens;
 
             for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
@@ -2184,7 +2184,7 @@ void options::digest_options()
                 }
                 outputFile.close();
             }
-           std::cout << "Data written to output.dat" << endl;
+            std::cout << "Data written to output.dat" << endl;
             delete (wavy);
             exit(0);
         }
@@ -2194,10 +2194,10 @@ void options::digest_options()
             exit(0);
         }
         else if (temp == "-test")
-           std::cout << "Running in test mode!" << endl, test = true;
+            std::cout << "Running in test mode!" << endl, test = true;
         else if (temp == "-thakkar_d_plot")
         {
-           std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
+            std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
             exit(0);
         }
         else if (temp == "-twin")

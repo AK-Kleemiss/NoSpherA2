@@ -30,6 +30,7 @@ atom::atom() {
     basis_set_id = 0;
     ECP_electrons = 0;
     frac_coords = { 0.,0.,0. };
+	is_asym = false;
 };
 
 atom::atom(const std::string& l, 
@@ -38,7 +39,7 @@ atom::atom(const std::string& l,
     const double& c1, 
     const double& c2, 
     const double& c3, 
-    const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }) 
+    const int& ch) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(0), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
 {};
 
 atom::atom(const std::string& l, 
@@ -48,7 +49,7 @@ atom::atom(const std::string& l,
     const double& c2, 
     const double& c3, 
     const int& ch, 
-    const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 })
+    const int& ECP_els) : nr(n), label(l), ID(id), x(c1), y(c2), z(c3), charge(ch), ECP_electrons(ECP_els), basis_set_id(0), frac_coords({ 0,0,0 }), is_asym(false)
 {};
 
 atom atom::operator= (const atom& rhs) {

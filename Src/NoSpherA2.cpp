@@ -404,7 +404,7 @@ int main(int argc, char **argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         // this one is for generation of an fchk file
-        if (opt.basis_set != "" || opt.fchk != "")
+        if (opt.fchk != "")
         {
             // Make a fchk out of the wfn/wfx file
             filesystem::path tmp = opt.basis_set_path / opt.basis_set;

@@ -135,6 +135,9 @@
     <ClCompile Include="..\Src\bondwise_analysis.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\cif.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -261,6 +264,9 @@
       <Filter>Headerdateien</Filter>
     </ClInclude>
     <ClInclude Include="..\Src\bondwise_analysis.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\cif.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
