@@ -66,7 +66,7 @@ jobs:
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2_arm64 -j && mv NoSpherA2_arm64 ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_arm64 && mv NoSpherA2_arm64 ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -129,7 +129,7 @@ jobs:
           make install
 
     - name: make_Linux
-      run: cd Linux && make -j
+      run: cd Linux && make
 
     - name: Archive executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
