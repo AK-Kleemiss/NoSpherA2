@@ -33,33 +33,20 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-openblas-mac
-      with:
-        path: Lib/OpenBLAS_build
-        key: openblas-mac-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
-        restore-keys: |
-          openblas-mac-${{ runner.os }}-
-    
-    - name: make_OpenBLAS
-      if: steps.cache-openblas-mac.outputs.cache-hit != 'true'
-      run: |
-          cd OpenBLAS 
-          mkdir -p installation 
-          make -j 
-          make PREFIX=../Lib/OpenBLAS_build/ install
+    - name: Install Compiler
+      run: brew install cmake
 
-    - name: make_OpenMP
+    #Xcode Command Line Tools
+    - name: Install Xcode Command Line Tools
       run: |
-          cd llvm-project/openmp 
-          mkdir -p build 
-          cd build 
-          cmake -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DLIBOMP_ENABLE_SHARED=OFF -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 .. 
-          make -j
-          cd runtime/src
-          cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
+        xcode-select --install || echo "Xcode Command Line Tools already installed"
+        sudo xcodebuild -license accept
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2
+        git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2/featomic
+
+    - name: Get OMP library
+      run: brew install libomp
 
     # Cache featomic
     - name: Cache featomic Build
@@ -82,7 +69,7 @@ jobs:
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2_native -j && mv NoSpherA2_native ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2 -j && mv NoSpherA2_Mac ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -109,34 +96,21 @@ jobs:
     - name: Install Compiler
       run: sudo apt update && sudo apt install -y build-essential
 
-    # Cache OpenBLAS
-    - name: Cache OpenBLAS Build
+    # Cache IntelMKL
+    - name: Cache IntelMKL Build
       uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-openblas-linux
+      id: cache-intelmkl-linux
       with:
-        path: Lib/OpenBLAS_build
-        key: openblas-linux-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
+        path: Lib/MKL
+        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
         restore-keys: |
-          openblas-linux-${{ runner.os }}-
+          intelmkl-linux-${{ runner.os }}-
 
-    - name: Build OpenBLAS
-      if: steps.cache-openblas-linux.outputs.cache-hit != 'true'
+    - name: Build IntelMKL
+      if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
       run: |
-          cd OpenBLAS 
-          mkdir -p installation 
-          make -j 
-          make PREFIX=installation install
-    
-
-    - name: make_OpenMP
-      run: |
-        cd llvm-project/openmp 
-        mkdir -p build 
-        cd build 
-        cmake -DCMAKE_C_COMPILER=gcc -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++ -DLIBOMP_ENABLE_SHARED=OFF .. 
-        make -j
-        cd runtime/src
-        cmake -DCMAKE_INSTALL_PREFIX=../../../../../Lib/OpenMP_build/ -P cmake_install.cmake
+          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh 
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=$(intel_ROOT) --eula accept
 
     # Cache featomic
     - name: Cache featomic Build
@@ -188,29 +162,6 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
 
-    # Cache OpenBLAS build
-    - name: Cache OpenBLAS Build
-      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-openblas-windows
-      with:
-        path: Lib/OpenBLAS_build  # Adjust if OpenBLAS installs elsewhere
-        key: openblas-windows-${{ runner.os }}-${{ hashFiles('OpenBLAS/**,Lib/OpenBLAS_build/**') }}
-        restore-keys: |
-          openblas-windows-${{ runner.os }}-
-
-    # Build OpenBLAS only if cache is missing
-    - name: make_OpenBLAS
-      if: steps.cache-openblas-windows.outputs.cache-hit != 'true'
-      shell: pwsh
-      run: |
-          cd OpenBLAS 
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DNOFORTRAN=ON ..
-          msbuild -nologo OpenBLAS.sln -p:Configuration=Release -m
-          cmake -DBUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=install -P cmake_install.cmake
-          robocopy ./install/ ../../Lib/OpenBLAS_build\ /E ; if ($LASTEXITCODE -le 7) { $global:LASTEXITCODE = 0 }
-
     # Cache featomic build
     - name: Cache featomic Build
       uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
@@ -234,6 +185,9 @@ jobs:
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
           msbuild -nologo .\featomic.sln -p:Configuration=Release
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
+
+    - name: Get Intel MKL
+      run: MSBuild .\Windows\NoSpherA2.sln /t:Restore -p:RestorePackagesConfig=true
 
     - name: make_Windows
       run: |
