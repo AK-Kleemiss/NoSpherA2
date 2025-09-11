@@ -33,9 +33,6 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    - name: Install Compiler
-      run: brew install cmake
-
     #Xcode Command Line Tools
     - name: Install Xcode Command Line Tools
       run: |
@@ -69,7 +66,7 @@ jobs:
 
     - name: make_MacOS
       run: >
-          cd Mac && make NoSpherA2 -j && mv NoSpherA2_Mac ../NoSpherA2_Mac
+          cd Mac && make NoSpherA2_arm64 -j && mv NoSpherA2_arm64 ../NoSpherA2_Mac
 
     - name: Archive executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -110,7 +107,7 @@ jobs:
       if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
       run: |
           wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh 
-          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=$(intel_ROOT) --eula accept
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/Lib/MKL --eula accept
 
     # Cache featomic
     - name: Cache featomic Build
