@@ -114,30 +114,35 @@ else
 endif
 
 
-NoSpherA2_Debug: IntelMKL featomic
-	@echo Building NoSpherA2_Debug for $(NAME)
-ifeq ($(NAME),WINDOWS)
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
-endif
-ifeq ($(NAME),LINUX)
-	@echo Start making Linux executable for NoSpherA2_Debug
-	@rm -f NoSpherA2_Debug
-	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
-endif
-ifeq ($(NAME),MAC)
-	@echo Debugging Currently not supported on Mac
-endif
-
 ifeq ($(NAME),WINDOWS)
 NoSpherA2: IntelMKL featomic
-	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe .
+	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Release /p:Platform=x64 && cd .. && copy Windows\x64\Release\NoSpherA2.exe . && copy Windows\x64\Release\libiomp5md.dll
+
+NoSpherA2_Debug: IntelMKL featomic
+	@echo Building NoSpherA2_Debug for $(NAME)
+	@cd Windows && msbuild NoSpherA2.sln /p:Configuration=Debug /p:Platform=x64 && cd .. && copy Windows\x64\Debug\NoSpherA2.exe .
+
+clean:
+	@cd Windows && if exist x64 rd /s /q x64
 endif
+
 ifeq ($(NAME),LINUX)
 NoSpherA2: IntelMKL featomic
 	@echo Start making Linux executable
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
+
+
+NoSpherA2_Debug: IntelMKL featomic
+	@echo Building NoSpherA2_Debug for $(NAME)
+	@rm -f NoSpherA2_Debug
+	@cd Linux && rm -f NoSpherA2_Debug && make NoSpherA2_Debug -j
+
+clean:
+	@cd Linux && make clean
+
 endif
+
 ifeq ($(NAME),MAC)
 NoSpherA2: IntelMKL featomic_$(NATIVE_ARCH)
 	@echo Start making Mac $(NATIVE_ARCH) executable
@@ -158,6 +163,9 @@ NoSpherA2_lipo:IntelMKL featomic_arm64 featomic_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
+
+clean:
+	@cd Mac && make clean
 endif
 
 test: NoSpherA2
@@ -166,4 +174,4 @@ tests: NoSpherA2
 	make -C tests all -k -B
 
 
-.PHONY: test tests NoSpherA2 all NoSpherA2_Debug
+.PHONY: test tests NoSpherA2 all NoSpherA2_Debug clean IntelMKL featomic check_rust
