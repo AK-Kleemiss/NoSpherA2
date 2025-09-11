@@ -132,7 +132,6 @@ NoSpherA2: IntelMKL featomic
 	@rm -f NoSpherA2
 	@cd Linux && rm -f NoSpherA2 && make all -j
 
-
 NoSpherA2_Debug: IntelMKL featomic
 	@echo Building NoSpherA2_Debug for $(NAME)
 	@rm -f NoSpherA2_Debug
