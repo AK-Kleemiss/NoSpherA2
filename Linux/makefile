@@ -50,7 +50,7 @@ MKL_LINK_FLAGS = \
 
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(SRC_DIR)/auxiliary_basis.cpp
 
 # Convert sources to object names (extract basename without path/extension)
 OBJ_NAMES := $(basename $(notdir $(SRCS)))
@@ -75,13 +75,13 @@ auxiliary_basis.o: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.cpp'
+	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
 auxiliary_basis.o_d: basis_set_converter
 	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
 	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
 	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.cpp'
+	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
 
 # ---- Pattern rules ----
 %.o: ../Src/%.cpp pch.h.gch
