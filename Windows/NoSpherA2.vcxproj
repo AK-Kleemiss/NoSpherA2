@@ -10800,6 +10800,7 @@
     <ClCompile Include="..\Src\b2c.cpp" />
     <ClCompile Include="..\Src\bondwise_analysis.cpp" />
     <ClCompile Include="..\Src\cart2sph.cpp" />
+    <ClCompile Include="..\Src\cif.cpp" />
     <ClCompile Include="..\Src\constants.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|ARM64'">Use</PrecompiledHeader>
@@ -12973,6 +12974,7 @@
     <ClInclude Include="..\Src\b2c.h" />
     <ClInclude Include="..\Src\bondwise_analysis.h" />
     <ClInclude Include="..\Src\cart2sph.h" />
+    <ClInclude Include="..\Src\cif.h" />
     <ClInclude Include="..\Src\constants.h" />
     <ClInclude Include="..\Src\ECPs_corrections.h" />
     <ClInclude Include="../Src/npy.h" />
@@ -13031,9 +13033,9 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="intelmkl.static.win-x64" Version="2025.2.0.627" />
-	<PackageReference Include="intelopenmp.devel.win" Version="2025.2.1.1000" />
-	<PackageReference Include="intelopenmp.redist.win" Version="2025.2.1.1000" />
-</ItemGroup>
+    <PackageReference Include="intelopenmp.devel.win" Version="2025.2.1.1000" />
+    <PackageReference Include="intelopenmp.redist.win" Version="2025.2.1.1000" />
+  </ItemGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
