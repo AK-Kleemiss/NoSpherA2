@@ -568,7 +568,7 @@ void cube::calc_dv() {
 
 // Function to compute dot product
 template <typename T>
-inline const double dot(const T& a, const T& b) {
+inline const double dot_(const T& a, const T& b) {
     double result = 0;
     for (int i = 0; i < a.size(); i++) {
         result += a[i] * b[i];
@@ -636,7 +636,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
 
     // Compute volume of the unit cell
     const std::array<double, 3> crossProduct = cross(cell_vectors[1], cell_vectors[2]);
-    const double volume = fabs(dot(cell_vectors[0], crossProduct));
+    const double volume = fabs(dot_(cell_vectors[0], crossProduct));
     std::cout << "Volume: " << volume << std::endl;
     const int grid_points = size[0] * size[1] * size[2];
     std::cout << "Number of grid points: " << grid_points << std::endl;
@@ -733,7 +733,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                         h * reciprocalLattice[0][1] + k * reciprocalLattice[1][1] + l * reciprocalLattice[2][1],
                         h * reciprocalLattice[0][2] + k * reciprocalLattice[1][2] + l * reciprocalLattice[2][2]
                     };
-                    const double k2 = dot(kvec, kvec);
+                    const double k2 = dot_(kvec, kvec);
 #pragma omp parallel for reduction(+:temp)
                     for (int d1 = 0; d1 < size[0]; d1++) {
                         double v1 = 0, kDotR = 0;
@@ -744,7 +744,7 @@ double cube::ewald_sum(const int kMax, const double conv) {
                                 for (int d4 = 0; d4 < size[0]; d4++) {
                                     for (int d5 = 0; d5 < size[1]; d5++) {
                                         for (int d6 = 0; d6 < size[2]; d6++) {
-                                            kDotR = dot(kvec, rij[d1 * size[1] * size[2] + d2 * size[2] + d3][d4 * size[1] * size[2] + d5 * size[2] + d6]);
+                                            kDotR = dot_(kvec, rij[d1 * size[1] * size[2] + d2 * size[2] + d3][d4 * size[1] * size[2] + d5 * size[2] + d6]);
                                             temp += exp(-k2 / FOUR_alsq) / abs(k2) * v1 * values[d4][d5][d6] * cos(kDotR);
                                         }
                                     }

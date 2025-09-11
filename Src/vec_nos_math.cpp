@@ -2,7 +2,7 @@
 #include "nos_math.h"
 
 #if defined(__APPLE__)
-// On macOS we’re using Accelerate for BLAS/LAPACK
+// On macOS weï¿½re using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
 #else
 // Linux/Windows with oneMKL
@@ -237,15 +237,22 @@ template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    if (conjugate)
-    {
-        for (size_t i = 0; i < vec1.size(); ++i)
+    if constexpr (std::is_same_v<T, std::complex<double>> ){
+        if (conjugate)
         {
-            result += conj(vec1[i]) * vec2[i];
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += std::conj(vec1[i]) * vec2[i];
+            }
         }
-    }
-    else
-    {
+        else
+        {
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += vec1[i] * vec2[i];
+            }
+        }
+    } else {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];

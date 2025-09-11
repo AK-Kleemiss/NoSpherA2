@@ -3,7 +3,7 @@
 #include "nos_math.h"
 
 #if defined(__APPLE__)
-// On macOS we’re using Accelerate for BLAS/LAPACK
+// On macOS we're using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
 #else
 // Linux/Windows with oneMKL
@@ -282,10 +282,24 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     const lapack_int lda = n;    // Leading dimension of eri2c
     const lapack_int ldb = 1;    // Leading dimension of rho
     ivec ipiv(n, 0);              // Pivot indices
+    lapack_int info = 0;
 
-    // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
+#if defined(__APPLE__)
+    // Convert row-major to column-major for Accelerate
+    vec A_col_major(A.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            A_col_major[j * n + i] = A[i * n + j]; // Transpose
+        }
+    }
+    
+    lapack_int ldb_col = n;
 
+    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &ldb_col, &info);
+#else
+    // MKL/LAPACKE: C interface, row-major
+    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
+#endif
     if (info != 0)
     {
         std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
@@ -360,7 +374,13 @@ NNLSResult nnls(dMatrix2& A,
         }
         int tmpint = m - nrow;
 
+        #if defined(__APPLE__)
+        lapack_int tmpint_nonconst = tmpint;
+        lapack_int incx = 1;
+        dlarfg_(&tmpint_nonconst, &work[nrow], &work[nrow + 1], &incx, &tau);
+        #else
         LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
+        #endif
         beta = work[nrow];
         work[nrow] = 1.0;
         unorm = 0.0;
@@ -375,7 +395,16 @@ NNLSResult nnls(dMatrix2& A,
             // ztest which is the new prospective value for x[j].
             std::copy(b.data(), b.data() + m, zz.begin());
 
+            #if defined(__APPLE__)
+            char side = 'L';
+            lapack_int tmpint_nonconst = tmpint;
+            lapack_int one = 1;
+            double work_temp[tmpint]; // workspace array
+            dlarfx_(&side, &tmpint_nonconst, &one, &work[nrow], &tau, &zz[nrow], &tmpint_nonconst, work_temp);
+            #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+            #endif
+            
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
                 // Set w[j] to 0.0 and move to the next greatest entry in w.
@@ -402,7 +431,15 @@ NNLSResult nnls(dMatrix2& A,
                 for (int _j = nrow; _j < m; ++_j) {
                     zz[_j] = A(_j, col);
                 }
+                #if defined(__APPLE__)
+                char side = 'L';
+                lapack_int tmpint_nonconst = tmpint;
+                lapack_int one = 1;
+                double work_temp2[tmpint]; // workspace array
+                dlarfx_(&side, &tmpint_nonconst, &one, &work[nrow], &tau, &zz[nrow], &tmpint_nonconst, work_temp2);
+                #else
                 LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+                #endif
                 for (int _j = nrow; _j < m; ++_j) {
                     A(_j, col) = zz[_j];
                 }
@@ -464,7 +501,11 @@ NNLSResult nnls(dMatrix2& A,
                     for (int j = jj; j < nsetp; ++j) {
                         int ii = inds[j];
                         inds[j - 1] = ii;
+                        #if defined(__APPLE__)
+                        dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #else
                         LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #endif
                         A(j, ii) = 0.0;
                         for (int col = 0; col < n; ++col) {
                             if (col != ii) {

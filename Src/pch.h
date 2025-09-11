@@ -14,9 +14,10 @@
 #include <numeric>
 
 #if defined(__APPLE__)
-// On macOS we’re using Accelerate for BLAS/LAPACK
+// On macOS weï¿½re using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
 #define lapack_int int
+#define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
 #else
 // Linux/Windows with oneMKL
 #include <mkl.h>

@@ -5722,6 +5722,7 @@ int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double
     int32_t LWORK = MXRYSROOTS * 18;
     //int32_t IWORK[MXRYSROOTS * 10];
     int32_t LIWORK = MXRYSROOTS * 10;
+    int INFO = 0;
     /*
         int matrix_layout, char jobz, char range,
         lapack_int n, double* d, double* e, double vl,
@@ -5730,8 +5731,20 @@ int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double
         lapack_int nzc, lapack_int* isuppz,
         lapack_logical* tryrac
         */
-    int INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
-    // Transpose vec of size n x n
+    #if defined(__APPLE__)
+    // Use Fortran-style LAPACK call
+    char jobz = 'V', range = 'A';
+    double work_temp[MXRYSROOTS * 18];
+    int iwork[MXRYSROOTS * 10];
+    dstemr_(&jobz, &range, &n, diag, diag_off1,
+                        nullptr, nullptr, nullptr, nullptr,
+                        &M, eig, vec, &LDZ, &NZC,
+                        ISUPPZ, &TRYRAC, work_temp, &LWORK,
+                        iwork, &LIWORK, &INFO);
+    #else
+    INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
+    #endif
+        // Transpose vec of size n x n
     // Original version usess COL_MAJOR version but this just does not seem to work here?
     // for (int i = 0; i < n; i++) {
     //    for (int j = i +1; j < n; j++) {

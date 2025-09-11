@@ -5,9 +5,8 @@ RM   := rm -f
 COMP ?= clang++
 APP  ?= NoSpherA2
 
-# Build both architectures; set ARCHS := arm64 if you don't have x86_64 libomp installed
-#ARCHS := arm64 x86_64
-ARCHS := arm64
+# Build both architectures for universal binary
+ARCHS := arm64 x86_64
 
 # Source & include roots
 SRC_DIR := ../Src
@@ -17,15 +16,15 @@ INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
               ../Lib/featomic_install/lib/libmetatensor.a
 
-# Sources
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+# Sources - exclude files that are included in other source files
+SRCS := $(filter-out $(SRC_DIR)/SALTED_predictor.cpp $(SRC_DIR)/SALTED_io.cpp $(SRC_DIR)/SALTED_equicomb.cpp, $(wildcard $(SRC_DIR)/*.cpp))
 
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
 OBJS_x86_64 := $(patsubst $(SRC_DIR)/%.cpp, build/x86_64/%.o, $(SRCS))
 
 # Common compile settings
-CXXSTD    := -std=c++20
+CXXSTD    := -std=c++20 -DACCELERATE_NEW_LAPACK
 OPTFLAGS  := -O3 -fvisibility=hidden
 WARNFLAGS := -fmessage-length=0
 INCLUDES  := $(addprefix -I,$(INC_DIRS))
@@ -60,7 +59,29 @@ LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
 # --------------------------------------------------------------------
 # Targets
 # --------------------------------------------------------------------
-all: $(APP)
+
+# Default target is universal binary
+all: NoSpherA2
+
+# Universal binary (both architectures)
+NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
+	@echo "Building MAC executable"
+	@echo "Start making Mac executable"
+	@echo "Lipo → $@"
+	@lipo -create -output $@ NoSpherA2_arm64 NoSpherA2_x86_64
+	@cp $@ ../
+	@echo "Done."
+
+# Single architecture builds
+NoSpherA2_arm64: $(OBJS_arm64)
+	@echo "Building MAC executable for arm64"
+	@echo "Link (arm64)…"
+	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_arm64) -o $@
+
+NoSpherA2_x86_64: $(OBJS_x86_64)
+	@echo "Building MAC executable for x86_64"
+	@echo "Link (x86_64)…"
+	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_x86_64) -o $@
 
 # Keep your original converter step
 basis_set_converter:
@@ -81,29 +102,13 @@ build/x86_64/%.o: $(SRC_DIR)/%.cpp | build/x86_64
 build/arm64  build/x86_64:
 	@mkdir -p $@
 
-# Link per-arch
-NoSpherA2_arm64: $(OBJS_arm64)
-	@echo "Link (arm64)…"
-	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_arm64) -o $@
-
-NoSpherA2_x86_64: $(OBJS_x86_64)
-	@echo "Link (x86_64)…"
-	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_x86_64) -o $@
-
-# Create universal
-$(APP): $(filter NoSpherA2_%,$(foreach A,$(ARCHS),NoSpherA2_$(A)))
-	@echo "Lipo → $@"
-	@lipo -create -output $@ $^
-	@cp $@ ../
-	@echo "Done."
-
 # Debug variant
 debug: CXXFLAGS_COMMON := -std=c++20 -O0 -g $(WARNFLAGS) $(INCLUDES) $(SYSROOT)
 debug: LDFLAGS_COMMON  := $(SYSROOT) -framework Accelerate
-debug: clean $(APP)
+debug: clean NoSpherA2_arm64
 
 clean:
 	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
 	@echo "Cleaned."
 
-.PHONY: all clean debug basis_set_converter
+.PHONY: all clean debug basis_set_converter NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
