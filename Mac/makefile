@@ -20,6 +20,7 @@ EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
   SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+endif
 
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))

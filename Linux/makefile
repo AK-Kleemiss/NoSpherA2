@@ -53,6 +53,7 @@ MKL_LINK_FLAGS = \
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
   SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+endif
 
 # Convert sources to object names (extract basename without path/extension)
 OBJ_NAMES := $(basename $(notdir $(SRCS)))
