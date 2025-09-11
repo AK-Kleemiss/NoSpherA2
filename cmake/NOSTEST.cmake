@@ -1,14 +1,8 @@
-if (WIN32)
-    set(NoSpherA2_EXE ${CMAKE_BINARY_DIR}/Src/NoSpherA2.exe)
-else ()
-    set(NoSpherA2_EXE ${CMAKE_BINARY_DIR}/Src/NoSpherA2)
-endif ()
-
 function(add_nos_test test_name test_args)
     # Parse keyworded args: ARGS (single value), COMPARE_NAME (single value)
     cmake_parse_arguments(PARSE_ARGV 2 TEST "" "COMPARE_NAME;COMPARE_GOOD;DIRECTORY" "")
     if(NOT TEST_COMPARE_NAME)
-        set(TEST_COMPARE_NAME "${test_name}.good")
+        set(TEST_COMPARE_NAME "NoSpherA2.log")
     endif()
     if (NOT TEST_DIRECTORY)
         set(TEST_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/${test_name}")
@@ -18,14 +12,23 @@ function(add_nos_test test_name test_args)
         set(TEST_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/${TEST_DIRECTORY})
     endif ()
     if (NOT TEST_COMPARE_GOOD)
-        set(TEST_COMPARE_GOOD "NoSpherA2.log")
+        set(TEST_COMPARE_GOOD "${test_name}.good")
     endif ()
     file(COPY ${TEST_SRC_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
     add_test(
         NAME ${test_name}
         WORKING_DIRECTORY ${TEST_BIN_DIR}
+#        COMMAND bash -c "$<TARGET_FILE:NoSpherA2> ${test_args} && diff -q -i -b ${TEST_COMPARE_NAME} ${TEST_COMPARE_GOOD}"
         COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/runTest.py
-                "${TEST_COMPARE_NAME}" "${TEST_COMPARE_GOOD}" "${NoSpherA2_EXE} ${test_args}"
+                "${TEST_COMPARE_NAME}" "${TEST_COMPARE_GOOD}" "$<TARGET_FILE:NoSpherA2> ${test_args}"
+    )
+    string(REPLACE " " ";" my_list "${test_args}")
+    add_custom_target(
+        debug_test_${test_name}
+#        COMMAND $<TARGET_FILE:NoSpherA2> ${my_list}
+        COMMAND $<TARGET_FILE:NoSpherA2>
+        WORKING_DIRECTORY ${TEST_BIN_DIR}
+        DEPENDS NoSpherA2
     )
 endfunction()

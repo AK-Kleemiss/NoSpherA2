@@ -6,6 +6,7 @@ add_executable(NoSpherA2
     "${GENERATED_AUX_CPP}"
     "${CMAKE_CURRENT_SOURCE_DIR}/wfn_class.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/atoms.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/cif.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/properties.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/spherical_density.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AtomGrid.cpp"
@@ -35,7 +36,6 @@ add_executable(NoSpherA2
     "${CMAKE_CURRENT_SOURCE_DIR}/qct.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/b2c.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/bondwise_analysis.cpp"
-
 )
 add_dependencies(NoSpherA2 generate_auxiliary_basis)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})

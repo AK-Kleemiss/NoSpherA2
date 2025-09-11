@@ -15,4 +15,4 @@ if __name__ == "__main__":
         log = f.read().strip()
 
     if good != log:
-        raise Exception("Test failed")
+        raise Exception(f"Test failed:\nLog:\n{log}")
