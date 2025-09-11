@@ -18,6 +18,10 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(BUILD_OPENMP "Necessary if cross compiling from windows to Linux/Darwin" OFF)
     option(USE_VECTOR_INSTRUCTIONS "If you want to use vector instructions. Defaults to ON" ON)
     option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
+    set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
+        "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
+    set(FAKE_HOME_TEST "ON" CACHE STRING
+        "This is for testing the automatic install of MKL. It pretends the home directory is at /tmp/home.")
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)

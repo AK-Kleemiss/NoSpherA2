@@ -76,10 +76,9 @@ target_link_options(NoSpherA2 PRIVATE
 )
 
 target_link_libraries(NoSpherA2 PUBLIC
+    MKL::MKL
     basis_set_helper
     mdspan
-    openmp
-    openblas
     metatensor
     featomic_static
     -ldl

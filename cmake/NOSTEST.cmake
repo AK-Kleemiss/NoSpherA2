@@ -7,9 +7,6 @@ endif ()
 function(add_nos_test test_name test_args)
     # Parse keyworded args: ARGS (single value), COMPARE_NAME (single value)
     cmake_parse_arguments(PARSE_ARGV 2 TEST "" "COMPARE_NAME;COMPARE_GOOD;DIRECTORY" "")
-
-    message(STATUS "Running test for ${test_name}!")
-
     if(NOT TEST_COMPARE_NAME)
         set(TEST_COMPARE_NAME "${test_name}.good")
     endif()

@@ -25,7 +25,6 @@ set(metatensor_STATIC_LIB ${metatensor_BINARY_DIR}/metatensor-core/target/releas
 CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.1/featomic-cxx-0.6.1.tar.gz"
-#    DOWNLOAD_ONLY YES
     OPTIONS
         "CMAKE_BUILD_TYPE Release"
         "FEATOMIC_FETCH_METATENSOR OFF"
@@ -43,81 +42,64 @@ if (featomic_ADDED)
            "${featomic_SOURCE_DIR}/include"
     )
 endif ()
-
-CPMAddPackage(
-    NAME cmakeLLVM
-    URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/cmake-21.1.0.src.tar.xz"
-    DOWNLOAD_ONLY YES
-)
-
-CPMAddPackage(
-    NAME openmpLLVM
-    URL "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.0/openmp-21.1.0.src.tar.xz"
-    DOWNLOAD_ONLY YES
-)
-
-if (cmakeLLVM_ADDED AND openmpLLVM_ADDED)
-    set(openmp_SOURCE_DIR "${CMAKE_BINARY_DIR}/_deps/openmpLLVM-src")
-    file(MAKE_DIRECTORY ${openmp_SOURCE_DIR})
-    file(COPY "${cmakeLLVM_SOURCE_DIR}/" DESTINATION "${openmp_SOURCE_DIR}/cmake")
-    file(COPY "${openmpLLVM_SOURCE_DIR}/" DESTINATION "${openmp_SOURCE_DIR}/openmp")
-    set(openmp_INSTALL_DIR ${CMAKE_BINARY_DIR}/_deps/openmpLLVM-install)
-    file(MAKE_DIRECTORY ${openmp_INSTALL_DIR})
-    file(MAKE_DIRECTORY ${openmp_INSTALL_DIR}/include)
-    message(WARNING ${CMAKE_BUILD_PARALLEL_LEVEL})
-    ExternalProject_Add(
-        openmpLLVM
-        SOURCE_DIR "${openmp_SOURCE_DIR}/openmp"
-        BINARY_DIR "${CMAKE_BINARY_DIR}/_deps/openmpLLVM-build"
-        CMAKE_ARGS
-            -DLIBOMP_ENABLE_SHARED=OFF
-            -DLIBOMP_FORTRAN_MODULES=ON
-        INSTALL_COMMAND ${CMAKE_COMMAND} --install . --prefix ${openmp_INSTALL_DIR}
-        BUILD_BYPRODUCTS ${openmp_INSTALL_DIR}/lib/libomp.a
-    )
-    add_library(openmp INTERFACE IMPORTED GLOBAL)
-    add_dependencies(openmp openmpLLVM)
-    target_link_libraries(openmp INTERFACE ${openmp_INSTALL_DIR}/lib/libomp.a)
-    target_include_directories(
-        openmp INTERFACE
-           ${openmp_INSTALL_DIR}/include
-    )
+set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
+message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
+message(WARNING "HERE: ${CMAKE_SOURCE_DIR}")
+if (${FAKE_HOME_TEST})
+    set(HOME "/tmp/home")
+else ()
+    set(HOME $ENV{HOME})
 endif ()
 
+if (NOT EXISTS ${ONEAPI_DIRECTORY})
+    set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
+    set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
 
-CPMAddPackage(
-    NAME openblas
-    URL "https://github.com/OpenMathLib/OpenBLAS/releases/download/v0.3.30/OpenBLAS-0.3.30.tar.gz"
-    DOWNLOAD_ONLY YES
-)
+    if(NOT EXISTS "${_MKL_CONFIG}")
+        file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/Lib/MKL")
+        set(_MKL_SH "${CMAKE_SOURCE_DIR}/Lib/intel-mkl-installer.sh")
+        if (NOT EXISTS ${_MKL_SH})
+            file(DOWNLOAD
+              "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh"
+              "${_MKL_SH}"
+              EXPECTED_HASH SHA256=7bfdde1379a9cd3c2784af4352931a0527a5c483c9da71e851a3f06e055af7c7
+              SHOW_PROGRESS
+              STATUS _DL_STATUS
+            )
+            list(GET _DL_STATUS 0 _DL_CODE)
+            if(NOT _DL_CODE EQUAL 0)
+              message(FATAL_ERROR "Failed to download oneMKL: ${_DL_STATUS}")
+            endif()
+        endif ()
+        set(OLD_HOME $ENV{HOME})
+        set(ENV{HOME} "/tmp/home")
+        message(STATUS "INSTALLING MKL IN: ${MKL_INSTALL_DIR}")
+        file(MAKE_DIRECTORY $ENV{HOME})
+        execute_process(
+            COMMAND "${_MKL_SH}" -a --silent --eula accept --install-dir "${MKL_INSTALL_DIR}"
 
-if (openblas_ADDED)
-    ExternalProject_Add(
-        OpenBLAS
-        SOURCE_DIR ${openblas_SOURCE_DIR}
-        DEPENDS openmp
-        BUILD_IN_SOURCE ON
-        BUILD_COMMAND make FC=gfortran USE_OPENMP=1 -j
-        INSTALL_COMMAND make install PREFIX=${CMAKE_BINARY_DIR}/3rdparty/openblas
-
-        BUILD_BYPRODUCTS ${CMAKE_BINARY_DIR}/3rdparty/openblas/lib/libopenblas.a
-        LOG_BUILD ON
+          RESULT_VARIABLE _MKL_RC
+        )
+        FILE(REMOVE $ENV{HOME})
+        set(ENV{HOME} ${OLD_HOME})
+        if(NOT _MKL_RC EQUAL 0)
+          message(FATAL_ERROR "oneMKL installer failed with code ${_MKL_RC}")
+        endif()
+    endif()
+    list(APPEND CMAKE_PREFIX_PATH "${_MKL_ROOT}")
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_MKL_ROOT}"
+        PATH_SUFFIXES "lib/cmake/mkl"
     )
-    # Create imported target
-    add_library(openblas STATIC IMPORTED GLOBAL)
-    add_dependencies(openblas OpenBLAS)
-    set_target_properties(openblas PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/3rdparty/openblas/lib/libopenblas.a
+    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+
+else ()
+    set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_ONEAPI_MKL_ROOT}" "${ONEAPI_DIRECTORY}"
+        PATH_SUFFIXES "lib/cmake/mkl"
     )
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/3rdparty/openblas/include)
-    set(OPENBLAS_INCLUDE_DIR ${CMAKE_BINARY_DIR}/3rdparty/openblas/include PARENT_SCOPE)
-    message(WARNING ${OPENBLAS_INCLUDE_DIR})
-    target_include_directories(openblas INTERFACE ${CMAKE_BINARY_DIR}/3rdparty/openblas/include)
+  message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
 
-    set(DESTINATION_INCLUDE_DIR "${CMAKE_BINARY_DIR}/3rdparty/openblas/include")
-    set(openblas_SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/openblas-src)
-
-    message(WARNING "SOURCE DIR: ${openblas_SOURCE_DIR}")
-    file(MAKE_DIRECTORY "${DESTINATION_INCLUDE_DIR}")
 endif ()
 
