@@ -292,10 +292,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
             A_col_major[j * n + i] = A[i * n + j]; // Transpose
         }
     }
-    
-    lapack_int ldb_col = n;
-
-    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &ldb_col, &info);
+    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &n, &info);
 #else
     // MKL/LAPACKE: C interface, row-major
     info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
@@ -375,9 +372,8 @@ NNLSResult nnls(dMatrix2& A,
         int tmpint = m - nrow;
 
         #if defined(__APPLE__)
-        lapack_int tmpint_nonconst = tmpint;
         lapack_int incx = 1;
-        dlarfg_(&tmpint_nonconst, &work[nrow], &work[nrow + 1], &incx, &tau);
+        dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
         #else
         LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
         #endif
@@ -397,10 +393,9 @@ NNLSResult nnls(dMatrix2& A,
 
             #if defined(__APPLE__)
             char side = 'L';
-            lapack_int tmpint_nonconst = tmpint;
             lapack_int one = 1;
-            double work_temp[tmpint]; // workspace array
-            dlarfx_(&side, &tmpint_nonconst, &one, &work[nrow], &tau, &zz[nrow], &tmpint_nonconst, work_temp);
+            vec work_temp(tmpint, 0.0);
+            dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
             #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
             #endif
@@ -433,10 +428,9 @@ NNLSResult nnls(dMatrix2& A,
                 }
                 #if defined(__APPLE__)
                 char side = 'L';
-                lapack_int tmpint_nonconst = tmpint;
                 lapack_int one = 1;
-                double work_temp2[tmpint]; // workspace array
-                dlarfx_(&side, &tmpint_nonconst, &one, &work[nrow], &tau, &zz[nrow], &tmpint_nonconst, work_temp2);
+                vec work_temp(tmpint, 0.0);
+                dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
                 #else
                 LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
                 #endif
