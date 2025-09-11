@@ -8,6 +8,7 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "nos_math.h"
+#include "cif.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 
@@ -499,7 +500,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
+            write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
         // log_file.close();
         return 0;
     }
@@ -522,7 +523,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
+            write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
         return 0;
     }
     std::cout << NoSpherA2_message(opt.no_date);

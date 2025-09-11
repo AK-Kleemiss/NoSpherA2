@@ -161,14 +161,14 @@ const std::string get_CIF_table(const int nr, const WFN& wavy)
     return ss.str();
 }
 
-void WFN::write_wfn_CIF(const std::filesystem::path& fileName) const
+void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
 {
-    err_checkf(basis_set_name != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
+    err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);
     std::stringstream ss;
-    ss << get_basis_set_CIF(0, *this);
+    ss << get_basis_set_CIF(0, wavy);
     ss << "\n\n";
-    ss << get_CIF_table(0, *this);
+    ss << get_CIF_table(0, wavy);
     file << ss.str();
     file.close();
 }

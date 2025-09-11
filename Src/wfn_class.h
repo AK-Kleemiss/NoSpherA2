@@ -239,7 +239,7 @@ public:
     /** Freeform comment header. */
     const std::string get_comment() const { return comment; };
     /** Write wavefunction CIF export. */
-    void write_wfn_CIF(const std::filesystem::path &filename) const;
+    //void write_wfn_CIF(const std::filesystem::path &filename) const;
     /** Get primitive exponent by index. */
     const double get_exponent(int nr) const { return exponents[nr]; };
     /** Number of electrons (Z total - charge - ECP core electrons). */
