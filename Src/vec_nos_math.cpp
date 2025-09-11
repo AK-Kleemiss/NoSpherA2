@@ -237,7 +237,7 @@ template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    if constexpr (std::is_same_v<T, std::complex<double>> ){
+    if constexpr (std::is_same_v<T, cdouble> ){
         if (conjugate)
         {
             for (size_t i = 0; i < vec1.size(); ++i)
