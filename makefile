@@ -158,7 +158,7 @@ NoSpherA2_x86_64: IntelMKL featomic_x86_64
 	@rm -f NoSpherA2_x86_64
 	@cd Mac && rm -f NoSpherA2_x86_64 && make NoSpherA2_x86_64 -j && cp NoSpherA2_x86_64 ../NoSpherA2_x86_64
 
-NoSpherA2_lipo:IntelMKL featomic_arm64 featomic_x86_64
+NoSpherA2_lipo: IntelMKL featomic_arm64 featomic_x86_64
 	@echo Start making Mac universal executable
 	@rm -f NoSpherA2
 	@cd Mac && rm -f NoSpherA2 && make NoSpherA2 -j
