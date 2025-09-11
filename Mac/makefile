@@ -14,10 +14,10 @@ INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 
 # Local static libs (adjust as needed)
 EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
-              ../Lib/featomic_install/lib/libmetatensor.a
+			  ../Lib/featomic_install/lib/libmetatensor.a
 
 # Sources - exclude files that are included in other source files
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(SRC_DIR)/auxiliary_basis.cpp
 
 # Per-arch objects
 OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
@@ -85,10 +85,23 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 
 # Keep your original converter step
 basis_set_converter:
+	@echo "Building basis set converter..."
 	@$(MAKE) -f makefile_basis_set_converter
 
-# Ensure aux file builds after converter
-build/%/auxiliary_basis.o: basis_set_converter
+# Generate auxiliary_basis.cpp when needed
+$(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter
+	@echo "auxiliary_basis.cpp generated"
+
+# Special rule for auxiliary_basis.o - fix the source file reference
+build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
+	@echo "Compiling auxiliary_basis.o (arm64) after BasisSetConverter finishes"
+	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
+	@echo "Finished building: auxiliary_basis.cpp (arm64)"
+
+build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
+	@echo "Compiling auxiliary_basis.o (x86_64) after BasisSetConverter finishes"
+	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
+	@echo "Finished building: auxiliary_basis.cpp (x86_64)"
 
 # Pattern rules
 build/arm64/%.o: $(SRC_DIR)/%.cpp | build/arm64
