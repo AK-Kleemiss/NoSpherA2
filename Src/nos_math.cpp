@@ -1,10 +1,9 @@
 #include "pch.h"
 #include <execution>
-#include <vector>
 #include "nos_math.h"
 
 #if defined(__APPLE__)
-// On macOS we�re using Accelerate for BLAS/LAPACK
+// On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
 #else
 // Linux/Windows with oneMKL
@@ -282,11 +281,22 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
     const lapack_int lda = n;    // Leading dimension of eri2c
     const lapack_int ldb = 1;    // Leading dimension of rho
-    std::vector<lapack_int> ipiv(n, 0);              // Pivot indices
+    ivec ipiv(n, 0);              // Pivot indices
+    lapack_int info = 0;
 
-    // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
-
+#if defined(__APPLE__)
+    // Convert row-major to column-major for Accelerate
+    vec A_col_major(A.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            A_col_major[j * n + i] = A[i * n + j]; // Transpose
+        }
+    }
+    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &n, &info);
+#else
+    // MKL/LAPACKE: C interface, row-major
+    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
+#endif
     if (info != 0)
     {
         std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
@@ -306,7 +316,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
 //
 //    //using namespace lahva::gpu;
 //    //// similar to the CPU Matrix, we have a quadratic 5 x 5 matrix
-//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values.
+//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values. 
 //    //Matrix<float, CudaHostAllocator<float>, CudaDeviceAsyncAllocator<float>> s(5, 1.0);
 //
 //}
@@ -323,7 +333,7 @@ NNLSResult nnls(dMatrix2& A,
     ivec inds(n);
     vec w(n), x(n), work(m), zz(m);
 
-    for (int i = 0; i < n; ++i)
+    for (int i = 0; i < n; ++i) 
         inds[i] = i;
 
     int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
@@ -361,7 +371,12 @@ NNLSResult nnls(dMatrix2& A,
         }
         int tmpint = m - nrow;
 
+        #if defined(__APPLE__)
+        lapack_int incx = 1;
+        dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
+        #else
         LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
+        #endif
         beta = work[nrow];
         work[nrow] = 1.0;
         unorm = 0.0;
@@ -376,7 +391,15 @@ NNLSResult nnls(dMatrix2& A,
             // ztest which is the new prospective value for x[j].
             std::copy(b.data(), b.data() + m, zz.begin());
 
+            #if defined(__APPLE__)
+            char side = 'L';
+            lapack_int one = 1;
+            vec work_temp(tmpint, 0.0);
+            dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+            #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+            #endif
+            
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
                 // Set w[j] to 0.0 and move to the next greatest entry in w.
@@ -403,7 +426,14 @@ NNLSResult nnls(dMatrix2& A,
                 for (int _j = nrow; _j < m; ++_j) {
                     zz[_j] = A(_j, col);
                 }
+                #if defined(__APPLE__)
+                char side = 'L';
+                lapack_int one = 1;
+                vec work_temp(tmpint, 0.0);
+                dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+                #else
                 LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+                #endif
                 for (int _j = nrow; _j < m; ++_j) {
                     A(_j, col) = zz[_j];
                 }
@@ -465,7 +495,11 @@ NNLSResult nnls(dMatrix2& A,
                     for (int j = jj; j < nsetp; ++j) {
                         int ii = inds[j];
                         inds[j - 1] = ii;
+                        #if defined(__APPLE__)
+                        dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #else
                         LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #endif
                         A(j, ii) = 0.0;
                         for (int col = 0; col < n; ++col) {
                             if (col != ii) {
