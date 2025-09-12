@@ -125,7 +125,6 @@ void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
         rho[original_size + atm_idx] = expected_electrons * atom_weight;
         
         // Reset coefficient index for this atom
-        int atom_coef_start = coef_idx;
         int type = -1, prim = 0;
         
         for (unsigned int shell = 0; shell < current_atom.get_shellcount().size(); shell++) {

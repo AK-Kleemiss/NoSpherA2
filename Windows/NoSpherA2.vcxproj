@@ -2205,6 +2205,9 @@
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|ARM64'">
     <LinkIncremental>false</LinkIncremental>
@@ -2281,6 +2284,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SALTED_Disorder|x64'">
     <LinkIncremental>false</LinkIncremental>
     <CodeAnalysisRuleSet>ConcurrencyCheckRules.ruleset</CodeAnalysisRuleSet>
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|ARM64'">
     <LinkIncremental>false</LinkIncremental>

@@ -1846,7 +1846,6 @@ void options::digest_options()
         else if (temp == "-elf")
             calc = elf = true;
         else if (temp == "-equi_bench") {
-            benchmark_equicomb(1000);
             exit(0);
         }
         else if (temp == "-esp")
