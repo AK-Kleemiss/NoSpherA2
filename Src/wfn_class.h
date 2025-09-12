@@ -238,7 +238,6 @@ public:
     const int get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */
     const std::string get_comment() const { return comment; };
-    /** Write wavefunction CIF export. */
     //void write_wfn_CIF(const std::filesystem::path &filename) const;
     /** Get primitive exponent by index. */
     const double get_exponent(int nr) const { return exponents[nr]; };
