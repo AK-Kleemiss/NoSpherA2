@@ -4,7 +4,7 @@
           AfterTargets="CopyFilesToOutputDirectory">
     <!-- Pick up anything NuGet put under runtimes\** (e.g., libiomp5md.dll, MKL dlls) -->
     <ItemGroup>
-      <RuntimeDlls Include="$(OutDir)packages/**/**/*.dll"
+      <RuntimeDlls Include="$(OutDir)packages/**/*.dll"
                    Condition="Exists('$(OutDir)packages')" />
       <RuntimePDBs Include="$(OutDir)packages/**/*.pdb"
                    Condition="Exists('$(OutDir)packages')" />
