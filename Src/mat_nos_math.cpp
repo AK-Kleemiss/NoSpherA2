@@ -3,7 +3,7 @@
 
 
 #if defined(__APPLE__)
-// On macOS we’re using Accelerate for BLAS/LAPACK
+// On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
 #else
 // Linux/Windows with oneMKL
