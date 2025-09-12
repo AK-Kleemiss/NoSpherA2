@@ -5,11 +5,13 @@
 #include "libCintMain.h"
 #include "nos_math.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-
-#include "lapacke.h"
-#include "cblas.h"
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
 {
@@ -31,47 +33,6 @@ vec einsum_ijk_ij_p(const dMatrix3 &v1, const dMatrix2 &v2)
         }
     }
     return rho;
-}
-
-void solve_linear_system(const vec2 &A, vec &b)
-{
-    err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    // LAPACK variables
-    const int n = (int) A.size(); // The order of the matrix eri2c
-    const int nrhs = 1;     // Number of right-hand sides (columns of rho and )
-    const int lda = n;      // Leading dimension of eri2c
-    const int ldb = n;      // Leading dimension of rho
-    ivec ipiv(n, 0);        // Pivot indices
-    vec temp = flatten<double>(transpose(A));
-    // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
-
-    if (info != 0)
-    {
-        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
-    }
-}
-
-void solve_linear_system(const vec &A, const unsigned long long &size_A, vec &b)
-{
-    err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
-    // LAPACK variables
-    const int n = (int)size_A; // The order of the matrix eri2c
-    const int nrhs = 1;   // Number of right-hand sides (columns of rho and )
-    const int lda = n;    // Leading dimension of eri2c
-    const int ldb = n;    // Leading dimension of rho
-    ivec ipiv(n, 0);      // Pivot indices
-
-    // Manually transpose the flattened matrix in A of size(size_A, size_A)
-    vec temp = transpose(A, n, n);
-
-    // Call LAPACK function to solve the system
-    int info = LAPACKE_dgesv(LAPACK_COL_MAJOR, n, nrhs, temp.data(), lda, ipiv.data(), b.data(), ldb);
-
-    if (info != 0)
-    {
-        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
-    }
 }
 
 // Reorder p-Orbitals to the SALTED convention of:

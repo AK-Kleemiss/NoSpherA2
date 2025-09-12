@@ -143,6 +143,8 @@ dMatrix2 elementWiseExponentiation(dMatrix2& matrix, double exponent);
 void _test_openblas();
 void _test_lahva();
 
+void solve_linear_system(const vec2& A, vec& b);
+void solve_linear_system(vec& A, const size_t& size_A, vec& b);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results
@@ -177,6 +179,3 @@ struct NNLSResult {
 NNLSResult nnls(
     dMatrix2& A, dMatrix1& B,
     int maxiter = -1);
-
-
-void set_BLAS_threads(int num_threads);

@@ -31,7 +31,7 @@ using namespace std;
 
 bool molecule::read_molecule(std::string path)
 {
-    if (!exists(path))
+    if (!std::filesystem::exists(path))
     {
         cout << "ERROR: Could not open file for reading!" << endl;
         return false;

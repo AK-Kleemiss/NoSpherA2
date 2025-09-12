@@ -6,7 +6,14 @@
 #include "int_g2e.h"
 
 #include "nos_math.h"
-#include "cblas.h"
+
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 #define gctrg gout
 #define gctrm gctr
@@ -2129,7 +2136,8 @@ void computeRho_Coulomb(Int_Params &param1,
     }
 
     std::cout << "Preallocating: " << static_cast<double>(sizeof(double) * tot_size * naok_max) / 1024 / 1024 << " MB" << std::endl;
-    vec res(tot_size * naok_max, 0.0);
+    //vec res(tot_size * naok_max, 0.0);
+    std::unique_ptr<double[]> res(new double[tot_size * naok_max]);
 
     CINTOpt *opty = nullptr;
     int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
@@ -2148,8 +2156,7 @@ void computeRho_Coulomb(Int_Params &param1,
         std::cout << "Memory needed for rho: " << static_cast<double>(sizeof(double) * tot_size * naok) / 1024 / 1024 << " MB" << std::endl;
 
         // Compute 3-center integrals
-        GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
-
+        GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.get(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
         int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
         // einsum('ijk,ij->k', res, dm, out=rho)
         // This is 100% pure magic, thanks ChatGPT
@@ -2158,10 +2165,11 @@ void computeRho_Coulomb(Int_Params &param1,
                     naok,
                     tot_size,
                     1.0,
-                    res.data(), tot_size,
+                    res.get(), tot_size,
                     dm.data(), 1,
                     0.0,
                     &rho[idx_curr_rho], 1);
+
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
         // std::fill(res.begin(), res.end(), 0); //This might be unnecessary, saves about 1sec for 15 steps  TEST THIS!!!!!
     }

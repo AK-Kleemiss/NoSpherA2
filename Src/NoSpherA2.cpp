@@ -8,6 +8,7 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "nos_math.h"
+#include "cif.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
 
@@ -35,13 +36,6 @@ int main(int argc, char **argv)
     opt.cwd = cwd;
     vector<WFN> wavy;
 
-    if (opt.threads != -1)
-    {
-        set_BLAS_threads(4);
-#ifdef _OPENMP
-        omp_set_num_threads(opt.threads);
-#endif
-    }
     log_file << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
     {
@@ -411,7 +405,7 @@ int main(int argc, char **argv)
         log_file << " done!\nNumber of atoms in Wavefunction file: " << wavy[0].get_ncen() << " Number of MOs: " << wavy[0].get_nmo() << endl;
 
         // this one is for generation of an fchk file
-        if (opt.basis_set != "" || opt.fchk != "")
+        if (opt.fchk != "")
         {
             // Make a fchk out of the wfn/wfx file
             filesystem::path tmp = opt.basis_set_path / opt.basis_set;
@@ -506,7 +500,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
+            write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
         // log_file.close();
         return 0;
     }
@@ -529,7 +523,7 @@ int main(int argc, char **argv)
         std::cout.rdbuf(_coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
         if (opt.write_CIF)
-            wavy[0].write_wfn_CIF(opt.wfn.replace_extension(".cif"));
+            write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
         return 0;
     }
     std::cout << NoSpherA2_message(opt.no_date);

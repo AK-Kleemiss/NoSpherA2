@@ -1,6 +1,14 @@
 #include "pch.h"
 #include "SALTED_equicomb.h"
-#include "cblas.h"
+
+#if defined(__APPLE__)
+// On macOS we’re using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+
 #include "constants.h"
 
 // BE AWARE, THAT V2 IS ALREADY ASSUMED TO BE CONJUGATED!!!!!
@@ -30,7 +38,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
         vec2 ptemp(l21, f_vec);
         cvec pcmplx(l21, constants::cnull);
 		cdouble* pvec_ptr;
-        const double* wigner_ptr = w3j.data();
+        const double* wigner_ptr = NULL;
         int limit_l1 = 0;
         inner = 0.0;
 

@@ -1,11 +1,16 @@
 #include "pch.h"
+#include <execution>
 #include "nos_math.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
-#include <execution>
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+#include "omp.h"
+
 
 template <typename T>
 T conj(const T &val)
@@ -259,6 +264,45 @@ void _test_openblas()
     std::cout << "All BLAS tests passed!" << std::endl;
 }
 
+
+void solve_linear_system(const vec2& A, vec& b)
+{
+    err_checkf(A.size() == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    vec temp = flatten<double>(A);
+    solve_linear_system(temp, A.size(), b);
+}
+
+void solve_linear_system(vec& A, const size_t& size_A, vec& b)
+{
+
+    err_checkf(size_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    // LAPACK variables
+    const lapack_int n = (int)size_A; // The order of the matrix eri2c
+    const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
+    const lapack_int lda = n;    // Leading dimension of eri2c
+    const lapack_int ldb = 1;    // Leading dimension of rho
+    ivec ipiv(n, 0);              // Pivot indices
+    lapack_int info = 0;
+
+#if defined(__APPLE__)
+    // Convert row-major to column-major for Accelerate
+    vec A_col_major(A.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            A_col_major[j * n + i] = A[i * n + j]; // Transpose
+        }
+    }
+    dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &n, &info);
+#else
+    // MKL/LAPACKE: C interface, row-major
+    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, ipiv.data(), b.data(), ldb);
+#endif
+    if (info != 0)
+    {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
+}
+
 //#include <linalg.hpp>
 //void _test_lahva() {
 //    lahva::cpu::Vector<double> p(5, 2.0);
@@ -327,7 +371,12 @@ NNLSResult nnls(dMatrix2& A,
         }
         int tmpint = m - nrow;
 
+        #if defined(__APPLE__)
+        lapack_int incx = 1;
+        dlarfg_(&tmpint, &work[nrow], &work[nrow + 1], &incx, &tau);
+        #else
         LAPACKE_dlarfg(tmpint, &work[nrow], &work[nrow + 1], 1, &tau);
+        #endif
         beta = work[nrow];
         work[nrow] = 1.0;
         unorm = 0.0;
@@ -342,7 +391,15 @@ NNLSResult nnls(dMatrix2& A,
             // ztest which is the new prospective value for x[j].
             std::copy(b.data(), b.data() + m, zz.begin());
 
+            #if defined(__APPLE__)
+            char side = 'L';
+            lapack_int one = 1;
+            vec work_temp(tmpint, 0.0);
+            dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+            #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+            #endif
+            
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
                 // Set w[j] to 0.0 and move to the next greatest entry in w.
@@ -369,7 +426,14 @@ NNLSResult nnls(dMatrix2& A,
                 for (int _j = nrow; _j < m; ++_j) {
                     zz[_j] = A(_j, col);
                 }
+                #if defined(__APPLE__)
+                char side = 'L';
+                lapack_int one = 1;
+                vec work_temp(tmpint, 0.0);
+                dlarfx_(&side, &tmpint, &one, &work[nrow], &tau, &zz[nrow], &tmpint, work_temp.data());
+                #else
                 LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
+                #endif
                 for (int _j = nrow; _j < m; ++_j) {
                     A(_j, col) = zz[_j];
                 }
@@ -431,7 +495,11 @@ NNLSResult nnls(dMatrix2& A,
                     for (int j = jj; j < nsetp; ++j) {
                         int ii = inds[j];
                         inds[j - 1] = ii;
+                        #if defined(__APPLE__)
+                        dlartg_(&A(j - 1, ii), &A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #else
                         LAPACKE_dlartgp(A(j - 1, ii), A(j, ii), &cc, &ss, &A(j - 1, ii));
+                        #endif
                         A(j, ii) = 0.0;
                         for (int col = 0; col < n; ++col) {
                             if (col != ii) {
@@ -692,18 +760,6 @@ NNLSResult nnls(dMatrix2& A,
 //    res = std::sqrt(res);
 //    return NNLSResult{ x, res, 0 };
 //}
-
-
-void set_BLAS_threads(int num_threads)
-{
-#ifdef _WIN32
-    _putenv_s("OPENBLAS_NUM_THREADS", std::to_string(num_threads).c_str());
-#else
-    std::string nums = "OPENBLAS_NUM_THREADS=" + std::to_string(num_threads);
-    char* env = strdup(nums.c_str());
-    putenv(env);
-#endif
-}
 
 // Remeaining functions which were separated for readibility
 #include "mat_nos_math.cpp"

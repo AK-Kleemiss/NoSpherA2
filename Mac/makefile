@@ -1,168 +1,130 @@
-#THIS IS THE MACOS MAKEFILE!#
-RM := rm
+# === macOS Makefile (Accelerate + libomp, universal) ===
+SHELL := /bin/bash
 
-COMP := g++
+RM   := rm -f
+COMP ?= clang++
+APP  ?= NoSpherA2
 
+# Build both architectures for universal binary
+ARCHS := arm64 x86_64
+
+# Source & include roots
+SRC_DIR := ../Src
+INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
+
+# Local static libs (adjust as needed)
+EXTRA_LIBS := ../Lib/featomic_install/lib/libfeatomic.a \
+			  ../Lib/featomic_install/lib/libmetatensor.a
+
+# Sources - automatically discover all .cpp files in SRC_DIR
+SRCS := $(wildcard $(SRC_DIR)/*.cpp)
+ifneq ($(filter $(SRC_DIR)/auxiliary_basis.cpp,$(SRCS)), $(SRC_DIR)/auxiliary_basis.cpp)
+  SRCS += $(SRC_DIR)/auxiliary_basis.cpp
+endif
+
+# Per-arch objects
+OBJS_arm64  := $(patsubst $(SRC_DIR)/%.cpp, build/arm64/%.o,  $(SRCS))
+OBJS_x86_64 := $(patsubst $(SRC_DIR)/%.cpp, build/x86_64/%.o, $(SRCS))
+
+# Common compile settings
+CXXSTD    := -std=c++20 -DACCELERATE_NEW_LAPACK
+OPTFLAGS  := -O3 -fvisibility=hidden
+WARNFLAGS := -fmessage-length=0
+INCLUDES  := $(addprefix -I,$(INC_DIRS))
+
+# macOS SDK
+SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
+SYSROOT := $(if $(SDKROOT),-isysroot $(SDKROOT),)
+
+# ---- OpenMP via libomp (Homebrew) ----
+# Override these if your Homebrew lives elsewhere.
+LIBOMP_PREFIX_arm64  ?= /opt/homebrew/opt/libomp
+LIBOMP_PREFIX_x86_64 ?= /usr/local/opt/libomp
+
+# Compile flags to enable OpenMP with Apple clang
+OMPFLAGS_arm64  := -Xpreprocessor -fopenmp -I$(LIBOMP_PREFIX_arm64)/include
+OMPFLAGS_x86_64 := -Xpreprocessor -fopenmp -I$(LIBOMP_PREFIX_x86_64)/include
+
+# Linker flags for libomp (+rpath so users don't need DYLD_LIBRARY_PATH)
+OMPLIBS_arm64   := -L$(LIBOMP_PREFIX_arm64)/lib   -Wl,-rpath,$(LIBOMP_PREFIX_arm64)/lib   -lomp
+OMPLIBS_x86_64  := -L$(LIBOMP_PREFIX_x86_64)/lib  -Wl,-rpath,$(LIBOMP_PREFIX_x86_64)/lib  -lomp
+
+# Common flags
+CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(INCLUDES) $(SYSROOT)
+LDFLAGS_COMMON  := $(SYSROOT) -framework Accelerate
+
+# Per-arch final flags
+CXXFLAGS_arm64  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
+CXXFLAGS_x86_64 := $(CXXFLAGS_COMMON)  -arch x86_64 $(OMPFLAGS_x86_64)
+LDFLAGS_arm64   := $(LDFLAGS_COMMON)   -arch arm64  $(OMPLIBS_arm64)
+LDFLAGS_x86_64  := $(LDFLAGS_COMMON)   -arch x86_64 $(OMPLIBS_x86_64)
+
+# --------------------------------------------------------------------
+# Targets
+# --------------------------------------------------------------------
+
+# Default target is universal binary
 all: NoSpherA2
 
-OBJ_NAMES := wfn_class atoms properties spherical_density AtomGrid basis_set convenience sphere_lebedev_rule scattering_factors cube fchk JKFit NoSpherA2 SALTED_utilities constants ECPs_corrections libCintMain nos_math SALTED_io SALTED_predictor SALTED_equicomb isosurface cart2sph int_g2e int_optimizer integration_params integrator rys_roots b2c bondwise_analysis qct auxiliary_basis
-OBJS_a := $(OBJ_NAMES:=.o_arm64)
-OBJS_DEBUG_a := $(OBJ_NAMES:=.o_arm64_d)
+# Universal binary (both architectures)
+NoSpherA2: NoSpherA2_arm64 NoSpherA2_x86_64
+	@echo "Building MAC executable"
+	@echo "Start making Mac executable"
+	@echo "Lipo → $@"
+	@lipo -create -output $@ NoSpherA2_arm64 NoSpherA2_x86_64
+	@cp $@ ../
+	@echo "Done."
 
-OBJS_x := $(OBJ_NAMES:=.o_x86_64)
-OBJS_DEBUG_x := $(OBJ_NAMES:=.o_x86_64_d)
+# Single architecture builds
+NoSpherA2_arm64: $(OBJS_arm64)
+	@echo "Building MAC executable for arm64"
+	@echo "Link (arm64)…"
+	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_arm64) -o $@
 
-GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0 -Xpreprocessor -fopenmp -static -MMD -MP
-GCC_OPTS_DEBUG := -std=c++2a -Og -g -c -fmessage-length=0 -Xpreprocessor -MP
+NoSpherA2_x86_64: $(OBJS_x86_64)
+	@echo "Building MAC executable for x86_64"
+	@echo "Link (x86_64)…"
+	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_x86_64) -o $@
 
-# Add architecture-specific flags
-OMP_BUILD_a := ../Lib/OpenMP_build/lib/libomp.a
-OMP_BUILD_I_a := ../Lib/OpenMP_build/include
-blas_a := ../Lib/OpenBLAS_build
-GCC_OPTS_a := ${GCC_OPTS} -mcpu=generic 
-GCC_OPTS_DEBUG_a := ${GCC_OPTS_DEBUG} -mcpu=generic
-TARGET_FLAG_a := -target aarch64-apple-macos13.0
-LIBFEATOMIC_a := ../Lib/featomic_install/lib/libfeatomic.a
-LIBFEATOMIC_a += ../Lib/featomic_install/lib/libmetatensor.a
-LIBFEATOMIC_a_inc += ../Lib/featomic_install/include
-
-OMP_BUILD_x := ../Lib/OpenMP_build_x86/lib/libomp.a
-OMP_BUILD_I_x := ../Lib/OpenMP_build_x86/include
-blas_x := ../Lib/OpenBLAS_build_x86_64/
-GCC_OPTS_x := ${GCC_OPTS} -march=x86-64
-GCC_OPTS_DEBUG_x := ${GCC_OPTS_DEBUG} -march=x86-64
-TARGET_FLAG_x := -target x86_64-apple-macos13.0
-LIBFEATOMIC_x := ../Lib/featomic_install_x86/lib/libfeatomic.a
-LIBFEATOMIC_x += ../Lib/featomic_install_x86/lib/libmetatensor.a
-LIBFEATOMIC_x_inc += ../Lib/featomic_install_x86/include
-
-LIBFEATOMIC_native     := $(LIBFEATOMIC_a)
-LIBFEATOMIC_native_inc := $(LIBFEATOMIC_a_inc)
-OMP_BUILD_I_native     := $(OMP_BUILD_I_a)
-OMP_BUILD_native       := $(OMP_BUILD_a)
-blas_native            := $(blas_a)
-OBJS_native            := $(OBJ_NAMES:=.o_native)
-GCC_OPTS_native        := ${GCC_OPTS} -mcpu=native -march=native
-
-#Basis set converter
+# Keep your original converter step
 basis_set_converter:
-	@make -f makefile_basis_set_converter basis_set_converter
+	@echo "Building basis set converter..."
+	@$(MAKE) -f makefile_basis_set_converter
 
-basis_set_converter_x86:
-	@make -f makefile_basis_set_converter basis_set_converter_x86
+# Generate auxiliary_basis.cpp when needed
+$(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter
+	@echo "auxiliary_basis.cpp generated"
 
-basis_set_converter_native:
-	@make -f makefile_basis_set_converter basis_set_converter_native
+# Special rule for auxiliary_basis.o - fix the source file reference
+build/arm64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/arm64
+	@echo "Compiling auxiliary_basis.o (arm64) after BasisSetConverter finishes"
+	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
+	@echo "Finished building: auxiliary_basis.cpp (arm64)"
 
-# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o_arm64: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_a}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_a}
-	@echo 'Finished building: auxiliary_basis.o'
+build/x86_64/auxiliary_basis.o: $(SRC_DIR)/auxiliary_basis.cpp | build/x86_64
+	@echo "Compiling auxiliary_basis.o (x86_64) after BasisSetConverter finishes"
+	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
+	@echo "Finished building: auxiliary_basis.cpp (x86_64)"
 
-#Basis set converter
-basis_set_converter:
-	@make -f makefile_basis_set_converter
+# Pattern rules
+build/arm64/%.o: $(SRC_DIR)/%.cpp | build/arm64
+	@echo "Compiling (arm64): $<"
+	@$(COMP) $(CXXFLAGS_arm64) -c $< -o $@
 
-# Ensure auxiliary_basis.o depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o_arm64: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS} -I${OMP_BUILD_arm64} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I../Lib -I${blas_arm64}/include -o "$@" ../Src/auxiliary_basis.cpp -target aarch64-apple-macos14.0
-	@echo 'Finished building: auxiliary_basis.o'
+build/x86_64/%.o: $(SRC_DIR)/%.cpp | build/x86_64
+	@echo "Compiling (x86_64): $<"
+	@$(COMP) $(CXXFLAGS_x86_64) -c $< -o $@
 
-%.o_arm64: ../Src/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_a_inc} -I${blas_a}/include -o "$@" "$<" ${TARGET_FLAG_a}
-	@echo 'Finished building: $<'
+build/arm64  build/x86_64:
+	@mkdir -p $@
 
-NoSpherA2_arm: ${OBJS_a}
-	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_a} ${blas_a}/lib/libopenblas.a ${OBJS_a} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
-	${RM} ${OBJS_a}
-	@echo 'Finished building target: $@'
-
-# Ensure auxiliary_basis.o_d depends on basis_set_converter to ensure proper sequence
-auxiliary_basis.o_arm64_d: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_a}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_a}
-	@echo 'Finished building: auxiliary_basis.o'
-
-%.o_arm64_d: ../Src/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_DEBUG_a} -I${OMP_BUILD_I_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_a_inc} -I${blas_a}/include -o "$@" "$<" ${TARGET_FLAG_a}
-	@echo 'Finished building: $<'
-
-NoSpherA2_Debug_arm: ${OBJS_DEBUG_a}
-	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_a} ${blas_a}/lib/libopenblas.a ${OBJS_DEBUG_a} ${LIBFEATOMIC_a} -I../ -I${blas_a}/include -L${OMP_BUILD_a} -L${blas_a}/lib -lcblas ${TARGET_FLAG_a}
-	@${RM} ${OBJS_DEBUG_a}
-	@echo 'Finished building target: $@'
-
-auxiliary_basis.o_x86: basis_set_converter_x86
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_x} -I${OMP_BUILD_I_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_x}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_x}
-	@echo 'Finished building: auxiliary_basis.o'
-
-auxiliary_basis.o_x86_d: basis_set_converter_x86
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_DEBUG_x} -I${OMP_BUILD_I_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_x}/include -o "$@" ../Src/auxiliary_basis.cpp ${TARGET_FLAG_x}
-	@echo 'Finished building: auxiliary_basis.o'
-
-%.o_x86: ../Src/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_x} -I${OMP_BUILD_I_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_x_inc} -I${blas_x}/include -o "$@" "$<" ${TARGET_FLAG_x}
-	@echo 'Finished building: $<'
-
-NoSpherA2_x86: ${OBJS_x}
-	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_x} ${blas_x}/lib/libopenblas.a ${OBJS_x} ${LIBFEATOMIC_x} -I../ -I${blas_x}/include -L${OMP_BUILD_x} -L${blas_x}/lib -lcblas ${TARGET_FLAG_x}
-	${RM} ${OBJS_x}
-	@echo 'Finished building target: $@'
-
-%.o_x86_d: ../Src/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_DEBUG_x} -I${OMP_BUILD_I_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_x_inc} -I${blas_x}/include -o "$@" "$<" ${TARGET_FLAG_x}
-	@echo 'Finished building: $<'
-
-NoSpherA2_Debug_x86: ${OBJS_DEBUG_x}
-	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_x} ${blas_x}/lib/libopenblas.a ${OBJS_DEBUG_x} ${LIBFEATOMIC_x} -I../ -I${blas_x}/include -L${OMP_BUILD_x} -L${blas_x}/lib -lcblas ${TARGET_FLAG_x}
-	@${RM} ${OBJS_DEBUG_x}
-	@echo 'Finished building target: $@'
-
-%.o_native: ../Src/%.cpp
-	@echo 'Building file: $<'
-	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_I_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${LIBFEATOMIC_native_inc} -I${blas_native}/include -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-auxiliary_basis.o_native: basis_set_converter_native
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@${COMP} ${GCC_OPTS_native} -I${OMP_BUILD_I_native} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -I${blas_native}/include -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: auxiliary_basis.o'
-
-NoSpherA2_native: ${OBJS_native}
-	@echo 'Building target: $@'
-	@${COMP} -o "$@" ${OMP_BUILD_native} ${blas_native}/lib/libopenblas.a ${OBJS_native} ${LIBFEATOMIC_native} -I../ -I${blas_native}/include -L${OMP_BUILD_native} -L${blas_native}/lib -lcblas
-	${RM} ${OBJS_native}
-	@echo 'Finished building target: $@'
-
-NoSpherA2: NoSpherA2_arm NoSpherA2_x86
-	@echo 'Building target: $@'
-	@lipo -create -output NoSpherA2 NoSpherA2_arm NoSpherA2_x86
-	@${RM} NoSpherA2_arm NoSpherA2_x86
-	@echo 'Finished building target: $@'
-
-NoSpherA2_Debug: NoSpherA2_Debug_arm NoSpherA2_Debug_x86
-	@echo 'Building target: $@'
-	@lipo -create -output NoSpherA2_Debug NoSpherA2_Debug_arm NoSpherA2_Debug_x86
-	@${RM} NoSpherA2_Debug_arm NoSpherA2_Debug_x86
-	@echo 'Finished building target: $@'
+# Debug variant
+debug: CXXFLAGS_COMMON := -std=c++20 -O0 -g $(WARNFLAGS) $(INCLUDES) $(SYSROOT)
+debug: LDFLAGS_COMMON  := $(SYSROOT) -framework Accelerate
+debug: clean NoSpherA2_arm64
 
 clean:
-	-${RM} NoSpherA2
-	-@echo ' '
+	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
+	@echo "Cleaned."
 
-.PHONY: all clean dependents basis_set_converter
-.SECONDARY:
-
-
+.PHONY: all clean debug basis_set_converter NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64

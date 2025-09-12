@@ -1,7 +1,13 @@
 #include "pch.h"
 #include "nos_math.h"
-#include "lapacke.h" // for LAPACKE_xxx
-#include "cblas.h"
+
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 // Flatten Vectors 2D
 template <typename T>
@@ -231,15 +237,22 @@ template <typename T>
 T self_dot(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugate)
 {
     T result{};
-    if (conjugate)
-    {
-        for (size_t i = 0; i < vec1.size(); ++i)
+    if constexpr (std::is_same_v<T, cdouble> ){
+        if (conjugate)
         {
-            result += conj(vec1[i]) * vec2[i];
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += std::conj(vec1[i]) * vec2[i];
+            }
         }
-    }
-    else
-    {
+        else
+        {
+            for (size_t i = 0; i < vec1.size(); ++i)
+            {
+                result += vec1[i] * vec2[i];
+            }
+        }
+    } else {
         for (size_t i = 0; i < vec1.size(); ++i)
         {
             result += vec1[i] * vec2[i];
@@ -278,9 +291,9 @@ T dot_BLAS(const std::vector<T> &vec1, const std::vector<T> &vec2, bool conjugat
     }
     else if constexpr (std::is_same_v<T, cdouble>)
     {
-        const openblas_complex_double t = conjugate ? cblas_zdotu((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1)
-                                                    : cblas_zdotc((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1);
-        result = cdouble(t.real, t.imag);
+        conjugate ? cblas_zdotu_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result)
+                  : cblas_zdotc_sub((int)vec1.size(), reinterpret_cast<const cdouble *>(vec1.data()), 1, reinterpret_cast<const cdouble *>(vec2.data()), 1, &result);
+        //result = cdouble(t.real, t.imag);
     }
     else
     {

@@ -55,6 +55,7 @@ private:
     //[1] = third order  (C111, C112, C113, C122, C123, C133, C222, C223, C233, C333)
     //[2] = fourth order (D1111, D1112, D1113, D1122, D1123, D1133, D1222, D1223, D1233, D1333, D2222, D2223, D2233, D2333, D3333)
     vec2 ADPs;
+    bool is_asym = false;
 public:
     atom();
     atom(const std::string &l, const std::string& id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
@@ -108,6 +109,8 @@ public:
     void clear_shellcount() { shellcount.clear(); };
     void set_ADPs(const vec2& adps) { ADPs = adps; };
     vec2 get_ADPs() const { return ADPs; };
+    bool get_is_asym() const { return is_asym; };
+    void set_is_asym(const bool& val) { is_asym = val; };
 
 
     bool operator==(const atom& other) const;
