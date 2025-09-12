@@ -96,3 +96,4 @@ Windows/packages*
 *libiomp*.dll
 /Windows/obj
 Lib/MKL
+*tbb*.def
