@@ -324,7 +324,12 @@ void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigne
         }
     }
     char trans = 'T'; // We need to solve A^T x = b
-    dgels_(&trans, &n, &m, &nrhs, A_col_major.data(), &lda, b.data(), &ldb, &info);
+    int iwork = -1;
+    double* work = NULL;
+    //TODO: Implement workspace query and allocation for dgels
+    std::cout << "Warning: LAPACK dgels not implemented on macOS/Accelerate. Exiting." << std::endl;
+    exit(1);
+    //dgels_(&trans, &n, &m, &nrhs, A_col_major.data(), &lda, b.data(), &ldb, work, &iwork, &info);
 
 #else
     info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);
