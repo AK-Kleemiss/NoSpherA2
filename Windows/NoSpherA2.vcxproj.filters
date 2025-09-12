@@ -286,7 +286,6 @@
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">

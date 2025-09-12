@@ -100,7 +100,7 @@ featomic_arm64: check_rust
 intel_ROOT := $(CURDIR)/Lib/MKL
 IntelMKL:
 ifeq ($(NAME),WINDOWS)
-	MSBuild .\Windows\NoSpherA2.sln /t:Restore -p:RestorePackagesConfig=true
+	MSBuild .\Windows\NoSpherA2.sln /t:Restore
 else ifeq ($(NAME),MAC)
 	@brew list --versions libomp >/dev/null 2>&1 || \
 	  { echo "Installing libomp (arm64)…"; brew install libomp; }

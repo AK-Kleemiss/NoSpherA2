@@ -189,7 +189,7 @@ jobs:
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
 
     - name: Get Intel MKL
-      run: MSBuild .\Windows\NoSpherA2.sln /t:Restore -p:RestorePackagesConfig=true
+      run: MSBuild .\Windows\NoSpherA2.sln /t:Restore
 
     - name: make_Windows
       run: |

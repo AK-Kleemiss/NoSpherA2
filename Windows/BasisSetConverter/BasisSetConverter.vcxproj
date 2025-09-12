@@ -41,9 +41,6 @@
   <ItemGroup>
     <ClInclude Include="..\..\Src\basis_set_helper\basis_set_helper.h" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
@@ -290,17 +287,4 @@
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\packages\intelmkl.static.win-x64.2025.2.0.627\build\native\intelmkl.static.win-x64.targets" Condition="Exists('..\packages\intelmkl.static.win-x64.2025.2.0.627\build\native\intelmkl.static.win-x64.targets')" />
-    <Import Project="..\packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets" Condition="Exists('..\packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets')" />
-    <Import Project="..\packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets" Condition="Exists('..\packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets')" />
-  </ImportGroup>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\intelmkl.static.win-x64.2025.2.0.627\build\native\intelmkl.static.win-x64.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\intelmkl.static.win-x64.2025.2.0.627\build\native\intelmkl.static.win-x64.targets'))" />
-    <Error Condition="!Exists('..\packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\intelopenmp.redist.win.2025.2.1.1000\build\native\intelopenmp.redist.win.targets'))" />
-    <Error Condition="!Exists('..\packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\intelopenmp.devel.win.2025.2.1.1000\build\native\intelopenmp.devel.win.targets'))" />
-  </Target>
 </Project>

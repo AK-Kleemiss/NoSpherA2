@@ -2434,7 +2434,7 @@
       <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib;tbb12.lib</IgnoreSpecificDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>VCOMPD.lib;VCOMP.lib</IgnoreSpecificDefaultLibraries>
     </Link>
     <PreBuildEvent>
       <Command>"$(TargetDir)..\BasisSetConverter\BasisSetConverter.exe" $(SolutionDir)</Command>
@@ -13008,7 +13008,6 @@
     <None Include="..\Linux\makefile" />
     <None Include="..\Mac\makefile" />
     <None Include="..\tests\makefile" />
-    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc" />
