@@ -12,6 +12,17 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
+
+#if defined(__APPLE__)
+// On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#define lapack_int int
+#define MKL_Set_Num_Threads(num) omp_set_num_threads(num)
+#else
+// Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif

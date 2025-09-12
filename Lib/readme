@@ -1,4 +1,3 @@
 The compilation of each OS is supposed to create the following fodlers here:
 featomic_install
-OpenBLAS_build
-OpenMP_build
+Intel MKL Libraries

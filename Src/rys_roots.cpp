@@ -15,10 +15,13 @@
 #include "convenience.h"
 #include "constants.h"
 
-#define lapack_complex_float std::complex<float>
-#define lapack_complex_double std::complex<double>
-#include "lapacke.h"
-#include "cblas.h"
+#if defined(__APPLE__)
+ // On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+ // Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 /*
  * This code computes incomplete gamma function.  It is based on Xin
  * Wu's implementation.
@@ -5710,25 +5713,38 @@ static int _dlaev2(double *eig, double *vec, double *diag, double *diag_off1)
 
 int _CINTdiagonalize(int n, double *diag, double *diag_off1, double *eig, double *vec)
 {
-    int32_t M = n;
+    lapack_int M = n;
     int32_t LDZ = std::max(1, n);
     int32_t NZC = std::max(1, n);
-    int32_t ISUPPZ[MXRYSROOTS * 2];
-    int32_t TRYRAC = 1;
+    lapack_int ISUPPZ[MXRYSROOTS * 2];
+    lapack_int TRYRAC = 1;
     //double WORK[MXRYSROOTS * 18];
     int32_t LWORK = MXRYSROOTS * 18;
     //int32_t IWORK[MXRYSROOTS * 10];
     int32_t LIWORK = MXRYSROOTS * 10;
+    int INFO = 0;
     /*
         int matrix_layout, char jobz, char range,
         lapack_int n, double* d, double* e, double vl,
-        double vu, lapack_int il, lapack_int iu,
+        double vu, lapack_int il, lapack_int iu,lapack_int
         lapack_int* m, double* w, double* z, lapack_int ldz,
         lapack_int nzc, lapack_int* isuppz,
         lapack_logical* tryrac
         */
-    int INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
-    // Transpose vec of size n x n
+    #if defined(__APPLE__)
+    // Use Fortran-style LAPACK call
+    char jobz = 'V', range = 'A';
+    double work_temp[MXRYSROOTS * 18];
+    int iwork[MXRYSROOTS * 10];
+    dstemr_(&jobz, &range, &n, diag, diag_off1,
+                        nullptr, nullptr, nullptr, nullptr,
+                        &M, eig, vec, &LDZ, &NZC,
+                        ISUPPZ, &TRYRAC, work_temp, &LWORK,
+                        iwork, &LIWORK, &INFO);
+    #else
+    INFO = LAPACKE_dstemr(LAPACK_ROW_MAJOR, 'V', 'A', n, diag, diag_off1, 0.0, 0.0, 0, 0, &M, eig, vec, LDZ, NZC, ISUPPZ, &TRYRAC);
+    #endif
+        // Transpose vec of size n x n
     // Original version usess COL_MAJOR version but this just does not seem to work here?
     // for (int i = 0; i < n; i++) {
     //    for (int j = i +1; j < n; j++) {

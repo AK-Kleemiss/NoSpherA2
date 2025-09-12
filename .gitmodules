@@ -1,13 +1,6 @@
 [submodule "mdspan"]
 	path = mdspan
 	url = https://github.com/kokkos/mdspan
-[submodule "OpenBLAS"]
-	path = OpenBLAS
-	url = https://github.com/OpenMathLib/OpenBLAS
-    branch = develop
-[submodule "llvm-project"]
-	path = llvm-project
-	url = https://github.com/llvm/llvm-project.git
 [submodule "featomic"]
 	path = featomic
 	url = https://github.com/metatensor/featomic

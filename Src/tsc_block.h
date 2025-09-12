@@ -7,11 +7,12 @@ template <typename numtype_index, typename numtype>
 class tsc_block
 {
 private:
-  cvec2 sf; //[#scatterer] [#reflection]
-  svec scatterer;                // Labels of reflections the correpsonding entry of sf belonds to
+  cvec2 sf;                                          //[#scatterer] [#reflection]
+  svec scatterer;                                    // Labels of reflections the correpsonding entry of sf belonds to
   std::vector<std::vector<numtype_index>> index;     //[3] [miller_index]
   std::string header;
   bool anomalous_dispersion;
+  std::string NaN = "NaN in SF!";
 
 public:
   tsc_block(
@@ -27,7 +28,7 @@ public:
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++)
       {
-        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
+        err_checkf(is_nan(given_sf[i][j]) == false, NaN, std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -35,6 +36,7 @@ public:
     index = given_index;
     header = given_header;
     anomalous_dispersion = false;
+	NaN = "NaN in SF! ";
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
@@ -48,19 +50,21 @@ public:
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++)
       {
-        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
+        err_checkf(is_nan(given_sf[i][j]) == false, NaN, std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
     scatterer = given_scatterer;
     index = given_index;
     anomalous_dispersion = false;
+    NaN = "NaN in SF! ";
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,
       svec &given_scatterer,
       hkl_list_d &given_index)
   {
+    NaN = "NaN in SF! ";
     sf.resize(given_sf.size());
 #pragma omp parallel for
     for (int i = 0; i < given_sf.size(); i++)
@@ -68,7 +72,7 @@ public:
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++)
       {
-        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
+        err_checkf(is_nan(given_sf[i][j]) == false, NaN, std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -86,6 +90,7 @@ public:
       svec &given_scatterer,
       hkl_list &given_index)
   {
+    NaN = "NaN in SF! ";
     sf.resize(given_sf.size());
 #pragma omp parallel for
     for (int i = 0; i < given_sf.size(); i++)
@@ -93,7 +98,7 @@ public:
       sf[i].resize(given_sf[i].size());
       for (int j = 0; j < given_sf[i].size(); j++)
       {
-        err_checkf(is_nan(given_sf[i][j]) == false, "NaN in SF!", std::cout);
+        err_checkf(is_nan(given_sf[i][j]) == false, NaN, std::cout);
         sf[i][j] = given_sf[i][j];
       }
     }
@@ -108,6 +113,7 @@ public:
   };
   tsc_block(std::filesystem::path &file_name)
   {
+    NaN = "NaN in SF! ";
     anomalous_dispersion = false;
     using namespace std;
     ifstream tsc_file(file_name.c_str(), ios::binary);
@@ -160,7 +166,7 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "TSCB file went bad!", std::cout);
   };
-  tsc_block() { anomalous_dispersion = false; };
+  tsc_block() { anomalous_dispersion = false; NaN = "NaN in SF! "; };
   ~tsc_block()
   {
     for (int i = 0; i < sf.size(); i++)

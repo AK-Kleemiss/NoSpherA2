@@ -464,19 +464,7 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit auto 1.3 -no-date</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Mohr_Salt|x64'">
-    <LocalDebuggerCommandArguments>-v -wfn mohrs_salt.gbw -cif mohrs_salt.cif -dmin 0.4 -ri_fit auto_aux 2.1 -no-date</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\mohr_salt</LocalDebuggerWorkingDirectory>
-    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|ARM64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -cpus 16 -mem 100000 -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>

@@ -13,7 +13,7 @@ Olex2 is free for use by OlexSys Ltd. (www.olxsys.org)
 The software is provided as-is under the BSD-2 licence. Please see [LICENSE](./LICENSE) for further details!
 
 ## Building NoSpherA2
-NoSpherA2 relies heavily on the submodule [OpenBLAS](https://github.com/OpenMathLib/OpenBLAS/tree/a64b75a2e00691b126a3c342a265f96fac98514f), [llvm](https://github.com/llvm/llvm-project/tree/2db262886f0c06c079e1b2808c4c14c16f8861b5), [featomic](https://github.com/metatensor/featomic) and the [mdSpan](https://github.com/kokkos/mdspan/tree/d34b447fbfdddfad63d2204923917e889ebe2e20) reference implementation. To clone this repository with all of it's dependencies do:
+NoSpherA2 relies heavily on the submodule [featomic](https://github.com/metatensor/featomic) and the [mdSpan](https://github.com/kokkos/mdspan/tree/d34b447fbfdddfad63d2204923917e889ebe2e20) reference implementation. To clone this repository with all of it's dependencies do:
 
 ```sh
 git clone --recursive https://github.com/AK-Kleemiss/NoSpherA2.git
@@ -30,11 +30,11 @@ git submodule update --init --recursive
 ### Windows Build Instructions
 #### **Prerequisites**
 - **Visual Studio 2022** with C++ build tools
-- GNU Make for Windows
-- cargo for compilation of rust (required for featomic): https://www.rust-lang.org/tools/install
+- GNU Make for Windows (for example from [here](https://gnuwin32.sourceforge.net/packages/make.htm))
+- cargo for compilation of rust (required for featomic) [download](https://www.rust-lang.org/tools/install)
 
 #### **Building NoSpherA2**
-Run inside a developers command prompt or power shell (amking sure make.exe is on your PATH):
+Run inside a developers command prompt or power shell (making sure make.exe is on your PATH):
 
 ```ps
 make.exe

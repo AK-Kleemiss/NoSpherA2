@@ -279,7 +279,7 @@ double fourier_bessel_integral(
 cdouble sfac_bessel(
     const primitive &p,
     const double *k_point,
-    const vec &coefs);
+    const double *coefs);
 
 /**
  * @brief Calculates the diffuse scattering factors.

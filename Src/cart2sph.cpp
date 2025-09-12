@@ -13,7 +13,15 @@
 #include <stdlib.h>
 #include <complex.h>
 #include "cart2sph.h"
-#include "cblas.h"
+
+
+#if defined(__APPLE__)
+ // On macOS we are using Accelerate for BLAS/LAPACK
+#include <Accelerate/Accelerate.h>
+#else
+ // Linux/Windows with oneMKL
+#include <mkl.h>
+#endif
 
 #define MALLOC_ALIGN8_INSTACK(var, n)                                 \
         var = (double *)(((uintptr_t)cache + 63) & (~(uintptr_t)63)); \

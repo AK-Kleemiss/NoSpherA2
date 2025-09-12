@@ -30,6 +30,7 @@ std::string help_message =
      "                                            [2]: xTB\n"
      "                                            [3]: pTB\n"
      "   --help/-help/--h                         print this help\n"
+     "   -cpus           <NUMBER>                 Sets the number of available threads to use. Defaults to all available CPUs"
      "   -v                                       Turn on Verbose (debug) Mode (Slow and a LOT of output!)\n"
      "   -v2                                      Even more stuff\n"
      "   -mult           <NUMBER>                 Input multiplicity of wavefunction (otherwise attempted to be read from the wfn)\n"
@@ -88,12 +89,12 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
         t.append("      and many more in communications or by feedback!\n");
-        t.append("NoSpherA2 uses featomic, Metatensor, and the OpenBLAS library.\n");
+        t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
         t.append("Please see, respectively:\n");
         t.append("   https://github.com/Luthaf/featomic\n");
         t.append("   https://github.com/lab-cosmo/metatensor\n");
-        t.append("   https://github.com/OpenMathLib/OpenBLAS\n");
+        t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
         t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
     }
@@ -1667,6 +1668,7 @@ void options::digest_options()
         else if (temp == "-blastest")
         {
             test_openblas();
+            test_solve_linear_equations();
             exit(0);
         }
         else if (temp == "-lahvatest")
@@ -1713,9 +1715,11 @@ void options::digest_options()
         else if (temp == "-cpus")
         {
             threads = stoi(arguments[i + 1]);
-            set_BLAS_threads(threads);
+            MKL_Set_Num_Threads(threads);
 #ifdef _OPENMP
             omp_set_num_threads(threads);
+            omp_set_dynamic(0);
+
 #endif
         }
         else if (temp == "-cmtc")
@@ -2050,12 +2054,12 @@ void options::digest_options()
         else if (temp == "-rho_cube")
         {
             string wfn_name = arguments[i + 1];
-           std::cout << "Reading wavefunction: " << wfn_name << endl;
+            std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-           std::cout << "Assigning ECPs" << endl;
+            std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-           std::cout << "Starting cube calculation" << endl;
+            std::cout << "Starting cube calculation" << endl;
             calc_rho_cube(*wavy);
             delete (wavy);
             exit(0);
@@ -2158,7 +2162,7 @@ void options::digest_options()
                 outputFile << r << " " << dens << "\n";
             }
             outputFile.close();
-           std::cout << "Data written to output.dat" << endl;
+            std::cout << "Data written to output.dat" << endl;
             delete (wavy1);
             delete (wavy2);
             exit(0);
@@ -2166,12 +2170,12 @@ void options::digest_options()
         else if (temp == "-spherical_aver_hirsh")
         {
             string wfn_name = arguments[i + 1];
-           std::cout << "Reading wavefunction: " << wfn_name << endl;
+            std::cout << "Reading wavefunction: " << wfn_name << endl;
             WFN *wavy = new WFN(wfn_name);
-           std::cout << "Assigning ECPs" << endl;
+            std::cout << "Assigning ECPs" << endl;
             if (ECP)
                 wavy->set_has_ECPs(true);
-           std::cout << "Starting spherical averaging" << endl;
+            std::cout << "Starting spherical averaging" << endl;
             double dens;
 
             for (int index_atom = 0; index_atom < wavy->get_ncen(); index_atom += 1)
@@ -2184,7 +2188,7 @@ void options::digest_options()
                 }
                 outputFile.close();
             }
-           std::cout << "Data written to output.dat" << endl;
+            std::cout << "Data written to output.dat" << endl;
             delete (wavy);
             exit(0);
         }
@@ -2194,10 +2198,10 @@ void options::digest_options()
             exit(0);
         }
         else if (temp == "-test")
-           std::cout << "Running in test mode!" << endl, test = true;
+            std::cout << "Running in test mode!" << endl, test = true;
         else if (temp == "-thakkar_d_plot")
         {
-           std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
+            std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
             exit(0);
         }
         else if (temp == "-twin")
@@ -3042,77 +3046,6 @@ std::wstring s2ws(const std::string &s)
     MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, &r[0], len);
     return r;
 }
-
-bool ExtractDLL(const std::filesystem::path &dllName)
-{
-    if (std::filesystem::exists(dllName))
-        return true; // DLL already exists
-
-    // Find the resource
-    HRSRC hRes = FindResource(NULL, MAKEINTRESOURCE(IDR_OPENBLAS), L"DLL");
-    if (!hRes)
-        return false;
-
-    // Load the resource
-    HGLOBAL hResLoad = LoadResource(NULL, hRes);
-    if (!hResLoad)
-        return false;
-
-    // Lock the resource to get a pointer to the data
-    void *pResData = LockResource(hResLoad);
-    if (!pResData)
-        return false;
-
-    // Get the size of the resource
-    DWORD resSize = SizeofResource(NULL, hRes);
-    if (resSize == 0)
-        return false;
-
-    // Write the resource data to a file
-    std::ofstream outFile(dllName, std::ios::binary);
-    if (!outFile)
-        return false;
-
-    outFile.write(reinterpret_cast<const char *>(pResData), resSize);
-    outFile.close();
-
-    return true;
-}
-
-bool check_OpenBLAS_DLL(const bool &debug)
-{
-    if (debug)
-        std::cout << "Checking for OpenBLAS DLL" << std::endl;
-    // Get the path of the executable
-    char tempPath[MAX_PATH];
-    GetModuleFileNameA(NULL, tempPath, MAX_PATH); // get path to NoSpherA2 executable
-    std::filesystem::path exeDir(tempPath);
-    exeDir = exeDir.parent_path();
-    if (debug)
-        std::cout << "Executable directory: " << exeDir << std::endl;
-
-    // Define the DLL name
-    std::filesystem::path dllName = exeDir / "libopenblas.dll";
-    if (debug)
-        std::cout << "DLL name: " << dllName << std::endl;
-    if (exists(dllName))
-        return true; // DLL already exists
-    else
-    {
-        if (debug)
-            std::cout << "DLL does not exist, extracting it from the executable!" << std::endl;
-        // Extract the DLL if it does not exist
-        if (!ExtractDLL(dllName))
-        {
-            std::cout << "Failed to extract DLL" << std::endl;
-            return false;
-        }
-        if (debug)
-            std::cout << "DLL extracted successfully!" << std::endl;
-    }
-    return true;
-}
-#endif
 */
 
 ProgressBar::~ProgressBar()

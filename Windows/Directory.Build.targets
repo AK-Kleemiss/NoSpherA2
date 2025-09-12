@@ -1,0 +1,32 @@
+<Project>
+  <!-- Applies to all MSBuild projects under this directory tree -->
+  <Target Name="FlattenNuGetRuntimes"
+          AfterTargets="CopyFilesToOutputDirectory">
+    <!-- Pick up anything NuGet put under runtimes\** (e.g., libiomp5md.dll, MKL dlls) -->
+    <ItemGroup>
+      <RuntimeDlls Include="$(OutDir)packages/**/*.dll"
+                   Condition="Exists('$(OutDir)packages')" />
+      <RuntimePDBs Include="$(OutDir)packages/**/*.pdb"
+                   Condition="Exists('$(OutDir)packages')" />
+    </ItemGroup>
+
+    <!-- Print summary and each file (MSBuild will emit one message per item) -->
+    <Message Text="Found dll: %(RuntimeDlls.Identity)" Importance="High" Condition="@(RuntimeDlls) != ''" />
+    <Message Text="Found pdb: %(RuntimePDBs.Identity)" Importance="High" Condition="@(RuntimePDBs) != ''" />
+    <Message Text="OutDir: $(OutDir)" Importance="High" />
+
+    <!-- Copy them next to the exe -->
+    <Copy SourceFiles="@(RuntimeDlls)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="@(RuntimeDlls) != ''" />
+    <Copy SourceFiles="@(RuntimePDBs)"
+          DestinationFolder="$(OutDir)"
+          SkipUnchangedFiles="true"
+          Condition="@(RuntimePDBs) != ''" />
+
+    <!-- Clean up the subfolder to avoid duplicate copies -->
+    <RemoveDir Directories="$(OutDir)packages"
+               Condition="Exists('$(OutDir)packages')" />
+  </Target>
+</Project>
