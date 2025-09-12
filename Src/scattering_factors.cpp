@@ -3405,7 +3405,7 @@ itsc_block calculate_scattering_factors_RI_fit(
             elec_sum += atom_elecs[iat];
     }
 
-    file << setprecision(4) << "Total number of analytical Electrons: " << elec_sum << endl;
+    file << setprecision(4) << "Total number of analytical Electrons: " << elec_sum << endl << endl;
     time_points.push_back(get_time());
     time_descriptions.push_back("Calculation of Charges");
 
