@@ -377,13 +377,13 @@ void GTOnr3c_drv(
                                              atm, natm, bas, nbas, env);
     const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
 
-    // #pragma omp parallel
+     #pragma omp parallel
     {
         int dims[3] = {naoi, naoj, naok};
         int shls[3] = {0, 0, 0};
         int ish, jsh, ksh, i0, j0, k0;
         double *cache = (double *)malloc(sizeof(double) * cache_size * di * di * di);
-        // #pragma omp for nowait schedule(dynamic)
+         #pragma omp for nowait schedule(dynamic)
         for (ksh = ksh0; ksh < ksh1; ksh++)
         {
             for (jsh = jsh0; jsh < jsh1; jsh++)
@@ -489,24 +489,24 @@ void GTOnr3c_fill_s1(
     }
 }
 
-void CINTgout2e(double *gout,
-                double *g,
-                int *idx,
-                CINTEnvVars *envs,
-                int gout_empty)
+void CINTgout2e(double* gout,
+    double* g,
+    int* idx,
+    CINTEnvVars* envs,
+    int gout_empty)
 {
     const int nf = envs->nf;
     const int nrys_roots = envs->nrys_roots;
-    double s = 0.0;
+
     if (gout_empty)
     {
-        // If gout is to be overwritten (empty), do a direct assignment
         for (int n = 0; n < nf; n++, idx += 3)
         {
             // Pointers to the relevant slices of g
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+            double s = 0.0;
 
             // Inner loop: accumulate products
 #pragma ivdep
@@ -515,7 +515,6 @@ void CINTgout2e(double *gout,
                 s += gx[i] * gy[i] * gz[i];
             }
             gout[n] = s;
-            s = 0.0;
         }
     }
     else
@@ -523,9 +522,10 @@ void CINTgout2e(double *gout,
         // If gout already has data, accumulate
         for (int n = 0; n < nf; n++, idx += 3)
         {
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+            double s = 0.0;
 
 #pragma ivdep
             for (int i = 0; i < nrys_roots; i++)
@@ -533,7 +533,6 @@ void CINTgout2e(double *gout,
                 s += gx[i] * gy[i] * gz[i];
             }
             gout[n] += s;
-            s = 0.0;
         }
     }
 }
