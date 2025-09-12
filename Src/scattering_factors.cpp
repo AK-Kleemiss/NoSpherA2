@@ -3331,7 +3331,7 @@ itsc_block calculate_scattering_factors_RI_fit(
     //    "mulliken_estimate", // charge scheme
     //    false);
 
-    vec coefs = density_fit_unrestrained(wave[nr], wavy_aux, opt.mem, 'C');
+    vec coefs = density_fit_unrestrained(wave[nr], wavy_aux, opt.mem, 'C', opt.debug);
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
 

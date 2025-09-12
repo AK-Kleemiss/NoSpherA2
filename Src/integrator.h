@@ -2,7 +2,7 @@
 #include "convenience.h"
 
 // Enhanced density fitting with adaptive electron restraints
-vec density_fit(const WFN& wavy, const WFN& wavy_aux, const double max_mem, const char metric,
+vec density_fit_restrain(const WFN& wavy, const WFN& wavy_aux, const double max_mem, const char metric,
                 double restraint_strength = 0.001, bool adaptive_restraint = true, 
                 const std::string& charge_scheme = "mulliken_estimate", bool analyze_quality = true);
 

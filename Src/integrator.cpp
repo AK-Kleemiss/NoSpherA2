@@ -161,7 +161,7 @@ void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux,
 }
 
 
-vec density_fit(const WFN &wavy, const WFN& wavy_aux, const double max_mem, const char metric,
+vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_mem, const char metric,
                  double restraint_strength, bool adaptive_restraint, 
                  const std::string& charge_scheme, bool analyze_quality)
 {
@@ -396,7 +396,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     
     // Method 1: Enhanced restraints with adaptive weighting
     std::cout << "\n--- Method 1: Enhanced Adaptive Restraints ---" << std::endl;
-    vec coeff_enhanced = density_fit(wavy, wavy_aux, max_mem, metric, 
+    vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, max_mem, metric,
                                    0.0001,     // restraint strength
                                    true,      // adaptive weighting
                                    "mulliken_estimate", // charge scheme

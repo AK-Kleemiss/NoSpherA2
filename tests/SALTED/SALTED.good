@@ -31,8 +31,6 @@ Generating densities...
 [              Calculating descriptors for l = 5               ]
 [#############################################################] 100% 
                                            ... done!
-                          ... done!
-Number of k - points to evaluate : 7672
 Table of Charges in electrons
        Atom      ML
          S    -0.552
@@ -50,6 +48,8 @@ Table of Charges in electrons
         Hb     0.315
         Hc     0.322
 Total number of analytical Electrons: 63.9897
+                          ... done!
+Number of k - points to evaluate : 7672
 [               Generating scattering factors...               ]
 [#############################################################] 100% 
                                           ... done!

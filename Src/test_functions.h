@@ -1822,7 +1822,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 
     load_basis_into_WFN(wavy_aux, aux_basis_set);
 
-    vec ri_coefs = density_fit(wavy, wavy_aux, (*opt).mem, 'C');
+    vec ri_coefs = density_fit_restrain(wavy, wavy_aux, opt->mem, 'C', opt->debug);
 
 
     vec3 grid;
