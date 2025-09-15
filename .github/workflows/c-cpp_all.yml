@@ -134,12 +134,12 @@ jobs:
           cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
           make install
           cd ../../../featomic/featomic
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
           make install
 
     - name: make_Linux
@@ -327,12 +327,12 @@ jobs:
           cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
           make install
           cd ../../../featomic/featomic 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
           make install
 
     - name: Build project
