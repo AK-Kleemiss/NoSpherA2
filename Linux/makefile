@@ -31,22 +31,31 @@ GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
 # Include directories
 INCLUDES := $(addprefix -I,$(INC_DIRS))
 
-# Threading backend selection
+# Threading backend selection - STATIC MKL but DYNAMIC libomp
 ifeq ($(MKL_THREADING),SEQ)
-  MKL_THR_LIB = -lmkl_sequential
-  IOMP_LIB    =
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_sequential.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  IOMP_LIB =
 else
-  MKL_THR_LIB = -lmkl_intel_thread
-  IOMP_LIB    = -liomp5
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_intel_thread.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  # Use dynamic linking for libiomp5 with rpath for runtime location
+  IOMP_LIB = -L"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,'$$ORIGIN' \
+             -liomp5
 endif
 
-# MKL link set per Intel guidance (+ rpaths so setvars isn't required at runtime)
-MKL_LINK_FLAGS = \
-  -L"$$MKLROOT/lib/intel64" -Wl,-rpath,"$$MKLROOT/lib/intel64" \
-  -Wl,--start-group -lmkl_intel_lp64 $(MKL_THR_LIB) -lmkl_core -Wl,--end-group \
-  $(IOMP_LIB) -lpthread -lm -ldl \
-  -L"$$ONEAPI_ROOT/compiler/latest/linux/lib" -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/lib" \
-  -L"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin"
+# MKL link flags - static MKL libraries + dynamic libiomp5
+MKL_LINK_FLAGS = $(MKL_STATIC_LIBS) $(IOMP_LIB) -lpthread -lm -ldl
 
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
@@ -61,62 +70,3 @@ OBJS   := $(OBJ_NAMES:=.o)
 OBJS_d := $(OBJ_NAMES:=.o_d)
 
 all: NoSpherA2
-
-# ---- Basis set converter (kept) ----
-basis_set_converter:
-	@$(MAKE) -f makefile_basis_set_converter
-
-# ---- Precompiled headers ----
-pch.h.gch: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -x c++-header -o "$@" "$<"
-
-pch.h.gch_d: ../Src/pch.h
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -x c++-header -o "$@" "$<"
-
-# ---- auxiliary_basis depends on converter ----
-auxiliary_basis.o: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
-
-auxiliary_basis.o_d: basis_set_converter
-	@echo 'Compiling auxiliary_basis.o_d after BasisSetConverter finishes'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" ../Src/auxiliary_basis.cpp
-	@echo 'Finished building: ../Src/auxiliary_basis.cpp'
-
-# ---- Pattern rules ----
-%.o: ../Src/%.cpp pch.h.gch
-	@echo 'Building file: $<'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS} -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-%.o_d: ../Src/%.cpp pch.h.gch_d
-	@echo 'Building file (debug): $<'
-	@$(WITH_ONEAPI) ${COMP} ${GCC_OPTS_DEBUG} -I"$$MKLROOT/include" $(INCLUDES) \
-	  -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
-	@echo 'Finished building: $<'
-
-# ---- Link ----
-NoSpherA2: ${OBJS}
-	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2" ${OBJS} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
-	cp NoSpherA2 ../
-	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
-	@echo 'Done building NoSpherA2'
-
-NoSpherA2_Debug: ${OBJS_d}
-	@echo 'Building target: $@'
-	@$(WITH_ONEAPI) ${COMP} -o "NoSpherA2_Debug" ${OBJS_d} ${LIBRASCALINE} $(MKL_LINK_FLAGS) ${LIBS}
-	cp NoSpherA2_Debug ../
-	cp ../Lib/MKL/compiler/2025.2/lib/libiomp5.so ../
-	@echo 'Done building Debug version of NoSpherA2'
-
-clean:
-	-${RM} NoSpherA2 ../NoSpherA2 NoSpherA2_Debug ../NoSpherA2_Debug ../BasisSetConverter ${OBJS} ${OBJS_d} $(OBJ_NAMES:=.d)
-	-@echo ' '
-
-.PHONY: all clean basis_set_converter
-.SECONDARY:
