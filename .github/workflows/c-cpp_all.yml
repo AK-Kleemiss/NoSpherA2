@@ -55,7 +55,7 @@ jobs:
         restore-keys: |
           featomic-mac-${{ runner.os }}-
 
-    - name: make_metatensor
+    - name: make_featomic
       if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
       run: |
           cd metatensor/metatensor-core
@@ -63,11 +63,7 @@ jobs:
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
           make install
-
-    - name: make_featomic
-      if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
-      run: |
-          cd featomic/featomic 
+          cd ../../featomic/featomic 
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
@@ -131,7 +127,7 @@ jobs:
         restore-keys: |
           featomic-linux-${{ runner.os }}-
 
-    - name: Build metatensor
+    - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
       run: |
           cd metatensor/metatensor-core 
@@ -139,11 +135,7 @@ jobs:
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
           make install
-
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
-      run: |
-          cd featomic/featomic 
+          cd ../../featomic/featomic
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
@@ -192,10 +184,11 @@ jobs:
         restore-keys: |
           featomic-windows-${{ runner.os }}-
 
-    - name: make_metatensor
+    # Build featomic only if cache is missing
+    - name: make_featomic
       if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
       run: |
-          cd featomic\featomic
+          cd metatensor\metatensor-core
           $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
@@ -204,12 +197,7 @@ jobs:
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
           msbuild -nologo .\metatensor.sln -p:Configuration=Release && \
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-
-    # Build featomic only if cache is missing
-    - name: make_featomic
-      if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
-      run: |
-          cd featomic\featomic
+          cd ..\..\featomic\featomic
           $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
@@ -335,10 +323,15 @@ jobs:
     - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
       run: |
-          cd featomic/featomic 
+          cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          make install
+          cd ../../featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
           make install
 
     - name: Build project
