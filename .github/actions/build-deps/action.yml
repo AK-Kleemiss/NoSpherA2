@@ -8,10 +8,37 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Setup Cargo environment (Unix)
+      if: inputs.platform != 'Windows'
+      shell: bash
+      run: |
+        # Ensure cargo is in PATH and verify version
+        source ~/.cargo/env || true
+        export PATH="$HOME/.cargo/bin:$PATH"
+        echo "PATH=$HOME/.cargo/bin:$PATH" >> $GITHUB_ENV
+        
+        # Verify we have the right version
+        cargo --version
+        rustc --version
+
+    - name: Setup Cargo environment (Windows)
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Ensure cargo is in PATH
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+        
+        # Verify we have the right version
+        & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
+        & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
+
     - name: Build featomic ARM64
       if: inputs.platform == 'Mac_ARM64'
       shell: bash
       run: |
+        source ~/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
         if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
           echo 'Building featomic for ARM64'
           cd featomic/featomic
@@ -27,6 +54,9 @@ runs:
       if: inputs.platform == 'Mac_x86_64'
       shell: bash
       run: |
+        source ~/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
         if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then
           echo 'Building featomic for x86_64'
           rustup target add x86_64-apple-darwin
@@ -43,6 +73,9 @@ runs:
       if: inputs.platform == 'Mac'
       shell: bash
       run: |
+        source ~/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
         if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
           echo 'Building featomic'
           cd featomic/featomic
@@ -58,6 +91,9 @@ runs:
       if: inputs.platform == 'Linux'
       shell: bash
       run: |
+        source ~/.cargo/env
+        export PATH="$HOME/.cargo/bin:$PATH"
+        
         if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
           echo 'Building featomic for Linux'
           cd featomic/featomic
@@ -89,6 +125,9 @@ runs:
       if: inputs.platform == 'Windows'
       shell: powershell
       run: |
+        # Ensure cargo is in PATH
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+        
         # Build featomic
         if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
           Write-Host "Building featomic for Windows"

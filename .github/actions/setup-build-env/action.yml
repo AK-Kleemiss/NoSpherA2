@@ -19,6 +19,17 @@ runs:
         git config --global --add safe.directory ${{ github.workspace }}
         git config --global --add safe.directory ${{ github.workspace }}/featomic
         
+        # Install/Update Rust and Cargo to version 1.86.0
+        echo "Installing Rust toolchain 1.86.0"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        source ~/.cargo/env
+        rustup default 1.86.0
+        rustup component add rust-src
+        
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
+        
         # Install libomp for ARM64 (should be available in /opt/homebrew)
         brew list --versions libomp >/dev/null 2>&1 || brew install libomp
         
@@ -35,12 +46,23 @@ runs:
         git config --global --add safe.directory ${{ github.workspace }}
         git config --global --add safe.directory ${{ github.workspace }}/featomic
         
+        # Install/Update Rust and Cargo to version 1.86.0
+        echo "Installing Rust toolchain 1.86.0"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        source ~/.cargo/env
+        rustup default 1.86.0
+        rustup component add rust-src
+        
+        # Add Rust target for x86_64 cross-compilation
+        rustup target add x86_64-apple-darwin
+        
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
+        
         # Install libomp for x86_64 (should be available in /usr/local)
         # On Intel macOS runners, Homebrew should install to /usr/local
         brew list --versions libomp >/dev/null 2>&1 || brew install libomp
-        
-        # Add Rust target for x86_64 cross-compilation if needed
-        rustup target add x86_64-apple-darwin
         
         echo "x86_64 setup complete"
 
@@ -51,6 +73,18 @@ runs:
         echo "Setting up macOS (legacy) environment"
         xcode-select --install || echo "Xcode Command Line Tools already installed"
         sudo xcodebuild -license accept
+        
+        # Install/Update Rust and Cargo to version 1.86.0
+        echo "Installing Rust toolchain 1.86.0"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        source ~/.cargo/env
+        rustup default 1.86.0
+        rustup component add rust-src
+        
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
+        
         brew install libomp
 
     - name: Setup Linux
@@ -58,7 +92,43 @@ runs:
       shell: bash
       run: |
         sudo apt update && sudo apt install -y build-essential
+        
+        # Install/Update Rust and Cargo to version 1.86.0
+        echo "Installing Rust toolchain 1.86.0"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        source ~/.cargo/env
+        rustup default 1.86.0
+        rustup component add rust-src
+        
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
 
     - name: Setup Windows
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Install Rust and Cargo version 1.86.0 for Windows
+        Write-Host "Installing Rust toolchain 1.86.0"
+        
+        # Download and install rustup
+        Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "rustup-init.exe"
+        .\rustup-init.exe -y --default-toolchain 1.86.0
+        
+        # Add cargo to PATH for this session
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+        
+        # Set default toolchain
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" default 1.86.0
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rust-src
+        
+        # Verify versions
+        Write-Host "Rust version: $(& "$env:USERPROFILE\.cargo\bin\rustc.exe" --version)"
+        Write-Host "Cargo version: $(& "$env:USERPROFILE\.cargo\bin\cargo.exe" --version)"
+        
+        # Update PATH for subsequent steps
+        echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Setup MSBuild (Windows)
       if: inputs.platform == 'Windows'
       uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
