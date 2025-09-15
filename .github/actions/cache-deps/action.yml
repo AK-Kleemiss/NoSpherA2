@@ -21,7 +21,7 @@ runs:
       if: inputs.platform == 'Mac_x86_64'
       uses: actions/cache@v4.2.4
       with:
-        path: Lib/featomic_install_x86
+        path: Lib/featomic_install
         key: featomic-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           featomic-${{ inputs.platform }}-${{ runner.os }}-
@@ -43,3 +43,14 @@ runs:
         key: intelmkl-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
         restore-keys: |
           intelmkl-${{ inputs.platform }}-${{ runner.os }}-
+
+    - name: Cache Intel MKL NuGet Packages (Windows)
+      if: inputs.platform == 'Windows'
+      uses: actions/cache@v4.2.4
+      with:
+        path: |
+          Windows/packages
+          ~/.nuget/packages
+        key: nuget-mkl-${{ inputs.platform }}-${{ hashFiles('Windows/**/*.vcxproj', 'Windows/**/*.sln') }}
+        restore-keys: |
+          nuget-mkl-${{ inputs.platform }}-

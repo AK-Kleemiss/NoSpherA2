@@ -57,22 +57,17 @@ runs:
         source ~/.cargo/env
         export PATH="$HOME/.cargo/bin:$PATH"
         
-        if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then
+        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
           echo 'Building featomic for x86_64'
           rustup target add x86_64-apple-darwin
           cd featomic/featomic
           mkdir -p build_x86_64
           cd build_x86_64
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" ..
+          # Install directly to featomic_install (same as ARM64)
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" ..
           make install
         else
           echo 'Skipping featomic build, already exists'
-        fi
-        
-        # Create symlink for compatibility with existing makefile
-        if [ ! -L Lib/featomic_install ]; then
-          ln -sf featomic_install_x86 Lib/featomic_install
-          echo "Created symlink: Lib/featomic_install -> Lib/featomic_install_x86"
         fi
 
     - name: Build featomic (Other Mac)
@@ -152,4 +147,4 @@ runs:
         
         cd ${{ github.workspace }}
         # Get Intel MKL
-        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages
+        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000
