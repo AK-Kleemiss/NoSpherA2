@@ -1,0 +1,64 @@
+name: 'Setup Build Environment'
+description: 'Setup platform-specific build environment'
+inputs:
+  platform:
+    description: 'Target platform (Mac_ARM64/Mac_x86_64/Linux/Windows)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup macOS ARM64
+      if: inputs.platform == 'Mac_ARM64'
+      shell: bash
+      run: |
+        echo "Setting up macOS ARM64 environment"
+        xcode-select --install || echo "Xcode Command Line Tools already installed"
+        sudo xcodebuild -license accept
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        git config --global --add safe.directory ${{ github.workspace }}
+        git config --global --add safe.directory ${{ github.workspace }}/featomic
+        
+        # Install libomp for ARM64 (should be available in /opt/homebrew)
+        brew list --versions libomp >/dev/null 2>&1 || brew install libomp
+        
+        echo "ARM64 setup complete"
+
+    - name: Setup macOS x86_64
+      if: inputs.platform == 'Mac_x86_64'
+      shell: bash
+      run: |
+        echo "Setting up macOS x86_64 environment"
+        xcode-select --install || echo "Xcode Command Line Tools already installed"
+        sudo xcodebuild -license accept
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        git config --global --add safe.directory ${{ github.workspace }}
+        git config --global --add safe.directory ${{ github.workspace }}/featomic
+        
+        # Install libomp for x86_64 (should be available in /usr/local)
+        # On Intel macOS runners, Homebrew should install to /usr/local
+        brew list --versions libomp >/dev/null 2>&1 || brew install libomp
+        
+        # Add Rust target for x86_64 cross-compilation if needed
+        rustup target add x86_64-apple-darwin
+        
+        echo "x86_64 setup complete"
+
+    - name: Setup macOS (legacy)
+      if: inputs.platform == 'Mac'
+      shell: bash
+      run: |
+        echo "Setting up macOS (legacy) environment"
+        xcode-select --install || echo "Xcode Command Line Tools already installed"
+        sudo xcodebuild -license accept
+        brew install libomp
+
+    - name: Setup Linux
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        sudo apt update && sudo apt install -y build-essential
+
+    - name: Setup Windows
+      if: inputs.platform == 'Windows'
+      uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0

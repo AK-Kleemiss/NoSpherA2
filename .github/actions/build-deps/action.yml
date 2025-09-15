@@ -1,0 +1,109 @@
+name: 'Build Dependencies'
+description: 'Build platform-specific dependencies'
+inputs:
+  platform:
+    description: 'Target platform'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Build featomic ARM64
+      if: inputs.platform == 'Mac_ARM64'
+      shell: bash
+      run: |
+        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
+          echo 'Building featomic for ARM64'
+          cd featomic/featomic
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
+          make install
+        else
+          echo 'Skipping featomic build, already exists'
+        fi
+
+    - name: Build featomic x86_64
+      if: inputs.platform == 'Mac_x86_64'
+      shell: bash
+      run: |
+        if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then
+          echo 'Building featomic for x86_64'
+          rustup target add x86_64-apple-darwin
+          cd featomic/featomic
+          mkdir -p build_x86_64
+          cd build_x86_64
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" ..
+          make install
+        else
+          echo 'Skipping featomic build, already exists'
+        fi
+
+    - name: Build featomic (Other Mac)
+      if: inputs.platform == 'Mac'
+      shell: bash
+      run: |
+        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
+          echo 'Building featomic'
+          cd featomic/featomic
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
+          make install
+        else
+          echo 'Skipping featomic build, already exists'
+        fi
+
+    - name: Build featomic (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
+          echo 'Building featomic for Linux'
+          cd featomic/featomic
+          mkdir -p build
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
+          make install
+        else
+          echo 'Skipping featomic build, already exists'
+        fi
+
+    - name: Build Intel MKL (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        if [ ! -f Lib/MKL/mkl/2025.2/lib/libmkl_core.a ]; then
+          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=${{ github.workspace }}/Lib/MKL --eula accept
+        else
+          echo 'Skipping IntelMKL build, already exists'
+        fi
+
+    - name: Set LD_LIBRARY_PATH for Intel OpenMP (Linux)
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: echo "LD_LIBRARY_PATH=${{ github.workspace }}/Lib/MKL/compiler/2025.2/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+    - name: Build dependencies (Windows)
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Build featomic
+        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
+          Write-Host "Building featomic for Windows"
+          cd featomic\featomic
+          $buildDir = "build"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
+          }
+          cd $buildDir
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+          msbuild -nologo .\featomic.sln -p:Configuration=Release
+          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
+        } else {
+          Write-Host "Skipping featomic build, already exists"
+        }
+        
+        # Get Intel MKL
+        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages
