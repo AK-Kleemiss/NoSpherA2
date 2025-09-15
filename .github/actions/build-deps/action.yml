@@ -68,6 +68,12 @@ runs:
         else
           echo 'Skipping featomic build, already exists'
         fi
+        
+        # Create symlink for compatibility with existing makefile
+        if [ ! -L Lib/featomic_install ]; then
+          ln -sf featomic_install_x86 Lib/featomic_install
+          echo "Created symlink: Lib/featomic_install -> Lib/featomic_install_x86"
+        fi
 
     - name: Build featomic (Other Mac)
       if: inputs.platform == 'Mac'
@@ -144,5 +150,6 @@ runs:
           Write-Host "Skipping featomic build, already exists"
         }
         
+        cd ${{ github.workspace }}
         # Get Intel MKL
         MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages
