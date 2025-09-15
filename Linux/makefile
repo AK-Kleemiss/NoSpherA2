@@ -19,7 +19,7 @@ INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 
 # Featomic local libs
 LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
-LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
+LIBRASCALINE   += ../Lib/featomic_install/lib64/libmetatensor.a
 LIBRASCALINE_I := ../Lib/featomic_install/include
 
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
