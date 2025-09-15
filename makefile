@@ -41,15 +41,30 @@ check_rust:
 endif
 
 ifeq ($(NAME),WINDOWS)
-featomic: check_rust
+metatensor: check_rust
 	@if not exist Lib\featomic_install\lib\metatensor.lib ( \
+		echo Building metatensor for $(NAME) && \
+		cd $(MAKEFILE_DIR)/metatensor/metatensor-core && \
+		(if exist build rd /s /q build) && \
+		mkdir build && \
+		cd build && \
+		echo Starting build && \
+		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
+		msbuild -nologo .\metatensor.sln -p:Configuration=Release && \
+		msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release \
+	) else ( \
+		echo metatensor already built \
+	)
+
+featomic: metatensor
+	@if not exist Lib\featomic_install\lib\featomic.lib ( \
 		echo Building featomic for $(NAME) && \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		(if exist build rd /s /q build) && \
 		mkdir build && \
 		cd build && \
 		echo Starting build && \
-		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
+		cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
 		msbuild -nologo .\featomic.sln -p:Configuration=Release && \
 		msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release \
 	) else ( \
