@@ -41,6 +41,7 @@ jobs:
         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
         git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2
         git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2/featomic
+        git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2/metatensor
 
     - name: Get OMP library
       run: brew install libomp
@@ -58,12 +59,12 @@ jobs:
     - name: make_featomic
       if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
       run: |
-          cd metatensor/metatensor-core
+          cd /Users/runner/work/NoSpherA2/NoSpherA2/metatensor/metatensor-core 
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
           make install
-          cd ../../featomic/featomic 
+          cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic 
           mkdir -p build
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
@@ -133,12 +134,12 @@ jobs:
           cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
           make install
-          cd ../../featomic/featomic
+          cd ../../../featomic/featomic
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
           make install
 
     - name: make_Linux
@@ -194,7 +195,7 @@ jobs:
             mkdir $buildDir
           }
           cd $buildDir
-          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" .. && \
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" ..
           msbuild -nologo .\metatensor.sln -p:Configuration=Release && \
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
           cd ..\..\featomic\featomic
@@ -326,12 +327,12 @@ jobs:
           cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
           make install
-          cd ../../featomic/featomic 
+          cd ../../../featomic/featomic 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../featomic_install .. 
           make install
 
     - name: Build project
