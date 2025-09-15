@@ -32,9 +32,11 @@ OPTFLAGS  := -O3 -fvisibility=hidden
 WARNFLAGS := -fmessage-length=0
 INCLUDES  := $(addprefix -I,$(INC_DIRS))
 
-# macOS SDK
+# macOS SDK and deployment target
 SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path 2>/dev/null)
 SYSROOT := $(if $(SDKROOT),-isysroot $(SDKROOT),)
+# Set deployment target to 13.3 to match LAPACK requirements
+DEPLOYMENT_TARGET := -mmacosx-version-min=13.3
 
 # ---- OpenMP via libomp (Homebrew) ----
 # Override these if your Homebrew lives elsewhere.
@@ -50,8 +52,8 @@ OMPLIBS_arm64   := -L$(LIBOMP_PREFIX_arm64)/lib   -Wl,-rpath,$(LIBOMP_PREFIX_arm
 OMPLIBS_x86_64  := -L$(LIBOMP_PREFIX_x86_64)/lib  -Wl,-rpath,$(LIBOMP_PREFIX_x86_64)/lib  -lomp
 
 # Common flags
-CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(INCLUDES) $(SYSROOT)
-LDFLAGS_COMMON  := $(SYSROOT) -framework Accelerate
+CXXFLAGS_COMMON := $(CXXSTD) $(OPTFLAGS) $(WARNFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
+LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
 
 # Per-arch final flags
 CXXFLAGS_arm64  := $(CXXFLAGS_COMMON)  -arch arm64  $(OMPFLAGS_arm64)
@@ -86,10 +88,16 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 	@echo "Link (x86_64)…"
 	@$(COMP) $^ $(EXTRA_LIBS) $(LDFLAGS_x86_64) -o $@
 
-# Keep your original converter step
+# Architecture-specific basis set converter
 basis_set_converter:
-	@echo "Building basis set converter..."
-	@$(MAKE) -f makefile_basis_set_converter
+	@echo "Building basis set converter for current architecture..."
+	@$(MAKE) -f makefile_basis_set_converter ARCH=$(shell uname -m) || \
+	 (echo "Building basis set converter directly..." && \
+	  $(COMP) $(CXXFLAGS_COMMON) -arch $(shell uname -m) $(OMPFLAGS_$(shell uname -m)) \
+	  ../Src/basis_set_helper/BasisSetConverter.cpp \
+	  ../Src/basis_set_helper/basis_set_helper.cpp \
+	  -o BasisSetConverter && \
+	  ./BasisSetConverter ../Windows/)
 
 # Generate auxiliary_basis.cpp when needed
 $(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter
@@ -119,12 +127,12 @@ build/arm64  build/x86_64:
 	@mkdir -p $@
 
 # Debug variant
-debug: CXXFLAGS_COMMON := -std=c++20 -O0 -g $(WARNFLAGS) $(INCLUDES) $(SYSROOT)
-debug: LDFLAGS_COMMON  := $(SYSROOT) -framework Accelerate
+debug: CXXFLAGS_COMMON := -std=c++20 -O0 -g $(WARNFLAGS) $(INCLUDES) $(SYSROOT) $(DEPLOYMENT_TARGET)
+debug: LDFLAGS_COMMON  := $(SYSROOT) $(DEPLOYMENT_TARGET) -framework Accelerate
 debug: clean NoSpherA2_arm64
 
 clean:
-	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2
+	-$(RM) -r build NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64 ../NoSpherA2 BasisSetConverter
 	@echo "Cleaned."
 
 .PHONY: all clean debug basis_set_converter NoSpherA2 NoSpherA2_arm64 NoSpherA2_x86_64
