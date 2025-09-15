@@ -44,10 +44,10 @@ jobs:
             
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make -j"
+            build-script: "cd Linux && make -j && cp NoSpherA2 ../ && cp libiomp5.so ../ 2>/dev/null || true"
             artifact-name: executable_Linux
             artifact-path: |
-              Linux/NoSpherA2
+              NoSpherA2
               libiomp5.so
               
           - os: windows-2022
