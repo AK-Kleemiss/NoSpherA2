@@ -1,4 +1,4 @@
-Running Openblas test
+Running MKL/Accelerate test
 Testing matrices directly
 Matrices have size 10x10
 Matrices have size 10x10
