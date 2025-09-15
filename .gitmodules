@@ -4,3 +4,6 @@
 [submodule "featomic"]
 	path = featomic
 	url = https://github.com/metatensor/featomic
+[submodule "metatensor"]
+	path = metatensor
+	url = https://github.com/metatensor/metatensor.git

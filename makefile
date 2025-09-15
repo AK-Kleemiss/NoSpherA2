@@ -59,39 +59,74 @@ else ifeq ($(NAME),MAC)
 featomic: check_rust featomic_$(NATIVE_ARCH)
 	@echo Built featomic for $(NATIVE_ARCH)
 else
-featomic: check_rust
+metatensor: check_rust
+	@if [ ! -f Lib/featomic_install/lib64/libmetatensor.a ]; then \
+		echo 'Building metatensor, since Lib/featomic_install/lib/libmetatensor.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/metatensor/metatensor-core && \
+		mkdir -p build && \
+		cd build && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		make install; \
+	else \
+		echo 'Skipping metatensor build, Lib/featomic_install/lib/libmetatensor.a already exists'; \
+	fi
+featomic: metatensor
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build && \
 		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
 		make install; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
 	fi
 endif
 
-featomic_x86_64: check_rust
+metatensor_x86_64: check_rust
+	@if [ ! -f Lib/featomic_install/lib64/libmetatensor.a ]; then \
+		echo 'Building metatensor, since Lib/featomic_install/lib/libmetatensor.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/metatensor/metatensor-core && \
+		mkdir -p build && \
+		cd build && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
+		make install; \
+	else \
+		echo 'Skipping metatensor build, Lib/featomic_install/lib/libmetatensor.a already exists'; \
+	fi
+
+featomic_x86_64: metatensor_x86_64
 	@if [ ! -f Lib/featomic_install_x86/lib/libfeatomic.a ]; then \
 		echo 'Building featomic for x86_64, since Lib/featomic_install_x86/lib/libfeatomic.a doesnt exist'; \
 		rustup target add x86_64-apple-darwin; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build_x86_64 && \
 		cd build_x86_64 && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. && \
 		make install; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install_x86/lib/libfeatomic.a already exists'; \
 	fi
 
-featomic_arm64: check_rust
+metatensor_arm64: check_rust
+	@if [ ! -f Lib/featomic_install/lib64/libmetatensor.a ]; then \
+		echo 'Building metatensor, since Lib/featomic_install/lib/libmetatensor.a doesnt exist'; \
+		cd $(MAKEFILE_DIR)/metatensor/metatensor-core && \
+		mkdir -p build && \
+		cd build && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		make install; \
+	else \
+		echo 'Skipping metatensor build, Lib/featomic_install/lib/libmetatensor.a already exists'; \
+	fi
+
+featomic_arm64: metatensor_arm64
 	@if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then \
 		echo 'Building featomic, since Lib/featomic_install/lib/libfeatomic.a doesnt exist'; \
 		cd $(MAKEFILE_DIR)/featomic/featomic && \
 		mkdir -p build && \
 		cd build && \
-		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
+		cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF  -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. && \
 		make install || true; \
 	else \
 		echo 'Skipping featomic build, Lib/featomic_install/lib/libfeatomic.a already exists'; \
