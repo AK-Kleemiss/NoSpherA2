@@ -198,7 +198,7 @@ jobs:
           cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" ..
           msbuild -nologo .\metatensor.sln -p:Configuration=Release
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-          cd ..\..\featomic\featomic
+          cd ..\..\..\featomic\featomic
           $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
