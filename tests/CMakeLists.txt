@@ -3,7 +3,7 @@ find_package(Python COMPONENTS Interpreter REQUIRED)
 
 FILE(COPY ${CMAKE_CURRENT_SOURCE_DIR}/runTest.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_nos_test(alanine_occ "-cif alanine.cif -dmin 0.5 -wfn alanine.owf.fchk -acc 1 -no-date")
-add_nos_test(disorder "-cif thpp.cif -hkl thpp.hkl -mtc olex2/Wfn_job/Part_1/thpp.wfx 0.1 olex2/Wfn_job/Part_2/thpp.wfx 0.2 -mtc_mult 1 1 -mtc_charge 0 0 -acc 0 -no-date" COMPARE_GOOD "disorder_THPP.good")
+add_nos_test(disorder "-cif thpp.cif -hkl thpp.hkl -mtc olex2/Wfn_job/Part_1/thpp.wfx 0.1 olex2/Wfn_job/Part_2/thpp.wfx 0.2 -mtc_mult 1 1 -mtc_ECP 0 0 -mtc_charge 0 0 -acc 0 -no-date" COMPARE_GOOD "disorder_THPP.good")
 add_nos_test(fourier_transform "-test_analytical -no-date" DIRECTORY "SALTED")
 add_nos_test(fractal "-fractal sucrose_diff.cube -no_date" COMPARE_GOOD "fractal.good" COMPARE_NAME "sucrose_diff.cube_fractal_plot" DIRECTORY "sucrose_fchk_SF")
 add_nos_test(grown_water "-cif water.cif -hkl water.hkl -wfn water.wfx -acc 0 -no-date" DIRECTORY "grown")
