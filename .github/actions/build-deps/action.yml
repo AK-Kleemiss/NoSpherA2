@@ -32,75 +32,19 @@ runs:
         & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
         & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
 
-    - name: Build featomic ARM64
-      if: inputs.platform == 'Mac_ARM64'
+    - name: Build featomic (Unix)
+      if: inputs.platform != 'Windows'
       shell: bash
       run: |
         source ~/.cargo/env
         export PATH="$HOME/.cargo/bin:$PATH"
-        
+    
         if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo 'Building featomic for ARM64'
+          echo "Building featomic for ${{ inputs.platform }}"
           cd featomic/featomic
           mkdir -p build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
-          make install
-        else
-          echo 'Skipping featomic build, already exists'
-        fi
-
-    - name: Build featomic x86_64
-      if: inputs.platform == 'Mac_x86_64'
-      shell: bash
-      run: |
-        source ~/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
-        
-        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo 'Building featomic for x86_64'
-          rustup target add x86_64-apple-darwin
-          cd featomic/featomic
-          mkdir -p build_x86_64
-          cd build_x86_64
-          # Install directly to featomic_install (same as ARM64)
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" ..
-          make install
-        else
-          echo 'Skipping featomic build, already exists'
-        fi
-
-    - name: Build featomic (Other Mac)
-      if: inputs.platform == 'Mac'
-      shell: bash
-      run: |
-        source ~/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
-        
-        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo 'Building featomic'
-          cd featomic/featomic
-          mkdir -p build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
-          make install
-        else
-          echo 'Skipping featomic build, already exists'
-        fi
-
-    - name: Build featomic (Linux)
-      if: inputs.platform == 'Linux'
-      shell: bash
-      run: |
-        source ~/.cargo/env
-        export PATH="$HOME/.cargo/bin:$PATH"
-        
-        if [ ! -f Lib/featomic_install/lib/libfeatomic.a ]; then
-          echo 'Building featomic for Linux'
-          cd featomic/featomic
-          mkdir -p build
-          cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
+          cmake ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install ..
           make install
         else
           echo 'Skipping featomic build, already exists'
@@ -138,7 +82,7 @@ runs:
             mkdir $buildDir
           }
           cd $buildDir
-          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
           msbuild -nologo .\featomic.sln -p:Configuration=Release
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
         } else {

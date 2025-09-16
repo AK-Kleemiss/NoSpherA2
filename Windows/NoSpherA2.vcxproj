@@ -13003,6 +13003,9 @@
     <ClInclude Include="..\Src\SALTED_utilities.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\.github\actions\build-deps\action.yml" />
+    <None Include="..\.github\actions\cache-deps\action.yml" />
+    <None Include="..\.github\actions\setup-build-env\action.yml" />
     <None Include="..\.github\workflows\c-cpp_all.yml" />
     <None Include="..\.github\workflows\codeql-analysis.yml" />
     <None Include="..\Linux\makefile" />

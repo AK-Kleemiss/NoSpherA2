@@ -8,26 +8,7 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Cache Featomic ARM64
-      if: inputs.platform == 'Mac_ARM64'
-      uses: actions/cache@v4.2.4
-      with:
-        path: Lib/featomic_install
-        key: featomic-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
-        restore-keys: |
-          featomic-${{ inputs.platform }}-${{ runner.os }}-
-
-    - name: Cache Featomic x86_64
-      if: inputs.platform == 'Mac_x86_64'
-      uses: actions/cache@v4.2.4
-      with:
-        path: Lib/featomic_install
-        key: featomic-${{ inputs.platform }}-${{ runner.os }}-${{ hashFiles('featomic/**') }}
-        restore-keys: |
-          featomic-${{ inputs.platform }}-${{ runner.os }}-
-
     - name: Cache Featomic (Other platforms)
-      if: inputs.platform != 'Mac_ARM64' && inputs.platform != 'Mac_x86_64'
       uses: actions/cache@v4.2.4
       with:
         path: Lib/featomic_install

@@ -17,9 +17,7 @@ permissions:
   contents: read
 
 env:
-  # Global configuration
-  FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
-  INTEL_MKL_URL: "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh"
+    FEATOMIC_CMAKE_FLAGS: "-DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF"
 
 jobs:
   # Build matrix for all platforms
@@ -30,14 +28,12 @@ jobs:
         include:
           - os: macos-latest  # Apple Silicon (ARM64)
             name: Mac_ARM64
-            arch: arm64
             build-script: "cd Mac && make NoSpherA2_arm64 -j"
             artifact-name: executable_MacOS_ARM64
             artifact-path: Mac/NoSpherA2_arm64
             
           - os: macos-13  # Intel x86_64
             name: Mac_x86_64
-            arch: x86_64
             build-script: "cd Mac && make NoSpherA2_x86_64 -j"
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2_x86_64

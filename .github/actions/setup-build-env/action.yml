@@ -8,84 +8,32 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup macOS ARM64
-      if: inputs.platform == 'Mac_ARM64'
+    - name: Setup macOS
+      if: inputs.platform == 'Mac_ARM64' || inputs.platform == 'Mac_x86_64'
       shell: bash
       run: |
-        echo "Setting up macOS ARM64 environment"
+        echo "Setting up macOS environment for ${{ inputs.platform }}"
         xcode-select --install || echo "Xcode Command Line Tools already installed"
         sudo xcodebuild -license accept
         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
         git config --global --add safe.directory ${{ github.workspace }}
         git config --global --add safe.directory ${{ github.workspace }}/featomic
-        
+    
         # Install/Update Rust and Cargo to version 1.86.0
         echo "Installing Rust toolchain 1.86.0"
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
         source ~/.cargo/env
         rustup default 1.86.0
         rustup component add rust-src
-        
+    
         # Verify versions
         echo "Rust version: $(rustc --version)"
         echo "Cargo version: $(cargo --version)"
-        
-        # Install libomp for ARM64 (should be available in /opt/homebrew)
+    
+        # Install libomp (Homebrew will install to correct location based on architecture)
         brew list --versions libomp >/dev/null 2>&1 || brew install libomp
-        
-        echo "ARM64 setup complete"
-
-    - name: Setup macOS x86_64
-      if: inputs.platform == 'Mac_x86_64'
-      shell: bash
-      run: |
-        echo "Setting up macOS x86_64 environment"
-        xcode-select --install || echo "Xcode Command Line Tools already installed"
-        sudo xcodebuild -license accept
-        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-        git config --global --add safe.directory ${{ github.workspace }}
-        git config --global --add safe.directory ${{ github.workspace }}/featomic
-        
-        # Install/Update Rust and Cargo to version 1.86.0
-        echo "Installing Rust toolchain 1.86.0"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
-        source ~/.cargo/env
-        rustup default 1.86.0
-        rustup component add rust-src
-        
-        # Add Rust target for x86_64 cross-compilation
-        rustup target add x86_64-apple-darwin
-        
-        # Verify versions
-        echo "Rust version: $(rustc --version)"
-        echo "Cargo version: $(cargo --version)"
-        
-        # Install libomp for x86_64 (should be available in /usr/local)
-        # On Intel macOS runners, Homebrew should install to /usr/local
-        brew list --versions libomp >/dev/null 2>&1 || brew install libomp
-        
-        echo "x86_64 setup complete"
-
-    - name: Setup macOS (legacy)
-      if: inputs.platform == 'Mac'
-      shell: bash
-      run: |
-        echo "Setting up macOS (legacy) environment"
-        xcode-select --install || echo "Xcode Command Line Tools already installed"
-        sudo xcodebuild -license accept
-        
-        # Install/Update Rust and Cargo to version 1.86.0
-        echo "Installing Rust toolchain 1.86.0"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
-        source ~/.cargo/env
-        rustup default 1.86.0
-        rustup component add rust-src
-        
-        # Verify versions
-        echo "Rust version: $(rustc --version)"
-        echo "Cargo version: $(cargo --version)"
-        
-        brew install libomp
+    
+        echo "${{ inputs.platform }} setup complete"
 
     - name: Setup Linux
       if: inputs.platform == 'Linux'
