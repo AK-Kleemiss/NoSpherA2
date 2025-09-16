@@ -1,9 +1,9 @@
 include(ExternalProject)
-#CPMAddPackage(
-#    NAME Ccache.cmake
-#    GITHUB_REPOSITORY TheLartians/Ccache.cmake
-#    VERSION 1.2.5
-#)
+CPMAddPackage(
+    NAME Ccache.cmake
+    GITHUB_REPOSITORY TheLartians/Ccache.cmake
+    VERSION 1.2.5
+)
 
 CPMAddPackage(
     NAME mdspan
@@ -45,6 +45,7 @@ if (featomic_ADDED)
     file(MAKE_DIRECTORY ${featomic_SOURCE_DIR}/.cargo)
     file(WRITE ${featomic_SOURCE_DIR}/.cargo/config.toml "paths = ['${metatensor_SOURCE_DIR}']")
 endif ()
+add_custom_target(featomic_target DEPENDS featomic_static featomic)
 set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
 message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
 message(WARNING "HERE: ${CMAKE_CURRENT_BINARY_DIR}")
@@ -54,6 +55,7 @@ else ()
     set(HOME $ENV{HOME})
 endif ()
 
+set(MKL_LINK "static")
 if (NOT EXISTS ${ONEAPI_DIRECTORY})
     set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
     set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
@@ -78,8 +80,9 @@ if (NOT EXISTS ${ONEAPI_DIRECTORY})
         set(ENV{HOME} "/tmp/home")
         message(STATUS "INSTALLING MKL IN: ${MKL_INSTALL_DIR}")
         file(MAKE_DIRECTORY $ENV{HOME})
+        execute_process(COMMAND chmod +x ${_MKL_SH})
         execute_process(
-            COMMAND "${_MKL_SH}" -a --silent --eula accept --install-dir "${MKL_INSTALL_DIR}"
+            COMMAND ${_MKL_SH} -a --silent --eula accept --install-dir "${MKL_INSTALL_DIR}"
 
           RESULT_VARIABLE _MKL_RC
         )
@@ -103,6 +106,5 @@ else ()
         PATH_SUFFIXES "lib/cmake/mkl"
     )
   message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
-
 endif ()
 
