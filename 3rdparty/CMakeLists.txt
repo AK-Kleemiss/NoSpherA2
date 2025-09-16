@@ -1,9 +1,9 @@
 include(ExternalProject)
-CPMAddPackage(
-    NAME Ccache.cmake
-    GITHUB_REPOSITORY TheLartians/Ccache.cmake
-    VERSION 1.2.5
-)
+#CPMAddPackage(
+#    NAME Ccache.cmake
+#    GITHUB_REPOSITORY TheLartians/Ccache.cmake
+#    VERSION 1.2.5
+#)
 
 CPMAddPackage(
     NAME mdspan
@@ -17,11 +17,11 @@ CPMAddPackage(
     GIT_TAG "metatensor-core-v0.1.17"
     OPTIONS
         "CMAKE_BUILD_TYPE Release"
-        "BUILD_SHARED_LIBS OFF"
-        "METATENSOR_INSTALL_BOTH_STATIC_SHARED OFF"
+        "BUILD_SHARED_LIBS ON"
+        "METATENSOR_INSTALL_BOTH_STATIC_SHARED ON"
 )
-
-set(metatensor_STATIC_LIB ${metatensor_BINARY_DIR}/metatensor-core/target/release/libmetatensor.a)
+message(WARNING "${CMAKE_INSTALL_LIBDIR}")
+list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.1/featomic-cxx-0.6.1.tar.gz"
@@ -31,6 +31,7 @@ CPMAddPackage(
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
 )
+
 if (featomic_ADDED)
     add_library(featomic_static INTERFACE IMPORTED GLOBAL)
     target_link_libraries(featomic_static INTERFACE
@@ -44,7 +45,7 @@ if (featomic_ADDED)
 endif ()
 set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
 message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
-message(WARNING "HERE: ${CMAKE_SOURCE_DIR}")
+message(WARNING "HERE: ${CMAKE_CURRENT_BINARY_DIR}")
 if (${FAKE_HOME_TEST})
     set(HOME "/tmp/home")
 else ()
