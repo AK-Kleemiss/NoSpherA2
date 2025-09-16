@@ -29,16 +29,21 @@ jobs:
         key: featomic-arm-mac-${{ runner.os }}-${{ hashFiles('featomic/**') }}
         restore-keys: |
           featomic-arm-mac-${{ runner.os }}-
-  
+
     - name: make_featomic
       if: steps.cache-featomic-arm-mac.outputs.cache-hit != 'true'
       run: |
-          cd featomic/featomic 
+          cd metatensor/metatensor-core 
+          mkdir -p build 
+          cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. 
+          make install
+          cd ../../featomic/featomic 
           mkdir -p build 
           cd build 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_arm .. 
           make install
-    
+
     - name: make_MacOS
       run: |
           cd Mac 
@@ -78,12 +83,16 @@ jobs:
       if: steps.cache-featomic-x86-mac.outputs.cache-hit != 'true'
       run: |
           rustup target add x86_64-apple-darwin 
+          cd /Users/runner/work/NoSpherA2/NoSpherA2/metatensor/metatensor-core
+          mkdir -p build_x86_64 
+          cd build_x86_64
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../Lib/featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 -DRUST_BUILD_TARGET="x86_64-apple-darwin" .. 
           cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic 
           mkdir -p build_x86_64 
           cd build_x86_64 
           cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install_x86 -DCMAKE_OSX_ARCHITECTURES=x86_64 .. 
           make install
-    
+
     - name: make_MacOS
       run: |
           cd Mac 
@@ -120,7 +129,7 @@ jobs:
     - name: Archive combined executable
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
-        name: NoSpherA2_Mac_combined  
+        name: NoSpherA2_Mac_combined
         path: NoSpherA2_Mac
     - name: Test combined executable
       run: |
@@ -128,4 +137,3 @@ jobs:
         cp NoSpherA2_Mac NoSpherA2
         make tests
 
-        

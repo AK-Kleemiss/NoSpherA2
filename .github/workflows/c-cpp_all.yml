@@ -41,6 +41,7 @@ jobs:
         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
         git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2
         git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2/featomic
+        git config --global --add safe.directory /Users/runner/work/NoSpherA2/NoSpherA2/metatensor
 
     - name: Get OMP library
       run: brew install libomp
@@ -58,10 +59,15 @@ jobs:
     - name: make_featomic
       if: steps.cache-featomic-mac.outputs.cache-hit != 'true'
       run: |
-          cd featomic/featomic 
+          cd /Users/runner/work/NoSpherA2/NoSpherA2/metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
+          make install
+          cd /Users/runner/work/NoSpherA2/NoSpherA2/featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
           make install
 
     - name: make_MacOS
@@ -121,14 +127,19 @@ jobs:
         key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
           featomic-linux-${{ runner.os }}-
-  
+
     - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
       run: |
-          cd featomic/featomic 
+          cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
+          make install
+          cd ../../../featomic/featomic
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../../Lib/featomic_install .. 
           make install
 
     - name: make_Linux
@@ -178,13 +189,22 @@ jobs:
     - name: make_featomic
       if: steps.cache-featomic-windows.outputs.cache-hit != 'true'
       run: |
-          cd featomic\featomic
+          cd metatensor\metatensor-core
           $buildDir = "build"
           if (-not (Test-Path $buildDir)) {
             mkdir $buildDir
           }
           cd $buildDir
-          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="../../../Lib/featomic_install" ..
+          msbuild -nologo .\metatensor.sln -p:Configuration=Release
+          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
+          cd ..\..\..\featomic\featomic
+          $buildDir = "build"
+          if (-not (Test-Path $buildDir)) {
+            mkdir $buildDir
+          }
+          cd $buildDir
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
           msbuild -nologo .\featomic.sln -p:Configuration=Release
           msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
 
@@ -300,14 +320,19 @@ jobs:
         key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
           featomic-linux-${{ runner.os }}-
-  
+
     - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
       run: |
-          cd featomic/featomic 
+          cd metatensor/metatensor-core 
           mkdir -p build
           cd build 
-          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=ON -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX=../../featomic_install .. 
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
+          make install
+          cd ../../../featomic/featomic 
+          mkdir -p build
+          cd build 
+          cmake -DCMAKE_BUILD_TYPE=Release -DFEATOMIC_FETCH_METATENSOR=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX../../featomic_install .. 
           make install
 
     - name: Build project
@@ -356,7 +381,7 @@ jobs:
           arguments: '--sarif Src'
           output: 'flawfinder_results.sarif'
         continue-on-error: true
-          
+
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@192325c86100d080feab897ff886c34abd4c83a3 # v3.30.3
         with:
