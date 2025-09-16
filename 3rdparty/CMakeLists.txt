@@ -42,6 +42,8 @@ if (featomic_ADDED)
         featomic_static INTERFACE
            "${featomic_SOURCE_DIR}/include"
     )
+    file(MAKE_DIRECTORY ${featomic_SOURCE_DIR}/.cargo)
+    file(WRITE ${featomic_SOURCE_DIR}/.cargo/config.toml "paths = ['${metatensor_SOURCE_DIR}']")
 endif ()
 set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
 message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
