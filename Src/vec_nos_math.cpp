@@ -95,7 +95,7 @@ T self_dot(const T &mat1, const T &mat2, bool transp1, bool transp2)
 
     T result(rows1, v_t(cols2, 0.0));
     const long long int totalIterations = static_cast<long long int>(rows1 * cols2 * cols1);
-    size_t total_size = rows1 * cols2;
+    size_t total_size = (size_t)rows1 * (size_t)cols2;
 
 #pragma omp parallel
     {
@@ -365,7 +365,7 @@ template ivec2 transpose(const ivec2 &mat);
 template <class T>
 std::vector<T> transpose(const std::vector<T> &mat, const int rows, const int cols)
 {
-    std::vector<T> result(rows * cols);
+    std::vector<T> result((size_t)rows * (size_t)cols);
 
     for (int i = 0; i < rows; ++i)
     {

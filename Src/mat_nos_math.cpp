@@ -147,7 +147,7 @@ template cMatrix2 dot(const cMatrix2 &mat1, const cMatrix2 &mat2, bool transp1, 
 template <typename T>
 Kokkos::Experimental::mdarray<T, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dot_BLAS(const std::vector<T> &flatMat1, const std::vector<T> &flatMat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
 {
-    std::vector<T> result_flat(m * n, 0.0);
+    std::vector<T> result_flat((size_t)m * (size_t)n, 0.0);
     if constexpr (std::is_same_v<T, double>)
     {
         // Call cblas_dgemm
@@ -189,7 +189,7 @@ template <typename T>
 T dot_BLAS(const T &Mat1, const T &Mat2, const int &m, const int &k1, const int &k2, const int &n, bool transp1, bool transp2)
 {
     using v_t = T::value_type;
-    std::vector<v_t> result_flat(m * n, 0.0);
+    std::vector<v_t> result_flat((size_t)m * (size_t)n, 0.0);
     if constexpr (std::is_same_v<v_t, double>)
     {
         // Call cblas_dgemm
