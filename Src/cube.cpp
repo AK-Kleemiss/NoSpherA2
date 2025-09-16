@@ -445,11 +445,11 @@ bool cube::fractal_dimension(const double stepsize) const
     {
       long long int x, y, z;
 #pragma omp for
-      for (long long int i = 0; i < size[0] * size[1] * (size[2] - 1); i++)
+      for (long long int i = 0; i < (size_t)size[0] * size[1] * ((size_t)size[2] - 1); i++)
       {
-        x = i / (size[1] * (size[2] - 1));
-        y = (i / (size[2] - 1)) % size[1];
-        z = i % (size[2] - 1);
+        x = i / ((size_t)size[1] * ((size_t)size[2] - 1));
+        y = (i / ((size_t)size[2] - 1)) % size[1];
+        z = i % ((size_t)size[2] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x][y][z + 1];
         for (int _i = 0; _i < steps; _i++)
@@ -458,11 +458,11 @@ bool cube::fractal_dimension(const double stepsize) const
             bins[_i]++;
       }
 #pragma omp for
-      for (long long int i = 0; i < size[0] * size[2] * (size[1] - 1); i++)
+      for (long long int i = 0; i < (size_t)size[0] * size[2] * ((size_t)size[1] - 1); i++)
       {
-        z = i / (size[0] * (size[1] - 1));
-        x = (i / (size[1] - 1)) % size[0];
-        y = i % (size[1] - 1);
+        z = i / ((size_t)size[0] * (size[1] - 1));
+        x = (i / ((size_t)size[1] - 1)) % size[0];
+        y = i % ((size_t)size[1] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x][y + 1][z];
         for (int _i = 0; _i < steps; _i++)
@@ -471,11 +471,11 @@ bool cube::fractal_dimension(const double stepsize) const
             bins[_i]++;
       }
 #pragma omp for
-      for (long long int i = 0; i < size[1] * size[2] * (size[0] - 1); i++)
+      for (long long int i = 0; i < (size_t)size[1] * size[2] * ((size_t)size[0] - 1); i++)
       {
-        y = i / ((size[0] - 1) * size[2]);
-        z = (i / (size[0] - 1)) % size[2];
-        x = i % (size[0] - 1);
+        y = i / (((size_t)size[0] - 1) * size[2]);
+        z = (i / ((size_t)size[0] - 1)) % size[2];
+        x = i % ((size_t)size[0] - 1);
         lv1 = values[x][y][z];
         lv2 = values[x + 1][y][z];
         for (int _i = 0; _i < steps; _i++)

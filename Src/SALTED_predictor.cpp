@@ -237,13 +237,13 @@ vec SALTEDPredictor::predict()
         if (config.sparsify)
         {
             int nfps = static_cast<int>(vfps[lam].size());
-            p.assign(natoms * (2 * lam + 1) * nfps, 0.0);
+            p.assign((size_t)natoms * ((size_t)2 * lam + 1) * nfps, 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llvec_t, lam, c2r, featsize[lam], nfps, vfps[lam], p);
             featsize[lam] = nfps;
         }
         else
         {
-            p.assign(natoms * (2 * lam + 1) * featsize[lam], 0.0);
+            p.assign((size_t)natoms * ((size_t)2 * lam + 1) * featsize[lam], 0.0);
             equicomb(natoms, (config.nspe1 * config.nrad1), (config.nspe2 * config.nrad2), v1, v2, wigner3j[lam], llmax, llvec_t, lam, c2r, featsize[lam], p);
         }
         pvec[lam] = p;

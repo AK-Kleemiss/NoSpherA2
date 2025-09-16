@@ -3846,7 +3846,7 @@ static void llaguerre_moments(int n, double t, double lower,
     }
     else
     {
-        long double lower2 = lower * lower;
+        long double lower2 = (long double)lower * lower;
         long double l10 = 0.l;
         long double l11 = 1.l;
         long double l12;
