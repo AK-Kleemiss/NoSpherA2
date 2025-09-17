@@ -90011,8 +90011,8 @@ static void dcopy_grids_ij(double *out, const double *gctr,
                            const int ngrids, const int ni, const int nj,
                            const int mgrids, const int mi, const int mj)
 {
-        const size_t ngi = ngrids * ni;
-        const size_t mgi = mgrids * mi;
+        const size_t ngi = (size_t)ngrids * ni;
+        const size_t mgi = (size_t)mgrids * mi;
         int i, j, m;
 
         for (j = 0; j < mj; j++)
@@ -90022,7 +90022,7 @@ static void dcopy_grids_ij(double *out, const double *gctr,
 #pragma ivdep
                         for (m = 0; m < mgrids; m++)
                         {
-                                out[i * ngrids + m] = gctr[i * mgrids + m];
+                                out[i * (size_t)ngrids + m] = gctr[i * (size_t)mgrids + m];
                         }
                 }
                 out += ngi;
@@ -90061,9 +90061,9 @@ static void dcopy_iklj(double *fijkl, const double *gctr,
                        const int ni, const int nj, const int nk, const int nl,
                        const int mi, const int mj, const int mk, const int ml)
 {
-        const size_t nij = ni * nj;
+        const size_t nij = (size_t)ni * nj;
         const size_t nijk = nij * nk;
-        const size_t mik = mi * mk;
+        const size_t mik = (size_t)mi * mk;
         const size_t mikl = mik * ml;
         int i, j, k, l;
         double *pijkl;
@@ -90231,7 +90231,7 @@ void c2s_dset0(double *out, const int *dims, int *counts)
         int ni = dims[0];
         int nj = dims[1];
         int nk = dims[2];
-        size_t nij = ni * nj;
+        size_t nij = (size_t)ni * nj;
         size_t nijk = nij * nk;
         int i, j, k, l;
         if (dims == counts)

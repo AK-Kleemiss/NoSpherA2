@@ -21,7 +21,7 @@ const std::span<const SimplePrimitive> BasisSet::operator[](const int& element) 
 }
 
 long double primitve_normalization(const double exp, const int l) {
-    long double numerator = std::pow(2 * exp / constants::PI, 3.0 / 2.0) * std::pow(4 * exp, l);
+    long double numerator = std::pow(2 * (long double) exp / constants::PI, 3.0 / 2.0) * std::pow(4 * (long double) exp, l);
     long double denominator = ((l == 0) ? 1 : constants::double_ft[2 * l - 1]);
     return std::sqrt(numerator / denominator);
 }

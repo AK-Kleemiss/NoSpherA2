@@ -18,9 +18,16 @@ SRC_DIR := ../Src
 INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 
 # Featomic local libs
-LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
-LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
 LIBRASCALINE_I := ../Lib/featomic_install/include
+LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
+METATENSOR_LIB64 := ../Lib/featomic_install/lib64/libmetatensor.a
+METATENSOR_LIB := ../Lib/featomic_install/lib/libmetatensor.a
+
+ifneq (,$(wildcard $(METATENSOR_LIB64)))
+  LIBRASCALINE += $(METATENSOR_LIB64)
+else
+  LIBRASCALINE += $(METATENSOR_LIB)
+endif
 
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \

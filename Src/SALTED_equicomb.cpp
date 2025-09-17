@@ -25,7 +25,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     const int llmax = (int)llvec[0].size();
 
     // Initialize p with zeros
-    p.assign(natoms * l21 * nfps, 0.0);
+    p.assign((size_t)natoms * l21 * nfps, 0.0);
     const vec f_vec(featsize, 0.0);
 
     // Declare variables at the beginning

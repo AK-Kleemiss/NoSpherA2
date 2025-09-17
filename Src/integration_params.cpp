@@ -221,17 +221,18 @@ void Int_Params::populate_bas()
         int bas_ptr = basis.env_idx;
         for (int shell = 0; shell < basis.shellcount.size(); shell++)
         {
-            _bas[index * 8 + 0] = atom_idx; // atom_id
-            _bas[index * 8 + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
-            _bas[index * 8 + 2] = (int)basis.shellcount[shell];                  // nprim
-            _bas[index * 8 + 3] = 1;                                     // ncentr    Not sure
-            _bas[index * 8 + 5] = bas_ptr;                               // Pointer to the exponents of a shell
+			size_t eightind = (size_t)index * 8;
+            _bas[eightind + 0] = atom_idx; // atom_id
+            _bas[eightind + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
+            _bas[eightind + 2] = (int)basis.shellcount[shell];                  // nprim
+            _bas[eightind + 3] = 1;                                     // ncentr    Not sure
+            _bas[eightind + 5] = bas_ptr;                               // Pointer to the exponents of a shell
             bas_ptr += (int)basis.shellcount[shell];                     // Add the number of contracted functions per shell to gain the pointer to the coefficient
-            _bas[index * 8 + 6] = bas_ptr;                               // Pointer to the coefficients of a shell
+            _bas[eightind + 6] = bas_ptr;                               // Pointer to the coefficients of a shell
             //_bas 8 is set to 0
-            bas_ptr += _bas[index * 8 + 2] * _bas[atom_idx * 8 + 3];
+            bas_ptr += _bas[eightind + 2] * _bas[eightind + 3];
 
-            nao += (_bas[index * 8 + 1] * 2 + 1) * _bas[index * 8 + 3]; // 2l+1 + n_centr
+            nao += ((size_t)_bas[eightind + 1] * 2 + 1) * _bas[eightind + 3]; // 2l+1 + n_centr
             index++;
         }
     }
