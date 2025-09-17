@@ -1,0 +1,59 @@
+name: BUILD_CMAKE
+on:
+  workflow_dispatch:
+
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Install Compiler
+      run: sudo apt update && sudo apt install -y build-essential
+
+    # Cache IntelMKL
+    - name: Cache IntelMKL Build
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+      id: cache-intelmkl-linux
+      with:
+        path: Lib/MKL
+        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
+        restore-keys: |
+          intelmkl-linux-${{ runner.os }}-
+
+    - name: Build IntelMKL
+      if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
+      run: |
+          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh 
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
+
+    - name: Cache featomic Build
+      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+      id: cache-featomic-linux
+      with:
+        path: build/_deps  # Adjust if featomic installs elsewhere
+        key: featomic-linux-${{ runner.os }}-${{ hashFiles('build/_deps/metatensor-build/metatensor-core/target/release/libmetatensor.a', 'build/_deps/featomic-build/target/release/libfeatomic.a') }}
+        restore-keys: |
+          featomic-linux-${{ runner.os }}-
+
+    - name: Build featomic
+      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p build
+        cd build 
+        cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build . --target featomic_target
+
+    - name: Build NoSpherA2
+      run: |
+        cd build
+        cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
+        ninja -j0
