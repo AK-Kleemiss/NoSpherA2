@@ -18,16 +18,9 @@ SRC_DIR := ../Src
 INC_DIRS := ../Src ../Lib ../Lib/featomic_install/include
 
 # Featomic local libs
-LIBRASCALINE_I := ../Lib/featomic_install/include
 LIBRASCALINE   := ../Lib/featomic_install/lib/libfeatomic.a
-METATENSOR_LIB64 := ../Lib/featomic_install/lib64/libmetatensor.a
-METATENSOR_LIB := ../Lib/featomic_install/lib/libmetatensor.a
-
-ifneq (,$(wildcard $(METATENSOR_LIB64)))
-  LIBRASCALINE += $(METATENSOR_LIB64)
-else
-  LIBRASCALINE += $(METATENSOR_LIB)
-endif
+LIBRASCALINE   += ../Lib/featomic_install/lib/libmetatensor.a
+LIBRASCALINE_I := ../Lib/featomic_install/include
 
 # ---- Compiler flags (no -fopenmp at link time; only at compile time) ----
 GCC_OPTS       := -std=c++2b -O3 -c -fmessage-length=0 -fopenmp -static -MMD -MP \
@@ -38,22 +31,31 @@ GCC_OPTS_DEBUG := -std=c++2b -Og -g -c -fmessage-length=0 -static -MMD -MP \
 # Include directories
 INCLUDES := $(addprefix -I,$(INC_DIRS))
 
-# Threading backend selection
+# Threading backend selection - STATIC MKL but DYNAMIC libomp
 ifeq ($(MKL_THREADING),SEQ)
-  MKL_THR_LIB = -lmkl_sequential
-  IOMP_LIB    =
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_sequential.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  IOMP_LIB =
 else
-  MKL_THR_LIB = -lmkl_intel_thread
-  IOMP_LIB    = -liomp5
+  MKL_STATIC_LIBS = \
+    -Wl,--start-group \
+    "$$MKLROOT/lib/intel64/libmkl_intel_lp64.a" \
+    "$$MKLROOT/lib/intel64/libmkl_intel_thread.a" \
+    "$$MKLROOT/lib/intel64/libmkl_core.a" \
+    -Wl,--end-group
+  # Use dynamic linking for libiomp5 with rpath for runtime location
+  IOMP_LIB = -L"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" \
+             -Wl,-rpath,'$$ORIGIN' \
+             -liomp5
 endif
 
-# MKL link set per Intel guidance (+ rpaths so setvars isn't required at runtime)
-MKL_LINK_FLAGS = \
-  -L"$$MKLROOT/lib/intel64" -Wl,-rpath,"$$MKLROOT/lib/intel64" \
-  -Wl,--start-group -lmkl_intel_lp64 $(MKL_THR_LIB) -lmkl_core -Wl,--end-group \
-  $(IOMP_LIB) -lpthread -lm -ldl \
-  -L"$$ONEAPI_ROOT/compiler/latest/linux/lib" -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/lib" \
-  -L"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin" -Wl,-rpath,"$$ONEAPI_ROOT/compiler/latest/linux/compiler/lib/intel64_lin"
+# MKL link flags - static MKL libraries + dynamic libiomp5
+MKL_LINK_FLAGS = $(MKL_STATIC_LIBS) $(IOMP_LIB) -lpthread -lm -ldl
 
 # ---- Objects ----
 # Sources - automatically discover all .cpp files in SRC_DIR
