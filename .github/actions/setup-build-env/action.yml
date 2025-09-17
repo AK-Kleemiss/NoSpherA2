@@ -19,11 +19,10 @@ runs:
         git config --global --add safe.directory ${{ github.workspace }}
         git config --global --add safe.directory ${{ github.workspace }}/featomic
     
-        # Install/Update Rust and Cargo to version 1.86.0
-        echo "Installing Rust toolchain 1.86.0"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        # Install/Update Rust and Cargo
+        echo "Installing Rust toolchain"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source ~/.cargo/env
-        rustup default 1.86.0
         rustup component add rust-src
     
         # Verify versions
@@ -41,11 +40,10 @@ runs:
       run: |
         sudo apt update && sudo apt install -y build-essential
         
-        # Install/Update Rust and Cargo to version 1.86.0
-        echo "Installing Rust toolchain 1.86.0"
-        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.86.0
+        # Install/Update Rust and Cargo
+        echo "Installing Rust toolchain"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source ~/.cargo/env
-        rustup default 1.86.0
         rustup component add rust-src
         
         # Verify versions
@@ -56,18 +54,18 @@ runs:
       if: inputs.platform == 'Windows'
       shell: powershell
       run: |
-        # Install Rust and Cargo version 1.86.0 for Windows
-        Write-Host "Installing Rust toolchain 1.86.0"
+        # Install Rust and Cargo for Windows
+        Write-Host "Installing Rust toolchain"
         
         # Download and install rustup
         Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "rustup-init.exe"
-        .\rustup-init.exe -y --default-toolchain 1.86.0
+        .\rustup-init.exe -y
         
         # Add cargo to PATH for this session
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
         
         # Set default toolchain
-        & "$env:USERPROFILE\.cargo\bin\rustup.exe" default 1.86.0
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe"
         & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rust-src
         
         # Verify versions
