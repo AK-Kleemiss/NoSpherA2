@@ -16,6 +16,8 @@ vec density_fit_hybrid(const WFN& wavy, const WFN& wavy_aux, const double max_me
 
 // Helper functions for charge analysis and restraints
 vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme = "nuclear");
+vec calculate_expected_charges(const dMatrix2& dm, const WFN& wavy);
+
 void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const vec& expected_charges = vec());
 void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, 
                            double base_restraint_coef = 0.001, bool adaptive_weighting = true,

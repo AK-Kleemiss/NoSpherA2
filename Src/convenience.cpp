@@ -2261,18 +2261,24 @@ void options::digest_options()
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
             load_basis_into_WFN(wavy_aux, aux_basis);
-            demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            //demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            dMatrix2 dm = wavy.get_dm();
+            vec charges = calculate_expected_charges(dm, wavy);
+
+            for (int i = 0; i < charges.size(); i++)
+                std::cout << "Charge on atom " << i << " (" << wavy.get_atom_label(i) << "): " << charges[i] << std::endl;
 
 
-            aux_basis = std::make_shared<BasisSet>();
-            aux_basis->gen_auto_aux(wavy);
 
-            WFN wavy_aux2(0);
-            wavy_aux2.set_atoms(wavy.get_atoms());
-            wavy_aux2.set_ncen(wavy.get_ncen());
-            wavy_aux2.delete_basis_set();
-            load_basis_into_WFN(wavy_aux2, aux_basis);
-            demonstrate_enhanced_density_fitting(wavy, wavy_aux2);
+            //aux_basis = std::make_shared<BasisSet>();
+            //aux_basis->gen_auto_aux(wavy);
+
+            //WFN wavy_aux2(0);
+            //wavy_aux2.set_atoms(wavy.get_atoms());
+            //wavy_aux2.set_ncen(wavy.get_ncen());
+            //wavy_aux2.delete_basis_set();
+            //load_basis_into_WFN(wavy_aux2, aux_basis);
+            //demonstrate_enhanced_density_fitting(wavy, wavy_aux2);
 
             exit(0);
         }

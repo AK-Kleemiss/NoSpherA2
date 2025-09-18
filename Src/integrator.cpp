@@ -320,6 +320,32 @@ vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::
     return expected_charges;
 }
 
+vec calculate_expected_charges(const dMatrix2& dm, const WFN& wavy) {
+    vec expected_charges(wavy.get_ncen(), 0.0);
+    
+    // Simple Mulliken population analysis
+    for (int i = 0; i < wavy.get_ncen(); i++) {
+        atom current_atom = wavy.get_atoms()[i];
+        int prim_start = 0;
+        for (int j = 0; j < i; j++) {
+            prim_start += wavy.get_atom_shell_count(j);
+        }
+        int prim_end = prim_start + wavy.get_atom_shell_count(i);
+        
+        double population = 0.0;
+        for (int p = prim_start; p < prim_end; p++) {
+            for (int q = 0; q < dm.size(); q++) {
+                population += dm(p, q) + dm(q, p);
+            }
+        }
+        
+        expected_charges[i] = current_atom.get_charge() - population;
+    }
+    
+    return expected_charges;
+}
+
+
 // Analyze the quality of density fitting and detect problematic charges
 void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, 
                                 const vec& expected_charges)
