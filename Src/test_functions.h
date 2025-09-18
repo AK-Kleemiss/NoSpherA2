@@ -1010,7 +1010,7 @@ void spherically_averaged_density(options &opt, const ivec val_els_alpha, const 
         radial_dens2[_r] = calc_grid_averaged_at_r(wavy, r, 1200, 5800);
         if (_r >= 1)
         {
-            tot_int2 += radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
+            tot_int2 += (long double)radial_dens2[_r] * r * r * (r - (_r - 1) * dr);
         }
         progress->update();
     }
@@ -1961,13 +1961,13 @@ void test_reading_SALTED_binary_file() {
 // Convert a row-major matrix to column-major format
 std::vector<double> rowToColMajor(const std::vector<double> &rowMajorMatrix, int rows, int cols)
 {
-    std::vector<double> colMajorMatrix(rows * cols);
+    std::vector<double> colMajorMatrix((size_t)rows * cols);
 
     for (int r = 0; r < rows; ++r)
     {
         for (int c = 0; c < cols; ++c)
         {
-            colMajorMatrix[c * rows + r] = rowMajorMatrix[r * cols + c];
+            colMajorMatrix[(size_t)c * rows + r] = rowMajorMatrix[(size_t)r * cols + c];
         }
     }
     return colMajorMatrix;

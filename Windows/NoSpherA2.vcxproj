@@ -12537,13 +12537,8 @@
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|x64'">stdclatest</LanguageStandard_C>
       <LanguageStandard_C Condition="'$(Configuration)|$(Platform)'=='Debug_SF|ARM64'">stdclatest</LanguageStandard_C>
     </ClCompile>
-    <ClCompile Include="..\Src\libCintMain.cpp">
-      <SupportJustMyCode Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</SupportJustMyCode>
-      <TreatWarningAsError Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</TreatWarningAsError>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Disabled</Optimization>
-      <IntrinsicFunctions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IntrinsicFunctions>
-      <FavorSizeOrSpeed Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Neither</FavorSizeOrSpeed>
-    </ClCompile>
+    <ClCompile Include="..\Src\libCintMain.cpp" />
+    <ClCompile Include="..\Src\mat_nos_math.cpp" />
     <ClCompile Include="..\Src\nos_math.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Publish|ARM64'">Use</PrecompiledHeader>
@@ -13444,6 +13439,7 @@
     <ClCompile Include="..\Src\SALTED_io.cpp" />
     <ClCompile Include="..\Src\SALTED_predictor.cpp" />
     <ClCompile Include="..\Src\SALTED_utilities.cpp" />
+    <ClCompile Include="..\Src\vec_nos_math.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h" />
@@ -13491,6 +13487,9 @@
     <ClInclude Include="..\Src\SALTED_utilities.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\.github\actions\build-deps\action.yml" />
+    <None Include="..\.github\actions\cache-deps\action.yml" />
+    <None Include="..\.github\actions\setup-build-env\action.yml" />
     <None Include="..\.github\workflows\c-cpp_all.yml" />
     <None Include="..\.github\workflows\codeql-analysis.yml" />
     <None Include="..\Linux\makefile" />

@@ -6893,7 +6893,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     vec occ(nmomax), eval(nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, occ.data()), "Error reading occupancies!", std::cout);
     err_checkf(read_block_from_fortran_binary(inFile, eval.data()), "Error reading energies!", std::cout);
-    vec tempvec(nbf*nmomax);
+    vec tempvec((size_t)nbf* (size_t)nmomax);
     err_checkf(read_block_from_fortran_binary(inFile, tempvec.data()), "Error reading MO coefficients!", std::cout);
     dMatrix2 momat = reshape<dMatrix2>(tempvec, Shape2D(nmomax, nbf));
 

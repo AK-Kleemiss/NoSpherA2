@@ -904,8 +904,8 @@ void computeEri2c(Int_Params &params, vec &eri2c)
     int2c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
-    vec res(naoi * naoj, 0.0);
-    eri2c.resize(naoi * naoj, 0.0);
+    vec res((size_t)naoi * (size_t)naoj, 0.0);
+    eri2c.resize((size_t)naoi * (size_t)naoj, 0.0);
     GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // res is in fortran order, write the result in regular ordering
@@ -913,7 +913,7 @@ void computeEri2c(Int_Params &params, vec &eri2c)
     {
         for (int j = 0; j < naoj; j++)
         {
-            eri2c[j * naoi + i] = res[i * naoj + j];
+            eri2c[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
         }
     }
 }
@@ -1010,7 +1010,7 @@ int CINT3c2e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
 
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t leng = (size_t)envs->g_size * 3 * ((size_t)(1 << envs->gbits) + 1);
     size_t lenk = nf * nc * n_comp;            // gctrk
     size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
     size_t leni = nf * i_ctr * n_comp;         // gctri
@@ -1102,7 +1102,7 @@ int CINT3c2e_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty)
     ADJUST_CUTOFF;
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,coord,0:1); +1 for nabla-r12
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
     size_t lenk = nf * nc * n_comp;            // gctrk
     size_t lenj = nf * i_ctr * j_ctr * n_comp; // gctrj
     size_t leni = nf * i_ctr * n_comp;         // gctri
@@ -1187,7 +1187,7 @@ int CINT3c2e_n11_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = i_ctr;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
     size_t leni = nf * i_ctr * n_comp; // gctri
     size_t len0 = nf * n_comp;         // gout
     size_t len = leng + leni + len0;
@@ -1236,7 +1236,7 @@ int CINT3c2e_1n1_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = j_ctr;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
+    size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
     size_t lenj = nf * j_ctr * n_comp; // gctrj
     size_t len0 = nf * n_comp;         // gout
     size_t len = leng + lenj + len0;
@@ -1290,8 +1290,8 @@ int CINT3c2e_111_loop(double *gctr, CINTEnvVars *envs, double *cache, int *empty
     COMMON_ENVS_AND_DECLARE;
     ADJUST_CUTOFF;
     int nc = 1;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t len0 = envs->nf * n_comp;
+    size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
+    size_t len0 = (size_t)envs->nf * (size_t)n_comp;
     size_t len = leng + len0;
     double *g;
     MALLOC_INSTACK(g, len);
@@ -1354,7 +1354,7 @@ int CINT3c2e_drv(double *out, const int *dims, CINTEnvVars *envs, CINTOpt *opt,
                  double *cache, void (*f_e1_c2s)(double *, double *, const int *, CINTEnvVars *, double *), int is_ssc)
 {
     int *x_ctr = envs->x_ctr;
-    size_t nc = envs->nf * x_ctr[0] * x_ctr[1] * x_ctr[2];
+    size_t nc = (size_t)envs->nf * (size_t)x_ctr[0] * (size_t)x_ctr[1] * (size_t)x_ctr[2];
     int n_comp = envs->ncomp_e1 * envs->ncomp_tensor;
     if (out == NULL)
     {
@@ -1369,10 +1369,10 @@ int CINT3c2e_drv(double *out, const int *dims, CINTEnvVars *envs, CINTOpt *opt,
     if (cache == NULL)
     {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
-        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        size_t len0 = envs->nf * n_comp;
-        size_t cache_size = std::max(leng + len0 + nc * n_comp * 3 + pdata_size,
-                                     nc * n_comp + envs->nf * 3);
+        size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
+        size_t len0 = (size_t)envs->nf * (size_t)n_comp;
+        size_t cache_size = std::max(leng + len0 + nc * (size_t)n_comp * 3 + pdata_size,
+                                     nc * (size_t)n_comp + (size_t)envs->nf * 3);
         stack = (double *)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
@@ -1489,8 +1489,8 @@ void computeEri3c(Int_Params &param1,
     int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // Compute integrals
-    vec res(naoi * naoj * naok, 0.0);
-    eri3c.resize(naoi * naoj * naok, 0.0);
+    vec res((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
+    eri3c.resize((size_t)naoi * (size_t)naoj * (size_t)naok, 0.0);
 
     GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
@@ -1504,8 +1504,8 @@ void computeEri3c(Int_Params &param1,
         {
             for (int i = 0; i < naoi; i++)
             {
-                std::size_t idx_F = i + j * naoi + k * (naoi * naoj);
-                std::size_t idx_C = i * (naoj * naok) + j * naok + k;
+                std::size_t idx_F = i + j * (size_t)naoi + k * ((size_t)naoi * (size_t)naoj);
+                std::size_t idx_C = i * ((size_t)naoj * (size_t)naok) + j * (size_t)naok + k;
                 eri3c[idx_C] = res[idx_F];
             }
         }
@@ -1562,11 +1562,11 @@ int CINT3c1e_loop_nopt(double *gctr, CINTEnvVars *envs, double *cache, int *empt
     CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
 
     int nc = i_ctr * j_ctr * k_ctr;
-    size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-    size_t lenk = envs->nf * nc * n_comp;            // gctrk
-    size_t lenj = envs->nf * i_ctr * j_ctr * n_comp; // gctrj
-    size_t leni = envs->nf * i_ctr * n_comp;         // gctri
-    size_t len0 = envs->nf * n_comp;                 // gout
+    size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
+    size_t lenk = (size_t)envs->nf * nc * n_comp;            // gctrk
+    size_t lenj = (size_t)envs->nf * i_ctr * j_ctr * n_comp; // gctrj
+    size_t leni = (size_t)envs->nf * i_ctr * n_comp;         // gctri
+    size_t len0 = (size_t)envs->nf * n_comp;                 // gout
     size_t len = leng + lenk + lenj + leni + len0;
     double *g;
     MALLOC_INSTACK(g, len);
@@ -1672,18 +1672,18 @@ int CINT3c1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
     if (out == NULL)
     {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
-        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        size_t len0 = envs->nf * n_comp;
-        int cache_size = std::max((double)(leng + len0 + nc * n_comp * 4 + pdata_size), (double)(nc * n_comp + envs->nf * 3));
+        size_t leng = (size_t)envs->g_size * 3 * ((1 << envs->gbits) + 1);
+        size_t len0 = (size_t)envs->nf * n_comp;
+        int cache_size = std::max((double)(leng + len0 + (size_t)nc * n_comp * 4 + pdata_size), (double)(nc * n_comp + envs->nf * 3));
         return cache_size;
     }
     double *stack = NULL;
     if (cache == NULL)
     {
         PAIRDATA_NON0IDX_SIZE(pdata_size);
-        size_t leng = envs->g_size * 3 * ((1 << envs->gbits) + 1);
-        size_t len0 = envs->nf * n_comp;
-        int cache_size = std::max((double)(leng + len0 + nc * n_comp * 4 + pdata_size), (double)(nc * n_comp + envs->nf * 3));
+        size_t leng = (size_t)envs->g_size * 3 * ((1 << envs->gbits) + 1);
+        size_t len0 = (size_t)envs->nf * n_comp;
+        int cache_size = std::max((double)(leng + len0 + (size_t)nc * n_comp * 4 + pdata_size), (double)(nc * n_comp + envs->nf * 3));
         stack = (double *)malloc(sizeof(double) * cache_size);
         cache = stack;
     }
@@ -1709,18 +1709,18 @@ int CINT3c1e_drv(double *out, int *dims, CINTEnvVars *envs, CINTOpt *opt,
         exit(1);
         int *atm = envs->atm;
         //int i;
-        double fac;
+        //double fac;
         double *buf;
         MALLOC_INSTACK(gctr, nc * n_comp);
         MALLOC_INSTACK(buf, nc * n_comp);
-        for (n = 0; n < envs->natm; n++)
-        {
-            if (atm(CHARGE_OF, n) != 0)
-            {
-                fac = -abs(atm(CHARGE_OF, n));
-                // CINT3c1e_nuc_loop_nopt(buf, envs, fac, n, cache, &empty);
-            }
-        }
+        //for (n = 0; n < envs->natm; n++)
+        //{
+        //    if (atm(CHARGE_OF, n) != 0)
+        //    {
+        //        fac = -abs(atm(CHARGE_OF, n));
+        //        // CINT3c1e_nuc_loop_nopt(buf, envs, fac, n, cache, &empty);
+        //    }
+        //}
         cache = buf; // release memory for c2s function
     }
 
@@ -1938,17 +1938,17 @@ int CINT1e_loop(double *gctr, CINTEnvVars *envs, double *cache, int int1e_type)
             }
             envs->fac[0] = fac1i;
             make_g1e_gout(gout, g, idx, envs, *gempty, int1e_type);
-            PRIM2CTR0(i, gout, envs->nf * n_comp);
+            PRIM2CTR0(i, gout, (size_t)envs->nf * n_comp);
         }
         if (!*iempty)
         {
-            PRIM2CTR0(j, gctri, envs->nf * i_ctr * n_comp);
+            PRIM2CTR0(j, gctri, (size_t)envs->nf * i_ctr * n_comp);
         }
     }
 
     if (n_comp > 1 && !*jempty)
     {
-        CINTdmat_transpose(gctr, gctrj, envs->nf * nc, n_comp);
+        CINTdmat_transpose(gctr, gctrj, (size_t)envs->nf * nc, n_comp);
     }
     return !*jempty;
 }
@@ -2045,8 +2045,8 @@ void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
     // Compute integrals
-    vec res(naoi * naoj, 0.0);
-    overlap_2c.resize(naoi * naoj, 0.0);
+    vec res((size_t)naoi * naoj, 0.0);
+    overlap_2c.resize((size_t)naoi * naoj, 0.0);
     GTOint2c(int1e_ovlp_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
 
     // res is in fortran order, write the result in regular ordering
@@ -2054,7 +2054,7 @@ void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
     {
         for (int j = 0; j < naoj; j++)
         {
-            overlap_2c[j * naoi + i] = res[i * naoj + j];
+            overlap_2c[j * (size_t)naoi + i] = res[i * (size_t)naoj + j];
         }
     }
 }
@@ -2073,7 +2073,7 @@ ivec calc_3c_steps(const unsigned long long int naoi, const unsigned long long i
 
     // First check if the maximum memory is enough to compute all integrals at once
     // Calculate minimum memory needed for all integrals
-    unsigned long long int naok_end = aoloc[nQM + nAux] - aoloc[nQM];
+    unsigned long long int naok_end = (size_t)(aoloc[(size_t)nQM + nAux]) - aoloc[nQM];
     double min_mem = static_cast<double>(sizeof(double) * naoi * naoj * naok_end) * 1e-6 + 200; // Small buffer of 200MB for other memory usage
     if (min_mem < max_mem)
     {

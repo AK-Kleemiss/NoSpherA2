@@ -140,7 +140,7 @@ void CINTOpt_set_non0coeff(CINTOpt* opt, int* atm, int natm,
     size_t tot_prim_ctr = 0;
     for (i = 0; i < nbas; i++) {
         tot_prim += bas(NPRIM_OF, i);
-        tot_prim_ctr += bas(NPRIM_OF, i) * bas(NCTR_OF, i);
+        tot_prim_ctr += (size_t)bas(NPRIM_OF, i) * bas(NCTR_OF, i);
     }
     if (tot_prim == 0) {
         return;

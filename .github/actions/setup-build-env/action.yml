@@ -1,0 +1,80 @@
+name: 'Setup Build Environment'
+description: 'Setup platform-specific build environment'
+inputs:
+  platform:
+    description: 'Target platform (Mac_ARM64/Mac_x86_64/Linux/Windows)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup macOS
+      if: inputs.platform == 'Mac_ARM64' || inputs.platform == 'Mac_x86_64'
+      shell: bash
+      run: |
+        echo "Setting up macOS environment for ${{ inputs.platform }}"
+        xcode-select --install || echo "Xcode Command Line Tools already installed"
+        sudo xcodebuild -license accept
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        git config --global --add safe.directory ${{ github.workspace }}
+        git config --global --add safe.directory ${{ github.workspace }}/featomic
+    
+        # Install/Update Rust and Cargo
+        echo "Installing Rust toolchain"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source ~/.cargo/env
+        rustup component add rust-src
+    
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
+    
+        # Install libomp (Homebrew will install to correct location based on architecture)
+        brew list --versions libomp >/dev/null 2>&1 || brew install libomp
+    
+        echo "${{ inputs.platform }} setup complete"
+
+    - name: Setup Linux
+      if: inputs.platform == 'Linux'
+      shell: bash
+      run: |
+        sudo apt update && sudo apt install -y build-essential
+        
+        # Install/Update Rust and Cargo
+        echo "Installing Rust toolchain"
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source ~/.cargo/env
+        rustup component add rust-src
+        
+        # Verify versions
+        echo "Rust version: $(rustc --version)"
+        echo "Cargo version: $(cargo --version)"
+
+    - name: Setup Windows
+      if: inputs.platform == 'Windows'
+      shell: powershell
+      run: |
+        # Install Rust and Cargo for Windows
+        Write-Host "Installing Rust toolchain"
+        
+        # Download and install rustup
+        Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "rustup-init.exe"
+        .\rustup-init.exe -y
+        
+        # Add cargo to PATH for this session
+        $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+        
+        # Set default toolchain
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe"
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rust-src
+        
+        # Verify versions
+        Write-Host "Rust version: $(& "$env:USERPROFILE\.cargo\bin\rustc.exe" --version)"
+        Write-Host "Cargo version: $(& "$env:USERPROFILE\.cargo\bin\cargo.exe" --version)"
+        
+        # Update PATH for subsequent steps
+        echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Setup MSBuild (Windows)
+      if: inputs.platform == 'Windows'
+      uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
