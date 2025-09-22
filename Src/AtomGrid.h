@@ -12,7 +12,8 @@ class AtomGrid
         const double alpha_max,
         const int max_l_quantum_number,
         const double alpha_min[],
-        std::ostream& file);
+        std::ostream& file,
+        GridType g_type);
 
     ~AtomGrid();
 
@@ -31,6 +32,20 @@ class AtomGrid
         double grid_z_bohr[],
         double grid_aw[],
         double grid_mw[]) const;
+
+    void get_grid(const int num_centers,
+        const int center_index,
+        const double* x_coordinates_bohr,
+        const double* y_coordinates_bohr,
+        const double* z_coordinates_bohr,
+        const int* proton_charges,
+        double grid_x_bohr[],
+        double grid_y_bohr[],
+        double grid_z_bohr[],
+        double grid_aw[],
+        double grid_mw[],
+        const WFN& wfn,
+        vec2& chi) const;
 
     void get_atomic_grid(
       const int center_index,
@@ -91,6 +106,7 @@ class AtomGrid
     std::vector<double> atom_grid_w_;
 
     int num_radial_grid_points_;
+	GridType type;
 
     std::vector<double> radial_atom_grid_r_bohr_;
     std::vector<double> radial_atom_grid_w_;
@@ -106,6 +122,18 @@ double get_becke_w(const int& num_centers,
     const double& y,
     const double& z,
     std::vector<double>& pa);
+
+double get_tfvc_w(const int& num_centers,
+    const int* proton_charges,
+    const double* x_coordinates_bohr,
+    const double* y_coordinates_bohr,
+    const double* z_coordinates_bohr,
+    const int& center_index,
+    const double& x,
+    const double& y,
+    const double& z,
+	std::vector<double>& pa,
+    const vec2& chi);
 
 const double get_r_inner(const double& max_error, const double& alpha_inner);
 

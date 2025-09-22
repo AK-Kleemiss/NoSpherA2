@@ -6,6 +6,7 @@ class WFN;
 class cell;
 class atom;
 class BasisSet;
+enum GridType { Becke, TFVC };
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
@@ -634,6 +635,7 @@ struct options
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
+	GridType grid_type = GridType::Becke;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

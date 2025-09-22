@@ -2219,6 +2219,10 @@ void options::digest_options()
         {
             old_tsc = true;
         }
+        else if (temp == "-tfvc" || temp == "-TFVC")
+        {
+			grid_type = GridType::TFVC;
+        }
         else if (temp == "-tscb")
         {
             std::filesystem::path name = arguments[i + 1];
@@ -2680,26 +2684,27 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
 
 bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
 #ifdef _WIN32
-    char filename[1024];
+    std::vector<char> filename_buf(4096);
 
     OPENFILENAMEA sfn;
-    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&filename_buf[0], filename_buf.size());
     ZeroMemory(&sfn, sizeof(sfn));
     sfn.lStructSize = sizeof(sfn);
     sfn.hwndOwner = NULL;  // If you have a window to center over, put its HANDLE here
     sfn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
-    sfn.lpstrFile = filename;
-    sfn.nMaxFile = 1024;
+    sfn.lpstrFile = filename_buf.data();
+    sfn.nMaxFile = static_cast<DWORD>(filename_buf.size());
     sfn.lpstrTitle = "Select a File for saving!";
     sfn.Flags = OFN_DONTADDTORECENT;
     bool end = false;
     while (!end) {
         if (GetSaveFileNameA(&sfn)) {
-            if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
-            if (exists(std::filesystem::path(filename))) {
-                std::cout << filename << " exists, do you want to overwrite it?";
+            std::string chosen(filename_buf.data());
+            if (debug) std::cout << "You chose the file \"" << chosen << "\"\n";
+            if (exists(std::filesystem::path(chosen))) {
+                std::cout << chosen << " exists, do you want to overwrite it?";
                 if (yesno()) {
-                    path = filename;
+                    path = chosen;
                     bool found = false;
                     for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
                     if (found) end = true;
@@ -2707,7 +2712,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
                 else return false;
             }
             else {
-                path = filename;
+                path = chosen;
                 bool found = false;
                 for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
                 if (found) end = true;
@@ -2971,12 +2976,15 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 
     for (i = 0; i < 8; ++i)
     {
-        if ((i * 4 + 4) > 32) {
+        constexpr size_t HASH_SIZE = 32;
+        const size_t off = static_cast<size_t>(i) * 4;
+        if (off + 4 > HASH_SIZE) {
             std::cerr << "Buffer overflow detected in sha256_final (hash write)!" << std::endl;
             return;
         }
-        state[i] = custom_bswap_32(state[i]);
-        memcpy(hash + i * 4, &state[i], 4);
+        // convert to big-endian value locally and copy 4 bytes
+        uint32_t be = custom_bswap_32(state[i]);
+        std::memcpy(hash + off, &be, sizeof(be));
     }
 }
 

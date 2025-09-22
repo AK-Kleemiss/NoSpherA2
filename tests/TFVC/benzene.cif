@@ -1,0 +1,38 @@
+data_benzene
+_space_group_IT_number             1
+_space_group_name_H-M_alt          'P 1'
+_space_group_name_Hall             'P 1'
+loop_
+  _space_group_symop_id
+  _space_group_symop_operation_xyz
+ 1 +X,+Y,+Z
+
+_cell_length_a                     10.0(9)
+_cell_length_b                     10.0(11)
+_cell_length_c                     10.0(11)
+_cell_angle_alpha                  90
+_cell_angle_beta                   90
+_cell_angle_gamma                  90
+_cell_volume                       1000.00(15)
+_cell_formula_units_Z              1
+
+loop_
+  _atom_site_label
+  _atom_site_type_symbol
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_U_iso_or_equiv
+  _atom_site_adp_type
+  _atom_site_occupancy
+  _atom_site_refinement_flags_posn
+  _atom_site_site_symmetry_order
+  _atom_site_disorder_group
+C1 C  0.00000(1)  0.07634(1)  0.00000(1) 0.0215(11) Uani 1 . 1 .
+C2 C  0.00000(1) -0.07634(1)  0.00000(1) 0.0215(11) Uani 1 . 1 .
+H1 H  0.10160(1)  0.11609(1)  0.00000(1) 0.0215(11) Uani 1 . 1 .
+H2 H -0.05080(1)  0.11608(1)  0.08798(1) 0.0215(11) Uani 1 . 1 .
+H3 H -0.05080(1)  0.11608(1) -0.08798(1) 0.0215(11) Uani 1 . 1 .
+H4 H -0.10160(1) -0.11609(1)  0.00000(1) 0.0215(11) Uani 1 . 1 .
+H5 H  0.05080(1) -0.11608(1) -0.08798(1) 0.0215(11) Uani 1 . 1 .
+H6 H  0.05080(1) -0.11608(1)  0.08798(1) 0.0215(11) Uani 1 . 1 .

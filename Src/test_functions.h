@@ -145,7 +145,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
     cif_input.close();
     vec2 d1, d2, d3, dens;
 
-    make_hirshfeld_grids(opt.pbc,
+    make_atomic_grids(opt.pbc,
                          opt.accuracy,
                          unit_cell,
                          wavy[0],
@@ -158,7 +158,8 @@ void sfac_scan(options &opt, std::ostream &log_file)
                          time_points,
                          time_descriptions,
                          opt.debug,
-                         opt.no_date);
+                         opt.no_date,
+                         opt.grid_type);
 
     std::cout << "finished partitioning" << endl;
     const int size = 4000;
@@ -1465,7 +1466,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
     svec labels({ele});
 
     auto temp_cell = cell();
-    make_hirshfeld_grids(0,
+    make_atomic_grids(0,
                          3,
                          temp_cell,
                          ECP_way_Au,
@@ -1474,10 +1475,10 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_ECP, d2_ECP, d3_ECP, dens_ECP,
                          labels,
-                        std::cout,
+                         std::cout,
                          time_points,
                          time_descriptions);
-    make_hirshfeld_grids(0,
+    make_atomic_grids(0,
                          3,
                          temp_cell,
                          wavy_full_Au,
@@ -1486,10 +1487,10 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_all, d2_all, d3_all, dens_all,
                          labels,
-                        std::cout,
+                         std::cout,
                          time_points,
                          time_descriptions);
-    make_hirshfeld_grids(0,
+    make_atomic_grids(0,
                          3,
                          temp_cell,
                          wavy_val_Au,
@@ -1498,7 +1499,7 @@ void test_core_sfac_corrected(double &precisison, int ncpus = 4, std::string ele
                          needs_grid,
                          d1_val, d2_val, d3_val, dens_val,
                          labels,
-                        std::cout,
+                         std::cout,
                          time_points,
                          time_descriptions);
 
@@ -1598,7 +1599,8 @@ void test_analytical_fourier(bool full)
         c_exp,
         max_l,
         alpha_min,
-        std::cout);
+        std::cout,
+        GridType::Becke);
 
     double pos[] = {0};
     for (int i = 0; i < grid.size(); i++)

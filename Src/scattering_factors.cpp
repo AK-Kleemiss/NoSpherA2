@@ -890,7 +890,8 @@ std::vector<AtomGrid> make_Prototype_atoms(
     std::ostream &file,
     const int &accuracy,
     const WFN &wave,
-    int basis_mode)
+    int basis_mode,
+    GridType type)
 {
     using namespace std;
     vec alpha_max(wave.get_ncen());
@@ -1181,14 +1182,15 @@ std::vector<AtomGrid> make_Prototype_atoms(
                          alpha_max_temp,
                          max_l_temp,
                          alpha_min_temp.data(),
-                         file);
+                         file,
+                         type);
     }
     if (debug)
         file << "max_l_overall: " << max_l_overall << endl;
     return res;
 }
 
-ivec make_atomic_grids(
+ivec make_integration_grids(
     const vec &x,
     const vec &y,
     const vec &z,
@@ -1201,10 +1203,13 @@ ivec make_atomic_grids(
     const std::vector<AtomGrid> &Prototype_grids,
     vec3 &grid,
     std::ostream &file,
-    bool debug)
+    bool debug,
+    GridType g_type)
 {
     using namespace std;
     ivec num_points(cif2wfn_list.size(), 0);
+    vec2 chi_matrix;
+	chi_matrix.reserve(cif2wfn_list.size());
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         if (debug)
@@ -1221,17 +1226,33 @@ ivec make_atomic_grids(
         for (int n = 0; n < 6; n++)
             grid[i][n].resize(num_points[i], 0.0);
 
-        Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
-                                       cif2wfn_list[i],
-                                       &x[0],
-                                       &y[0],
-                                       &z[0],
-                                       &atom_z[0],
-                                       grid[i][0].data(),
-                                       grid[i][1].data(),
-                                       grid[i][2].data(),
-                                       grid[i][3].data(),
-                                       grid[i][5].data());
+        if (g_type == GridType::Becke) {
+            Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
+                cif2wfn_list[i],
+                &x[0],
+                &y[0],
+                &z[0],
+                &atom_z[0],
+                grid[i][0].data(),
+                grid[i][1].data(),
+                grid[i][2].data(),
+                grid[i][3].data(),
+                grid[i][5].data());
+        }
+        else if (g_type == GridType::TFVC)
+            Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
+                cif2wfn_list[i],
+                &x[0],
+                &y[0],
+                &z[0],
+                &atom_z[0],
+                grid[i][0].data(),
+                grid[i][1].data(),
+                grid[i][2].data(),
+                grid[i][3].data(),
+                grid[i][5].data(),
+                wave,
+                chi_matrix);
     }
     if (debug)
     {
@@ -1544,7 +1565,7 @@ void prune_hirshfeld(
 }
 
 /**
- * Generates Hirshfeld grids based on the specified parameters.
+ * Generates Atomic grids based on the specified parameters.
  *
  * @param pbc The periodic boundary condition flag.
  * @param accuracy The accuracy level for grid generation.
@@ -1569,7 +1590,7 @@ void prune_hirshfeld(
  *
  * @return The number of grid points in the final total grid.
  */
-int make_hirshfeld_grids(
+int make_atomic_grids(
     const int &pbc,
     const int &accuracy,
     cell &unit_cell,
@@ -1586,7 +1607,8 @@ int make_hirshfeld_grids(
     std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
-    bool no_date)
+    bool no_date,
+    GridType type)
 {
     using namespace std;
 #ifdef FLO_CUDA
@@ -1651,7 +1673,7 @@ int make_hirshfeld_grids(
     fill_xyzc(x, y, z, atom_z, pbc, wave, unit_cell);
 
     // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, cif2wfn_list, debug, file, accuracy, wave, 1);
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, cif2wfn_list, debug, file, accuracy, wave, 1, type);
     if (no_date)
         file << "\nMaking Becke Grids..." << flush;
     else
@@ -1679,7 +1701,7 @@ int make_hirshfeld_grids(
     {
         file << " ...  " << flush;
     }
-    ivec num_points = make_atomic_grids(
+    ivec num_points = make_integration_grids(
         x,
         y,
         z,
@@ -1692,7 +1714,8 @@ int make_hirshfeld_grids(
         Prototype_grids,
         grid,
         file,
-        debug);
+        debug,
+        type);
     Prototype_grids.clear();
 
     int points = vec_sum(num_points);
@@ -1775,7 +1798,7 @@ int make_hirshfeld_grids(
 
     WFN temp = wave;
     temp.delete_unoccupied_MOs();
-    const int nr_pts = static_cast<int>(total_grid[0].size());
+    const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
     const int nr_mos = temp.get_nmo(true);
     const int nr_cen = temp.get_ncen();
     if (debug)
@@ -1796,10 +1819,10 @@ int make_hirshfeld_grids(
 #pragma omp for
         for (int i = 0; i < nr_pts; i++)
         {
-            total_grid[5][i] = temp.compute_dens(
-                total_grid[0][i],
-                total_grid[1][i],
-                total_grid[2][i],
+            total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
+                total_grid[TotalGridIndex::X][i],
+                total_grid[TotalGridIndex::Y][i],
+                total_grid[TotalGridIndex::Z][i],
                 d_temp,
                 phi_temp);
         }
@@ -1837,9 +1860,9 @@ int make_hirshfeld_grids(
 #pragma omp parallel for
                     for (int i = 0; i < total_grid[0].size(); i++)
                     {
-                        periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
-                                                                total_grid[1][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
-                                                                total_grid[2][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
+                        periodic_grid[j][i] = temp.compute_dens(total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
+                                                                total_grid[TotalGridIndex::Y][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
+                                                                total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
                     }
                     j++;
                 }
@@ -1896,14 +1919,14 @@ int make_hirshfeld_grids(
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
-            if (abs(total_grid[6][p]) > cutoff(accuracy))
+            if (abs(total_grid[TotalGridIndex::becke_weight][p]) > cutoff(accuracy))
             {
-                atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
-                atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
+                atom_els[0][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
+                atom_els[1][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
             }
             if (total_grid[4][p] != 0)
             {
-                atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+                atom_els[2][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p];
             }
         }
         el_sum_becke += atom_els[0][i];
@@ -1928,10 +1951,10 @@ int make_hirshfeld_grids(
             file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
         file << endl;
     }
-
+    if (type != GridType::TFVC)
 #pragma omp parallel for
-    for (int p = 0; p < total_grid[0].size(); p++)
-        total_grid[5][p] *= total_grid[3][p];
+        for (int p = 0; p < total_grid[0].size(); p++)
+            total_grid[TotalGridIndex::wavefunction_electron_density][p] *= total_grid[TotalGridIndex::quadrature_weight][p];
     file << " done!" << endl
          << "Number of points evaluated: " << total_grid[0].size() << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
          << endl
@@ -1948,7 +1971,7 @@ int make_hirshfeld_grids(
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
         if (debug)
-            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
+            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[0][counter]
                  << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
                  << fixed << setw(10) << setprecision(3) << atom_els[2][counter];
         counter++;
@@ -2000,26 +2023,26 @@ int make_hirshfeld_grids(
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
-            res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+            type == GridType::Becke ? res = total_grid[TotalGridIndex::wavefunction_electron_density][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p] : res = total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
             if (abs(res) > _cut)
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(ci, 0));
-                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(ci, 1));
-                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(ci, 2));
-                diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
+                d1[i][run] = (total_grid[TotalGridIndex::X][p] - wave.get_atom_coordinate(ci, 0));
+                d2[i][run] = (total_grid[TotalGridIndex::Y][p] - wave.get_atom_coordinate(ci, 1));
+                d3[i][run] = (total_grid[TotalGridIndex::Z][p] - wave.get_atom_coordinate(ci, 2));
+                diff = total_grid[TotalGridIndex::wavefunction_electron_density][p] - (total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]);
                 if (wave.get_atom_ECP_electrons(ci) != 0)
                 {
                     dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                    densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(ci)) * total_grid[3][p];
+                    densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(ci)) * total_grid[TotalGridIndex::quadrature_weight][p];
                     if (wave.get_ECP_mode() != 0)
-                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[TotalGridIndex::quadrature_weight][p];
                     diff += densy;
                 }
                 diffs += pow(diff, 2);
-                upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
-                lower += abs(total_grid[5][p] + densy);
+                upper += abs(abs(total_grid[TotalGridIndex::wavefunction_electron_density][p]) - abs(total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]) + densy);
+                lower += abs(total_grid[TotalGridIndex::wavefunction_electron_density][p] + densy);
                 avg += abs(diff);
                 run++;
             }
@@ -2110,7 +2133,7 @@ static int make_hirshfeld_grids_ML(
     fill_xyzc(x, y, z, atom_z, 0, wave, cell());
 
     // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, asym_atom_list, debug, file, accuracy, wave, 2);
+    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, asym_atom_list, debug, file, accuracy, wave, 2, GridType::Becke);
     if (no_date)
         file << "\nMaking Becke Grids..." << flush;
     else
@@ -2134,7 +2157,7 @@ static int make_hirshfeld_grids_ML(
     else
         file << " ...  " << flush;
 
-    ivec num_points = make_atomic_grids(
+    ivec num_points = make_integration_grids(
         x,
         y,
         z,
@@ -2147,7 +2170,8 @@ static int make_hirshfeld_grids_ML(
         Prototype_grids,
         grid,
         file,
-        debug);
+        debug,
+        GridType::Becke);
     Prototype_grids.clear();
 
     int points = vec_sum(num_points);
@@ -3486,20 +3510,21 @@ tsc_block<int, cdouble> calculate_scattering_factors(
         file << "made it post CIF now make grids!" << endl;
     vec2 d1, d2, d3, dens;
 
-    const int points = make_hirshfeld_grids(opt.pbc,
-                                            opt.accuracy,
-                                            unit_cell,
-                                            wave[nr],
-                                            atom_type_list,
-                                            asym_atom_list,
-                                            needs_grid,
-                                            d1, d2, d3, dens,
-                                            labels,
-                                            file,
-                                            time_points,
-                                            time_descriptions,
-                                            opt.debug,
-                                            opt.no_date);
+    const int points = make_atomic_grids(opt.pbc,
+                                         opt.accuracy,
+                                         unit_cell,
+                                         wave[nr],
+                                         atom_type_list,
+                                         asym_atom_list,
+                                         needs_grid,
+                                         d1, d2, d3, dens,
+                                         labels,
+                                         file,
+                                         time_points,
+                                         time_descriptions,
+                                         opt.debug,
+                                         opt.no_date,
+                                         opt.grid_type);
 
     time_points.push_back(get_time());
     time_descriptions.push_back("density vectors");
@@ -3655,7 +3680,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     cif_input.close();
     vec2 d1, d2, d3, dens;
 
-    make_hirshfeld_grids(opt.pbc,
+    make_atomic_grids(opt.pbc,
                          opt.accuracy,
                          unit_cell,
                          wavy[0],
@@ -3668,7 +3693,8 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                          time_points,
                          time_descriptions,
                          opt.debug,
-                         opt.no_date);
+                         opt.no_date,
+                         opt.grid_type);
 
     hkl_list_d hkl;
     generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
@@ -3776,9 +3802,9 @@ ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
         nr_list.emplace_back(atm_idx);
     }
 
-    std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1);
+    std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1, GridType::Becke);
 
-    ivec num_points = make_atomic_grids(
+    ivec num_points = make_integration_grids(
         x,
         y,
         z,
@@ -3791,7 +3817,8 @@ ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
         Prototype_grids,
         grid,
         std::cout,
-        true);
+        true,
+        GridType::Becke);
 
     Prototype_grids.clear();
 

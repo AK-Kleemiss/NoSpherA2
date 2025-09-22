@@ -2416,7 +2416,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <OpenMPSupport>true</OpenMPSupport>
+      <OpenMPSupport>false</OpenMPSupport>
       <FloatingPointModel>Fast</FloatingPointModel>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <FunctionLevelLinking>true</FunctionLevelLinking>

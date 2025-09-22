@@ -31,6 +31,27 @@ class cell;
  */
 struct options;
 
+enum GridIndex
+{
+    x_coord = 0,
+    y_coord = 1,
+    z_coord = 2,
+	atomic_weight = 3,
+	molecular_weight = 4,
+	electron_density = 5
+};
+
+enum TotalGridIndex
+{
+    X = 0,
+    Y = 1,
+    Z = 2,
+	quadrature_weight = 3,
+	spherical_electron_density = 4,
+	wavefunction_electron_density = 5,
+    becke_weight = 6
+};
+
 /**
  * @brief Calculates the MTC (Modified Thakkar) scattering factors.
  * @param opt The options for scattering factors calculations.
@@ -182,7 +203,7 @@ svec read_atoms_from_CIF(
     const bool debug = false);
 
 /**
- * @brief Makes Hirshfeld grids.
+ * @brief Makes Atomic grids.
  * @param pbc The periodic boundary condition.
  * @param accuracy The accuracy.
  * @param unit_cell The unit cell.
@@ -205,7 +226,7 @@ svec read_atoms_from_CIF(
  * @param no_date Flag indicating whether to exclude the date from the output.
  * @return The number of Hirshfeld grids generated.
  */
-int make_hirshfeld_grids(
+int make_atomic_grids(
     const int &pbc,
     const int &accuracy,
     cell &unit_cell,
@@ -222,7 +243,8 @@ int make_hirshfeld_grids(
     std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug = false,
-    bool no_date = false);
+    bool no_date = false,
+    GridType type = GridType::Becke);
 
 /**
  * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
