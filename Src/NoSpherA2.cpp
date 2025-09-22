@@ -270,8 +270,10 @@ int main(int argc, char **argv)
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers();
-            if (wavy[i].get_origin() != 7 && !opt.SALTED && !opt.RI_FIT)
+            if (!opt.SALTED)
             {
+                if (wavy[i].get_origin() == 7)
+                    opt.iam_switch = true;
                 result.append(calculate_scattering_factors(
                                   opt,
                                   wavy,
@@ -304,29 +306,6 @@ int main(int argc, char **argv)
                                   &known_kpts),
                               log_file);
                 delete temp_pred;
-            }
-            else if (opt.RI_FIT)
-            {
-                result.append(calculate_scattering_factors(
-                                  opt,
-                                  wavy,
-                                  log_file,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              log_file);
-            }
-            else
-            {
-                opt.iam_switch = true;
-                result.append(calculate_scattering_factors(
-                                  opt,
-                                  wavy,
-                                  log_file,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              log_file);
             }
         }
 
@@ -444,29 +423,14 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                if (wavy[0].get_origin() != 7 && !opt.RI_FIT)
-                    res = calculate_scattering_factors(
-                        opt,
-                        wavy,
-                        log_file,
-                        empty,
-                        0);
-                else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
-                    res = calculate_scattering_factors(
-                        opt,
-                        wavy,
-                        log_file,
-                        empty,
-                        0);
-                else {
+                if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
-                    res = calculate_scattering_factors(
+                res = calculate_scattering_factors(
                         opt,
                         wavy,
                         log_file,
                         empty,
                         0);
-                }
             }
             else
             {
