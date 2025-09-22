@@ -295,9 +295,9 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors_SALTED(
+                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor>(
                                   opt,
-                                  *temp_pred,
+                                  temp_pred,
                                   log_file,
                                   known_scatterer,
                                   i,
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
             }
             else if (opt.RI_FIT)
             {
-                result.append(calculate_scattering_factors_RI_fit(
+                result.append(calculate_scattering_factors(
                                   opt,
                                   wavy,
                                   log_file,
@@ -318,12 +318,14 @@ int main(int argc, char **argv)
             }
             else
             {
-                result.append(thakkar_sfac(
+                opt.iam_switch = true;
+                result.append(calculate_scattering_factors(
                                   opt,
+                                  wavy,
                                   log_file,
                                   known_scatterer,
-                                  wavy,
-                                  i),
+                                  i,
+                                  &known_kpts),
                               log_file);
             }
         }
@@ -373,7 +375,7 @@ int main(int argc, char **argv)
         svec empty({});
         //use atoms of group 0
         opt.groups[0].push_back(0);
-        itsc_block res = thakkar_sfac(opt, log_file, empty, wavy, 0);
+        itsc_block res = calculate_scattering_factors(opt, wavy, log_file, empty, 0);
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -450,19 +452,21 @@ int main(int argc, char **argv)
                         empty,
                         0);
                 else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
-                    res = calculate_scattering_factors_RI_fit(
+                    res = calculate_scattering_factors(
                         opt,
                         wavy,
                         log_file,
                         empty,
                         0);
-                else
-                    res = thakkar_sfac(
+                else {
+                    opt.iam_switch = true;
+                    res = calculate_scattering_factors(
                         opt,
+                        wavy,
                         log_file,
                         empty,
-                        wavy,
                         0);
+                }
             }
             else
             {
@@ -478,7 +482,7 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors_SALTED(
+                res = calculate_scattering_factors(
                     opt,
                     *temp_pred,
                     log_file,

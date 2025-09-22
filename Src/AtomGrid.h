@@ -6,56 +6,19 @@ class AtomGrid
 {
   public:
     AtomGrid(const double radial_precision,
-        const int min_num_angular_points,
-        const int max_num_angular_points,
-        const int proton_charge,
-        const double alpha_max,
-        const int max_l_quantum_number,
-        const double alpha_min[],
-        std::ostream& file,
-        GridType g_type);
+             const int min_num_angular_points,
+             const int max_num_angular_points,
+             const int proton_charge,
+             const double alpha_max,
+             const int max_l_quantum_number,
+             const double alpha_min[],
+             std::ostream& file);
 
     ~AtomGrid();
 
     int get_num_grid_points() const;
 
     int get_num_radial_grid_points() const;
-
-    void get_grid(const int num_centers,
-        const int center_index,
-        const double* x_coordinates_bohr,
-        const double* y_coordinates_bohr,
-        const double* z_coordinates_bohr,
-        const int* proton_charges,
-        double grid_x_bohr[],
-        double grid_y_bohr[],
-        double grid_z_bohr[],
-        double grid_aw[],
-        double grid_mw[]) const;
-
-    void get_grid(const int num_centers,
-        const int center_index,
-        const double* x_coordinates_bohr,
-        const double* y_coordinates_bohr,
-        const double* z_coordinates_bohr,
-        const int* proton_charges,
-        double grid_x_bohr[],
-        double grid_y_bohr[],
-        double grid_z_bohr[],
-        double grid_aw[],
-        double grid_mw[],
-        const WFN& wfn,
-        vec2& chi) const;
-
-    void get_atomic_grid(
-      const int center_index,
-      const double* x_coordinates_bohr,
-      const double* y_coordinates_bohr,
-      const double* z_coordinates_bohr,
-      double grid_x_bohr[],
-      double grid_y_bohr[],
-      double grid_z_bohr[],
-      double grid_aw[]) const;
 
     void get_grid(const int num_centers,
                   const int center_index,
@@ -66,23 +29,11 @@ class AtomGrid
                   double grid_x_bohr[],
                   double grid_y_bohr[],
                   double grid_z_bohr[],
-                  double grid_w[]) const;
-    void get_atom_grid_omp(
-        double grid_x_bohr[],
-        double grid_y_bohr[],
-        double grid_z_bohr[],
-        double grid_w[]) const;
-
-    void get_grid_omp(const int num_centers,
-        const int center_index,
-        const double* x_coordinates_bohr,
-        const double* y_coordinates_bohr,
-        const double* z_coordinates_bohr,
-        const int* proton_charges,
-        double grid_x_bohr[],
-        double grid_y_bohr[],
-        double grid_z_bohr[],
-        double grid_w[]) const;
+                  double grid_aw[],
+                  double grid_becke_w[],
+                  double grid_TFVC_w[],
+                  const WFN& wfn,
+                  vec2& chi) const;
 
     void get_radial_grid(double grid_r_bohr[], double grid_w[]) const;
     void get_radial_distances(double grid_r_bohr[]) const;
@@ -100,16 +51,15 @@ class AtomGrid
 
   private:
 
-    std::vector<double> atom_grid_x_bohr_;
-    std::vector<double> atom_grid_y_bohr_;
-    std::vector<double> atom_grid_z_bohr_;
-    std::vector<double> atom_grid_w_;
+    vec atom_grid_x_bohr_;
+    vec atom_grid_y_bohr_;
+    vec atom_grid_z_bohr_;
+    vec atom_grid_w_;
 
     int num_radial_grid_points_;
-	GridType type;
 
-    std::vector<double> radial_atom_grid_r_bohr_;
-    std::vector<double> radial_atom_grid_w_;
+    vec radial_atom_grid_r_bohr_;
+    vec radial_atom_grid_w_;
 };
 
 double get_becke_w(const int& num_centers,
@@ -121,7 +71,7 @@ double get_becke_w(const int& num_centers,
     const double& x,
     const double& y,
     const double& z,
-    std::vector<double>& pa);
+    vec& pa);
 
 double get_tfvc_w(const int& num_centers,
     const int* proton_charges,
@@ -132,7 +82,7 @@ double get_tfvc_w(const int& num_centers,
     const double& x,
     const double& y,
     const double& z,
-	std::vector<double>& pa,
+	vec& pa,
     const vec2& chi);
 
 const double get_r_inner(const double& max_error, const double& alpha_inner);

@@ -6,7 +6,7 @@ class WFN;
 class cell;
 class atom;
 class BasisSet;
-enum GridType { Becke, TFVC };
+enum PartitionType { Becke, TFVC, Hirshfeld, RI };
 
 inline std::streambuf *coutbuf = std::cout.rdbuf(); // save old buf
 void error_check(const bool condition, const std::source_location loc, const std::string &error_mesasge, std::ostream &log_file = std::cout);
@@ -618,11 +618,9 @@ struct options
     bool no_date = false;
     bool gbw2wfn = false;
     bool old_tsc = false;
-    bool thakkar_d_plot = false;
     bool write_CIF = false;
     bool all_mos = false;
     bool test = false;
-    bool becke = false;
     bool electron_diffraction = false;
     bool ECP = false;
     bool RI_FIT = false;
@@ -635,7 +633,7 @@ struct options
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
-	GridType grid_type = GridType::Becke;
+	PartitionType partition_type = PartitionType::Hirshfeld;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

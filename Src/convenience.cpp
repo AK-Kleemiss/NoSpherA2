@@ -23,7 +23,7 @@ std::string help_message =
      "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
      "   -b              <FILENAME>               Read this basis set\n"
      "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-     "   -dmin             <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
      "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
      "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
      "                                            [1]: def2-ECP\n"
@@ -60,7 +60,7 @@ std::string help_message =
      "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
      "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
      "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
-     "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+     "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
      "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
      "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
      "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
@@ -88,6 +88,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Alessandro Genoni,\n");
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
+        t.append("      Martí Gimferer,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
@@ -1637,9 +1638,6 @@ void options::digest_options()
             bondwise_laplacian_plots(wfn);
             exit(0);
         }
-        else if (temp == "-lukas_test") {
-            exit(0);
-        }
         else if (temp == "-atom_dens")
         {
            std::cout << NoSpherA2_message() << endl;
@@ -1665,6 +1663,8 @@ void options::digest_options()
         }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
+        else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
+            partition_type = PartitionType::Becke;
         else if (temp == "-blastest")
         {
             test_openblas();
@@ -2063,6 +2063,7 @@ void options::digest_options()
         else if (temp == "-RI_FIT" || temp == "-ri_fit")
         {
             RI_FIT = true;
+            partition_type = PartitionType::RI;
             // Check if next argument is a valid basis set name or a new argument starting with "-"
             if (i + 1 < argc && arguments[i + 1].find("-") != 0)
             {
@@ -2195,11 +2196,6 @@ void options::digest_options()
         }
         else if (temp == "-test")
             std::cout << "Running in test mode!" << endl, test = true;
-        else if (temp == "-thakkar_d_plot")
-        {
-            std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
-            exit(0);
-        }
         else if (temp == "-twin")
         {
             twin_law.resize(twin_law.size() + 1);
@@ -2221,7 +2217,7 @@ void options::digest_options()
         }
         else if (temp == "-tfvc" || temp == "-TFVC")
         {
-			grid_type = GridType::TFVC;
+			partition_type = PartitionType::TFVC;
         }
         else if (temp == "-tscb")
         {

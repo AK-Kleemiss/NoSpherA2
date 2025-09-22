@@ -17,92 +17,6 @@
 #include "TargetConditionals.h"
 #endif
 
-
-void thakkar_d_test(options &opt)
-{
-    using namespace std;
-    Thakkar Os(76), Ca(20), C(6), O(8), H(1), P(15);
-    Thakkar_Cation C_cat(6), O_cat(8), P_cat(15), Ca_cat(20);
-    Thakkar_Anion C_an(6), O_an(8), H_an(1), P_an(15);
-    double k_value = 0.0;
-    if (!opt.electron_diffraction)
-    {
-        ofstream result("thakkar.dat", ios::out);
-        for (double i = 0.001; i <= 4.0; i += 0.001)
-        {
-            k_value = constants::bohr2ang(constants::FOUR_PI * i);
-            result << showpos << setw(6) << setprecision(3) << fixed << i;
-            result << showpos << setw(16) << setprecision(8) << scientific << H.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Ca.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Os.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << Ca_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << H_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << C_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << O_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << P_an.get_form_factor(k_value);
-            result << endl;
-        }
-        result.flush();
-        result.close();
-    }
-    else
-    {
-        ofstream result("thakkar_ED.dat", ios::out);
-        for (double i = 0.001; i <= 4.0; i += 0.001)
-        {
-            k_value = constants::bohr2ang(constants::FOUR_PI * i);
-            result << showpos << setw(6) << setprecision(3) << fixed << i;
-            complex<double> temp = H.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = Ca.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
-            temp = Os.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(76, temp, i, 0).real();
-            temp = 0.0;
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = Ca_cat.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(20, temp, i, 0).real();
-            temp = H_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(1, temp, i, 0).real();
-            temp = C_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 0).real();
-            temp = O_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 0).real();
-            temp = P_an.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(15, temp, i, 0).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, 1).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(8, temp, i, 1).real();
-            temp = C.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(6, temp, i, -1).real();
-            temp = O.get_form_factor(k_value);
-            result << showpos << setw(16) << setprecision(8) << scientific << convert_to_ED_single(7, temp, i, -1).real();
-            result << endl;
-        }
-        result.flush();
-        result.close();
-    }
-}
-
 void sfac_scan(options &opt, std::ostream &log_file)
 {
     using namespace std;
@@ -159,7 +73,7 @@ void sfac_scan(options &opt, std::ostream &log_file)
                          time_descriptions,
                          opt.debug,
                          opt.no_date,
-                         opt.grid_type);
+                         opt.partition_type);
 
     std::cout << "finished partitioning" << endl;
     const int size = 4000;
@@ -1579,13 +1493,14 @@ void test_analytical_fourier(bool full)
         kpts.push_back({ (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1, (double)rand() / RAND_MAX * 2 - 1 });
     }
     vec2 grid;
-    grid.resize(5); // x, y, z, dens, atomic_weight
+    grid.resize(7); // x, y, z, dens, atomic_weight, becke_weight, TFVC_weight
 
     // Conditions for the Wavefunction
     const double c_exp = 2.0;
     double vals[] = { 1.0 };
     unsigned int max_l = 6;
     double radial_res = 1E-17;
+    int charge = 1;
     if (full) {
         max_l = 8;
         radial_res = 1E-25;
@@ -1595,19 +1510,20 @@ void test_analytical_fourier(bool full)
     AtomGrid griddy(radial_res,
         350,
         5000,
-        1,
+        charge,
         c_exp,
         max_l,
         alpha_min,
-        std::cout,
-        GridType::Becke);
+        std::cout);
 
     double pos[] = {0};
     for (int i = 0; i < grid.size(); i++)
     {
         grid[i].resize(griddy.get_num_grid_points(), 0.0);
     }
-    griddy.get_atomic_grid(0, pos, pos, pos, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data());
+    
+    vec2 empty(1, vec(1, 0.0));
+    griddy.get_grid(1, 0, pos, pos, pos, &charge, grid[0].data(), grid[1].data(), grid[2].data(), grid[4].data(), grid[5].data(), grid[6].data(), WFN(), empty);
 
     // Initialize the vectors sf_A and sf_N
     cvec2 sf_A, sf_N;
@@ -1677,7 +1593,8 @@ void test_analytical_fourier(bool full)
                 sf_A[0][i] = 0.0;
                 sf_N[0][i] = 0.0;
             }
-#pragma omp parallel for
+            double work = 0.0;
+#pragma omp parallel for private(work)
             for (int i = 0; i < kpts.size(); i++)
             {
                 double k_pt_local[4] = { kpts[i][0] * 2 * constants::PI , kpts[i][1] * 2 * constants::PI , kpts[i][2] * 2 * constants::PI , 0.0 };
@@ -1688,7 +1605,7 @@ void test_analytical_fourier(bool full)
                 //sf_A[0][i] = sfac_bessel(p, k_pt_local, ri_coefs);
                 for (int _p = 0; _p < grid[0].size(); _p++)
                 {
-                    double work = 2 * constants::PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
+                    work = constants::TWO_PI * (kpts[i][0] * grid[0][_p] + kpts[i][1] * grid[1][_p] + kpts[i][2] * grid[2][_p]);
                     sf_N[0][i] += std::polar(grid[3][_p] * grid[4][_p], work);
                 }
                 diff = abs(sf_A[0][i] - sf_N[0][i]);

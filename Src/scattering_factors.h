@@ -37,8 +37,9 @@ enum GridIndex
     y_coord = 1,
     z_coord = 2,
 	atomic_weight = 3,
-	molecular_weight = 4,
-	electron_density = 5
+	electron_density = 4,
+    molecular_becke_weight = 5,
+    molecular_TFVC_weight = 6
 };
 
 enum TotalGridIndex
@@ -49,69 +50,29 @@ enum TotalGridIndex
 	quadrature_weight = 3,
 	spherical_electron_density = 4,
 	wavefunction_electron_density = 5,
-    becke_weight = 6
+    becke_weight = 6,
+    TFVC_weight = 7
 };
 
 /**
- * @brief Calculates the MTC (Modified Thakkar) scattering factors.
+ * @brief Calculates the scattering factors based on calculator_type and opt.partitioning_type.
  * @param opt The options for scattering factors calculations.
- * @param file The output stream to write the results to.
- * @param known_atoms The list of known atoms.
- * @param wave The list of wavefunctions.
- * @param nr The number of wavefunctions.
- * @return True if the calculation is successful, false otherwise.
- */
-itsc_block thakkar_sfac(
-    options &opt,
-    std::ostream &file,
-    svec &known_atoms,
-    std::vector<WFN> &wave,
-    const int &nr);
-
-/**
- * @brief Calculates the MTC (Modified Thakkar) scattering factors.
- * @param opt The options for scattering factors calculations.
- * @param wave The list of wavefunctions.
+ * @param calculator The calculator to use for the calculations.
  * @param file The output stream to write the results to.
  * @param known_atoms The list of known atoms.
  * @param nr The number of wavefunctions.
  * @param kpts The list of k-points.
- * @return The calculated scattering factors.
+ * @return The calculated scattering factors block.
  */
-itsc_block calculate_scattering_factors_SALTED(
+template<typename tsc_block_type, typename calculator_type>
+tsc_block_type calculate_scattering_factors(
     options& opt,
-    SALTEDPredictor& SP,
+    calculator_type& calculator,
     std::ostream& file,
     svec& known_atoms,
     const int& nr,
-    vec2* kpts = NULL);
-
-
-itsc_block calculate_scattering_factors_RI_fit(
-    options& opt,
-    const std::vector<WFN> &wave,
-    std::ostream& file,
-    svec& known_atoms,
-    const int& nr,
-    vec2* kpts = NULL);
-
-/**
- * @brief Calculates the MTC (Modified Thakkar) scattering factors.
- * @param opt The options for scattering factors calculations.
- * @param wave The list of wavefunctions.
- * @param file The output stream to write the results to.
- * @param known_atoms The list of known atoms.
- * @param nr The number of wavefunctions.
- * @param kpts The list of k-points.
- * @return The calculated scattering factors.
- */
-itsc_block calculate_scattering_factors(
-    options &opt,
-    const std::vector<WFN> &wave,
-    std::ostream &file,
-    svec &known_atoms,
-    const int &nr,
-    vec2 *kpts = NULL);
+    vec2* kpts = NULL
+);
 
 /**
  * @brief Generates the hkl (Miller indices) list.
@@ -157,21 +118,6 @@ void generate_fractional_hkl(
     std::ostream &file,
     double stepsize,
     bool debug);
-
-/**
- * @brief Converts the scattering factor to the ED (Electron Density) single.
- * @tparam NumType The type of the charge.
- * @param neutralcharge The neutral charge.
- * @param sf The scattering factor.
- * @param k_vector The k-vector.
- * @param charge The charge.
- * @return The converted ED single.
- */
-cdouble convert_to_ED_single(
-    const int &neutralcharge,
-    cdouble &sf,
-    const double &k_vector,
-    const int charge = 0);
 
 /**
  * @brief Reads atoms from CIF (Crystallographic Information File).
@@ -244,7 +190,7 @@ int make_atomic_grids(
     std::vector<std::string> &time_descriptions,
     bool debug = false,
     bool no_date = false,
-    GridType type = GridType::Becke);
+    PartitionType type = PartitionType::Hirshfeld);
 
 /**
  * @brief Adds ECP (Effective Core Potential) contribution to the scattering factors.
