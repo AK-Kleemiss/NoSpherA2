@@ -1206,7 +1206,7 @@ void test_xtb_molden(options &opt, std::ostream &log_file)
         opt.dmin = 0.5;
        std::cout << "STARTING CALC" << endl;
         svec empty = {};
-        calculate_scattering_factors(
+        calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
             opt,
             wavy,
             log_file,
