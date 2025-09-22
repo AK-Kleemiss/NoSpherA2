@@ -274,7 +274,7 @@ int main(int argc, char **argv)
             {
                 if (wavy[i].get_origin() == 7)
                     opt.iam_switch = true;
-                result.append(calculate_scattering_factors(
+                result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                                   opt,
                                   wavy,
                                   log_file,
@@ -297,9 +297,9 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor>(
+                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
                                   opt,
-                                  temp_pred,
+                                  *temp_pred,
                                   log_file,
                                   known_scatterer,
                                   i,
@@ -354,7 +354,7 @@ int main(int argc, char **argv)
         svec empty({});
         //use atoms of group 0
         opt.groups[0].push_back(0);
-        itsc_block res = calculate_scattering_factors(opt, wavy, log_file, empty, 0);
+        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log_file, empty, 0);
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
                 if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
-                res = calculate_scattering_factors(
+                res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                         opt,
                         wavy,
                         log_file,
@@ -446,7 +446,7 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors(
+                res = calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
                     opt,
                     *temp_pred,
                     log_file,

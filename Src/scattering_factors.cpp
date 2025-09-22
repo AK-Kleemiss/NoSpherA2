@@ -3030,7 +3030,7 @@ tsc_block_type calculate_scattering_factors(
             }
         }
     }
-    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor>)
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>)
     {
         // Remove all unneccecary atoms from wavy
         int current_index = 0;
@@ -3125,7 +3125,7 @@ tsc_block_type calculate_scattering_factors(
                 opt.debug);
         }
     }
-    else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>>){
+    else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC)
         {
             vec2 d1, d2, d3, dens;
@@ -3166,7 +3166,7 @@ tsc_block_type calculate_scattering_factors(
         {
             file << "\nGenerating densities... " << endl;
             //If no basis is yet loaded, assume a auto aux should be generated
-            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(wave[nr]);
+            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(*wavy);
 
             WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy->get_atoms());
