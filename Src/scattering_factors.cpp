@@ -2582,6 +2582,10 @@ tsc_block_type calculate_scattering_factors(
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
     cvec2 sf;
+    sf.resize(asym_atom_list.size());
+#pragma omp parallel for
+    for (int i = 0; i < asym_atom_list.size(); i++)
+        sf[i].resize(hkl.size());
     if (opt.iam_switch){
         vector<Thakkar> spherical_atoms;
         spherical_atoms.reserve(atom_type_list.size());
@@ -2589,11 +2593,6 @@ tsc_block_type calculate_scattering_factors(
             spherical_atoms.emplace_back(atom_type_list[i]);
 
         const int imax = (int)asym_atom_list.size();
-
-        sf.resize(asym_atom_list.size());
-#pragma omp parallel for
-        for (int i = 0; i < asym_atom_list.size(); i++)
-            sf[i].resize(hkl.size());
 
         hkl_list_it it = hkl.begin();
 #pragma omp parallel for private(it)
@@ -2787,7 +2786,6 @@ tsc_block_type calculate_scattering_factors(
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
         
-            cvec2 sf;
             calc_SF_SALTED(
                 k_pt,
                 coefs,

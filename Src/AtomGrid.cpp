@@ -519,10 +519,10 @@ double get_becke_w(const int& num_centers,
     dist_a = vx * vx + vy * vy + vz * vz;
     dist_a = std::sqrt(dist_a);
 
-    if (dist_a > 15) {
-      pa[a] = 0.0;
-      continue;
-    }
+    //if (dist_a > 15) {
+    //  pa[a] = 0.0;
+    //  continue;
+    //}
 
     R_a = constants::bragg_angstrom[proton_charges[a]];
 
@@ -546,7 +546,7 @@ double get_becke_w(const int& num_centers,
 
       if (std::abs(R_a - R_b) > constants::cutoff) {
         chi = R_a / R_b;
-        u_ab = (chi - 1) / (chi + 1);
+        u_ab = (chi - 1.0) / (chi + 1.0);
         a_ab = u_ab / (u_ab * u_ab - 1.0);
 
         // JCP 88, 2547 (1988), eq. A3
