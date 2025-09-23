@@ -2261,14 +2261,13 @@ void options::digest_options()
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
             load_basis_into_WFN(wavy_aux, aux_basis);
-            //demonstrate_enhanced_density_fitting(wavy, wavy_aux);
-            dMatrix2 dm = wavy.get_dm();
-            vec charges = calculate_expected_charges(dm, wavy);
+            demonstrate_enhanced_density_fitting(wavy, wavy_aux);
+            //dMatrix2 dm = wavy.get_dm();
+            //vec charges_sand = calculate_expected_charges(wavy, wavy_aux, "sanderson_estimate");
+            //vec charges_mul = calculate_expected_charges(wavy, wavy_aux, "mulliken");
 
-            for (int i = 0; i < charges.size(); i++)
-                std::cout << "Charge on atom " << i << " (" << wavy.get_atom_label(i) << "): " << charges[i] << std::endl;
-
-
+            //for (int i = 0; i < charges_mul.size(); i++)
+            //    std::cout << "Charge on atom " << i << " (" << wavy.get_atom_label(i) << "): Mulliken: " << charges_mul[i] << " Sanderson: " << charges_sand[i] << std::endl;
 
             //aux_basis = std::make_shared<BasisSet>();
             //aux_basis->gen_auto_aux(wavy);

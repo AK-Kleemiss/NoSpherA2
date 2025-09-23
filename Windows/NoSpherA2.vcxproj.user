@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-wfn fe_complex_def2_qzvp.gbw -test_RI -v -no-date</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Co110.gbw -test_RI -v -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -740,9 +740,9 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>..\tests\Fe_gbw</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-wfn Fe.gbw -cif Fe.cif -dmin 0.8 -ri_fit auto 4.0 -no-date -cpus 12</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Co110.gbw -test_RI -v -no-date</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>

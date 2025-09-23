@@ -3325,13 +3325,13 @@ itsc_block calculate_scattering_factors_RI_fit(
     load_basis_into_WFN(wavy_aux, opt.aux_basis);
 
 
-    //vec coefs = density_fit_hybrid(wave[nr], wavy_aux, opt.mem, 'C',
-    //    0.0001,     // restraint strength
-    //    1e-6,      // tikhonov lambda
-    //    "mulliken_estimate", // charge scheme
-    //    false);
+    vec coefs = density_fit_hybrid(wave[nr], wavy_aux, opt.mem, 'C',
+        0.00005,     // restraint strength
+        1e-6,      // tikhonov lambda
+        "mulliken", // charge scheme
+        false);
 
-    vec coefs = density_fit_unrestrained(wave[nr], wavy_aux, opt.mem, 'C', opt.debug);
+    //vec coefs = density_fit_unrestrained(wave[nr], wavy_aux, opt.mem, 'C', opt.debug);
     file << setw(12 * 4 + 2) << "... done!\n"
         << flush;
 

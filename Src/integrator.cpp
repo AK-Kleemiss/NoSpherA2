@@ -278,73 +278,64 @@ vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::
             expected_charges[i] = wavy_aux.get_atoms()[i].get_charge();
         }
     }
-    else if (scheme == "mulliken_estimate") {
-        // Rough Mulliken-like estimate based on electronegativity
-        // This is a simplified approach - in practice you'd want proper Mulliken analysis
-        double total_electrons = 0.0;
-        vec electronegativities(wavy_aux.get_ncen());
-        
-        for (int i = 0; i < wavy_aux.get_ncen(); i++) {
-            double Z = wavy_aux.get_atoms()[i].get_charge();
-            total_electrons += Z;
-            
-            // Approximate electronegativity (Pauling scale)
-            if (Z == 1) electronegativities[i] = 2.20;      // H
-            else if (Z == 6) electronegativities[i] = 2.55;  // C
-            else if (Z == 7) electronegativities[i] = 3.04;  // N
-            else if (Z == 8) electronegativities[i] = 3.44;  // O
-            else if (Z == 9) electronegativities[i] = 3.98;  // F
-            else electronegativities[i] = 2.0 + Z * 0.1;    // Rough estimate
+    // https://pubs.acs.org/doi/10.1021/ed065p227
+    else if (scheme == "sanderson_estimate") {
+        double compound_electronegativity = 1.0;
+        for (const auto& atom : wavy.get_atoms()) {
+            compound_electronegativity *= constants::allen_electronegativities[atom.get_charge()-1];
         }
-        
-        // Redistribute electrons based on electronegativity differences
-        double avg_electronegativity = 0.0;
-        for (double en : electronegativities) avg_electronegativity += en;
-        avg_electronegativity /= electronegativities.size();
-        
-        for (int i = 0; i < wavy_aux.get_ncen(); i++) {
-            double Z = wavy_aux.get_atoms()[i].get_charge();
-            double en_diff = electronegativities[i] - avg_electronegativity;
-            // More electronegative atoms get slightly more electrons
-            expected_charges[i] = Z + en_diff * 0.1;
-        }
-    }
-    else if (scheme == "formal_charges") {
-        // Use formal charges if available (would need to be passed in)
-        // For now, default to nuclear charges
-        for (int i = 0; i < wavy_aux.get_ncen(); i++) {
-            expected_charges[i] = wavy_aux.get_atoms()[i].get_charge();
-        }
-    }
-    
-    return expected_charges;
-}
+        compound_electronegativity = std::pow(compound_electronegativity, 1.0 / wavy.get_ncen());
 
-vec calculate_expected_charges(const dMatrix2& dm, const WFN& wavy) {
-    vec expected_charges(wavy.get_ncen(), 0.0);
-    
-    // Simple Mulliken population analysis
-    for (int i = 0; i < wavy.get_ncen(); i++) {
-        atom current_atom = wavy.get_atoms()[i];
-        int prim_start = 0;
-        for (int j = 0; j < i; j++) {
-            prim_start += wavy.get_atom_shell_count(j);
+        for (int iat = 0; iat < wavy_aux.get_ncen(); iat++) {
+            double atom_electronegativity = constants::allen_electronegativities[wavy_aux.get_atoms()[iat].get_charge() - 1];
+            expected_charges[iat] = wavy_aux.get_atoms()[iat].get_charge() + (compound_electronegativity - atom_electronegativity) / (1.57 * std::sqrt(atom_electronegativity));
         }
-        int prim_end = prim_start + wavy.get_atom_shell_count(i);
-        
-        double population = 0.0;
-        for (int p = prim_start; p < prim_end; p++) {
-            for (int q = 0; q < dm.size(); q++) {
-                population += dm(p, q) + dm(q, p);
+    }
+    else if (scheme == "mulliken") {
+        dMatrix2 dm = wavy.get_dm();
+        vec eri2c;
+        Int_Params normal_basis(wavy);
+        compute2c_Overlap(normal_basis, eri2c);
+        dMatrixRef2 eri2c_ref(eri2c.data(), normal_basis.get_nao(), normal_basis.get_nao());
+        const size_t nao = dm.extent(1);
+
+        // optional: symmetric Mulliken operator M = 1/2 (P S + S P)
+        // (avoid forming full matrices if memory is tight; just accumulate the diagonal)
+        vec mulliken_pop(wavy.get_ncen(), 0.0);
+
+        size_t mu_begin = 0;
+        for (unsigned iat = 0; iat < wavy.get_ncen(); ++iat) {
+            const atom A = wavy.get_atoms()[iat];
+
+            // determine how many AOs belong to this atom (use contracted shells, not primitives!)
+            size_t nAO_A = 0;
+            int prim = 0;
+            for (size_t sh = 0; sh < A.get_shellcount().size(); ++sh) {
+                int l = A.get_basis_set_entry(prim).get_type() - 1;
+                nAO_A += size_t(2 * l + 1);
+                prim += A.get_shellcount()[sh];
             }
+            size_t mu_end = mu_begin + nAO_A;
+
+            double GA = 0.0;
+            for (size_t m = mu_begin; m < mu_end; ++m) {
+                double diag_PS = 0.0;
+                for (size_t n = 0; n < nao; ++n)
+                    diag_PS += dm(m, n) * eri2c_ref(n, m);
+                GA += diag_PS;
+            }
+            expected_charges[iat] = GA;//A.get_charge() - GA;        // Mulliken charge
+            mu_begin = mu_end;
         }
-        
-        expected_charges[i] = current_atom.get_charge() - population;
     }
-    
+    else {
+        std::cerr << "Warning: Unknown charge scheme '" << scheme 
+            << "'. Defaulting to nuclear charges." << std::endl;
+        expected_charges = calculate_expected_charges(wavy, wavy_aux, "nuclear");
+    }
+
     return expected_charges;
 }
-
 
 // Analyze the quality of density fitting and detect problematic charges
 void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, 
@@ -413,7 +404,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
 {
     std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
     
-    double max_mem = 1000.0; // MB
+    double max_mem = 100000.0; // MB
     char metric = 'C'; // Coulomb metric
     
     // Method 0: Unrestrained (original approach)
@@ -423,17 +414,17 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     // Method 1: Enhanced restraints with adaptive weighting
     std::cout << "\n--- Method 1: Enhanced Adaptive Restraints ---" << std::endl;
     vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, max_mem, metric,
-                                   0.0001,     // restraint strength
+                                   0.00005,     // restraint strength
                                    true,      // adaptive weighting
-                                   "mulliken_estimate", // charge scheme
+                                   "mulliken", // charge scheme
                                    true);     // analyze quality
     
     // Method 2: Hybrid approach
     std::cout << "\n--- Method 2: Hybrid Regularization ---" << std::endl;
     vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, max_mem, metric,
-                                         0.0001,     // restraint strength
+                                         0.00005,     // restraint strength
                                          1e-6,      // tikhonov lambda
-                                         "mulliken_estimate"); // charge scheme
+                                         "mulliken"); // charge scheme
     
     // Compare results
     std::cout << "\n=== Method Comparison ===" << std::endl;
