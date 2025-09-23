@@ -1532,8 +1532,6 @@ void test_analytical_fourier(bool full)
     sf_A[0].resize(kpts.size(), 0.0);
     sf_N[0].resize(kpts.size(), 0.0);
 
-
-
     // double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
     // int steps[3]{ 0, 0, 0 };
     // readxyzMinMax_fromWFN(wavy, MinMax, steps, 3., 0.025, true);

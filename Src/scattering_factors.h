@@ -67,7 +67,7 @@ enum TotalGridIndex
 template<typename tsc_block_type, typename calculator_type>
 tsc_block_type calculate_scattering_factors(
     options& opt,
-    calculator_type& calculator,
+    calculator_type calculator,
     std::ostream& file,
     svec& known_atoms,
     const int& nr,

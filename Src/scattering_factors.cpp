@@ -1493,9 +1493,18 @@ void prune_grid(
 #pragma omp parallel for reduction(+ : final_size)
     for (int i = 0; i < num_points.size(); i++)
     {
+        bool use_point = false;
         for (int p = 0; p < num_points[i]; p++)
         {
-            if (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::atomic_weight][p] * spherical_density[i][p] / grid[i][GridIndex::electron_density][p]) > cutoff)
+            if (type == PartitionType::Hirshfeld)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::atomic_weight][p] * spherical_density[i][p] / grid[i][GridIndex::electron_density][p]) > cutoff);
+            else if (type == PartitionType::Becke)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
+            else if (type == PartitionType::TFVC)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_TFVC_weight][p]) > cutoff);
+            else
+                use_point = false;
+            if (use_point)
             {
                 new_gridsize[i]++;
             }
@@ -1503,7 +1512,7 @@ void prune_grid(
         reductions[i] = num_points[i] - new_gridsize[i];
         final_size += new_gridsize[i];
     }
-    for (int k = 0; k < 7; k++)
+    for (int k = 0; k < total_grid.size(); k++)
         total_grid[k].resize(final_size);
 #pragma omp parallel for
     for (int i = 0; i < num_points.size(); i++)
@@ -1931,11 +1940,14 @@ int make_atomic_grids(
         file << endl;
     }
     file << " done!" << endl
-         << "Number of points evaluated: " << total_grid[0].size() << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
-         << endl
-         << "Table of Charges in electrons" << endl
-         << endl
-         << "    Atom       Becke   Spherical Hirshfeld     TFVC" << endl;
+        << "Number of points evaluated: " << total_grid[0].size() << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
+        << endl
+        << "Table of Charges in electrons" << endl
+        << endl
+        << "    Atom       Becke   Spherical Hirshfeld   TFVC";
+    if(debug)
+		file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
+    file << endl;
 
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
@@ -1946,7 +1958,7 @@ int make_atomic_grids(
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Hirshfeld][i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::TFVC][i];
         if (debug)
-            file << " ----debug---- " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Becke][i]
+            file << "   ----debug---- " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Becke][i]
                  << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Spherical][i]
                  << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Hirshfeld][i]
                  << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::TFVC][i];
@@ -2449,19 +2461,19 @@ void convert_to_ED(const ivec &asym_atom_list,
     }
 }
 
-template<typename tsc_block_type, typename calculator_type>
+template <typename tsc_block_type, typename calculator_type>
 tsc_block_type calculate_scattering_factors(
     options& opt,
-    calculator_type& calculator,
+    calculator_type calculator,
     std::ostream& file,
     svec& known_atoms,
     const int& nr,
     vec2* kpts
 ){
     using namespace std;
-    int nat;
-    WFN* wavy;
-    if constexpr (std::is_same_v<calculator_type, std::vector<WFN>>){
+    int nat = 0;
+    WFN* wavy = NULL;
+    if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         wavy = &calculator[nr];
         err_checkf(wavy->get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
         if (!opt.cif_based_combined_tsc_calc)
@@ -2485,7 +2497,7 @@ tsc_block_type calculate_scattering_factors(
             file << "Working with: " << wavy->get_path() << endl;
         nat = wavy->get_ncen();
     }
-    else{
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>) {
         wavy = &calculator.wavy;
         nat = wavy->get_ncen();
     }
