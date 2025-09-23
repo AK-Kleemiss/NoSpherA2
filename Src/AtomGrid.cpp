@@ -282,44 +282,67 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                     // If they are neighbours and close enough we do the line search for topology evaluation!
                     auto extrema = find_line_density_extrema(wfn, a, b, samples, refine);
                     size_t use_extr = 0;
-                    if (extrema.size() == 1 && extrema[0].type == DensityExtremum::Type::Minimum) {
-                        use_extr = 0;
-                    }
-                    else if (extrema.size() == 3) {
-                        if (extrema[1].type == DensityExtremum::Type::Minimum)
-                            use_extr = 1;
-                        else if (extrema[1].type == DensityExtremum::Type::Minimum) {
-                            if(debug)
-                                std::cout << "Strange case with 3 extrema but middle is not a minimum. Using first minimum." << std::endl;
-                            if (extrema[0].type == DensityExtremum::Type::Minimum)
-                                use_extr = 0;
-                            else
-                                use_extr = 1;
+                    if (wfn.get_atom_ECP_electrons(a) != 0 || wfn.get_atom_ECP_electrons(b) != 0) {
+                        double closeness = 1.0;
+                        for (int i = 0; i < extrema.size(); i++) {
+                            if (abs(extrema[i].t - 0.5) < closeness && extrema[i].type == DensityExtremum::Type::Minimum) {
+                                use_extr = i;
+                                closeness = abs(extrema[i].t - 0.5);
+                            }
                         }
-                        if (extrema[1].type == DensityExtremum::Type::Maximum)
-                            //Normal case for maximum in between two atoms
-                            use_extr = 1;
                     }
-                    else if (extrema.size() == 2) {
-                        //"Hydrogen case"
-                        if (extrema[0].type == DensityExtremum::Type::Minimum && extrema[1].type == DensityExtremum::Type::Maximum) {
+                    else {
+                        if (extrema.size() == 1 && extrema[0].type == DensityExtremum::Type::Minimum) {
                             use_extr = 0;
                         }
-                        else if (extrema[0].type == DensityExtremum::Type::Maximum && extrema[1].type == DensityExtremum::Type::Minimum) {
-                            use_extr = 1;
+                        else if (extrema.size() % 2 != 0) {
+                            int maxmin = 0;
+                            for (auto ex : extrema) {
+                                if (ex.type == DensityExtremum::Type::Maximum)
+                                    maxmin++;
+                                else
+                                    maxmin--;
+                            }
+                            if (maxmin > 0) {
+                                double closeness = 1.0;
+                                for (int i = 0; i < extrema.size(); i++) {
+                                    if (abs(extrema[i].t - 0.5) < closeness && extrema[i].type == DensityExtremum::Type::Minimum) {
+                                        use_extr = i;
+                                        closeness = extrema[i].t - 0.5;
+                                    }
+                                }
+                            }
+                            else {
+                                if (extrema[1].type == DensityExtremum::Type::Minimum)
+                                    use_extr = 1;
+                                else if (extrema[1].type == DensityExtremum::Type::Maximum) {
+                                    if (debug)
+                                        std::cout << "Strange case with 3 extrema but middle is not a minimum. Using Maximum." << std::endl;
+                                    use_extr = 1;
+                                }
+                            }
+                        }
+                        else if (extrema.size() == 2) {
+                            //"Hydrogen case"
+                            if (extrema[0].type == DensityExtremum::Type::Minimum && extrema[1].type == DensityExtremum::Type::Maximum) {
+                                use_extr = 0;
+                            }
+                            else if (extrema[0].type == DensityExtremum::Type::Maximum && extrema[1].type == DensityExtremum::Type::Minimum) {
+                                use_extr = 1;
+                            }
+                            else {
+                                std::cout << "WARNING: Unexpected types of extrema found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
+                                chi[a][b] = 1.0;
+                                chi[b][a] = 1.0;
+                                continue;
+                            }
                         }
                         else {
-                            std::cout << "WARNING: Unexpected types of extrema found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
+                            std::cout << "WARNING: Unexpected number of extrema (" << extrema.size() << ") found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
                             chi[a][b] = 1.0;
                             chi[b][a] = 1.0;
                             continue;
                         }
-                    }
-                    else {
-                        std::cout << "WARNING: Unexpected number of extrema (" << extrema.size() << ") found between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
-                        chi[a][b] = 1.0;
-                        chi[b][a] = 1.0;
-                        continue;
                     }
                     // And save the "chi" in the same matrix
                     chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
@@ -526,7 +549,7 @@ double get_becke_w(const int& num_centers,
 
     R_a = constants::bragg_angstrom[proton_charges[a]];
 
-    for (int b = 0; b < a; b++) {
+    for (int b = a + 1; b < num_centers; b++) {
       vx = x_coordinates_bohr[b] - x;
       vy = y_coordinates_bohr[b] - y;
       vz = z_coordinates_bohr[b] - z;

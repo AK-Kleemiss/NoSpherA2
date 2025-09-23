@@ -1831,7 +1831,7 @@ void options::digest_options()
         }
         else if (temp == "-e_field")
             efield = stod(arguments[i + 1]);
-        else if (temp == "-ECP")
+        else if (temp == "-ECP" || temp == "-ecp" || temp == "-Ecp")
         {
             ECP = true;
             if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
