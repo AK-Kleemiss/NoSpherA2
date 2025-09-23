@@ -232,7 +232,7 @@ int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true) {
+vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false) {
 	vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
     std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
     double rijx2, rijy2, rijz2, xdist, disth;
@@ -289,7 +289,8 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true) {
                         if (extrema[1].type == DensityExtremum::Type::Minimum)
                             use_extr = 1;
                         else if (extrema[1].type == DensityExtremum::Type::Minimum) {
-                            std::cout << "Strange case with 3 extrema but middle is not a minimum. Using first minimum." << std::endl;
+                            if(debug)
+                                std::cout << "Strange case with 3 extrema but middle is not a minimum. Using first minimum." << std::endl;
                             if (extrema[0].type == DensityExtremum::Type::Minimum)
                                 use_extr = 0;
                             else
@@ -330,7 +331,8 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true) {
                     }
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
-                    std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a][b] << std::endl;
+                    if(debug)
+                        std::cout << "TFVC -- Atom pair: " << a << ", " << b << ", Ratio: " << chi[a][b] << std::endl;
                 }
             }
             else {
@@ -356,7 +358,8 @@ void AtomGrid::get_grid(const int num_centers,
     double grid_becke_w[],
     double grid_TFVC_w[],
     const WFN& wfn,
-    vec2& chi) const
+    vec2& chi,
+    bool debug) const
 {
     //vec pa(num_centers);
     //double x = -1.836008, y = -0.292080, z = -0.861742;
@@ -381,7 +384,7 @@ void AtomGrid::get_grid(const int num_centers,
 
     if (num_centers > 1) {
         if (chi.size() == 0)
-            chi = make_chi(wfn, 50, true);
+            chi = make_chi(wfn, 50, true, debug);
 #pragma omp parallel
         {
             vec pa(num_centers);

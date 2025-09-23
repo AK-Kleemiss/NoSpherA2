@@ -1223,22 +1223,20 @@ ivec make_integration_grids(
                                        grid[i][GridIndex::molecular_becke_weight].data(),
                                        grid[i][GridIndex::molecular_TFVC_weight].data(),
                                        wave,
-                                       chi_matrix);
+                                       chi_matrix,
+                                       debug);
     }
     if (debug)
     {
-        int run = 0;
         file << "  label  | wfn  | grid | number of gridpoints\n";
         for (int j = 0; j < wave.get_ncen(); j++)
         {
             file << setw(8) << wave.get_atom_label(j);
             if (needs_grid[j])
             {
-
                 size_t index = find(cif2wfn_list.begin(), cif2wfn_list.end(), j) - cif2wfn_list.begin();
                 file << " | " << setw(4) << cif2wfn_list.at(index) << " | " << setw(4) << index << " |";
                 file << setw(7) << num_points[index];
-                run++;
             }
             else
             {
