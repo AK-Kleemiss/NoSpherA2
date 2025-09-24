@@ -55,7 +55,7 @@
 #ifdef __CMAKE_BUILD__
 #include "mdspan/mdarray.hpp"
 #else
-#include  "../mdspan/mdarray.hpp"
+#include  "../mdspan/include/mdspan/mdarray.hpp"
 #endif
 
 
