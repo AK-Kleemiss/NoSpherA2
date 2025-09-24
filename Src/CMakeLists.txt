@@ -59,6 +59,8 @@ target_compile_options(NoSpherA2 PRIVATE
     -MP
     -fmessage-length=0
 )
+# This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
+add_compile_definitions(NoSpherA2 "-D__CMAKE_BUILD__")
 
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(NoSpherA2 PRIVATE

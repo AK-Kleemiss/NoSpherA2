@@ -52,7 +52,11 @@
 #endif
 #define MDSPAN_USE_BRACKET_OPERATOR 0
 #define MDSPAN_USE_PAREN_OPERATOR 1
+#ifdef __CMAKE_BUILD__
 #include "mdspan/mdarray.hpp"
+#else
+#include  "../mdspan/mdarray.hpp"
+#endif
 
 
 // Here are the system specific libaries
