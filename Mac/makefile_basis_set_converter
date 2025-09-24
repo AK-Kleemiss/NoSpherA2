@@ -3,13 +3,15 @@ RM := rm
 
 COMP := g++
 
-all: basis_set_converter 
+all: basis_set_converter basis_set_converter_x86
+x86_64: basis_set_converter_x86
+arm64: basis_set_converter
 
 # Define the two separate lists with appropriate endings
 GCC_OPTS := -std=c++2a -O3 -c -fmessage-length=0
 
 GCC_OPTS_a := ${GCC_OPTS} -mcpu=apple-m1
-GCC_OPTS_x := ${GCC_OPTS} -march=x86_64
+GCC_OPTS_x := ${GCC_OPTS} -march=x86-64
 TARGET_FLAG_a := -target aarch64-apple-macos13.0
 TARGET_FLAG_x := -target x86_64-apple-macos13.0
 
@@ -19,17 +21,17 @@ BASIS_OBJS_x86    := $(BASIS_OBJ_NAMES:=.o_x86_basis)
 BASIS_OBJS_native := $(BASIS_OBJ_NAMES:=.o_native_basis)
 
 
-%.o_arm64_basis: ../Src/basis_set_helper/%.cpp 
+%.o_arm64_basis: ../Src/basis_set_helper/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_a} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_a}
 	@echo 'Finished building: $<'
 
-%.o_native_basis: ../Src/basis_set_helper/%.cpp 
+%.o_native_basis: ../Src/basis_set_helper/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 
-%.o_x86_basis: ../Src/basis_set_helper/%.cpp 
+%.o_x86_basis: ../Src/basis_set_helper/%.cpp
 	@echo 'Building file: $<'
 	@${COMP} ${GCC_OPTS_x} -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o "$@" "$<" ${TARGET_FLAG_x}
 	@echo 'Finished building: $<'
@@ -38,19 +40,19 @@ BASIS_OBJS_native := $(BASIS_OBJ_NAMES:=.o_native_basis)
 basis_set_converter: ${BASIS_OBJS_arm64}
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_arm64} ${TARGET_FLAG_a}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Windows/
+	./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo 'Done building basis_set_helper'
 
 basis_set_converter_x86: ${BASIS_OBJS_x86}
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_x86} ${TARGET_FLAG_x}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Windows/
+	./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo 'Done building basis_set_helper'
 
 basis_set_converter_native: ${BASIS_OBJS_native}
 	@${COMP} -o "BasisSetConverter" ${BASIS_OBJS_native}
 	@mv BasisSetConverter ../
-	./../BasisSetConverter ../Windows/
+	./../BasisSetConverter ../Src/basis_set_helper ../Src
 	@echo 'Done building basis_set_helper'
 
 clean:
@@ -59,7 +61,7 @@ clean:
 	@echo "Cleaned up"
 
 
-.PHONY: all clean basis_set_converter 
+.PHONY: all clean basis_set_converter
 .SECONDARY:
 
 
