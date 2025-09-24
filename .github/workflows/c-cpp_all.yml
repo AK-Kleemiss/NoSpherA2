@@ -40,7 +40,7 @@ jobs:
 
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make -j && cp NoSpherA2 ../ && cp libiomp5.so ../ 2>/dev/null || true"
+            build-script: "cd Linux && make -j && cp NoSpherA2 ../"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2
