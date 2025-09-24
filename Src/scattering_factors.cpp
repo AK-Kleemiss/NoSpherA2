@@ -2033,7 +2033,7 @@ int make_atomic_grids(
                     diff += densy;
                 }
                 diffs += pow(diff, 2);
-                upper += abs(abs(total_grid[TotalGridIndex::wavefunction_electron_density][p]) - abs(total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]) + densy);
+                upper += abs(abs(res) - abs(total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]) + densy);
                 lower += abs(total_grid[TotalGridIndex::wavefunction_electron_density][p] + densy);
                 avg += abs(diff);
                 run++;
