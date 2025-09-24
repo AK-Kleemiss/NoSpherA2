@@ -1,5 +1,6 @@
 #include "pch.h"
 #include <execution>
+#include <vector>
 #include "nos_math.h"
 
 #if defined(__APPLE__)
@@ -281,7 +282,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
     const lapack_int lda = n;    // Leading dimension of eri2c
     const lapack_int ldb = 1;    // Leading dimension of rho
-    ivec ipiv(n, 0);              // Pivot indices
+    std::vector<lapack_int> ipiv(n, 0);              // Pivot indices
     lapack_int info = 0;
 
 #if defined(__APPLE__)
@@ -316,7 +317,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
 //
 //    //using namespace lahva::gpu;
 //    //// similar to the CPU Matrix, we have a quadratic 5 x 5 matrix
-//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values. 
+//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values.
 //    //Matrix<float, CudaHostAllocator<float>, CudaDeviceAsyncAllocator<float>> s(5, 1.0);
 //
 //}
@@ -333,7 +334,7 @@ NNLSResult nnls(dMatrix2& A,
     ivec inds(n);
     vec w(n), x(n), work(m), zz(m);
 
-    for (int i = 0; i < n; ++i) 
+    for (int i = 0; i < n; ++i)
         inds[i] = i;
 
     int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
@@ -399,7 +400,7 @@ NNLSResult nnls(dMatrix2& A,
             #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
             #endif
-            
+
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
                 // Set w[j] to 0.0 and move to the next greatest entry in w.
