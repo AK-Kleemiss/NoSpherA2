@@ -155,7 +155,7 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         return 0;
     }
-    // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
+    // Perform calculation of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (!opt.wfn2.empty())
     {
         wavy.emplace_back(opt.wfn, opt.debug);

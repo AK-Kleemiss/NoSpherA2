@@ -521,8 +521,6 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     /** Raw pointer to primitive exponents. */
     const double *get_ptr_exponents() { return &exponents[0]; };
-    /** Raw pointer to MO coefficients for given MO. */
-    const double *get_ptr_mo_coefficients(const int &mo);
 };
 
 #include "mo_class.h"

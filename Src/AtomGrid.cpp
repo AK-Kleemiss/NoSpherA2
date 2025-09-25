@@ -268,12 +268,14 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
         }
     }
     for (int a = 0; a < wfn.get_ncen(); a++) {
+        rijx2 = wfn.get_atom_coordinate(a, 0); //abuse old variable
+		rijy2 = wfn.get_atom_coordinate(a, 1);
+		rijz2 = wfn.get_atom_coordinate(a, 2);
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
             if (neighbours[a][b]) {
-                disth = vec_length({ wfn.get_atom_coordinate(b, 0) - wfn.get_atom_coordinate(a, 0),
-                                     wfn.get_atom_coordinate(b, 1) - wfn.get_atom_coordinate(a, 1),
-                                     wfn.get_atom_coordinate(b, 2) - wfn.get_atom_coordinate(a, 2) }) / 2.0; // Half inter-atomic distance
-                if (disth > constants::far_away) {
+                if (vec_length({ wfn.get_atom_coordinate(b, 0) - rijx2,
+                                 wfn.get_atom_coordinate(b, 1) - rijy2,
+                                 wfn.get_atom_coordinate(b, 2) - rijz2 }) > constants::far_away) {
                     // If they are neighbours but far apart we will consider them equal radius
                     chi[a][b] = 1.0;
                     chi[b][a] = 1.0;
@@ -407,7 +409,7 @@ void AtomGrid::get_grid(const int num_centers,
 
     if (num_centers > 1) {
         if (chi.size() == 0)
-            chi = make_chi(wfn, 50, true, debug);
+            chi = make_chi(wfn, 20, true, debug);
 #pragma omp parallel
         {
             vec pa_b(num_centers);

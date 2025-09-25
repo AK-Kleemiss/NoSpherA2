@@ -88,7 +88,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Alessandro Genoni,\n");
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
-        t.append("      Martí Gimferer,\n");
+        t.append("      Marti Gimferrer,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
