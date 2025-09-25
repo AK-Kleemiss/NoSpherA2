@@ -63,7 +63,7 @@ class AtomGrid
     vec radial_atom_grid_w_;
 };
 
-double get_becke_w(const int& num_centers,
+std::pair<double,double> get_integration_weights(const int& num_centers,
     const int* proton_charges,
     const double* x_coordinates_bohr,
     const double* y_coordinates_bohr,
@@ -72,18 +72,8 @@ double get_becke_w(const int& num_centers,
     const double& x,
     const double& y,
     const double& z,
-    vec& pa);
-
-double get_tfvc_w(const int& num_centers,
-    const int* proton_charges,
-    const double* x_coordinates_bohr,
-    const double* y_coordinates_bohr,
-    const double* z_coordinates_bohr,
-    const int& center_index,
-    const double& x,
-    const double& y,
-    const double& z,
-	vec& pa,
+    vec& pa_b,
+    vec& pa_tv, 
     const vec2& chi);
 
 const double get_r_inner(const double& max_error, const double& alpha_inner);

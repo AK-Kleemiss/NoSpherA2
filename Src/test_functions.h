@@ -764,7 +764,9 @@ void calc_partition_densities()
         d[i].resize(DFT.get_ncen());
     vec phi(DFT.get_nmo(), 0.0);
     double x = 0;
-    vec pa(5);
+    vec pa_b(5);
+    vec pa_tv(5);
+    vec2 chi;
     // #pragma omp for
     for (int i = 0; i < size; i++)
     {
@@ -783,8 +785,8 @@ void calc_partition_densities()
         total_dens[i] += H.get_radial_density(temp);
         temp = sqrt(pow(x - Pos_H4[0], 2) + pow(Pos_H4[1], 2) + pow(Pos_H4[2], 2));
         total_dens[i] += H.get_radial_density(temp);
-        B_weights_C[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa);
-        B_weights_H[i] = get_becke_w(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa);
+        B_weights_C[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 0, x, 0, 0, pa_b, pa_tv, chi).first;
+        B_weights_H[i] = get_integration_weights(5, charges.data(), x_coords.data(), y_coords.data(), z_coords.data(), 1, x, 0, 0, pa_b, pa_tv, chi).first;
         pb.update();
     }
     //    }

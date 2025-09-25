@@ -1626,7 +1626,7 @@ int make_atomic_grids(
                                    debug,
                                    no_date)
 #endif
-               int atoms_with_grids = vec_sum(needs_grid);
+    int atoms_with_grids = vec_sum(needs_grid);
     if (debug)
     {
         int run = 0;

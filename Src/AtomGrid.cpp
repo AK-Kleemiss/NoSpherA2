@@ -410,7 +410,9 @@ void AtomGrid::get_grid(const int num_centers,
             chi = make_chi(wfn, 50, true, debug);
 #pragma omp parallel
         {
-            vec pa(num_centers);
+            vec pa_b(num_centers);
+            vec pa_tv(num_centers);
+            std::pair<double, double> result_weights;
             double temp;
 #pragma omp for
             for (int ipoint = 0; ipoint < get_num_grid_points(); ipoint++) {
@@ -418,27 +420,22 @@ void AtomGrid::get_grid(const int num_centers,
                 grid_y_bohr[ipoint] = atom_grid_y_bohr_[ipoint] + y_coordinates_bohr[center_index];
                 grid_z_bohr[ipoint] = atom_grid_z_bohr_[ipoint] + z_coordinates_bohr[center_index];
                 temp = atom_grid_w_[ipoint];
-                grid_becke_w[ipoint] = temp * get_becke_w(num_centers,
-                                                          proton_charges,
-                                                          x_coordinates_bohr,
-                                                          y_coordinates_bohr,
-                                                          z_coordinates_bohr,
-                                                          center_index,
-                                                          grid_x_bohr[ipoint],
-                                                          grid_y_bohr[ipoint],
-                                                          grid_z_bohr[ipoint],
-                                                          pa);
-                grid_TFVC_w[ipoint] = temp * get_tfvc_w(num_centers,
-                                                        proton_charges,
-                                                        x_coordinates_bohr,
-                                                        y_coordinates_bohr,
-                                                        z_coordinates_bohr,
-                                                        center_index,
-                                                        grid_x_bohr[ipoint],
-                                                        grid_y_bohr[ipoint],
-                                                        grid_z_bohr[ipoint], 
-                                                        pa, 
-                                                        chi);
+                result_weights = get_integration_weights(
+                    num_centers,
+                    proton_charges,
+                    x_coordinates_bohr,
+                    y_coordinates_bohr,
+                    z_coordinates_bohr,
+                    center_index,
+                    grid_x_bohr[ipoint],
+                    grid_y_bohr[ipoint],
+                    grid_z_bohr[ipoint],
+                    pa_b,
+                    pa_tv,
+                    chi
+                );
+			    grid_becke_w[ipoint] = temp * result_weights.first;
+				grid_TFVC_w[ipoint] = temp * result_weights.second;
                 grid_aw[ipoint] = temp;
             }
         }
@@ -514,104 +511,9 @@ constexpr double f(const double& x)
   return f;
 }
 
-// JCP 88, 2547 (1988)
-double get_becke_w(const int& num_centers,
-  const int* proton_charges,
-  const double* x_coordinates_bohr,
-  const double* y_coordinates_bohr,
-  const double* z_coordinates_bohr,
-  const int& center_index,
-  const double& x,
-  const double& y,
-  const double& z,
-  std::vector<double>& pa)
-{
-  double R_a, R_b;
-  double u_ab, a_ab, mu_ab, nu_ab;
-  double f, chi;
-  double dist_a, dist_b, dist_ab;
-  double vx, vy, vz;
-
-  for (int a = 0; a < num_centers; a++)
-    pa[a] = 1.0;
-
-  for (int a = 0; a < num_centers; a++) {
-    vx = x_coordinates_bohr[a] - x;
-    vy = y_coordinates_bohr[a] - y;
-    vz = z_coordinates_bohr[a] - z;
-    dist_a = vx * vx + vy * vy + vz * vz;
-    dist_a = std::sqrt(dist_a);
-
-    //if (dist_a > 15) {
-    //  pa[a] = 0.0;
-    //  continue;
-    //}
-
-    R_a = constants::bragg_angstrom[proton_charges[a]];
-
-    for (int b = a + 1; b < num_centers; b++) {
-      vx = x_coordinates_bohr[b] - x;
-      vy = y_coordinates_bohr[b] - y;
-      vz = z_coordinates_bohr[b] - z;
-      dist_b = vx * vx + vy * vy + vz * vz;
-      dist_b = std::sqrt(dist_b);
-
-      R_b = constants::bragg_angstrom[proton_charges[b]];
-
-      vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-      vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-      vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-      dist_ab = vx * vx + vy * vy + vz * vz;
-      dist_ab = std::sqrt(dist_ab);
-
-      // JCP 88, 2547 (1988), eq. 11
-      mu_ab = (dist_a - dist_b) / dist_ab;
-
-      if (std::abs(R_a - R_b) > constants::cutoff) {
-        chi = R_a / R_b;
-        u_ab = (chi - 1.0) / (chi + 1.0);
-        a_ab = u_ab / (u_ab * u_ab - 1.0);
-
-        // JCP 88, 2547 (1988), eq. A3
-        if (a_ab > 0.5)
-          a_ab = 0.5;
-        else if (a_ab < -0.5)
-          a_ab = -0.5;
-
-        nu_ab = mu_ab + a_ab * (1.0 - mu_ab * mu_ab);
-      }
-      else
-        nu_ab = mu_ab;
-
-      f = f3(nu_ab);
-
-      if (std::abs(1.0 - f) < constants::cutoff)
-        pa[a] = 0.0;
-      else {
-        if (pa[a] > 1E-250 || pa[a] < -1E-250)
-          pa[a] *= 0.5 * (1.0 - f);
-        else
-          pa[a] = 0.0;
-        if (pa[b] > 1E-250 || pa[b] < -1E-250)
-          pa[b] *= 0.5 * (1.0 + f);
-        else
-          pa[b] = 0.0;
-      }
-    }
-  }
-
-  double w = 0.0;
-  for (int a = 0; a < num_centers; a++)
-    w += pa[a];
-
-  if (std::abs(w) > constants::cutoff)
-    return pa[center_index] / w;
-  else
-    return 1.0;
-}
-
-// JCP 139, 071103 (2013)
-double get_tfvc_w(const int& num_centers,
+// JCP 139, 071103 (2013) for TFVC
+// JCP 88, 2547 (1988) for Becke
+std::pair<double, double> get_integration_weights(const int& num_centers,
     const int* proton_charges,
     const double* x_coordinates_bohr,
     const double* y_coordinates_bohr,
@@ -620,15 +522,19 @@ double get_tfvc_w(const int& num_centers,
     const double& x,
     const double& y,
     const double& z,
-    std::vector<double>& pa,
+    std::vector<double>& pa_b,
+	std::vector<double>& pa_tv,
     const vec2& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
+	double R_a, R_b, chi_becke, u_ab;
 
-    for (int a = 0; a < num_centers; a++)
-        pa[a] = 1.0;
+    for (int a = 0; a < num_centers; a++) {
+        pa_b[a] = 1.0;
+		pa_tv[a] = 1.0;
+    }
 
     for (int a = 0; a < num_centers; a++) {
         vx = x_coordinates_bohr[a] - x;
@@ -636,6 +542,7 @@ double get_tfvc_w(const int& num_centers,
         vz = z_coordinates_bohr[a] - z;
         dist_a = vx * vx + vy * vy + vz * vz;
         dist_a = std::sqrt(dist_a);
+        R_a = constants::bragg_angstrom[proton_charges[a]];
 
         for (int b = a + 1; b < num_centers; b++) {
             vx = x_coordinates_bohr[b] - x;
@@ -643,13 +550,15 @@ double get_tfvc_w(const int& num_centers,
             vz = z_coordinates_bohr[b] - z;
             dist_b = vx * vx + vy * vy + vz * vz;
             dist_b = std::sqrt(dist_b);
+            R_b = constants::bragg_angstrom[proton_charges[b]];
 
             dist_ab = std::sqrt(pow(x_coordinates_bohr[a] - x_coordinates_bohr[b], 2)
                 + pow(y_coordinates_bohr[a] - y_coordinates_bohr[b], 2)
                 + pow(z_coordinates_bohr[a] - z_coordinates_bohr[b], 2)
             );
 
-            // eq. 7
+            // JCP 139, 071103 (2013), eq. 7
+            // JCP 88, 2547 (1988), eq. 11
             mu_ab = (dist_a - dist_b) / dist_ab;
 
             nu_ab = (1.0 + mu_ab - chi[a][b] * (1.0 - mu_ab)) / (1.0 + mu_ab + chi[a][b] * (1.0 - mu_ab));
@@ -657,29 +566,60 @@ double get_tfvc_w(const int& num_centers,
             f = f4(nu_ab);
 
             if (std::abs(1.0 - f) < constants::cutoff)
-                pa[a] = 0.0;
+                pa_tv[a] = 0.0;
             else {
 				//Reduce numerical jittering
-                if (pa[a] > 1E-250 || pa[a] < -1E-250)
-                    pa[a] *= 0.5 * (1.0 - f);
+                if (pa_tv[a] > 1E-250 || pa_tv[a] < -1E-250)
+                    pa_tv[a] *= 0.5 * (1.0 - f);
                 else
-                    pa[a] = 0.0;
-                if (pa[b] > 1E-250 || pa[b] < -1E-250)
-                    pa[b] *= 0.5 * (1.0 + f);
+                    pa_tv[a] = 0.0;
+                if (pa_tv[b] > 1E-250 || pa_tv[b] < -1E-250)
+                    pa_tv[b] *= 0.5 * (1.0 + f);
                 else
-                    pa[b] = 0.0;
+                    pa_tv[b] = 0.0;
+            }
+
+
+            if (std::abs(R_a - R_b) > constants::cutoff) {
+                chi_becke = R_a / R_b;
+                u_ab = (chi_becke - 1.0) / (chi_becke + 1.0);
+                u_ab = u_ab / (u_ab * u_ab - 1.0);
+
+                // JCP 88, 2547 (1988), eq. A3
+                if (u_ab > 0.5)
+                    u_ab = 0.5;
+                else if (u_ab < -0.5)
+                    u_ab = -0.5;
+
+                nu_ab = mu_ab + u_ab * (1.0 - mu_ab * mu_ab);
+            }
+            else
+                nu_ab = mu_ab;
+
+            f = f3(nu_ab);
+
+            if (std::abs(1.0 - f) < constants::cutoff)
+                pa_b[a] = 0.0;
+            else {
+                if (pa_b[a] > 1E-250 || pa_b[a] < -1E-250)
+                    pa_b[a] *= 0.5 * (1.0 - f);
+                else
+                    pa_b[a] = 0.0;
+                if (pa_b[b] > 1E-250 || pa_b[b] < -1E-250)
+                    pa_b[b] *= 0.5 * (1.0 + f);
+                else
+                    pa_b[b] = 0.0;
             }
         }
     }
 
-    double w = 0.0;
-    for (int a = 0; a < num_centers; a++)
-        w += pa[a];
+    double w_becke = 0.0, w_tfvc = 0.0;
+    for (int a = 0; a < num_centers; a++) {
+        w_becke += pa_b[a];
+		w_tfvc += pa_tv[a];
+    }
 
-    if (std::abs(w) > constants::cutoff)
-        return pa[center_index] / w;
-    else
-        return 1.0;
+    return { std::abs(w_becke) > constants::cutoff ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > constants::cutoff ? pa_tv[center_index] / w_tfvc : 1.0 };
 }
 
 // TCA 106, 178 (2001), eq. 25
