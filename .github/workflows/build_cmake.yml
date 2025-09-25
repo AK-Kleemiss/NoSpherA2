@@ -107,10 +107,7 @@ jobs:
       shell: powershell
       run: |
         cd ${{ github.workspace }}
-        dir ..
-        dir ..\..
-        dir .
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ..
+        cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ..
         MSBuild -nologo NoSpherA2.sln 
