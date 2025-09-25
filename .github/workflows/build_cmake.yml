@@ -87,7 +87,7 @@ jobs:
         
         # Update PATH for subsequent steps
         echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        "$env:VCPKG_ROOT\vcpkg.exe" install intel-mkl
+        & "$env:VCPKG_ROOT\vcpkg.exe" install intel-mkl
 
     - name: Setup MSBuild (Windows)
       uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
