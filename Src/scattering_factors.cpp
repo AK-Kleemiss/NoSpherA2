@@ -1667,7 +1667,7 @@ int make_atomic_grids(
     // Make Prototype grids with only single atom weights for all elements
     vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, cif2wfn_list, debug, file, accuracy, wave, 1);
     if (no_date)
-        file << "\nMaking Becke Grids..." << flush;
+        file << "\nMaking Integration Grids..." << flush;
     else
     {
         file << endl
@@ -1711,7 +1711,7 @@ int make_atomic_grids(
 
     int points = vec_sum(num_points);
     if (debug)
-        file << "Becke Grid exists" << endl;
+        file << "Integration Grid exists" << endl;
     else
         file << setw(55) << "done! Number of gridpoints: " << defaultfloat << points << endl;
 
@@ -1862,12 +1862,9 @@ int make_atomic_grids(
     }
 
     if (debug)
-        file << endl
-             << "with total number of points: " << total_grid[0].size() << endl;
-    else
-        file << "                done!" << endl;
-
-    file << "Applying hirshfeld weights and integrating charges..." << flush;
+        file << endl;
+    file << "                done!" << endl
+         << "Applying integration weights and integrating charges..." << flush;
     double el_sum_becke = 0.0;
     double el_sum_TFVC = 0.0;
     double el_sum_hirshfeld = 0.0;
@@ -1905,7 +1902,7 @@ int make_atomic_grids(
             if (abs(total_grid[TotalGridIndex::becke_weight][p]) > cutoff(accuracy))
             {
                 atom_els[AtomSum::Becke][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
-                atom_els[AtomSum::Spherical][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
+                //atom_els[AtomSum::Spherical][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
                 atom_els[AtomSum::TFVC][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::TFVC_weight][p];
 
             }
@@ -1931,18 +1928,14 @@ int make_atomic_grids(
 
     if (debug)
     {
-        file << "Becke grid with hirshfeld weights done!" << endl;
-        file << "atom_els[2]: ";
-        for (int i = 0; i < cif2wfn_list.size(); i++)
-            file << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Hirshfeld][i] << " ";
-        file << endl;
+        file << "Integration grid with weights done!" << endl;
     }
     file << " done!" << endl
-        << "Number of points evaluated: " << total_grid[0].size() << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
+        << "Number of points evaluated: " << total_grid[0].size() << "." << endl
         << endl
         << "Table of Charges in electrons" << endl
         << endl
-        << "    Atom       Becke   Spherical Hirshfeld   TFVC";
+        << "    Atom       Becke   Hirshfeld   TFVC";
     if(debug)
 		file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
     file << endl;
@@ -1952,7 +1945,6 @@ int make_atomic_grids(
         int a = cif2wfn_list[i];
         file << setw(10) << labels[i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Becke][i]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Spherical][i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Hirshfeld][i]
              << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::TFVC][i];
         if (debug)
@@ -1963,8 +1955,10 @@ int make_atomic_grids(
         file << endl;
     }
 
-    file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl
-         << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
+    file << "Total number of electrons in the wavefunction:" << endl << setw(10) << setprecision(6)
+         << " Becke:     " << el_sum_becke << endl
+         << " Hirshfeld: " << el_sum_hirshfeld << endl
+         << " TVFC:      " << el_sum_TFVC << endl;
 
     if (debug)
     {
@@ -2023,7 +2017,7 @@ int make_atomic_grids(
                 d1[i][run] = (total_grid[TotalGridIndex::X][p] - wave.get_atom_coordinate(ci, 0));
                 d2[i][run] = (total_grid[TotalGridIndex::Y][p] - wave.get_atom_coordinate(ci, 1));
                 d3[i][run] = (total_grid[TotalGridIndex::Z][p] - wave.get_atom_coordinate(ci, 2));
-                diff = total_grid[TotalGridIndex::wavefunction_electron_density][p] - (total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]);
+                diff = (total_grid[TotalGridIndex::wavefunction_electron_density][p] - total_grid[TotalGridIndex::spherical_electron_density][p]) * total_grid[TotalGridIndex::quadrature_weight][p];
                 if (wave.get_atom_ECP_electrons(ci) != 0)
                 {
                     dist = vec_length({d1[i][run], d2[i][run], d3[i][run]});
@@ -2034,7 +2028,7 @@ int make_atomic_grids(
                 }
                 diffs += pow(diff, 2);
                 upper += abs(abs(res) - abs(total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]) + densy);
-                lower += abs(total_grid[TotalGridIndex::wavefunction_electron_density][p] + densy);
+                lower += abs(total_grid[TotalGridIndex::wavefunction_electron_density][p]) * total_grid[TotalGridIndex::quadrature_weight][p] + densy;
                 avg += abs(diff);
                 run++;
             }

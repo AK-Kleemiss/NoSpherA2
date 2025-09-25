@@ -273,7 +273,7 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                 disth = vec_length({ wfn.get_atom_coordinate(b, 0) - wfn.get_atom_coordinate(a, 0),
                                      wfn.get_atom_coordinate(b, 1) - wfn.get_atom_coordinate(a, 1),
                                      wfn.get_atom_coordinate(b, 2) - wfn.get_atom_coordinate(a, 2) }) / 2.0; // Half inter-atomic distance
-                if (disth > 10.0) {
+                if (disth > constants::far_away) {
                     // If they are neighbours but far apart we will consider them equal radius
                     chi[a][b] = 1.0;
                     chi[b][a] = 1.0;
@@ -541,19 +541,26 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
         vy = y_coordinates_bohr[a] - y;
         vz = z_coordinates_bohr[a] - z;
         dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
+
+        if (dist_a > constants::far_away) {
+            pa_b[a] = 0.0;
+            pa_tv[a] = 0.0;
+            continue;
+        }
+
         R_a = constants::bragg_angstrom[proton_charges[a]];
 
         for (int b = a + 1; b < num_centers; b++) {
+            vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+            vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+            vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+            dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
+
             vx = x_coordinates_bohr[b] - x;
             vy = y_coordinates_bohr[b] - y;
             vz = z_coordinates_bohr[b] - z;
             dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
             R_b = constants::bragg_angstrom[proton_charges[b]];
-
-            vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
-            vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
-            vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
-            dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
 
             // JCP 139, 071103 (2013), eq. 7
             // JCP 88, 2547 (1988), eq. 11
