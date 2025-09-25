@@ -1418,11 +1418,11 @@ void calc_spherical_values(
 #pragma omp for
         for (int g = 0; g < atoms_with_grids; g++)
         {
+            double ax = wave.get_atom_coordinate(i, 0), ay = wave.get_atom_coordinate(i, 1), az = wave.get_atom_coordinate(i, 2), d, temp;
             for (int p = 0; p < num_points[g]; p++)
             {
-                double d = sqrt(pow(grid[g][GridIndex::x_coord][p] - wave.get_atom_coordinate(i, 0), 2) + pow(grid[g][GridIndex::y_coord][p] - wave.get_atom_coordinate(i, 1), 2) + pow(grid[g][GridIndex::z_coord][p] - wave.get_atom_coordinate(i, 2), 2));
-                double temp =
-                    linear_interpolate_spherical_density(
+                d = sqrt(pow(grid[g][GridIndex::x_coord][p] - ax, 2) + pow(grid[g][GridIndex::y_coord][p] - ay, 2) + pow(grid[g][GridIndex::z_coord][p] - az, 2));
+                temp = linear_interpolate_spherical_density(
                         radial_density[type_list_number],
                         radial_dist[type_list_number],
                         d,

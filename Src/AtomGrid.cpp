@@ -540,22 +540,20 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
         vx = x_coordinates_bohr[a] - x;
         vy = y_coordinates_bohr[a] - y;
         vz = z_coordinates_bohr[a] - z;
-        dist_a = vx * vx + vy * vy + vz * vz;
-        dist_a = std::sqrt(dist_a);
+        dist_a = std::sqrt(vx * vx + vy * vy + vz * vz);
         R_a = constants::bragg_angstrom[proton_charges[a]];
 
         for (int b = a + 1; b < num_centers; b++) {
             vx = x_coordinates_bohr[b] - x;
             vy = y_coordinates_bohr[b] - y;
             vz = z_coordinates_bohr[b] - z;
-            dist_b = vx * vx + vy * vy + vz * vz;
-            dist_b = std::sqrt(dist_b);
+            dist_b = std::sqrt(vx * vx + vy * vy + vz * vz);
             R_b = constants::bragg_angstrom[proton_charges[b]];
 
-            dist_ab = std::sqrt(pow(x_coordinates_bohr[a] - x_coordinates_bohr[b], 2)
-                + pow(y_coordinates_bohr[a] - y_coordinates_bohr[b], 2)
-                + pow(z_coordinates_bohr[a] - z_coordinates_bohr[b], 2)
-            );
+            vx = x_coordinates_bohr[b] - x_coordinates_bohr[a];
+            vy = y_coordinates_bohr[b] - y_coordinates_bohr[a];
+            vz = z_coordinates_bohr[b] - z_coordinates_bohr[a];
+            dist_ab = std::sqrt(vx * vx + vy * vy + vz * vz);
 
             // JCP 139, 071103 (2013), eq. 7
             // JCP 88, 2547 (1988), eq. 11
