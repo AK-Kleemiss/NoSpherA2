@@ -1671,7 +1671,7 @@ int make_atomic_grids(
     else
     {
         file << endl
-             << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+             << "Selected accuracy: " << accuracy << "\nMaking Integration Grids..." << flush;
     }
     time_points.push_back(get_time());
     time_descriptions.push_back("Prototype Grid setup");
@@ -1713,7 +1713,7 @@ int make_atomic_grids(
     if (debug)
         file << "Integration Grid exists" << endl;
     else
-        file << setw(55) << "done! Number of gridpoints: " << defaultfloat << points << endl;
+        file << setw(49) << "done! Number of gridpoints: " << defaultfloat << points << endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("Becke Grid setup");
@@ -2481,7 +2481,7 @@ tsc_block_type calculate_scattering_factors(
         }
         err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
         file << "Number of protons: " << wavy->get_nr_electrons() << endl
-             << "Number of electrons: " << wavy->count_nr_electrons() << endl;
+             << "Number of electrons: " << fixed << wavy->count_nr_electrons() << endl;
         if (wavy->get_has_ECPs())
             file << "Number of ECP electrons: " << wavy->get_nr_ECP_electrons() << endl;
         // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
