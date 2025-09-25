@@ -1,6 +1,5 @@
 #include "pch.h"
 #include <execution>
-#include <vector>
 #include "nos_math.h"
 
 #if defined(__APPLE__)
