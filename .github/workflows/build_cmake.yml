@@ -63,7 +63,6 @@ jobs:
     runs-on:  windows-2022
     steps:
     - uses: friendlyanon/setup-vcpkg@v1.6.1
-      with: { committish: b3e2e9a85d653be314d326a87e2ed9fff889517d }
     - name: Setup Windows
       shell: powershell
       run: |
