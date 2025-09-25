@@ -63,7 +63,7 @@ jobs:
     runs-on:  windows-2022
     steps:
     - uses: friendlyanon/setup-vcpkg@v1.6.1
-    with: { committish: 4334d8b4c8916018600212ab4dd4bbdc343065d1 }
+      with: { committish: 4334d8b4c8916018600212ab4dd4bbdc343065d1 }
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
     - name: Setup Windows
       shell: powershell
