@@ -61,10 +61,16 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 
     vec dens(samples);
     vec ts(samples);
-    Thakkar spherical_temp1(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
-    Thakkar spherical_temp2(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
-    Spherical_Gaussian_Density a1(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
-    Spherical_Gaussian_Density a2(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
+    Thakkar* spherical_temp1;
+    Thakkar* spherical_temp2;
+    Spherical_Gaussian_Density* a1;
+    Spherical_Gaussian_Density* a2;
+    if (wfn.get_ECP_mode() != 0) {
+        spherical_temp1 = new Thakkar(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
+        spherical_temp2 = new Thakkar(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
+        a1 = new Spherical_Gaussian_Density(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
+        a2 = new Spherical_Gaussian_Density(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
+    }
 #pragma omp parallel for
     for (int i = 0; i < samples; ++i) {
         const double t = t0 + i * dt;
@@ -75,11 +81,18 @@ static std::vector<DensityExtremum> find_line_density_extrema(
         dens[i] = wfn.compute_dens(x, y, z);
 		if (wfn.get_ECP_mode() == 0) 
             continue; // No ECPs, skip the rest
-        dens[i] += spherical_temp1.get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
-        dens[i] += spherical_temp2.get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
-        dens[i] += a1.get_radial_density(ab_len * t);
-		dens[i] += a2.get_radial_density(ab_len * (1.0 - t));
+        dens[i] += spherical_temp1->get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
+        dens[i] += spherical_temp2->get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
+        dens[i] += a1->get_radial_density(ab_len * t);
+		dens[i] += a2->get_radial_density(ab_len * (1.0 - t));
     }
+
+    if (wfn.get_ECP_mode() != 0) {
+        delete spherical_temp1;
+        delete spherical_temp2;
+        delete a1;
+        delete a2;
+	}
 
     // Detect extrema via sign changes of the discrete derivative
     for (int i = 1; i < samples - 1; ++i) {

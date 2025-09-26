@@ -347,7 +347,6 @@ public:
             }
             break;
         default:
-            err_not_impl_SA();
             z = NULL;
             c = NULL;
             nex = 0;
