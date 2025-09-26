@@ -79,12 +79,12 @@ static std::vector<DensityExtremum> find_line_density_extrema(
         const double y = ay + dy * t;
         const double z = az + dz * t;
         dens[i] = wfn.compute_dens(x, y, z);
-		if (wfn.get_ECP_mode() == 0) 
-            continue; // No ECPs, skip the rest
-        dens[i] += spherical_temp1->get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
-        dens[i] += spherical_temp2->get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
-        dens[i] += a1->get_radial_density(ab_len * t);
-		dens[i] += a2->get_radial_density(ab_len * (1.0 - t));
+        if (wfn.get_ECP_mode() != 0) {
+            dens[i] += spherical_temp1->get_core_density(ab_len * t, wfn.get_atom_ECP_electrons(atomA));
+            dens[i] += spherical_temp2->get_core_density(ab_len * (1.0 - t), wfn.get_atom_ECP_electrons(atomB));
+            dens[i] += a1->get_radial_density(ab_len * t);
+            dens[i] += a2->get_radial_density(ab_len * (1.0 - t));
+        }
     }
 
     if (wfn.get_ECP_mode() != 0) {
