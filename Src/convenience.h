@@ -633,7 +633,7 @@ struct options
     int pbc = 0;
     int charge = 0;
     int ECP_mode = 0;
-	PartitionType partition_type = PartitionType::Hirshfeld;
+    PartitionType partition_type = PartitionType::Hirshfeld;
     unsigned int mult = 0;
     hkl_list m_hkl_list;
 

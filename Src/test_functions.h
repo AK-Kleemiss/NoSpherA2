@@ -1939,7 +1939,7 @@ void test_solve_linear_equations() {
                 std::cout << std::setw(12) << A[i][j];
             std::cout << std::endl;
         }
-		std::cout << "Target   b: " << b_orig[0] << " " << b_orig[1] << " " << b_orig[2] << std::endl;
+        std::cout << "Target   b: " << b_orig[0] << " " << b_orig[1] << " " << b_orig[2] << std::endl;
         std::cout << "Original x: ";
         for (double v : x_expected) std::cout << v << " ";
         std::cout << std::endl;

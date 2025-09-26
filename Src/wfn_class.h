@@ -174,6 +174,8 @@ public:
     const int get_MO_op_count(const int &op) const;
     /** Clear all MOs and reset counter. */
     const void clear_MOs();
+	/** Get maximum absolute MO coefficient (for cutoff checks). */
+    const double get_maximum_MO_coefficient(bool occu = true) const;
 
     //--------------------in and output----------------------------------------
     /** Change stored basis set name label. */

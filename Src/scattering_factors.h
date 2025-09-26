@@ -36,8 +36,8 @@ enum GridIndex
     x_coord = 0,
     y_coord = 1,
     z_coord = 2,
-	atomic_weight = 3,
-	electron_density = 4,
+    atomic_weight = 3,
+    electron_density = 4,
     molecular_becke_weight = 5,
     molecular_TFVC_weight = 6
 };
@@ -47,9 +47,9 @@ enum TotalGridIndex
     X = 0,
     Y = 1,
     Z = 2,
-	quadrature_weight = 3,
-	spherical_electron_density = 4,
-	wavefunction_electron_density = 5,
+    quadrature_weight = 3,
+    spherical_electron_density = 4,
+    wavefunction_electron_density = 5,
     becke_weight = 6,
     TFVC_weight = 7
 };

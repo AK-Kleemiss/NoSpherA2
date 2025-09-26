@@ -2221,7 +2221,7 @@ void options::digest_options()
         }
         else if (temp == "-tfvc" || temp == "-TFVC")
         {
-			partition_type = PartitionType::TFVC;
+            partition_type = PartitionType::TFVC;
         }
         else if (temp == "-tscb")
         {

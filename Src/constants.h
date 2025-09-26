@@ -8,7 +8,8 @@
 
 namespace constants
 {
-
+    static double exp_cutoff=-23.5;
+    static double density_accuracy = 5.0e-5; // SQRT of the desired accuracy for density calculations
     double constexpr sqrtNewtonRaphson(double x, double curr, double prev)
     {
         return curr == prev

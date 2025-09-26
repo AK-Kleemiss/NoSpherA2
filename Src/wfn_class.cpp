@@ -434,7 +434,7 @@ const double WFN::get_MO_coef_f(const int &nr_mo, const int &nr_primitive) const
     return MOs[nr_mo].get_coefficient_f(nr_primitive);
 };
 
-const double *WFN::get_MO_coef_ptr(const int &nr_mo)
+const double* WFN::get_MO_coef_ptr(const int &nr_mo)
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_ptr();
@@ -935,6 +935,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
             MOs[i].push_back_coef(temp_val[i][j]);
         }
     }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 };
 
@@ -1325,7 +1326,22 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
     getline(rf, line);
     virial_ratio = stod(line);
     rf.close();
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
+};
+
+const double WFN::get_maximum_MO_coefficient(bool occu) const {
+    double max_coef = 0.0;
+    for (int i = 0; i < nmo; i++) {
+        if (occu && MOs[i].get_occ() == 0.0) 
+            continue;
+        for(int j=0; j<nex; j++){
+            if (std::abs(MOs[i].get_coefficients()[j]) > max_coef) {
+                max_coef  = std::abs(MOs[i].get_coefficients()[j]);
+            }
+        }
+    }
+    return max_coef;
 };
 
 bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file, const bool debug)
@@ -2045,7 +2061,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
     dMatrix2 temp_co = diag_dot(m_coefs, occ, true);
     DM = dot(temp_co, m_coefs);
-    
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 };
 
@@ -2729,6 +2745,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     {
         err_checkf(false, "Error during reading of the gbw file! " + string(e.what()), file);
     }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 };
 
@@ -4880,11 +4897,6 @@ void WFN::pop_back_cube()
     cub.pop_back();
 }
 
-const double *WFN::get_ptr_mo_coefficients(const int &mo)
-{
-    return MOs[mo].get_ptr_coefficients();
-};
-
 const unsigned int WFN::get_atom_integer_mass(const unsigned int &atomnr) const
 {
     if (get_atom_charge(atomnr) > 86)
@@ -5346,6 +5358,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 
         }
     }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 };
 
@@ -5482,8 +5495,8 @@ const double WFN::compute_dens_cartesian(
         iat = centers[j] - 1;
         constants::type2vector(types[j], l);
         ex = -exponents[j] * d[3][iat];
-        if (ex < -46.0517)
-        { // corresponds to cutoff of ex ~< 1E-20
+        if (ex < constants::exp_cutoff)
+        { // corresponds to cutoff of maximum density contribution of 1E-5
             continue;
         }
         ex = exp(ex);
@@ -5507,12 +5520,14 @@ const double WFN::compute_dens_cartesian(
         for (mo = 0; mo < nmo; mo++)
         {
             *run += (*run2).get_coefficient_f(j) * ex; // build MO values at this point
+            //*run += *(coef_ptrs[mo]) * ex;
             run2++, run++;
+            //(coef_ptrs[mo])++, run++;
         }
     }
 
-    double *run = phi.data();
-    const MO *run2 = MOs.data();
+    double* run = phi.data();
+    const MO* run2 = MOs.data();
     for (mo = 0; mo < nmo; mo++)
     {
         Rho += (*run2).get_occ() * pow(*run, 2);
@@ -5561,7 +5576,7 @@ const double WFN::compute_spin_dens_cartesian(
         iat = centers[j] - 1;
         constants::type2vector(types[j], l);
         ex = -exponents[j] * d[3][iat];
-        if (ex < -46.0517)
+        if (ex < constants::exp_cutoff)
         { // corresponds to cutoff of ex ~< 1E-20
             continue;
         }
@@ -5978,7 +5993,7 @@ const void WFN::computeValues(
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         d[3] = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
         double temp = -get_exponent(j) * (d[3]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6099,7 +6114,7 @@ const void WFN::computeELIELF(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6204,7 +6219,7 @@ const void WFN::computeELI(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6305,7 +6320,7 @@ const void WFN::computeELF(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6408,7 +6423,7 @@ const void WFN::computeLapELIELF(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6522,7 +6537,7 @@ const void WFN::computeLapELI(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6631,7 +6646,7 @@ const double WFN::computeLap(
         d[1] = PosGrid[1] - atoms[iat].get_coordinate(1);
         d[2] = PosGrid[2] - atoms[iat].get_coordinate(2);
         double temp = -get_exponent(j) * (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
-        if (temp < -34.5388) // corresponds to cutoff of ex < 1E-15
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6736,7 +6751,7 @@ const double WFN::computeMO(
         // if (iat != atom) continue;
         constants::type2vector(get_type(j), l);
         temp = -get_exponent(j) * d[3][iat];
-        if (temp < -46.0517) // corresponds to cutoff of ex ~< 1E-20
+        if (temp < constants::exp_cutoff)
             continue;
         ex = exp(temp);
         for (int k = 0; k < 3; k++)
@@ -6992,6 +7007,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     inFile.close();
     if(debug)
         this->write_wfn("test_convert_from_xtb.wfn", false, false);
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 }
 

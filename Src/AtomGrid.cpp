@@ -233,7 +233,7 @@ int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
 vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false) {
-	vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
+    vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
     std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
     double rijx2, rijy2, rijz2, xdist, disth;
     for (int a = 0; a < wfn.get_ncen(); a++){
@@ -269,8 +269,8 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
     }
     for (int a = 0; a < wfn.get_ncen(); a++) {
         rijx2 = wfn.get_atom_coordinate(a, 0); //abuse old variable
-		rijy2 = wfn.get_atom_coordinate(a, 1);
-		rijz2 = wfn.get_atom_coordinate(a, 2);
+        rijy2 = wfn.get_atom_coordinate(a, 1);
+        rijz2 = wfn.get_atom_coordinate(a, 2);
 #pragma omp parallel for
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
             if (neighbours[a][b]) {
@@ -437,8 +437,8 @@ void AtomGrid::get_grid(const int num_centers,
                     pa_tv,
                     chi
                 );
-			    grid_becke_w[ipoint] = temp * result_weights.first;
-				grid_TFVC_w[ipoint] = temp * result_weights.second;
+                grid_becke_w[ipoint] = temp * result_weights.first;
+                grid_TFVC_w[ipoint] = temp * result_weights.second;
                 grid_aw[ipoint] = temp;
             }
         }
@@ -526,17 +526,17 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
     const double& y,
     const double& z,
     std::vector<double>& pa_b,
-	std::vector<double>& pa_tv,
+    std::vector<double>& pa_tv,
     const vec2& chi)
 {
     double mu_ab, nu_ab, f, dist_ab;
     double dist_a, dist_b;
     double vx, vy, vz;
-	double R_a, R_b, chi_becke, u_ab;
+    double R_a, R_b, chi_becke, u_ab;
 
     for (int a = 0; a < num_centers; a++) {
         pa_b[a] = 1.0;
-		pa_tv[a] = 1.0;
+        pa_tv[a] = 1.0;
     }
 
     for (int a = 0; a < num_centers; a++) {
@@ -576,7 +576,7 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
             if (std::abs(1.0 - f) < constants::cutoff)
                 pa_tv[a] = 0.0;
             else {
-				//Reduce numerical jittering
+                //Reduce numerical jittering
                 if (pa_tv[a] > 1E-250 || pa_tv[a] < -1E-250)
                     pa_tv[a] *= 0.5 * (1.0 - f);
                 else
@@ -624,7 +624,7 @@ std::pair<double, double> get_integration_weights(const int& num_centers,
     double w_becke = 0.0, w_tfvc = 0.0;
     for (int a = 0; a < num_centers; a++) {
         w_becke += pa_b[a];
-		w_tfvc += pa_tv[a];
+        w_tfvc += pa_tv[a];
     }
 
     return { std::abs(w_becke) > constants::cutoff ? pa_b[center_index] / w_becke : 1.0, std::abs(w_tfvc) > constants::cutoff ? pa_tv[center_index] / w_tfvc : 1.0 };

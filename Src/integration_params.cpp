@@ -221,7 +221,7 @@ void Int_Params::populate_bas()
         int bas_ptr = basis.env_idx;
         for (int shell = 0; shell < basis.shellcount.size(); shell++)
         {
-			size_t eightind = (size_t)index * 8;
+            size_t eightind = (size_t)index * 8;
             _bas[eightind + 0] = atom_idx; // atom_id
             _bas[eightind + 1] = (int)basis.shelltypes[shell];  // l s=0, p=1, d=2 ...
             _bas[eightind + 2] = (int)basis.shellcount[shell];                  // nprim

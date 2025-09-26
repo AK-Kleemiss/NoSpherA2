@@ -1193,7 +1193,7 @@ ivec make_integration_grids(
     using namespace std;
     ivec num_points(cif2wfn_list.size(), 0);
     vec2 chi_matrix;
-	chi_matrix.reserve(cif2wfn_list.size());
+    chi_matrix.reserve(cif2wfn_list.size());
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         if (debug)
@@ -1936,7 +1936,7 @@ int make_atomic_grids(
         << endl
         << "    Atom       Becke   Hirshfeld   TFVC";
     if(debug)
-		file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
+        file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
     file << endl;
 
     for (int i = 0; i < cif2wfn_list.size(); i++)
@@ -2152,7 +2152,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
             int coef_count = 0;
-			const int num_atoms = (int)atom_list.size();
+            const int num_atoms = (int)atom_list.size();
             const double* coef_slice_ptr = NULL;
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
