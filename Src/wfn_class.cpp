@@ -180,7 +180,7 @@ void WFN::assign_MO_coefs(const int &nr, vec &values)
     MOs[nr].assign_coefs(values);
 };
 
-const double WFN::get_MO_energy(const int &mo) const
+const double& WFN::get_MO_energy(const int &mo) const
 {
     err_checkf(mo < nmo, "not enough MOs", std::cout);
     return MOs[mo].get_energy();
@@ -422,13 +422,13 @@ bool WFN::add_exp(const int &cent, const int &type, const double &e)
         return true;
 };
 
-const double WFN::get_MO_coef(const int &nr_mo, const int &nr_primitive) const
+const double& WFN::get_MO_coef(const int &nr_mo, const int &nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient(nr_primitive);
 };
 
-const double WFN::get_MO_coef_f(const int &nr_mo, const int &nr_primitive) const
+const double& WFN::get_MO_coef_f(const int &nr_mo, const int &nr_primitive) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_coefficient_f(nr_primitive);
@@ -440,7 +440,7 @@ const double* WFN::get_MO_coef_ptr(const int &nr_mo)
     return MOs[nr_mo].get_coefficient_ptr();
 };
 
-const int WFN::get_MO_primitive_count(const int &nr_mo) const
+const int& WFN::get_MO_primitive_count(const int &nr_mo) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_primitive_count();
@@ -4927,12 +4927,12 @@ const double WFN::get_atom_real_mass(const int &atomnr) const
     return constants::real_masses[get_atom_charge(atomnr) - 1];
 }
 
-const double WFN::get_MO_occ(const int &nr) const
+const double& WFN::get_MO_occ(const int &nr) const
 {
     return MOs[nr].get_occ();
 };
 
-const int WFN::get_MO_op(const int &nr) const
+const int& WFN::get_MO_op(const int &nr) const
 {
     return MOs[nr].get_op();
 };

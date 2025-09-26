@@ -2162,15 +2162,17 @@ void calc_SF_SALTED(const vec2 &k_pt,
             for (int i = 0; i < 3; i++) 
                 k_pt_local[i] /= k_pt_local[3];
 
-            for (int iat = 0; iat < num_atoms; iat++)
+            const atom* atom_ptr = &(atom_list[0]);
+            const basis_set_entry* basis_ptr = NULL;
+            for (int iat = 0; iat < num_atoms; iat++, atom_ptr++)
             {
-                const int lim = (int)atom_list[iat].get_basis_set_size();
-                for (int i_basis = 0; i_basis < lim; i_basis++)
+                const int lim = (int)atom_ptr->get_basis_set_size();
+                basis_ptr = &(atom_ptr->get_basis_set_entry(0));
+                coef_slice_ptr = coefs.data();
+                for (int i_basis = 0; i_basis < lim; i_basis++, basis_ptr++, coef_slice_ptr += 2 * basis.get_type() + 1)
                 {
-                    basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
-                    coef_slice_ptr = coefs.data() + coef_count;
+                    basis = basis_ptr->get_primitive();
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
-                    coef_count += 2 * basis.get_type() + 1;
                 }
             }
             pb.update();

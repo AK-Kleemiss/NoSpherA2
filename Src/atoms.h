@@ -17,11 +17,11 @@ public:
     basis_set_entry(double g_coefficient, double g_exponent, unsigned int g_type, unsigned int g_shell);
     // Getter functions
     
-    double get_coefficient() const { return coefficient; };
-    double get_exponent() const { return exponent; };
-    unsigned int get_type() const { return type; };
-    unsigned int get_shell() const { return shell; };
-    primitive get_primitive() const { return p; };
+    const double& get_coefficient() const { return coefficient; };
+    const double& get_exponent() const { return exponent; };
+    const unsigned int& get_type() const { return type; };
+    const unsigned int& get_shell() const { return shell; };
+    const primitive& get_primitive() const { return p; };
     // Setter functions
      
     void set_coefficient(const double& value) { coefficient = value; };
@@ -72,7 +72,9 @@ public:
     void assign_ID(const std::string& id);
     void set_ID(const std::string& id);
     std::string get_ID() const;
-    basis_set_entry get_basis_set_entry(const int& _nr) const { return basis_set[_nr]; };
+    const basis_set_entry& get_basis_set_entry(const int& _nr) const { return basis_set[_nr]; };
+    // Non-const overload to obtain a mutable reference
+    basis_set_entry& get_basis_set_entry(const int& _nr) { return basis_set[_nr]; }
     double get_coordinate(const unsigned int& axis) const;
     int get_charge() const { return charge; };
     int get_ECP_electrons() const { return ECP_electrons; };

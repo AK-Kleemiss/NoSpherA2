@@ -43,14 +43,14 @@ public:
 
     return true;
   };
-  const double get_coefficient(const int& _nr) const {
+  const double& get_coefficient(const int& _nr) const {
     err_checkf(_nr < coefficients.size() && _nr >= 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
     return coefficients[_nr];
   }; 
   const vec get_coefficients() const {
       return coefficients;
   };
-  const double get_coefficient_f(const int& _nr) const {
+  const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
   const double* get_coefficient_ptr() const {
@@ -73,8 +73,8 @@ public:
   void set_occ(const int& iocc) { occ = iocc; };
   void set_occ(const double& iocc) { occ = iocc; };
   void set_op(const int& oper) { op = oper; };
-  const double get_occ() const { return occ; };
-  const int get_op() const { return op; };
+  const double& get_occ() const { return occ; };
+  const int& get_op() const { return op; };
   void set_ener(const double& iener) { ener = iener; };
   const int get_primitive_count() const { return (int) coefficients.size(); };
   const std::string hdr() {
