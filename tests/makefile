@@ -238,7 +238,7 @@ TFVC:
 	$(call RUN_TEST,$@,TFVC, \
 		-cif water.cif \
 		-dmin 0.84 \
-		-wfn Rwater.gbw \
+		-wfn water.gbw \
 		-acc 0 \
 		-no-date)
 

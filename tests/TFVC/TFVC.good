@@ -1,0 +1,45 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                  "water.gbw" done!
+Number of atoms in Wavefunction file: 4 Number of MOs: 73
+Number of protons: 12
+Number of electrons: 12.000000
+Reading:                                  "water.cif" done!
+Generating hkl indices up to d=:              0.84... done!
+Nr of reflections generated:                 13824
+Number of symmetry operations:                   1
+Nr of reflections to be used:                 7740
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 7740
+There are:
+   4 atoms read from the wavefunction, of which 
+   4 are identified as asymmetric unit atoms!
+
+Making Integration Grids... ...                       done! Number of gridpoints: 730
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 716
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 716.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+        O1    -0.165    -0.299    -1.310
+        H1     0.076     0.146     0.558
+        H2     0.076     0.146     0.558
+        He     0.000     0.000     0.000
+Total number of electrons in the asymmetric unit:
+ Becke:     12.013428
+ Hirshfeld: 12.006169
+ TVFC:      12.193653
+[                Calculating Scattering Factors               ]
+[=============================================================] 100% 
+Writing tsc file...  ... done!
