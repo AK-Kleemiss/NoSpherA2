@@ -377,7 +377,8 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                     // For if one have a very polarized bond (bcp super displaced towards one of the atoms
                     double ri = extrema[use_extr].distA / (extrema[use_extr].distA + extrema[use_extr].distB);
                     if (ri >= 0.90 || ri <= 0.10) {
-                        std::cout << "WARNING, LARGE POLARIZATION. PLEASE CHECK" << std::endl;
+                        std::cout << "WARNING: Large bond polarization detected between atoms " << a << " and " << b
+                                  << " (ri = " << ri << ", ri >= 0.90 or ri <= 0.10). Please verify TFVC results." << std::endl;
                     }
                     // Some printing on the ratio between pair of atoms, for if strange results (or against chemical intuition) are obtained one can see if it is TFVC problem
                     // This is helpful to see if the "bcp" evaluation is broken, or one face a nasty scenario that is not yet included in the code...
