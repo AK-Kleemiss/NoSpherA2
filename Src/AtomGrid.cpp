@@ -61,10 +61,10 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 
     vec dens(samples);
     vec ts(samples);
-    Thakkar* spherical_temp1;
-    Thakkar* spherical_temp2;
-    Spherical_Gaussian_Density* a1;
-    Spherical_Gaussian_Density* a2;
+    Thakkar* spherical_temp1 = NULL;
+    Thakkar* spherical_temp2 = NULL;
+    Spherical_Gaussian_Density* a1 = NULL;
+    Spherical_Gaussian_Density* a2 = NULL;
     if (wfn.get_ECP_mode() != 0) {
         spherical_temp1 = new Thakkar(wfn.get_atom_charge(atomA), wfn.get_ECP_mode());
         spherical_temp2 = new Thakkar(wfn.get_atom_charge(atomB), wfn.get_ECP_mode());
