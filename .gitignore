@@ -97,3 +97,5 @@ Windows/packages*
 /Windows/obj
 Lib/MKL
 *tbb*.def
+libiomp5.so
+*.diff

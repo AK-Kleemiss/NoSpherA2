@@ -27,7 +27,7 @@ else
   RM := rm
   BASE_PATH := ../../NoSpherA2
   MV := mv
-  DIFF := diff -q -i -b
+  DIFF := diff -i -b
   define TIME_START
     start_time=$$(date +%s.%N)
   endef
@@ -43,8 +43,9 @@ else
       $(BASE_PATH) $3; \
       test_result=$$?; \
       if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
-      $(DIFF) $1.log $1.good; \
+      $(DIFF) $1.log $1.good > ../$1.diff 2>&1; \
       diff_result=$$?; \
+	  if [ $$diff_result -ne 0 ]; then echo "--> DIFF written to $1.diff"; else rm -f $1.diff; fi; \
       eval $(TIME_END); \
       exit $$test_result || exit $$diff_result; \
     }

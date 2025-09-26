@@ -1954,7 +1954,7 @@ int make_atomic_grids(
         file << endl;
     }
 
-    file << "Total number of electrons in the wavefunction:" << endl << setw(10) << setprecision(6)
+    file << "Total number of electrons in the asymmetric unit:" << endl << setw(10) << setprecision(6)
          << " Becke:     " << el_sum_becke << endl
          << " Hirshfeld: " << el_sum_hirshfeld << endl
          << " TVFC:      " << el_sum_TFVC << endl;
@@ -2076,6 +2076,7 @@ void make_k_pts(const bool &read_k_pts,
     const int size = (int)hkl.size();
     if (!read_k_pts)
     {
+		file << "Generating k-points..." << flush;
         k_pt.resize(3);
 #pragma omp parallel for
         for (int i = 0; i < 3; i++)
@@ -2098,7 +2099,7 @@ void make_k_pts(const bool &read_k_pts,
                 }
             }
         }
-        file << "\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
+        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
         if (save_k_pts)
             save_k_points(k_pt, hkl);
     }
