@@ -372,8 +372,14 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
                         }
                     }
                     // And save the "chi" in the same matrix
-                    chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
-                    chi[b][a] = 1.0 / chi[a][b];
+                    if (extrema[use_extr].distB == 0.0) {
+                        std::cout << "WARNING: Division by zero detected for chi between atoms " << a << " and " << b << ". Setting chi to 1.0." << std::endl;
+                        chi[a][b] = 1.0;
+                        chi[b][a] = 1.0;
+                    } else {
+                        chi[a][b] = extrema[use_extr].distA / extrema[use_extr].distB;
+                        chi[b][a] = 1.0 / chi[a][b];
+                    }
                     // For if one have a very polarized bond (bcp super displaced towards one of the atoms
                     double ri = extrema[use_extr].distA / (extrema[use_extr].distA + extrema[use_extr].distB);
                     if (ri >= 0.90 || ri <= 0.10) {
