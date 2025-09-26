@@ -410,7 +410,7 @@ void AtomGrid::get_grid(const int num_centers,
 
     if (num_centers > 1) {
         if (chi.size() == 0)
-            chi = make_chi(wfn, 20, true, debug);
+            chi = make_chi(wfn, 40, true, debug);
 #pragma omp parallel
         {
             vec pa_b(num_centers);
