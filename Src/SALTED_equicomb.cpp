@@ -31,7 +31,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     // Declare variables at the beginning
     int iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m1, m2;
     double inner, normfact, preal;
-    ProgressBar pb(natoms, 59, "#", " ", "Calculating descriptors for l = " + toString(lam));
+    ProgressBar pb(natoms, 60, "#", " ", "Calculating descriptors for l = " + toString(lam));
 #pragma omp parallel for private(iat, n1, n2, il, imu, im1, im2, i, j, ifeat, l1, l2, mu, m1, m2, inner, normfact, preal) default(none) shared(pb, natoms, nrad1, nrad2, v1, v2, w3j, llmax, llvec, lam, c2r, nfps, vfps, p, featsize, l21, f_vec, std::cout, constants::cnull)
     for (iat = 0; iat < natoms; ++iat)
     {

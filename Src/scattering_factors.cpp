@@ -2140,7 +2140,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
-    ProgressBar pb(k_pt[0].size(), 59, "#", " ", "Generating scattering factors...");
+    ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
 #pragma omp parallel shared(pb, sf)
     {
 #pragma omp for
