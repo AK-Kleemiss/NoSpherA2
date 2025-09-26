@@ -236,6 +236,7 @@ void set_core_counts(int* max_s, int* max_p, int* max_d, int* max_f, const int& 
 {
     if (ECP_mode == 1 || ECP_mode == 3)
     {
+        // If there are no core electrons, there is nothing to set for core orbital counts, so return early.
         if (core_els == 0)
             return;
         if (core_els == 2)
