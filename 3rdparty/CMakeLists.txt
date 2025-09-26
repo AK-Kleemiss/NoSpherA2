@@ -1,4 +1,6 @@
 include(ExternalProject)
+set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
+set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
 CPMAddPackage(
     NAME Ccache.cmake
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
@@ -19,6 +21,7 @@ CPMAddPackage(
         "CMAKE_BUILD_TYPE Release"
         "BUILD_SHARED_LIBS ON"
         "METATENSOR_INSTALL_BOTH_STATIC_SHARED ON"
+        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
 )
 message(WARNING "${CMAKE_INSTALL_LIBDIR}")
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
@@ -30,13 +33,20 @@ CPMAddPackage(
         "FEATOMIC_FETCH_METATENSOR OFF"
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
 )
+if (WIN32)
+    set(featomic_st_name "featomic.lib")
+else ()
+    set(featomic_st_name "libfeatomic.a")
+endif ()
 
 if (featomic_ADDED)
     add_library(featomic_static INTERFACE IMPORTED GLOBAL)
     target_link_libraries(featomic_static INTERFACE
         ${metatensor_STATIC_LIB}
-        "${featomic_BINARY_DIR}/target/release/libfeatomic.a"
+#        "${featomic_BINARY_DIR}/target/release/${featomic_st_name}"
+        ${featomic_STATIC_LIB}
     )
     target_include_directories(
         featomic_static INTERFACE

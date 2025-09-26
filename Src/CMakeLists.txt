@@ -49,42 +49,41 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(OPENMP_FLAG "-fopenmp")
 endif ()
-
+if (MSVC)
+    target_compile_options(NoSpherA2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
+endif()
 target_compile_options(NoSpherA2 PRIVATE
-    $<$<CONFIG:Debug>:-g -Og>
-    $<$<CONFIG:Release>:-O3>
-    ${OPENMP_FLAG}
-    -static
-    -MMD
-    -MP
-    -fmessage-length=0
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O3>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:${OPENMP_FLAG}>
 )
+if (MSVC)
+    set(CMAKE_TRY_COMPILE_CONFIGURATION Release CACHE STRING "" FORCE)
+endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
-add_compile_definitions(NoSpherA2 "-D__CMAKE_BUILD__")
+#add_compile_definitions(NoSpherA2 "-D__CMAKE_BUILD__")
+target_compile_definitions(NoSpherA2 PRIVATE __CMAKE_BUILD__)
 
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(NoSpherA2 PRIVATE
-        -msse2
-        -msse3
-        -msse4.1
-        -msse4.2
-        -mavx
-        -ffast-math
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
+        $<$<CXX_COMPILER_ID:MSVC>:/arch:AVX>
     )
 endif ()
 target_link_options(NoSpherA2 PRIVATE
-    -static-libgcc
-    -static-libstdc++
+    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libgcc>
+    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++>
 )
-
 target_link_libraries(NoSpherA2 PUBLIC
     MKL::MKL
     basis_set_helper
     mdspan
-    metatensor
-    featomic_static
-    -ldl
-    -lpthread
-    -latomic
+    metatensor::static
+    featomic::static
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-ldl>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-lpthread>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-latomic>
+
 )
 
