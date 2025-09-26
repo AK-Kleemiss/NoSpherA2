@@ -20,7 +20,7 @@ else ()
 endif ()
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/Src/auxiliary_basis.cpp
-    COMMAND ${BSC_EXE} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
+    COMMAND $<TARGET_FILE:BasisSetConverter> ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
     DEPENDS BasisSetConverter
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating auxiliary_basis.cpp using BasisSetConverter"
