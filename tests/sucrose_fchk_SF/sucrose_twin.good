@@ -10,75 +10,77 @@ This Software is published with BSD-2 clause license.
 Reading:                  "olex2/Wfn_job/sucrose.wfx" done!
 Number of atoms in Wavefunction file: 45 Number of MOs: 91
 Number of protons: 182
-Number of electrons: 182
+Number of electrons: 182.000000
 Reading:                                "sucrose.cif" done!
-There are:
-  45 atoms read from the wavefunction, of which 
-  45 are identified as asymmetric unit atoms!
-
-Making Becke Grids... ...                             done! Number of gridpoints: 4902
-Calculating spherical densities...                    done!
-Pruning Grid...                                       done! Number of gridpoints: 4902
-Calculating non-spherical densities...                done!
-Applying hirshfeld weights and integrating charges... done!
-Number of points evaluated: 4902 with 181.514305 electrons in Becke Grid in total.
-
-Table of Charges in electrons
-
-    Atom       Becke   Spherical Hirshfeld
-        O1    -0.025     0.223    -0.145
-        O2    -0.034     0.419    -0.320
-        H2     0.247     0.023     0.238
-        O3    -0.321     0.119    -0.311
-        H3     0.230     0.038     0.192
-        O4    -0.123     0.266    -0.227
-        H4     0.264     0.040     0.227
-        O5    -0.294    -0.025    -0.128
-        H5     0.270     0.040     0.228
-        O6     0.014     0.310    -0.166
-        O7    -0.206     0.259    -0.336
-        H7     0.254     0.100     0.171
-        O8    -0.113     0.270    -0.221
-        H8     0.229     0.012     0.220
-        O9    -0.193     0.254    -0.282
-        H9     0.233     0.036     0.192
-       O10    -0.192     0.215    -0.247
-       H10     0.227     0.078     0.142
-       O11    -0.123     0.242    -0.257
-        C1    -0.097     0.028    -0.006
-        H1     0.120     0.078     0.046
-        C2    -0.326    -0.141    -0.080
-       H2a     0.111     0.057     0.060
-       H2b     0.125     0.097     0.029
-        C3    -0.036     0.061     0.035
-       H3a     0.098     0.066     0.044
-        C4    -0.057     0.096    -0.085
-       H4a     0.104     0.063     0.053
-        C5     0.025     0.107     0.020
-       H5a     0.115     0.059     0.071
-        C6    -0.136    -0.052     0.026
-        H6     0.136     0.078     0.068
-        C7    -0.160    -0.219     0.136
-        C8    -0.060     0.048    -0.006
-       H8a     0.093     0.061     0.050
-       H8b     0.101     0.054     0.065
-        C9    -0.172    -0.065     0.043
-       H9a     0.143     0.097     0.068
-       C10    -0.136    -0.062     0.010
-      H10a     0.122     0.085     0.048
-       C11    -0.086     0.061    -0.036
-       H11     0.091     0.052     0.045
-       C12    -0.164    -0.044    -0.012
-      H12a     0.089     0.046     0.058
-      H12b     0.101     0.085     0.028
-Total number of electrons in the wavefunction: 181.514
- and Hirshfeld electrons (asym unit): 182.251
 Reading:                  "olex2/Wfn_job/sucrose.hkl" done!
 Nr of reflections read from file: 4027
 Number of symmetry operations: 2
 Nr of reflections to be used: 6928
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 6928
+There are:
+  45 atoms read from the wavefunction, of which 
+  45 are identified as asymmetric unit atoms!
 
-Number of k-points to evaluate: 6928 for 4902 gridpoints.
+Making Integration Grids... ...                       done! Number of gridpoints: 4902
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 4902
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 4902.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+        O1    -0.024    -0.145    -1.345
+        O2    -0.034    -0.320    -1.164
+        H2     0.247     0.238     0.575
+        O3    -0.321    -0.311    -1.292
+        H3     0.230     0.192     0.586
+        O4    -0.123    -0.227    -1.358
+        H4     0.264     0.227     0.599
+        O5    -0.293    -0.128    -1.143
+        H5     0.270     0.228     0.617
+        O6     0.015    -0.166    -1.278
+        O7    -0.206    -0.336    -1.226
+        H7     0.254     0.171     0.578
+        O8    -0.113    -0.220    -1.328
+        H8     0.229     0.220     0.589
+        O9    -0.193    -0.282    -1.290
+        H9     0.233     0.192     0.563
+       O10    -0.192    -0.247    -1.239
+       H10     0.227     0.142     0.612
+       O11    -0.123    -0.257    -1.365
+        C1    -0.097    -0.006     0.635
+        H1     0.120     0.046    -0.119
+        C2    -0.326    -0.079     0.761
+       H2a     0.111     0.060    -0.083
+       H2b     0.125     0.029    -0.057
+        C3    -0.036     0.035     0.775
+       H3a     0.098     0.044    -0.167
+        C4    -0.057    -0.085     0.992
+       H4a     0.104     0.053    -0.139
+        C5     0.025     0.020     0.980
+       H5a     0.115     0.071    -0.117
+        C6    -0.136     0.026     1.246
+        H6     0.136     0.068    -0.101
+        C7    -0.160     0.136     1.319
+        C8    -0.060    -0.006     1.059
+       H8a     0.092     0.050    -0.172
+       H8b     0.101     0.065    -0.081
+        C9    -0.172     0.043     0.842
+       H9a     0.143     0.068    -0.051
+       C10    -0.136     0.010     0.937
+      H10a     0.121     0.048    -0.086
+       C11    -0.086    -0.036     0.718
+       H11     0.091     0.045    -0.139
+       C12    -0.164    -0.012     0.714
+      H12a     0.089     0.058    -0.129
+      H12b     0.101     0.028    -0.105
+Total number of electrons in the asymmetric unit:
+ Becke:     181.512747
+ Hirshfeld: 182.248987
+ TVFC:      181.877105
 [                Calculating Scattering Factors                ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

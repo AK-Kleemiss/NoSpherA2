@@ -1,0 +1,57 @@
+    _   __     _____       __              ___   ___
+   / | / /___ / ___/____  / /_  ___  _____/   | |__ \
+  /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
+ / /|  / /_/ /__/ / /_/ / / / /  __/ /  / ___ |/ __/
+/_/ |_/\____/____/ .___/_/ /_/\___/_/  /_/  |_/____/
+                /_/
+This software is part of the cuQCT software suite developed by Florian Kleemiss.
+Please give credit and cite corresponding pieces!
+This Software is published with BSD-2 clause license.
+Reading:                                     "Rh.gbw" done!
+Number of atoms in Wavefunction file: 15 Number of MOs: 189
+Number of protons: 144
+Number of electrons: 116.000000
+Number of ECP electrons: 28
+Reading:                                     "Rh.cif" done!
+Generating hkl indices up to d=:              0.84... done!
+Nr of reflections generated:                 13824
+Number of symmetry operations:                   1
+Nr of reflections to be used:                 7740
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 7740
+There are:
+  15 atoms read from the wavefunction, of which 
+  15 are identified as asymmetric unit atoms!
+
+Making Integration Grids... ...                       done! Number of gridpoints: 1948
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 1948
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 1948.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+       Rh1    -1.778     0.051     0.510
+       Cl1    -0.077    -0.368    -0.551
+        C1     0.253    -0.089     0.924
+        O1     0.171    -0.093    -1.475
+        S1    -0.374     0.199     2.302
+        O2     0.170    -0.248    -1.540
+        O3     0.139    -0.270    -1.267
+        P1     0.520     0.297     2.369
+        H1     0.087     0.058    -0.606
+        H2     0.098     0.033    -0.787
+        H3     0.072     0.043    -0.656
+        P2     0.512     0.410     2.356
+        H4     0.084     0.040    -0.744
+        H5     0.096     0.030    -0.810
+        H6     0.080     0.058    -0.565
+Total number of electrons in the asymmetric unit:
+ Becke:     143.948328
+ Hirshfeld: 143.848762
+ TVFC:      144.539477
+[                Calculating Scattering Factors                ]
+[=============================================================] 100% 
+Writing tsc file...  ... done!
