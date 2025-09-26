@@ -2444,8 +2444,9 @@ void convert_to_ED(const ivec &asym_atom_list,
 {
     double h2 = 0.0;
     const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+    const int hkl_size = hkl.size();
 #pragma omp parallel for private(h2) shared(hkl_vector)
-    for (int s = 0; s < hkl.size(); s++)
+    for (int s = 0; s < hkl_size; s++)
     {
         h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
         for (int i = 0; i < asym_atom_list.size(); i++)
