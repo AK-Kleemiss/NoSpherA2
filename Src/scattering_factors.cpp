@@ -1863,7 +1863,7 @@ int make_atomic_grids(
     if (debug)
         file << endl;
     file << "                done!" << endl
-         << "Applying integration weights and integrating charges..." << flush;
+         << "Applying integration weights and integrating charge..." << flush;
     double el_sum_becke = 0.0;
     double el_sum_TFVC = 0.0;
     double el_sum_hirshfeld = 0.0;
@@ -1929,7 +1929,7 @@ int make_atomic_grids(
     {
         file << "Integration grid with weights done!" << endl;
     }
-    file << " done!" << endl
+    file << "done!" << endl
         << "Number of points evaluated: " << total_grid[0].size() << "." << endl
         << endl
         << "Table of Charges in electrons" << endl
