@@ -2684,7 +2684,8 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
 
 bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
 #ifdef _WIN32
-    std::vector<char> filename_buf(4096);
+    constexpr size_t MAX_FILENAME_SIZE = 4096;
+    std::vector<char> filename_buf(MAX_FILENAME_SIZE);
 
     OPENFILENAMEA sfn;
     ZeroMemory(&filename_buf[0], filename_buf.size());
