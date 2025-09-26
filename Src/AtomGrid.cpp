@@ -60,7 +60,7 @@ static std::vector<DensityExtremum> find_line_density_extrema(
 
     vec dens(samples);
     vec ts(samples);
-
+#pragma omp parallel for
     for (int i = 0; i < samples; ++i) {
         const double t = t0 + i * dt;
         ts[i] = t;
@@ -271,6 +271,7 @@ vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug =
         rijx2 = wfn.get_atom_coordinate(a, 0); //abuse old variable
 		rijy2 = wfn.get_atom_coordinate(a, 1);
 		rijz2 = wfn.get_atom_coordinate(a, 2);
+#pragma omp parallel for
         for (int b = a + 1; b < wfn.get_ncen(); b++) {
             if (neighbours[a][b]) {
                 if (vec_length({ wfn.get_atom_coordinate(b, 0) - rijx2,

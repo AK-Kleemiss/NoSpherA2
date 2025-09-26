@@ -1693,13 +1693,15 @@ int make_atomic_grids(
     {
         file << " ...  " << flush;
     }
+    WFN temp = wave;
+    temp.delete_unoccupied_MOs();
     ivec num_points = make_integration_grids(
         x,
         y,
         z,
         atom_z,
         needs_grid,
-        wave,
+        temp,
         pbc,
         atom_type_list,
         cif2wfn_list,
@@ -1786,9 +1788,6 @@ int make_atomic_grids(
 
     file << "Calculating non-spherical densities..." << flush;
     vec2 periodic_grid;
-
-    WFN temp = wave;
-    temp.delete_unoccupied_MOs();
     const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
     const int nr_mos = temp.get_nmo(true);
     const int nr_cen = temp.get_ncen();
