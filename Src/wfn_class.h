@@ -145,7 +145,7 @@ public:
     /** Pointer to raw coefficients of one MO (size = nex). */
     const double *get_MO_coef_ptr(const int &nr_mo);
     /** Number of primitives for a given MO (should equal nex). */
-    const int& get_MO_primitive_count(const int &nr_mo) const;
+    const int get_MO_primitive_count(const int &nr_mo) const;
     /** Append a new MO (no operator / spin id). */
     bool push_back_MO(const int &nr, const double &occ, const double &ener);
     /** Append a new MO with operator id (e.g. spin channel). */
@@ -219,7 +219,7 @@ public:
     /** Get total charge. */
     const int& get_charge() const { return charge; };
     /** Get spin multiplicity. */
-    const int& get_multi() const { return multi; };
+    const unsigned int& get_multi() const { return multi; };
     /** Set multiplicity by reference (legacy). */
     void set_multi(unsigned int &in) { multi = in; };
     /** Set charge. */

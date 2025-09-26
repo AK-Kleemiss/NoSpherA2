@@ -440,7 +440,7 @@ const double* WFN::get_MO_coef_ptr(const int &nr_mo)
     return MOs[nr_mo].get_coefficient_ptr();
 };
 
-const int& WFN::get_MO_primitive_count(const int &nr_mo) const
+const int WFN::get_MO_primitive_count(const int &nr_mo) const
 {
     err_checkf(nr_mo < MOs.size() && nr_mo >= 0, "WRONG INPUT!", std::cout);
     return MOs[nr_mo].get_primitive_count();

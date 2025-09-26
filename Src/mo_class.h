@@ -114,7 +114,7 @@ public:
     }
     return temp;
   }
-  const double get_energy() const {
+  const double& get_energy() const {
     return ener;
   };
   const vec& get_ptr_coef_vector() const { return coefficients; };
