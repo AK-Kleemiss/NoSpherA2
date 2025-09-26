@@ -309,27 +309,42 @@ public:
         {
         case 2:
             temp_Z = atomic_number - 2;
-            if (temp_Z < 0)
-                err_not_impl_SA();
-            nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
-            z = xtb_corrections::z[temp_Z].data();
-            c = xtb_corrections::c[temp_Z].data();
+            if (temp_Z < 0) {
+                nex = 0;
+                z = NULL;
+                c = NULL;
+            }
+            else {
+                nex = static_cast<int>(xtb_corrections::c[temp_Z].size());
+                z = xtb_corrections::z[temp_Z].data();
+                c = xtb_corrections::c[temp_Z].data();
+            }
             break;
         case 3:
             temp_Z = atomic_number - 2;
-            if (temp_Z < 0)
-                err_not_impl_SA();
-            nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
-            z = ptb_corrections::z[temp_Z].data();
-            c = ptb_corrections::c[temp_Z].data();
+            if (temp_Z < 0) {
+                nex = 0;
+                z = NULL;
+                c = NULL;
+            }
+            else {
+                nex = static_cast<int>(ptb_corrections::c[temp_Z].size());
+                z = ptb_corrections::z[temp_Z].data();
+                c = ptb_corrections::c[temp_Z].data();
+            }
             break;
         case 1:
             temp_Z = atomic_number - 37;
-            if (temp_Z < 0)
-                err_not_impl_SA();
-            nex = static_cast<int>(def_corrections::c[temp_Z].size());
-            z = def_corrections::z[temp_Z].data();
-            c = def_corrections::c[temp_Z].data();
+            if (temp_Z < 0) {
+                nex = 0;
+                z = NULL;
+                c = NULL;
+            }
+            else {
+                nex = static_cast<int>(def_corrections::c[temp_Z].size());
+                z = def_corrections::z[temp_Z].data();
+                c = def_corrections::c[temp_Z].data();
+            }
             break;
         default:
             err_not_impl_SA();

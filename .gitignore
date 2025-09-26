@@ -99,3 +99,5 @@ Lib/MKL
 *tbb*.def
 libiomp5.so
 *.diff
+tests/SALTED/temp_rascaline.xyz
+tests/grown/temp_wavefunction.wfn

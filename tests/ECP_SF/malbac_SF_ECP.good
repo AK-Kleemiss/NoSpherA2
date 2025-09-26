@@ -10,83 +10,85 @@ This Software is published with BSD-2 clause license.
 Reading:                                 "malbac.gbw" done!
 Number of atoms in Wavefunction file: 52 Number of MOs: 1133
 Number of protons: 276
-Number of electrons: 248
+Number of electrons: 248.000000
 Number of ECP electrons: 28
 Reading:                                 "malbac.cif" done!
-There are:
-  52 atoms read from the wavefunction, of which 
-  52 are identified as asymmetric unit atoms!
-
-Making Becke Grids... ...                             done! Number of gridpoints: 15826
-Calculating spherical densities...                    done!
-Pruning Grid...                                       done! Number of gridpoints: 15728
-Calculating non-spherical densities...                done!
-Applying hirshfeld weights and integrating charges... done!
-Number of points evaluated: 15728 with 275.479634 electrons in Becke Grid in total.
-
-Table of Charges in electrons
-
-    Atom       Becke   Spherical Hirshfeld
-        Pd    -2.118    -1.675     0.413
-         P     0.013    -0.126     0.252
-        Cl    -0.059     0.539    -0.384
-         O     0.439     0.780    -0.267
-        N1     0.550     0.644    -0.023
-        C1     0.038     0.147    -0.035
-        C2     0.086     0.270    -0.068
-        C3     0.059     0.163    -0.036
-        C5    -0.117     0.047    -0.070
-        H5     0.171     0.110     0.084
-        C6    -0.055     0.127    -0.064
-        H6     0.097     0.026     0.064
-        C7    -0.145     0.041    -0.085
-        H7     0.138     0.071     0.078
-        C8    -0.014     0.056     0.019
-        H8     0.182     0.137     0.067
-        C9    -0.006     0.124    -0.040
-       C12    -0.082     0.118    -0.087
-       H12     0.102     0.044     0.060
-       C14     0.012     0.099     0.003
-       H14     0.188     0.133     0.080
-       C15    -0.003     0.073    -0.012
-       H15     0.199     0.161     0.058
-       C16    -0.028     0.033     0.022
-       H16     0.141     0.084     0.067
-       C17    -0.052     0.046    -0.018
-       H17     0.079     0.010     0.063
-       C18    -0.035     0.073    -0.025
-       H18     0.139     0.079     0.070
-       C19     0.002     0.098    -0.014
-       H19     0.130     0.091     0.059
-       C20    -0.043     0.073    -0.030
-       H20     0.167     0.094     0.088
-       C21    -0.072     0.010    -0.012
-       H21     0.090     0.020     0.075
-       C22    -0.092     0.019    -0.043
-       H22     0.147     0.092     0.065
-       C23    -0.084    -0.019    -0.011
-       H23     0.056    -0.016     0.065
-       C24    -0.068     0.017    -0.008
-       H24     0.030    -0.029     0.056
-       C29    -0.086     0.057    -0.056
-       H29     0.140     0.084     0.066
-       C30    -0.026     0.091    -0.031
-       H30     0.139     0.075     0.073
-        N2    -0.070     0.221    -0.180
-       C31     0.035    -0.020     0.122
-       C32     0.053     0.134     0.012
-       H32     0.153     0.097     0.077
-       C33    -0.058    -0.003     0.003
-       C34    -0.074     0.020    -0.016
-       H34     0.133     0.080     0.062
-Total number of electrons in the wavefunction: 275.480
- and Hirshfeld electrons (asym unit): 275.391
 Reading:                                 "malbac.hkl" done!
 Nr of reflections read from file: 15646
 Number of symmetry operations: 1
 Nr of reflections to be used: 9134
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 9134
+There are:
+  52 atoms read from the wavefunction, of which 
+  52 are identified as asymmetric unit atoms!
 
-Number of k-points to evaluate: 9134 for 15728 gridpoints.
+Making Integration Grids... ...                       done! Number of gridpoints: 15826
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 15728
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 15728.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+        Pd    -2.117     0.414     0.664
+         P     0.014     0.252     2.301
+        Cl    -0.059    -0.384    -0.441
+         O     0.440    -0.267    -1.284
+        N1     0.551    -0.023    -1.108
+        C1     0.039    -0.035    -0.722
+        C2     0.086    -0.068    -0.668
+        C3     0.059    -0.036    -0.648
+        C5    -0.116    -0.070    -0.015
+        H5     0.171     0.084     0.008
+        C6    -0.055    -0.064     0.058
+        H6     0.096     0.064    -0.012
+        C7    -0.144    -0.085    -0.029
+        H7     0.138     0.078     0.027
+        C8    -0.013     0.019    -0.029
+        H8     0.182     0.067     0.059
+        C9    -0.006    -0.040     0.004
+       C12    -0.082    -0.087     0.077
+       H12     0.102     0.060    -0.017
+       C14     0.013     0.003    -0.044
+       H14     0.188     0.080     0.054
+       C15    -0.002    -0.012    -0.049
+       H15     0.199     0.058     0.086
+       C16    -0.027     0.022     0.047
+       H16     0.140     0.067     0.045
+       C17    -0.050    -0.018    -0.007
+       H17     0.078     0.063    -0.077
+       C18    -0.035    -0.025    -0.009
+       H18     0.138     0.070     0.048
+       C19     0.003    -0.014     0.037
+       H19     0.131     0.059    -0.013
+       C20    -0.039    -0.030    -0.002
+       H20     0.167     0.088     0.071
+       C21    -0.072    -0.012    -0.032
+       H21     0.089     0.075    -0.036
+       C22    -0.091    -0.043    -0.070
+       H22     0.146     0.065     0.047
+       C23    -0.084    -0.011     0.005
+       H23     0.054     0.065    -0.100
+       C24    -0.070    -0.008     0.033
+       H24     0.029     0.057    -0.162
+       C29    -0.088    -0.056    -0.048
+       H29     0.139     0.066     0.042
+       C30    -0.026    -0.031    -0.002
+       H30     0.138     0.073     0.029
+        N2    -0.070    -0.180    -0.841
+       C31     0.036     0.122     1.642
+       C32     0.053     0.012     0.893
+       H32     0.152     0.077     0.013
+       C33    -0.058     0.003     0.003
+       C34    -0.076    -0.016     0.007
+       H34     0.132     0.062     0.037
+Total number of electrons in the asymmetric unit:
+ Becke:     275.474703
+ Hirshfeld: 275.389941
+ TVFC:      276.128912
 [                Calculating Scattering Factors                ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!
