@@ -13,10 +13,14 @@ add_library(basis_set_helper STATIC
 target_include_directories(basis_set_helper PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
-message(WARNING ${CMAKE_SOURCE_DIR})
+if (WIN32)
+    set(BSC_EXE "${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter.exe")
+else ()
+    set(BSC_EXE "${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter")
+endif ()
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/Src/auxiliary_basis.cpp
-    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/BasisSetConverter ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
+    COMMAND ${BSC_EXE} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_BINARY_DIR}/Src
     DEPENDS BasisSetConverter
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     COMMENT "Generating auxiliary_basis.cpp using BasisSetConverter"
