@@ -109,7 +109,7 @@ int fixed_density_fit_test()
 
     Int_Params aux_basis(wavy_aux);
 
-    //   normal_basis.print_data("normal_basis");
+    // normal_basis.print_data("normal_basis");
     // aux_basis.print_data("aux_basis");
 
     vec eri2c;

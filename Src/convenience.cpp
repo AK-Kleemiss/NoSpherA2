@@ -2087,7 +2087,7 @@ void options::digest_options()
                 if (!BasisSetLibrary().check_basis_set_exists(arguments[i + 1]))
                 {
                     cout << "Basis set " << arguments[i + 1] << " not found in the library. Exiting." << endl;
-                    exit(0);
+                    exit(1);
                 }
                 aux_basis = BasisSetLibrary().get_basis_set(arguments[i + 1]);
             }
