@@ -30,7 +30,7 @@ atom::atom() {
     basis_set_id = 0;
     ECP_electrons = 0;
     frac_coords = { 0.,0.,0. };
-	is_asym = false;
+    is_asym = false;
 };
 
 atom::atom(const std::string& l, 

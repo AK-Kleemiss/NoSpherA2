@@ -36,7 +36,7 @@ public:
     index = given_index;
     header = given_header;
     anomalous_dispersion = false;
-	NaN = "NaN in SF! ";
+    NaN = "NaN in SF! ";
   };
   tsc_block(
       std::vector<std::vector<numtype>> &given_sf,

@@ -618,9 +618,122 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>$(SolutionDir)\x64\Release;$(IncludePath)</IncludePath>
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <IncludePath>$(SolutionDir)\x64\Release;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ML|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Rascaline|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SH|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fourier_Transform|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|x64'">
+    <linkage-MKL-static-win-x64>static</linkage-MKL-static-win-x64>
+    <threading-MKL-static-win-x64>intel</threading-MKL-static-win-x64>
+    <interface-MKL-static-win-x64>lp64</interface-MKL-static-win-x64>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -2033,6 +2146,7 @@
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|x64'">pch.h</PrecompiledHeaderFile>
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='D_pTB|ARM64'">pch.h</PrecompiledHeaderFile>
     </ClCompile>
+    <ClCompile Include="..\Src\cif.cpp" />
     <ClCompile Include="..\Src\constants.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='D_polarizability|ARM64'">Use</PrecompiledHeader>

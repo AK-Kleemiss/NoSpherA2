@@ -14,7 +14,7 @@ template <typename mat_t, typename vec_t, typename Shape_t>
 mat_t reshape(vec_t& vec_in, const Shape_t size)
 {
     using ext_t = typename mat_t::extents_type;
-	using ele_t = typename mat_t::element_type;
+    using ele_t = typename mat_t::element_type;
     ext_t exts;
     if constexpr (std::is_same_v<Shape_t, Shape2D>)
     {
@@ -33,7 +33,7 @@ mat_t reshape(vec_t& vec_in, const Shape_t size)
         err_checkf(false, "Invalid Shape!", std::cout);
     }
 
-	mat_t result(exts);
+    mat_t result(exts);
     if constexpr (std::is_same_v<vec_t, vec> || std::is_same_v<vec_t, cvec> || std::is_same_v<vec_t, ivec>)
     {
         std::copy(vec_in.begin(), vec_in.end(), result.data());
@@ -44,7 +44,7 @@ mat_t reshape(vec_t& vec_in, const Shape_t size)
         || std::is_same_v<vec_t, dMatrix3> || std::is_same_v<vec_t, cMatrix3> || std::is_same_v<vec_t, iMatrix3>
         || std::is_same_v<vec_t, dMatrix4> || std::is_same_v<vec_t, cMatrix4> || std::is_same_v<vec_t, iMatrix4>)
     {
-		std::copy(vec_in.data(), vec_in.data() + vec_in.size(), result.data());
+        std::copy(vec_in.data(), vec_in.data() + vec_in.size(), result.data());
         return result;
     }
     else
@@ -52,7 +52,7 @@ mat_t reshape(vec_t& vec_in, const Shape_t size)
         err_checkf(false, "Invalid Types!", std::cout);
     }
     mat_t res_0;
-	return res_0;
+    return res_0;
 }
 template dMatrix2 reshape(dMatrix1 &vec_in, const Shape2D size);
 template cMatrix2 reshape(cMatrix1 &vec_in, const Shape2D size);
@@ -106,7 +106,7 @@ T1 flatten(const T2 &vecND)
 {
     auto size = vecND.size();
     T1 res(size);
-	std::copy(vecND.data(), vecND.data() + size, res.data());
+    std::copy(vecND.data(), vecND.data() + size, res.data());
     return res;
 }
 template dMatrix1 flatten(const dMatrix2 &vecND);
@@ -322,7 +322,7 @@ T dot_BLAS(const T2 &Mat, const T &vec, bool transp)
         return {};
     }
     T result_m(result.size());
-	std::move(result.begin(), result.end(), result_m.data());
+    std::move(result.begin(), result.end(), result_m.data());
     return result_m;
 }
 template dMatrix1 dot_BLAS(const dMatrix2 &Mat, const dMatrix1 &vec, bool transp);

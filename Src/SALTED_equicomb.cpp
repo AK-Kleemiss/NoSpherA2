@@ -37,7 +37,7 @@ void equicomb(int natoms, int nrad1, int nrad2,
     {
         vec2 ptemp(l21, f_vec);
         cvec pcmplx(l21, constants::cnull);
-		cdouble* pvec_ptr;
+        cdouble* pvec_ptr;
         const double* wigner_ptr = NULL;
         int limit_l1 = 0;
         inner = 0.0;

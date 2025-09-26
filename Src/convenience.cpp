@@ -23,7 +23,7 @@ std::string help_message =
      "   -fchk           <FILENAME>.fchk          Write a wavefunction to the given filename [requires -b and -d]\n"
      "   -b              <FILENAME>               Read this basis set\n"
      "   -d              <PATH>                   Path to basis_sets directory with basis_sets in tonto style\n"
-     "   -dmin             <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
+     "   -dmin           <NUMBER>                 Minimum d-spacing to consider for scattering factors (repalaces hkl file)\n"
      "   -hkl_min_max    <6 Numbers>              Performs calculation on hkl range defined by the 6 numbers. (replaces dmin and hkl)\n"
      "   -ECP            <NUMBER>                 Defines the ECP corrections to be applied to a wavefunction. The given Number defines the ECP type:\n"
      "                                            [1]: def2-ECP\n"
@@ -44,6 +44,8 @@ std::string help_message =
      "   -acc            0,1,[2],3,4...           Accuracy of numerical grids used, where the number indicates a pre-defined level. 4 should be considered maximum,\n"
      "                                            anything above will most likely introduce numberical error and is just implemented for testing purposes.\n"
      "   -gbw2wfn                                 Only reads wavefucntion from .gbw specified by -wfn and prints it into .wfn format.\n"
+     "   -TFVC                                    Use the Topological Fuzzy Voronoi Cells (TFVC) partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
+     "   -Becke                                   Use Becke partitioning scheme instead of Hirshfeld for partitioning the electron density.\n"
      "   -tscb           <FILENAME>.tscb          Convert binary tsc file to bigger, less accurate human-readable form.\n"
      "   -twin           -1 0 0 0 -1 0 0 0 -1     3x3 floating-point-matrix in the form -1 0 0 0 -1 0 0 0 -1 which contains the twin matrix to use.\n"
      "                                            If there is more than a single twin law to be used, use the twin command multiple times.\n"
@@ -60,7 +62,7 @@ std::string help_message =
      "   -QCT                                     Starts the old QCT menu and options for working on wavefunctions/cubes and calcualtions\n"
      "                                            TIP: This mode can use many parameters like -radius, -b, -d, so they do not have to be mentioned later\n"
      "   -laplacian_bonds <Path to wavefunction>  Calculates the Laplacian of the electron density along the direct line between atoms that might be bonded by distance\n"
-     "   -cmtc           <List of .wfns + parts>  Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
+     "   -cmtc            <List of .wfns + parts> Performs calculation for a list of wavefunctions AND CIFs (=CIF-based-multi-Tsc-Calc), where asymmetric unit is defined by each CIF that matches a wfn.\n"
      "      Normal:       NoSpherA2.exe -cif A.cif -hkl A.hkl -wfn A.wfx -acc 1 -cpus 7\n"
      "      thakkar-tsc:  NoSpherA2.exe -cif A.cif -hkl A.hkl -xyz A.xyz -acc 1 -cpus 7 -IAM\n"
      "      Disorder:     NoSpherA2.exe -cif A.cif -hkl A.hkl -acc 1 -cpus 7 -mtc 1.wfn 0,1 2.wfn 0,2 3.wfn 0,3 -mtc_charge 0 0 0 -mtc_mult 1 1 1 -mtc_ECP 0 0 0\n"
@@ -88,6 +90,7 @@ std::string NoSpherA2_message(bool no_date)
         t.append("      Alessandro Genoni,\n");
         t.append("      Lukas M. Seifert,\n");
         t.append("      Daniel Bruex,\n");
+        t.append("      Marti Gimferrer,\n");
         t.append("      and many more in communications or by feedback!\n");
         t.append("NoSpherA2 uses featomic, Metatensor, and the mdspan library.\n");
         t.append("The used packages are published under BSD-3 clause License.\n");
@@ -96,7 +99,9 @@ std::string NoSpherA2_message(bool no_date)
         t.append("   https://github.com/lab-cosmo/metatensor\n");
         t.append("   This software utilizes Intel(c) Math Kernel Library (oneMKL), version 2025.2.0.629, for optimized mathematical computations\n");
         t.append("NoSpherA2 was published at  : Kleemiss et al. Chem. Sci., 2021, 12, 1675 - 1692.\n");
-        t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst 2024, 57, 161 - 174.\n");
+        t.append("Slater IAM was published at : Kleemiss et al. J. Appl. Cryst. 2024, 57, 161 - 174.\n");
+        t.append("ECP correction functions at : Kleemiss et al. J. Appl. Cryst. 2025, 58, 374 - 382.\n");
+        t.append("TFVC partitioning at        : Gimferrer et al. TBA.\n");
     }
     return t;
 }
@@ -1637,9 +1642,6 @@ void options::digest_options()
             bondwise_laplacian_plots(wfn);
             exit(0);
         }
-        else if (temp == "-lukas_test") {
-            exit(0);
-        }
         else if (temp == "-atom_dens")
         {
            std::cout << NoSpherA2_message() << endl;
@@ -1665,6 +1667,8 @@ void options::digest_options()
         }
         else if (temp == "-b")
             basis_set = arguments[i + 1];
+        else if (temp == "-becke" || temp == "-BECKE" || temp == "-Becke")
+            partition_type = PartitionType::Becke;
         else if (temp == "-blastest")
         {
             test_openblas();
@@ -1831,7 +1835,7 @@ void options::digest_options()
         }
         else if (temp == "-e_field")
             efield = stod(arguments[i + 1]);
-        else if (temp == "-ECP")
+        else if (temp == "-ECP" || temp == "-ecp" || temp == "-Ecp")
         {
             ECP = true;
             if (argc >= i + 2 && string(arguments[i + 1]).find("-") != 0)
@@ -2063,6 +2067,7 @@ void options::digest_options()
         else if (temp == "-RI_FIT" || temp == "-ri_fit")
         {
             RI_FIT = true;
+            partition_type = PartitionType::RI;
             // Check if next argument is a valid basis set name or a new argument starting with "-"
             if (i + 1 < argc && arguments[i + 1].find("-") != 0)
             {
@@ -2195,11 +2200,6 @@ void options::digest_options()
         }
         else if (temp == "-test")
             std::cout << "Running in test mode!" << endl, test = true;
-        else if (temp == "-thakkar_d_plot")
-        {
-            std::cout << "Making a table of Thakkar scattering factors and leaving!" << endl, thakkar_d_test(*this);
-            exit(0);
-        }
         else if (temp == "-twin")
         {
             twin_law.resize(twin_law.size() + 1);
@@ -2218,6 +2218,10 @@ void options::digest_options()
         else if (temp == "-old_tsc")
         {
             old_tsc = true;
+        }
+        else if (temp == "-tfvc" || temp == "-TFVC")
+        {
+            partition_type = PartitionType::TFVC;
         }
         else if (temp == "-tscb")
         {
@@ -2680,26 +2684,28 @@ bool open_file_dialog(std::filesystem::path& path, bool debug, std::vector <std:
 
 bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector<std::string>& endings, const std::string& filename_given, const std::string& current_path) {
 #ifdef _WIN32
-    char filename[1024];
+    constexpr size_t MAX_FILENAME_SIZE = 4096;
+    std::vector<char> filename_buf(MAX_FILENAME_SIZE);
 
     OPENFILENAMEA sfn;
-    ZeroMemory(&filename, sizeof(filename));
+    ZeroMemory(&filename_buf[0], filename_buf.size());
     ZeroMemory(&sfn, sizeof(sfn));
     sfn.lStructSize = sizeof(sfn);
     sfn.hwndOwner = NULL;  // If you have a window to center over, put its HANDLE here
     sfn.lpstrFilter = "Known Formats\0*.gbw;*.fchk;*.wfx;*.wfn;*.ffn;*.molden;*.molden.input;*.xtb\0gbw Files\0*.gbw\0wfn Files\0*.wfn\0wfx Files\0*.wfx\0ffn Files\0*.ffn\0cube Files\0*.cub;*.cube\0xtb Files\0*.xtb\0Any File\0*\0";
-    sfn.lpstrFile = filename;
-    sfn.nMaxFile = 1024;
+    sfn.lpstrFile = filename_buf.data();
+    sfn.nMaxFile = static_cast<DWORD>(filename_buf.size());
     sfn.lpstrTitle = "Select a File for saving!";
     sfn.Flags = OFN_DONTADDTORECENT;
     bool end = false;
     while (!end) {
         if (GetSaveFileNameA(&sfn)) {
-            if (debug) std::cout << "You chose the file \"" << filename << "\"\n";
-            if (exists(std::filesystem::path(filename))) {
-                std::cout << filename << " exists, do you want to overwrite it?";
+            std::string chosen(filename_buf.data());
+            if (debug) std::cout << "You chose the file \"" << chosen << "\"\n";
+            if (exists(std::filesystem::path(chosen))) {
+                std::cout << chosen << " exists, do you want to overwrite it?";
                 if (yesno()) {
-                    path = filename;
+                    path = chosen;
                     bool found = false;
                     for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
                     if (found) end = true;
@@ -2707,7 +2713,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
                 else return false;
             }
             else {
-                path = filename;
+                path = chosen;
                 bool found = false;
                 for (int i = 0; i < endings.size(); i++) if (path.extension() == endings[i]) found = true;
                 if (found) end = true;
@@ -2971,12 +2977,15 @@ void sha::sha256_final(uint32_t state[8], uint8_t buffer[64], uint64_t bitlen, u
 
     for (i = 0; i < 8; ++i)
     {
-        if ((i * 4 + 4) > 32) {
+        constexpr size_t HASH_SIZE = 32;
+        const size_t off = static_cast<size_t>(i) * 4;
+        if (off + 4 > HASH_SIZE) {
             std::cerr << "Buffer overflow detected in sha256_final (hash write)!" << std::endl;
             return;
         }
-        state[i] = custom_bswap_32(state[i]);
-        memcpy(hash + i * 4, &state[i], 4);
+        // convert to big-endian value locally and copy 4 bytes
+        uint32_t be = custom_bswap_32(state[i]);
+        std::memcpy(hash + off, &be, sizeof(be));
     }
 }
 

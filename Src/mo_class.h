@@ -53,7 +53,7 @@ public:
   const double get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
-  const double* get_coefficient_ptr() {
+  const double* get_coefficient_ptr() const {
     return coefficients.data();
   };
   const bool set_coefficient(const int& _nr, const double& value) {
@@ -117,7 +117,6 @@ public:
   const double get_energy() const {
     return ener;
   };
-  const double* get_ptr_coefficients() { return &coefficients[0]; };
   const vec& get_ptr_coef_vector() const { return coefficients; };
   void assign_coefs(const vec& values) { coefficients.resize(values.size()); coefficients = values; }
 };

@@ -1,6 +1,6 @@
 RM := rm
 
-ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED alanine_occ
+ALL_TARGETS = sucrose_SF sucrose_IAM sucrose_twin fractal disorder_THPP grown_water properties rubredoxin_cmtc wfn_reading malbac_SF_ECP sucrose_ptb Hybrid_mode openBLAS ri_fit fourier_transform reading_SALTED SALTED alanine_occ TFVC_ECP TFVC
 
 # Convert the path to an OS-specific format if necessary
 # For Unix-like systems, this will be a no-op
@@ -27,7 +27,7 @@ else
   RM := rm
   BASE_PATH := ../../NoSpherA2
   MV := mv
-  DIFF := diff -q -i -b
+  DIFF := diff -i -b
   define TIME_START
     start_time=$$(date +%s.%N)
   endef
@@ -43,8 +43,9 @@ else
       $(BASE_PATH) $3; \
       test_result=$$?; \
       if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
-      $(DIFF) $1.log $1.good; \
+      $(DIFF) $1.log $1.good > ../$1.diff 2>&1; \
       diff_result=$$?; \
+	  if [ $$diff_result -ne 0 ]; then echo "--> DIFF written to $1.diff"; else rm -f $1.diff; fi; \
       eval $(TIME_END); \
       exit $$test_result || exit $$diff_result; \
     }
@@ -53,6 +54,8 @@ endif
 
 
 all: $(ALL_TARGETS)
+
+.IGNORE: $(ALL_TARGETS)
 
 all_tests: $(ALL_TARGETS) fourier_transform_full rubredoxin_cmtc_full fchk_conversion
 
@@ -220,6 +223,23 @@ wfn_reading:
 	$(call RUN_TEST,$@,wfn_reading, \
 		-hkl test.hkl -acc 0 \
 		-cif test.cif -wfn test.wfn \
+		-no-date)
+
+TFVC_ECP:
+	$(call RUN_TEST,$@,TFVC, \
+		-cif Rh.cif \
+		-dmin 0.84 \
+		-wfn Rh.gbw \
+		-acc 0 \
+		-ECP 1 \
+		-no-date)
+
+TFVC:
+	$(call RUN_TEST,$@,TFVC, \
+		-cif water.cif \
+		-dmin 0.84 \
+		-wfn Rwater.gbw \
+		-acc 0 \
 		-no-date)
 
 .PHONY: all clean dependents SALTED reading_SALTED
