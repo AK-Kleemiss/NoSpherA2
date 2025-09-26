@@ -90,14 +90,8 @@ NoSpherA2_x86_64: $(OBJS_x86_64)
 
 # Architecture-specific basis set converter
 basis_set_converter:
-	@echo "Building basis set converter for current architecture..."
-	@$(MAKE) -f makefile_basis_set_converter ARCH=$(shell uname -m) || \
-	 (echo "Building basis set converter directly..." && \
-	  $(COMP) $(CXXFLAGS_COMMON) -arch $(shell uname -m) $(OMPFLAGS_$(shell uname -m)) \
-	  ../Src/basis_set_helper/BasisSetConverter.cpp \
-	  ../Src/basis_set_helper/basis_set_helper.cpp \
-	  -o BasisSetConverter && \
-	  ./BasisSetConverter ../Windows/)
+	@echo "Building basis set converter for current architecture: $(shell uname -m)"
+	@$(MAKE) -f makefile_basis_set_converter $(shell uname -m)
 
 # Generate auxiliary_basis.cpp when needed
 $(SRC_DIR)/auxiliary_basis.cpp: basis_set_converter

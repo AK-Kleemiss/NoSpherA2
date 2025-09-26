@@ -17,6 +17,7 @@ runs:
         sudo xcodebuild -license accept
         sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
         git config --global --add safe.directory ${{ github.workspace }}
+        git config --global --add safe.directory ${{ github.workspace }}/mdspan
         git config --global --add safe.directory ${{ github.workspace }}/featomic
     
         # Install/Update Rust and Cargo
