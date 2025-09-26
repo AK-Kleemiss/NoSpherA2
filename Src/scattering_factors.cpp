@@ -2453,6 +2453,23 @@ void convert_to_ED(const ivec &asym_atom_list,
     }
 }
 
+/**
+ * @brief Calculates scattering factors using the provided calculator and options.
+ *
+ * This templated function computes scattering factors for a set of atoms and k-points.
+ *
+ * @tparam tsc_block_type The type used to store the resulting scattering factors block.
+ *         Must support assignment and access as used in the function.
+ * @tparam calculator_type The type of the calculator object.
+ *         Must provide the required interface for calculating scattering factors.
+ * @param opt Options for the calculation.
+ * @param calculator The calculator object used to compute scattering factors.
+ * @param file Output stream for logging messages.
+ * @param known_atoms List of known atom symbols.
+ * @param nr Number of atoms.
+ * @param kpts Pointer to the k-points vector.
+ * @return A block of scattering factors of type tsc_block_type.
+ */
 template <typename tsc_block_type, typename calculator_type>
 tsc_block_type calculate_scattering_factors(
     options& opt,
