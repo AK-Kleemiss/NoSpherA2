@@ -498,41 +498,44 @@ void CINTgout2e(double *gout,
     const int nf = envs->nf;
     const int nrys_roots = envs->nrys_roots;
     double s = 0.0;
+    double* gx;
+    double* gy;
+    double* gz;
     if (gout_empty)
     {
         // If gout is to be overwritten (empty), do a direct assignment
-        for (int n = 0; n < nf; n++, idx += 3)
+        for (int n = 0; n < nf; n++, gout++, idx += 3)
         {
             // Pointers to the relevant slices of g
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            gx = g + idx[0];
+            gy = g + idx[1];
+            gz = g + idx[2];
 
             // Inner loop: accumulate products
 #pragma ivdep
-            for (int i = 0; i < nrys_roots; i++)
+            for (int i = 0; i < nrys_roots; i++, gx++, gy++, gz++)
             {
-                s += gx[i] * gy[i] * gz[i];
+                s += *gx * *gy * *gz;
             }
-            gout[n] = s;
+            *gout = s;
             s = 0.0;
         }
     }
     else
     {
         // If gout already has data, accumulate
-        for (int n = 0; n < nf; n++, idx += 3)
+        for (int n = 0; n < nf; n++, gout++, idx += 3)
         {
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            gx = g + idx[0];
+            gy = g + idx[1];
+            gz = g + idx[2];
 
 #pragma ivdep
-            for (int i = 0; i < nrys_roots; i++)
+            for (int i = 0; i < nrys_roots; i++, gx++, gy++, gz++)
             {
-                s += gx[i] * gy[i] * gz[i];
+                s += *gx * *gy * *gz;
             }
-            gout[n] += s;
+            *gout += s;
             s = 0.0;
         }
     }

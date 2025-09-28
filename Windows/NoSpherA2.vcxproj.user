@@ -1,7 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif Rh.cif -wfn Rh.gbw -hkl_min_max -10 10 -10 10 -10 10 -v -acc 4 -TFVC -ECP 1</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-cif Rh.cif -wfn Rh.gbw -hkl_min_max -10 10 -10 10 -10 10 -v -acc 2 -TFVC -ECP 1</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>..\tests\TFVC</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
@@ -452,8 +452,8 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|x64'">
-    <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -cpus 16 -mem 100000 -no-date</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-wfn sucrose.gbw -cif sucrose.cif -dmin 0.5 -ri_fit def2_svp_rifit -cpus 16 -mem 30000</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>

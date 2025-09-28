@@ -624,6 +624,9 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     DEF_GXYZ(double, g, gx, gy, gz);
     double* p1x, * p1y, * p1z, * p2x, * p2y, * p2z;
     double rx, ry, rz;
+    int lim_j = 0;
+    int lim_nroots = 0;
+    int base_ptr = 0;
 
     // g(i,...,j) = rirj * g(i-1,...,j) +  g(i-1,...,j+1)
     rx = rirj[0];
@@ -636,8 +639,9 @@ void CINTg0_lj2d_4d(double* g, CINTEnvVars* envs)
     p2y = gy - di + dj;
     p2z = gz - di + dj;
     for (i = 1; i <= li; i++) {
-        for (j = 0; j <= nmax - i; j++) {
-            const int base_ptr = j * dj + i * di;
+        lim_j = nmax - i;
+        for (j = 0; j <= lim_j; j++) {
+            base_ptr = j * dj + i * di;
             for (l = 0; l <= mmax; l++) {
                 const int ptr = base_ptr + l * dl;
                 for (n = 0; n < nroots; n++) {
