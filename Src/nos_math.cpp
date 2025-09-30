@@ -281,7 +281,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     const lapack_int nrhs = 1;   // Number of right-hand sides (columns of rho and )
     const lapack_int lda = n;    // Leading dimension of eri2c
     const lapack_int ldb = 1;    // Leading dimension of rho
-    std::vector<lapack_int> ipiv(n, 0);              // Pivot indices
+    ivec ipiv(n, 0);              // Pivot indices
     lapack_int info = 0;
 
 #if defined(__APPLE__)
