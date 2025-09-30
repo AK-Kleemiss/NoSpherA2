@@ -75,19 +75,6 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
     k_points_file.close();
 }
 
-cdouble convert_to_ED_single(
-    const int &neutralcharge,
-    cdouble &sf,
-    const double &k_vector,
-    const int charge)
-{
-    const double h2 = pow(k_vector, 2);
-    std::complex<double> neutral(constants::ED_fact * (neutralcharge - sf.real()) / h2, -constants::ED_fact * sf.imag() / h2);
-    if (charge == 0)
-        return neutral;
-    return neutral + constants::ED_fact * charge / h2;
-};
-
 /**
  * @brief Saves k-points to a binary file.
  *
@@ -1188,7 +1175,7 @@ std::vector<AtomGrid> make_Prototype_atoms(
     return res;
 }
 
-ivec make_atomic_grids(
+ivec make_integration_grids(
     const vec &x,
     const vec &y,
     const vec &z,
@@ -1205,6 +1192,8 @@ ivec make_atomic_grids(
 {
     using namespace std;
     ivec num_points(cif2wfn_list.size(), 0);
+    vec2 chi_matrix;
+    chi_matrix.reserve(cif2wfn_list.size());
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         if (debug)
@@ -1218,7 +1207,7 @@ ivec make_atomic_grids(
 
         num_points[i] = Prototype_grids[type].get_num_grid_points();
 
-        for (int n = 0; n < 6; n++)
+        for (int n = 0; n < 7; n++)
             grid[i][n].resize(num_points[i], 0.0);
 
         Prototype_grids[type].get_grid(int(wave.get_ncen() * pow(pbc * 2 + 1, 3)),
@@ -1227,26 +1216,27 @@ ivec make_atomic_grids(
                                        &y[0],
                                        &z[0],
                                        &atom_z[0],
-                                       grid[i][0].data(),
-                                       grid[i][1].data(),
-                                       grid[i][2].data(),
-                                       grid[i][3].data(),
-                                       grid[i][5].data());
+                                       grid[i][GridIndex::x_coord].data(),
+                                       grid[i][GridIndex::y_coord].data(),
+                                       grid[i][GridIndex::z_coord].data(),
+                                       grid[i][GridIndex::atomic_weight].data(),
+                                       grid[i][GridIndex::molecular_becke_weight].data(),
+                                       grid[i][GridIndex::molecular_TFVC_weight].data(),
+                                       wave,
+                                       chi_matrix,
+                                       debug);
     }
     if (debug)
     {
-        int run = 0;
         file << "  label  | wfn  | grid | number of gridpoints\n";
         for (int j = 0; j < wave.get_ncen(); j++)
         {
             file << setw(8) << wave.get_atom_label(j);
             if (needs_grid[j])
             {
-
                 size_t index = find(cif2wfn_list.begin(), cif2wfn_list.end(), j) - cif2wfn_list.begin();
                 file << " | " << setw(4) << cif2wfn_list.at(index) << " | " << setw(4) << index << " |";
                 file << setw(7) << num_points[index];
-                run++;
             }
             else
             {
@@ -1428,11 +1418,11 @@ void calc_spherical_values(
 #pragma omp for
         for (int g = 0; g < atoms_with_grids; g++)
         {
+            double ax = wave.get_atom_coordinate(i, 0), ay = wave.get_atom_coordinate(i, 1), az = wave.get_atom_coordinate(i, 2), d, temp;
             for (int p = 0; p < num_points[g]; p++)
             {
-                double d = sqrt(pow(grid[g][0][p] - wave.get_atom_coordinate(i, 0), 2) + pow(grid[g][1][p] - wave.get_atom_coordinate(i, 1), 2) + pow(grid[g][2][p] - wave.get_atom_coordinate(i, 2), 2));
-                double temp =
-                    linear_interpolate_spherical_density(
+                d = sqrt(pow(grid[g][GridIndex::x_coord][p] - ax, 2) + pow(grid[g][GridIndex::y_coord][p] - ay, 2) + pow(grid[g][GridIndex::z_coord][p] - az, 2));
+                temp = linear_interpolate_spherical_density(
                         radial_density[type_list_number],
                         radial_dist[type_list_number],
                         d,
@@ -1440,7 +1430,7 @@ void calc_spherical_values(
                         1.0E-7);
                 if (i == cif2wfn_list[g])
                     spherical_density[g][p] += temp;
-                grid[g][4][p] += temp;
+                grid[g][GridIndex::electron_density][p] += temp;
             }
         }
     }
@@ -1464,11 +1454,11 @@ void calc_spherical_values(
                         {
 #pragma omp parallel for
                             for (int p = 0; p < num_points[g]; p++)
-                                grid[g][4][p] += linear_interpolate_spherical_density(
+                                grid[g][GridIndex::electron_density][p] += linear_interpolate_spherical_density(
                                     radial_density[type_list_number],
                                     radial_dist[type_list_number],
                                     sqrt(
-                                        pow(grid[g][0][p] - (wave.get_atom_coordinate(i, 0) + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][1][p] - (wave.get_atom_coordinate(i, 1) + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][2][p] - (wave.get_atom_coordinate(i, 2) + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
+                                        pow(grid[g][GridIndex::x_coord][p] - (wave.get_atom_coordinate(i, 0) + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2)), 2) + pow(grid[g][GridIndex::y_coord][p] - (wave.get_atom_coordinate(i, 1) + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2)), 2) + pow(grid[g][GridIndex::z_coord][p] - (wave.get_atom_coordinate(i, 2) + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2)), 2)),
                                     lincr,
                                     1.0E-7);
                         }
@@ -1487,12 +1477,13 @@ constexpr double cutoff(const int &accuracy)
         return 1E-30;
 }
 
-void prune_hirshfeld(
+void prune_grid(
     vec3 &grid,
     vec2 &total_grid,
     vec2 &spherical_density,
     ivec &num_points,
-    double cutoff)
+    double cutoff,
+    PartitionType type)
 {
     ivec new_gridsize(num_points.size(), 0);
     ivec reductions(num_points.size(), 0);
@@ -1500,9 +1491,18 @@ void prune_hirshfeld(
 #pragma omp parallel for reduction(+ : final_size)
     for (int i = 0; i < num_points.size(); i++)
     {
+        bool use_point = false;
         for (int p = 0; p < num_points[i]; p++)
         {
-            if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][p] / grid[i][4][p]) > cutoff)
+            if (type == PartitionType::Hirshfeld)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::atomic_weight][p] * spherical_density[i][p] / grid[i][GridIndex::electron_density][p]) > cutoff);
+            else if (type == PartitionType::Becke)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
+            else if (type == PartitionType::TFVC)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_TFVC_weight][p]) > cutoff);
+            else
+                use_point = false;
+            if (use_point)
             {
                 new_gridsize[i]++;
             }
@@ -1510,12 +1510,13 @@ void prune_hirshfeld(
         reductions[i] = num_points[i] - new_gridsize[i];
         final_size += new_gridsize[i];
     }
-    for (int k = 0; k < 7; k++)
+    for (int k = 0; k < total_grid.size(); k++)
         total_grid[k].resize(final_size);
 #pragma omp parallel for
     for (int i = 0; i < num_points.size(); i++)
     {
         int offset = 0;
+        bool use_point = false;
         for (int j = 0; j < i; j++)
         {
             offset += new_gridsize[j];
@@ -1524,11 +1525,23 @@ void prune_hirshfeld(
         for (int p = 0; p < num_points[i]; p++)
         {
             pr = p - reduction;
-            if (grid[i][4][p] != 0.0 && abs(grid[i][3][p] * spherical_density[i][pr] / grid[i][4][p]) > cutoff)
+            if (type == PartitionType::Hirshfeld)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::atomic_weight][p] * spherical_density[i][pr] / grid[i][GridIndex::electron_density][p]) > cutoff);
+            else if (type == PartitionType::Becke)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_becke_weight][p]) > cutoff);
+            else if (type == PartitionType::TFVC)
+                use_point = (grid[i][GridIndex::electron_density][p] != 0.0 && abs(grid[i][GridIndex::molecular_TFVC_weight][p]) > cutoff);
+            else
+                use_point = false;
+            if (use_point)
             {
-                for (int k = 0; k < 5; k++)
-                    total_grid[k][pr + offset] = grid[i][k][p];
-                total_grid[6][pr + offset] = grid[i][5][p];
+                total_grid[TotalGridIndex::X][pr + offset] = grid[i][GridIndex::x_coord][p];
+                total_grid[TotalGridIndex::Y][pr + offset] = grid[i][GridIndex::y_coord][p];
+                total_grid[TotalGridIndex::Z][pr + offset] = grid[i][GridIndex::z_coord][p];
+                total_grid[TotalGridIndex::quadrature_weight][pr + offset] = grid[i][GridIndex::atomic_weight][p];
+                total_grid[TotalGridIndex::spherical_electron_density][pr + offset] = grid[i][GridIndex::electron_density][p];
+                total_grid[TotalGridIndex::becke_weight][pr + offset] = grid[i][GridIndex::molecular_becke_weight][p];
+                total_grid[TotalGridIndex::TFVC_weight][pr + offset] = grid[i][GridIndex::molecular_TFVC_weight][p];
             }
             else
             {
@@ -1544,7 +1557,7 @@ void prune_hirshfeld(
 }
 
 /**
- * Generates Hirshfeld grids based on the specified parameters.
+ * Generates Atomic grids based on the specified parameters.
  *
  * @param pbc The periodic boundary condition flag.
  * @param accuracy The accuracy level for grid generation.
@@ -1569,7 +1582,7 @@ void prune_hirshfeld(
  *
  * @return The number of grid points in the final total grid.
  */
-int make_hirshfeld_grids(
+int make_atomic_grids(
     const int &pbc,
     const int &accuracy,
     cell &unit_cell,
@@ -1586,7 +1599,8 @@ int make_hirshfeld_grids(
     std::vector<_time_point> &time_points,
     std::vector<std::string> &time_descriptions,
     bool debug,
-    bool no_date)
+    bool no_date,
+    PartitionType type)
 {
     using namespace std;
 #ifdef FLO_CUDA
@@ -1612,7 +1626,7 @@ int make_hirshfeld_grids(
                                    debug,
                                    no_date)
 #endif
-               int atoms_with_grids = vec_sum(needs_grid);
+    int atoms_with_grids = vec_sum(needs_grid);
     if (debug)
     {
         int run = 0;
@@ -1643,9 +1657,9 @@ int make_hirshfeld_grids(
     ivec atom_z(nr_of_atoms);
 #pragma omp parallel for
     for (int i = 0; i < atoms_with_grids; i++)
-        grid[i].resize(6);
+        grid[i].resize(7);
     // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
-    // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4= molecular becke weight, 5=total spherical density],
+    // c = coordinate of enum GridIndex,
     // p = point in this grid
 
     fill_xyzc(x, y, z, atom_z, pbc, wave, unit_cell);
@@ -1653,11 +1667,11 @@ int make_hirshfeld_grids(
     // Make Prototype grids with only single atom weights for all elements
     vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, cif2wfn_list, debug, file, accuracy, wave, 1);
     if (no_date)
-        file << "\nMaking Becke Grids..." << flush;
+        file << "\nMaking Integration Grids..." << flush;
     else
     {
         file << endl
-             << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
+             << "Selected accuracy: " << accuracy << "\nMaking Integration Grids..." << flush;
     }
     time_points.push_back(get_time());
     time_descriptions.push_back("Prototype Grid setup");
@@ -1679,13 +1693,15 @@ int make_hirshfeld_grids(
     {
         file << " ...  " << flush;
     }
-    ivec num_points = make_atomic_grids(
+    WFN temp = wave;
+    temp.delete_unoccupied_MOs();
+    ivec num_points = make_integration_grids(
         x,
         y,
         z,
         atom_z,
         needs_grid,
-        wave,
+        temp,
         pbc,
         atom_type_list,
         cif2wfn_list,
@@ -1697,9 +1713,9 @@ int make_hirshfeld_grids(
 
     int points = vec_sum(num_points);
     if (debug)
-        file << "Becke Grid exists" << endl;
+        file << "Integration Grid exists" << endl;
     else
-        file << setw(55) << "done! Number of gridpoints: " << defaultfloat << points << endl;
+        file << setw(49) << "done! Number of gridpoints: " << defaultfloat << points << endl;
 
     time_points.push_back(get_time());
     time_descriptions.push_back("Becke Grid setup");
@@ -1754,11 +1770,11 @@ int make_hirshfeld_grids(
     // Total grid as a sum of all atomic grids.
     // Dimensions: [c] [p]
     // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=numerical grid weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    vec2 total_grid(7);
+    // c = coordinate, which is 0=x, 1=y, 2=z, 3=numerical grid weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight, 7=TFVC weight
+    vec2 total_grid(8);
     file << "Pruning Grid..." << flush;
 
-    prune_hirshfeld(grid, total_grid, spherical_density, num_points, cutoff(accuracy));
+    prune_grid(grid, total_grid, spherical_density, num_points, cutoff(accuracy), type);
     points = vec_sum(num_points);
 
     // total_grid[5].resize(total_grid[0].size());
@@ -1772,10 +1788,7 @@ int make_hirshfeld_grids(
 
     file << "Calculating non-spherical densities..." << flush;
     vec2 periodic_grid;
-
-    WFN temp = wave;
-    temp.delete_unoccupied_MOs();
-    const int nr_pts = static_cast<int>(total_grid[0].size());
+    const int nr_pts = static_cast<int>(total_grid[TotalGridIndex::X].size());
     const int nr_mos = temp.get_nmo(true);
     const int nr_cen = temp.get_ncen();
     if (debug)
@@ -1796,10 +1809,10 @@ int make_hirshfeld_grids(
 #pragma omp for
         for (int i = 0; i < nr_pts; i++)
         {
-            total_grid[5][i] = temp.compute_dens(
-                total_grid[0][i],
-                total_grid[1][i],
-                total_grid[2][i],
+            total_grid[TotalGridIndex::wavefunction_electron_density][i] = temp.compute_dens(
+                total_grid[TotalGridIndex::X][i],
+                total_grid[TotalGridIndex::Y][i],
+                total_grid[TotalGridIndex::Z][i],
                 d_temp,
                 phi_temp);
         }
@@ -1808,20 +1821,6 @@ int make_hirshfeld_grids(
         shrink_vector<vec>(d_temp);
         shrink_vector<double>(phi_temp);
     }
-    // if (debug) {
-    //    //Copy grid from GPU to print:
-    //    // Dimensions: [c] [p]
-    //    // p = the number of gridpoint
-    //    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    //    ofstream grid("grid.file", ios::out);
-    //    for (int i = 0; i < total_grid[0].size(); i++) {
-    //        for (int j = 0; j < 7; j++)
-    //            grid << setw(16) << scientific << setprecision(8) << total_grid[j][i];
-    //        grid << "\n";
-    //    }
-    //    grid.flush();
-    //    grid.close();
-    // }
     if (pbc != 0)
     {
         periodic_grid.resize((int)pow(pbc * 2 + 1, 3));
@@ -1837,9 +1836,9 @@ int make_hirshfeld_grids(
 #pragma omp parallel for
                     for (int i = 0; i < total_grid[0].size(); i++)
                     {
-                        periodic_grid[j][i] = temp.compute_dens(total_grid[0][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
-                                                                total_grid[1][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
-                                                                total_grid[2][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
+                        periodic_grid[j][i] = temp.compute_dens(total_grid[TotalGridIndex::X][i] + _x * unit_cell.get_cm(0, 0) + _y * unit_cell.get_cm(0, 1) + _z * unit_cell.get_cm(0, 2),
+                                                                total_grid[TotalGridIndex::Y][i] + _x * unit_cell.get_cm(1, 0) + _y * unit_cell.get_cm(1, 1) + _z * unit_cell.get_cm(1, 2),
+                                                                total_grid[TotalGridIndex::Z][i] + _x * unit_cell.get_cm(2, 0) + _y * unit_cell.get_cm(2, 1) + _z * unit_cell.get_cm(2, 2));
                     }
                     j++;
                 }
@@ -1862,20 +1861,23 @@ int make_hirshfeld_grids(
     }
 
     if (debug)
-        file << endl
-             << "with total number of points: " << total_grid[0].size() << endl;
-    else
-        file << "                done!" << endl;
-
-    file << "Applying hirshfeld weights and integrating charges..." << flush;
+        file << endl;
+    file << "                done!" << endl
+         << "Applying integration weights and integrating charge..." << flush;
     double el_sum_becke = 0.0;
-    // double el_sum_spherical = 0.0;
+    double el_sum_TFVC = 0.0;
     double el_sum_hirshfeld = 0.0;
+    enum AtomSum {
+        Becke = 0,
+        Spherical = 1,
+        Hirshfeld = 2,
+        TFVC = 3
+    };
     // Vector containing integrated numbers of electrons
-    // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
+    // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density 3=TFVC weighted density
     // dimension 1: atoms of asym_atom_list
-    vec2 atom_els(3);
-    for (int n = 0; n < 3; n++)
+    vec2 atom_els(4);
+    for (int n = 0; n < 4; n++)
     {
         atom_els[n].resize(cif2wfn_list.size(), 0.0);
     }
@@ -1887,7 +1889,7 @@ int make_hirshfeld_grids(
             file << cif2wfn_list[i] << " ";
     }
     // Generate Electron sums
-#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) //, el_sum_spherical)
+#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld, el_sum_TFVC)
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         // if (debug) file << "i=" << i << endl;
@@ -1896,67 +1898,66 @@ int make_hirshfeld_grids(
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
-            if (abs(total_grid[6][p]) > cutoff(accuracy))
+            if (abs(total_grid[TotalGridIndex::becke_weight][p]) > cutoff(accuracy))
             {
-                atom_els[0][i] += total_grid[6][p] * total_grid[5][p];
-                atom_els[1][i] += total_grid[6][p] * total_grid[4][p];
+                atom_els[AtomSum::Becke][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
+                //atom_els[AtomSum::Spherical][i] += total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::spherical_electron_density][p];
+                atom_els[AtomSum::TFVC][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::TFVC_weight][p];
+
             }
-            if (total_grid[4][p] != 0)
+            if (total_grid[TotalGridIndex::spherical_electron_density][p] != 0)
             {
-                atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+                atom_els[AtomSum::Hirshfeld][i] += total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p];
             }
         }
-        el_sum_becke += atom_els[0][i];
-        // el_sum_spherical += atom_els[1][i];
-        el_sum_hirshfeld += atom_els[2][i];
+        el_sum_becke += atom_els[AtomSum::Becke][i];
+        el_sum_hirshfeld += atom_els[AtomSum::Hirshfeld][i];
+        el_sum_TFVC += atom_els[AtomSum::TFVC][i];
         if (wave.get_has_ECPs())
         {
             int n = wave.get_atom_ECP_electrons(cif2wfn_list[i]);
             el_sum_becke += n;
-            // el_sum_spherical += n;
             el_sum_hirshfeld += n;
-            atom_els[0][i] += n;
-            atom_els[2][i] += n;
+            el_sum_TFVC += n;
+            atom_els[AtomSum::Becke][i] += n;
+            atom_els[AtomSum::Hirshfeld][i] += n;
+            atom_els[AtomSum::TFVC][i] += n;
         }
     }
 
     if (debug)
     {
-        file << "Becke grid with hirshfeld weights done!" << endl;
-        file << "atom_els[2]: ";
-        for (int i = 0; i < cif2wfn_list.size(); i++)
-            file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
-        file << endl;
+        file << "Integration grid with weights done!" << endl;
     }
+    file << "done!" << endl
+        << "Number of points evaluated: " << total_grid[0].size() << "." << endl
+        << endl
+        << "Table of Charges in electrons" << endl
+        << endl
+        << "    Atom       Becke   Hirshfeld   TFVC";
+    if(debug)
+        file << "   ----debug---- charge    N(Becke)    N(Sph.)   N(Hirshf.)    TFVC";
+    file << endl;
 
-#pragma omp parallel for
-    for (int p = 0; p < total_grid[0].size(); p++)
-        total_grid[5][p] *= total_grid[3][p];
-    file << " done!" << endl
-         << "Number of points evaluated: " << total_grid[0].size() << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
-         << endl
-         << "Table of Charges in electrons" << endl
-         << endl
-         << "    Atom       Becke   Spherical Hirshfeld" << endl;
-
-    int counter = 0;
     for (int i = 0; i < cif2wfn_list.size(); i++)
     {
         int a = cif2wfn_list[i];
         file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter];
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Becke][i]
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::Hirshfeld][i]
+             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[AtomSum::TFVC][i];
         if (debug)
-            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
-                 << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
-                 << fixed << setw(10) << setprecision(3) << atom_els[2][counter];
-        counter++;
+            file << "   ----debug---- " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Becke][i]
+                 << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Spherical][i]
+                 << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::Hirshfeld][i]
+                 << fixed << setw(10) << setprecision(3) << atom_els[AtomSum::TFVC][i];
         file << endl;
     }
 
-    file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl
-         << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
+    file << "Total number of electrons in the asymmetric unit:" << endl << setw(10) << setprecision(6)
+         << " Becke:     " << el_sum_becke << endl
+         << " Hirshfeld: " << el_sum_hirshfeld << endl
+         << " TVFC:      " << el_sum_TFVC << endl;
 
     if (debug)
     {
@@ -2000,448 +2001,34 @@ int make_hirshfeld_grids(
             start_p += num_points[a];
         for (int p = start_p; p < start_p + num_points[i]; p++)
         {
-            res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
+            if (type == PartitionType::Becke)
+                res = total_grid[TotalGridIndex::becke_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
+            else if (type == PartitionType::TFVC)
+                res = total_grid[TotalGridIndex::TFVC_weight][p] * total_grid[TotalGridIndex::wavefunction_electron_density][p];
+            else if (type == PartitionType::Hirshfeld)
+                res = total_grid[TotalGridIndex::wavefunction_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p] * spherical_density[i][p - start_p] / total_grid[TotalGridIndex::spherical_electron_density][p];
+            else
+                res = 0;
             if (abs(res) > _cut)
             {
                 densy = 0;
                 dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(ci, 0));
-                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(ci, 1));
-                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(ci, 2));
-                diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
+                d1[i][run] = (total_grid[TotalGridIndex::X][p] - wave.get_atom_coordinate(ci, 0));
+                d2[i][run] = (total_grid[TotalGridIndex::Y][p] - wave.get_atom_coordinate(ci, 1));
+                d3[i][run] = (total_grid[TotalGridIndex::Z][p] - wave.get_atom_coordinate(ci, 2));
+                diff = (total_grid[TotalGridIndex::wavefunction_electron_density][p] - total_grid[TotalGridIndex::spherical_electron_density][p]) * total_grid[TotalGridIndex::quadrature_weight][p];
                 if (wave.get_atom_ECP_electrons(ci) != 0)
                 {
-                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                    densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(ci)) * total_grid[3][p];
+                    dist = vec_length({d1[i][run], d2[i][run], d3[i][run]});
+                    densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(ci)) * total_grid[TotalGridIndex::quadrature_weight][p];
                     if (wave.get_ECP_mode() != 0)
-                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
+                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[TotalGridIndex::quadrature_weight][p];
                     diff += densy;
                 }
                 diffs += pow(diff, 2);
-                upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
-                lower += abs(total_grid[5][p] + densy);
+                upper += abs(abs(res) - abs(total_grid[TotalGridIndex::spherical_electron_density][p] * total_grid[TotalGridIndex::quadrature_weight][p]) + densy);
+                lower += abs(total_grid[TotalGridIndex::wavefunction_electron_density][p]) * total_grid[TotalGridIndex::quadrature_weight][p] + densy;
                 avg += abs(diff);
-                run++;
-            }
-        }
-        points += run;
-        shrink_vector<double>(spherical_density[i]);
-        dens[i].resize(run);
-        d1[i].resize(run);
-        d2[i].resize(run);
-        d3[i].resize(run);
-    }
-    if (no_date == false)
-    {
-        file << "NRMSD value of density =              " << setw(9) << setprecision(4) << fixed << sqrt(diffs / points) / (avg / points);
-        file << "\nR value of sph. vs non-sph. density = " << setw(9) << setprecision(4) << fixed << upper / lower * 100 << " %" << endl;
-    }
-    shrink_vector<vec>(spherical_density);
-#pragma omp parallel for
-    for (int _grid = 0; _grid < total_grid.size(); _grid++)
-        shrink_vector<double>(total_grid[_grid]);
-    shrink_vector<vec>(total_grid);
-    return points;
-}
-
-/**
- * @brief Generates Hirshfeld grids for the RI method.
- *
- * This function generates Hirshfeld grids for the RI (Resolution of Identity) method.
- * It takes various parameters such as accuracy, wavefunction, coefficient filename,
- * atom type list, asymmetric atom list, needs grid vector, displacement vectors,
- * density vectors, expansion coefficients, output file stream, timing variables,
- * debug flag, and no date flag.
- *
- * @param accuracy The accuracy of the grids.
- * @param wave The wavefunction.
- * @param coefs The coefficient vector.
- * @param atom_type_list The list of atom types.
- * @param asym_atom_list The list of asymmetric atoms.
- * @param needs_grid The vector indicating if a grid is needed for each atom.
- * @param d1 The displacement vector d1.
- * @param d2 The displacement vector d2.
- * @param d3 The displacement vector d3.
- * @param dens The density vector.
- * @param exp_coefs The number of expansion coefficients.
- * @param file The output file stream.
- * @param start The start time point.
- * @param end_becke The end time point for Becke grid generation.
- * @param end_prototypes The end time point for prototype generation.
- * @param end_spherical The end time point for spherical grid generation.
- * @param end_prune The end time point for pruning.
- * @param end_aspherical The end time point for aspherical grid generation.
- * @param debug The debug flag.
- * @param no_date The no date flag.
- *
- * @return number of gridpoints in the final total grid
- */
-static int make_hirshfeld_grids_ML(
-    const int &accuracy,
-    const WFN &wave,
-    vec coefs,
-    const ivec &atom_type_list,
-    const ivec &asym_atom_list,
-    bvec &needs_grid,
-    vec2 &d1,
-    vec2 &d2,
-    vec2 &d3,
-    vec2 &dens,
-    const svec &labels,
-    std::ostream &file,
-    std::vector<_time_point> &time_points,
-    std::vector<std::string> &time_descriptions,
-    bool debug,
-    bool no_date)
-{
-    using namespace std;
-    int atoms_with_grids = vec_sum(needs_grid);
-    // GRID COORDINATES for [a][c][p] a = atom [0,ncen],
-    // c = coordinate [0=x, 1=y, 2=z, 3=atomic becke weight, 4=total spherical density, 5=molecular becke weight],
-    // p = point in this grid
-    vec3 grid(atoms_with_grids);
-    const int nr_of_atoms = (wave.get_ncen());
-    vec x(nr_of_atoms), y(nr_of_atoms), z(nr_of_atoms);
-    ivec atom_z(nr_of_atoms);
-#pragma omp parallel for
-    for (int i = 0; i < atoms_with_grids; i++)
-        grid[i].resize(6);
-
-    fill_xyzc(x, y, z, atom_z, 0, wave, cell());
-
-    // Make Prototype grids with only single atom weights for all elements
-    vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_type_list, asym_atom_list, debug, file, accuracy, wave, 2);
-    if (no_date)
-        file << "\nMaking Becke Grids..." << flush;
-    else
-        file << endl
-             << "Selected accuracy: " << accuracy << "\nMaking Becke Grids..." << flush;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Prototype Grid setup");
-    if (debug)
-    {
-        long long int dur = get_sec(time_points.end()[-2], time_points.end()[-1]);
-        for (int prototype = 0; prototype < Prototype_grids.size(); prototype++)
-            file << "Number of gridpoints for atom type " << atom_type_list[prototype] << ": " << Prototype_grids[prototype].get_num_grid_points() << endl;
-
-        //    int diff = end - start;
-        if (dur < 1)
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << get_msec(time_points.end()[-2], time_points.end()[-1]) << " ms" << endl;
-        else
-            file << "Time until prototypes are done: " << fixed << setprecision(0) << dur << " s" << endl;
-    }
-    else
-        file << " ...  " << flush;
-
-    ivec num_points = make_atomic_grids(
-        x,
-        y,
-        z,
-        atom_z,
-        needs_grid,
-        wave,
-        0,
-        atom_type_list,
-        asym_atom_list,
-        Prototype_grids,
-        grid,
-        file,
-        debug);
-    Prototype_grids.clear();
-
-    int points = vec_sum(num_points);
-    if (debug)
-        file << "Becke Grid exists" << endl;
-    else
-        file << "                           done! Number of gridpoints: " << defaultfloat << points << endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Becke Grid setup");
-
-    file << "Calculating spherical densities..." << flush;
-
-    // density of spherical atom at each
-    // Dimensions: [a] [d]
-    // a = atom number in atom type list for which the weight is calcualted
-    // d = distance to look at obtained from point_to_distance_map
-    vec2 spherical_density(atoms_with_grids);
-    vec2 radial_density(atom_type_list.size());
-    vec2 radial_dist(atom_type_list.size());
-    const double lincr = make_sphericals(radial_density, radial_dist, atom_type_list, file, debug);
-    err_checkf(lincr != -1000, "Error during making of spherical density vectors!", file);
-
-    calc_spherical_values(
-        wave,
-        atoms_with_grids,
-        grid,
-        spherical_density,
-        radial_density,
-        radial_dist,
-        atom_type_list,
-        num_points,
-        asym_atom_list,
-        file,
-        lincr,
-        0,
-        cell(),
-        debug);
-    for (int i = 0; i < atoms_with_grids; i++)
-        err_checkf(num_points[i] == spherical_density[i].size(), "mismatch in number of spherical density points! i=" + toString(i), file);
-
-    file << "                    done!" << endl;
-
-    shrink_vector<vec>(radial_density);
-    shrink_vector<vec>(radial_dist);
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("spherical density");
-
-    ivec new_gridsize(atoms_with_grids, 0);
-    ivec reductions(atoms_with_grids, 0);
-    // Total grid as a sum of all atomic grids.
-    // Dimensions: [c] [p]
-    // p = the number of gridpoint
-    // c = coordinate, which is 0=x, 1=y, 2=z, 3=atomic becke weight, 4=spherical density, 5=wavefunction density, 6=molecular becke weight
-    vec2 total_grid(7);
-
-    file << "Pruning Grid..." << flush;
-    prune_hirshfeld(grid, total_grid, spherical_density, num_points, cutoff(accuracy));
-    points = vec_sum(num_points);
-
-    // total_grid[5].resize(total_grid[0].size());
-    if (debug)
-        file << "sphericals done!" << endl;
-    else
-        file << "                                       done! Number of gridpoints: " << defaultfloat << points << endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Grid Pruning");
-
-    file << "Calculating non-spherical densities..." << flush;
-    vec2 periodic_grid;
-    vec coefs_temp = coefs;
-    {
-        WFN temp = wave;
-        const int nr_pts = (int)total_grid[0].size();
-
-#pragma omp parallel for
-        for (int i = 0; i < nr_pts; i++)
-        {
-            total_grid[5][i] = calc_density_ML(
-                total_grid[0][i],
-                total_grid[1][i],
-                total_grid[2][i],
-                coefs,
-                temp.get_atoms());
-        }
-        shrink_vector<double>(coefs);
-    }
-
-    if (debug)
-        file << endl
-             << "with total number of points: " << total_grid[0].size() << endl;
-    else
-        file << "                done!" << endl;
-
-    file << "Applying hirshfeld weights and integrating charges..." << flush;
-    double el_sum_becke = 0.0;
-    // double el_sum_spherical = 0.0;
-    double el_sum_hirshfeld = 0.0;
-    // Vector containing integrated numbers of electrons
-    // dimension 0: 0=Becke grid integration 1=Summed spherical density 2=hirshfeld weighted density
-    // dimension 1: atoms of asym_atom_list
-
-    vec2 atom_els(5);
-    for (int n = 0; n < 5; n++)
-    {
-        atom_els[n].resize(asym_atom_list.size(), 0.0);
-    }
-
-    if (debug)
-        file << "before loop" << endl;
-    // Generate Electron sums
-#pragma omp parallel for reduction(+ : el_sum_becke, el_sum_hirshfeld) // el_sum_spherical)
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        // if (debug) file << "i=" << i << endl;
-        int start_p = 0;
-        for (int a = 0; a < i; a++)
-            start_p += num_points[a];
-        for (int p = start_p; p < start_p + num_points[i]; p++)
-        {
-            if (abs(total_grid[6][p]) > cutoff(accuracy))
-            {
-                atom_els[0][i] += total_grid[6][p] * total_grid[5][p]; // Molecular grid * WFN rho
-                atom_els[1][i] += total_grid[6][p] * total_grid[4][p]; // Molecular grid * spheircal rho
-            }
-            if (total_grid[4][p] != 0)
-            {
-                // WFN rho * atomic weight * hirshfeld weight
-                atom_els[2][i] += total_grid[5][p] * total_grid[3][p] * spherical_density[i][p - start_p] / total_grid[4][p];
-            }
-        }
-        el_sum_becke += atom_els[0][i];
-        // el_sum_spherical += atom_els[1][i];
-        el_sum_hirshfeld += atom_els[2][i];
-        if (wave.get_has_ECPs())
-        {
-            int n = wave.get_atom_ECP_electrons(asym_atom_list[i]);
-            el_sum_becke += n;
-            // el_sum_spherical += n;
-            el_sum_hirshfeld += n;
-            atom_els[0][i] += n;
-            atom_els[2][i] += n;
-        }
-    }
-
-    double el_sum = 0.0;
-    int e = 0, size = 0;
-    double radial = 0;
-    basis_set_entry bf;
-    double n = 0;
-
-    int coef_counter = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-
-        size = (int)wave.get_atom_basis_set_size(i);
-
-        double temp_dens = 0;
-        for (e = 0; e < size; e++)
-        {
-            bf = wave.get_atom_basis_set_entry(i, e);
-            primitive p(i, bf.get_type(), bf.get_exponent(), bf.get_coefficient());
-            if (p.get_type() > 0)
-            {
-                break;
-            }
-            radial = constants::PI / (2.0 * std::pow(p.get_exp(), 1.5)) * p.get_coef() * p.normalization_constant(); // gaussian_radial(p, d[3]) * p.coefficient;
-
-            n = coefs_temp[coef_counter + e] * radial;
-
-            temp_dens += n; // *spherical_harmonic(p.type, m, d);
-            file << setprecision(2) << "Radial: " << radial
-                 << " | Coef: " << coefs_temp[coef_counter + e] << setprecision(0)
-                 << " | Coef Counter: " << coef_counter + e
-                 << " | Size: " << size << setprecision(2)
-                 << " | Exponent: " << bf.get_exponent()
-                 << " | Coefficient: " << bf.get_coefficient()
-                 << " | Norm Const: " << p.normalization_constant()
-                 << " | Temp Dens: " << temp_dens
-                 << " | New Dens: " << n << endl;
-        }
-
-        atom_els[3][i] += temp_dens;
-        for (e = 0; e < size; e++)
-        {
-            bf = wave.get_atom_basis_set_entry(i, e);
-            coef_counter += (2 * bf.get_type() + 1);
-        }
-        file << "---------------------------------" << endl;
-        // atom_els[3][i] *= step; // * constants::FOUR_PI) / 2;
-        el_sum += atom_els[3][i];
-    }
-
-    if (debug)
-    {
-        file << "Becke grid with hirshfeld weights done!" << endl;
-        file << "atom_els[2]: ";
-        for (int i = 0; i < asym_atom_list.size(); i++)
-            file << fixed << setw(10) << setprecision(3) << atom_els[2][i] << " ";
-        file << endl;
-    }
-
-#pragma omp parallel for
-    for (int p = 0; p < total_grid[0].size(); p++)
-        total_grid[5][p] *= total_grid[3][p];
-    file << " done!" << endl
-         << "Number of points evaluated: " << total_grid[0].size()
-         << " with " << fixed << setw(10) << setprecision(6) << el_sum_becke << " electrons in Becke Grid in total." << endl
-         << endl
-         << "Table of Charges in electrons" << endl
-         << endl
-         << "    Atom       Becke   Spherical Hirshfeld     ML" << endl;
-
-    int counter = 0;
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        int a = asym_atom_list[i];
-        file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[0][counter]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[1][counter]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[2][counter]
-             << fixed << setw(10) << setprecision(3) << wave.get_atom_charge(a) - atom_els[3][counter];
-        if (debug)
-            file << " " << setw(4) << wave.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_els[0][counter]
-                 << fixed << setw(10) << setprecision(3) << atom_els[1][counter]
-                 << fixed << setw(10) << setprecision(3) << atom_els[2][counter]
-                 << fixed << setw(10) << setprecision(3) << atom_els[3][counter];
-        counter++;
-        file << endl;
-    }
-
-    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-    file << "Total number of electrons in the wavefunction: " << el_sum_becke << endl
-         << " and Hirshfeld electrons (asym unit): " << el_sum_hirshfeld << endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("aspherical density");
-
-    dens.resize(asym_atom_list.size());
-    if (debug)
-        file << "resized outer dens" << endl;
-    d1.resize(asym_atom_list.size());
-    d2.resize(asym_atom_list.size());
-    d3.resize(asym_atom_list.size());
-    if (debug)
-        file << "resized outer d1-3" << endl;
-    points = 0;
-#pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        dens[i].resize(num_points[i]);
-        d1[i].resize(num_points[i]);
-        d2[i].resize(num_points[i]);
-        d3[i].resize(num_points[i]);
-    }
-    double upper = 0, diffs = 0, avg = 0, lower = 0, _cut = cutoff(accuracy);
-#pragma omp parallel for reduction(+ : points, upper, avg, diffs, lower)
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        int start_p = 0;
-        int run = 0;
-        double res;
-        double diff;
-        double dist = 0;
-        double densy;
-        int c = wave.get_atom_charge(asym_atom_list[i]);
-        Thakkar spherical_temp(c, wave.get_ECP_mode());
-        for (int a = 0; a < i; a++)
-            start_p += num_points[a];
-        for (int p = start_p; p < start_p + num_points[i]; p++)
-        {
-            res = total_grid[5][p] * spherical_density[i][p - start_p] / total_grid[4][p];
-            if (abs(res) > _cut)
-            {
-                densy = 0;
-                dens[i][run] = (res);
-                d1[i][run] = (total_grid[0][p] - wave.get_atom_coordinate(asym_atom_list[i], 0));
-                d2[i][run] = (total_grid[1][p] - wave.get_atom_coordinate(asym_atom_list[i], 1));
-                d3[i][run] = (total_grid[2][p] - wave.get_atom_coordinate(asym_atom_list[i], 2));
-                diff = total_grid[5][p] - total_grid[4][p] * total_grid[3][p];
-                if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
-                {
-                    dist = sqrt(pow(d1[i][run], 2) + pow(d2[i][run], 2) + pow(d3[i][run], 2));
-                    densy = spherical_temp.get_core_density(dist, wave.get_atom_ECP_electrons(asym_atom_list[i])) * total_grid[3][p];
-                    if (wave.get_ECP_mode())
-                        densy += Spherical_Gaussian_Density(c, wave.get_ECP_mode()).get_radial_density(dist) * total_grid[3][p];
-                    diff += densy;
-                }
-                diffs += pow(diff, 2);
-                upper += abs(abs(total_grid[5][p]) - abs(total_grid[4][p] * total_grid[3][p]) + densy);
-                lower += abs(total_grid[5][p] + densy);
-                avg += diff;
                 run++;
             }
         }
@@ -2479,7 +2066,6 @@ static int make_hirshfeld_grids_ML(
  */
 void make_k_pts(const bool &read_k_pts,
                 const bool &save_k_pts,
-                const int gridsize,
                 const cell &unit_cell,
                 hkl_list &hkl,
                 vec2 &k_pt,
@@ -2490,6 +2076,7 @@ void make_k_pts(const bool &read_k_pts,
     const int size = (int)hkl.size();
     if (!read_k_pts)
     {
+		file << "Generating k-points..." << flush;
         k_pt.resize(3);
 #pragma omp parallel for
         for (int i = 0; i < 3; i++)
@@ -2512,8 +2099,7 @@ void make_k_pts(const bool &read_k_pts,
                 }
             }
         }
-        if (gridsize != 0)
-            file << "\nNumber of k-points to evaluate: " << k_pt[0].size() << " for " << gridsize << " gridpoints." << endl;
+        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
         if (save_k_pts)
             save_k_points(k_pt, hkl);
     }
@@ -2567,7 +2153,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
             int coef_count = 0;
-			const int num_atoms = (int)atom_list.size();
+            const int num_atoms = (int)atom_list.size();
             const double* coef_slice_ptr = NULL;
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
@@ -2576,15 +2162,17 @@ void calc_SF_SALTED(const vec2 &k_pt,
             for (int i = 0; i < 3; i++) 
                 k_pt_local[i] /= k_pt_local[3];
 
-            for (int iat = 0; iat < num_atoms; iat++)
+            const atom* atom_ptr = &(atom_list[0]);
+            const basis_set_entry* basis_ptr = NULL;
+            for (int iat = 0; iat < num_atoms; iat++, atom_ptr++)
             {
-                const int lim = (int)atom_list[iat].get_basis_set_size();
-                for (int i_basis = 0; i_basis < lim; i_basis++)
+                const int lim = (int)atom_ptr->get_basis_set_size();
+                basis_ptr = &(atom_ptr->get_basis_set_entry(0));
+                coef_slice_ptr = coefs.data();
+                for (int i_basis = 0; i_basis < lim; i_basis++, basis_ptr++, coef_slice_ptr += 2 * basis.get_type() + 1)
                 {
-                    basis = atom_list[iat].get_basis_set_entry(i_basis).get_primitive();
-                    coef_slice_ptr = coefs.data() + coef_count;
+                    basis = basis_ptr->get_primitive();
                     sf[iat][i_kpt] += sfac_bessel(basis, k_pt_local, coef_slice_ptr);
-                    coef_count += 2 * basis.get_type() + 1;
                 }
             }
             pb.update();
@@ -2645,35 +2233,6 @@ void calc_SF(const int &points,
                  << endl;
     }
 
-#ifdef FLO_CUDA
-    double **gpu_k_pt = NULL,
-           **gpu_sf_r = NULL,
-           **gpu_sf_i = NULL;
-    vector<double> long_kpt;
-    long_kpt.resize(3 * k_pt_unique[0].size());
-    for (int i = 0; i < k_pt_unique[0].size(); i++)
-    {
-        long_kpt[3 * i + 0] = k_pt_unique[0][i];
-        long_kpt[3 * i + 1] = k_pt_unique[1][i];
-        long_kpt[3 * i + 2] = k_pt_unique[2][i];
-    }
-    gpu_k_pt = (double **)malloc(sizeof(double *));
-    gpu_sf_r = (double **)malloc(sizeof(double *));
-    gpu_sf_i = (double **)malloc(sizeof(double *));
-    cudaMalloc((void **)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
-    cudaMalloc((void **)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-    cudaMalloc((void **)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
-    cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
-
-    dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
-    gpu_make_sf<<<blocks, 1>>>(
-        gpu_sf_r[0],
-        gpu_sf_i[0],
-        gpu_k_pt[0],
-
-    );
-#else
-
     ProgressBar *progress = new ProgressBar(imax, 60, "=", " ", "Calculating Scattering Factors");
     long long int pmax;
     double *dens_local, *d1_local, *d2_local, *d3_local;
@@ -2704,9 +2263,72 @@ void calc_SF(const int &points,
         progress->update();
     }
     delete (progress);
-
-#endif
 }
+
+void calc_SF_CUDA(const int &points,
+             vec2 &k_pt,
+             vec2 &d1,
+             vec2 &d2,
+             vec2 &d3,
+             vec2 &dens,
+             cvec2 &sf,
+             std::ostream &file,
+             _time_point &start,
+             _time_point &end1,
+             bool debug,
+             bool no_date){
+    const long long int imax = static_cast<long long int>(dens.size());
+    const long long int smax = static_cast<long long int>(k_pt[0].size());
+    sf.reserve(imax * smax);
+    sf.resize(imax);
+#pragma omp parallel for
+    for (int i = 0; i < imax; i++)
+        sf[i].resize(smax, constants::cnull);
+    using namespace std;
+    if (debug)
+        file << "Initialized FFs" << std::endl
+             << "asym atom list size: " << imax << " total grid size: " << points << endl;
+    end1 = get_time();
+
+    if (!no_date)
+    {
+        long long int dur = get_sec(start, end1);
+        if (dur < 1)
+            file << "Time to prepare: " << fixed << setprecision(0) << get_msec(start, end1) << " ms" << endl
+                 << endl;
+        else
+            file << "Time to prepare: " << fixed << setprecision(0) << dur << " s" << endl
+                 << endl;
+    }
+#ifdef __CUDACC__
+    double **gpu_k_pt = NULL,
+           **gpu_sf_r = NULL,
+           **gpu_sf_i = NULL;
+    vector<double> long_kpt;
+    long_kpt.resize(3 * k_pt_unique[0].size());
+    for (int i = 0; i < k_pt_unique[0].size(); i++)
+    {
+        long_kpt[3 * i + 0] = k_pt_unique[0][i];
+        long_kpt[3 * i + 1] = k_pt_unique[1][i];
+        long_kpt[3 * i + 2] = k_pt_unique[2][i];
+    }
+    gpu_k_pt = (double **)malloc(sizeof(double *));
+    gpu_sf_r = (double **)malloc(sizeof(double *));
+    gpu_sf_i = (double **)malloc(sizeof(double *));
+    cudaMalloc((void **)&gpu_k_pt[0], sizeof(double) * k_pt_unique[0].size() * 3);
+    cudaMalloc((void **)&gpu_sf_r[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+    cudaMalloc((void **)&gpu_sf_i[0][i], sizeof(double) * asym_atom_list.size() * k_pt_unique[0].size());
+    cudaMemcpy(gpu_k_pt[0], long_kpt.data(), sizeof(double) * k_pt_unique[0].size() * 3, cudaMemcpyHostToDevice);
+
+    dim3 blocks(asym_atom_list.size(), k_pt_unique[0].size());
+    gpu_make_sf<<<blocks, 1>>>(
+        gpu_sf_r[0],
+        gpu_sf_i[0],
+        gpu_k_pt[0],
+
+    );
+#endif
+             }
 
 /**
  * Adds the ECP (Effective Core Potential) contribution to the scattering factors.
@@ -2822,10 +2444,11 @@ void convert_to_ED(const ivec &asym_atom_list,
                    const cell &unit_cell,
                    const hkl_list &hkl)
 {
-    double h2;
+    double h2 = 0.0;
     const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+    const int hkl_size = hkl.size();
 #pragma omp parallel for private(h2) shared(hkl_vector)
-    for (int s = 0; s < hkl.size(); s++)
+    for (int s = 0; s < hkl_size; s++)
     {
         h2 = pow(unit_cell.get_stl_of_hkl(hkl_vector[s]), 2);
         for (int i = 0; i < asym_atom_list.size(); i++)
@@ -2834,158 +2457,62 @@ void convert_to_ED(const ivec &asym_atom_list,
 }
 
 /**
- * Calculates the scattering factors for multipel calcualtions happening after each other.
+ * @brief Calculates scattering factors using the provided calculator and options.
  *
- * @param opt The options object containing the necessary parameters.
- * @param file The output stream to write the results to.
- * @param known_atoms The vector of known atom names.
- * @param wave The vector of wave functions.
- * @param nr The number of radial points.
- * @return A tsc_block object containing the calculated scattering factors.
+ * This templated function computes scattering factors for a set of atoms and k-points.
+ *
+ * @tparam tsc_block_type The type used to store the resulting scattering factors block.
+ *         Must support assignment and access as used in the function.
+ * @tparam calculator_type The type of the calculator object.
+ *         Must provide the required interface for calculating scattering factors.
+ * @param opt Options for the calculation.
+ * @param calculator The calculator object used to compute scattering factors.
+ * @param file Output stream for logging messages.
+ * @param known_atoms List of known atom symbols.
+ * @param nr Number of atoms.
+ * @param kpts Pointer to the k-points vector.
+ * @return A block of scattering factors of type tsc_block_type.
  */
-tsc_block<int, cdouble> thakkar_sfac(
-    options &opt,
-    std::ostream &file,
-    svec &known_atoms,
-    std::vector<WFN> &wave,
-    const int &nr)
-{
+template <typename tsc_block_type, typename calculator_type>
+tsc_block_type calculate_scattering_factors(
+    options& opt,
+    calculator_type calculator,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts
+){
     using namespace std;
-    err_checkf(exists(opt.hkl) || opt.dmin != 99.0 || opt.hkl_min_max[0][0] != -100 || opt.hkl_min_max[2][1] != 100, "HKL file does not exists!", file);
-    err_checkf(exists(opt.cif), "CIF does not exists!", file);
-    file << "Number of protons: " << wave[nr].get_nr_electrons() << endl;
-    file << "Reading: " << opt.hkl;
-    file.flush();
-
-    cell unit_cell(opt.cif, file, opt.debug);
-    ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    ivec asym_atom_list;
-    bvec constant_atoms;
-    bvec needs_grid(wave[nr].get_ncen(), false);
-
-    auto labels = read_atoms_from_CIF(cif_input,
-                                      opt.groups[nr],
-                                      unit_cell,
-                                      wave[nr],
-                                      known_atoms,
-                                      atom_type_list,
-                                      asym_atom_to_type_list,
-                                      asym_atom_list,
-                                      needs_grid,
-                                      file,
-                                      constant_atoms,
-                                      opt.SALTED,
-                                      opt.debug);
-
-    cif_input.close();
-
-    if (opt.debug)
-        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-    if (opt.debug)
-        file << "made it post CIF, now make grids!" << endl;
-
-    hkl_list hkl;
-    if (opt.m_hkl_list.size() != 0)
-    {
-        hkl = opt.m_hkl_list;
-        /*
-#pragma omp parallel for
-        for (int i = 0; i < known_indices[0].size(); i++) {
-            ivectemp_hkl{ known_indices[0][i], known_indices[1][i], known_indices[2][i] };
-#pragma omp critical
-            hkl.emplace(temp_hkl);
-        }*/
-    }
-    else if (nr == 0 && opt.read_k_pts == false)
-    {
-        if (opt.dmin != 99.0)
-            if (opt.electron_diffraction)
-                generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
-            else
-                generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-        else if (opt.hkl_min_max[0][0] != -100 || opt.hkl_min_max[2][1] != 100)
-            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-        else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-        opt.m_hkl_list = hkl;
-    }
-
-    vector<Thakkar> spherical_atoms;
-    spherical_atoms.reserve(atom_type_list.size());
-    for (int i = 0; i < atom_type_list.size(); i++)
-        spherical_atoms.emplace_back(atom_type_list[i]);
-
-    const int imax = (int)asym_atom_list.size();
-
-    cvec2 sf;
-    sf.resize(asym_atom_list.size());
-#pragma omp parallel for
-    for (int i = 0; i < asym_atom_list.size(); i++)
-        sf[i].resize(hkl.size());
-
-    hkl_list_it it = hkl.begin();
-#pragma omp parallel for private(it)
-    for (int s = 0; s < hkl.size(); s++)
-    {
-        it = next(hkl.begin(), s);
-        double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(*it));
-        for (int i = 0; i < imax; i++)
-            sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
-    }
-
-    if (opt.electron_diffraction)
-    {
-        double h2;
-#pragma omp parallel for private(h2, it)
-        for (int s = 0; s < hkl.size(); s++)
+    int nat = 0;
+    WFN* wavy = NULL;
+    if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
+        wavy = &calculator[nr];
+        err_checkf(wavy->get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
+        if (!opt.cif_based_combined_tsc_calc)
         {
-            it = next(hkl.begin(), s);
-            h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
-            for (int i = 0; i < imax; i++)
-                sf[i][s] = constants::ED_fact * ((cdouble)atom_type_list[i] - sf[i][s]) / h2;
+            err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
         }
+        else
+        {
+            for (int i = 0; i < opt.combined_tsc_calc_cifs.size(); i++)
+            {
+                err_checkf(filesystem::exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i].string() + " does not exists!", file);
+            }
+        }
+        err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
+        file << "Number of protons: " << wavy->get_nr_electrons() << endl
+             << "Number of electrons: " << fixed << wavy->count_nr_electrons() << endl;
+        if (wavy->get_has_ECPs())
+            file << "Number of ECP electrons: " << wavy->get_nr_ECP_electrons() << endl;
+        // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
+        if (opt.debug)
+            file << "Working with: " << wavy->get_path() << endl;
+        nat = wavy->get_ncen();
     }
-
-    if (opt.debug)
-        file << endl
-             << "SFs are made, now just write them!" << endl;
-
-    tsc_block<int, cdouble> blocky(
-        sf,
-        labels,
-        hkl);
-
-    return blocky;
-}
-
-/**
- * Calculates the scattering factors for the MulTi Cif mode (MTC).
- *
- * @param opt The options for the calculation.
- * @param wave The vector of wave functions.
- * @param file The output stream to write the results to.
- * @param known_atoms The vector of known atoms.
- * @param nr The number of atoms.
- * @param kpts The pointer to the vector of k-points (optional).
- * @return The calculated scattering factors.
- */
-tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
-    options &opt,
-    SALTEDPredictor &SP,
-    std::ostream &file,
-    svec &known_atoms,
-    const int &nr,
-    vec2 *kpts)
-{
-    using namespace std;
-    err_checkf(SP.wavy.get_ncen() != 0, "No Atoms in the wavefunction, this will not work!! ABORTING!!", file);
-    err_checkf(exists(opt.cif), "CIF does not exists!", file);
-    file << "Number of protons: " << SP.wavy.get_nr_electrons() << endl;
-    if (opt.debug)
-        file << "Working with: " << SP.wavy.get_path() << endl;
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>) {
+        wavy = &calculator.wavy;
+        nat = wavy->get_ncen();
+    }
 
     vector<_time_point> time_points;
     vector<string> time_descriptions;
@@ -2997,476 +2524,21 @@ tsc_block<int, cdouble> calculate_scattering_factors_SALTED(
     else
         cif = opt.cif;
 
-    cell unit_cell(cif, file, opt.debug);
-    ifstream cif_input(cif, std::ios::in);
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    ivec asym_atom_list;
-    bvec constant_atoms;
-    bvec needs_grid(SP.wavy.get_ncen(), false);
-
-    auto labels = read_atoms_from_CIF(cif_input,
-                                      opt.groups[nr],
-                                      unit_cell,
-                                      SP.wavy,
-                                      known_atoms,
-                                      atom_type_list,
-                                      asym_atom_to_type_list,
-                                      asym_atom_list,
-                                      needs_grid,
-                                      file,
-                                      constant_atoms,
-                                      opt.SALTED,
-                                      opt.debug);
-
-    cif_input.close();
-    time_points.push_back(get_time());
-    time_descriptions.push_back("CIF reading");
-
-    if (opt.debug)
-        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-    hkl_list hkl;
-    if (!opt.read_k_pts)
-    {
-        if (opt.dmin != 99.0)
-            if (opt.electron_diffraction)
-                generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
-            else
-                generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-        else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-    }
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Generating hkl");
-
-    if (opt.debug)
-        file << "made it post CIF now make grids!" << endl;
-
-    // Remove all unneccecary atoms from wavy
-    int current_index = 0;
-    for (int i = 0; i < needs_grid.size(); i++)
-    {
-        if (opt.debug)
-            std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
-
-        if (!needs_grid[i])
-        {
-            SP.wavy.erase_atom(current_index);
-            constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
-            current_index--;
-        }
-        current_index++;
-    }
-
-    // Generation of SALTED density coefficients
-    file << "\nGenerating densities... " << endl;
-    vec coefs = SP.gen_SALTED_densities();
-    file << setw(13 * 4) << "... done!" << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("SALTED prediction");
-    SP.shrink_intermediate_vectors();
-
-    vec2 k_pt;
-    make_k_pts(
-        opt.read_k_pts,
-        opt.save_k_pts,
-        0,
-        unit_cell,
-        hkl,
-        k_pt,
-        file,
-        opt.debug);
-
-    file << "                          ... done!\n"
-         << flush;
-    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("k-points preparation");
-
-    // Remove all unneccecary atoms from wavy only if it is not the first calculation
-    if (nr != 0)
-    {
-        err_checkf(constant_atoms.size() <= SP.wavy.get_ncen(),
-                   "There are more constant atoms than atoms in the wavefunction! This should not happen!", file);
-        // We need coeffs for the atoms and coeff seperateley
-        size_t current_coef_index = coefs.size();
-        for (int i = static_cast<int>(constant_atoms.size()) - 1; i >= 0; i--)
-        {
-            // Count up all coeffs for one atom
-            const int lim = (int)SP.wavy.get_atom_basis_set_size(i);
-            int coef_count = 0;
-            for (int i_basis = 0; i_basis < lim; i_basis++)
-            {
-                coef_count += 2 * SP.wavy.get_atom_basis_set_entry(i, i_basis).get_primitive().get_type() + 1;
-            }
-
-            // Remove atoms and coeffs from list if they are constant atoms
-            if (constant_atoms[i])
-            {
-                labels.erase(labels.begin() + i, labels.begin() + i + 1);
-                SP.wavy.erase_atom(i);
-                coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
-            }
-            current_coef_index -= coef_count;
-        };
-    }
-
-    // SP.wavy.write_xyz("Run" + std::to_string(nr) + "Pos_2.xyz");
-    // calc_cube_ML(coefs,SP.wavy);
-
-    vec atom_elecs = calc_atomic_density(SP.wavy.get_atoms(), coefs);
-    file << "Table of Charges in electrons\n"
-         << "       Atom      ML" << endl;
-
-    for (int i = 0; i < SP.wavy.get_ncen(); i++)
-    {
-
-        file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << SP.wavy.get_atom_charge(i) - atom_elecs[i];
-        if (opt.debug)
-            file << " " << setw(4) << SP.wavy.get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
-        file << endl;
-    }
-    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Calculation of Charges");
-
-    cvec2 sf;
-    calc_SF_SALTED(
-        k_pt,
-        coefs,
-        SP.wavy.get_atoms(),
-        sf);
-    file << setw(13 * 4) << "... done!\n"
-         << flush;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Fourier transform");
-
-    if (SP.wavy.get_has_ECPs())
-    {
-        add_ECP_contribution(
-            asym_atom_list,
-            SP.wavy,
-            sf,
-            unit_cell,
-            hkl,
-            file,
-            opt.ECP_mode,
-            opt.debug);
-    }
-
-    if (opt.electron_diffraction)
-    {
-        convert_to_ED(asym_atom_list,
-                      SP.wavy,
-                      sf,
-                      unit_cell,
-                      hkl);
-    }
-
-    tsc_block<int, cdouble> blocky(
-        sf,
-        labels,
-        hkl);
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("tsc calculation");
-
-    if (opt.needs_Thakkar_fill)
-    {
-        file << "Performing the remaining calculation of spherical atoms..." << std::endl;
-        vector<WFN> tempy;
-        tempy.emplace_back(opt.wfn);
-        opt.m_hkl_list = hkl;
-        tsc_block<int, cdouble> blocky_thakkar = thakkar_sfac(opt, file, labels, tempy, 0);
-        blocky.append(std::move(blocky_thakkar), file);
-        time_points.push_back(get_time());
-        time_descriptions.push_back("Spherical Atoms");
-    }
-
-
-    if (!opt.no_date)
-    {
-        write_timing_to_file(file,
-                             time_points,
-                             time_descriptions);
-    }
-
-    return blocky;
-}
-
-/**
- * Calculates the scattering factors for the given options, wave, and expansion coefficients.
- *
- * @param opt The options for the calculation.
- * @param wave The WFN object representing the wave.
- * @param file The output stream to write the results to.
- * @param exp_coefs The expected coefficients to use.
- * @param coefs The coefficients to use.
- * @return True if the scattering factors were calculated successfully, false otherwise.
- */
-itsc_block calculate_scattering_factors_RI_fit(
-    options &opt,
-    const std::vector<WFN> &wave,
-    std::ostream &file,
-    svec &known_atoms,
-    const int &nr,
-    vec2 *kpts)
-{
-    using namespace std;
-    err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-    if (!opt.cif_based_combined_tsc_calc)
-    {
-        err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
-    }
-    else
-    {
-        for (int i = 0; i < opt.combined_tsc_calc_cifs.size(); i++)
-        {
-            err_checkf(filesystem::exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i].string() + " does not exists!", file);
-        }
-    }
-    err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
-    file << "Number of protons: " << wave[nr].get_nr_electrons() << endl
-         << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
-    if (wave[nr].get_has_ECPs())
-        file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
-    // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-    if (opt.debug)
-        file << "Working with: " << wave[nr].get_path() << endl;
-
-    vector<_time_point> time_points;
-    vector<string> time_descriptions;
-    time_points.push_back(get_time());
-
-    cell unit_cell(opt.cif, file, opt.debug);
-    ifstream cif_input(opt.cif.c_str(), std::ios::in);
-    ivec atom_type_list;
-    ivec asym_atom_to_type_list;
-    ivec asym_atom_list;
-    bvec constant_atoms;
-    bvec needs_grid(wave[nr].get_ncen(), false);
-
-    auto labels = read_atoms_from_CIF(cif_input,
-                                      opt.groups[0],
-                                      unit_cell,
-                                      wave[nr],
-                                      known_atoms,
-                                      atom_type_list,
-                                      asym_atom_to_type_list,
-                                      asym_atom_list,
-                                      needs_grid,
-                                      file,
-                                      constant_atoms,
-                                      opt.SALTED,
-                                      opt.debug);
-
-    cif_input.close();
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("CIF reading");
-
-    if (opt.debug)
-        file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-    hkl_list hkl;
-    if (!opt.read_k_pts)
-    {
-        if (opt.dmin != 99.0)
-            if (opt.electron_diffraction)
-                generate_hkl(opt.dmin / 2.0, hkl, opt.twin_law, unit_cell, file, opt.debug);
-            else
-                generate_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, file, opt.debug);
-        else if (opt.hkl_min_max[0][0] != -100 && opt.hkl_min_max[2][1] != 100)
-            generate_hkl(opt.hkl_min_max, hkl, opt.twin_law, unit_cell, file, opt.debug, opt.electron_diffraction);
-        else
-            read_hkl(opt.hkl, hkl, opt.twin_law, unit_cell, file, opt.debug);
-    }
-
-    if (opt.debug)
-        file << "made it post CIF, now make grids!" << endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Generating hkl");
-
-    // Generation of SALTED density coefficients
-    file << "\nGenerating densities... " << endl;
-    //If no basis is yet loaded, assume a auto aux should be generated
-    if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(wave[nr]);
-
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wave[nr].get_atoms());
-    wavy_aux.set_ncen(wave[nr].get_ncen());
-    wavy_aux.delete_basis_set();
-    load_basis_into_WFN(wavy_aux, opt.aux_basis);
-
-    vec coefs = density_fit(wave[nr], wavy_aux, opt.mem, 'C');
-    file << setw(12 * 4 + 2) << "... done!\n"
-         << flush;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("RI-Fit");
-
-    file << "\nGenerating k-points...  " << flush;
-    vec2 k_pt;
-    make_k_pts(
-        opt.read_k_pts,
-        opt.save_k_pts,
-        0,
-        unit_cell,
-        hkl,
-        k_pt,
-        file,
-        opt.debug);
-    file << "                          ... done!\n"
-         << flush;
-    file << "Number of k - points to evaluate : " << k_pt[0].size() << std::endl;
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("k-points preparation");
-
-    vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
-    file << "Table of Charges in electrons\n"
-         << "       Atom      ML" << endl;
-
-    for (int i = 0; i < asym_atom_list.size(); i++)
-    {
-        int a = asym_atom_list[i];
-        file << setw(10) << labels[i]
-             << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
-        if (opt.debug)
-            file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
-        file << endl;
-    }
-
-    auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
-    file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Calculation of Charges");
-
-    cvec2 sf;
-    calc_SF_SALTED(
-        k_pt,
-        coefs,
-        wavy_aux.get_atoms(),
-        sf);
-    file << setw(12 * 4 + 2) << "... done!" << endl;
-    time_points.push_back(get_time());
-    time_descriptions.push_back("Fourier transform");
-
-    if (wavy_aux.get_has_ECPs())
-    {
-        add_ECP_contribution(
-            asym_atom_list,
-            wavy_aux,
-            sf,
-            unit_cell,
-            hkl,
-            file,
-            opt.ECP_mode,
-            opt.debug);
-    }
-
-    if (opt.electron_diffraction)
-    {
-        convert_to_ED(asym_atom_list,
-                      wavy_aux,
-                      sf,
-                      unit_cell,
-                      hkl);
-    }
-
-    tsc_block<int, cdouble> blocky(
-        sf,
-        labels,
-        hkl);
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("last corrections");
-
-    if (!opt.no_date)
-    {
-        write_timing_to_file(file,
-                             time_points,
-                             time_descriptions);
-    }
-
-    return blocky;
-}
-
-/**
- * Calculates the scattering factors for the MulTi Cif mode (MTC).
- *
- * @param opt The options for the calculation.
- * @param wave The vector of wave functions.
- * @param file The output stream to write the results to.
- * @param known_atoms The vector of known atoms.
- * @param nr The number of atoms.
- * @param kpts The pointer to the vector of k-points (optional).
- * @return The calculated scattering factors.
- */
-tsc_block<int, cdouble> calculate_scattering_factors(
-    options &opt,
-    const std::vector<WFN> &wave,
-    std::ostream &file,
-    svec &known_atoms,
-    const int &nr,
-    vec2 *kpts)
-{
-    using namespace std;
-#ifdef FLO_CUDA
-
-#endif
-    err_checkf(wave[nr].get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
-    if (!opt.cif_based_combined_tsc_calc)
-    {
-        err_checkf(filesystem::exists(opt.cif), "CIF " + opt.cif.string() + " does not exists!", file);
-    }
-    else
-    {
-        for (int i = 0; i < opt.combined_tsc_calc_cifs.size(); i++)
-        {
-            err_checkf(filesystem::exists(opt.combined_tsc_calc_cifs[i]), "CIF " + opt.combined_tsc_calc_cifs[i].string() + " does not exists!", file);
-        }
-    }
-    err_checkf(opt.groups[nr].size() >= 1, "Not enough groups specified to work with!", file);
-    file << "Number of protons: " << wave[nr].get_nr_electrons() << endl
-         << "Number of electrons: " << wave[nr].count_nr_electrons() << endl;
-    if (wave[nr].get_has_ECPs())
-        file << "Number of ECP electrons: " << wave[nr].get_nr_ECP_electrons() << endl;
-    // err_checkf(exists(asym_cif), "Asym/Wfn CIF does not exists!", file);
-    if (opt.debug)
-        file << "Working with: " << wave[nr].get_path() << endl;
-
-    vector<_time_point> time_points;
-    vector<string> time_descriptions;
-    time_points.push_back(get_time());
-
-    filesystem::path cif;
-    if (opt.cif_based_combined_tsc_calc)
-        cif = opt.combined_tsc_calc_cifs[nr];
-    else
-        cif = opt.cif;
-
+    
     cell unit_cell(cif, file, opt.debug);
     ifstream cif_input(cif.c_str(), std::ios::in);
     ivec atom_type_list;
     ivec asym_atom_to_type_list;
     ivec asym_atom_list;
     bvec constant_atoms;
-    bvec needs_grid(wave[nr].get_ncen(), false);
+    bvec needs_grid(nat, false);
     if (opt.debug)
         file << "Reading atoms!!!!" << endl;
 
     auto labels = read_atoms_from_CIF(cif_input,
                                       opt.groups[nr],
                                       unit_cell,
-                                      wave[nr],
+                                      *wavy,
                                       known_atoms,
                                       atom_type_list,
                                       asym_atom_to_type_list,
@@ -3481,28 +2553,6 @@ tsc_block<int, cdouble> calculate_scattering_factors(
 
     if (opt.debug)
         file << "There are " << atom_type_list.size() << " Types of atoms and " << asym_atom_to_type_list.size() << " atoms in total" << endl;
-
-    if (opt.debug)
-        file << "made it post CIF now make grids!" << endl;
-    vec2 d1, d2, d3, dens;
-
-    const int points = make_hirshfeld_grids(opt.pbc,
-                                            opt.accuracy,
-                                            unit_cell,
-                                            wave[nr],
-                                            atom_type_list,
-                                            asym_atom_list,
-                                            needs_grid,
-                                            d1, d2, d3, dens,
-                                            labels,
-                                            file,
-                                            time_points,
-                                            time_descriptions,
-                                            opt.debug,
-                                            opt.no_date);
-
-    time_points.push_back(get_time());
-    time_descriptions.push_back("density vectors");
 
     vec2 k_pt;
     hkl_list hkl;
@@ -3528,7 +2578,6 @@ tsc_block<int, cdouble> calculate_scattering_factors(
         make_k_pts(
             nr != 0 && hkl.size() == 0,
             opt.save_k_pts,
-            points,
             unit_cell,
             hkl,
             k_pt,
@@ -3546,48 +2595,260 @@ tsc_block<int, cdouble> calculate_scattering_factors(
 
     time_points.push_back(get_time());
     time_descriptions.push_back("k-points preparation");
+    cvec2 sf;
+    sf.resize(asym_atom_list.size());
+#pragma omp parallel for
+    for (int i = 0; i < asym_atom_list.size(); i++)
+        sf[i].resize(hkl.size());
+    if (opt.iam_switch){
+        vector<Thakkar> spherical_atoms;
+        spherical_atoms.reserve(atom_type_list.size());
+        for (int i = 0; i < atom_type_list.size(); i++)
+            spherical_atoms.emplace_back(atom_type_list[i]);
 
-    vector<vector<complex<double>>> sf;
-    _time_point end1;
-    calc_SF(points,
-            k_pt,
-            d1, d2, d3, dens,
-            sf,
-            file,
-            time_points.front(),
-            end1,
-            opt.debug,
-            opt.no_date);
+        const int imax = (int)asym_atom_list.size();
 
-    time_points.push_back(end1);
-    time_descriptions.push_back("final preparation");
+        hkl_list_it it = hkl.begin();
+#pragma omp parallel for private(it)
+        for (int s = 0; s < hkl.size(); s++)
+        {
+            it = next(hkl.begin(), s);
+            double k = constants::bohr2ang(constants::FOUR_PI * unit_cell.get_stl_of_hkl(*it));
+            for (int i = 0; i < imax; i++)
+                sf[i][s] = spherical_atoms[asym_atom_to_type_list[i]].get_form_factor(k);
+        }
 
-    if (wave[nr].get_has_ECPs())
+        if (opt.electron_diffraction)
+        {
+            double h2;
+#pragma omp parallel for private(h2, it)
+            for (int s = 0; s < hkl.size(); s++)
+            {
+                it = next(hkl.begin(), s);
+                h2 = pow(unit_cell.get_stl_of_hkl(*it), 2);
+                for (int i = 0; i < imax; i++)
+                    sf[i][s] = constants::ED_fact * ((cdouble)atom_type_list[i] - sf[i][s]) / h2;
+            }
+        }
+    }
+    else if constexpr (std::is_same_v<calculator_type, SALTEDPredictor&>)
     {
-        add_ECP_contribution(
-            asym_atom_list,
-            wave[nr],
-            sf,
-            unit_cell,
-            hkl,
-            file,
-            opt.ECP_mode,
-            opt.debug);
+        // Remove all unneccecary atoms from wavy
+        int current_index = 0;
+        for (int i = 0; i < needs_grid.size(); i++)
+        {
+            if (opt.debug)
+                std::cout << "atom: " << i << " should be calculated: " << needs_grid[i] << std::endl;
+
+            if (!needs_grid[i])
+            {
+                wavy->erase_atom(current_index);
+                constant_atoms.erase(constant_atoms.begin() + current_index, constant_atoms.begin() + current_index + 1);
+                current_index--;
+            }
+            current_index++;
+        }
+
+        // Generation of SALTED density coefficients
+        file << "\nGenerating densities... " << endl;
+        vec coefs = calculator.gen_SALTED_densities();
+        file << setw(13 * 4) << "... done!" << endl;
+        time_points.push_back(get_time());
+        time_descriptions.push_back("SALTED prediction");
+        calculator.shrink_intermediate_vectors();
+
+        // Remove all unneccecary atoms from wavy only if it is not the first calculation
+        if (nr != 0)
+        {
+            err_checkf(constant_atoms.size() <= calculator.wavy.get_ncen(),
+                       "There are more constant atoms than atoms in the wavefunction! This should not happen!", file);
+            // We need coeffs for the atoms and coeff seperateley
+            size_t current_coef_index = coefs.size();
+            for (int i = static_cast<int>(constant_atoms.size()) - 1; i >= 0; i--)
+            {
+                // Count up all coeffs for one atom
+                const int lim = (int)wavy->get_atom_basis_set_size(i);
+                int coef_count = 0;
+                for (int i_basis = 0; i_basis < lim; i_basis++)
+                {
+                    coef_count += 2 * wavy->get_atom_basis_set_entry(i, i_basis).get_primitive().get_type() + 1;
+                }
+
+                // Remove atoms and coeffs from list if they are constant atoms
+                if (constant_atoms[i])
+                {
+                    labels.erase(labels.begin() + i, labels.begin() + i + 1);
+                    wavy->erase_atom(i);
+                    coefs.erase(coefs.begin() + current_coef_index - coef_count, coefs.begin() + current_coef_index);
+                }
+                current_coef_index -= coef_count;
+            };
+        }
+
+        vec atom_elecs = calc_atomic_density(calculator.wavy.get_atoms(), coefs);
+        file << "Table of Charges in electrons\n"
+             << "       Atom      ML" << endl;
+
+        for (int i = 0; i < wavy->get_ncen(); i++)
+        {
+
+            file << setw(10) << labels[i]
+                 << fixed << setw(10) << setprecision(3) << wavy->get_atom_charge(i) - atom_elecs[i];
+            if (opt.debug)
+                file << " " << setw(4) << wavy->get_atom_charge(i) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+            file << endl;
+        }
+        auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+        file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Calculation of Charges");
+
+        calc_SF_SALTED(
+            k_pt,
+            coefs,
+            calculator.wavy.get_atoms(),
+            sf);
+        file << setw(13 * 4) << "... done!\n"
+             << flush;
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Fourier transform");
+
+        if (calculator.wavy.get_has_ECPs())
+        {
+            add_ECP_contribution(
+                asym_atom_list,
+                calculator.wavy,
+                sf,
+                unit_cell,
+                hkl,
+                file,
+                opt.ECP_mode,
+                opt.debug);
+        }
+    }
+    else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
+        if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC)
+        {
+            vec2 d1, d2, d3, dens;
+            const int points = make_atomic_grids(opt.pbc,
+                                                 opt.accuracy,
+                                                 unit_cell,
+                                                 *wavy,
+                                                 atom_type_list,
+                                                 asym_atom_list,
+                                                 needs_grid,
+                                                 d1, d2, d3, dens,
+                                                 labels,
+                                                 file,
+                                                 time_points,
+                                                 time_descriptions,
+                                                 opt.debug,
+                                                 opt.no_date,
+                                                 opt.partition_type);
+
+            time_points.push_back(get_time());
+            time_descriptions.push_back("density vectors");
+
+            _time_point end1;
+            calc_SF(points,
+                    k_pt,
+                    d1, d2, d3, dens,
+                    sf,
+                    file,
+                    time_points.front(),
+                    end1,
+                    opt.debug,
+                    opt.no_date);
+
+            time_points.push_back(end1);
+            time_descriptions.push_back("Fourier transform");
+        }
+        else if (opt.partition_type == PartitionType::RI)
+        {
+            file << "\nGenerating densities... " << endl;
+            //If no basis is yet loaded, assume a auto aux should be generated
+            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(*wavy);
+
+            WFN wavy_aux(0);
+            wavy_aux.set_atoms(wavy->get_atoms());
+            wavy_aux.set_ncen(wavy->get_ncen());
+            wavy_aux.delete_basis_set();
+            load_basis_into_WFN(wavy_aux, opt.aux_basis);
+
+            vec coefs = density_fit(*wavy, wavy_aux, opt.mem, 'C');
+            file << setw(12 * 4 + 2) << "... done!\n"
+                 << flush;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("RI-Fit");
+            
+            vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
+            file << "Table of Charges in electrons\n"
+                 << "       Atom      ML" << endl;
+            
+            for (int i = 0; i < asym_atom_list.size(); i++)
+            {
+                int a = asym_atom_list[i];
+                file << setw(10) << labels[i]
+                     << fixed << setw(10) << setprecision(3) << wavy_aux.get_atom_charge(a) - atom_elecs[i];
+                if (opt.debug)
+                    file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
+                file << endl;
+            }
+        
+            auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
+            file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("Calculation of Charges");
+        
+            calc_SF_SALTED(
+                k_pt,
+                coefs,
+                wavy_aux.get_atoms(),
+                sf);
+            file << setw(12 * 4 + 2) << "... done!" << endl;
+            time_points.push_back(get_time());
+            time_descriptions.push_back("Fourier transform");
+        }
+        if (wavy->get_has_ECPs())
+        {
+            add_ECP_contribution(
+                asym_atom_list,
+                *wavy,
+                sf,
+                unit_cell,
+                hkl,
+                file,
+                opt.ECP_mode,
+                opt.debug);
+        }
     }
 
     if (opt.electron_diffraction)
     {
         convert_to_ED(asym_atom_list,
-                      wave[nr],
+                      *wavy,
                       sf,
                       unit_cell,
                       hkl);
     }
 
-    tsc_block<int, cdouble> blocky(
+    tsc_block_type blocky(
         sf,
         labels,
         hkl);
+
+    if (opt.needs_Thakkar_fill)
+    {
+        file << "Performing the remaining calculation of spherical atoms..." << std::endl;
+        vector<WFN> tempy;
+        tempy.emplace_back(opt.wfn);
+        opt.m_hkl_list = hkl;
+        tsc_block<int, cdouble> blocky_thakkar = calculate_scattering_factors<itsc_block, std::vector<WFN>>(opt, tempy, file, labels, 0);
+        blocky.append(std::move(blocky_thakkar), file);
+        time_points.push_back(get_time());
+        time_descriptions.push_back("Spherical Atoms");
+    }
+
 
     time_points.push_back(get_time());
     time_descriptions.push_back("tsc calculation");
@@ -3601,6 +2862,19 @@ tsc_block<int, cdouble> calculate_scattering_factors(
 
     return blocky;
 }
+template itsc_block calculate_scattering_factors( options& opt,
+    std::vector<WFN>& calculator,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts);
+template itsc_block calculate_scattering_factors( options& opt,
+    SALTEDPredictor& calculator,
+    std::ostream& file,
+    svec& known_atoms,
+    const int& nr,
+    vec2* kpts);
+
 
 /**
  * Calculates the diffuse (that is non integer hkl) scattering factors based on the given options.
@@ -3655,7 +2929,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
     cif_input.close();
     vec2 d1, d2, d3, dens;
 
-    make_hirshfeld_grids(opt.pbc,
+    make_atomic_grids(opt.pbc,
                          opt.accuracy,
                          unit_cell,
                          wavy[0],
@@ -3668,7 +2942,8 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
                          time_points,
                          time_descriptions,
                          opt.debug,
-                         opt.no_date);
+                         opt.no_date,
+                         opt.partition_type);
 
     hkl_list_d hkl;
     generate_fractional_hkl(opt.dmin, hkl, opt.twin_law, unit_cell, log_file, opt.sfac_diffuse, opt.debug);
@@ -3778,7 +3053,7 @@ ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
 
     std::vector<AtomGrid> Prototype_grids = make_Prototype_atoms(atom_types, nr_list, true, std::cout, accuracy, wavy, 1);
 
-    ivec num_points = make_atomic_grids(
+    ivec num_points = make_integration_grids(
         x,
         y,
         z,

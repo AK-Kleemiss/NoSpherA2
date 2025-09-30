@@ -138,6 +138,12 @@
     <ClCompile Include="..\Src\cif.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="..\Src\mat_nos_math.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\vec_nos_math.cpp">
+      <Filter>Quelldateien</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="../Src/AtomGrid.h">
@@ -286,6 +292,9 @@
     <None Include="..\tests\makefile">
       <Filter>Ressourcendateien</Filter>
     </None>
+    <None Include="..\.github\actions\build-deps\action.yml" />
+    <None Include="..\.github\actions\cache-deps\action.yml" />
+    <None Include="..\.github\actions\setup-build-env\action.yml" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource.rc">

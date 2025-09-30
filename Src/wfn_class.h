@@ -139,9 +139,9 @@ public:
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
     /** Get a MO primitive coefficient (double precision / internal). */
-    const double get_MO_coef(const int &nr_mo, const int &nr_primtive) const;
+    const double& get_MO_coef(const int &nr_mo, const int &nr_primtive) const;
     /** Get a MO primitive coefficient (fast / possibly float). */
-    const double get_MO_coef_f(const int &nr_mo, const int &nr_primtive) const;
+    const double& get_MO_coef_f(const int &nr_mo, const int &nr_primtive) const;
     /** Pointer to raw coefficients of one MO (size = nex). */
     const double *get_MO_coef_ptr(const int &nr_mo);
     /** Number of primitives for a given MO (should equal nex). */
@@ -157,15 +157,15 @@ public:
     /** Delete MO at index (reorders container). */
     void delete_MO(const int &nr);
     /** MO energy accessor. */
-    const double get_MO_energy(const int &mo) const;
+    const double& get_MO_energy(const int &mo) const;
     /** Primitive center index (1-based) for primitive nr. */
-    const int get_center(const int &nr) const { return centers[nr]; };
+    const int& get_center(const int &nr) const { return centers[nr]; };
     /** Primitive type code for primitive nr. */
-    const int get_type(const int &nr) const { return types[nr]; };
+    const int& get_type(const int &nr) const { return types[nr]; };
     /** MO occupation number. */
-    const double get_MO_occ(const int &nr) const;
+    const double& get_MO_occ(const int &nr) const;
     /** Operator (spin / symmetry block) id for MO. */
-    const int get_MO_op(const int &nr) const;
+    const int& get_MO_op(const int &nr) const;
     /** Remove all fully unoccupied MOs (occ==0). */
     void delete_unoccupied_MOs();
     /** Const reference to MO object. */
@@ -174,6 +174,8 @@ public:
     const int get_MO_op_count(const int &op) const;
     /** Clear all MOs and reset counter. */
     const void clear_MOs();
+	/** Get maximum absolute MO coefficient (for cutoff checks). */
+    const double get_maximum_MO_coefficient(bool occu = true) const;
 
     //--------------------in and output----------------------------------------
     /** Change stored basis set name label. */
@@ -215,32 +217,32 @@ public:
     /** Assign multiplicity (spin (2S+1)). */
     void assign_multi(const int &i_multi) { multi = i_multi; };
     /** Get total charge. */
-    const int get_charge() const { return charge; };
+    const int& get_charge() const { return charge; };
     /** Get spin multiplicity. */
-    const int get_multi() const { return multi; };
+    const unsigned int& get_multi() const { return multi; };
     /** Set multiplicity by reference (legacy). */
     void set_multi(unsigned int &in) { multi = in; };
     /** Set charge. */
     void set_charge(const int &in) { charge = in; };
     /** Number of primitives (nex). */
-    const int get_nex() const { return nex; };
+    const int& get_nex() const { return nex; };
     /** Number of centers / atoms. */
-    const int get_ncen() const { return ncen; };
+    const int& get_ncen() const { return ncen; };
     /** Manually set number of centers (use with care). */
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
-    const int get_nmo() const { return nmo; };
+    const int& get_nmo() const { return nmo; };
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool &only_occ) const;
     /** Origin/file type code. */
-    const int get_origin() const { return origin; };
+    const int& get_origin() const { return origin; };
     /** ECP mode (def2/xTB/pTB etc.). */
-    const int get_ECP_mode() const { return ECP_m; };
+    const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */
-    const std::string get_comment() const { return comment; };
+    const std::string& get_comment() const { return comment; };
     //void write_wfn_CIF(const std::filesystem::path &filename) const;
     /** Get primitive exponent by index. */
-    const double get_exponent(int nr) const { return exponents[nr]; };
+    const double& get_exponent(int nr) const { return exponents[nr]; };
     /** Number of electrons (Z total - charge - ECP core electrons). */
     const unsigned int get_nr_electrons() const;
     /** Total number of core electrons represented by ECPs. */
@@ -250,17 +252,17 @@ public:
     /** Human-readable string listing centers and positions. */
     const std::string get_centers(const bool &bohr) const;
     /** Basis set name accessor. */
-    const std::string get_basis_set_name() const { return basis_set_name; };
+    const std::string& get_basis_set_name() const { return basis_set_name; };
     /** Set basis set name string. */
     void set_basis_set_name(const std::string &input) { basis_set_name = input; };
     /** Path to last loaded/saved file. */
-    const std::filesystem::path get_path() const { return path; };
+    const std::filesystem::path& get_path() const { return path; };
     /** Construct file header line for .wfn writing. */
     const std::string hdr(const bool &occupied) const;
     /** Set electronic structure method label (e.g. DFT functional). */
     void set_method(const std::string &input) { method = input; };
     /** Get method label. */
-    const std::string get_method() const { return method; };
+    const std::string& get_method() const { return method; };
     /** Erase atom (and adjust counts). */
     bool erase_atom(const int &nr);
     /** List primitives to stdout. */
@@ -280,11 +282,11 @@ public:
     /** Mark object as modified. */
     void set_modified() { modified = true; };
     /** Modification flag. */
-    const bool get_modified() const { return modified; };
+    const bool& get_modified() const { return modified; };
     /** Enable / disable spherical harmonic interpretation for d/f functions. */
     void set_d_f_switch(const bool &in) { d_f_switch = in; };
     /** Query spherical harmonic switch. */
-    const bool get_d_f_switch() const { return d_f_switch; };
+    const bool& get_d_f_switch() const { return d_f_switch; };
     /** Inspect ordering of primitives vs expected canonical orders. @return composite order code */
     int check_order(const bool &debug) const;
     /** Sort primitives into canonical order based on order code. */
@@ -294,13 +296,13 @@ public:
     /** Explicitly set distance switch flag. */
     void set_dist_switch(const bool &g) { distance_switch = g; };
     /** Query distance switch. */
-    const bool get_dist_switch() const { return distance_switch; };
+    const bool& get_dist_switch() const { return distance_switch; };
     /** Set ECP usage flag and optionally populate atom core electron counts. */
     void set_has_ECPs(const bool &in, const bool &apply_to_aotms = true, const int &ECP_mode = 1);
     /** Manually assign ECP core electron counts for given atomic numbers. */
     void set_ECPs(ivec &nr, ivec &elcount);
     /** Query whether ECPs are active. */
-    const bool get_has_ECPs() const { return has_ECPs; };
+    const bool& get_has_ECPs() const { return has_ECPs; };
     /** Copy assignment (deep copy except shared basis definition pointer). */
     void operator=(const WFN &right);
     /** Compute formal charge from atom charges - electron count (ignores stored charge). */
@@ -312,15 +314,15 @@ public:
     /** Compute normalization constants for basis primitives / contractions. */
     const vec get_norm_const(std::ostream &file, const bool debug = false) const;
     /** Total SCF energy (if available). */
-    double get_total_energy() const { return total_energy; };
+    const double& get_total_energy() const { return total_energy; };
     /** Virial ratio (if available). */
-    double get_virial_ratio() const { return virial_ratio; };
+    const double& get_virial_ratio() const { return virial_ratio; };
     /** Upper-triangular density matrix (linear storage). */
-    vec get_DensityMatrix() const { return UT_DensityMatrix; };
+    const vec& get_DensityMatrix() const { return UT_DensityMatrix; };
     /** Upper-triangular spin density matrix (linear storage). */
-    vec get_SpinDensityMatrix() const { return UT_SpinDensityMatrix; };
+    const vec& get_SpinDensityMatrix() const { return UT_SpinDensityMatrix; };
     /** Number of basis functions (if tracked). */
-    int get_nfunc() const { return nfunc; };
+    const int& get_nfunc() const { return nfunc; };
     /**
      * Deletes the basis set information from all atoms (shell definitions & primitives).
      * @return true if the basis set information was successfully deleted, false otherwise.
@@ -521,8 +523,6 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     /** Raw pointer to primitive exponents. */
     const double *get_ptr_exponents() { return &exponents[0]; };
-    /** Raw pointer to MO coefficients for given MO. */
-    const double *get_ptr_mo_coefficients(const int &mo);
 };
 
 #include "mo_class.h"

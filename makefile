@@ -109,7 +109,7 @@ else
 		wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh; \
 		sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=$(intel_ROOT) --eula accept; \
 	else \
-		echo 'Skipping IntelMKL build, MKL\mkl\2025.2\lib\libmkl_core.a already exists'; \
+		echo 'Skipping IntelMKL build, MKL\\mkl\\2025.2\\lib\\libmkl_core.a already exists'; \
 	fi
 endif
 

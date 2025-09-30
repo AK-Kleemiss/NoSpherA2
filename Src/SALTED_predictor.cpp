@@ -15,7 +15,7 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 
     config.salted_filename = find_first_salted_file(opt_in.salted_model_dir);
 
-	  if (config.salted_filename == "") {
+    if (config.salted_filename == "") {
         if (opt_in.coef_file != "") {
             std::cout << "Using density coefficients found in: " << opt_in.coef_file << std::endl;
             config.dfbasis = "cc-pvqz-jkfit";

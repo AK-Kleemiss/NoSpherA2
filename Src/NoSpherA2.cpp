@@ -155,7 +155,7 @@ int main(int argc, char **argv)
         std::cout << "Finished!" << endl;
         return 0;
     }
-    // Perform calcualtion of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
+    // Perform calculation of difference between two wavefunctions using the resolution, radius, wfn and wfn2 keywords. wfn2 keaword is provided by density-difference flag
     if (!opt.wfn2.empty())
     {
         wavy.emplace_back(opt.wfn, opt.debug);
@@ -270,9 +270,11 @@ int main(int argc, char **argv)
         for (int i = 0; i < opt.combined_tsc_calc_files.size(); i++)
         {
             known_scatterer = result.get_scatterers();
-            if (wavy[i].get_origin() != 7 && !opt.SALTED && !opt.RI_FIT)
+            if (!opt.SALTED)
             {
-                result.append(calculate_scattering_factors(
+                if (wavy[i].get_origin() == 7)
+                    opt.iam_switch = true;
+                result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                                   opt,
                                   wavy,
                                   log_file,
@@ -295,7 +297,7 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                result.append(calculate_scattering_factors_SALTED(
+                result.append(calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
                                   opt,
                                   *temp_pred,
                                   log_file,
@@ -304,27 +306,6 @@ int main(int argc, char **argv)
                                   &known_kpts),
                               log_file);
                 delete temp_pred;
-            }
-            else if (opt.RI_FIT)
-            {
-                result.append(calculate_scattering_factors_RI_fit(
-                                  opt,
-                                  wavy,
-                                  log_file,
-                                  known_scatterer,
-                                  i,
-                                  &known_kpts),
-                              log_file);
-            }
-            else
-            {
-                result.append(thakkar_sfac(
-                                  opt,
-                                  log_file,
-                                  known_scatterer,
-                                  wavy,
-                                  i),
-                              log_file);
             }
         }
 
@@ -373,7 +354,7 @@ int main(int argc, char **argv)
         svec empty({});
         //use atoms of group 0
         opt.groups[0].push_back(0);
-        itsc_block res = thakkar_sfac(opt, log_file, empty, wavy, 0);
+        itsc_block res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, log_file, empty, 0);
         log_file << "Writing tsc file... " << flush;
         if (opt.binary_tsc)
             res.write_tscb_file();
@@ -442,26 +423,13 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                if (wavy[0].get_origin() != 7 && !opt.RI_FIT)
-                    res = calculate_scattering_factors(
+                if (wavy[0].get_origin() == 7)
+                    opt.iam_switch = true;
+                res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                         opt,
                         wavy,
                         log_file,
                         empty,
-                        0);
-                else if (wavy[0].get_origin() != 7 && opt.RI_FIT)
-                    res = calculate_scattering_factors_RI_fit(
-                        opt,
-                        wavy,
-                        log_file,
-                        empty,
-                        0);
-                else
-                    res = thakkar_sfac(
-                        opt,
-                        log_file,
-                        empty,
-                        wavy,
                         0);
             }
             else
@@ -478,7 +446,7 @@ int main(int argc, char **argv)
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
-                res = calculate_scattering_factors_SALTED(
+                res = calculate_scattering_factors<itsc_block, SALTEDPredictor&>(
                     opt,
                     *temp_pred,
                     log_file,

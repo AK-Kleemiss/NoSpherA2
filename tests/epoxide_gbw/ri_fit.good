@@ -10,20 +10,19 @@ This Software is published with BSD-2 clause license.
 Reading:                                "epoxide.gbw" done!
 Number of atoms in Wavefunction file: 7 Number of MOs: 62
 Number of protons: 24
-Number of electrons: 24
+Number of electrons: 24.000000
 Reading:                                "epoxide.cif" done!
 Generating hkl indices up to d=:              0.40... done!
 Nr of reflections generated:                 26048
 Number of symmetry operations:                   2
 Nr of reflections to be used:                16275
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 16275
 
 Generating densities... 
 Preallocating: 15.3089 MB
 Memory needed for rho: 15.3089 MB
                                         ... done!
-
-Generating k-points...                            ... done!
-Number of k - points to evaluate : 16275
 Table of Charges in electrons
        Atom      ML
         O1    -0.869

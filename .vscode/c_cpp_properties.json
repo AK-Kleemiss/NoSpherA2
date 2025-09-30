@@ -3,7 +3,8 @@
         {
             "name": "windows-gcc-x64",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/Windows/packages/intelmkl.static.win-x64/2025.2.0.627/build/native/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -22,7 +23,7 @@
         {
             "name": "Mac",
             "includePath": [
-                "${workspaceFolder}/**",
+                "${workspaceFolder}/**"
             ],
             "defines": [],
             "macFrameworkPath": [
