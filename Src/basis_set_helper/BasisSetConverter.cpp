@@ -93,6 +93,9 @@ int main(int argc, char** argv)
     std::ofstream log_file("test.log");
     log_file << "Starting BasisSetConverter..." << std::endl;
     std::filesystem::path basis_path(argv[1]);
+    basis_path = basis_path.parent_path().parent_path();
+    basis_path /= std::filesystem::path("Src/basis_set_helper/basis_sets/");
+    basis_path.make_preferred();
     std::filesystem::path src_path;
     if (argc >= 3)
     {
@@ -101,9 +104,7 @@ int main(int argc, char** argv)
     else {
         src_path = basis_path.parent_path().parent_path().parent_path();
     }
-    basis_path = basis_path.parent_path().parent_path();
-    basis_path /= std::filesystem::path("Src/basis_set_helper/basis_sets/");
-    basis_path.make_preferred();
+
     log_file << "Basis path: " << basis_path << std::endl;
 
     //--------------------Find all basis set files----------------
