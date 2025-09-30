@@ -31,21 +31,21 @@ jobs:
             build-script: "cd Mac && make NoSpherA2_arm64 -j"
             artifact-name: executable_MacOS_ARM64
             artifact-path: Mac/NoSpherA2_arm64
-            
+
           - os: macos-13  # Intel x86_64
             name: Mac_x86_64
             build-script: "cd Mac && make NoSpherA2_x86_64 -j"
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2_x86_64
-            
+
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make -j && cp NoSpherA2 ../ && cp libiomp5.so ../ 2>/dev/null || true"
+            build-script: "cd Linux && make -j && cp NoSpherA2 ../"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2
               libiomp5.so
-              
+
           - os: windows-2022
             name: Windows
             build-script: |
@@ -58,7 +58,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
-    
+
     steps:
     - name: Harden Runner
       uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
@@ -100,7 +100,7 @@ jobs:
     needs: build
     runs-on: macos-latest
     name: Build macOS Universal Binary
-    
+
     steps:
     - name: Harden Runner
       uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
@@ -294,7 +294,7 @@ jobs:
         key: featomic-linux-${{ runner.os }}-${{ hashFiles('featomic/**,Lib/featomic_install/**') }}
         restore-keys: |
           featomic-linux-${{ runner.os }}-
-  
+
     - name: Build featomic
       if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
       run: |
@@ -351,7 +351,7 @@ jobs:
           arguments: '--sarif Src'
           output: 'flawfinder_results.sarif'
         continue-on-error: true
-          
+
       - name: Upload analysis results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
         with:
