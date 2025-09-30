@@ -79,11 +79,16 @@ target_link_libraries(NoSpherA2 PUBLIC
     MKL::MKL
     basis_set_helper
     mdspan
-    metatensor::static
+        metatensor::static
     featomic::static
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-ldl>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-lpthread>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-latomic>
-
+    $<$<CXX_COMPILER_ID:MSVC>:userenv>
+    $<$<CXX_COMPILER_ID:MSVC>:ntdll>
+    $<$<CXX_COMPILER_ID:MSVC>:ws2_32>
 )
-
+get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
+if(MKL_LIBRARIES)
+    install(RUNTIME NoSpherA2 DESTINATION ${CMAKE_BINARY_DIR}/bin OPTIONAL)
+endif()

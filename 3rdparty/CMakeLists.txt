@@ -13,24 +13,13 @@ CPMAddPackage(
     GIT_TAG "stable"
 )
 
-CPMAddPackage(
-    NAME metatensor
-    GITHUB_REPOSITORY "metatensor/metatensor"
-    GIT_TAG "metatensor-core-v0.1.17"
-    OPTIONS
-        "CMAKE_BUILD_TYPE Release"
-        "BUILD_SHARED_LIBS ON"
-        "METATENSOR_INSTALL_BOTH_STATIC_SHARED ON"
-        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
-)
-message(WARNING "${CMAKE_INSTALL_LIBDIR}")
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
-    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.1/featomic-cxx-0.6.1.tar.gz"
+    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.2/featomic-cxx-0.6.2.tar.gz"
     OPTIONS
         "CMAKE_BUILD_TYPE Release"
-        "FEATOMIC_FETCH_METATENSOR OFF"
+        "FEATOMIC_FETCH_METATENSOR ON"
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
         "CMAKE_TRY_COMPILE_CONFIGURATION Release"
@@ -41,21 +30,6 @@ else ()
     set(featomic_st_name "libfeatomic.a")
 endif ()
 
-if (featomic_ADDED)
-    add_library(featomic_static INTERFACE IMPORTED GLOBAL)
-    target_link_libraries(featomic_static INTERFACE
-        ${metatensor_STATIC_LIB}
-#        "${featomic_BINARY_DIR}/target/release/${featomic_st_name}"
-        ${featomic_STATIC_LIB}
-    )
-    target_include_directories(
-        featomic_static INTERFACE
-           "${featomic_SOURCE_DIR}/include"
-    )
-    file(MAKE_DIRECTORY ${featomic_SOURCE_DIR}/.cargo)
-    file(WRITE ${featomic_SOURCE_DIR}/.cargo/config.toml "paths = ['${metatensor_SOURCE_DIR}']")
-endif ()
-add_custom_target(featomic_target DEPENDS featomic_static featomic)
 set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
 message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
 message(WARNING "HERE: ${CMAKE_CURRENT_BINARY_DIR}")
