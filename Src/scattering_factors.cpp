@@ -85,7 +85,7 @@ void read_k_points(vec2 &k_pt, hkl_list &hkl, std::ostream &file)
  * @param k_pt A vector of vectors containing the k-points.
  * @param hkl A list containing the hkl values corresponding to the k-points.
  */
-void save_k_points(vec2 &k_pt, hkl_list &hkl)
+void save_k_points(const vec2 &k_pt, const hkl_list &hkl)
 {
     std::ofstream k_points_file("kpts.dat", std::ios::out | std::ios::binary | std::ios::trunc);
     int nr[1] = {(int)k_pt[0].size()};
@@ -2125,7 +2125,7 @@ cdouble sfac_bessel(
     const double* k_point,
     const double* coefs)
 {
-    return constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
+    return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
 
 

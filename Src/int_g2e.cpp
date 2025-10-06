@@ -336,6 +336,7 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
     double yij_kl = rij[1] - rkl[1];
     double zij_kl = rij[2] - rkl[2];
     double rr = xij_kl * xij_kl + yij_kl * yij_kl + zij_kl * zij_kl;
+    double u2, tmp1, tmp2, tmp3, tmp4, tmp5;
 
     a1 = aij * akl;
     a0 = a1 / (aij + akl);
@@ -397,13 +398,12 @@ int CINTg0_2e(double* g, double* rij, double* rkl, double cutoff, CINTEnvVars* e
         return 1;
     }
 
-    double u2, tmp1, tmp2, tmp3, tmp4, tmp5;
-    double rijrx = rij[0] - envs->rx_in_rijrx[0];
-    double rijry = rij[1] - envs->rx_in_rijrx[1];
-    double rijrz = rij[2] - envs->rx_in_rijrx[2];
-    double rklrx = rkl[0] - envs->rx_in_rklrx[0];
-    double rklry = rkl[1] - envs->rx_in_rklrx[1];
-    double rklrz = rkl[2] - envs->rx_in_rklrx[2];
+    const double rijrx = rij[0] - envs->rx_in_rijrx[0];
+    const double rijry = rij[1] - envs->rx_in_rijrx[1];
+    const double rijrz = rij[2] - envs->rx_in_rijrx[2];
+    const double rklrx = rkl[0] - envs->rx_in_rklrx[0];
+    const double rklry = rkl[1] - envs->rx_in_rklrx[1];
+    const double rklrz = rkl[2] - envs->rx_in_rklrx[2];
     Rys2eT bc;
     double* b00 = bc.b00;
     double* b10 = bc.b10;
@@ -457,19 +457,13 @@ void CINTg0_2e_2d(double* g, Rys2eT* bc, CINTEnvVars* envs)
     const int dn = envs->g2d_ijmax;
     int i, j, m, n, off;
     DEF_GXYZ(double, g, gx, gy, gz);
-    double* p0x, * p0y, * p0z;
-    double* p1x, * p1y, * p1z;
-    double nb1, mb0;
 
-    for (i = 0; i < nroots; i++) {
-        gx[i] = 1;
-        gy[i] = 1;
-        //gz[i] = w[i];
-    }
+    std::fill(gx, gx + envs->nrys_roots, 1.0);
+    std::fill(gy, gy + envs->nrys_roots, 1.0);
 
-    double s0x, s1x, s2x, t0x, t1x;
-    double s0y, s1y, s2y, t0y, t1y;
-    double s0z, s1z, s2z, t0z, t1z;
+    double s0x, s1x, s2x;
+    double s0y, s1y, s2y;
+    double s0z, s1z, s2z;
     double c00x, c00y, c00z, c0px, c0py, c0pz, b10, b01, b00;
     for (i = 0; i < nroots; i++) {
         c00x = bc->c00x[i];
