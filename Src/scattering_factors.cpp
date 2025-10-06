@@ -2147,9 +2147,8 @@ void calc_SF_SALTED(const vec2 &k_pt,
 #pragma omp for
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
-            int coef_count = 0;
             const int num_atoms = (int)atom_list.size();
-            const double* coef_slice_ptr = NULL;
+            const double* coef_slice_ptr = coefs.data();
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
@@ -2163,7 +2162,6 @@ void calc_SF_SALTED(const vec2 &k_pt,
             {
                 const int lim = (int)atom_ptr->get_basis_set_size();
                 basis_ptr = &(atom_ptr->get_basis_set_entry(0));
-                coef_slice_ptr = coefs.data();
                 for (int i_basis = 0; i_basis < lim; i_basis++, basis_ptr++, coef_slice_ptr += 2 * basis.get_type() + 1)
                 {
                     basis = basis_ptr->get_primitive();
