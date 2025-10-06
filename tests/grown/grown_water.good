@@ -10,56 +10,58 @@ This Software is published with BSD-2 clause license.
 Reading:                                  "water.wfx" done!
 Number of atoms in Wavefunction file: 48 Number of MOs: 261
 Number of protons: 261
-Number of electrons: 261
+Number of electrons: 261.000000
 Reading:                                  "water.cif" done!
-There are:
-  48 atoms read from the wavefunction, of which 
-  26 are identified as asymmetric unit atoms!
-
-Making Becke Grids... ...                             done! Number of gridpoints: 3826
-Calculating spherical densities...                    done!
-Pruning Grid...                                       done! Number of gridpoints: 3722
-Calculating non-spherical densities...                done!
-Applying hirshfeld weights and integrating charges... done!
-Number of points evaluated: 3722 with 149.193047 electrons in Becke Grid in total.
-
-Table of Charges in electrons
-
-    Atom       Becke   Spherical Hirshfeld
-       Mn1    -2.645    -2.320     0.174
-        S1    -0.578    -0.972     0.537
-        C7    -0.133     0.065    -0.050
-        N2     0.605     0.910    -0.201
-        C6    -0.181    -0.067    -0.065
-        H6     0.134     0.064     0.071
-        C5    -0.025     0.181    -0.056
-        H5     0.070     0.001     0.064
-        C4     0.005     0.068     0.036
-        C3    -0.131    -0.198     0.160
-        C2    -0.150    -0.042    -0.031
-        H2     0.133     0.069     0.077
-        C1    -0.126    -0.006    -0.059
-        H1     0.158     0.090     0.075
-        O2     0.110     0.546    -0.304
-        O3     0.109     0.557    -0.313
-        O1    -0.156     0.226    -0.234
-        O4     0.776     1.104    -0.152
-       H4a     0.085    -0.112     0.198
-       H4b     0.073    -0.073     0.150
-        O5     0.263     0.542    -0.105
-       H5a     0.113    -0.060     0.177
-       H5b     0.102    -0.074     0.182
-       O10     0.128     0.600    -0.332
-      H10a     0.047    -0.110     0.146
-      H10b     0.019    -0.126     0.123
-Total number of electrons in the wavefunction: 149.193
- and Hirshfeld electrons (asym unit): 147.734
 Reading:                                  "water.hkl" done!
 Nr of reflections read from file: 3019
 Number of symmetry operations: 2
 Nr of reflections to be used: 5928
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 5928
+There are:
+  48 atoms read from the wavefunction, of which 
+  26 are identified as asymmetric unit atoms!
 
-Number of k-points to evaluate: 5928 for 3722 gridpoints.
+Making Integration Grids... ...                       done! Number of gridpoints: 3826
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 3722
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 3722.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+       Mn1    -2.641     0.174     1.605
+        S1    -0.578     0.537     3.467
+        C7    -0.131    -0.050    -0.412
+        N2     0.606    -0.201    -1.682
+        C6    -0.182    -0.065    -0.027
+        H6     0.134     0.071     0.050
+        C5    -0.027    -0.056     0.049
+        H5     0.070     0.064    -0.087
+        C4     0.005     0.036    -0.043
+        C3    -0.131     0.160     1.707
+        C2    -0.151    -0.031     0.008
+        H2     0.133     0.077     0.002
+        C1    -0.128    -0.059     0.033
+        H1     0.157     0.075     0.048
+        O2     0.110    -0.304    -1.571
+        O3     0.109    -0.313    -1.670
+        O1    -0.156    -0.234    -1.464
+        O4     0.777    -0.152    -1.112
+       H4a     0.085     0.198     0.707
+       H4b     0.072     0.150     0.707
+        O5     0.263    -0.105    -1.371
+       H5a     0.112     0.177     0.636
+       H5b     0.101     0.182     0.613
+       O10     0.128    -0.332    -1.270
+      H10a     0.046     0.146     0.615
+      H10b     0.022     0.123     0.699
+Total number of electrons in the asymmetric unit:
+ Becke:     149.192006
+ Hirshfeld: 147.734012
+ TVFC:      147.762076
 [                Calculating Scattering Factors                ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

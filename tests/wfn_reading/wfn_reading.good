@@ -10,48 +10,50 @@ This Software is published with BSD-2 clause license.
 Reading:                                   "test.wfn" done!
 Number of atoms in Wavefunction file: 18 Number of MOs: 135
 Number of protons: 135
-Number of electrons: 135
+Number of electrons: 135.000000
 Reading:                                   "test.cif" done!
-There are:
-  18 atoms read from the wavefunction, of which 
-  18 are identified as asymmetric unit atoms!
-
-Making Becke Grids... ...                             done! Number of gridpoints: 1770
-Calculating spherical densities...                    done!
-Pruning Grid...                                       done! Number of gridpoints: 1728
-Calculating non-spherical densities...                done!
-Applying hirshfeld weights and integrating charges... done!
-Number of points evaluated: 1728 with 135.063979 electrons in Becke Grid in total.
-
-Table of Charges in electrons
-
-    Atom       Becke   Spherical Hirshfeld
-      Cu01    -1.534    -1.640     0.899
-      Cl02    -0.053     0.628    -0.483
-      S003     0.110     0.587    -0.265
-      Cl04    -0.024     0.630    -0.387
-      S005    -0.330    -0.267     0.113
-      N006     0.144     0.242     0.035
-      N007     0.535     0.571     0.025
-      H00a     0.194     0.036     0.156
-      H00b     0.161    -0.001     0.155
-      C008     0.201     0.206     0.115
-      C009    -0.161    -0.006     0.047
-      H00c     0.153     0.102     0.064
-      H00d     0.112     0.043     0.075
-      H00e     0.125     0.059     0.072
-      C00A     0.030     0.233    -0.083
-      H00f     0.099     0.043     0.039
-      H00g     0.110     0.052     0.048
-      H00h     0.066     0.002     0.065
-Total number of electrons in the wavefunction: 135.064
- and Hirshfeld electrons (asym unit): 134.310
 Reading:                                   "test.hkl" done!
 Nr of reflections read from file: 23
 Number of symmetry operations: 4
 Nr of reflections to be used: 12
+Generating k-points...                            ... done!
+Number of k-points to evaluate: 12
+There are:
+  18 atoms read from the wavefunction, of which 
+  18 are identified as asymmetric unit atoms!
 
-Number of k-points to evaluate: 12 for 1728 gridpoints.
-[                Calculating Scattering Factors                ]
+Making Integration Grids... ...                       done! Number of gridpoints: 1770
+Calculating spherical densities...                    done!
+Pruning Grid...                                       done! Number of gridpoints: 1728
+Calculating non-spherical densities...                done!
+Applying integration weights and integrating charge...done!
+Number of points evaluated: 1728.
+
+Table of Charges in electrons
+
+    Atom       Becke   Hirshfeld   TFVC
+      Cu01    -1.534     0.899     1.635
+      Cl02    -0.053    -0.483    -0.642
+      S003     0.110    -0.265     0.485
+      Cl04    -0.024    -0.387    -0.446
+      S005    -0.330     0.113     0.593
+      N006     0.144     0.035    -1.140
+      N007     0.535     0.025    -0.455
+      H00a     0.194     0.156     0.371
+      H00b     0.161     0.155     0.305
+      C008     0.201     0.115     0.083
+      C009    -0.161     0.047    -0.354
+      H00c     0.152     0.064     0.025
+      H00d     0.112     0.075    -0.006
+      H00e     0.125     0.072     0.004
+      C00A     0.030    -0.083     0.821
+      H00f     0.099     0.039    -0.112
+      H00g     0.109     0.048    -0.093
+      H00h     0.066     0.065    -0.178
+Total number of electrons in the asymmetric unit:
+ Becke:     135.063670
+ Hirshfeld: 134.310349
+ TVFC:      134.105330
+[                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

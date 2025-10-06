@@ -362,7 +362,7 @@ void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigne
 //
 //    //using namespace lahva::gpu;
 //    //// similar to the CPU Matrix, we have a quadratic 5 x 5 matrix
-//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values. 
+//    //// here we explicitly give the template parameters for the Allocators instead of relying on default values.
 //    //Matrix<float, CudaHostAllocator<float>, CudaDeviceAsyncAllocator<float>> s(5, 1.0);
 //
 //}
@@ -379,7 +379,7 @@ NNLSResult nnls(dMatrix2& A,
     ivec inds(n);
     vec w(n), x(n), work(m), zz(m);
 
-    for (int i = 0; i < n; ++i) 
+    for (int i = 0; i < n; ++i)
         inds[i] = i;
 
     int iteration = 0, iz1 = 0, nrow = 0, nsetp = 0, jj = 0;
@@ -445,7 +445,7 @@ NNLSResult nnls(dMatrix2& A,
             #else
             LAPACKE_dlarfx(LAPACK_COL_MAJOR, 'L', tmpint, 1.0, &work[nrow], tau, &zz[nrow], tmpint, &tmp);
             #endif
-            
+
             if (zz[nrow] / beta <= 0.0) {
                 // reject column j as a candidate to be moved from set z to set p.
                 // Set w[j] to 0.0 and move to the next greatest entry in w.
