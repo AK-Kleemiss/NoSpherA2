@@ -109,6 +109,63 @@ void save_k_points(vec2 &k_pt, hkl_list &hkl)
 }
 
 /**
+ * Generates k-points based on the given parameters.
+ *
+ * @param read_k_pts Flag indicating whether to read k-points from a file.
+ * @param save_k_pts Flag indicating whether to save generated k-points to a file.
+ * @param gridsize The size of the grid used for generating k-points.
+ * @param unit_cell The unit cell used for generating k-points.
+ * @param hkl The list of hkl values used for generating k-points.
+ * @param k_pt The vector to store the generated k-points.
+ * @param file The output stream to write the generated k-points.
+ * @param debug Flag indicating whether to enable debug mode.
+ */
+void make_k_pts(const bool& read_k_pts,
+    const bool& save_k_pts,
+    const cell& unit_cell,
+    hkl_list& hkl,
+    vec2& k_pt,
+    std::ostream& file,
+    bool debug = false)
+{
+    using namespace std;
+    const int size = (int)hkl.size();
+    if (!read_k_pts)
+    {
+        file << "Generating k-points..." << flush;
+        k_pt.resize(3);
+#pragma omp parallel for
+        for (int i = 0; i < 3; i++)
+            k_pt[i].resize(size, 0.0);
+
+        if (debug)
+            file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+        // Create local copy of hkl list for faster access
+        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+
+#pragma omp parallel for
+        for (int ref = 0; ref < size; ref++)
+        {
+            const hkl_t hkl_ = hkl_vector[ref];
+            for (int x = 0; x < 3; x++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
+                }
+            }
+        }
+        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
+        if (save_k_pts)
+            save_k_points(k_pt, hkl);
+    }
+    else
+    {
+        read_k_points(k_pt, hkl, file);
+    }
+}
+
+/**
  * Reads the hkl data from the specified file and populates the hkl_list with the data.
  *
  * @param hkl_filename The filename of the hkl file to read.
@@ -2053,64 +2110,7 @@ int make_atomic_grids(
     return points;
 }
 
-/**
- * Generates k-points based on the given parameters.
- *
- * @param read_k_pts Flag indicating whether to read k-points from a file.
- * @param save_k_pts Flag indicating whether to save generated k-points to a file.
- * @param gridsize The size of the grid used for generating k-points.
- * @param unit_cell The unit cell used for generating k-points.
- * @param hkl The list of hkl values used for generating k-points.
- * @param k_pt The vector to store the generated k-points.
- * @param file The output stream to write the generated k-points.
- * @param debug Flag indicating whether to enable debug mode.
- */
-void make_k_pts(const bool &read_k_pts,
-                const bool &save_k_pts,
-                const cell &unit_cell,
-                hkl_list &hkl,
-                vec2 &k_pt,
-                std::ostream &file,
-                bool debug = false)
-{
-    using namespace std;
-    const int size = (int)hkl.size();
-    if (!read_k_pts)
-    {
-		file << "Generating k-points..." << flush;
-        k_pt.resize(3);
-#pragma omp parallel for
-        for (int i = 0; i < 3; i++)
-            k_pt[i].resize(size, 0.0);
-
-        if (debug)
-            file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-        // Create local copy of hkl list for faster access
-        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
-
-#pragma omp parallel for
-        for (int ref = 0; ref < size; ref++)
-        {
-            const hkl_t hkl_ = hkl_vector[ref];
-            for (int x = 0; x < 3; x++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
-                }
-            }
-        }
-        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
-        if (save_k_pts)
-            save_k_points(k_pt, hkl);
-    }
-    else
-    {
-        read_k_points(k_pt, hkl, file);
-    }
-}
-
-// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
+// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi Sd
 double fourier_bessel_integral(
     const primitive &p,
     const double &H)
@@ -2120,20 +2120,13 @@ double fourier_bessel_integral(
     return p.normalization_constant() * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
-
 cdouble sfac_bessel(
     const primitive& p,
     const double* k_point,
     const double* coefs)
 {
-    const int t = p.get_type();
-    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
-    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs);
-    return result;
-
+    return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
-
-
 
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
@@ -2769,7 +2762,7 @@ tsc_block_type calculate_scattering_factors(
         {
             file << "\nGenerating densities... " << endl;
             //If no basis is yet loaded, assume a auto aux should be generated
-            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(*wavy);
+            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_auto_aux(*wavy);
 
             WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy->get_atoms());
@@ -2777,7 +2770,7 @@ tsc_block_type calculate_scattering_factors(
             wavy_aux.delete_basis_set();
             load_basis_into_WFN(wavy_aux, opt.aux_basis);
 
-            vec coefs = density_fit(*wavy, wavy_aux, opt.mem, 'C');
+            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, opt.mem, 'C');
             file << setw(12 * 4 + 2) << "... done!\n"
                  << flush;
             time_points.push_back(get_time());

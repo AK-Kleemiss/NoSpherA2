@@ -116,7 +116,7 @@ void BasisSet::gen_etb_aux(const WFN& orbital_wfn) {
 //The AutoAux algorithm by ORCA
 //JCTC, 13 (2016), 554
 namespace auto_aux_constants {
-    inline constexpr double BETA_SMALL = 1.8;
+    inline constexpr double BETA_SMALL = 2.0;
     // Index by total L (0..), fallback used if L exceeds size
     inline const std::vector<double> BETA_BIG = { 1.8, 2.0, 2.2, 2.2, 2.2, 2.3, 3.0, 3.0 };
     // Cap factors for compact L (0..2*l_val)
