@@ -2125,11 +2125,7 @@ cdouble sfac_bessel(
     const double* k_point,
     const double* coefs)
 {
-    const int t = p.get_type();
-    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
-    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs);
-    return result;
-
+    return constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
 
 
