@@ -2256,14 +2256,21 @@ void options::digest_options()
                 std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
                 exit(1);
             }
+            if (aux_basis == nullptr)
+            {
+                std::cout << "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set." << std::endl;
+                exit(1);
+            }
+  
 
             WFN wavy(wfn);
-            aux_basis = std::make_shared<BasisSet>(wavy, 2.0);
 
             WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy.get_atoms());
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
+
+            if ((*aux_basis).get_primitive_count() == 0) (*aux_basis).gen_auto_aux(wavy);
             load_basis_into_WFN(wavy_aux, aux_basis);
             demonstrate_enhanced_density_fitting(wavy, wavy_aux);
             //dMatrix2 dm = wavy.get_dm();

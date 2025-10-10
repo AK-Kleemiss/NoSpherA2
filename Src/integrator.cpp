@@ -179,16 +179,16 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
     std::cout << "Auxiliary basis functions: " << aux_basis.get_nao() << std::endl;
     std::cout << "Metric: " << (metric == 'C' ? "Coulomb" : "Overlap") << std::endl;
 
-    // Compute integrals
-    if (metric == 'C')
-    {
-        computeEri2c(aux_basis, eri2c);
-        computeRho_Coulomb(normal_basis, aux_basis, dm, rho, max_mem);
-    }
-    else if (metric == 'O')
-    {
-        compute2c_Overlap(aux_basis, eri2c);
-        computeRho_Overlap(normal_basis, aux_basis, dm, rho, max_mem);
+
+    switch (metric) {
+        case 'C':
+            compute2C<Coulomb2C>(aux_basis, eri2c);
+            computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho, max_mem);
+            break;
+        case 'O':
+            compute2C<Overlap2C>(aux_basis, eri2c);
+            computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, max_mem);
+            break;
     }
 
     // Calculate expected charges based on chosen scheme
@@ -199,7 +199,7 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
     add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, 
                           adaptive_restraint, expected_charges);
     
-    // Solve the regularized system
+    // Solve the regularized 
     std::cout << "Solving regularized linear system..." << std::endl;
     solve_linear_system(eri2c, rho.size(), aux_basis.get_nao(), rho);
 
@@ -232,15 +232,15 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
     std::cout << "\n=== Hybrid Density Fitting (Restraints + Tikhonov) ===" << std::endl;
 
     // Compute integrals
-    if (metric == 'C')
-    {
-        computeEri2c(aux_basis, eri2c);
-        computeRho_Coulomb(normal_basis, aux_basis, dm, rho, max_mem);
-    }
-    else if (metric == 'O')
-    {
-        compute2c_Overlap(aux_basis, eri2c);
-        computeRho_Overlap(normal_basis, aux_basis, dm, rho, max_mem);
+    switch (metric) {
+    case 'C':
+        compute2C<Coulomb2C>(aux_basis, eri2c);
+        computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        break;
+    case 'O':
+        compute2C<Overlap2C>(aux_basis, eri2c);
+        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        break;
     }
 
     // First apply Tikhonov regularization to the original matrix
@@ -295,7 +295,7 @@ vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::
         dMatrix2 dm = wavy.get_dm();
         vec eri2c;
         Int_Params normal_basis(wavy);
-        compute2c_Overlap(normal_basis, eri2c);
+        compute2C<Overlap2C>(normal_basis, eri2c);
         dMatrixRef2 eri2c_ref(eri2c.data(), normal_basis.get_nao(), normal_basis.get_nao());
         const size_t nao = dm.extent(1);
 
@@ -424,7 +424,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, max_mem, metric,
                                          0.00005,     // restraint strength
                                          1e-6,      // tikhonov lambda
-                                         "mulliken"); // charge scheme
+                                         "mulliken", true); // charge scheme
     
     // Compare results
     std::cout << "\n=== Method Comparison ===" << std::endl;
@@ -458,12 +458,12 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     rms_unrestrained_vs_enhanced = std::sqrt(rms_unrestrained_vs_enhanced / n_coeff);
     rms_unrestrained_vs_hybrid = std::sqrt(rms_unrestrained_vs_hybrid / n_coeff);
     rms_enhanced_vs_hybrid = std::sqrt(rms_enhanced_vs_hybrid / n_coeff);
-    
+
     std::cout << "\n=== RMS Coefficient Differences ===" << std::endl;
     std::cout << "Unrestrained vs Enhanced: " << std::fixed << std::setprecision(6) << rms_unrestrained_vs_enhanced << std::endl;
     std::cout << "Unrestrained vs Hybrid:   " << std::fixed << std::setprecision(6) << rms_unrestrained_vs_hybrid << std::endl;
     std::cout << "Enhanced vs Hybrid:       " << std::fixed << std::setprecision(6) << rms_enhanced_vs_hybrid << std::endl;
-    
+
     // Calculate coefficient magnitude statistics
     double avg_unrestrained = 0.0, avg_enhanced = 0.0, avg_hybrid = 0.0;
     for (size_t i = 0; i < n_coeff; i++) {
@@ -501,16 +501,17 @@ vec density_fit_unrestrained(const WFN &wavy, const WFN& wavy_aux, const double 
     std::cout << "Auxiliary basis functions: " << aux_basis.get_nao() << std::endl;
     std::cout << "Metric: " << (metric == 'C' ? "Coulomb" : "Overlap") << std::endl;
 
+
     // Compute integrals
-    if (metric == 'C')
-    {
-        computeEri2c(aux_basis, eri2c);
-        computeRho_Coulomb(normal_basis, aux_basis, dm, rho, max_mem);
-    }
-    else if (metric == 'O')
-    {
-        compute2c_Overlap(aux_basis, eri2c);
-        computeRho_Overlap(normal_basis, aux_basis, dm, rho, max_mem);
+    switch (metric) {
+    case 'C':
+        compute2C<Coulomb2C>(aux_basis, eri2c);
+        computeRho<Coulomb3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        break;
+    case 'O':
+        compute2C<Overlap2C>(aux_basis, eri2c);
+        computeRho<Overlap3C>(normal_basis, aux_basis, dm, rho, max_mem);
+        break;
     }
 
     std::cout << "Solving unrestrained linear system..." << std::endl;

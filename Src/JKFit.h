@@ -37,7 +37,7 @@ public:
     //Constructor for the generation of a basis set from a given WFN and beta value
     BasisSet(const WFN& wavy, const double beta) : BasisSet() {
         _beta = beta;
-        gen_etb_aux(wavy);
+        gen_auto_aux(wavy);
     }
 
     //Constructor for the initialization of a auto_aux basis set

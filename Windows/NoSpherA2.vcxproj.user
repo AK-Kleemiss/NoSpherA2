@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif Rh.cif -wfn Rh.gbw -hkl_min_max -10 10 -10 10 -10 10 -v -acc 4 -TFVC -ECP 1</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>..\tests\TFVC</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-v -cpus 8 -wfn epoxid_6_31G.gbw -RI_FIT auto_aux 2.0 -test_RI</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'">
@@ -758,5 +758,8 @@
     <LocalDebuggerWorkingDirectory>..\tests\NiP3_fchk\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments>-b def2-TZVP -d ./ -wfn in.ffn</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ShowAllFiles>false</ShowAllFiles>
   </PropertyGroup>
 </Project>
