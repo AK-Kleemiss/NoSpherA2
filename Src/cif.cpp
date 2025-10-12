@@ -161,7 +161,7 @@ const std::string get_CIF_table(const int nr, const WFN& wavy)
     return ss.str();
 }
 
-void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
+void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName, std::string additional_info)
 {
     err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);
@@ -169,6 +169,28 @@ void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
     ss << get_basis_set_CIF(0, wavy);
     ss << "\n\n";
     ss << get_CIF_table(0, wavy);
+    if (additional_info != "") {
+        ss << "\n\n";
+        ss << additional_info;
+    }
+    file << ss.str();
+    file.close();
+}
+
+void write_wfn_CIF(std::vector<WFN>& wavy, const std::filesystem::path& fileName, std::string additional_info)
+{
+    std::ofstream file(fileName);
+    std::stringstream ss;
+    for (int i = 0; i < wavy.size(); i++) {
+        err_checkf(wavy[i].get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
+        ss << get_basis_set_CIF(i, wavy[i]);
+        ss << "\n\n";
+        ss << get_CIF_table(i, wavy[i]);
+    }
+    if (additional_info != "") {
+        ss << "\n\n";
+        ss << additional_info;
+    }
     file << ss.str();
     file.close();
 }
