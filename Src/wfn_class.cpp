@@ -2565,15 +2565,15 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
             int temp_bas_idx = 0;
             for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
-                int type = basis[temp_bas_idx].get_type() - 1;
+                const int type = basis.at(temp_bas_idx).get_type() - 1;
                 temp_bas_idx += _atom.get_shellcount(shell);
                 for (int m = -type; m <= type; m++) {
                     auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m + type, Kokkos::full_extent);
-                    auto off = constants::orca_2_pySCF(type,m);
-                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + off, Kokkos::full_extent);
+                    const size_t off = constants::orca_2_pySCF(type,m);
+                    dMatrixRef1 reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + off, Kokkos::full_extent);
                     std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     if (operators == 2) {
-                        auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
+                        dMatrixRef1 coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
                         reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + off, Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     } 
@@ -2589,7 +2589,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             std::vector<basis_set_entry> basis = _atom.get_basis_set();
             int temp_bas_idx = 0;
             for (unsigned int shell = 0; shell < _atom.get_shellcount_size(); shell++) {
-                int type = basis[temp_bas_idx].get_type() - 1;
+                int type = basis.at(temp_bas_idx).get_type() - 1;
                 temp_bas_idx += _atom.get_shellcount(shell);
                 if (type_end.find(type + 1) == type_end.end()) {
                     type_end[type] = index + 2 * type + 1;
