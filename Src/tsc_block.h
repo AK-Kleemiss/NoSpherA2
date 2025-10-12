@@ -428,6 +428,33 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
+  const std::string get_tscb_cif_block(const options& opt) const {
+    std::string result;
+    result += "_aspheric_ffs_partitioning.name ";
+    if(opt.partition_type == PartitionType::Becke){ result += "'Becke'\n"; }
+    else if(opt.partition_type == PartitionType::TFVC){ result += "'TFVC'\n"; }
+    else if(opt.partition_type == PartitionType::Hirshfeld){ result += "'Hirshfeld'\n"; }
+    else if(opt.partition_type == PartitionType::RI){ result += "'RI-Fit'\n"; }
+    else { result += "'Unknown'\n"; }
+    result += "_aspheric_ffs_partitioning.software 'NoSpherA2'\n";
+    result += "_aspheric_ffs_partitioning.source 'partitioned molecular wavefunction calculation'";
+    result += "\nloop_\n_aspheric_ff.index_h\n_aspheric_ff.index_k\n_aspheric_ff.index_l\n_aspheric_ff.form_factor_real\n_aspheric_ff.form_factor_imag\n ";
+    for(size_t i=0; i<index[0].size(); i++) {
+      for(int dim=0; dim<3; dim++) {
+        result += std::to_string(index[dim][i]) + " ";
+      }
+      result += "'[";
+      for(size_t s=0; s<sf.size(); s++) {
+        result += std::to_string(real(sf[s][i])) + " ";
+      }
+      result += "]' '[";
+      for (size_t s = 0; s < sf.size(); s++) {
+          result += std::to_string(imag(sf[s][i])) + " ";
+      }
+      result += "]'\n ";
+    }
+    return result;
+  }
   void write_tscb_file(std::filesystem::path cif_name = "test.cif", std::filesystem::path name = "experimental.tscb")
   {
     try {  // Wrap in try-catch to help identify where segfaults occur
