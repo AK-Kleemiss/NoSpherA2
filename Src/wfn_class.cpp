@@ -2267,6 +2267,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                     atoms[a].get_basis_set_coefficient(s)));
             }
         }
+        basis_set_name = "GBW read basis set";
         // int norm_const_run = 0;
         int MO_run = 0;
         vec2 p_pure_2_cart;

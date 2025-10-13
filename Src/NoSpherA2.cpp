@@ -331,7 +331,7 @@ int main(int argc, char **argv)
                 log_file << "Writing Time: " << fixed << setprecision(0) << floor(get_sec(start, end_write) / 3600) << " h " << (get_sec(start, end_write) % 3600) / 60 << " m\n";
             log_file << endl;
             if(opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", result.get_tscb_cif_block(opt));
+                write_wfn_CIF(wavy, "test.wfn_cif", result, opt);
         }
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
@@ -366,7 +366,7 @@ int main(int argc, char **argv)
         }
         log_file << " ... done!" << endl;
         if (opt.write_CIF)
-            write_wfn_CIF(wavy, "test.wfn_cif", res.get_tscb_cif_block(opt));
+            write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
         log_file.flush();
         std::cout.rdbuf(coutbuf); // reset to standard output again
         std::cout << "Finished!" << endl;
@@ -411,8 +411,9 @@ int main(int argc, char **argv)
             if (opt.mult == 0)
                 err_checkf(wavy[0].guess_multiplicity(log_file), "Error guessing multiplicity", log_file);
             free_fchk(log_file, outputname, "", wavy[0], opt.debug, true);
-            if (opt.write_CIF)
+            if (opt.write_CIF) {
                 write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
+            }
         }
 
         // This one will calcualte a single tsc/tscb file form a single wfn
@@ -470,7 +471,7 @@ int main(int argc, char **argv)
             }
             log_file << " ... done!" << endl;
             if (opt.write_CIF)
-                write_wfn_CIF(wavy, "test.wfn_cif", res.get_tscb_cif_block(opt));
+                write_wfn_CIF(wavy, "test.wfn_cif", res, opt);
         }
         log_file.flush();
         std::cout.rdbuf(_coutbuf); // reset to standard output again

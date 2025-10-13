@@ -237,7 +237,7 @@ public:
     err_checkf(nr < index[dim].size(), "invalid nr for index", file);
     return index[dim][nr];
   };
-  const bool is_empty() { return (sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
+  const bool is_empty() { return !(sf.size() > 0 && scatterer.size() > 0 && index.size() > 0); };
   const int scatterer_size()
   {
     if (sf.size() == scatterer.size())
@@ -428,16 +428,16 @@ public:
     tsc_file.close();
     err_checkf(!tsc_file.bad(), "Error during writing of tsc file!", std::cout);
   }
-  const std::string get_tscb_cif_block(const options& opt) const {
+  const std::string get_tsc_cif_block(const options& opt) const {
     std::string result;
-    result += "_aspheric_ffs_partitioning.name ";
+    result += "_aspheric_ffs_partitioning.name     ";
     if(opt.partition_type == PartitionType::Becke){ result += "'Becke'\n"; }
     else if(opt.partition_type == PartitionType::TFVC){ result += "'TFVC'\n"; }
     else if(opt.partition_type == PartitionType::Hirshfeld){ result += "'Hirshfeld'\n"; }
     else if(opt.partition_type == PartitionType::RI){ result += "'RI-Fit'\n"; }
     else { result += "'Unknown'\n"; }
     result += "_aspheric_ffs_partitioning.software 'NoSpherA2'\n";
-    result += "_aspheric_ffs_partitioning.source 'partitioned molecular wavefunction calculation'";
+    result += "_aspheric_ffs_partitioning.source   'partitioned molecular wavefunction calculation'";
     result += "\nloop_\n_aspheric_ff.index_h\n_aspheric_ff.index_k\n_aspheric_ff.index_l\n_aspheric_ff.form_factor_real\n_aspheric_ff.form_factor_imag\n ";
     for(size_t i=0; i<index[0].size(); i++) {
       for(int dim=0; dim<3; dim++) {
