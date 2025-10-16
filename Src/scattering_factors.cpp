@@ -2487,6 +2487,7 @@ tsc_block_type calculate_scattering_factors(
     WFN* wavy = NULL;
     if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         wavy = &calculator[nr];
+        wavy->delete_Qs();
         err_checkf(wavy->get_ncen() != 0, "No Atoms in the wavefunction, this will not work!!ABORTING!!", file);
         if (!opt.cif_based_combined_tsc_calc)
         {

@@ -168,6 +168,8 @@ public:
     const int& get_MO_op(const int &nr) const;
     /** Remove all fully unoccupied MOs (occ==0). */
     void delete_unoccupied_MOs();
+    /** Delet all Qs from the waveufnciton (charge = 119)*/
+    void delete_Qs();
     /** Const reference to MO object. */
     const MO &get_MO(const int &n) const;
     /** Count MOs having a specified operator id. */

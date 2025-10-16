@@ -4949,6 +4949,18 @@ void WFN::delete_unoccupied_MOs()
         }
     }
 };
+void WFN::delete_Qs() {
+    const int old_ncen = ncen;
+    for (int i = static_cast<int>(atoms.size()) - 1; i >= 0; i--) {
+        if (atoms[i].get_charge() == 119) {
+            atoms.erase(atoms.begin() + i);
+            ncen--;
+            for (int j = 0; j < centers.size(); j++)
+                if (centers[j] >= i) 
+                    centers[j]--;
+        }
+    }
+}
 
 bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, const bool debug)
 {

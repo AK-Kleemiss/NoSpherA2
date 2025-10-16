@@ -1237,6 +1237,7 @@ void properties_calculation(options &opt)
         }
 
     wavy.delete_unoccupied_MOs();
+    wavy.delete_Qs();
 
     if (opt.hdef || opt.def || opt.hirsh)
     {
@@ -1328,6 +1329,7 @@ void properties_calculation(options &opt)
         log2 << "Calculating ESP..." << flush;
         WFN temp = wavy;
         temp.delete_unoccupied_MOs();
+        temp.delete_Qs();
         Calc_ESP(ESP, temp, opt.radius, opt.no_date, log2);
         log2 << "Writing cube to Disk..." << flush;
         ESP.write_file(true);
