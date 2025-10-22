@@ -415,6 +415,25 @@ bool read_block_from_fortran_binary(std::ifstream &file, void *Target)
     }
     return true;
 }
+template<typename T>
+bool read_block_from_fortran_binary(std::ifstream& file, std::vector<T>& Target)
+{
+    int size_begin = 0, size_end = 0;
+    file.read(reinterpret_cast<char*>(&size_begin), sizeof(int));
+	Target.resize(size_begin / sizeof(T));
+    file.read(reinterpret_cast<char*>(Target.data()), size_begin);
+    file.read(reinterpret_cast<char*>(&size_end), sizeof(int));
+    if (size_begin != size_end)
+    {
+        std::cout << "Error reading block from binary file: " << size_begin << " vs. " << size_end << std::endl;
+        return false;
+    }
+    return true;
+}
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<double>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<int>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<float>& Target);
+template bool read_block_from_fortran_binary(std::ifstream& file, std::vector<char>& Target);
 
 primitive::primitive(int c, int t, double e, double coef) : center(c), type(t), exp(e), coefficient(coef)
 {
@@ -1854,7 +1873,7 @@ void options::digest_options()
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
-            WFN *temp_w = new WFN(9);
+            WFN* temp_w = new WFN(e_origin::cub);
             cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {

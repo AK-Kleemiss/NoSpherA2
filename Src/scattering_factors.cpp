@@ -2770,7 +2770,7 @@ tsc_block_type calculate_scattering_factors(
             //If no basis is yet loaded, assume a auto aux should be generated
             if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(*wavy);
 
-            WFN wavy_aux(0);
+            WFN wavy_aux(e_origin::NOT_YET_DEFINED);
             wavy_aux.set_atoms(wavy->get_atoms());
             wavy_aux.set_ncen(wavy->get_ncen());
             wavy_aux.delete_basis_set();
@@ -2887,7 +2887,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
-    wavy.emplace_back(1);
+    wavy.emplace_back(e_origin::wfn);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     // set number of threads
 #ifdef _OPENMP

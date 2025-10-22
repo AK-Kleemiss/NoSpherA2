@@ -7,7 +7,7 @@ cube::cube()
 {
     loaded = false;
     na = 0;
-    parent_wavefunction = new WFN(6);
+    parent_wavefunction = new WFN(e_origin::cub);
     size = { 0, 0, 0 };
     origin = { 0.0, 0.0, 0.0 };
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
@@ -32,7 +32,7 @@ cube::cube(int x, int y, int z, int g_na, bool grow_values)
         }
     }
     na = g_na;
-    parent_wavefunction = new WFN(6);
+    parent_wavefunction = new WFN(e_origin::cub);
     vectors = { { { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 }, { 0.0, 0.0, 0.0 } } };
     dv = abs(vectors[0][0] * vectors[1][1] * vectors[2][2] - vectors[2][0] * vectors[1][1] * vectors[0][2] + vectors[0][1] * vectors[1][2] * vectors[2][0] - vectors[2][1] * vectors[1][2] * vectors[0][0] + vectors[0][2] * vectors[1][0] * vectors[2][1] - vectors[2][2] * vectors[1][0] * vectors[0][1]);
 };
@@ -52,7 +52,7 @@ cube::cube(const int g_na, const ivec &g_size, const vec &g_origin, const vec2 &
 {
     using namespace std;
     na = g_na;
-    parent_wavefunction = new WFN(6);
+    parent_wavefunction = new WFN(e_origin::cub);
    std::cout << "Assigned Nr of Atoms" << endl;
     for (int i = 0; i < 3; i++)
     {

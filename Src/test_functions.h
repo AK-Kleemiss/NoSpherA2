@@ -1557,7 +1557,7 @@ void test_analytical_fourier(bool full)
         vec coefs(type * 2 + 1);
 
         // Initialize the Wavefunction
-        WFN wavy(0);
+        WFN wavy(e_origin::NOT_YET_DEFINED);
         wavy.push_back_MO(0, 1.0, -13);
         wavy.push_back_atom("H", 0, 0, 0, 1);
         wavy.push_back_atom_basis_set(0, c_exp, vals[0], type, 0);
@@ -1670,7 +1670,7 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
     }
 
     // Initialize the Wavefunction
-    WFN wavy(0);
+    WFN wavy(e_origin::NOT_YET_DEFINED);
     wavy.push_back_MO(0, 1.0, -13);
     wavy.push_back_atom("H", 0, 0, 0, 1);
     wavy.push_back_atom_basis_set(0, 1.0, 1.0, lambda, 0);
@@ -1731,7 +1731,7 @@ void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
     using namespace std;
 
-    WFN wavy_aux(0);
+    WFN wavy_aux(e_origin::NOT_YET_DEFINED);
     wavy_aux.set_atoms(wavy.get_atoms());
     wavy_aux.set_ncen(wavy.get_ncen());
     wavy_aux.delete_basis_set();

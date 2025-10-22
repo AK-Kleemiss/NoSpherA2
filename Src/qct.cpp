@@ -1353,13 +1353,13 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         break;
                                     }
                                     wavy.erase(wavy.begin()+activewave);
-                                    if(path.find(".wfn")!=-1) wavy.insert(wavy.begin()+activewave-1,WFN(2));
-                                    else wavy.insert(wavy.begin()+activewave-1,WFN(4));
+                                    if(path.find(".wfn")!=-1) wavy.insert(wavy.begin()+activewave-1,WFN(e_origin::wfn));
+                                    else wavy.insert(wavy.begin()+activewave-1,WFN(e_origin::ffn));
                                 }
                                 else if(wavy.size()==0||activewave==wavy.size()||new_wfn) {
                                     if(opt.debug) std::cout << "Making a new wavefunction!" << endl;
-                                    if(path.find(".wfn")!=-1) wavy.emplace_back(2);
-                                    else wavy.emplace_back(4);
+                                    if(path.find(".wfn")!=-1) wavy.emplace_back(e_origin::wfn);
+                                    else wavy.emplace_back(e_origin::ffn);
                                     if(wavy.size()>1) activewave++;
                                     if(opt.debug) std::cout << "Size: " << wavy.size() << " active: " << activewave << endl;
                                 }

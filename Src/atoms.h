@@ -60,7 +60,7 @@ public:
     atom();
     atom(const std::string &l, const std::string& id, const int &n, const double &c1, const double &c2, const double &c3, const int &ch);
     atom(const std::string& l, const std::string& id, const int& n, const double& c1, const double& c2, const double& c3, const int& ch, const int& ECP_els);
-    atom operator=(const atom &rhs);
+    atom& operator=(const atom &rhs);
     void print_values() const;
     bool push_back_basis_set(const double &coefficient, const double &exponent, const int &type, const int &shell);
     void print_values_long() const;
@@ -102,10 +102,14 @@ public:
     int get_basis_set_shell(const int& _nr) const { return basis_set[_nr].get_shell(); };
     void set_basis_set_id(const int& id) { basis_set_id = id; };
     int get_basis_set_id() const { return basis_set_id; };
-    void set_shellcount(const std::vector<unsigned int>& sc) { shellcount = sc; };
+    void set_shellcount(const std::vector<unsigned int> sc) { shellcount.resize(sc.size()); shellcount = sc; };
     std::vector<unsigned int> get_shellcount() const { return shellcount; };
     unsigned int get_shellcount_size() const { return (unsigned int)shellcount.size(); };
-    void set_shellcount(const unsigned int& _nr, const unsigned int& value) { shellcount[_nr] = value; };
+    // Make indexed setter safe
+    void set_shellcount(const unsigned int& _nr, const unsigned int& value) {
+        if (_nr >= shellcount.size()) shellcount.resize(_nr + 1u, 0u);
+        shellcount[_nr] = value;
+    }
     unsigned int get_shellcount(const unsigned int& _nr) const { return shellcount[_nr]; };
     void push_back_shell(const unsigned int& type) { shellcount.push_back(type); };
     void clear_shellcount() { shellcount.clear(); };

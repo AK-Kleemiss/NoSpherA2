@@ -1,0 +1,23 @@
+{
+   name=     cyt
+   output_style_options= { real_precision= 8 }
+   CIF= { file_name= cyt.cif }
+   process_CIF
+   basis_directory= ./
+   basis_name= def2-SVP
+   
+   charge=       0
+   multiplicity= 1
+   put
+   scfdata= {
+      initial_density= promolecule
+      kind=            rhf
+      direct=          on
+      convergence= 0.00001
+      diis= { convergence_tolerance= 0.00001 }
+      output= YES
+      output_results= YES
+   }
+   
+   scf
+}
