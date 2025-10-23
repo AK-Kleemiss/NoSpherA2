@@ -94,5 +94,27 @@ def compare(n: int) -> None:
 
 
 
-for i in range(1,5):
-    compare(i)
+#for i in range(1,5):
+#    compare(i)
+    
+    
+
+d4 = -1.15134806E-07  
+d5 = 1.10898632E-06 
+d6 = -2.44742291E-06
+
+tonto_d4 = -0.19941933E-06
+tonto_d5 = 0.19208206E-05
+tonto_d6 = -0.42390608E-05
+
+print(" D functions ----   "
+      f"{d4:<.8e} {d5:<.8e} {d6:<.8e}")
+print("Tonto D functions   "
+        f"{tonto_d4:<.8e} {tonto_d5:<.8e} {tonto_d6:<.8e}")
+print("Ratio               "
+      f"{d4/tonto_d4:<.8e} {d5/tonto_d5:<.8e} {d6/tonto_d6:<.8e}")
+
+print((d4/tonto_d4)**2)
+print(math.sqrt(0.3333))
+
+print(math.sqrt(1.5))

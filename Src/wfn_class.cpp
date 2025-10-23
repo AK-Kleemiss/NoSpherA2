@@ -2414,10 +2414,8 @@ __________________________________
                 {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        for (int _i = 0; _i < 3; _i++)
-                            push_back_MO_coef(MO_run, d_temp[_i][s]);
-                        for (int _i = 3; _i < 6; _i++)
-                            push_back_MO_coef(MO_run, d_temp[_i][s]);// * sqrt(3));
+                        for (int _i = 0; _i < 6; _i++)
+                            push_back_MO_coef(MO_run, d_temp[_i][s] / sqrt(1.5));
                         for (int cart = 0; cart < 6; cart++)
                         {
                             if (MO_run == 0)
