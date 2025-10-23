@@ -2251,7 +2251,8 @@ __________________________________
             do {
                 const double exponent = stod(line_digest[line_digest.size() == 2 ? 0 : 2]);
                 const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
-                temp_at.push_back_basis_set(exponent, coefficient, angul+1, s);
+                const double norm_fac = pow(pow(2 , 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul],2),0.25);
+                temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul+1, s);
                 getline(rf, line);
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);

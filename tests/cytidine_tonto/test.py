@@ -44,7 +44,7 @@ def double_factorial(n:int) -> int:
         return 1
     else:
         return n * double_factorial(n - 2)
-l = 1
+l = 0
 #pow(pow(2, 7 + 4 * l) * pow(exp, 3 + 2 * l) / math.pi / pow(double_factorial(2 * l + 1), 2), 0.25);
 
 #pow(pow(2 ,3 + 4 * l) * pow(exp, 2 * l + 3) / math.pi**3 / pow(double_factorial(l),2),0.25)
@@ -61,27 +61,37 @@ def compare(n: int) -> None:
     coef_dict = {1: coef_1, 2: coef_2, 3: coef_3, 4: coef_4, 5: coef_5}
     norm_dict = {1: norm_c1, 2: norm_c2, 3: norm_c3, 4: norm_c4, 5: norm_c5}
     target_dict = {1: target_1, 2: target_2, 3: target_3, 4: target_4, 5: target_5}
+    exp_dict = {1: c_1, 2: c_2, 3: c_3, 4: c_4, 5: c_5}
     
     c = c_dict[n]
     coef = coef_dict[n]
     norm_c = norm_dict[n]
     target = target_dict[n]
+    exp = exp_dict[n]
     
-    calc = pow(pow(2 ,3 + 4 * l) * pow(c, 2 * l + 3) / math.pi**3 / pow(double_factorial(l),2),0.25)
+    calc = pow(pow(2 , 3 + 4 * l) * pow(exp, 2 * l + 3) / math.pi**3 / pow(double_factorial(l),2),0.25)
 
     print(f"---- Target: {n} ----", f"{target:<.8e} ------------")
     print(f"c{n} from NSA2       {c:<.8e}  c{n} from basis {coef:<.8e} ratio {c/coef:<.8e}")
 
     print(f"norm from Tonto     {calc:<.8e}")
     print(f"norm from tonto fac {calc/difference:<.8e}")
+    print(f"norm from tonto fac {calc*difference:<.8e}")
     print(f"norm NSA2           {norm_c:<.8e}")
  
     print(f"no norm             {a*c:<.8e} ratio: {(a*c)/target:<.8f}")
     print(f"no_norm / faktor    {a*c/difference:<.8e} ratio: {(a*c/difference)/target:<.8f}")
     print(f"no_norm * faktor    {a*c*difference:<.8e} ratio: {(a*c*difference)/target:<.8f}")
-    print(f"with norm           {a*coef:<.8e} ratio: {(a*coef)/target:<.8f}")
-    print(f"with norm / faktor  {a*coef/difference:<.8e} ratio: {(a*coef/difference)/target:<.8f}")
-    print(f"with norm * faktor  {a*coef*difference:<.8e} ratio: {(a*coef*difference)/target:<.8f}")
+    print(f"no norm_2           {a*coef:<.8e} ratio: {(a*coef)/target:<.8f}")
+    print(f"no norm_2 / faktor  {a*coef/difference:<.8e} ratio: {(a*coef/difference)/target:<.8f}")
+    print(f"no norm_2 * faktor  {a*coef*difference:<.8e} ratio: {(a*coef*difference)/target:<.8f}")
+    print(f"incl norm           {a*c*norm_c:<.8e} ratio: {(a*c*norm_c)/target:<.8f}")
+    print(f"incl norm / factor  {a*c*norm_c/difference:<.8e} ratio: {(a*c*norm_c/difference)/target:<.8f}")
+    print(f"incl norm * factor  {a*c*norm_c*difference:<.8e} ratio: {(a*c*norm_c*difference)/target:<.8f}")
+    print(f"incl norm           {a*c*calc:<.8e} ratio: {(a*c*calc)/target:<.8f}")
+    print(f"incl norm / factor  {a*c*calc/difference:<.8e} ratio: {(a*c*calc/difference)/target:<.8f}")
+    print(f"incl norm * factor  {a*c*calc*difference:<.8e} ratio: {(a*c*calc*difference)/target:<.8f}")
+
 
 
 for i in range(1,5):
