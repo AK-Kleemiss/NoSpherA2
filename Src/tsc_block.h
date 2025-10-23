@@ -438,7 +438,7 @@ public:
     else { result += "'Unknown'\n"; }
     result += "_aspheric_ffs_partitioning.software 'NoSpherA2'\n";
     result += "_aspheric_ffs_partitioning.source   'partitioned molecular wavefunction calculation'";
-    result += "\nloop_\n_aspheric_ff.index_h\n_aspheric_ff.index_k\n_aspheric_ff.index_l\n_aspheric_ff.form_factor_real\n_aspheric_ff.form_factor_imag\n ";
+    result += "\n\nloop_\n_aspheric_ff.index_h\n_aspheric_ff.index_k\n_aspheric_ff.index_l\n_aspheric_ff.form_factor_real\n_aspheric_ff.form_factor_imag\n ";
     for(size_t i=0; i<index[0].size(); i++) {
       for(int dim=0; dim<3; dim++) {
         result += std::to_string(index[dim][i]) + " ";

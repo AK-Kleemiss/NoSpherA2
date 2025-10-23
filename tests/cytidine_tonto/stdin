@@ -13,11 +13,12 @@
       initial_density= promolecule
       kind=            rhf
       direct=          on
-      convergence= 0.00001
-      diis= { convergence_tolerance= 0.00001 }
+      convergence= 0.001
+      diis= { convergence_tolerance= 0.001 }
       output= YES
       output_results= YES
    }
    
    scf
+   write_aim2000_wfn_file
 }
