@@ -3123,3 +3123,36 @@ void ProgressBar::initialize_taskbar_progress()
     }
 }
 #endif
+
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug) {
+
+	double lambda_start = 0.0;
+    double lambda_step = stod(lambda_step);
+    std::string jobname, line;
+    std::filesystem::path stdout_file = str;
+    std::ifstream rf(stdout_file.string().c_str(), std::ios::in);
+    rf.seekg(0);
+    while (rf.good() && line.find("Name ...") == std::string::npos) {
+        getline(rf, line);
+    }
+    jobname = split_string<std::string>(line, " ")[2];
+    
+	//iterate over files in the same folder looking for .orbital_energies,restricted or .MO_energies,r and .molecular_orbitals,restricted or .MOs,r at the given lambda value
+    //example filename: NiP3.molecular_orbitals,lambda=0.000000,restricted
+	//make lambda value into a string with 6 decimal places
+	std::string formatted_lambda = std::to_string(lambda_start);
+    std::filesystem::path energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" +  + ",restricted");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,r");
+    std::filesystem::path orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,restricted");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,r");
+    while ()
+
+
+    
+    err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", std::cout);
+    err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", std::cout);
+    //check if there is a stdout file in the same folder
+    err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", std::cout);
+};

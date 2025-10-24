@@ -213,7 +213,7 @@ public:
     /** Read Molden format (.molden). */
     bool read_molden(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     /** Read tonto orbital_energies and molecular_orbitals binary file. */
-    bool read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug = false);
+    bool read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug = false, const std::filesystem::path& energies_filename = "", const std::filesystem::path& orbitals_filename = "");
     /** Read ORCA .gbw binary file. */
     bool read_gbw(const std::filesystem::path&filename, std::ostream &file, const bool debug = false, const bool has_ECPs = false);
     /** Read xTB / pTB binary orbital file. */

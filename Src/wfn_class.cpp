@@ -2071,68 +2071,79 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     return true;
 };
 
-bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug)
+bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug, const std::filesystem::path& energies_filename, const std::filesystem::path& orbitals_filename)
 {
     using namespace std;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
     std::filesystem::path energies_file, orbitals_file, stdout_file;
     ifstream rf;
     string line;
-    if (filename.string().find("stdout") != std::string::npos) {
-        string jobname;
-        stdout_file = filename;
-        rf.open(stdout_file.string().c_str(), ios::in);
-        rf.seekg(0);
-        while (rf.good() && line.find("Name ...") == string::npos) {
-            getline(rf, line);
+    if (energies_filename == "" && orbitals_filename == "") {
+        if (filename.string().find("stdout") != std::string::npos) {
+            string jobname;
+            stdout_file = filename;
+            rf.open(stdout_file.string().c_str(), ios::in);
+            rf.seekg(0);
+            while (rf.good() && line.find("Name ...") == string::npos) {
+                getline(rf, line);
+            }
+            jobname = split_string<string>(line, " ")[2];
+            energies_file = filename.parent_path() / (jobname + ".orbital_energies,restricted");
+            if (!std::filesystem::exists(energies_file))
+                energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
+            orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,restricted");
+            if (!std::filesystem::exists(orbitals_file))
+                orbitals_file = filename.parent_path() / (jobname + ".MOs,r");
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
         }
-        jobname = split_string<string>(line, " ")[2];
-        energies_file = filename.parent_path() / (jobname + ".orbital_energies,restricted");
-        if (!std::filesystem::exists(energies_file))
-            energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
-        orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,restricted");
-        if (!std::filesystem::exists(orbitals_file))
-            orbitals_file = filename.parent_path() / (jobname + ".MOs,r");
-        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
-        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
-        //check if there is a stdout file in the same folder
-        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
-    }
-    else if (filename.extension() == ".orbital_energies,restricted" || filename.extension() == ".MO_energies,r") {
-        energies_file = filename;
-        orbitals_file = filename;
-        if (filename.extension() == ".orbital_energies,restricted") {
-            orbitals_file.replace_extension(".molecular_orbitals,restricted");
+        else if (filename.extension() == ".orbital_energies,restricted" || filename.extension() == ".MO_energies,r") {
+            energies_file = filename;
+            orbitals_file = filename;
+            if (filename.extension() == ".orbital_energies,restricted") {
+                orbitals_file.replace_extension(".molecular_orbitals,restricted");
+            }
+            else if (filename.extension() == ".MO_energies,r") {
+                orbitals_file.replace_extension(".MOs,r");
+            }
+            stdout_file = filename.parent_path() / "stdout";
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+            rf.open(stdout_file.string().c_str(), ios::in);
         }
-        else if (filename.extension() == ".MO_energies,r") {
-            orbitals_file.replace_extension(".MOs,r");
+        else if (filename.extension() == ".molecular_orbitals,restricted" || filename.extension() == ".MOs,r") {
+            orbitals_file = filename;
+            energies_file = filename;
+            if (filename.extension() == ".molecular_orbitals,restricted") {
+                energies_file.replace_extension(".orbital_energies,restricted");
+            }
+            else if (filename.extension() == ".MOs,r") {
+                energies_file.replace_extension(".MO_energies,r");
+            }
+            stdout_file = filename.parent_path() / "stdout";
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+            rf.open(stdout_file.string().c_str(), ios::in);
         }
-        stdout_file = filename.parent_path() / "stdout";
-        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
-        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
-        //check if there is a stdout file in the same folder
-        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
-        rf.open(stdout_file.string().c_str(), ios::in);
-    }
-    else if (filename.extension() == ".molecular_orbitals,restricted" || filename.extension() == ".MOs,r") {
-        orbitals_file = filename;
-        energies_file = filename;
-        if (filename.extension() == ".molecular_orbitals,restricted") {
-            energies_file.replace_extension(".orbital_energies,restricted");
+        else {
+            err_checkf(false, "Filename extension not recognized for tonto files! Please provide either .orbital_energies,restricted or .molecular_orbitals,restricted (or their short forms).", file);
         }
-        else if (filename.extension() == ".MOs,r") {
-            energies_file.replace_extension(".MO_energies,r");
-        }
-        stdout_file = filename.parent_path() / "stdout";
-        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
-        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
-        //check if there is a stdout file in the same folder
-        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
-        rf.open(stdout_file.string().c_str(), ios::in);
     }
     else {
-        err_checkf(false, "Filename extension not recognized for tonto files! Please provide either .orbital_energies,restricted or .molecular_orbitals,restricted (or their short forms).", file);
-    }
+        energies_file = energies_filename;
+        orbitals_file = orbitals_filename;
+        stdout_file = filename;
+        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+        rf.open(stdout_file.string().c_str(), ios::in);
+	}
 
 
     if (debug)
@@ -2574,20 +2585,7 @@ __________________________________
         }
         err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
     }
-    
-    //Make the matrix symmetric
-    //while (coefficients[0].size() < coefficients[0][0].size()) {
-    //    coefficients[0].push_back(vec(coefficients[0][0].size(), 0.0));
-    //    occ.push_back(0);
-    //}
-    //while (coefficients[0][0].size() < coefficients[0].size()) {
-    //    for (int i = 0; i < coefficients[0].size(); i++) {
-    //        coefficients[0][i].push_back(0.0);
-    //    }
-    //    occ.push_back(0);
-    //}
-    //vec _coefficients = flatten<double>(coefficients);
-    //dMatrix2 m_coefs = reshape<dMatrix2>(_coefficients, Shape2D((int)coefficients[0].size(), (int)coefficients[0].size()));
+
     dMatrix2 temp_co = diag_dot(coefficients, occ, true);
     DM = dot(temp_co, coefficients);
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
