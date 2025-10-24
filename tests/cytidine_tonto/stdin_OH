@@ -1,13 +1,17 @@
 {
-   name=     cyt
+   name=     OH
    output_style_options= { real_precision= 8 }
-   CIF= { file_name= cyt.cif }
-   process_CIF
    basis_directory= ./
-   basis_name= def2-SVP
-   
-   charge=       0
+   basis_name= custom
+   charge=       -1
    multiplicity= 1
+   atoms= {
+      keys= { label= { units= angstrom } pos= }
+      data= {
+         1     0.0    0.0    0.0
+         8     1.0    0.0    0.0
+      }
+   }
    put
    scfdata= {
       initial_density= promolecule

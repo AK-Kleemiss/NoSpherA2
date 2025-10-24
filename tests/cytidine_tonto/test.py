@@ -118,3 +118,111 @@ print((d4/tonto_d4)**2)
 print(math.sqrt(0.3333))
 
 print(math.sqrt(1.5))
+
+
+f1 = 3.72056418E-04 
+f2 = -9.80555572E-14 
+f3 = -2.35484325E-13
+f4 = -7.39529468E-14 
+f5 = -1.89159647E-13 
+f6 = -2.20064316E-03 
+f7 = -2.41091929E-13 
+f8 = -2.20064316E-03
+f9 = -9.54164514E-14 
+f10=  3.61091530E-15
+
+tonto_f1 = 0.16638869E-03 
+tonto_f2 =-0.43851778E-13 
+tonto_f3 =-0.10531179E-12
+tonto_f4 = -0.33072763E-13 
+tonto_f5 = -0.84594766E-13 
+tonto_f6 = -0.98415754E-03 
+tonto_f7 = -0.10781959E-12 
+tonto_f8 = -0.98415754E-03
+tonto_f9 = -0.42671534E-13  
+tonto_f10 = 0.16148504E-14
+
+print(" F functions ----   "
+      f"{f1:<.8e} {f2:<.8e} {f3:<.8e} {f4:<.8e} {f5:<.8e} "
+      f"{f6:<.8e} {f7:<.8e} {f8:<.8e} {f9:<.8e} {f10:<.8e}")
+print("Tonto F functions   "
+      f"{tonto_f1:<.8e} {tonto_f2:<.8e} {tonto_f3:<.8e} {tonto_f4:<.8e} {tonto_f5:<.8e} "
+      f"{tonto_f6:<.8e} {tonto_f7:<.8e} {tonto_f8:<.8e} {tonto_f9:<.8e} {tonto_f10:<.8e}")
+print("Ratio               "
+      f"{f1/tonto_f1:<.8e} {f2/tonto_f2:<.8e} {f3/tonto_f3:<.8e} {f4/tonto_f4:<.8e} {f5/tonto_f5:<.8e} "
+      f"{f6/tonto_f6:<.8e} {f7/tonto_f7:<.8e} {f8/tonto_f8:<.8e} {f9/tonto_f9:<.8e} {f10/tonto_f10:<.8e}")
+
+print((f1/tonto_f1)**2)
+print((f2/tonto_f2)**2)
+print((f3/tonto_f3)**2)
+print((f4/tonto_f4)**2)
+print((f5/tonto_f5)**2)
+print((f6/tonto_f6)**2)
+print((f7/tonto_f7)**2)
+print((f8/tonto_f8)**2)
+print((f9/tonto_f9)**2)
+print((f10/tonto_f10)**2)
+
+g11 = -2.21752490E-02
+g12 = -5.14765074E-02 
+g13 = -5.14765074E-02 
+g14 = -2.72421014E-13  
+g15 = 4.98557839E-14 
+g16 = -2.27440097E-13
+g17 =  5.09601293E-14 
+g18 =  -1.58563739E-14  
+g19 =  7.79416965E-14 
+g20 =  -7.14942370E-02 
+g21 =  -7.14942370E-02
+g22 = -1.02953019E-01  
+g23 = 2.26403626E-14 
+g24 = -1.33348554E-14 
+g25 = -2.49425372E-13
+
+tonto_g11=  -0.61209502E-02
+tonto_g12= -0.14208866E-01 
+tonto_g13= -0.14208866E-01 
+tonto_g14= -0.75195344E-13  
+tonto_g15= 0.13761504E-13 
+tonto_g16= -0.62779431E-13
+tonto_g17=  0.14066332E-13 
+tonto_g18=  -0.43767750E-14  
+tonto_g19=  0.21513952E-13 
+tonto_g20=  -0.19734284E-01 
+tonto_g21=  -0.19734284E-01
+tonto_g22= -0.28417733E-01 
+tonto_g23= 0.62493338E-14 
+tonto_g24= -0.36807698E-14 
+tonto_g25= -0.68847944E-13
+
+print(" G functions ----   "
+      f"{g11:<.8e} {g12:<.8e} {g13:<.8e} {g14:<.8e} {g15:<.8e} "
+      f"{g16:<.8e} {g17:<.8e} {g18:<.8e} {g19:<.8e} {g20:<.8e} "
+      f"{g21:<.8e} {g22:<.8e} {g23:<.8e} {g24:<.8e} {g25:<.8e} ")
+print("Tonto G functions   "
+        f"{tonto_g11:<.8e} {tonto_g12:<.8e} {tonto_g13:<.8e} {tonto_g14:<.8e} {tonto_g15:<.8e} "
+        f"{tonto_g16:<.8e} {tonto_g17:<.8e} {tonto_g18:<.8e} {tonto_g19:<.8e} {tonto_g20:<.8e} "
+        f"{tonto_g21:<.8e} {tonto_g22:<.8e} {tonto_g23:<.8e} {tonto_g24:<.8e} {tonto_g25:<.8e} ")
+print("Ratio               "
+      f" {g11/tonto_g11:<.8e}  {g12/tonto_g12:<.8e}  {g13/tonto_g13:<.8e}  {g14/tonto_g14:<.8e}  {g15/tonto_g15:<.8e}"
+      f" {g16/tonto_g16:<.8e}  {g17/tonto_g17:<.8e}  {g18/tonto_g18:<.8e}  {g19/tonto_g19:<.8e}  {g20/tonto_g20:<.8e}"
+      f" {g21/tonto_g21:<.8e}  {g22/tonto_g22:<.8e}  {g23/tonto_g23:<.8e}  {g24/tonto_g24:<.8e}  {g25/tonto_g25:<.8e}")
+
+
+print((g11/tonto_g11)**2)
+print((g12/tonto_g12)**2)
+print((g13/tonto_g13)**2)
+print((g14/tonto_g14)**2)
+print((g15/tonto_g15)**2)
+print((g16/tonto_g16)**2)
+print((g17/tonto_g17)**2)
+print((g18/tonto_g18)**2)
+print((g19/tonto_g19)**2)
+print((g20/tonto_g20)**2)
+print((g21/tonto_g21)**2)
+print((g22/tonto_g22)**2)
+print((g23/tonto_g23)**2)
+print((g24/tonto_g24)**2)
+print((g25/tonto_g25)**2)
+
+print(math.sqrt(13.125))

@@ -101,3 +101,4 @@ libiomp5.so
 *.diff
 tests/SALTED/temp_rascaline.xyz
 tests/grown/temp_wavefunction.wfn
+*.density_matrix,restricted

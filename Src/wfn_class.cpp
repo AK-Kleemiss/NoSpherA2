@@ -2407,7 +2407,7 @@ __________________________________
                 }
                 for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                 {
-                    d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                    d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(1.5);
                 }
                 d_run++;
                 if (d_run == 6)
@@ -2415,7 +2415,7 @@ __________________________________
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
                         for (int _i = 0; _i < 6; _i++)
-                            push_back_MO_coef(MO_run, d_temp[_i][s] / sqrt(1.5));
+                            push_back_MO_coef(MO_run, d_temp[_i][s]);
                         for (int cart = 0; cart < 6; cart++)
                         {
                             if (MO_run == 0)
@@ -2443,7 +2443,7 @@ __________________________________
                 }
                 for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                 {
-                    f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                    f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(5.0);
                 }
                 f_run++;
                 if (f_run == 10)
@@ -2452,24 +2452,13 @@ __________________________________
                     {
                         for (int cart = 0; cart < 10; cart++)
                         {
-                            // THIS IS A MESS AND NEEDS REEVALUATION; THEY ARE CERTAINLY NOT CORRECT!
-                            if (cart < 3 || cart == 9)
-                            {
-                                if (cart == 9)
-                                    push_back_MO_coef(MO_run, f_temp[cart][s] * sqrt(15));
-                                else
-                                    push_back_MO_coef(MO_run, f_temp[cart][s]);
-                            }
-                            else if (cart == 3 || cart == 4)
-                                push_back_MO_coef(MO_run, f_temp[cart + 1][s] * sqrt(15));
+                            // tonto swaps type 17 and 16
+                            if (cart != 5 && cart != 6)
+                                push_back_MO_coef(MO_run, f_temp[cart][s]);
                             else if (cart == 5)
-                                push_back_MO_coef(MO_run, f_temp[cart + 3][s] * sqrt(15));
-                            else if (cart == 6)
-                                push_back_MO_coef(MO_run, f_temp[cart - 3][s] * sqrt(5));
-                            else if (cart == 7)
-                                push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(5));
-                            else if (cart == 8)
-                                push_back_MO_coef(MO_run, f_temp[cart - 1][s] * sqrt(15));
+                                push_back_MO_coef(MO_run, f_temp[cart + 1][s]);
+							else if (cart == 6)
+								push_back_MO_coef(MO_run, f_temp[cart - 1][s]);
                             if (MO_run == 0)
                             {
                                 push_back_exponent(prims[basis_run + s].get_exp());
@@ -2495,7 +2484,7 @@ __________________________________
                 }
                 for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                 {
-                    g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                    g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(13.125);
                 }
                 g_run++;
                 if (g_run == 15)
