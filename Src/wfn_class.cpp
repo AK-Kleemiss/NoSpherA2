@@ -539,7 +539,8 @@ void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, 
 	else if (fileName.extension() == ".stda")
         err_checkf(read_ptb(fileName, file, debug), "Problem reading ptb file", file);
 	else if (fileName.extension() == ".orbital_energies,restricted" || fileName.extension() == ".MO_energies,r"
-        || fileName.extension() == ".molecular_orbitals,restricted" || fileName.extension() == ".MOs,r")
+        || fileName.extension() == ".molecular_orbitals,restricted" || fileName.extension() == ".MOs,r"
+        || fileName.string().find("stdout") != std::string::npos)
 		err_checkf(read_tonto(fileName, file, debug), "Problem reading tonto file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
@@ -2074,63 +2075,91 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
 {
     using namespace std;
     err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
-    std::filesystem::path energies_file, orbitals_file;
-    if (filename.extension() == ".orbital_energies,restricted" || filename.extension() == ".MO_energies,r") {
+    std::filesystem::path energies_file, orbitals_file, stdout_file;
+    ifstream rf;
+    string line;
+    if (filename.string().find("stdout") != std::string::npos) {
+        string jobname;
+        stdout_file = filename;
+        rf.open(stdout_file.string().c_str(), ios::in);
+        rf.seekg(0);
+        while (rf.good() && line.find("Name ...") == string::npos) {
+            getline(rf, line);
+        }
+        jobname = split_string<string>(line, " ")[2];
+        energies_file = filename.parent_path() / (jobname + ".orbital_energies,restricted");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
+        orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,restricted");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = filename.parent_path() / (jobname + ".MOs,r");
+        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+        //check if there is a stdout file in the same folder
+        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+    }
+    else if (filename.extension() == ".orbital_energies,restricted" || filename.extension() == ".MO_energies,r") {
         energies_file = filename;
         orbitals_file = filename;
         if (filename.extension() == ".orbital_energies,restricted") {
-			orbitals_file.replace_extension(".molecular_orbitals,restricted");
+            orbitals_file.replace_extension(".molecular_orbitals,restricted");
         }
         else if (filename.extension() == ".MO_energies,r") {
-			orbitals_file.replace_extension(".MOs,r");
+            orbitals_file.replace_extension(".MOs,r");
         }
+        stdout_file = filename.parent_path() / "stdout";
+        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+        //check if there is a stdout file in the same folder
+        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+        rf.open(stdout_file.string().c_str(), ios::in);
     }
     else if (filename.extension() == ".molecular_orbitals,restricted" || filename.extension() == ".MOs,r") {
         orbitals_file = filename;
         energies_file = filename;
-		if (filename.extension() == ".molecular_orbitals,restricted") {
+        if (filename.extension() == ".molecular_orbitals,restricted") {
             energies_file.replace_extension(".orbital_energies,restricted");
         }
-		else if (filename.extension() == ".MOs,r") {
+        else if (filename.extension() == ".MOs,r") {
             energies_file.replace_extension(".MO_energies,r");
         }
+        stdout_file = filename.parent_path() / "stdout";
+        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+        //check if there is a stdout file in the same folder
+        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+        rf.open(stdout_file.string().c_str(), ios::in);
     }
     else {
         err_checkf(false, "Filename extension not recognized for tonto files! Please provide either .orbital_energies,restricted or .molecular_orbitals,restricted (or their short forms).", file);
-	}
-    err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
-    err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
-    //check if there is a stdout file in the same folder
-	std::filesystem::path stdout_file = filename.parent_path() / "stdout";
-	err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+    }
+
 
     if (debug)
         file << "File is valid, continuing...\n" << GetCurrentDir << endl;
     origin = e_origin::tonto;
-	//open the files as read-only binary files
+    //open the files as read-only binary files
     ifstream rf_e(energies_file.c_str(), ios::binary);
     ifstream rf_o(orbitals_file.c_str(), ios::binary);
     err_checkf(rf_e.good(), "couldn't open " + energies_file.string() + ", leaving", file);
-	err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
+    err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
     if (rf_e.good())
         path = filename;
-    string line;
     rf_e.seekg(0);
-	rf_o.seekg(0);
+    rf_o.seekg(0);
 
-	//Read the energies and orbital coefficients from binary files
+    //Read the energies and orbital coefficients from binary files
     vec energies, orbitals;
     read_block_from_fortran_binary(rf_e, energies);
     read_block_from_fortran_binary(rf_o, orbitals);
 
     rf_e.close();
-	rf_o.close();
+    rf_o.close();
 
-	//Now read the stdout file to get the atomic positions and basis set
-	ifstream rf(stdout_file.c_str());
-	rf.seekg(0);
-	err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
-	//fast forward to the atom section
+    //Now read the stdout file to get the atomic positions and basis set
+    rf.seekg(0);
+    err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
+    //fast forward to the atom section
     while (rf.good() && line.find("Molecule information") == string::npos) {
         getline(rf, line);
     }
@@ -2138,48 +2167,48 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
     //skip 8 lines to get to the charge
     for (int i = 0; i < 8; i++) {
         getline(rf, line);
-	}
-	svec line_digest = split_string<string>(line, " ");
-	//get the charge form the last element in the line
-	charge = stoi(line_digest[line_digest.size() - 1]);
-	getline(rf, line);
+    }
+    svec line_digest = split_string<string>(line, " ");
+    //get the charge form the last element in the line
+    charge = stoi(line_digest[line_digest.size() - 1]);
+    getline(rf, line);
     line_digest = split_string<string>(line, " ");
     multi = stoi(line_digest[line_digest.size() - 1]);
     getline(rf, line);
     getline(rf, line);
     line_digest = split_string<string>(line, " ");
-	const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
+    const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
     getline(rf, line);
     line_digest = split_string<string>(line, " ");
     const int expected_electrons = stoi(line_digest[line_digest.size() - 1]);
     while (rf.good() && line.find("Atom coordinates") == string::npos) {
         getline(rf, line);
     }
-	//skip 11 lines to get to the atom list
+    //skip 11 lines to get to the atom list
     for (int i = 0; i < 11; i++) {
         getline(rf, line);
-	}
+    }
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     err_checkf(line_digest[0] == "1", "Atom list does nor start with one? let me stop...", std::cout);
 
-    while(!line.empty() && line.front() != '_')
+    while (!line.empty() && line.front() != '_')
     {
         line_digest = split_string<string>(line, " ");
         remove_empty_elements(line_digest);
         string label = line_digest[1];
-		int atomic_number = static_cast<int>(stod(line_digest[2]));
+        int atomic_number = static_cast<int>(stod(line_digest[2]));
         double x = constants::ang2bohr(stod(line_digest[3]));
         double y = constants::ang2bohr(stod(line_digest[4]));
         double z = constants::ang2bohr(stod(line_digest[5]));
         err_checkf(push_back_atom(label, x, y, z, atomic_number), "Error pushing back an atom!", std::cout);
         getline(rf, line);
-	}
+    }
     err_checkf(ncen == expected_atoms, "Did not read expected numebr of atoms!", std::cout);
     while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
         getline(rf, line);
     }
-	//get 3 lines down to the basis set name
+    //get 3 lines down to the basis set name
     for (int i = 0; i < 3; i++) {
         getline(rf, line);
     }
@@ -2210,16 +2239,16 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
     line_digest = split_string<string>(line, " ");
     remove_empty_elements(line_digest);
     const int no_prim = stoi(line_digest[line_digest.size() - 1]);
-	std::vector<std::pair<std::string, atom>> basis_set_data;
-	std::map<char, int> l_map = { {'S',0}, {'P',1}, {'D',2}, {'F',3}, {'G',4}, {'H',5}, {'I',6}, {'s',0}, {'p',1}, {'d',2}, {'f',3}, {'g',4}, {'h',5}, {'i',6} };
-    for(int nbs = 0; nbs < no_basis_sets; nbs++)
+    std::vector<std::pair<std::string, atom>> basis_set_data;
+    std::map<char, int> l_map = { {'S',0}, {'P',1}, {'D',2}, {'F',3}, {'G',4}, {'H',5}, {'I',6}, {'s',0}, {'p',1}, {'d',2}, {'f',3}, {'g',4}, {'h',5}, {'i',6} };
+    for (int nbs = 0; nbs < no_basis_sets; nbs++)
     {
         //two empty lines
         getline(rf, line);
         getline(rf, line);
         getline(rf, line);//looks like "Basis set H:3-21G"
-		line_digest = split_string<string>(line, " "); 
-		const string atom_type = split_string<string>(line_digest[2], ":")[0];
+        line_digest = split_string<string>(line, " ");
+        const string atom_type = split_string<string>(line_digest[2], ":")[0];
         getline(rf, line); // empty line
         getline(rf, line);//looks like "No. of shells .... N"
         line_digest = split_string<string>(line, " ");
@@ -2238,11 +2267,11 @@ __________________________________
 __________________________________
 
 */
-		for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
+        for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
         atom temp_at(atom_type, "0000000000000", 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
         for (int s = 0; s < shells_local; s++)
         {
-			//getline(rf, line); //get shell line
+            //getline(rf, line); //get shell line
             line_digest = split_string<string>(line, " ");
             remove_empty_elements(line_digest);
             err_checkf(l_map.contains(line_digest[0][0]), "Angular momentum not found: " + line_digest[0], std::cout);
@@ -2251,15 +2280,15 @@ __________________________________
             do {
                 const double exponent = stod(line_digest[line_digest.size() == 2 ? 0 : 2]);
                 const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
-                const double norm_fac = pow(pow(2 , 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul],2),0.25);
-                temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul+1, s);
+                const double norm_fac = pow(pow(2, 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul], 2), 0.25);
+                temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul + 1, s);
                 getline(rf, line);
                 line_digest = split_string<string>(line, " ");
                 remove_empty_elements(line_digest);
             } while (line_digest.size() == 2);
         }
-		err_checkf(line[0] == '_', "Expected a line of underscores after basis set for atom " + atom_type, file);
-		basis_set_data.push_back(std::make_pair(atom_type, temp_at));
+        err_checkf(line[0] == '_', "Expected a line of underscores after basis set for atom " + atom_type, file);
+        basis_set_data.push_back(std::make_pair(atom_type, temp_at));
     }
     //Now assign the basis set data to the atoms
     for (int a = 0; a < ncen; a++)
@@ -2272,9 +2301,9 @@ __________________________________
                 atoms[a].set_basis_set(atom_template.get_basis_set());
                 atoms[a].set_shellcount(atom_template.get_shellcount());
                 break;
-			}
+            }
         }
-	}
+    }
 
     int expected_coefs = 0;
     vector<primitive> prims;
@@ -2315,13 +2344,46 @@ __________________________________
                 atoms[a].get_basis_set_coefficient(s)));
         }
     }
-	err_checkf(expected_coefs == no_bf, "Expected number of basis functions (" + to_string(expected_coefs) + ") does not match number in file (" + to_string(no_bf) + ")!", file);
-	dMatrix2 coefficients = reshape<dMatrix2>(orbitals, Shape2D(expected_coefs, expected_coefs));
-	vec occ(expected_coefs, 0.0);
-    for(int i=0; i< get_nr_electrons()/2.0; i++)
+    err_checkf(expected_coefs == no_bf, "Expected number of basis functions (" + to_string(expected_coefs) + ") does not match number in file (" + to_string(no_bf) + ")!", file);
+    dMatrix2 coefficients = reshape<dMatrix2>(orbitals, Shape2D(expected_coefs, expected_coefs));
+    vec occ(expected_coefs, 0.0);
+    int alpha_els = 0, beta_els = 0, temp_els = get_nr_electrons();
+    while (temp_els > 1)
     {
-        occ[i] = 2.0;
-	}
+        alpha_els++;
+        beta_els++;
+        temp_els -= 2;
+        if (debug)
+            file << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", file);
+        err_checkf(alpha_els + beta_els <= get_nr_electrons(), "Error setting alpha and beta electrons! Sum a + b > elcount!", file);
+        err_checkf(temp_els > -int(get_nr_electrons()), "Error setting alpha and beta electrons! Ran below -elcount!", file);
+    }
+    alpha_els += temp_els;
+    if (debug)
+        file << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+    const int mult = get_multi();
+    int diff = 0;
+    if (mult != 0)
+        diff = get_multi() - 1;
+    if (debug)
+        file << "diff: " << diff << std::endl;
+    while (alpha_els - beta_els != diff)
+    {
+        alpha_els++;
+        beta_els--;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
+    }
+    if (mult != 1) {
+        for (int i = 0; i < alpha_els; i++)
+            occ[i] = 1.0;
+        for (int i = alpha_els; i < alpha_els + beta_els; i++)
+            occ[i] = 1.0;
+    }
+    else {
+        for (int i = 0; i < alpha_els; i++)
+            occ[i] = 2.0;
+    }
 	for (int MO_run = 0; MO_run < expected_coefs; MO_run++)
     {
         push_back_MO(MO_run, occ[MO_run], energies[MO_run], 0);
