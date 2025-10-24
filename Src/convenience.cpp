@@ -2122,6 +2122,31 @@ void options::digest_options()
             SALTED = true;
             salted_model_dir = arguments[i + 1];
         }
+        else if (temp == "-SALTED_COEFS" || temp == "-salted_coefs")
+        {
+            salted_model_dir = arguments[i + 1];
+
+            //Check that wfn is not empty
+            if (wfn.empty())
+            {
+                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
+                exit(1);
+            }
+
+            WFN wavy(wfn);
+            SALTEDPredictor SP(wavy, *this);
+            string df_basis_name = SP.get_dfbasis_name();
+            filesystem::path salted_model_path = SP.get_salted_filename();
+            log_file << "Using " << salted_model_path << " for the prediction" << endl;
+            std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+            load_basis_into_WFN(SP.wavy, aux_basis);
+            vec coefs = SP.gen_SALTED_densities();
+            npy::npy_data<double> np_coeffs;
+            np_coeffs.data = coefs;
+            np_coeffs.fortran_order = false;
+            np_coeffs.shape = { unsigned long(coefs.size()) };
+            npy::write_npy("SALTED_COEFS.npy", np_coeffs);
+            }
         else if (temp == "-test_reading_SALTED_binary") {
             test_reading_SALTED_binary_file();
             exit(0);
