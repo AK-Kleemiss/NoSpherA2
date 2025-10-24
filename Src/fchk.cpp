@@ -801,7 +801,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
     {
         file << "Origin: " << wave.get_origin() << endl;
     }
-    if (wave.get_origin() == 2 || wave.get_origin() == 4 || wave.get_origin() == 9 || wave.get_origin() == 8)
+    if (wave.get_origin() == 2 || wave.get_origin() == 4 || wave.get_origin() == 9 || wave.get_origin() == 8 || wave.get_origin() == e_origin::tonto)
     {
         //-----------------------check ordering and order accordingly----------------------
         wave.sort_wfn(wave.check_order(debug), debug);

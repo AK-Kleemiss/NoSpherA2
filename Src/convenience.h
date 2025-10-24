@@ -672,7 +672,7 @@ const double gaussian_radial(const primitive& p, const double& r);
 
 int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
 
-void convert_tonto_XCW_lambda_steps(const std::string& str, bool debug);
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug);
 
 double hypergeometric(double a, double b, double c, double x);
 
