@@ -516,6 +516,10 @@ public:
     bool cube_multiply(const int& nr, const cube& right) { return cub[nr] *= right; };
     /** Divide cube by another cube (element-wise). */
     bool cube_divide(const int& nr, const cube& right) { return cub[nr] /= right; };
+    /** Writes a cubefile of the elctron density to disc */
+    void write_rho_cube(const double& radius = 3., const double& increment = 0.025) const;
+    /** Calculate Cubefile of electron density**/
+    void calc_rho_cube(cube& cube_data) const;
     //-----------Pointer to members---------------------
     /** Raw pointer to primitive type array. */
     const int *get_ptr_types() { return &types[0]; };

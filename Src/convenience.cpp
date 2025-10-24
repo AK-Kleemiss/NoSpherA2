@@ -2058,13 +2058,12 @@ void options::digest_options()
         {
             string wfn_name = arguments[i + 1];
             std::cout << "Reading wavefunction: " << wfn_name << endl;
-            WFN *wavy = new WFN(wfn_name);
+            WFN wavy = WFN(wfn_name);
             std::cout << "Assigning ECPs" << endl;
             if (ECP)
-                wavy->set_has_ECPs(true);
+                wavy.set_has_ECPs(true);
             std::cout << "Starting cube calculation" << endl;
-            calc_rho_cube(*wavy);
-            delete (wavy);
+            wavy.write_rho_cube();
             exit(0);
         }
         else if (temp == "-RI_FIT" || temp == "-ri_fit")

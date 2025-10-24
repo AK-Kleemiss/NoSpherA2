@@ -399,33 +399,105 @@ void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux,
     }
 }
 
+
+#include "SALTED_utilities.h"
+//#include "test_functions.h"
 // Example usage function demonstrating the enhanced density fitting approaches
 void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
 {
+    //#include "test_functions.h"
     std::cout << "\n=== Enhanced Density Fitting Demonstration ===" << std::endl;
-    
+
     double max_mem = 100000.0; // MB
     char metric = 'C'; // Coulomb metric
-    
+
     // Method 0: Unrestrained (original approach)
     std::cout << "\n--- Method 0: Unrestrained (Baseline) ---" << std::endl;
     vec coeff_unrestrained = density_fit_unrestrained(wavy, wavy_aux, max_mem, metric, true);
-    
+
     // Method 1: Enhanced restraints with adaptive weighting
     std::cout << "\n--- Method 1: Enhanced Adaptive Restraints ---" << std::endl;
     vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, max_mem, metric,
-                                   0.00005,     // restraint strength
-                                   true,      // adaptive weighting
-                                   "mulliken", // charge scheme
-                                   true);     // analyze quality
-    
+        0.0002,     // restraint strength
+        true,      // adaptive weighting
+        "mulliken", // charge scheme
+        true);     // analyze quality
+
     // Method 2: Hybrid approach
     std::cout << "\n--- Method 2: Hybrid Regularization ---" << std::endl;
     vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, max_mem, metric,
-                                         0.00005,     // restraint strength
-                                         1e-6,      // tikhonov lambda
-                                         "mulliken", true); // charge scheme
+        0.0002,     // restraint strength
+        1e-6,      // tikhonov lambda
+        "mulliken", true); // charge scheme
+    const double radius = 3.0;
+    const double increment = 0.1;
+
+    std::vector<vec> all_coeffs = { coeff_unrestrained, coeff_enhanced, coeff_hybrid };
+    WFN dummy = wavy;
+    WFN dummy_aux = wavy_aux;
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
+    dummy.delete_unoccupied_MOs();
+    //Cubes: 0=WFN, 1=RI_Unrestrained, 2=RI_Enhanced, 3=RI_Hybrid
+    std::vector<cube> cubes;
+    for (int a = 0; a < 4; a++) {
+        cubes.push_back(cube(steps[0], steps[1], steps[2], dummy.get_ncen(), true));
+        for (int i = 0; i < 3; i++)
+        {
+            cubes[a].set_origin(i, MinMax[i]);
+            cubes[a].set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+        }
+
+    }
+    cubes[0].give_parent_wfn(dummy);
+    cubes[1].give_parent_wfn(dummy_aux);
+    cubes[2].give_parent_wfn(dummy_aux);
+    cubes[3].give_parent_wfn(dummy_aux);
+
+    std::cout << "Starting work..." << std::endl;
+    cubes[0].set_comment1("Calculated density using NoSpherA2 for WFN");
+    cubes[1].set_comment1("Calculated density using SALTED RI (Unrestrained)");
+    cubes[2].set_comment1("Calculated density using SALTED RI (Enhanced Restraints)");
+    cubes[3].set_comment1("Calculated density using SALTED RI (Hybrid Approach)");
+
+    cubes[0].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_WFN.cube");
+    cubes[1].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Unrestrained.cube");
+    cubes[2].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Enhanced.cube");
+    cubes[3].set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_RI_Hybrid.cube");
+
+
+    for (int a = 0; a < 4; a++) {
+        //See if the cubefile already exists, if yes skip the calculation and just load it
+        if (std::filesystem::exists(cubes[a].get_path())) {
+            cubes[a].read_file(true, true);
+        }
+        else {
+            std::cout << "Calculating cube for density..." << std::endl;
+            if (a == 0)
+                wavy.calc_rho_cube(cubes[a]);
+            else
+                calc_cube_ML(all_coeffs[a-1], dummy_aux, cubes[a]);
+            //cubes[a].write_file(false, false);
+        }
+    }
+
+    //Calculate difference cubes
+    for (int a = 1; a < 4; a++) {
+        cube diff = cubes[0] - cubes[a];
+        diff.calc_dv();
+        double rrs = cubes[0].rrs(cubes[a]);
+        vec sums = diff.double_sum();
+        std::cout << "Difference WFN - Method " << a - 1 << ": RRS = " << std::scientific << std::setprecision(6) << rrs
+            << ", Sum = " << std::fixed << std::setprecision(6) << sums[0]
+            << ", |Sum| = " << std::fixed << std::setprecision(6) << sums[1] << std::endl;
+        //diff.set_comment1("Difference cube: WFN - Method " + std::to_string(a - 1));
+        //diff.give_parent_wfn(dummy);
+        //diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_Method" + std::to_string(a - 1) + ".cube");
+        //diff.write_file(true, false);
+    }
     
+
     // Compare results
     std::cout << "\n=== Method Comparison ===" << std::endl;
     std::cout << "Unrestrained        - Max coeff: " << std::fixed << std::setprecision(6) 
