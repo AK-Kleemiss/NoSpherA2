@@ -288,8 +288,15 @@ struct CINTEnvVars {
     double rkl[3];
 };
 
-ivec make_loc(ivec& bas, int nbas);
+enum COORDINATE_TYPE {
+    SPH = 1,
+    CART = 2
+};
 
+template<COORDINATE_TYPE CT>
+ivec make_loc(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::CART>(ivec& bas, int nbas);
+template ivec make_loc<COORDINATE_TYPE::SPH>(ivec& bas, int nbas);
 
 /*
  * to optimize memory copy in cart2sph.c, remove the common factor for s

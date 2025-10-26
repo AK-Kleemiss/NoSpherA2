@@ -17,6 +17,10 @@ void computeEri2c(Int_Params& param1,
 void compute2c_Overlap(Int_Params& param1,
     vec& overlap_2c);
 
+// Function to compute Overlap integrals
+void compute2c_Overlap_Cart(Int_Params& param1,
+    vec& overlap_2c);
+
 /*
 * Function to compute fitting coefficients for the density matrix using the Coulomb metric
 * This function combines the calculation of 3-center 2-electron integrals and the fitting coefficients
