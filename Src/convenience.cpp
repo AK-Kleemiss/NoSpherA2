@@ -1820,7 +1820,7 @@ void options::digest_options()
         {
             std::string stdo = arguments[i + 1];
             std::string step = arguments[i + 2];
-            convert_tonto_XCW_lambda_steps(stdo, step, debug);
+            convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
             exit(0);
         }
         else if (temp == "-def" || temp == "-DEF")
@@ -3132,7 +3132,7 @@ void ProgressBar::initialize_taskbar_progress()
 }
 #endif
 
-void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug) {
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt) {
 
 	double lambda = 0.0;
     const double ls = stod(lambda_step);
@@ -3165,11 +3165,20 @@ void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& l
         err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", std::cout);
         std::cout << "lambda = " + std::to_string(lambda) + "..." << std::flush;
 
-        WFN wavy(e_origin::tonto);
-        wavy.read_tonto(stdout_file, std::cout, debug, energies_file, orbitals_file);
-        std::string basename = jobname + "_l_" + formatted_lambda;
-        wavy.write_wfn(basename +".wfn", debug, false);
-        free_fchk(std::cout, basename + ".fchk", "", wavy, debug, true);
+        std::vector<WFN> wavy;
+        wavy.emplace_back(e_origin::tonto);
+        wavy.back().read_tonto(stdout_file, std::cout, debug, energies_file, orbitals_file);
+        std::filesystem::path basename = stdout_file.parent_path() / (jobname + "_l_" + formatted_lambda);
+        wavy.back().write_wfn(basename.replace_extension(".wfn"), debug, false);
+        free_fchk(std::cout, basename.replace_extension(".fchk"), "", wavy.back(), debug, true);
+
+        if (opt.cif != "") {
+            svec ka;
+            int nr = 0;
+            opt.groups[0] = { 0 };
+            tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, std::cout, ka, nr);
+            result.write_tscb_file(opt.cif, basename.replace_extension(".tscb"));
+        }
 
         lambda += ls;
         std::stringstream ss_l;
