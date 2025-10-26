@@ -1818,6 +1818,7 @@ void options::digest_options()
         }
         else if (temp == "-convert_XCW")
         {
+            err_checkf(argc >= i + 3, "Not enough arguments for -convert_XCW\Please provide at least stdout name and lambda step!", std::cout);
             std::string stdo = arguments[i + 1];
             std::string step = arguments[i + 2];
             convert_tonto_XCW_lambda_steps(stdo, step, debug, *this);
@@ -3169,15 +3170,15 @@ void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& l
         wavy.emplace_back(e_origin::tonto);
         wavy.back().read_tonto(stdout_file, std::cout, debug, energies_file, orbitals_file);
         std::filesystem::path basename = stdout_file.parent_path() / (jobname + "_l_" + formatted_lambda);
-        wavy.back().write_wfn(basename.replace_extension(".wfn"), debug, false);
-        free_fchk(std::cout, basename.replace_extension(".fchk"), "", wavy.back(), debug, true);
+        wavy.back().write_wfn(basename.string() + ".wfn", debug, false);
+        free_fchk(std::cout, basename.string() + ".fchk", "", wavy.back(), debug, true);
 
         if (opt.cif != "") {
             svec ka;
             int nr = 0;
             opt.groups[0] = { 0 };
             tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, std::cout, ka, nr);
-            result.write_tscb_file(opt.cif, basename.replace_extension(".tscb"));
+            result.write_tscb_file(opt.cif, basename.string() +".tscb");
         }
 
         lambda += ls;
