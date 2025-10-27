@@ -3806,8 +3806,32 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
     */
     using namespace std;
 
+	//make a copy of this WFN to compute the overlap matrix
+    WFN copy(*this);
+    copy.delete_basis_set();
+    
+    //Add the decontracted basis to the copy
+    for (int e = 0; e < nex; e++){
+        int type = 0;
+        if (types[e] == 1)
+            type = 1;
+        else if (types[e] == 2)
+            type = 2;
+        else if (types[e] == 5)
+            type = 3;
+        else if (types[e] == 11)
+            type = 4;
+        else if (types[e] == 21)
+            type = 5;
+        else
+            continue;
+        unsigned int shellsize = std::max(copy.get_atom_shell_count(centers[e]), 0);
+		copy.push_back_atom_basis_set(centers[e] - 1, exponents[e], 1.0, type, shellsize);
+
+	}
+
     vec OVLP_matrix = {};
-	Int_Params int_params(*this);
+	Int_Params int_params(copy);
 
 	compute2c_Overlap_Cart(int_params, OVLP_matrix);
 	//We have the overlap matrix, now write it to file
