@@ -220,6 +220,8 @@ public:
     bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     /** Write current wavefunction to .wfn file (optionally only occupied). */
     bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied);
+    /** Write current wavefunction to .47 file (optionally only occupied). */
+    bool write_nbo(const std::filesystem::path& fileName, const bool& debug);
     /** Write atomic geometry to .xyz file. */
     bool write_xyz(const std::filesystem::path& fileName);
     /** Set internal path field. */

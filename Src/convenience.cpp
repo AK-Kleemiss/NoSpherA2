@@ -1816,6 +1816,14 @@ void options::digest_options()
             test_core_sfac_corrected(prec, threads, arguments[i + 2], a, b);
             exit(0);
         }
+        else if (temp == "-convert_to_47") {
+            err_checkf(argc >= i + 2, "Not enough arguments for -convert_to_47\Please provide at least stdout name!", std::cout);
+            std::filesystem::path wfn = arguments[i + 1];
+			WFN wavy(e_origin::NOT_YET_DEFINED);
+			wavy.read_known_wavefunction_format(wfn, std::cout, debug);
+			wavy.write_nbo(wfn.replace_extension(".47"), debug);
+			exit(0);
+        }
         else if (temp == "-convert_XCW")
         {
             err_checkf(argc >= i + 3, "Not enough arguments for -convert_XCW\Please provide at least stdout name and lambda step!", std::cout);

@@ -8,6 +8,8 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include "libCintMain.h"
+#include "integration_params.h"
 
 void WFN::fill_pre()
 {
@@ -3097,11 +3099,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 temp_bas_idx += _atom.get_shellcount(shell);
                 for (int m = -type; m <= type; m++) {
                     auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m + type, Kokkos::full_extent);
-                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
                     std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     if (operators == 2) {
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
-                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     } 
                 }
@@ -3728,6 +3730,250 @@ bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, co
     }
     rf << "END DATA" << endl;
     rf.flush();
+    rf.close();
+    return true;
+};
+
+bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
+{
+    //We want to write a .47 file that looks like this according to the NBO manual:
+    /*
+ $GENNBO NATOMS=7 NBAS=28 UPPER BODM FORMAT=PRECISE $END 
+ $NBO $END
+ $COORD
+ Methylamine in 3-21G basis set
+ 6 6 0.745914 0.011106 0.000000
+ 7 7 -0.721743 -0.071848 0.000000
+ 1 1 1.042059 1.060105 0.000000
+ 1 1 1.129298 -0.483355 0.892539
+ 1 1 1.129298 -0.483355 -0.892539
+ 1 1 -1.076988 0.386322 -0.827032
+ 1 1 -1.076988 0.386322 0.827032
+ $END
+ $BASIS
+    CENTER = 1 1 1 1 1 1 1 1 1 2 2 2 2
+             2 2 2 2 2 3 3 4 4 5 5 6 6
+             7 7 
+    LABEL = 1 1 101 102 103 1 101 102 103 1 1 101 102 
+            103 1 101 102 103 1 1 1 1 1 1 1 1 
+            1 1 
+ $END 
+ $CONTRACT
+  NSHELL = 16 
+    NEXP = 27 
+   NCOMP = 1 4 4 1 4 4 1 1 1 1 1 1 1 
+           1 1 1 
+   NPRIM = 3 2 1 3 2 1 2 1 2 1 2 1 2 
+           1 2 1 
+    NPTR = 1 4 6 7 10 12 13 15 16 18 19 21 22 24 25 27 
+    EXP = 0.172256000000E+03 0.259109000000E+02 0.553335000000E+01 
+          0.366498000000E+01 0.770545000000E+00 0.195857000000E+00 
+          0.242766000000E+03 0.364851000000E+02 0.781449000000E+01 
+          0.542522000000E+01 0.114915000000E+01 0.283205000000E+00 
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
+          0.544717800000E+01 0.824547240000E+00 0.183191580000E+00 
+     CS = 0.617669074000E-01 0.358794043000E+00 0.700713084000E+00 
+         -0.395895162000E+00 0.121583436000E+01 0.100000000000E+01 
+          0.598657005000E-01 0.352955003000E+00 0.706513006000E+00 
+         -0.413300077000E+00 0.122441727000E+01 0.100000000000E+01 
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
+          0.156284979000E+00 0.904690877000E+00 0.100000000000E+01 
+     CP = 0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.236459947000E+00 0.860618806000E+00 0.100000000000E+01 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.237972016000E+00 0.858953059000E+00 0.100000000000E+01 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+          0.000000000000E+00 0.000000000000E+00 0.000000000000E+00 
+ $END 
+ $OVERLAP 
+          0.100000000000E+01 0.191447444408E+00 0.100000000000E+01 
+ $END 
+ $DENSITY 
+          0.203642496554E+01 0.110916720865E+00 0.103889621321E+00 
+ $END 
+ $LCAOMO 
+         -0.581395484288E-03 -0.241638924924E-02 -0.179639931958E-02 
+ $END
+    */
+    using namespace std;
+
+    vec OVLP_matrix = {};
+	Int_Params int_params(*this);
+
+	compute2c_Overlap_Cart(int_params, OVLP_matrix);
+	//We have the overlap matrix, now write it to file
+
+    ofstream rf(fileName, ios::out);
+    string line;
+	stringstream stream;
+    if (!rf.is_open())
+    {
+        std::cout << "Sorry, can't open the file...\n";
+        return false;
+    }
+
+    
+
+	rf << " $GENNBO NATOMS=" << ncen << " NBAS=" << nex << " UPPER BODM FORMAT=PRECISE $END" << endl;
+	rf << " $NBO NBO NRT $END" << endl;
+	rf << " $COORD" << endl;
+	rf << " .47 file generated by NoSpherA2 based on " << path << endl;
+	for (int i = 0; i < ncen; i++)
+        //To-do: Fix second charge mention for ECPs depending on the mode of the wfn / maybe by file type?!
+		rf << " " << setw(2) << get_atom_charge(i) << " " << setw(2) << get_atom_charge(i) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 0) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 1) << " " << fixed << setprecision(6) << setw(8) << get_atom_coordinate(i, 2) << endl;
+	rf << " $END" << endl;
+	rf << " $BASIS" << endl;
+	rf << "    CENTER = ";
+    for (int i = 0; i < nex; i++) {
+		rf << centers.at(i) << " ";
+        if (i%13 == 0 && i!= 0)
+			rf << "\n             ";
+    }
+    rf.flush();
+	rf << "\n    LABEL = ";
+
+    int highest_angular = -1;
+    for (int i = 0; i < nex; i++) {
+        rf << constants::type_2_nbo(types.at(i)) << " ";
+        if (i % 13 == 0 && i != 0)
+            rf << "\n             ";
+    }
+    rf.flush();
+	rf << "\n $END" << endl;
+
+    string comp_string = "";
+	string exp_string = "";
+    string nprim_string = "";
+    string nptr_string = "";
+    svec cx_string(5);
+    int nshell = 0;
+    for (int i = 0; i < nex; i++) {
+        string nr = to_string(constants::type_2_nbo(types.at(i)));
+        if (nr.back() == '1') {
+            nshell++;
+            if (nr.front() == '1') {
+                comp_string += "1 ";
+                cx_string[0] += "0.100000000000E+01 ";
+                cx_string[1] += "0.000000000000E+00 ";
+                cx_string[2] += "0.000000000000E+00 ";
+                cx_string[3] += "0.000000000000E+00 ";
+                cx_string[4] += "0.000000000000E+00 ";
+                highest_angular = std::max(highest_angular, 0);
+            }
+            else if (nr.front() == '2') {
+                comp_string += "3 ";
+                cx_string[0] += "0.000000000000E+00 ";
+                cx_string[1] += "0.100000000000E+01 ";
+                cx_string[2] += "0.000000000000E+00 ";
+                cx_string[3] += "0.000000000000E+00 ";
+                cx_string[4] += "0.000000000000E+00 ";
+                highest_angular = std::max(highest_angular, 1);
+            }
+            else if (nr.front() == '3') {
+                comp_string += "6 ";
+                cx_string[0] += "0.000000000000E+00 ";
+                cx_string[1] += "0.000000000000E+00 ";
+                cx_string[2] += "0.100000000000E+01 ";
+                cx_string[3] += "0.000000000000E+00 ";
+                cx_string[4] += "0.000000000000E+00 ";
+                highest_angular = std::max(highest_angular, 2);
+            }
+            else if (nr.front() == '4') {
+                comp_string += "10 ";
+                cx_string[0] += "0.000000000000E+00 ";
+                cx_string[1] += "0.000000000000E+00 ";
+                cx_string[2] += "0.000000000000E+00 ";
+                cx_string[3] += "0.100000000000E+01 ";
+                cx_string[4] += "0.000000000000E+00 ";
+                highest_angular = std::max(highest_angular, 3);
+            }
+            else if (nr.front() == '5') {
+                comp_string += "15 ";
+                cx_string[0] += "0.000000000000E+00 ";
+                cx_string[1] += "0.000000000000E+00 ";
+                cx_string[2] += "0.000000000000E+00 ";
+                cx_string[3] += "0.000000000000E+00 ";
+                cx_string[4] += "0.100000000000E+01 ";
+                highest_angular = std::max(highest_angular, 4);
+            }
+            exp_string += to_string(exponents.at(i)) + " ";
+            nprim_string += "1 ";
+            nptr_string += to_string(i + 1) + " ";
+            if ((nshell % 13) == 0 && i != 0) {
+                comp_string += "\n           ";
+                nprim_string += "\n           ";
+                nptr_string += "\n           ";
+            }
+            if ((nshell % 3) == 0 && i != 0) {
+                exp_string += "\n           ";
+                for (int j = 0; j < 5; j++)
+                    cx_string[j] += "\n          ";
+            }
+        }
+    }
+	rf << " $CONTRACT" << endl;
+	rf << "  NSHELL = " << nshell << endl;
+	rf << "    NEXP = " << nshell << endl;
+    rf << "   NCOMP = " << comp_string << endl;
+	rf << "   NPRIM = " << nprim_string << endl;
+    rf << "    NPTR = " << nptr_string << endl;
+	rf << "     EXP = " << exp_string << endl;
+	if (highest_angular >= 0) rf << "     CS = " << cx_string[0] << endl;
+	if (highest_angular >= 1) rf << "     CP = " << cx_string[1] << endl;
+	if (highest_angular >= 2) rf << "     CD = " << cx_string[2] << endl;
+	if (highest_angular >= 3) rf << "     CF = " << cx_string[3] << endl;
+	if (highest_angular >= 4) rf << "     CG = " << cx_string[4] << endl;
+	rf << " $END" << endl;
+	rf << " $OVERLAP " << endl;
+	dMatrixRef2 OVLP_mat(OVLP_matrix.data(), nex, nex);
+	int runner = 0;
+    for (int i = 0; i < nex; i++) {
+        for (int j = i; j < nex; j++) {
+			runner++;
+            stream.str("");
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << OVLP_mat(i, j);
+            rf << stream.str() << " ";
+            if (runner % 3 == 0)
+				rf << "\n";
+        }
+    }
+	rf << " $END" << endl;
+	rf << " $DENSITY " << endl;
+    runner = 0;
+    for (int i = 0; i < nex; i++) {
+        for (int j = i; j < nex; j++) {
+            runner++;
+            stream.str("");
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << DM(i, j);
+            rf << stream.str() << " ";
+            if (runner % 3 == 0)
+                rf << "\n";
+        }
+    }
+	rf << " $END" << endl;
+	rf << " $LCAOMO " << endl;
+    for (int mo_counter = 0; mo_counter < nmo; mo_counter++)
+    {
+        if (debug)
+            std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
+        for (int i = 0; i < nex; i++) {
+            stream.str("");
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << MOs[mo_counter].get_coefficient(i);
+            rf << stream.str() << " ";
+            if ((i + 1) % 3 == 0)
+                rf << "\n";
+        }
+	}
+	rf << " $END" << endl;
     rf.close();
     return true;
 };

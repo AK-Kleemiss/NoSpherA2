@@ -896,7 +896,7 @@ void computeEri2c(Int_Params &params, vec &eri2c)
     int nat = params.get_natoms();
 
     ivec shl_slice = {0, nbas, 0, nbas};
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
@@ -1481,7 +1481,7 @@ void computeEri3c(Int_Params &param1,
     assert(shl_slice[3] <= nbas);
     assert(shl_slice[5] <= nbas);
 
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
     int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
@@ -2040,7 +2040,7 @@ void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
     int nat = params.get_natoms();
 
     ivec shl_slice = {0, nbas, 0, nbas};
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
@@ -2049,6 +2049,46 @@ void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
     vec res((size_t)naoi * naoj, 0.0);
     overlap_2c.resize((size_t)naoi * naoj, 0.0);
     GTOint2c(int1e_ovlp_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
+
+    // res is in fortran order, write the result in regular ordering
+    for (int i = 0; i < naoi; i++)
+    {
+        for (int j = 0; j < naoj; j++)
+        {
+            overlap_2c[j * (size_t)naoi + i] = res[i * (size_t)naoj + j];
+        }
+    }
+}
+
+int int1e_ovlp_cart(double* out, int* dims, int* shls, int* atm, int natm,
+    int* bas, int nbas, double* env, CINTOpt* opt, double* cache)
+{
+    int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
+    CINTEnvVars envs;
+    CINTinit_int1e_EnvVars(&envs, ng, shls, atm, natm, bas, nbas, env);
+    envs.f_gout = &CINTgout1e;
+    return CINT1e_drv(out, dims, &envs, cache, &c2s_cart_1e, 0);
+}
+
+void compute2c_Overlap_Cart(Int_Params& params, vec& overlap_2c)
+{
+    ivec bas = params.get_bas();
+    ivec atm = params.get_atm();
+    vec env = params.get_env();
+
+    int nbas = params.get_nbas();
+    int nat = params.get_natoms();
+
+    ivec shl_slice = { 0, nbas, 0, nbas };
+    ivec aoloc = make_loc<COORDINATE_TYPE::CART>(bas, nbas);
+
+    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
+    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
+
+    // Compute integrals
+    vec res((size_t)naoi * naoj, 0.0);
+    overlap_2c.resize((size_t)naoi * naoj, 0.0);
+    GTOint2c(int1e_ovlp_cart, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
 
     // res is in fortran order, write the result in regular ordering
     for (int i = 0; i < naoi; i++)
@@ -2117,7 +2157,7 @@ void computeRho_Coulomb(Int_Params &param1,
     int nat = combined.get_natoms();
     int nbas = combined.get_nbas();
 
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 
     rho.resize(param2.get_nao(), 0.0);
 
@@ -2194,7 +2234,7 @@ void computeRho_Overlap(Int_Params &param1,
     int nat = combined.get_natoms();
     int nbas = combined.get_nbas();
 
-    ivec aoloc = make_loc(bas, nbas);
+    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
 
     rho.resize(param2.get_nao(), 0.0);
 
