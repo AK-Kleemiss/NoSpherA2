@@ -3884,7 +3884,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
         string nr = to_string(constants::type_2_nbo(types.at(i)));
         if (nr.back() == '1') {
             nshell++;
-            if (nr.front() == '1') {
+            if (nr == "1") {
                 comp_string += "  1 ";
                 cx_string[0] += "0.100000000000E+01 ";
                 cx_string[1] += "0.000000000000E+00 ";
@@ -3893,7 +3893,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.000000000000E+00 ";
                 highest_angular = std::max(highest_angular, 0);
             }
-            else if (nr.front() == '2') {
+            else if (nr.front() == '1') {
                 comp_string += "  3 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.100000000000E+01 ";
@@ -3902,7 +3902,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.000000000000E+00 ";
                 highest_angular = std::max(highest_angular, 1);
             }
-            else if (nr.front() == '3') {
+            else if (nr.front() == '2') {
                 comp_string += "  6 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
@@ -3911,7 +3911,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.000000000000E+00 ";
                 highest_angular = std::max(highest_angular, 2);
             }
-            else if (nr.front() == '4') {
+            else if (nr.front() == '3') {
                 comp_string += " 10 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
@@ -3920,7 +3920,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.000000000000E+00 ";
                 highest_angular = std::max(highest_angular, 3);
             }
-            else if (nr.front() == '5') {
+            else if (nr.front() == '4') {
                 comp_string += " 15 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
