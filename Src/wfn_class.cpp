@@ -2080,6 +2080,8 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
     std::filesystem::path energies_file, orbitals_file, stdout_file;
     ifstream rf;
     string line;
+	string scf_kind;
+    bool restricted_search = true;
     if (energies_filename == "" && orbitals_filename == "") {
         if (filename.string().find("stdout") != std::string::npos) {
             string jobname;
@@ -2090,12 +2092,42 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
                 getline(rf, line);
             }
             jobname = split_string<string>(line, " ")[2];
+
+            rf.seekg(0);
+            while (rf.good() && line.find("SCF kind ....") == string::npos) {
+                getline(rf, line);
+            }
+            scf_kind = split_string<string>(line, " ")[3];
+            if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
+                restricted_search = true;
+			else //there could be other kinds like ghf, but at the moment let me expect either uhf/uks or rhf/rks
+				restricted_search = false;
+
+            method = scf_kind;
+
             energies_file = filename.parent_path() / (jobname + ".orbital_energies,restricted");
             if (!std::filesystem::exists(energies_file))
                 energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
+            if (!std::filesystem::exists(energies_file)) {
+                energies_file = filename.parent_path() / (jobname + ".orbital_energies,alpha");
+				restricted_search = false;
+            }
+            if (!std::filesystem::exists(energies_file)) {
+                energies_file = filename.parent_path() / (jobname + ".MO_energies,a");
+                restricted_search = false;
+            }
+
             orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,restricted");
             if (!std::filesystem::exists(orbitals_file))
                 orbitals_file = filename.parent_path() / (jobname + ".MOs,r");
+            if (!std::filesystem::exists(orbitals_file)) {
+                orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,alpha");
+                restricted_search = false;
+            }
+            if (!std::filesystem::exists(orbitals_file)) {
+                orbitals_file = filename.parent_path() / (jobname + ".MOs,a");
+                restricted_search = false;
+            }
             err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
             err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
             //check if there is a stdout file in the same folder
@@ -2147,6 +2179,8 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
         rf.open(stdout_file.string().c_str(), ios::in);
 	}
 
+    const bool restricted = restricted_search;
+
 
     if (debug)
         file << "File is valid, continuing...\n" << GetCurrentDir << endl;
@@ -2165,6 +2199,20 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
     vec energies, orbitals;
     read_block_from_fortran_binary(rf_e, energies);
     read_block_from_fortran_binary(rf_o, orbitals);
+
+    vec energies_beta, orbitals_beta;
+    if (!restricted) {
+        rf_e.close();
+        rf_o.close();
+		energies_file.replace_extension(".orbital_energies,beta");
+		orbitals_file.replace_extension(".molecular_orbitals,beta");
+		rf_e.open(energies_file.string().c_str(), ios::binary);
+		rf_o.open(orbitals_file.string().c_str(), ios::binary);
+        err_checkf(rf_e.good(), "couldn't open " + energies_file.string() + ", leaving", file);
+        err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
+        read_block_from_fortran_binary(rf_e, energies_beta);
+        read_block_from_fortran_binary(rf_o, orbitals_beta);
+	}
 
     rf_e.close();
     rf_o.close();
@@ -2217,7 +2265,36 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
         err_checkf(push_back_atom(label, x, y, z, atomic_number), "Error pushing back an atom!", std::cout);
         getline(rf, line);
     }
-    err_checkf(ncen == expected_atoms, "Did not read expected numebr of atoms!", std::cout);
+    err_checkf(ncen == expected_atoms, "Did not read expected number of atoms!", std::cout);
+
+    int alpha_els = 0, beta_els = 0, temp_els = get_nr_electrons();
+    while (temp_els > 1)
+    {
+        alpha_els++;
+        beta_els++;
+        temp_els -= 2;
+        if (debug)
+            file << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", file);
+        err_checkf(alpha_els + beta_els <= get_nr_electrons(), "Error setting alpha and beta electrons! Sum a + b > elcount!", file);
+        err_checkf(temp_els > -int(get_nr_electrons()), "Error setting alpha and beta electrons! Ran below -elcount!", file);
+    }
+    alpha_els += temp_els;
+    if (debug)
+        file << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+    const int mult = get_multi();
+    int diff = 0;
+    if (mult != 0)
+        diff = get_multi() - 1;
+    if (debug)
+        file << "diff: " << diff << std::endl;
+    while (alpha_els - beta_els != diff)
+    {
+        alpha_els++;
+        beta_els--;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
+    }
+
     while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
         getline(rf, line);
     }
@@ -2358,238 +2435,255 @@ __________________________________
         }
     }
     err_checkf(expected_coefs == no_bf, "Expected number of basis functions (" + to_string(expected_coefs) + ") does not match number in file (" + to_string(no_bf) + ")!", file);
-    dMatrix2 coefficients = reshape<dMatrix2>(orbitals, Shape2D(expected_coefs, expected_coefs));
-    vec occ(expected_coefs, 0.0);
-    int alpha_els = 0, beta_els = 0, temp_els = get_nr_electrons();
-    while (temp_els > 1)
-    {
-        alpha_els++;
-        beta_els++;
-        temp_els -= 2;
-        if (debug)
-            file << temp_els << std::endl;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", file);
-        err_checkf(alpha_els + beta_els <= get_nr_electrons(), "Error setting alpha and beta electrons! Sum a + b > elcount!", file);
-        err_checkf(temp_els > -int(get_nr_electrons()), "Error setting alpha and beta electrons! Ran below -elcount!", file);
-    }
-    alpha_els += temp_els;
-    if (debug)
-        file << "al/be els:" << alpha_els << " " << beta_els << std::endl;
-    const int mult = get_multi();
-    int diff = 0;
-    if (mult != 0)
-        diff = get_multi() - 1;
-    if (debug)
-        file << "diff: " << diff << std::endl;
-    while (alpha_els - beta_els != diff)
-    {
-        alpha_els++;
-        beta_els--;
-        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
-    }
-    if (mult != 1) {
-        for (int i = 0; i < alpha_els; i++)
-            occ[i] = 1.0;
-        for (int i = alpha_els; i < alpha_els + beta_els; i++)
-            occ[i] = 1.0;
-    }
-    else {
-        for (int i = 0; i < alpha_els; i++)
-            occ[i] = 2.0;
-    }
-	for (int MO_run = 0; MO_run < expected_coefs; MO_run++)
-    {
-        push_back_MO(MO_run, occ[MO_run], energies[MO_run], 0);
-        int p_run = 0;
-        vec2 p_temp(3);
-        int d_run = 0;
-        vec2 d_temp(6);
-        int f_run = 0;
-        vec2 f_temp(10);
-        int g_run = 0;
-        vec2 g_temp(15);
-        int basis_run = 0;
-        for (int i = 0; i < expected_coefs; i++)
+
+	const unsigned int nr_operators = restricted ? 1 : 2;
+
+    for (int op = 0; op < nr_operators; op++) {
+        if(debug)
+			file << "Reading " << (op == 0 ? "alpha/restricted" : "beta") << " orbitals..." << std::endl;
+
+        dMatrix2 coefficients;
+        vec occ(expected_coefs, 0.0);
+        if (op == 0)
+            coefficients = reshape<dMatrix2>(orbitals, Shape2D(expected_coefs, expected_coefs));
+        else
+            coefficients = reshape<dMatrix2>(orbitals_beta, Shape2D(expected_coefs, expected_coefs));
+
+        for (int MO_run = 0; MO_run < expected_coefs; MO_run++)
         {
-            switch (prims[basis_run].get_type())
-            {
-            case 1:
-            {
-                for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                {
-                    double t = coefficients(MO_run,i) * prims[basis_run + s].get_coef();
-                    if (abs(t) < 1E-10)
-                        t = 0;
-                    push_back_MO_coef(MO_run, t);
-                    if (MO_run == 0)
-                    {
-                        push_back_exponent(prims[basis_run + s].get_exp());
-                        push_back_center(prims[basis_run].get_center());
-                        push_back_type(prims[basis_run].get_type());
-                        nex++;
+            if (op == 0) {
+                if (restricted) {
+                    if (MO_run < alpha_els && multi == 1) { //RHF all paired
+                        push_back_MO(MO_run, 2.0, energies[MO_run], 0);
+						occ[MO_run] = 2.0;
                     }
+                    else if (multi != 1 && MO_run < beta_els) { // RHF only 2 until beta electrons
+                        push_back_MO(MO_run, 2.0, energies[MO_run], 0);
+                        occ[MO_run] = 2.0;
+                    }
+                    else if (multi != 1 && MO_run >= beta_els && MO_run < alpha_els) { // RHF only 2 until beta electrons
+                        push_back_MO(MO_run, 1.0, energies[MO_run], 0);
+                        occ[MO_run] = 1.0;
+                    }
+                    else
+                        push_back_MO(MO_run, 0.0, energies[MO_run], 0);
                 }
-                basis_run += temp_shellsizes[basis_run];
-                break;
+                else {
+                    if (MO_run < alpha_els) { // UHF
+                        push_back_MO(MO_run, 1.0, energies[MO_run], 0);
+                        occ[MO_run] = 1.0;
+                    }
+                    else
+                        push_back_MO(MO_run, 0.0, energies[MO_run], 0);
+                }
+
             }
-            case 2:
+            else {
+                if (MO_run < beta_els) {
+                    push_back_MO(expected_coefs + MO_run, 1.0, energies_beta[MO_run], 1);
+                    occ[MO_run] = 1.0;
+                }
+                else 
+					push_back_MO(expected_coefs + MO_run, 0.0, energies_beta[MO_run], 1);
+            }
+            int p_run = 0;
+            vec2 p_temp(3);
+            int d_run = 0;
+            vec2 d_temp(6);
+            int f_run = 0;
+            vec2 f_temp(10);
+            int g_run = 0;
+            vec2 g_temp(15);
+            int basis_run = 0;
+            for (int i = 0; i < expected_coefs; i++)
             {
-                if (p_run == 0)
+                switch (prims[basis_run].get_type())
                 {
-                    for (int _i = 0; _i < 3; _i++)
-                    {
-                        p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                    }
-                }
-                for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                {
-                    p_temp[p_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
-                }
-                p_run++;
-                if (p_run == 3)
+                case 1:
                 {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        double temp_coef = 0;
-                        for (int cart = 0; cart < 3; cart++)
+                        double t = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                        if (abs(t) < 1E-10)
+                            t = 0;
+                        op == 0 ? push_back_MO_coef(MO_run, t) : push_back_MO_coef(MO_run + expected_coefs, t);
+                        if (MO_run == 0 && op == 0)
                         {
-                            temp_coef = p_temp[cart][s];
-                            if (abs(temp_coef) < 1E-10)
-                                temp_coef = 0;
-                            push_back_MO_coef(MO_run, temp_coef);
-                            if (MO_run == 0)
-                            {
-                                push_back_exponent(prims[basis_run + s].get_exp());
-                                push_back_center(prims[basis_run].get_center());
-                                push_back_type(prims[basis_run].get_type() + cart);
-                                nex++;
-                            }
+                            push_back_exponent(prims[basis_run + s].get_exp());
+                            push_back_center(prims[basis_run].get_center());
+                            push_back_type(prims[basis_run].get_type());
+                            nex++;
                         }
                     }
-                    p_run = 0;
                     basis_run += temp_shellsizes[basis_run];
+                    break;
                 }
-                break;
-            }
-            case 3:
-            {
-                if (d_run == 0)
+                case 2:
                 {
-                    for (int _i = 0; _i < 6; _i++)
+                    if (p_run == 0)
                     {
-                        d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        for (int _i = 0; _i < 3; _i++)
+                        {
+                            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
                     }
-                }
-                for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                {
-                    d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(1.5);
-                }
-                d_run++;
-                if (d_run == 6)
-                {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        p_temp[p_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                    }
+                    p_run++;
+                    if (p_run == 3)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            double temp_coef = 0;
+                            for (int cart = 0; cart < 3; cart++)
+                            {
+                                temp_coef = p_temp[cart][s];
+                                if (abs(temp_coef) < 1E-10)
+                                    temp_coef = 0;
+                                op == 0 ? push_back_MO_coef(MO_run, temp_coef) : push_back_MO_coef(MO_run + expected_coefs, temp_coef);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(prims[basis_run].get_type() + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        p_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                case 3:
+                {
+                    if (d_run == 0)
                     {
                         for (int _i = 0; _i < 6; _i++)
-                            push_back_MO_coef(MO_run, d_temp[_i][s]);
-                        for (int cart = 0; cart < 6; cart++)
                         {
-                            if (MO_run == 0)
-                            {
-                                push_back_exponent(prims[basis_run + s].get_exp());
-                                push_back_center(prims[basis_run].get_center());
-                                push_back_type(5 + cart);
-                                nex++;
-                            }
+                            d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
                         }
                     }
-                    d_run = 0;
-                    basis_run += temp_shellsizes[basis_run];
-                }
-                break;
-            }
-            case 4:
-            {
-                if (f_run == 0)
-                {
-                    for (int _i = 0; _i < 10; _i++)
-                    {
-                        f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
-                    }
-                }
-                for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                {
-                    f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(5.0);
-                }
-                f_run++;
-                if (f_run == 10)
-                {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        for (int cart = 0; cart < 10; cart++)
+                        d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(1.5);
+                    }
+                    d_run++;
+                    if (d_run == 6)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            // tonto swaps type 17 and 16
-                            if (cart != 5 && cart != 6)
-                                push_back_MO_coef(MO_run, f_temp[cart][s]);
-                            else if (cart == 5)
-                                push_back_MO_coef(MO_run, f_temp[cart + 1][s]);
-							else if (cart == 6)
-								push_back_MO_coef(MO_run, f_temp[cart - 1][s]);
-                            if (MO_run == 0)
+                            for (int _i = 0; _i < 6; _i++)
+                                op == 0 ? push_back_MO_coef(MO_run, d_temp[_i][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[_i][s]);
+                            for (int cart = 0; cart < 6; cart++)
                             {
-                                push_back_exponent(prims[basis_run + s].get_exp());
-                                push_back_center(prims[basis_run].get_center());
-                                push_back_type(11 + cart);
-                                nex++;
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(5 + cart);
+                                    nex++;
+                                }
                             }
                         }
+                        d_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
                     }
-                    f_run = 0;
-                    basis_run += temp_shellsizes[basis_run];
+                    break;
                 }
-                break;
-            }
-            case 5:
-            {
-                if (g_run == 0)
+                case 4:
                 {
-                    for (int _i = 0; _i < 15; _i++)
+                    if (f_run == 0)
                     {
-                        g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        for (int _i = 0; _i < 10; _i++)
+                        {
+                            f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
                     }
-                }
-                for (int s = 0; s < temp_shellsizes[basis_run]; s++)
-                {
-                    g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(13.125);
-                }
-                g_run++;
-                if (g_run == 15)
-                {
                     for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                     {
-                        for (int cart = 0; cart < 15; cart++)
+                        f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(5.0);
+                    }
+                    f_run++;
+                    if (f_run == 10)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
                         {
-                            push_back_MO_coef(MO_run, g_temp[cart][s]);
-                            if (MO_run == 0)
+                            for (int cart = 0; cart < 10; cart++)
                             {
-                                push_back_exponent(prims[basis_run].get_exp());
-                                push_back_center(prims[basis_run].get_center());
-                                push_back_type(21 + cart);
-                                nex++;
+                                // tonto swaps type 17 and 16
+                                if (cart != 5 && cart != 6)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart][s]);
+                                else if (cart == 5)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart + 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart + 1][s]);
+                                else if (cart == 6)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart - 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart - 1][s]);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(11 + cart);
+                                    nex++;
+                                }
                             }
                         }
+                        f_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
                     }
-                    g_run = 0;
-                    basis_run += temp_shellsizes[basis_run];
+                    break;
                 }
-                break;
+                case 5:
+                {
+                    if (g_run == 0)
+                    {
+                        for (int _i = 0; _i < 15; _i++)
+                        {
+                            g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(13.125);
+                    }
+                    g_run++;
+                    if (g_run == 15)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            for (int cart = 0; cart < 15; cart++)
+                            {
+                                op == 0 ? push_back_MO_coef(MO_run, g_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, g_temp[cart][s]);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(21 + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        g_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                }
             }
-            }
+            err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
         }
-        err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+        dMatrix2 temp_co = diag_dot(coefficients, occ, true);
+        if(op == 0)
+            DM = dot(temp_co, coefficients);
+        else {
+			dMatrix2 DM_beta = dot(temp_co, coefficients);
+            for(int i=0; i<expected_coefs; i++)
+                for(int j=0; j<expected_coefs; j++)
+					DM(i, j) += DM_beta(i, j);
+        }
     }
 
-    dMatrix2 temp_co = diag_dot(coefficients, occ, true);
-    DM = dot(temp_co, coefficients);
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
 };

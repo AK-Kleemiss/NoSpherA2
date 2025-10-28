@@ -102,3 +102,4 @@ libiomp5.so
 tests/SALTED/temp_rascaline.xyz
 tests/grown/temp_wavefunction.wfn
 *.density_matrix,restricted
+tests/cytidine_tonto/temp_wavefunction.wfn
