@@ -3825,7 +3825,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
             type = 5;
         else
             continue;
-        unsigned int shellsize = std::max(copy.get_atom_shell_count(centers[e]), 0);
+        unsigned int shellsize = std::max(copy.get_atom_shell_count(centers[e] - 1), 0);
 		copy.push_back_atom_basis_set(centers[e] - 1, exponents[e], 1.0, type, shellsize);
 
 	}
@@ -3964,7 +3964,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
         for (int j = i; j < nex; j++) {
 			runner++;
             stream.str("");
-            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << OVLP_mat(i, j);
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << OVLP_mat(i, j);
             rf << stream.str() << " ";
             if (runner % 3 == 0)
 				rf << "\n";
@@ -3973,11 +3973,31 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
 	rf << " $END" << endl;
 	rf << " $DENSITY " << endl;
     runner = 0;
+	//Build the density matrix in the decontracted basis
+    vec coef;
+    vec occ(nex, 0.0);
+    coef.resize(nex*nex);
+    for(int mo = 0; mo < nex; mo++){
+        if (mo >= nmo) {
+            for (int i = 0; i < nex; i++) {
+                coef[mo * nex + i] = 0.0;
+            }
+            continue;
+        }
+        for(int i = 0; i < nex; i++){
+			coef[mo*nex + i] = MOs[mo].get_coefficient_f(i);
+        }
+		occ[mo] = MOs[mo].get_occ();
+    }
+    dMatrix2 coefficients = reshape<dMatrix2>(coef, Shape2D(nex, nex));
+	dMatrix2 coef_occ = diag_dot(coefficients, occ);
+    dMatrix2 DM_new = dot(coef_occ, coefficients);
+
     for (int i = 0; i < nex; i++) {
         for (int j = i; j < nex; j++) {
             runner++;
             stream.str("");
-            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << DM(i, j);
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << DM_new(i, j);
             rf << stream.str() << " ";
             if (runner % 3 == 0)
                 rf << "\n";
@@ -3985,13 +4005,13 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
     }
 	rf << " $END" << endl;
 	rf << " $LCAOMO " << endl;
-    for (int mo_counter = 0; mo_counter < nmo; mo_counter++)
+    for (int mo_counter = 0; mo_counter < nex; mo_counter++)
     {
         if (debug)
             std::cout << "Writing MO #" << mo_counter + 1 << "...\n";
         for (int i = 0; i < nex; i++) {
             stream.str("");
-            stream << uppercase << scientific << showpoint << setprecision(12) << setw(16) << MOs[mo_counter].get_coefficient(i);
+            stream << uppercase << scientific << showpoint << setprecision(12) << setw(19) << coefficients(mo_counter, i);
             rf << stream.str() << " ";
             if ((i + 1) % 3 == 0)
                 rf << "\n";
