@@ -3885,7 +3885,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
         if (nr.back() == '1') {
             nshell++;
             if (nr.front() == '1') {
-                comp_string += "1 ";
+                comp_string += "  1 ";
                 cx_string[0] += "0.100000000000E+01 ";
                 cx_string[1] += "0.000000000000E+00 ";
                 cx_string[2] += "0.000000000000E+00 ";
@@ -3894,7 +3894,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 highest_angular = std::max(highest_angular, 0);
             }
             else if (nr.front() == '2') {
-                comp_string += "3 ";
+                comp_string += "  3 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.100000000000E+01 ";
                 cx_string[2] += "0.000000000000E+00 ";
@@ -3903,7 +3903,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 highest_angular = std::max(highest_angular, 1);
             }
             else if (nr.front() == '3') {
-                comp_string += "6 ";
+                comp_string += "  6 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
                 cx_string[2] += "0.100000000000E+01 ";
@@ -3912,7 +3912,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 highest_angular = std::max(highest_angular, 2);
             }
             else if (nr.front() == '4') {
-                comp_string += "10 ";
+                comp_string += " 10 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
                 cx_string[2] += "0.000000000000E+00 ";
@@ -3921,7 +3921,7 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 highest_angular = std::max(highest_angular, 3);
             }
             else if (nr.front() == '5') {
-                comp_string += "15 ";
+                comp_string += " 15 ";
                 cx_string[0] += "0.000000000000E+00 ";
                 cx_string[1] += "0.000000000000E+00 ";
                 cx_string[2] += "0.000000000000E+00 ";
@@ -3929,33 +3929,37 @@ bool WFN::write_nbo(const std::filesystem::path& fileName, const bool& debug)
                 cx_string[4] += "0.100000000000E+01 ";
                 highest_angular = std::max(highest_angular, 4);
             }
-            exp_string += to_string(exponents.at(i)) + " ";
-            nprim_string += "1 ";
-            nptr_string += to_string(i + 1) + " ";
+			stream << setw(18) << scientific << setprecision(11) << exponents.at(i);
+            exp_string += stream.str();
+            stream.str("");
+            nprim_string += "  1 ";
+            stream << setw(4) << to_string(i + 1);
+            nptr_string += stream.str();
+            stream.str("");
             if ((nshell % 13) == 0 && i != 0) {
-                comp_string += "\n           ";
-                nprim_string += "\n           ";
+                comp_string += "\n            ";
+                nprim_string += "\n            ";
                 nptr_string += "\n           ";
             }
             if ((nshell % 3) == 0 && i != 0) {
-                exp_string += "\n           ";
+                exp_string += "\n          ";
                 for (int j = 0; j < 5; j++)
-                    cx_string[j] += "\n          ";
+                    cx_string[j] += "\n           ";
             }
         }
     }
 	rf << " $CONTRACT" << endl;
 	rf << "  NSHELL = " << nshell << endl;
 	rf << "    NEXP = " << nshell << endl;
-    rf << "   NCOMP = " << comp_string << endl;
-	rf << "   NPRIM = " << nprim_string << endl;
+    rf << "   NCOMP =  " << comp_string << endl;
+	rf << "   NPRIM =  " << nprim_string << endl;
     rf << "    NPTR = " << nptr_string << endl;
-	rf << "     EXP = " << exp_string << endl;
-	if (highest_angular >= 0) rf << "     CS = " << cx_string[0] << endl;
-	if (highest_angular >= 1) rf << "     CP = " << cx_string[1] << endl;
-	if (highest_angular >= 2) rf << "     CD = " << cx_string[2] << endl;
-	if (highest_angular >= 3) rf << "     CF = " << cx_string[3] << endl;
-	if (highest_angular >= 4) rf << "     CG = " << cx_string[4] << endl;
+	rf << "     EXP =" << exp_string << endl;
+	if (highest_angular >= 0) rf << "      CS = " << cx_string[0] << endl;
+	if (highest_angular >= 1) rf << "      CP = " << cx_string[1] << endl;
+	if (highest_angular >= 2) rf << "      CD = " << cx_string[2] << endl;
+	if (highest_angular >= 3) rf << "      CF = " << cx_string[3] << endl;
+	if (highest_angular >= 4) rf << "      CG = " << cx_string[4] << endl;
 	rf << " $END" << endl;
 	rf << " $OVERLAP " << endl;
 	dMatrixRef2 OVLP_mat(OVLP_matrix.data(), nex, nex);
