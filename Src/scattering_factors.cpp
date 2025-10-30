@@ -2718,7 +2718,8 @@ tsc_block_type calculate_scattering_factors(
             wavy_aux.delete_basis_set();
             load_basis_into_WFN(wavy_aux, combined_aux_basis);
 
-            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, opt.mem, 'C');
+            vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
+                                            0.0002, 1e-6, "TFVC");
             file << setw(12 * 4 + 2) << "... done!\n"
                  << flush;
             time_points.push_back(get_time());

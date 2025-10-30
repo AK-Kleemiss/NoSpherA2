@@ -15,7 +15,7 @@ vec density_fit_hybrid(const WFN& wavy, const WFN& wavy_aux, const double max_me
                       double tikhonov_lambda = 1e-6, const std::string& charge_scheme = "mulliken", bool analyze_quality = false);
 
 // Helper functions for charge analysis and restraints
-vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme = "mulliken");
+vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme = "mulliken");
 
 void analyze_density_fit_quality(const vec& coefficients, const WFN& wavy_aux, const vec& expected_charges = vec());
 void add_electron_restraint(vec& eri2c, vec& rho, const WFN& wavy_aux, 

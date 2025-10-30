@@ -4,6 +4,7 @@
 #include "JKFit.h"
 #include "libCintMain.h"
 #include "nos_math.h"
+#include "GridManager.h"
 
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
@@ -192,12 +193,12 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
     }
 
     // Calculate expected charges based on chosen scheme
-    vec expected_charges = calculate_expected_charges(wavy, wavy_aux, charge_scheme);
     std::cout << "Using charge scheme: " << charge_scheme << std::endl;
+    vec expected_populations = calculate_expected_populations(wavy, wavy_aux, charge_scheme);
     
     // Apply enhanced electron restraints
     add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, 
-                          adaptive_restraint, expected_charges);
+                          adaptive_restraint, expected_populations);
     
     // Solve the regularized 
     std::cout << "Solving regularized linear system..." << std::endl;
@@ -208,7 +209,7 @@ vec density_fit_restrain(const WFN &wavy, const WFN& wavy_aux, const double max_
 
     // Analyze the quality of the fit if requested
     if (analyze_quality) {
-        analyze_density_fit_quality(rho, wavy_aux, expected_charges);
+        analyze_density_fit_quality(rho, wavy_aux, expected_populations);
     }
 
     std::cout << "===============================================\n" << std::endl;
@@ -250,8 +251,8 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
     }
 
     // Then add electron restraints
-    vec expected_charges = calculate_expected_charges(wavy, wavy_aux, charge_scheme);
-    add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, true, expected_charges);
+    vec expected_populations = calculate_expected_populations(wavy, wavy_aux, charge_scheme);
+    add_electron_restraint(eri2c, rho, wavy_aux, restraint_strength, true, expected_populations);
     
     std::cout << "Solving hybrid regularized system..." << std::endl;
     solve_linear_system(eri2c, rho.size(), n, rho);
@@ -260,22 +261,22 @@ vec density_fit_hybrid(const WFN &wavy, const WFN& wavy_aux, const double max_me
     
     // Analyze the quality of the fit if requested
     if (analyze_quality) {
-        analyze_density_fit_quality(rho, wavy_aux, expected_charges);
+        analyze_density_fit_quality(rho, wavy_aux, expected_populations);
     }
 
     std::cout << "====================================================\n" << std::endl;
     return rho;
 }
 
-// Calculate expected atomic charges based on different partitioning schemes
-vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme)
+// Calculate expected atomic populations based on different partitioning schemes
+vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const std::string& scheme)
 {
-    vec expected_charges(wavy_aux.get_ncen());
+    vec expected_populations(wavy_aux.get_ncen());
     
     if (scheme == "nuclear") {
-        // Simple nuclear charge
+        // Simple nuclear populations
         for (int i = 0; i < wavy_aux.get_ncen(); i++) {
-            expected_charges[i] = wavy_aux.get_atoms()[i].get_charge();
+            expected_populations[i] = wavy_aux.get_atoms()[i].get_charge();
         }
     }
     // https://pubs.acs.org/doi/10.1021/ed065p227
@@ -288,7 +289,7 @@ vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::
 
         for (int iat = 0; iat < wavy_aux.get_ncen(); iat++) {
             double atom_electronegativity = constants::allen_electronegativities[wavy_aux.get_atoms()[iat].get_charge() - 1];
-            expected_charges[iat] = wavy_aux.get_atoms()[iat].get_charge() + (compound_electronegativity - atom_electronegativity) / (1.57 * std::sqrt(atom_electronegativity));
+            expected_populations[iat] = wavy_aux.get_atoms()[iat].get_charge() + (compound_electronegativity - atom_electronegativity) / (1.57 * std::sqrt(atom_electronegativity));
         }
     }
     else if (scheme == "mulliken") {
@@ -324,17 +325,51 @@ vec calculate_expected_charges(const WFN& wavy, const WFN& wavy_aux, const std::
                     diag_PS += dm(m, n) * eri2c_ref(n, m);
                 GA += diag_PS;
             }
-            expected_charges[iat] = GA;//A.get_charge() - GA;        // Mulliken charge
+            expected_populations[iat] = GA;//A.get_charge() - GA;        // Mulliken charge
             mu_begin = mu_end;
+        }
+    }
+    else if (scheme == "TFVC") {
+        // Example usage in your main calculation function
+        GridConfiguration config;
+        config.accuracy = 0;
+        config.partition_type = PartitionType::TFVC;
+        config.pbc = 0;
+        config.debug = false;
+
+        cell unit_cell = cell();
+        ivec asym_atom_list(wavy.get_ncen());
+        for (int atom_nr = 0; atom_nr < wavy.get_ncen(); atom_nr++) {
+            asym_atom_list[atom_nr] = atom_nr;
+        }
+        svec labels(wavy.get_ncen());
+        for (int i = 0; i < wavy.get_ncen(); i++) {
+            labels[i] = wavy.get_atoms()[i].get_label();
+        }
+
+        GridManager grid_manager(config);
+
+        WFN temp = wavy;
+        temp.delete_unoccupied_MOs();
+        // Setup grids for the molecule
+        bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
+        grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+        
+
+        // Calculate partitioned charges
+        auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+        //results.printChargeTable(labels, temp, std::cout);
+        for (int i = 0; i < temp.get_ncen(); i++) {
+            expected_populations[i] = results.atom_charges[static_cast<int>(PartitionType::TFVC)][i];
         }
     }
     else {
         std::cerr << "Warning: Unknown charge scheme '" << scheme 
             << "'. Defaulting to nuclear charges." << std::endl;
-        expected_charges = calculate_expected_charges(wavy, wavy_aux, "nuclear");
+        expected_populations = calculate_expected_populations(wavy, wavy_aux, "nuclear");
     }
 
-    return expected_charges;
+    return expected_populations;
 }
 
 // Analyze the quality of density fitting and detect problematic charges
@@ -420,7 +455,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     vec coeff_enhanced = density_fit_restrain(wavy, wavy_aux, max_mem, metric,
         0.0002,     // restraint strength
         true,      // adaptive weighting
-        "mulliken", // charge scheme
+        "TFVC", // charge scheme
         true);     // analyze quality
 
     // Method 2: Hybrid approach
@@ -428,7 +463,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
     vec coeff_hybrid = density_fit_hybrid(wavy, wavy_aux, max_mem, metric,
         0.0002,     // restraint strength
         1e-6,      // tikhonov lambda
-        "mulliken", true); // charge scheme
+        "TFVC", true); // charge scheme
     const double radius = 3.0;
     const double increment = 0.1;
 
@@ -478,7 +513,7 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
                 wavy.calc_rho_cube(cubes[a]);
             else
                 calc_cube_ML(all_coeffs[a-1], dummy_aux, cubes[a]);
-            //cubes[a].write_file(false, false);
+            cubes[a].write_file(false, false);
         }
     }
 
@@ -491,10 +526,10 @@ void demonstrate_enhanced_density_fitting(const WFN& wavy, const WFN& wavy_aux)
         std::cout << "Difference WFN - Method " << a - 1 << ": RRS = " << std::scientific << std::setprecision(6) << rrs
             << ", Sum = " << std::fixed << std::setprecision(6) << sums[0]
             << ", |Sum| = " << std::fixed << std::setprecision(6) << sums[1] << std::endl;
-        //diff.set_comment1("Difference cube: WFN - Method " + std::to_string(a - 1));
-        //diff.give_parent_wfn(dummy);
-        //diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_Method" + std::to_string(a - 1) + ".cube");
-        //diff.write_file(true, false);
+        diff.set_comment1("Difference cube: WFN - Method " + std::to_string(a - 1));
+        diff.give_parent_wfn(dummy);
+        diff.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho_diff_Method" + std::to_string(a - 1) + ".cube");
+        diff.write_file(true, false);
     }
     
 
