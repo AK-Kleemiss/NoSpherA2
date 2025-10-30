@@ -15,6 +15,7 @@
 #include "integrator.h"
 #include "JKFit.h"
 #include "SALTED_utilities.h"
+#include "GridManager.h"
 
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
@@ -1307,87 +1308,6 @@ ivec make_integration_grids(
     return num_points;
 }
 
-double make_sphericals(
-    vec2 &dens,
-    vec2 &dist,
-    const ivec &atom_type_list,
-    std::ostream &file,
-    bool debug = false,
-    double incr_start = 1.005,
-    double min_dist = 0.0000001,
-    int accuracy = 2)
-{
-    using namespace std;
-    const double incr = pow(incr_start, max(1, accuracy - 1));
-    const double lincr = log(incr);
-    vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
-    // Make radial grids
-    if (debug)
-    {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
-            double current = 1;
-            double _dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    if (current == -20)
-                        return -1000;
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    if (current == -20)
-                        return false;
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << dens[i].size() << endl;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            double current = 1;
-            double _dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-        }
-    }
-    sphericals.clear();
-    if (debug)
-    {
-        file << "Cleared the sphericals!" << endl;
-    }
-    return lincr;
-}
-
 void fill_xyzc(
     vec &x,
     vec &y,
@@ -2449,6 +2369,38 @@ void convert_to_ED(const ivec &asym_atom_list,
     }
 }
 
+
+int make_atomic_grids_wrapper(
+                            const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec & labels, //
+                            std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
+                            const int& accuracy = 2, const PartitionType& partition_type = PartitionType::Hirshfeld, const int &pbc = 0, const bool& debug = false) {
+    GridConfiguration config;
+    config.accuracy = accuracy;
+    config.partition_type = partition_type;
+    config.pbc = pbc;
+    config.debug = debug;
+
+    GridManager grid_manager(config);
+
+    WFN temp = wave;
+    temp.delete_unoccupied_MOs();
+    // Setup grids for the molecule
+    grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.add_timing_info_to_vecs(time_points, time_descriptions);
+
+    // Calculate partitioned charges
+    auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+    results.printChargeTable(labels, temp, std::cout);
+    time_points.push_back(get_time());
+    time_descriptions.push_back("calculate charges");
+
+    grid_manager.getDensityVectors(temp, d1, d2, d3, dens);
+    time_points.push_back(get_time());
+    time_descriptions.push_back("combined density vectors");
+
+    return grid_manager.getTotalGridPoints();
+}
+
 /**
  * @brief Calculates scattering factors using the provided calculator and options.
  *
@@ -2722,25 +2674,20 @@ tsc_block_type calculate_scattering_factors(
     else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC)
         {
-            vec2 d1, d2, d3, dens;
-            const int points = make_atomic_grids(opt.pbc,
-                                                 opt.accuracy,
-                                                 unit_cell,
-                                                 *wavy,
-                                                 atom_type_list,
-                                                 asym_atom_list,
-                                                 needs_grid,
-                                                 d1, d2, d3, dens,
-                                                 labels,
-                                                 file,
-                                                 time_points,
-                                                 time_descriptions,
-                                                 opt.debug,
-                                                 opt.no_date,
-                                                 opt.partition_type);
-
-            time_points.push_back(get_time());
-            time_descriptions.push_back("density vectors");
+            vec2 d1, d2, d3, dens; 
+            const int points = make_atomic_grids_wrapper(
+                                        *wavy,
+                                        needs_grid,
+                                        asym_atom_list,
+                                        unit_cell,
+                                        labels,
+                                        time_points,
+                                        time_descriptions,
+                                        d1, d2, d3, dens,
+                                        opt.accuracy,
+                                        opt.partition_type,
+                                        opt.pbc,
+                                        opt.debug);
 
             _time_point end1;
             calc_SF(points,
@@ -2760,13 +2707,16 @@ tsc_block_type calculate_scattering_factors(
         {
             file << "\nGenerating densities... " << endl;
             //If no basis is yet loaded, assume a auto aux should be generated
-            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_auto_aux(*wavy);
+            for (shared_ptr<BasisSet>& aux_basis_set : opt.aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(*wavy); }
+
+            shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
+            for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
 
             WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy->get_atoms());
             wavy_aux.set_ncen(wavy->get_ncen());
             wavy_aux.delete_basis_set();
-            load_basis_into_WFN(wavy_aux, opt.aux_basis);
+            load_basis_into_WFN(wavy_aux, combined_aux_basis);
 
             vec coefs = density_fit_unrestrained(*wavy, wavy_aux, opt.mem, 'C');
             file << setw(12 * 4 + 2) << "... done!\n"

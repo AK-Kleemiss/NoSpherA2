@@ -12,7 +12,6 @@
 #include "nos_math.h"
 #include "featomic.hpp"
 #include "metatensor.h"
-#include "nos_math.h"
 #ifdef __APPLE__
 #include "TargetConditionals.h"
 #endif

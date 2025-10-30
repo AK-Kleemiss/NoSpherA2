@@ -2070,33 +2070,28 @@ void options::digest_options()
         {
             RI_FIT = true;
             partition_type = PartitionType::RI;
+            int next_basis_set = i+1;
             // Check if next argument is a valid basis set name or a new argument starting with "-"
-            if (i + 1 < argc && arguments[i + 1].find("-") != 0)
-            {
-
-                if (arguments[i + 1] == "auto_aux") {
+            while (next_basis_set < argc && arguments[next_basis_set].find("-") != 0) {
+                if (arguments[next_basis_set] == "auto_aux") {
                     double beta = 2.0;
                     //Check if the next argument is a valid double
-                    if (i + 2 < argc && arguments[i + 2].find("-") != 0) {
-                        beta = std::stod(arguments[i + 2]);
+                    if (next_basis_set + 1 < argc && arguments[next_basis_set + 1].find("-") != 0) {
+                        beta = std::stod(arguments[next_basis_set + 1]);
                     }
-                    if (debug) cout << "Using automatic basis set generation with beta: " << beta << endl;
-                    aux_basis = std::make_shared<BasisSet>(beta);
-                    continue;
+                    aux_basis.push_back(std::make_shared<BasisSet>(beta));
+                    break;
                 }
-
-
-                if (!BasisSetLibrary().check_basis_set_exists(arguments[i + 1]))
-                {
+                if (!BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set])) {
                     cout << "Basis set " << arguments[i + 1] << " not found in the library. Exiting." << endl;
                     exit(1);
                 }
-                aux_basis = BasisSetLibrary().get_basis_set(arguments[i + 1]);
+                aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
+                next_basis_set++;
             }
-            else
-            {
+            if (aux_basis.size() == 0) {
                 cout << "No basis set specified. Falling back to automatic generation using beta = 2.0!" << endl;
-                aux_basis = std::make_shared<BasisSet>(2.0);
+                aux_basis.push_back(std::make_shared<BasisSet>(2.0));
             }
         }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
@@ -2280,7 +2275,7 @@ void options::digest_options()
                 std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
                 exit(1);
             }
-            if (aux_basis == nullptr)
+            if (aux_basis.empty())
             {
                 std::cout << "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set." << std::endl;
                 exit(1);
@@ -2294,8 +2289,12 @@ void options::digest_options()
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
 
-            if ((*aux_basis).get_primitive_count() == 0) (*aux_basis).gen_auto_aux(wavy);
-            load_basis_into_WFN(wavy_aux, aux_basis);
+            for (shared_ptr<BasisSet>& aux_basis_set : aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(wavy); }
+
+            shared_ptr<BasisSet> combined_aux_basis = aux_basis[0];
+            for (int basis_nr = 1; basis_nr < aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*aux_basis[basis_nr]); }
+
+            load_basis_into_WFN(wavy_aux, combined_aux_basis);
             demonstrate_enhanced_density_fitting(wavy, wavy_aux);
             //dMatrix2 dm = wavy.get_dm();
             //vec charges_sand = calculate_expected_charges(wavy, wavy_aux, "sanderson_estimate");

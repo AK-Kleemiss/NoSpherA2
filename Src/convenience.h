@@ -33,6 +33,7 @@ typedef std::vector<cvec> cvec2;
 typedef std::vector<cvec2> cvec3;
 typedef std::vector<std::vector<cvec2>> cvec4;
 typedef std::vector<bool> bvec;
+typedef std::vector<bvec> bvec2;
 typedef std::vector<std::string> svec;
 typedef std::vector<std::filesystem::path> pathvec;
 typedef std::chrono::high_resolution_clock::time_point _time_point;
@@ -576,7 +577,7 @@ struct options
     ivec cmo2;
     ivec ignore;
     std::filesystem::path salted_model_dir;
-    std::shared_ptr<BasisSet> aux_basis;
+    std::vector<std::shared_ptr<BasisSet>> aux_basis;
     std::filesystem::path wfn;
     std::filesystem::path wfn2;
     std::filesystem::path fchk;

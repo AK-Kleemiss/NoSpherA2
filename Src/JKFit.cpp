@@ -20,6 +20,41 @@ const std::span<const SimplePrimitive> BasisSet::operator[](const int& element) 
     return { _primitives + _elementOffsets[element], static_cast<std::size_t>(_elementCounts[element])};
 }
 
+constexpr std::array<int, 118> compute_prefix_sum(const std::array<int, 118>& counts) {
+    std::array<int, 118> offsets{};
+    int sum = 0;
+    for (int i = 0; i < 118; ++i) {
+        offsets[i] = (counts[i] == 0) ? -1 : sum;
+        sum += counts[i];
+    }
+    return offsets;
+}
+//Look through all primitives in the main basisset and see if they are defined in the other basis set, if so, add them to this basis set
+void BasisSet::operator+=(const BasisSet& other) {
+    _name += "_plus_" + other._name;
+    std::vector<SimplePrimitive> new_primitives;
+    for (int elem = 0; elem < 118; elem++) {
+        //If this basis set has primitives for this element, add them
+        int count_this = _elementCounts[elem];
+        if (count_this != 0) {
+            new_primitives.insert(new_primitives.end(), _primitives + _elementOffsets[elem], _primitives + _elementOffsets[elem] + count_this);
+            continue;
+        }
+
+        //If not, look if the other basis set has primitives for this element, if so, add them
+        int count_other = other._elementCounts[elem];
+        if (count_other != 0) {
+            new_primitives.insert(new_primitives.end(), other._primitives + other._elementOffsets[elem], other._primitives + other._elementOffsets[elem] + count_other);
+            _elementCounts[elem] = count_other; 
+            continue;
+        }
+    }
+    _ownedPrimitives = new_primitives;
+    _primitiveCount = static_cast<uint32_t>(_ownedPrimitives.size());
+    _elementOffsets = compute_prefix_sum(_elementCounts);
+    _primitives = _ownedPrimitives.data();
+}
+
 long double primitve_normalization(const double exp, const int l) {
     long double numerator = std::pow(2 * (long double) exp / constants::PI, 3.0 / 2.0) * std::pow(4 * (long double) exp, l);
     long double denominator = ((l == 0) ? 1 : constants::double_ft[2 * l - 1]);

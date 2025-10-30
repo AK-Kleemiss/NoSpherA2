@@ -34,11 +34,14 @@
     <Filter Include="Headerdateien\mdspan">
       <UniqueIdentifier>{53cebc2e-6707-423c-b1e4-3e8b01ff9900}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Quelldateien\Grids">
+      <UniqueIdentifier>{87b72b91-b668-44bb-b149-21d426980d52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Headerdateien\Grids">
+      <UniqueIdentifier>{3b51d547-fcb2-4002-9c05-8db510272008}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="../Src/AtomGrid.cpp">
-      <Filter>Quelldateien</Filter>
-    </ClCompile>
     <ClCompile Include="../Src/basis_set.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
@@ -144,11 +147,14 @@
     <ClCompile Include="..\Src\vec_nos_math.cpp">
       <Filter>Quelldateien</Filter>
     </ClCompile>
+    <ClCompile Include="../Src/AtomGrid.cpp">
+      <Filter>Quelldateien\Grids</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Src\GridManager.cpp">
+      <Filter>Quelldateien\Grids</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="../Src/AtomGrid.h">
-      <Filter>Headerdateien</Filter>
-    </ClInclude>
     <ClInclude Include="../Src/atoms.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
@@ -274,6 +280,15 @@
     </ClInclude>
     <ClInclude Include="..\Src\cif.h">
       <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="icon.h">
+      <Filter>Headerdateien</Filter>
+    </ClInclude>
+    <ClInclude Include="../Src/AtomGrid.h">
+      <Filter>Headerdateien\Grids</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Src\GridManager.h">
+      <Filter>Headerdateien\Grids</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

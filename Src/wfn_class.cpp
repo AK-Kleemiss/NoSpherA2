@@ -2327,6 +2327,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             {
                 file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
             }
+            //Without this, expected_coefs is set to 0 after push_back_MO... no idea why
+            const double constant_expected_coefs = expected_coefs;
             for (int j = 0; j < dimension; j++)
             {
                 push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j], i);
@@ -2343,7 +2345,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 // if (debug) {
                 //   file << "Starting the " << j << ". loop... wish me luck... " << endl;
                 // }
-                for (int p = 0; p < expected_coefs; p++)
+                for (int p = 0; p < constant_expected_coefs; p++)
                 {
                     switch (prims[basis_run].get_type())
                     {

@@ -49,6 +49,7 @@ public:
 
     std::shared_ptr<std::array<std::vector<primitive>, 118>> get_data();
     const std::span<const SimplePrimitive> operator[](const int&element) const ;
+    void operator+=(const BasisSet& other);
 
     void set_name(const std::string& name) { _name = name; }
     void set_primitive_count(uint32_t count) { _primitiveCount = count; }
