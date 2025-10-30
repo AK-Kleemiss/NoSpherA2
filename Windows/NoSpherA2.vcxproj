@@ -467,7 +467,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
-    <UseDynamicDebugging>false</UseDynamicDebugging>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -477,6 +477,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -505,6 +506,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_BasisSetConverter|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -524,6 +526,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_isosurface|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -543,6 +546,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC_scan|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -562,6 +566,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_gbw2wfn|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -581,6 +586,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fractal|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -600,6 +606,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SFAC|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -619,6 +626,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_merge_tscs|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -638,6 +646,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -657,6 +666,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SH|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -696,6 +706,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>false</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='GenCube|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -715,6 +726,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_tsc|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -734,6 +746,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_polarizability|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -753,6 +766,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_gbw_SF|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -772,6 +786,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_OpenShell_gbw|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -791,6 +806,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_ECP|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -810,6 +826,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_def2_ECP|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -829,6 +846,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_pot|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -848,6 +866,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ECP_file|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -867,6 +886,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_tscb|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -886,6 +906,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_grown|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -905,6 +926,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Molden|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -924,6 +946,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_molden|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -943,6 +966,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_F_molden|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -962,6 +986,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -981,6 +1006,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_UNKNOWN|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1000,6 +1026,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_Fourier_Transform|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1019,6 +1046,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Mohr_Salt|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1028,6 +1056,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1056,6 +1085,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SALTED_BINARY|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1075,6 +1105,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='debug_Daniel|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1094,6 +1125,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_BLAS|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1114,6 +1146,7 @@
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <WholeProgramOptimization>true</WholeProgramOptimization>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_SALTED|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1134,6 +1167,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_xTB_Co_molden|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1153,6 +1187,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SALTED_Disorder|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1162,6 +1197,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1190,6 +1226,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ptb_Disorder|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1209,6 +1246,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile_Disorder|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1228,6 +1266,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_MTC_Disorder|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1247,6 +1286,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SF_Hybrid|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1266,6 +1306,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_SF_CMTC|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1285,6 +1326,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_kpts_file|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1304,6 +1346,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_tsc_merge|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1323,6 +1366,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_IAM_SF|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1342,6 +1386,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1361,6 +1406,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_properties|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1380,6 +1426,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_ESP|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1399,6 +1446,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_fchk_generation|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1418,6 +1466,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PBC_CaF2|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1437,6 +1486,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_PDF|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1457,6 +1507,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1478,6 +1529,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release + Copy|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1499,6 +1551,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
     <EnableUnitySupport>true</EnableUnitySupport>
+    <UseDynamicDebugging>false</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Publish|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -1519,6 +1572,7 @@
     <UseOfMfc>Static</UseOfMfc>
     <EnableUnitySupport>true</EnableUnitySupport>
     <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+    <UseDynamicDebugging>true</UseDynamicDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_pTB_reader|ARM64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
