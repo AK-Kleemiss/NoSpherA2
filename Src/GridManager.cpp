@@ -216,7 +216,7 @@ void GridManager::setupGridsForMolecule(const WFN& wave, const bvec& needs_grid,
     addTimingPoint("Atomic Grid setup");
 
     // Calculate Hirshfeld weights if needed
-    if (config_.partition_type == PartitionType::Hirshfeld || config_.debug) {
+    if (config_.partition_type == PartitionType::Hirshfeld || config_.debug || config_.all_charges) {
         calculateHirshfeldWeights(wave, unit_cell);
         addTimingPoint("Hirshfeld Weights");
     }
@@ -226,6 +226,11 @@ void GridManager::setupGridsForMolecule(const WFN& wave, const bvec& needs_grid,
     addTimingPoint("Grid Pruning");
 
     // Calculate non-spherical densities
+    if (config_.debug) {
+        std::cout << std::endl
+            << "Using " << wave.get_nmo() << " MOs in temporary wavefunction" << std::endl;
+        wave.write_wfn("temp_wavefunction.wfn", false, true);
+    }
     calculateNonSphericalDensities(wave, unit_cell);
     addTimingPoint("WFN evaluation on grid");
 
@@ -236,6 +241,7 @@ void GridManager::setupGridsForMolecule(const WFN& wave, const bvec& needs_grid,
 }
 
 void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
+    std::cout << "GridManager: Setting up prototype grids for atom types..." << std::endl;
     prototype_grids_.clear();
     prototype_grids_.reserve(atom_types.size());
     
@@ -291,11 +297,17 @@ void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
             alpha_min.data(),
             std::cout
         );
+        if (config_.debug) {
+            std::cout << "Created prototype grid for atom type " << atom_type 
+                      << " with " << prototype_grids_.back().get_num_grid_points() 
+                      << " points." << std::endl;
+        }
     }
 }
 
 void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cell,
                                            const bvec& needs_grid, const ivec& atom_list) {
+    std::cout << "GridManager: Generating integration grids for atoms..." << std::endl;
     const int num_atoms_with_grids = atom_list.size();
     grid_data_.resizeForAtoms(num_atoms_with_grids);
     
@@ -338,37 +350,6 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
         }
     }
 
-    //int idx = 0
-    //for (int pbc_x = -config_.pbc; pbc_x <= config_.pbc; ++pbc_x) {
-    //    for (int pbc_y = -config_.pbc; pbc_y <= config_.pbc; ++pbc_y) {
-    //        for (int pbc_z = -config_.pbc; pbc_z <= config_.pbc; ++pbc_z) {
-    //            for (int i = 0; i < wave.get_ncen(); ++i) {
-    //                charges[idx] = wave.get_atom_charge(i);
-    //                
-    //                if (pbc_x == 0 && pbc_y == 0 && pbc_z == 0) {
-    //                    x_coords[idx] = wave.get_atom_coordinate(i, 0);
-    //                    y_coords[idx] = wave.get_atom_coordinate(i, 1);
-    //                    z_coords[idx] = wave.get_atom_coordinate(i, 2);
-    //                } else {
-    //                    x_coords[idx] = wave.get_atom_coordinate(i, 0) + 
-    //                                   pbc_x * unit_cell.get_cm(0, 0) + 
-    //                                   pbc_y * unit_cell.get_cm(0, 1) + 
-    //                                   pbc_z * unit_cell.get_cm(0, 2);
-    //                    y_coords[idx] = wave.get_atom_coordinate(i, 1) + 
-    //                                   pbc_x * unit_cell.get_cm(1, 0) + 
-    //                                   pbc_y * unit_cell.get_cm(1, 1) + 
-    //                                   pbc_z * unit_cell.get_cm(1, 2);
-    //                    z_coords[idx] = wave.get_atom_coordinate(i, 2) + 
-    //                                   pbc_x * unit_cell.get_cm(2, 0) + 
-    //                                   pbc_y * unit_cell.get_cm(2, 1) + 
-    //                                   pbc_z * unit_cell.get_cm(2, 2);
-    //                }
-    //                ++idx;
-    //            }
-    //        }
-    //    }
-    //}
-    
     // Generate grids for each atom
     vec2 chi_matrix;  // For TFVC partitioning
     for (int i = 0; i < num_atoms_with_grids; ++i) {
@@ -410,13 +391,21 @@ void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cel
             chi_matrix,
             config_.debug
         );
+        if (config_.debug) std::cout << "Generated grid for atom " << i + 1 << "/" << num_atoms_with_grids 
+            << " (Type " << atom_type << ") with " << num_points << " points." << std::endl;
     }
     
     grid_data_.total_points = std::accumulate(grid_data_.num_points_per_atom.begin(),
                                               grid_data_.num_points_per_atom.end(), 0);
+    std::cout << "GridManager: Generated total of " << grid_data_.total_points << " grid points." << std::endl;
 }
 
 PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const cell& unit_cell) {
+    if (config_.debug) {
+        std::string scheme_name = (config_.debug || config_.all_charges) ? "every" : config_.getPartitionName();
+                std::cout << "GridManager: Calculating partitioned charges using " 
+                    << scheme_name << " scheme..." << std::endl;
+    }
     enum CHARGE_ORDER{ S_BECKE = 0, S_TFVC = 1, S_HIRSH = 2 };
     
     PartitionResults results;
@@ -448,29 +437,55 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
         const double* wH = atomic_grid[GridData::GridIndex::HIRSH_WEIGHT].data();
         const double* wT = atomic_grid[GridData::GridIndex::TFVC_WEIGHT].data();
 
-        double accB = 0.0, accH = 0.0, accT = 0.0;
-        // Vectorizable inner loop; no shared writes.
+        if (config_.debug || config_.all_charges) {
+            double accB = 0.0, accH = 0.0, accT = 0.0;
+            // Vectorizable inner loop; no shared writes.
 #pragma omp simd reduction(+:accB, accH, accT)
-        for (int p = 0; p < n_points; ++p) {
-            const double r = rho[p];
-            accB += r * wB[p];
-            accH += r * wH[p];
-            accT += r * wT[p];
-        }
+            for (int p = 0; p < n_points; ++p) {
+                const double r = rho[p];
+                accB += r * wB[p];
+                accH += r * wH[p];
+                accT += r * wT[p];
+            }
 
-        results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = accB;
-        results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = accH;
-        results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
-            
+            results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = accB;
+            results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = accH;
+            results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
+        }
+        else {
+            const double* w = atomic_grid[idx_single].data();
+            double acc = 0.0;
+
+    #pragma omp simd reduction(+:acc)
+            for (int p = 0; p < n_points; ++p) {
+                acc += rho[p] * w[p];
+            }
+
+            // Store only into the active scheme
+            switch (config_.partition_type) {
+            case PartitionType::Becke:     results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = acc;  break;
+            case PartitionType::TFVC:      results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = acc;  break;
+            case PartitionType::Hirshfeld: results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
+            }
+        }
+        
         // Add ECP electrons (only to computed schemes)
         if (wave.get_has_ECPs()) {
             const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
-            results.atom_charges[S_BECKE][atom] += ecp_e;
-            results.atom_charges[S_HIRSH][atom] += ecp_e;
-            results.atom_charges[S_TFVC][atom] += ecp_e;
+            if (config_.debug || config_.all_charges) {
+                results.atom_charges[S_BECKE][atom] += ecp_e;
+                results.atom_charges[S_HIRSH][atom] += ecp_e;
+                results.atom_charges[S_TFVC][atom] += ecp_e;
+            }
+            else {
+                switch (config_.partition_type) {
+                case PartitionType::Becke:     results.atom_charges[S_BECKE][atom] += ecp_e; break;
+                case PartitionType::TFVC:      results.atom_charges[S_TFVC][atom] += ecp_e; break;
+                case PartitionType::Hirshfeld: results.atom_charges[S_HIRSH][atom] += ecp_e; break;
+                }
+            }
         }
     }
-    
 
     // Calculate total charges
     results.overall_charges.resize(3, 0.0); 
@@ -611,11 +626,11 @@ void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, std
     
     for (int i = 0; i < labels.size(); ++i) {
         file << std::setw(10) << labels[i]
-             << std::fixed << std::setw(10) << std::setprecision(3) 
+             << std::fixed << std::setw(10) << std::setprecision(6) 
              << wave.get_atom_charge(i) - atom_charges[0][i]  // Becke
-             << std::fixed << std::setw(10) << std::setprecision(3)
+             << std::fixed << std::setw(10) << std::setprecision(6)
              << wave.get_atom_charge(i) - atom_charges[2][i]  // Hirshfeld
-             << std::fixed << std::setw(10) << std::setprecision(3)
+             << std::fixed << std::setw(10) << std::setprecision(6)
              << wave.get_atom_charge(i) - atom_charges[1][i]  // TFVC
              << std::endl;
     }
@@ -645,7 +660,7 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
     // Calculate radial densities using Thakkar spherical atoms
     lincr_ = make_sphericals(radial_density_, radial_distances_, atom_type_list_,
         std::cout, config_.debug, 1.005, 1.0E-7, config_.accuracy);
-
+    err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
     vec2 single_spherical_density(grid_data_.atomic_grids.size());
     vec2 combined_spherical_density(grid_data_.atomic_grids.size());
@@ -770,6 +785,9 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
         }
     }
 
+    if (config_.debug) {
+        std::cout << "GridManager: Spherical densities calculated, calculating Hirshfeld weights..." << std::endl;
+    }
     //Calculate hirshfeld weights
     for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
         double* combined_ptr = combined_spherical_density[g].data();
@@ -779,10 +797,6 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
             atom_grid[GridData::GridIndex::HIRSH_WEIGHT][p] =
                 (combined_ptr[p] != 0.0) ? (atom_grid[GridData::GridIndex::WEIGHT][p] * (single_ptr[p] / combined_ptr[p])) : 0.0;
         }
-    }
-
-    if (config_.debug) {
-        std::cout << "GridManager: Spherical densities calculated" << std::endl;
     }
 }
 
@@ -854,7 +868,7 @@ void GridManager::pruneGrid() {
         const int n = grid_data_.num_points_per_atom[g];
         const auto& grid = grid_data_.atomic_grids[g];
 
-        if (config_.debug) {
+        if (config_.debug || config_.all_charges) {
             // Gather raw pointers for chosen weights (avoids double indexing in the inner loop).
             std::vector<const double*> W; W.reserve(chosen.size());
             for (auto idx : chosen) W.push_back(grid[idx].data());

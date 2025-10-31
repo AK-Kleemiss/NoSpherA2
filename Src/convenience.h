@@ -596,6 +596,7 @@ struct options
     std::filesystem::path basis_set_path;
     std::string cwd;
     bool debug = false;
+    bool all_charges = false;
     bool rho = false;
     bool calc = false;
     bool eli = false;

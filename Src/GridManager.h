@@ -32,6 +32,7 @@ struct GridConfiguration {
     int pbc = 0;
     PartitionType partition_type = PartitionType::Hirshfeld;
     bool debug = false;
+    bool all_charges = false;
     
     double getCutoff() const;
     std::string getPartitionName() const;

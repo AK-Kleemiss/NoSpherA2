@@ -1615,6 +1615,8 @@ void options::digest_options()
             continue;
         if (temp == "-acc")
             accuracy = stoi(arguments[i + 1]);
+        if (temp == "-all_charges")
+            all_charges = true;
         else if (temp == "-Anion")
         {
             int n = 1;

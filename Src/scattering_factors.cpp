@@ -2373,12 +2373,20 @@ void convert_to_ED(const ivec &asym_atom_list,
 int make_atomic_grids_wrapper(
                             const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec & labels, //
                             std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
-                            const int& accuracy = 2, const PartitionType& partition_type = PartitionType::Hirshfeld, const int &pbc = 0, const bool& debug = false) {
+                            const options& opt) {
+
+    int atoms_with_grids = vec_sum(needs_grid);
+    err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
+    err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
+
+    std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::flush;
+
     GridConfiguration config;
-    config.accuracy = accuracy;
-    config.partition_type = partition_type;
-    config.pbc = pbc;
-    config.debug = debug;
+    config.accuracy = opt.accuracy;
+    config.partition_type = opt.partition_type;
+    config.pbc = opt.pbc;
+    config.debug = opt.debug;
+    config.all_charges = opt.all_charges;
 
     GridManager grid_manager(config);
 
@@ -2684,10 +2692,7 @@ tsc_block_type calculate_scattering_factors(
                                         time_points,
                                         time_descriptions,
                                         d1, d2, d3, dens,
-                                        opt.accuracy,
-                                        opt.partition_type,
-                                        opt.pbc,
-                                        opt.debug);
+                                        opt);
 
             _time_point end1;
             calc_SF(points,
