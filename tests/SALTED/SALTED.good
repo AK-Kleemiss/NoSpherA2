@@ -19,17 +19,17 @@ Generating k-points...                            ... done!
 Number of k-points to evaluate: 7672
 
 Generating densities... 
-[              Calculating descriptors for l = 0              ]
+[              Calculating descriptors for l = 0               ]
 [#############################################################] 100% 
-[              Calculating descriptors for l = 1              ]
+[              Calculating descriptors for l = 1               ]
 [#############################################################] 100% 
-[              Calculating descriptors for l = 2              ]
+[              Calculating descriptors for l = 2               ]
 [#############################################################] 100% 
-[              Calculating descriptors for l = 3              ]
+[              Calculating descriptors for l = 3               ]
 [#############################################################] 100% 
-[              Calculating descriptors for l = 4              ]
+[              Calculating descriptors for l = 4               ]
 [#############################################################] 100% 
-[              Calculating descriptors for l = 5              ]
+[              Calculating descriptors for l = 5               ]
 [#############################################################] 100% 
                                            ... done!
 Table of Charges in electrons
@@ -49,7 +49,9 @@ Table of Charges in electrons
         Hb     0.315
         Hc     0.322
 Total number of analytical Electrons: 63.9897
-[               Generating scattering factors...              ]
+                          ... done!
+Number of k - points to evaluate : 7672
+[               Generating scattering factors...               ]
 [#############################################################] 100% 
                                           ... done!
 Writing tsc file...  ... done!

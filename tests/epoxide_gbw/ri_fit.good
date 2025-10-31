@@ -21,31 +21,32 @@ Number of k-points to evaluate: 16275
 
 Generating densities... 
 
-=== Hybrid Density Fitting (Restraints + Tikhonov) ===
+=== Unrestrained Density Fitting (Original) ===
+Normal basis functions: 62
+Auxiliary basis functions: 522
+Metric: Coulomb
 Preallocating: 15.3089 MB
-[                       Computing Rho:                        ]
-[#############################################################] 100% 
-GridManager: Setting up prototype grids for atom types...
-GridManager: Generating integration grids for atoms...
-GridManager: Generated total of 714 grid points.
-Setting adaptive restraint coefficient to: 0.000184
-Added electron restraints for 7 atoms.
-Solving hybrid regularized system...
-Error: 0.000030733458
-====================================================
-
+Memory needed for rho: 15.3089 MB
                                         ... done!
 Table of Charges in electrons
        Atom      ML
-        O1    -1.023
-        C2     1.006
-       H2a    -0.056
-       H2b    -0.164
-        C3     0.343
-       H3a    -0.028
-       H3b    -0.079
-Total number of analytical Electrons: 24.0010
-[               Generating scattering factors...              ]
+        O1    -0.869
+        C2    -0.505
+       H2a     0.439
+       H2b     0.464
+        C3    -0.452
+       H3a     0.497
+       H3b     0.426
+Total number of analytical Electrons: 24.0005
+
+Generating hkl indices up to d=:              0.40... done!
+Nr of reflections generated:                 26048
+Number of symmetry operations:                   2
+Nr of reflections to be used:                16275
+
+Generating k-points...                            ... done!
+Number of k - points to evaluate : 16275
+[               Generating scattering factors...               ]
 [#############################################################] 100% 
                                          ... done!
 Writing tsc file...  ... done!
