@@ -873,27 +873,24 @@ void GridManager::pruneGrid() {
         const auto& grid = grid_data_.atomic_grids[g];
 
         if (config_.debug || config_.all_charges) {
-            // Gather raw pointers for chosen weights (avoids double indexing in the inner loop).
-            std::vector<const double*> W; W.reserve(chosen.size());
-            for (auto idx : chosen) W.push_back(grid[idx].data());
+            const double* w_Becke = grid[GridData::GridIndex::BECKE_WEIGHT].data();
+            const double* w_TFVC = grid[GridData::GridIndex::TFVC_WEIGHT].data();
+            const double* w_Hirsh = grid[GridData::GridIndex::HIRSH_WEIGHT].data();
+#pragma omp simd
             for (int p = 0; p < n; ++p) {
                 // OR-reduce comparisons; branchless.
-                bool keep = false;
-                for (const double* w : W) {
-                    const double v = w[p];
-                    keep |= (v < lo) | (v > hi);
-                }
+                bool keep = fabs(w_Becke[p]) > cutoff;
+                keep |= fabs(w_TFVC[p]) > cutoff;
+                keep |= fabs(w_Hirsh[p]) > cutoff;
+
                 kept_local[p] = keep;
             }
         }
         else {
             const double* weights = grid[chosen[0]].data();
+#pragma omp simd
             for (int p = 0; p < n; ++p) {
-                // OR-reduce comparisons; branchless.
-                bool keep = false;
-                const double v = weights[p];
-                keep |= (v < lo) | (v > hi);
-                kept_local[p] = keep;
+                kept_local[p] = fabs(weights[p]) > cutoff;//keep;
             }
         }
         pruned_num_points[g] = std::count(kept_local.begin(), kept_local.end(), true);
