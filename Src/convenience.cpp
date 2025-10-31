@@ -2138,7 +2138,7 @@ void options::digest_options()
             npy::npy_data<double> np_coeffs;
             np_coeffs.data = coefs;
             np_coeffs.fortran_order = false;
-            np_coeffs.shape = { unsigned long(coefs.size()) };
+            np_coeffs.shape = { static_cast<unsigned long>(coefs.size()) };
             npy::write_npy("SALTED_COEFS.npy", np_coeffs);
             }
         else if (temp == "-test_reading_SALTED_binary") {
