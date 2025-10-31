@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>-cif Rh.cif -wfn Rh.gbw -hkl_min_max -10 10 -10 10 -10 10 -v -acc 4 -TFVC -ECP 1</LocalDebuggerCommandArguments>
-    <LocalDebuggerWorkingDirectory>..\tests\TFVC</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>-v -cpus 8 -wfn epoxid_6_31G.gbw -RI_FIT auto_aux 2.0 -test_RI</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_QCT|x64'">
@@ -349,7 +349,19 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Mohr_Salt|x64'">
+    <LocalDebuggerCommandArguments>-wfn F2.molden -cif F2.cif -dmin 0.5 -v -acc 1 -ECP 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|ARM64'">
+    <LocalDebuggerCommandArguments>-wfn F2.molden -cif F2.cif -dmin 0.5 -v -acc 1 -ECP 2</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Mohr_Salt|ARM64'">
     <LocalDebuggerCommandArguments>-wfn F2.molden -cif F2.cif -dmin 0.5 -v -acc 1 -ECP 2</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\molden_file\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
@@ -457,7 +469,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_RI_Test|ARM64'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='D_Mohr_Salt|ARM64'">
     <LocalDebuggerCommandArguments>-wfn epoxide.gbw -cif epoxide.cif -dmin 0.4 -ri_fit combo_basis_fit -no-date</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\epoxide_gbw</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
@@ -529,7 +541,19 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SALTED_Disorder|x64'">
+    <LocalDebuggerCommandArguments>-SALTED ../SALTED/Model -cif olex2\Wfn_job\thpp.cif -hkl thpp.hkl -cpus 8 -v -mtc olex2\Wfn_Job\Part_1\thpp.xyz 0,1 olex2\Wfn_Job\Part_2\thpp.xyz 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SF_Disorder|ARM64'">
+    <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -cpus 8 -acc 2 -v -mtc olex2\Wfn_Job\Part_1\thpp.wfx 0,1 olex2\Wfn_Job\Part_2\thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 0 0</LocalDebuggerCommandArguments>
+    <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug_SALTED_Disorder|ARM64'">
     <LocalDebuggerCommandArguments>-cif thpp.cif -hkl thpp.hkl -cpus 8 -acc 2 -v -mtc olex2\Wfn_Job\Part_1\thpp.wfx 0,1 olex2\Wfn_Job\Part_2\thpp.wfx 0,2 -mtc_mult 1 1 -mtc_charge 0 0 -mtc_ECP 0 0</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(SolutionDir)..\tests\disorder\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
@@ -716,9 +740,9 @@
     <LocalDebuggerAmpDefaultAccelerator>{ADEFF70D-84BF-47A1-91C3-FF6B0FC71218}</LocalDebuggerAmpDefaultAccelerator>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerWorkingDirectory>..\tests\RI_Test_2</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
-    <LocalDebuggerCommandArguments>-lukas_test</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>-wfn Co110.gbw -test_RI -v -no-date</LocalDebuggerCommandArguments>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <LocalDebuggerWorkingDirectory>..\tests\Lukas_Test</LocalDebuggerWorkingDirectory>
@@ -734,5 +758,8 @@
     <LocalDebuggerWorkingDirectory>..\tests\NiP3_fchk\</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommandArguments>-b def2-TZVP -d ./ -wfn in.ffn</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ShowAllFiles>false</ShowAllFiles>
   </PropertyGroup>
 </Project>

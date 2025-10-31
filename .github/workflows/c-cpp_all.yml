@@ -90,7 +90,7 @@ jobs:
       run: ${{ matrix.build-script }}
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
@@ -114,13 +114,13 @@ jobs:
         fetch-depth: 1
 
     - name: Download ARM64 Binary
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_MacOS_ARM64
         path: ./arm64/
 
     - name: Download x86_64 Binary
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_MacOS_x86_64
         path: ./x86_64/
@@ -155,7 +155,7 @@ jobs:
         chmod +x ./universal/NoSpherA2_Mac
 
     - name: Upload Universal Binary
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: executable_MacOS_Universal
         path: ./universal/NoSpherA2_Mac
@@ -177,7 +177,7 @@ jobs:
         fetch-depth: 1
 
     - name: Download Linux Executable
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Linux
 
@@ -189,7 +189,7 @@ jobs:
         make all -k
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: differences in tests
         path: tests/*.diff
@@ -207,22 +207,22 @@ jobs:
         egress-policy: audit
 
     - name: Download Linux Executable
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Linux
 
     - name: Download macOS Universal Binary
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_MacOS_Universal
 
     - name: Download Windows Executable
-      uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Windows
 
     - name: Archive all executables
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: executables
         path: |
@@ -259,7 +259,7 @@ jobs:
         fetch-depth: 1
 
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+      uses: github/codeql-action/init@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
       with:
         languages: ${{ matrix.language }}
         source-root: Src
@@ -308,13 +308,13 @@ jobs:
       run: cd Linux && make -j1
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+      uses: github/codeql-action/analyze@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
       with:
         output: 'codeql-results.sarif'
       continue-on-error: true
 
     - name: Upload analysis results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+      uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
       with:
         sarif_file: ${{github.workspace}}/codeql-results.sarif
         category: codeql
@@ -353,7 +353,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload analysis results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@3599b3baa15b485a2e49ef411a7a4bb2452e7f93 # v3.30.5
+        uses: github/codeql-action/upload-sarif@4e94bd11f71e507f7f87df81788dff88d1dacbfb # v4.31.0
         with:
           sarif_file: ${{github.workspace}}/flawfinder_results.sarif
           category: flawfinder
