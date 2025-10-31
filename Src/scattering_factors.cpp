@@ -2385,7 +2385,7 @@ int make_atomic_grids_wrapper(
         << std::setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << std::endl;
 
 
-    std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::flush;
+    std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
 
     GridConfiguration config;
     config.accuracy = opt.accuracy;
