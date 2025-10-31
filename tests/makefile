@@ -242,5 +242,5 @@ TFVC:
 		-acc 0 \
 		-no-date)
 
-.PHONY: all clean dependents SALTED reading_SALTED
+.PHONY: all clean dependents SALTED reading_SALTED $(ALL_TARGETS)
 .SECONDARY:
