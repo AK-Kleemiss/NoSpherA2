@@ -639,7 +639,7 @@ void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, con
     file << "Total number of electrons:\n"
          << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[0] << "\n"
          << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[2] << "\n"
-         << " TFVC:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[1] << std::endl;
+         << " TVFC:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[1] << std::endl;
 }
 
 void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
