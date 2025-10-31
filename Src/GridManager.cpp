@@ -843,7 +843,7 @@ void GridManager::pruneGrid() {
    
     //Choose grids to consider for pruning
     std::vector<GridData::GridIndex> chosen;
-    if (config_.debug) {
+    if (config_.debug || config_.all_charges) {
         chosen = {
             GridData::GridIndex::BECKE_WEIGHT,
             GridData::GridIndex::TFVC_WEIGHT,
