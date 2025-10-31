@@ -217,7 +217,7 @@ void GridManager::setupGridsForMolecule(const WFN& wave, const bvec& needs_grid,
 
     // Calculate Hirshfeld weights if needed
     if (config_.partition_type == PartitionType::Hirshfeld || config_.debug || config_.all_charges) {
-        calculateHirshfeldWeights(wave, unit_cell);
+        calculateHirshfeldWeights(wave, unit_cell, atom_list);
         addTimingPoint("Hirshfeld Weights");
     }
     
@@ -609,7 +609,7 @@ ivec GridManager::identifyAtomTypes(const WFN& wave, const bvec& needs_grid) {
     std::set<int> unique_types;
     
     for (int i = 0; i < wave.get_ncen(); ++i) {
-        if (i < needs_grid.size() && needs_grid[i]) {
+        if (i < needs_grid.size() && (needs_grid[i])) {
             const int charge = wave.get_atom_charge(i);
             if (charge != 119) {  // Skip dummy atoms
                 unique_types.insert(charge);
@@ -620,45 +620,48 @@ ivec GridManager::identifyAtomTypes(const WFN& wave, const bvec& needs_grid) {
     return ivec(unique_types.begin(), unique_types.end());
 }
 
-void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, std::ostream& file) const {
+void PartitionResults::printChargeTable(const svec& labels, const WFN& wave, const ivec atom_list, std::ostream& file) const {
     file << "Table of Charges in electrons\n"
          << "    Atom       Becke   Hirshfeld   TFVC\n";
     
-    for (int i = 0; i < labels.size(); ++i) {
+    for (int i = 0; i < atom_list.size(); ++i) {
+        const int atom_idx = atom_list[i];
         file << std::setw(10) << labels[i]
-             << std::fixed << std::setw(10) << std::setprecision(6) 
-             << wave.get_atom_charge(i) - atom_charges[0][i]  // Becke
-             << std::fixed << std::setw(10) << std::setprecision(6)
-             << wave.get_atom_charge(i) - atom_charges[2][i]  // Hirshfeld
-             << std::fixed << std::setw(10) << std::setprecision(6)
-             << wave.get_atom_charge(i) - atom_charges[1][i]  // TFVC
+             << std::fixed << std::setw(10) << std::setprecision(3) 
+             << wave.get_atom_charge(atom_idx) - atom_charges[0][i]  // Becke
+             << std::fixed << std::setw(10) << std::setprecision(3)
+             << wave.get_atom_charge(atom_idx) - atom_charges[2][i]  // Hirshfeld
+             << std::fixed << std::setw(10) << std::setprecision(3)
+             << wave.get_atom_charge(atom_idx) - atom_charges[1][i]  // TFVC
              << std::endl;
     }
     
     file << "Total number of electrons:\n"
-         << " Becke:     " << overall_charges[0] << "\n"
-         << " Hirshfeld: " << overall_charges[2] << "\n"
-         << " TFVC:      " << overall_charges[1] << std::endl;
+         << " Becke:     " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[0] << "\n"
+         << " Hirshfeld: " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[2] << "\n"
+         << " TFVC:      " << std::fixed << std::setw(10) << std::setprecision(6) << overall_charges[1] << std::endl;
 }
 
-void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell) {
+void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list) {
     using namespace std;
+    bvec fake_needs_grid(wave.get_ncen(), true);
+    ivec complete_type_list = identifyAtomTypes(wave, fake_needs_grid);
 
     if (config_.debug) {
         std::cout << "GridManager: Calculating spherical densities..." << std::endl;
     }
 
     // Setup spherical density calculation
-    radial_density_.resize(atom_type_list_.size());
-    radial_distances_.resize(atom_type_list_.size());
+    radial_density_.resize(complete_type_list.size());
+    radial_distances_.resize(complete_type_list.size());
 
-    for (int i = 0; i < atom_type_list_.size(); ++i) {
+    for (int i = 0; i < complete_type_list.size(); ++i) {
         radial_density_[i].reserve(1000);
         radial_distances_[i].reserve(1000);
     }
 
     // Calculate radial densities using Thakkar spherical atoms
-    lincr_ = make_sphericals(radial_density_, radial_distances_, atom_type_list_,
+    lincr_ = make_sphericals(radial_density_, radial_distances_, complete_type_list,
         std::cout, config_.debug, 1.005, 1.0E-7, config_.accuracy);
     err_checkf(lincr_ != -1000, "error during creations of sphericals", std::cout);
 
@@ -672,12 +675,12 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
     }
 
 
-    // For each atom in the molecule
-    for (int atom_idx = 0; atom_idx < wave.get_ncen(); ++atom_idx) {
+    // For each atom
+    for (int atom_idx = 0; atom_idx < wave.get_ncen(); atom_idx++) {
         // Find the type index for this atom
         int type_idx = -1;
-        for (int j = 0; j < atom_type_list_.size(); ++j) {
-            if (wave.get_atom_charge(atom_idx) == atom_type_list_[j]) {
+        for (int j = 0; j < complete_type_list.size(); ++j) {
+            if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
                 type_idx = j;
                 break;
             }
@@ -691,6 +694,7 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
 
         // Add this atom's spherical density contribution to all grids
         for (int g = 0; g < grid_data_.atomic_grids.size(); ++g) {
+            int g_to_atom_idx = atom_list[g];
             const int num_points = grid_data_.num_points_per_atom[g];
 
 #pragma omp parallel for
@@ -708,7 +712,7 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
                     lincr_,
                     1.0E-7);
 
-                if (atom_idx == g) {
+                if (atom_idx == g_to_atom_idx) {
                     single_spherical_density[g][p] += density;
                 }
                 combined_spherical_density[g][p] += density;
@@ -732,8 +736,8 @@ void GridManager::calculateHirshfeldWeights(const WFN& wave, const cell& unit_ce
                     for (int atom_idx = 0; atom_idx < wave.get_ncen(); ++atom_idx) {
                         // Find the type index for this atom
                         int type_idx = -1;
-                        for (int j = 0; j < atom_type_list_.size(); ++j) {
-                            if (wave.get_atom_charge(atom_idx) == atom_type_list_[j]) {
+                        for (int j = 0; j < complete_type_list.size(); ++j) {
+                            if (wave.get_atom_charge(atom_idx) == complete_type_list[j]) {
                                 type_idx = j;
                                 break;
                             }

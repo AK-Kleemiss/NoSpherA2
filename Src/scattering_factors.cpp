@@ -2378,6 +2378,12 @@ int make_atomic_grids_wrapper(
     int atoms_with_grids = vec_sum(needs_grid);
     err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
     err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
+    err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", std::cout);
+    std::cout << "There are:\n"
+        << std::setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
+        //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
+        << std::setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << std::endl;
+
 
     std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::flush;
 
@@ -2398,7 +2404,7 @@ int make_atomic_grids_wrapper(
 
     // Calculate partitioned charges
     auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
-    results.printChargeTable(labels, temp, std::cout);
+    results.printChargeTable(labels, temp, asym_atom_list, std::cout);
     time_points.push_back(get_time());
     time_descriptions.push_back("calculate charges");
 

@@ -54,7 +54,7 @@ struct PartitionResults {
     double nrmsd = 0.0;
     double r_value = 0.0;
     
-    void printChargeTable(const svec& labels, const WFN& wave, std::ostream& file) const;
+    void printChargeTable(const svec& labels, const WFN& wave, const ivec atom_list, std::ostream& file) const;
 };
 
 class GridManager {
@@ -73,7 +73,7 @@ private:
     void generateIntegrationGrids(const WFN& wave, const cell& unit_cell, 
                                   const bvec& needs_grid, const ivec& atom_list);
     void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
-    void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell);
+    void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     void pruneGrid();
     
     void addTimingPoint(const std::string& label) {
