@@ -2030,7 +2030,7 @@ int make_atomic_grids(
     return points;
 }
 
-// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi Sd
+// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi S
 double fourier_bessel_integral(
     const primitive &p,
     const double &H)
