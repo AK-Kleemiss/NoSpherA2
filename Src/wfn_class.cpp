@@ -2949,7 +2949,7 @@ const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int
     return atoms[nr].get_coordinate(axis);
 };
 
-bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied)
+bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied) const
 {
     using namespace std;
     if (debug)
