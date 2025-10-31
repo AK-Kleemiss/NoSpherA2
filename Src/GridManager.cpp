@@ -444,59 +444,30 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
         const int n_points = grid_data_.num_points_per_atom[atom];
 
         const double* rho = atomic_grid[GridData::GridIndex::WFN_DENSITY].data();
+        const double* wB = atomic_grid[GridData::GridIndex::BECKE_WEIGHT].data();
+        const double* wH = atomic_grid[GridData::GridIndex::HIRSH_WEIGHT].data();
+        const double* wT = atomic_grid[GridData::GridIndex::TFVC_WEIGHT].data();
 
-        if (config_.debug) {
-            const double* wB = atomic_grid[GridData::GridIndex::BECKE_WEIGHT].data();
-            const double* wH = atomic_grid[GridData::GridIndex::HIRSH_WEIGHT].data();
-            const double* wT = atomic_grid[GridData::GridIndex::TFVC_WEIGHT].data();
-
-            double accB = 0.0, accH = 0.0, accT = 0.0;
-
-            // Vectorizable inner loop; no shared writes.
+        double accB = 0.0, accH = 0.0, accT = 0.0;
+        // Vectorizable inner loop; no shared writes.
 #pragma omp simd reduction(+:accB, accH, accT)
-            for (int p = 0; p < n_points; ++p) {
-                const double r = rho[p];
-                accB += r * wB[p];
-                accH += r * wH[p];
-                accT += r * wT[p];
-            }
-
-            results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = accB;
-            results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = accH;
-            results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
+        for (int p = 0; p < n_points; ++p) {
+            const double r = rho[p];
+            accB += r * wB[p];
+            accH += r * wH[p];
+            accT += r * wT[p];
         }
-        else {
-            const double* w = atomic_grid[idx_single].data();
-            double acc = 0.0;
 
-#pragma omp simd reduction(+:acc)
-            for (int p = 0; p < n_points; ++p) {
-                acc += rho[p] * w[p];
-            }
-
-            // Store only into the active scheme
-            switch (config_.partition_type) {
-            case PartitionType::Becke:     results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = acc;  break;
-            case PartitionType::TFVC:      results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = acc;  break;
-            case PartitionType::Hirshfeld: results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = acc;  break;
-            }
-        }
+        results.atom_charges[CHARGE_ORDER::S_BECKE][atom] = accB;
+        results.atom_charges[CHARGE_ORDER::S_HIRSH][atom] = accH;
+        results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
             
         // Add ECP electrons (only to computed schemes)
         if (wave.get_has_ECPs()) {
             const int ecp_e = wave.get_atom_ECP_electrons(atom); // map atom->basis if needed
-            if (config_.debug) {
-                results.atom_charges[S_BECKE][atom] += ecp_e;
-                results.atom_charges[S_HIRSH][atom] += ecp_e;
-                results.atom_charges[S_TFVC][atom] += ecp_e;
-            }
-            else {
-                switch (config_.partition_type) {
-                case PartitionType::Becke:     results.atom_charges[S_BECKE][atom] += ecp_e; break;
-                case PartitionType::TFVC:      results.atom_charges[S_TFVC][atom] += ecp_e; break;
-                case PartitionType::Hirshfeld: results.atom_charges[S_HIRSH][atom] += ecp_e; break;
-                }
-            }
+            results.atom_charges[S_BECKE][atom] += ecp_e;
+            results.atom_charges[S_HIRSH][atom] += ecp_e;
+            results.atom_charges[S_TFVC][atom] += ecp_e;
         }
     }
     
