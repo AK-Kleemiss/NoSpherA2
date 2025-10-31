@@ -518,7 +518,7 @@ public:
     bool cube_divide(const int& nr, const cube& right) { return cub[nr] /= right; };
     /** Writes a cubefile of the electron density to disc */
     void write_rho_cube(const double& radius = 3., const double& increment = 0.025) const;
-    /** Calculate Cubefile of electron density**/
+    /** Calculate Cubefile of electron density **/
     void calc_rho_cube(cube& cube_data) const;
     //-----------Pointer to members---------------------
     /** Raw pointer to primitive type array. */
