@@ -418,15 +418,15 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
     }
     
     //Choose grids to consider for charge calculation
-    GridData::GridIndex idx_single = GridData::GridIndex::BECKE_WEIGHT; // default
-    if (!config_.debug) {
-        switch (config_.partition_type) {
-        case PartitionType::Becke:     idx_single = GridData::GridIndex::BECKE_WEIGHT;  break;
-        case PartitionType::TFVC:      idx_single = GridData::GridIndex::TFVC_WEIGHT;   break;
-        case PartitionType::Hirshfeld: idx_single = GridData::GridIndex::HIRSH_WEIGHT;  break;
-        }
+    GridData::GridIndex weight_index;
+    switch (config_.partition_type) {
+    case PartitionType::Becke:     weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
+    case PartitionType::TFVC:      weight_index = GridData::GridIndex::TFVC_WEIGHT;   break;
+    case PartitionType::Hirshfeld: weight_index = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    default:                       weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     }
 
+    const double cutoff = config_.getCutoff();
 #pragma omp parallel for schedule(static)
     for (int atom = 0; atom < num_atoms; ++atom) {
         vec2& atomic_grid = grid_data_.atomic_grids[atom];
@@ -453,7 +453,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
             results.atom_charges[CHARGE_ORDER::S_TFVC][atom] = accT;
         }
         else {
-            const double* w = atomic_grid[idx_single].data();
+            const double* w = atomic_grid[weight_index].data();
             double acc = 0.0;
 
     #pragma omp simd reduction(+:acc)
@@ -842,24 +842,14 @@ void GridManager::pruneGrid() {
     const int original_size = grid_data_.total_points;
    
     //Choose grids to consider for pruning
-    std::vector<GridData::GridIndex> chosen;
-    if (config_.debug || config_.all_charges) {
-        chosen = {
-            GridData::GridIndex::BECKE_WEIGHT,
-            GridData::GridIndex::TFVC_WEIGHT,
-            GridData::GridIndex::HIRSH_WEIGHT
-        };
-    }
-    else {
-        switch (config_.partition_type) {
-        case PartitionType::Becke:     chosen = { GridData::GridIndex::BECKE_WEIGHT }; break;
-        case PartitionType::TFVC:      chosen = { GridData::GridIndex::TFVC_WEIGHT };  break;
-        case PartitionType::Hirshfeld: chosen = { GridData::GridIndex::HIRSH_WEIGHT }; break;
-        }
+    GridData::GridIndex weight_index;
+    switch (config_.partition_type) {
+    case PartitionType::Becke:      weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
+    case PartitionType::TFVC:       weight_index = GridData::GridIndex::TFVC_WEIGHT;   break;
+    case PartitionType::Hirshfeld:  weight_index = GridData::GridIndex::HIRSH_WEIGHT;  break;
+    default:                        weight_index = GridData::GridIndex::BECKE_WEIGHT;  break;
     }
 
-    //For bit magic
-    const double lo = -cutoff, hi = cutoff;
     bvec2 point_is_kept(grid_data_.atomic_grids.size());
     ivec pruned_num_points(grid_data_.atomic_grids.size());
 
@@ -887,10 +877,10 @@ void GridManager::pruneGrid() {
             }
         }
         else {
-            const double* weights = grid[chosen[0]].data();
+            const double* weights = grid[weight_index].data();
 #pragma omp simd
             for (int p = 0; p < n; ++p) {
-                kept_local[p] = fabs(weights[p]) > cutoff;//keep;
+                kept_local[p] = (fabs(weights[p]) > cutoff);//keep;
             }
         }
         pruned_num_points[g] = std::count(kept_local.begin(), kept_local.end(), true);
