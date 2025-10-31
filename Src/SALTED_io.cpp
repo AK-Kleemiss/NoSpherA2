@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include "nos_math.h"
+#include "JKFit.h"
 
 std::filesystem::path find_first_salted_file(const std::filesystem::path &directory_path)
 {
@@ -344,8 +345,14 @@ T SALTED_BINARY_FILE::read_generic_blocks(const std::string& key, std::function<
 
     int n_blocks;
     file.read(reinterpret_cast<char*>(&n_blocks), sizeof(n_blocks));
-
-    T result(n_blocks);
+    
+    T result;
+    if constexpr (std::is_same_v<T, std::shared_ptr<BasisSet>>) {
+        result = std::make_shared<BasisSet>();
+    }
+    else {
+        result = T(n_blocks);
+    }
     for (int i = 0; i < n_blocks; i++) {
         process_block(result, i);
     }
@@ -417,11 +424,36 @@ std::unordered_map<std::string, dMatrix2> SALTED_BINARY_FILE::read_lambda_based_
                 std::vector<size_t> dims;
                 vec data;
                 read_dataset(data, dims);
-                //container.emplace(std::piecewise_construct, std::forward_as_tuple(element + std::to_string(lam)), std::forward_as_tuple(dims[0], dims[1]));
-                //dMatrix2 A = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
-                //std::copy(data.begin(), data.end(), container[element + std::to_string(lam)].data());
                 container[element + std::to_string(lam)] = reshape<dMatrix2>(data, Shape2D{ dims[0], dims[1] });
             }
+        }
+    );
+}
+
+
+std::shared_ptr<BasisSet> SALTED_BINARY_FILE::read_basis_set() {
+    return read_generic_blocks<std::shared_ptr<BasisSet>>("BASIS",
+        [this](std::shared_ptr<BasisSet>& bs, int i) {
+            int atomic_nr;
+            file.read(reinterpret_cast<char*>(&atomic_nr), sizeof(atomic_nr));
+            std::cout << "Reading basis set for atomic number: " << atomic_nr << std::endl;
+            std::vector<size_t> dims;
+            ivec contractions;
+            read_dataset(contractions, dims);
+            ivec angular_momenta_per_shell;
+            read_dataset(angular_momenta_per_shell, dims);
+            vec exponents_per_shell;
+            read_dataset(exponents_per_shell, dims);
+            vec coefficients;
+            read_dataset(coefficients, dims);
+            size_t primitive_index = 0;
+            for (int contraction = 0; contraction < contractions.size(); contraction++) {
+                int angular_momentum = angular_momenta_per_shell[contraction];
+                for (int func = 0; func < contractions[contraction]; func++, primitive_index++) {
+                    bs->add_owned_primitive({ 1, angular_momenta_per_shell[primitive_index], exponents_per_shell[primitive_index], coefficients[primitive_index], contraction });
+                }
+            }
+            bs->set_count_for_element(atomic_nr-1, dims[0]);
         }
     );
 }

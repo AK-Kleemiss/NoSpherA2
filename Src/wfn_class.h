@@ -201,7 +201,7 @@ public:
     /** Read xTB / pTB binary orbital file. */
     bool read_ptb(const std::filesystem::path&filename, std::ostream &file, const bool debug = false);
     /** Write current wavefunction to .wfn file (optionally only occupied). */
-    bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied);
+    bool write_wfn(const std::filesystem::path&fileName, const bool &debug, const bool occupied) const;
     /** Write atomic geometry to .xyz file. */
     bool write_xyz(const std::filesystem::path& fileName);
     /** Set internal path field. */
@@ -516,6 +516,10 @@ public:
     bool cube_multiply(const int& nr, const cube& right) { return cub[nr] *= right; };
     /** Divide cube by another cube (element-wise). */
     bool cube_divide(const int& nr, const cube& right) { return cub[nr] /= right; };
+    /** Writes a cubefile of the electron density to disc */
+    void write_rho_cube(const double& radius = 3., const double& increment = 0.025) const;
+    /** Calculate Cubefile of electron density **/
+    void calc_rho_cube(cube& cube_data) const;
     //-----------Pointer to members---------------------
     /** Raw pointer to primitive type array. */
     const int *get_ptr_types() { return &types[0]; };

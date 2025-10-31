@@ -18,12 +18,12 @@ Number of atoms in Wavefunction file: 31 Number of MOs: 642
 Number of protons: 57
 Number of electrons: 56.000000
 Reading:                             "residues/1.cif" done!
-Reading:                                 "1yk4_h.hkl" done!
-Nr of reflections read from file: 200
+Reading:                            "1yk4_h_full.hkl" done!
+Nr of reflections read from file: 147777
 Number of symmetry operations: 4
-Nr of reflections to be used: 800
+Nr of reflections to be used: 295477
 Generating k-points...                            ... done!
-Number of k-points to evaluate: 800
+Number of k-points to evaluate: 295477
 There are:
   18 atoms read from the wavefunction, of which 
   12 are identified as asymmetric unit atoms!

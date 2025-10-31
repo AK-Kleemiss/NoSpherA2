@@ -2327,6 +2327,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
             {
                 file << "I read the cores successfully\nI am expecting " << expected_coefs << " coefficients per MO" << endl;
             }
+            //Without this, expected_coefs is set to 0 after push_back_MO... no idea why
+            const double constant_expected_coefs = expected_coefs;
             for (int j = 0; j < dimension; j++)
             {
                 push_back_MO(i * dimension + j + 1, occupations[i][j], energies[i][j], i);
@@ -2343,7 +2345,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 // if (debug) {
                 //   file << "Starting the " << j << ". loop... wish me luck... " << endl;
                 // }
-                for (int p = 0; p < expected_coefs; p++)
+                for (int p = 0; p < constant_expected_coefs; p++)
                 {
                     switch (prims[basis_run].get_type())
                     {
@@ -2947,7 +2949,7 @@ const double WFN::get_atom_coordinate(const unsigned int &nr, const unsigned int
     return atoms[nr].get_coordinate(axis);
 };
 
-bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied)
+bool WFN::write_wfn(const std::filesystem::path &fileName, const bool &debug, const bool occupied) const
 {
     using namespace std;
     if (debug)
@@ -7417,3 +7419,91 @@ void WFN::write_cube_xdgraph(const int& nr, const std::filesystem::path& filenam
         std::cout << "Cube file written!" << std::endl;
     }
 }
+
+void WFN::calc_rho_cube(cube& cube_data) const
+{
+    _time_point start = get_time();
+    const int s1 = cube_data.get_size(0), s2 = cube_data.get_size(1), s3 = cube_data.get_size(2), total_size = s1 * s2 * s3;
+    ;
+    std::cout << "Lets go into the loop! There is " << total_size << " points" << std::endl;
+    ProgressBar* progress = new ProgressBar(total_size, 50, "=", " ", "Calculating Rho");
+
+    vec v1{
+        cube_data.get_vector(0, 0),
+        cube_data.get_vector(1, 0),
+        cube_data.get_vector(2, 0) },
+        v2{
+            cube_data.get_vector(0, 1),
+            cube_data.get_vector(1, 1),
+            cube_data.get_vector(2, 1) },
+            v3{
+                cube_data.get_vector(0, 2),
+                cube_data.get_vector(1, 2),
+                cube_data.get_vector(2, 2) },
+                orig{
+                    cube_data.get_origin(0),
+                    cube_data.get_origin(1),
+                    cube_data.get_origin(2) };
+
+#pragma omp parallel
+    {
+        vec2 d;
+        vec phi((*this).get_nmo(), 0.0);
+        d.resize(16);
+        for (int i = 0; i < 16; i++)
+            d[i].resize((*this).get_ncen(), 0.0);
+#pragma omp for schedule(dynamic)
+        for (int index = 0; index < total_size; index++)
+        {
+            int i = index / (s2 * s3);
+            int j = (index / s3) % s2;
+            int k = index % s3;
+
+            vec PosGrid{
+                i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
+                i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
+                i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
+
+            cube_data.set_value(i, j, k, (*this).compute_dens(PosGrid[0], PosGrid[1], PosGrid[2], d, phi));
+            progress->update();
+        }
+    }
+    delete (progress);
+
+    using namespace std;
+    _time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    cube_data.calc_dv();
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_data.sum() << std::endl;
+};
+
+void WFN::write_rho_cube(const double& radius, const double& increment) const{
+    using namespace std;
+    double MinMax[6]{ 0, 0, 0, 0, 0, 0 };
+    int steps[3]{ 0, 0, 0 };
+    WFN dummy = (*this);
+    readxyzMinMax_fromWFN(dummy, MinMax, steps, radius, increment, true);
+    cube CubeRho(steps[0], steps[1], steps[2], dummy.get_ncen(), true);
+    dummy.delete_unoccupied_MOs();
+    CubeRho.give_parent_wfn(dummy);
+    std::cout << "Starting work..." << endl;
+
+    for (int i = 0; i < 3; i++)
+    {
+        CubeRho.set_origin(i, MinMax[i]);
+        CubeRho.set_vector(i, i, (MinMax[i + 3] - MinMax[i]) / steps[i]);
+    }
+    CubeRho.set_comment1("Calculated density using NoSpherA2");
+    CubeRho.set_comment2("from " + dummy.get_path().string());
+    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
+
+    calc_rho_cube(CubeRho);
+
+    std::filesystem::path fn((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_rho.cube");
+    CubeRho.write_file(fn, false);
+};

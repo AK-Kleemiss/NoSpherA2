@@ -15,6 +15,7 @@
 #include "integrator.h"
 #include "JKFit.h"
 #include "SALTED_utilities.h"
+#include "GridManager.h"
 
 #ifdef PEOJECT_NAME
 #define FLO_CUDA
@@ -106,6 +107,63 @@ void save_k_points(vec2 &k_pt, hkl_list &hkl)
     }
     k_points_file.flush();
     k_points_file.close();
+}
+
+/**
+ * Generates k-points based on the given parameters.
+ *
+ * @param read_k_pts Flag indicating whether to read k-points from a file.
+ * @param save_k_pts Flag indicating whether to save generated k-points to a file.
+ * @param gridsize The size of the grid used for generating k-points.
+ * @param unit_cell The unit cell used for generating k-points.
+ * @param hkl The list of hkl values used for generating k-points.
+ * @param k_pt The vector to store the generated k-points.
+ * @param file The output stream to write the generated k-points.
+ * @param debug Flag indicating whether to enable debug mode.
+ */
+void make_k_pts(const bool& read_k_pts,
+    const bool& save_k_pts,
+    const cell& unit_cell,
+    hkl_list& hkl,
+    vec2& k_pt,
+    std::ostream& file,
+    bool debug = false)
+{
+    using namespace std;
+    const int size = (int)hkl.size();
+    if (!read_k_pts)
+    {
+        file << "Generating k-points..." << flush;
+        k_pt.resize(3);
+#pragma omp parallel for
+        for (int i = 0; i < 3; i++)
+            k_pt[i].resize(size, 0.0);
+
+        if (debug)
+            file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
+        // Create local copy of hkl list for faster access
+        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
+
+#pragma omp parallel for
+        for (int ref = 0; ref < size; ref++)
+        {
+            const hkl_t hkl_ = hkl_vector[ref];
+            for (int x = 0; x < 3; x++)
+            {
+                for (int j = 0; j < 3; j++)
+                {
+                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
+                }
+            }
+        }
+        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
+        if (save_k_pts)
+            save_k_points(k_pt, hkl);
+    }
+    else
+    {
+        read_k_points(k_pt, hkl, file);
+    }
 }
 
 /**
@@ -655,17 +713,6 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                 if (debug)
                     file << " cart. pos.: " << setw(8) << position[0] << "+/-" << precisions[0] << " " << setw(8) << position[1] << "+/-" << precisions[1] << " " << setw(8) << position[2] << "+/-" << precisions[2] << endl;
 
-                if (group_field == -1)
-                {
-                    constant_atoms.push_back(true);
-                }
-                else if (fields[group_field].c_str()[0] != '.')
-                {
-                    constant_atoms.push_back(false);
-                }
-                else
-                    constant_atoms.push_back(true);
-
                 bool old_atom = false;
 #pragma omp parallel for reduction(|| : old_atom)
                 for (int run = 0; run < known_atoms.size(); run++)
@@ -782,6 +829,18 @@ svec read_atoms_from_CIF(std::ifstream &cif_input,
                                 }
                             }
                         }
+
+                        if (group_field == -1)
+                        {
+                            constant_atoms.push_back(true);
+                        }
+                        else if (fields[group_field].c_str()[0] != '.')
+                        {
+                            constant_atoms.push_back(false);
+                        }
+                        else
+                            constant_atoms.push_back(true);
+
                         labels[i] = fields[label_field];
                         asym_atom_list.push_back(i);
                         needs_grid[i] = true;
@@ -1247,87 +1306,6 @@ ivec make_integration_grids(
         file << flush;
     }
     return num_points;
-}
-
-double make_sphericals(
-    vec2 &dens,
-    vec2 &dist,
-    const ivec &atom_type_list,
-    std::ostream &file,
-    bool debug = false,
-    double incr_start = 1.005,
-    double min_dist = 0.0000001,
-    int accuracy = 2)
-{
-    using namespace std;
-    const double incr = pow(incr_start, max(1, accuracy - 1));
-    const double lincr = log(incr);
-    vector<Thakkar> sphericals; // sphericals is a vector that will store objects of type Thakkar.
-    for (int i = 0; i < atom_type_list.size(); i++)
-        sphericals.emplace_back(atom_type_list[i]); // push_back is like a copy without making a copy
-    // Make radial grids
-    if (debug)
-    {
-        file << "\nSize of atom_type_list:" << setw(5) << atom_type_list.size() << endl;
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            file << "\nCalculating for atomic number " << atom_type_list[i] << endl;
-            double current = 1;
-            double _dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    if (current == -20)
-                        return -1000;
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    if (current == -20)
-                        return false;
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            file << "Number of radial density points for atomic number " << atom_type_list[i] << ": " << dens[i].size() << endl;
-        }
-    }
-    else
-    {
-#pragma omp parallel for
-        for (int i = 0; i < atom_type_list.size(); i++)
-        {
-            double current = 1;
-            double _dist = min_dist;
-            if (accuracy > 3)
-                while (current > 1E-10)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-            else
-                while (current > 1E-12)
-                {
-                    dist[i].push_back(_dist);
-                    current = sphericals[i].get_radial_density(_dist);
-                    dens[i].push_back(current);
-                    _dist *= incr;
-                }
-        }
-    }
-    sphericals.clear();
-    if (debug)
-    {
-        file << "Cleared the sphericals!" << endl;
-    }
-    return lincr;
 }
 
 void fill_xyzc(
@@ -2052,64 +2030,7 @@ int make_atomic_grids(
     return points;
 }
 
-/**
- * Generates k-points based on the given parameters.
- *
- * @param read_k_pts Flag indicating whether to read k-points from a file.
- * @param save_k_pts Flag indicating whether to save generated k-points to a file.
- * @param gridsize The size of the grid used for generating k-points.
- * @param unit_cell The unit cell used for generating k-points.
- * @param hkl The list of hkl values used for generating k-points.
- * @param k_pt The vector to store the generated k-points.
- * @param file The output stream to write the generated k-points.
- * @param debug Flag indicating whether to enable debug mode.
- */
-void make_k_pts(const bool &read_k_pts,
-                const bool &save_k_pts,
-                const cell &unit_cell,
-                hkl_list &hkl,
-                vec2 &k_pt,
-                std::ostream &file,
-                bool debug = false)
-{
-    using namespace std;
-    const int size = (int)hkl.size();
-    if (!read_k_pts)
-    {
-		file << "Generating k-points..." << flush;
-        k_pt.resize(3);
-#pragma omp parallel for
-        for (int i = 0; i < 3; i++)
-            k_pt[i].resize(size, 0.0);
-
-        if (debug)
-            file << "K_point_vector is here! size: " << k_pt[0].size() << endl;
-        // Create local copy of hkl list for faster access
-        const std::vector<hkl_t> hkl_vector(hkl.begin(), hkl.end());
-
-#pragma omp parallel for
-        for (int ref = 0; ref < size; ref++)
-        {
-            const hkl_t hkl_ = hkl_vector[ref];
-            for (int x = 0; x < 3; x++)
-            {
-                for (int j = 0; j < 3; j++)
-                {
-                    k_pt[x][ref] += unit_cell.get_rcm(x, j) * hkl_[j];
-                }
-            }
-        }
-        file << "                            ... done!\nNumber of k-points to evaluate: " << k_pt[0].size() << endl;
-        if (save_k_pts)
-            save_k_points(k_pt, hkl);
-    }
-    else
-    {
-        read_k_points(k_pt, hkl, file);
-    }
-}
-
-// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759),a ssuming that H = 2 \pi S
+// This function yields the fourier bessel transform of the radial integral of a gaussian density function (compare equation 1.2.7.9 in 10.1107/97809553602060000759), assuming that H = 2 \pi S
 double fourier_bessel_integral(
     const primitive &p,
     const double &H)
@@ -2119,20 +2040,13 @@ double fourier_bessel_integral(
     return p.normalization_constant() * (pow(H, l) * constants::sqr_pi * exp(-H * H / (4 * b))) / (constants::pow_2[l + 2] * pow(b, l + 1.5));
 }
 
-
 cdouble sfac_bessel(
     const primitive& p,
     const double* k_point,
     const double* coefs)
 {
-    const int t = p.get_type();
-    const cdouble radial = constants::FOUR_PI_i_pows[t] * fourier_bessel_integral(p, k_point[3]) * p.get_coef();
-    cdouble result = radial * constants::spherical_harmonic(t, k_point, coefs);
-    return result;
-
+    return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
-
-
 
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
@@ -2140,6 +2054,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
                     cvec2 &sf)
 {
     sf.resize(atom_list.size());
+
     ProgressBar pb(k_pt[0].size(), 60, "#", " ", "Generating scattering factors...");
 #pragma omp parallel shared(pb, sf)
     {
@@ -2152,9 +2067,8 @@ void calc_SF_SALTED(const vec2 &k_pt,
 #pragma omp for
         for (int i_kpt = 0; i_kpt < k_pt[0].size(); i_kpt++)
         {
-            int coef_count = 0;
             const int num_atoms = (int)atom_list.size();
-            const double* coef_slice_ptr = NULL;
+            const double* coef_slice_ptr = coefs.data();
             double k_pt_local[4] = {k_pt[0][i_kpt], k_pt[1][i_kpt], k_pt[2][i_kpt], 0.0};
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
@@ -2168,7 +2082,6 @@ void calc_SF_SALTED(const vec2 &k_pt,
             {
                 const int lim = (int)atom_ptr->get_basis_set_size();
                 basis_ptr = &(atom_ptr->get_basis_set_entry(0));
-                coef_slice_ptr = coefs.data();
                 for (int i_basis = 0; i_basis < lim; i_basis++, basis_ptr++, coef_slice_ptr += 2 * basis.get_type() + 1)
                 {
                     basis = basis_ptr->get_primitive();
@@ -2456,6 +2369,52 @@ void convert_to_ED(const ivec &asym_atom_list,
     }
 }
 
+
+int make_atomic_grids_wrapper(
+                            const WFN& wave, const bvec& needs_grid, const ivec& asym_atom_list, const cell& unit_cell, const svec & labels, //
+                            std::vector<_time_point>& time_points, svec& time_descriptions, vec2& d1, vec2& d2, vec2& d3, vec2& dens,
+                            const options& opt) {
+
+    int atoms_with_grids = vec_sum(needs_grid);
+    err_checkf(atoms_with_grids > 0, "No atoms with grids to generate!", std::cout);
+    err_checkf(atoms_with_grids <= wave.get_ncen(), "More atoms with grids than in the wavefunction! Aborting!", std::cout);
+    err_checkf(atoms_with_grids == asym_atom_list.size(), "Number of atoms with grids does not match the number of atoms in the CIF file!", std::cout);
+    std::cout << "There are:\n"
+        << std::setw(4) << wave.get_ncen() << " atoms read from the wavefunction, of which \n"
+        //<< setw(4) << all_atom_list.size() << " will be used for grid setup and\n"
+        << std::setw(4) << asym_atom_list.size() << " are identified as asymmetric unit atoms!" << std::endl;
+
+
+    std::cout << "\nSelected accuracy: " << opt.accuracy << "\nMaking Integration Grids..." << std::endl;
+
+    GridConfiguration config;
+    config.accuracy = opt.accuracy;
+    config.partition_type = opt.partition_type;
+    config.pbc = opt.pbc;
+    config.debug = opt.debug;
+    config.all_charges = opt.all_charges;
+
+    GridManager grid_manager(config);
+
+    WFN temp = wave;
+    temp.delete_unoccupied_MOs();
+    // Setup grids for the molecule
+    grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.add_timing_info_to_vecs(time_points, time_descriptions);
+
+    // Calculate partitioned charges
+    auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
+    results.printChargeTable(labels, temp, asym_atom_list, std::cout);
+    time_points.push_back(get_time());
+    time_descriptions.push_back("calculate charges");
+
+    grid_manager.getDensityVectors(temp, d1, d2, d3, dens);
+    time_points.push_back(get_time());
+    time_descriptions.push_back("combined density vectors");
+
+    return grid_manager.getTotalGridPoints();
+}
+
 /**
  * @brief Calculates scattering factors using the provided calculator and options.
  *
@@ -2729,25 +2688,17 @@ tsc_block_type calculate_scattering_factors(
     else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC)
         {
-            vec2 d1, d2, d3, dens;
-            const int points = make_atomic_grids(opt.pbc,
-                                                 opt.accuracy,
-                                                 unit_cell,
-                                                 *wavy,
-                                                 atom_type_list,
-                                                 asym_atom_list,
-                                                 needs_grid,
-                                                 d1, d2, d3, dens,
-                                                 labels,
-                                                 file,
-                                                 time_points,
-                                                 time_descriptions,
-                                                 opt.debug,
-                                                 opt.no_date,
-                                                 opt.partition_type);
-
-            time_points.push_back(get_time());
-            time_descriptions.push_back("density vectors");
+            vec2 d1, d2, d3, dens; 
+            const int points = make_atomic_grids_wrapper(
+                                        *wavy,
+                                        needs_grid,
+                                        asym_atom_list,
+                                        unit_cell,
+                                        labels,
+                                        time_points,
+                                        time_descriptions,
+                                        d1, d2, d3, dens,
+                                        opt);
 
             _time_point end1;
             calc_SF(points,
@@ -2767,15 +2718,19 @@ tsc_block_type calculate_scattering_factors(
         {
             file << "\nGenerating densities... " << endl;
             //If no basis is yet loaded, assume a auto aux should be generated
-            if ((*opt.aux_basis).get_primitive_count() == 0) (*opt.aux_basis).gen_aux(*wavy);
+            for (shared_ptr<BasisSet>& aux_basis_set : opt.aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(*wavy); }
+
+            shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
+            for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
 
             WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy->get_atoms());
             wavy_aux.set_ncen(wavy->get_ncen());
             wavy_aux.delete_basis_set();
-            load_basis_into_WFN(wavy_aux, opt.aux_basis);
+            load_basis_into_WFN(wavy_aux, combined_aux_basis);
 
-            vec coefs = density_fit(*wavy, wavy_aux, opt.mem, 'C');
+            vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
+                                            0.0002, 1e-6, "TFVC");
             file << setw(12 * 4 + 2) << "... done!\n"
                  << flush;
             time_points.push_back(get_time());

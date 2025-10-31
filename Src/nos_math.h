@@ -145,6 +145,7 @@ void _test_lahva();
 
 void solve_linear_system(const vec2& A, vec& b);
 void solve_linear_system(vec& A, const size_t& size_A, vec& b);
+void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b);
 
 //Small implementation of the non-negative least squares problem
 // A small struct to hold results

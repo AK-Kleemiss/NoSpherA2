@@ -441,7 +441,67 @@ vec calc_atomic_density(const std::vector<atom> &atoms, const vec &coefs)
     return atom_elecs;
 }
 
-cube calc_cube_ML(const vec data, WFN &dummy, const int atom_nr)
+void calc_cube_ML(const vec& data, WFN& dummy, cube& cube_data, const int& atom_nr)
+{
+    _time_point start = get_time();
+
+    const int s1 = cube_data.get_size(0), s2 = cube_data.get_size(1), s3 = cube_data.get_size(2), total_size = s1 * s2 * s3;
+    std::cout << "Lets go into the loop! There is " << total_size << " points" << std::endl;
+
+    ProgressBar* progress = new ProgressBar(total_size, 60, "=", " ", "Calculating Values");
+    vec v1{
+        cube_data.get_vector(0, 0),
+        cube_data.get_vector(1, 0),
+        cube_data.get_vector(2, 0) },
+        v2{
+            cube_data.get_vector(0, 1),
+            cube_data.get_vector(1, 1),
+            cube_data.get_vector(2, 1) },
+            v3{
+                cube_data.get_vector(0, 2),
+                cube_data.get_vector(1, 2),
+                cube_data.get_vector(2, 2) },
+                orig{
+                    cube_data.get_origin(0),
+                    cube_data.get_origin(1),
+                    cube_data.get_origin(2) };
+
+    if (atom_nr != -1)
+        std::cout << "Calculation for atom " << atom_nr << std::endl;
+
+    std::vector<atom> atoms = dummy.get_atoms();
+#pragma omp parallel for schedule(dynamic)
+    for (int index = 0; index < total_size; index++)
+    {
+        int i = index / (s2 * s3);
+        int j = (index / s3) % s2;
+        int k = index % s3;
+
+        vec PosGrid{
+            i * v1[0] + j * v2[0] + k * v3[0] + orig[0],
+            i * v1[1] + j * v2[1] + k * v3[1] + orig[1],
+            i * v1[2] + j * v2[2] + k * v3[2] + orig[2] };
+        cube_data.set_value(i, j, k,
+            (atom_nr == -1)
+            ? calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms)
+            : calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, atoms, atom_nr));
+        progress->update();
+    }
+    delete (progress);
+
+    using namespace std;
+    _time_point end = get_time();
+    if (get_sec(start, end) < 60)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
+    else if (get_sec(start, end) < 3600)
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
+    else
+        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
+    cube_data.calc_dv();
+    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << cube_data.sum() << std::endl;
+};
+
+cube calc_cube_ML(const vec& data, WFN &dummy, const int& atom_nr)
 {
     double MinMax[6]{0, 0, 0, 0, 0, 0};
     int steps[3]{0, 0, 0};
@@ -458,92 +518,7 @@ cube calc_cube_ML(const vec data, WFN &dummy, const int atom_nr)
     CubeRho.set_comment2("from " + dummy.get_path().string());
     CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_RI_rho.cube");
 
-    _time_point start = get_time();
+    calc_cube_ML(data, dummy, CubeRho, atom_nr);
 
-    ProgressBar *progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom_nr != -1)
-        std::cout << "Calculation for atom " << atom_nr << std::endl;
-
-#pragma omp parallel for schedule(dynamic)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2)};
-
-                if (atom_nr == -1)
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms()));
-                else
-                    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr));
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    using namespace std;
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    CubeRho.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
     return CubeRho;
-};
-
-void calc_cube_ML(const vec data, WFN& dummy, const int atom_nr, cube &CubeRho)
-{
-    CubeRho.set_comment1("Calculated density using NoSpherA2 from ML Data");
-    CubeRho.set_comment2("from " + dummy.get_path().string());
-    CubeRho.set_path((dummy.get_path().parent_path() / dummy.get_path().stem()).string() + "_RI_rho.cube");
-    _time_point start = get_time();
-
-    ProgressBar* progress = new ProgressBar(CubeRho.get_size(0), 60, "=", " ", "Calculating Values");
-    if (atom_nr != -1)
-        std::cout << "Calculation for atom " << atom_nr << std::endl;
-    double dens = 0.0;
-#pragma omp parallel for schedule(dynamic) private(dens)
-    for (int i = 0; i < CubeRho.get_size(0); i++)
-    {
-        for (int j = 0; j < CubeRho.get_size(1); j++)
-            for (int k = 0; k < CubeRho.get_size(2); k++)
-            {
-
-                vec PosGrid{
-                    i * CubeRho.get_vector(0, 0) + j * CubeRho.get_vector(0, 1) + k * CubeRho.get_vector(0, 2) + CubeRho.get_origin(0),
-                    i * CubeRho.get_vector(1, 0) + j * CubeRho.get_vector(1, 1) + k * CubeRho.get_vector(1, 2) + CubeRho.get_origin(1),
-                    i * CubeRho.get_vector(2, 0) + j * CubeRho.get_vector(2, 1) + k * CubeRho.get_vector(2, 2) + CubeRho.get_origin(2) };
-
-                dens = (atom_nr == -1)
-                    ? calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms())
-                    : calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr);
-
-                CubeRho.set_value(i, j, k, dens);
-
-                //if (atom_nr == -1)
-                //    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms()));
-                //else
-                //    CubeRho.set_value(i, j, k, calc_density_ML(PosGrid[0], PosGrid[1], PosGrid[2], data, dummy.get_atoms(), atom_nr));
-            }
-        progress->update();
-    }
-    delete (progress);
-
-    using namespace std;
-    _time_point end = get_time();
-    if (get_sec(start, end) < 60)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) << " s" << endl;
-    else if (get_sec(start, end) < 3600)
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 60 << " m " << get_sec(start, end) % 60 << " s" << endl;
-    else
-        std::cout << "Time to calculate Values: " << fixed << setprecision(0) << get_sec(start, end) / 3600 << " h " << (get_sec(start, end) % 3600) / 60 << " m" << endl;
-    CubeRho.calc_dv();
-    std::cout << "Number of electrons: " << std::fixed << std::setprecision(4) << CubeRho.sum() << std::endl;
 };
