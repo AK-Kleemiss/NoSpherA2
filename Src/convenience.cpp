@@ -3178,14 +3178,19 @@ void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& l
     if (!std::filesystem::exists(orbitals_file))
         orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda="+ formatted_lambda +",a");
 
-    while (std::filesystem::exists(energies_file)) {
-        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", std::cout);
-        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", std::cout);
+    while (std::filesystem::exists(energies_file) && std::filesystem::exists(orbitals_file)) {
+        const std::filesystem::path of = orbitals_file;
+        const std::filesystem::path ef = energies_file;
+
+        err_checkf(of.string() != "", "Orbitals file name is empty?!", std::cout);
+        err_checkf(ef.string() != "", "Energy file name is empty?!", std::cout);
+        err_checkf(std::filesystem::exists(of), "couldn't open or find " + of.string() + ", leaving", std::cout);
+        err_checkf(std::filesystem::exists(ef), "couldn't open or find " + ef.string() + ", leaving", std::cout);
         std::cout << "lambda = " + std::to_string(lambda) + "..." << std::flush;
 
         std::vector<WFN> wavy;
         wavy.emplace_back(e_origin::tonto);
-        wavy.back().read_tonto(stdout_file, std::cout, debug, energies_file, orbitals_file);
+        wavy.back().read_tonto(stdout_file, std::cout, debug, ef, of);
         std::filesystem::path basename = stdout_file.parent_path() / (jobname + "_l_" + formatted_lambda);
         wavy.back().write_wfn(basename.string() + ".wfn", debug, false);
         free_fchk(std::cout, basename.string() + ".fchk", "", wavy.back(), debug, true);
@@ -3210,7 +3215,7 @@ void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& l
         if (!std::filesystem::exists(energies_file))
             energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",a");
 
-        std::filesystem::path orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
+        orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
         if (!std::filesystem::exists(orbitals_file))
             orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",r");
         if (!std::filesystem::exists(orbitals_file))
