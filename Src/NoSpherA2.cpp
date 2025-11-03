@@ -288,12 +288,15 @@ int main(int argc, char **argv)
                 // Fill WFN with the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
 
-                SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[i], opt);
-                string df_basis_name = temp_pred->get_dfbasis_name();
+                std::shared_ptr<SALTEDPredictor> temp_pred = std::make_shared<SALTEDPredictor>(wavy[i], opt);
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
-                load_basis_into_WFN(temp_pred->wavy, aux_basis);
+
+                if (!temp_pred->basis_set_loaded()){
+                    string df_basis_name = temp_pred->get_dfbasis_name();
+                    std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
+                    load_basis_into_WFN(temp_pred->wavy, aux_basis);
+                }
 
                 if (opt.debug)
                     log_file << "Entering scattering ML Factor Calculation with H part!" << endl;
@@ -305,7 +308,6 @@ int main(int argc, char **argv)
                                   i,
                                   &known_kpts),
                               log_file);
-                delete temp_pred;
             }
         }
 

@@ -22,17 +22,14 @@ There are:
   18 atoms read from the wavefunction, of which 
   18 are identified as asymmetric unit atoms!
 
-Making Integration Grids... ...                       done! Number of gridpoints: 1770
-Calculating spherical densities...                    done!
-Pruning Grid...                                       done! Number of gridpoints: 1728
-Calculating non-spherical densities...                done!
-Applying integration weights and integrating charge...done!
-Number of points evaluated: 1728.
-
+Selected accuracy: 0
+Making Integration Grids...
+GridManager: Setting up prototype grids for atom types...
+GridManager: Generating integration grids for atoms...
+GridManager: Generated total of 1770 grid points.
 Table of Charges in electrons
-
     Atom       Becke   Hirshfeld   TFVC
-      Cu01    -1.534     0.899     1.635
+      Cu01    -1.535     0.899     1.635
       Cl02    -0.053    -0.483    -0.642
       S003     0.110    -0.265     0.485
       Cl04    -0.024    -0.387    -0.446
@@ -50,10 +47,10 @@ Table of Charges in electrons
       H00f     0.099     0.039    -0.112
       H00g     0.109     0.048    -0.093
       H00h     0.066     0.065    -0.178
-Total number of electrons in the asymmetric unit:
- Becke:     135.063670
+Total number of electrons:
+ Becke:     135.063889
  Hirshfeld: 134.310349
- TVFC:      134.105330
+ TVFC:      134.105550
 [                Calculating Scattering Factors               ]
 [=============================================================] 100% 
 Writing tsc file...  ... done!

@@ -303,6 +303,52 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     }
 }
 
+void solve_linear_system(vec& A, const unsigned long long& rows_A, const unsigned long long& cols_A, vec& b)
+{
+    err_checkf(rows_A == b.size(), "Inconsitent size of arrays in linear_solve", std::cout);
+    // LAPACK variables
+    const int m = (int)rows_A;
+    const int n = (int)cols_A; // colums of matrix A
+    const int nrhs = 1;   // Number of right-hand sides (columns of rho and X)
+    const int lda = n;    // Leading dimension of eri2c
+    const int ldb = m;    // Leading dimension of rho
+    int info = 0;
+
+    // Call LAPACK function to solve the system
+#if defined(__APPLE__)
+    // Convert row-major to column-major for Accelerate
+    vec A_col_major(A.size());
+    for (int i = 0; i < m; ++i) {
+        for (int j = 0; j < n; ++j) {
+            A_col_major[j * m + i] = A[i * n + j]; // Transpose
+        }
+    }
+    char trans = 'T'; // We need to solve A^T x = b
+    int iwork = -1;
+    double* work = NULL;
+    //TODO: Implement workspace query and allocation for dgels
+    std::cout << "Warning: LAPACK dgels not implemented on macOS/Accelerate. Exiting." << std::endl;
+    exit(1);
+    //dgels_(&trans, &n, &m, &nrhs, A_col_major.data(), &lda, b.data(), &ldb, work, &iwork, &info);
+
+#else
+    info = LAPACKE_dgels(LAPACK_COL_MAJOR, 'T', n, m, nrhs, A.data(), lda, b.data(), ldb);
+#endif
+
+    double error = 0.0;
+    std::cout << "Error: ";
+    for (int i = n; i < m; i++)
+    {
+        error += b[i] * b[i];
+    }
+    std::cout << std::fixed << std::showpoint << std::setprecision(12) << std::sqrt(error) << std::endl;
+
+    if (info != 0)
+    {
+        std::cout << "Error: LAPACKE_dgesv returned " << info << std::endl;
+    }
+}
+
 //#include <linalg.hpp>
 //void _test_lahva() {
 //    lahva::cpu::Vector<double> p(5, 2.0);

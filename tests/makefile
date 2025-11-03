@@ -14,7 +14,7 @@ ifeq ($(OS),Windows_NT)
     @echo 'Running test: $1'
     @echo @echo off > run_test.bat
     @echo cd $2 >> run_test.bat
-    @echo $(BASE_PATH) $3 >> run_test.bat
+    @echo $(BASE_PATH) -all_charges $3 >> run_test.bat
     @echo set test_result=%%errorlevel%% >> run_test.bat
     @echo if exist NoSpherA2.log ($(MV) NoSpherA2.log $1.log ^& $(DIFF) $1.log $1.good) >> run_test.bat
     @echo exit /b %%test_result%% >> run_test.bat
@@ -40,7 +40,7 @@ else
   define RUN_TEST
     @echo 'Running test: $1'
     @eval $(TIME_START); cd $2 && { \
-      $(BASE_PATH) $3; \
+      $(BASE_PATH) -all_charges $3; \
       test_result=$$?; \
       if [ -f NoSpherA2.log ]; then $(MV) NoSpherA2.log $1.log; fi && \
       $(DIFF) $1.log $1.good > ../$1.diff 2>&1; \
@@ -242,5 +242,5 @@ TFVC:
 		-acc 0 \
 		-no-date)
 
-.PHONY: all clean dependents SALTED reading_SALTED
+.PHONY: all clean dependents SALTED reading_SALTED $(ALL_TARGETS)
 .SECONDARY:

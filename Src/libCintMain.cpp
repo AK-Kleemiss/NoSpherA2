@@ -377,13 +377,13 @@ void GTOnr3c_drv(
                                              atm, natm, bas, nbas, env);
     const int njobs = (std::max(nish, njsh) / BLKSIZE + 1) * nksh;
 
-    // #pragma omp parallel
+     #pragma omp parallel
     {
         int dims[3] = {naoi, naoj, naok};
         int shls[3] = {0, 0, 0};
         int ish, jsh, ksh, i0, j0, k0;
         double *cache = (double *)malloc(sizeof(double) * cache_size * di * di * di);
-        // #pragma omp for nowait schedule(dynamic)
+         #pragma omp for nowait schedule(dynamic)
         for (ksh = ksh0; ksh < ksh1; ksh++)
         {
             for (jsh = jsh0; jsh < jsh1; jsh++)
@@ -489,24 +489,24 @@ void GTOnr3c_fill_s1(
     }
 }
 
-void CINTgout2e(double *gout,
-                double *g,
-                int *idx,
-                CINTEnvVars *envs,
-                int gout_empty)
+void CINTgout2e(double* gout,
+    double* g,
+    int* idx,
+    CINTEnvVars* envs,
+    int gout_empty)
 {
     const int nf = envs->nf;
     const int nrys_roots = envs->nrys_roots;
-    double s = 0.0;
+
     if (gout_empty)
     {
-        // If gout is to be overwritten (empty), do a direct assignment
         for (int n = 0; n < nf; n++, idx += 3)
         {
             // Pointers to the relevant slices of g
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+            double s = 0.0;
 
             // Inner loop: accumulate products
 #pragma ivdep
@@ -515,7 +515,6 @@ void CINTgout2e(double *gout,
                 s += gx[i] * gy[i] * gz[i];
             }
             gout[n] = s;
-            s = 0.0;
         }
     }
     else
@@ -523,9 +522,10 @@ void CINTgout2e(double *gout,
         // If gout already has data, accumulate
         for (int n = 0; n < nf; n++, idx += 3)
         {
-            const double *gx = g + idx[0];
-            const double *gy = g + idx[1];
-            const double *gz = g + idx[2];
+            const double* gx = g + idx[0];
+            const double* gy = g + idx[1];
+            const double* gz = g + idx[2];
+            double s = 0.0;
 
 #pragma ivdep
             for (int i = 0; i < nrys_roots; i++)
@@ -533,7 +533,6 @@ void CINTgout2e(double *gout,
                 s += gx[i] * gy[i] * gz[i];
             }
             gout[n] += s;
-            s = 0.0;
         }
     }
 }
@@ -883,39 +882,6 @@ void GTOint2c(int (*intor)(double *, int *, int *, int *, int, int *, int, doubl
                      atm, natm, bas, nbas, env, opt, cache);
         }
         free(cache);
-    }
-}
-
-void computeEri2c(Int_Params &params, vec &eri2c)
-{
-    ivec bas = params.get_bas();
-    ivec atm = params.get_atm();
-    vec env = params.get_env();
-
-    int nbas = params.get_nbas();
-    int nat = params.get_natoms();
-
-    ivec shl_slice = {0, nbas, 0, nbas};
-    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
-
-    int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
-    int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
-
-    CINTOpt *opty = nullptr;
-    int2c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
-
-    // Compute integrals
-    vec res((size_t)naoi * (size_t)naoj, 0.0);
-    eri2c.resize((size_t)naoi * (size_t)naoj, 0.0);
-    GTOint2c(int2c2e_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
-
-    // res is in fortran order, write the result in regular ordering
-    for (int i = 0; i < naoi; i++)
-    {
-        for (int j = 0; j < naoj; j++)
-        {
-            eri2c[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
-        }
     }
 }
 
@@ -2030,8 +1996,28 @@ int int1e_ovlp_sph(double *out, int *dims, int *shls, int *atm, int natm,
     return CINT1e_drv(out, dims, &envs, cache, &c2s_sph_1e, 0);
 }
 
-void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
-{
+
+// --- Traits for kernels ------------------------------------------------------
+void Coulomb2C::optimizer(CINTOpt*& opt,
+    int* atm, int nat, int* bas, int nbas, double* env) {
+    int2c2e_optimizer(&opt, atm, nat, bas, nbas, env);
+}
+void Coulomb2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
+    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    GTOint2c(int2c2e_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
+}
+
+void Overlap2C::optimizer(CINTOpt*& opt,
+    const int*, int, const int*, int, const double*) {
+    opt = nullptr; // no optimizer needed for overlap
+}
+void Overlap2C::drv(double* out, int comp, int* shl_slice, int* aoloc,
+    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    GTOint2c(int1e_ovlp_sph, out, comp, 0, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
+}
+
+template <typename Kernel>
+void compute2C(Int_Params& params, vec& ret) {
     ivec bas = params.get_bas();
     ivec atm = params.get_atm();
     vec env = params.get_env();
@@ -2045,20 +2031,25 @@ void compute2c_Overlap(Int_Params &params, vec &overlap_2c)
     int naoi = aoloc[shl_slice[1]] - aoloc[shl_slice[0]];
     int naoj = aoloc[shl_slice[3]] - aoloc[shl_slice[2]];
 
+    CINTOpt* opty = nullptr;
+    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+
     // Compute integrals
-    vec res((size_t)naoi * naoj, 0.0);
-    overlap_2c.resize((size_t)naoi * naoj, 0.0);
-    GTOint2c(int1e_ovlp_sph, res.data(), 1, 0, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
+    vec res((size_t)naoi * (size_t)naoj, 0.0);
+    ret.resize((size_t)naoi * (size_t)naoj, 0.0);
+    Kernel::drv(res.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
 
     // res is in fortran order, write the result in regular ordering
     for (int i = 0; i < naoi; i++)
     {
         for (int j = 0; j < naoj; j++)
         {
-            overlap_2c[j * (size_t)naoi + i] = res[i * (size_t)naoj + j];
+            ret[(size_t)j * (size_t)naoi + i] = res[(size_t)i * (size_t)naoj + j];
         }
     }
 }
+template void compute2C<Coulomb2C>(Int_Params& params, vec& ret);
+template void compute2C<Overlap2C>(Int_Params& params, vec& ret);
 
 int int1e_ovlp_cart(double* out, int* dims, int* shls, int* atm, int natm,
     int* bas, int nbas, double* env, CINTOpt* opt, double* cache)
@@ -2138,7 +2129,52 @@ ivec calc_3c_steps(const unsigned long long int naoi, const unsigned long long i
     return steps;
 }
 
-void computeRho_Coulomb(Int_Params &param1,
+// --- Traits for kernels ------------------------------------------------------
+void Coulomb3C::optimizer(CINTOpt*& opt,
+    int* atm, int nat, int* bas, int nbas, double* env) {
+    int3c2e_optimizer(&opt, atm, nat, bas, nbas, env);
+}
+void Coulomb3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
+    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, opt, atm, nat, bas, nbas, env);
+}
+
+void Overlap3C::optimizer(CINTOpt*& opt,
+    const int*, int, const int*, int, const double*) {
+    opt = nullptr;
+}
+void Overlap3C::drv(double* out, int comp, int* shl_slice, int* aoloc,
+    CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env) {
+    (void)opt;
+    GTOnr3c_drv(int3c1e_sph, GTOnr3c_fill_s1, out, comp, shl_slice, aoloc, nullptr, atm, nat, bas, nbas, env);
+}
+
+inline double* aligned_alloc_d(size_t n)
+{
+    void* p = nullptr;
+
+#if defined(__APPLE__)
+    // POSIX (Linux, macOS)
+    if (posix_memalign(&p, 64, n * sizeof(double)) != 0)
+        throw std::bad_alloc();
+#else
+    p = MKL_malloc(n * sizeof(double), 64);
+    if (!p) throw std::bad_alloc();
+#endif
+    return reinterpret_cast<double*>(p);
+}
+
+inline void aligned_free_d(double* p)
+{
+#if defined(__APPLE__)
+    free(p);
+#else
+    MKL_free(p);
+#endif
+}
+
+template <typename Kernel>
+void computeRho(Int_Params &param1,
                         Int_Params &param2,
                         const dMatrix2 &dm,
                         vec &rho,
@@ -2176,12 +2212,13 @@ void computeRho_Coulomb(Int_Params &param1,
     }
 
     std::cout << "Preallocating: " << static_cast<double>(sizeof(double) * tot_size * naok_max) / 1024 / 1024 << " MB" << std::endl;
-    //vec res(tot_size * naok_max, 0.0);
-    std::unique_ptr<double[]> res(new double[tot_size * naok_max]);
+
+    std::unique_ptr<double, decltype(&aligned_free_d)> res(aligned_alloc_d(tot_size* naok_max), aligned_free_d);
 
     CINTOpt *opty = nullptr;
-    int3c2e_optimizer(&opty, atm.data(), nat, bas.data(), nbas, env.data());
+    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
 
+    ProgressBar pb(steps.size() - 1, 60, "#", " ", "Computing Rho: ");
     for (int step_idx = 1; step_idx < steps.size(); step_idx++)
     {
         ivec shl_slice = {
@@ -2193,10 +2230,9 @@ void computeRho_Coulomb(Int_Params &param1,
             steps[step_idx]};
 
         unsigned int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
-        std::cout << "Memory needed for rho: " << static_cast<double>(sizeof(double) * tot_size * naok) / 1024 / 1024 << " MB" << std::endl;
 
         // Compute 3-center integrals
-        GTOnr3c_drv(int3c2e_sph, GTOnr3c_fill_s1, res.get(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+        Kernel::drv(res.get(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
         int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
         // einsum('ijk,ij->k', res, dm, out=rho)
         // This is 100% pure magic, thanks ChatGPT
@@ -2212,76 +2248,16 @@ void computeRho_Coulomb(Int_Params &param1,
 
         // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
         // std::fill(res.begin(), res.end(), 0); //This might be unnecessary, saves about 1sec for 15 steps  TEST THIS!!!!!
+        pb.update(std::cout);
     }
 }
-
-void computeRho_Overlap(Int_Params &param1,
-                        Int_Params &param2,
-                        const dMatrix2 &dm,
-                        vec &rho,
-                        double max_mem)
-{
-    int nQM = param1.get_nbas();
-    int nAux = param2.get_nbas();
-
-    Int_Params combined = param1 + param2;
-    // combined.print_data("combined");
-
-    ivec bas = combined.get_bas();
-    ivec atm = combined.get_atm();
-    vec env = combined.get_env();
-
-    int nat = combined.get_natoms();
-    int nbas = combined.get_nbas();
-
-    ivec aoloc = make_loc<COORDINATE_TYPE::SPH>(bas, nbas);
-
-    rho.resize(param2.get_nao(), 0.0);
-
-    unsigned long long int naoi = aoloc[nQM] - aoloc[0];
-    unsigned long long int naoj = aoloc[nQM] - aoloc[0];
-
-    ivec steps = calc_3c_steps(naoi, naoj, aoloc, nQM, nAux, max_mem);
-
-    // Calculate maximum vector size
-    double min_mem = static_cast<double>(sizeof(double) * naoi * naoj) / 1024 / 1024;
-    unsigned long long int naok_max = static_cast<unsigned long long int>((max_mem - min_mem) / (static_cast<double>(min_mem))) + 5;
-    if (naok_max > (aoloc[nQM + nAux] - aoloc[nQM]))
-    {
-        naok_max = aoloc[nQM + nAux] - aoloc[nQM];
-    }
-
-    std::cout << "Preallocating: " << static_cast<double>(sizeof(double) * naoi * naoj * naok_max) / 1024 / 1024 << " MB" << std::endl;
-    vec res(naoi * naoj * naok_max, 0.0);
-
-    for (int step_idx = 1; step_idx < steps.size(); step_idx++)
-    {
-        ivec shl_slice = {
-            0,
-            nQM,
-            0,
-            nQM,
-            steps[step_idx - 1],
-            steps[step_idx]};
-
-        unsigned long long int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
-        std::cout << "Memory needed for rho: " << static_cast<double>(sizeof(double) * naoi * naoj * naok) / 1024 / 1024 << " MB" << std::endl;
-
-        // Compute 3-center integrals
-        GTOnr3c_drv(int3c1e_sph, GTOnr3c_fill_s1, res.data(), 1, shl_slice.data(), aoloc.data(), NULL, atm.data(), nat, bas.data(), nbas, env.data());
-
-        int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
-        // einsum('ijk,ij->k', res, dm, out=rho)
-        // This is 100% pure magic, thanks ChatGPT
-        cblas_dgemv(CblasRowMajor, CblasNoTrans,
-                    naok,
-                    naoi * naoj,
-                    1.0,
-                    res.data(), naoi * naoj,
-                    dm.data(), 1,
-                    0.0,
-                    &rho[idx_curr_rho], 1);
-        // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
-        // std::fill(res.begin(), res.end(), 0); //This might be unnecessary, saves about 1sec for 15 steps  TEST THIS!!!!!
-    }
-}
+template void computeRho<Coulomb3C>(Int_Params &param1,
+                                   Int_Params &param2,
+                                   const dMatrix2 &dm,
+                                   vec &rho,
+                                   double max_mem);
+template void computeRho<Overlap3C>(Int_Params &param1,
+                                   Int_Params &param2,
+                                   const dMatrix2 &dm,
+                                   vec &rho,
+                                   double max_mem);

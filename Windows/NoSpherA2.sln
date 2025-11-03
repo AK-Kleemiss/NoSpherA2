@@ -30,6 +30,8 @@ Global
 		D_isosurface|x64 = D_isosurface|x64
 		D_ML|ARM64 = D_ML|ARM64
 		D_ML|x64 = D_ML|x64
+		D_Mohr_Salt|ARM64 = D_Mohr_Salt|ARM64
+		D_Mohr_Salt|x64 = D_Mohr_Salt|x64
 		D_OpenShell_gbw|ARM64 = D_OpenShell_gbw|ARM64
 		D_OpenShell_gbw|x64 = D_OpenShell_gbw|x64
 		D_polarizability|ARM64 = D_polarizability|ARM64
@@ -86,6 +88,8 @@ Global
 		Debug_PBC_CaF2|x64 = Debug_PBC_CaF2|x64
 		Debug_properties|ARM64 = Debug_properties|ARM64
 		Debug_properties|x64 = Debug_properties|x64
+		Debug_SALTED_Disorder|ARM64 = Debug_SALTED_Disorder|ARM64
+		Debug_SALTED_Disorder|x64 = Debug_SALTED_Disorder|x64
 		Debug_SF_Disorder|ARM64 = Debug_SF_Disorder|ARM64
 		Debug_SF_Disorder|x64 = Debug_SF_Disorder|x64
 		Debug_SF_ECP|ARM64 = Debug_SF_ECP|ARM64
@@ -152,6 +156,10 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ML|ARM64.Build.0 = D_ML|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ML|x64.ActiveCfg = D_ML|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_ML|x64.Build.0 = D_ML|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Mohr_Salt|ARM64.ActiveCfg = D_Mohr_Salt|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Mohr_Salt|ARM64.Build.0 = D_Mohr_Salt|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Mohr_Salt|x64.ActiveCfg = D_Mohr_Salt|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_Mohr_Salt|x64.Build.0 = D_Mohr_Salt|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|ARM64.ActiveCfg = D_OpenShell_gbw|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|ARM64.Build.0 = D_OpenShell_gbw|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.D_OpenShell_gbw|x64.ActiveCfg = D_OpenShell_gbw|x64
@@ -264,6 +272,10 @@ Global
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_properties|ARM64.Build.0 = Debug_properties|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_properties|x64.ActiveCfg = Debug_properties|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_properties|x64.Build.0 = Debug_properties|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SALTED_Disorder|ARM64.ActiveCfg = Debug_SALTED_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SALTED_Disorder|ARM64.Build.0 = Debug_SALTED_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SALTED_Disorder|x64.ActiveCfg = Debug_SALTED_Disorder|x64
+		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SALTED_Disorder|x64.Build.0 = Debug_SALTED_Disorder|x64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF_Disorder|ARM64.ActiveCfg = Debug_SF_Disorder|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF_Disorder|ARM64.Build.0 = Debug_SF_Disorder|ARM64
 		{2AB57786-36D2-4490-82E3-032F9A65CF10}.Debug_SF_Disorder|x64.ActiveCfg = Debug_SF_Disorder|x64
@@ -353,6 +365,9 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ML|ARM64.ActiveCfg = D_ML|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ML|ARM64.Build.0 = D_ML|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_ML|x64.ActiveCfg = D_ML|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_Mohr_Salt|ARM64.ActiveCfg = Release_SALTED|ARM64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_Mohr_Salt|ARM64.Build.0 = Release_SALTED|ARM64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_Mohr_Salt|x64.ActiveCfg = Release_SALTED|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|ARM64.ActiveCfg = Release_SALTED|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|ARM64.Build.0 = Release_SALTED|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.D_OpenShell_gbw|x64.ActiveCfg = Debug|x64
@@ -439,6 +454,9 @@ Global
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_properties|ARM64.ActiveCfg = Profile_Disorder|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_properties|ARM64.Build.0 = Profile_Disorder|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_properties|x64.ActiveCfg = Debug|x64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SALTED_Disorder|ARM64.ActiveCfg = Profile_Disorder|ARM64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SALTED_Disorder|ARM64.Build.0 = Profile_Disorder|ARM64
+		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SALTED_Disorder|x64.ActiveCfg = Profile_Disorder|x64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SF_Disorder|ARM64.ActiveCfg = Profile_Disorder|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SF_Disorder|ARM64.Build.0 = Profile_Disorder|ARM64
 		{B4802F99-47DD-48DF-B5AC-FC18305DEC81}.Debug_SF_Disorder|x64.ActiveCfg = Debug|x64
@@ -521,6 +539,10 @@ Global
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_ML|ARM64.Build.0 = Release|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_ML|x64.ActiveCfg = Release|x64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_ML|x64.Build.0 = Release|x64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_Mohr_Salt|ARM64.ActiveCfg = Release|ARM64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_Mohr_Salt|ARM64.Build.0 = Release|ARM64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_Mohr_Salt|x64.ActiveCfg = Release|x64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_Mohr_Salt|x64.Build.0 = Release|x64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_OpenShell_gbw|ARM64.ActiveCfg = Release|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_OpenShell_gbw|ARM64.Build.0 = Release|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.D_OpenShell_gbw|x64.ActiveCfg = Release|x64
@@ -633,6 +655,10 @@ Global
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_properties|ARM64.Build.0 = Debug|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_properties|x64.ActiveCfg = Debug|x64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_properties|x64.Build.0 = Debug|x64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SALTED_Disorder|ARM64.ActiveCfg = Debug|ARM64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SALTED_Disorder|ARM64.Build.0 = Debug|ARM64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SALTED_Disorder|x64.ActiveCfg = Debug|x64
+		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SALTED_Disorder|x64.Build.0 = Debug|x64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SF_Disorder|ARM64.ActiveCfg = Debug|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SF_Disorder|ARM64.Build.0 = Debug|ARM64
 		{C0E62D8D-0FD6-4F5F-A9A2-C4C1673ED7A9}.Debug_SF_Disorder|x64.ActiveCfg = Debug|x64

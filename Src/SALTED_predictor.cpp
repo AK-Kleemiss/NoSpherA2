@@ -76,6 +76,11 @@ SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
     config.predict_filename = "temp_rascaline.xyz";
     if (wavy.get_nmo() != 0)
         wavy.clear_MOs(); // Delete unneccesarry MOs, since we are predicting anyway.
+
+    if (file.basis_set_defined()) {
+        load_basis_into_WFN(wavy, file.read_basis_set());
+        bbasis_set_loaded = true;
+    }
 }
 
 const std::string SALTEDPredictor::get_dfbasis_name() const
@@ -168,7 +173,7 @@ void SALTEDPredictor::setup_atomic_environment()
 
 void SALTEDPredictor::read_model_data() {
     const std::filesystem::path _SALTEDpath = SALTED_DIR / config.salted_filename;
-    SALTED_BINARY_FILE file = SALTED_BINARY_FILE(_SALTEDpath);
+    SALTED_BINARY_FILE file(_SALTEDpath);
     if (config.field) {
         err_not_impl_f("Calculations using 'Field = True' are not yet supported", std::cout);
     }
