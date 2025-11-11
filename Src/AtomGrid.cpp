@@ -256,7 +256,7 @@ int AtomGrid::get_num_grid_points() const { return (int) atom_grid_x_bohr_.size(
 
 int AtomGrid::get_num_radial_grid_points() const { return num_radial_grid_points_; }
 
-vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false) {
+vec2 make_chi(const WFN& wfn, int samples, bool refine, bool debug) {
     vec2 chi(wfn.get_ncen(), vec(wfn.get_ncen(), 0.0));
     std::vector<std::vector<bool>> neighbours(wfn.get_ncen(), bvec(wfn.get_ncen(), true));
     double rijx2, rijy2, rijz2, xdist, disth;

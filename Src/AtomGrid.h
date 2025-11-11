@@ -63,6 +63,8 @@ class AtomGrid
     vec radial_atom_grid_w_;
 };
 
+vec2 make_chi(const WFN& wfn, int samples = 50, bool refine = true, bool debug = false);
+
 std::pair<double,double> get_integration_weights(const int& num_centers,
     const int* proton_charges,
     const double* x_coordinates_bohr,

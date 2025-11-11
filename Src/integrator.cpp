@@ -353,7 +353,7 @@ vec calculate_expected_populations(const WFN& wavy, const WFN& wavy_aux, const s
         temp.delete_unoccupied_MOs();
         // Setup grids for the molecule
         bvec needs_grid = GridManager::determineAtomsNeedingGrids(temp, asym_atom_list);
-        grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+        grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
         
 
         // Calculate partitioned charges

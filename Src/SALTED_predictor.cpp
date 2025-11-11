@@ -6,6 +6,7 @@
 #include "constants.h"
 #include "wfn_class.h"
 #include <filesystem>
+#include "JKFit.h"
 
 SALTEDPredictor::SALTEDPredictor(const WFN &wavy_in, options &opt_in)
 {

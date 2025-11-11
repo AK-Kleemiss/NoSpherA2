@@ -1522,26 +1522,6 @@ double bessel_first_kind(const int l, const double x)
     }
 }
 
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b)
-{
-    wavy.set_basis_set_ptr((*b).get_data());
-    int nr_coefs = 0;
-    for (int i = 0; i < wavy.get_ncen(); i++)
-    {
-        int current_charge = wavy.get_atom_charge(i) - 1;
-        const std::span<const SimplePrimitive> basis = (*b)[current_charge];
-        int size = (int)basis.size();
-        for (int e = 0; e < size; e++)
-        {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
-            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
-
-            nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
-        }
-    }
-    return nr_coefs;
-}
-
 
 double get_decimal_precision_from_CIF_number(std::string &given_string)
 {
@@ -2084,10 +2064,8 @@ void options::digest_options()
                     aux_basis.push_back(std::make_shared<BasisSet>(beta));
                     break;
                 }
-                if (!BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set])) {
-                    cout << "Basis set " << arguments[i + 1] << " not found in the library. Exiting." << endl;
-                    exit(1);
-                }
+                err_chkf(BasisSetLibrary().check_basis_set_exists(arguments[next_basis_set]), 
+                    "Basis set " + arguments[next_basis_set] + " not found in the library. Exiting.", std::cout);
                 aux_basis.push_back(BasisSetLibrary().get_basis_set(arguments[next_basis_set]));
                 next_basis_set++;
             }
@@ -2298,22 +2276,6 @@ void options::digest_options()
 
             load_basis_into_WFN(wavy_aux, combined_aux_basis);
             demonstrate_enhanced_density_fitting(wavy, wavy_aux);
-            //dMatrix2 dm = wavy.get_dm();
-            //vec charges_sand = calculate_expected_charges(wavy, wavy_aux, "sanderson_estimate");
-            //vec charges_mul = calculate_expected_charges(wavy, wavy_aux, "mulliken");
-
-            //for (int i = 0; i < charges_mul.size(); i++)
-            //    std::cout << "Charge on atom " << i << " (" << wavy.get_atom_label(i) << "): Mulliken: " << charges_mul[i] << " Sanderson: " << charges_sand[i] << std::endl;
-
-            //aux_basis = std::make_shared<BasisSet>();
-            //aux_basis->gen_auto_aux(wavy);
-
-            //WFN wavy_aux2(0);
-            //wavy_aux2.set_atoms(wavy.get_atoms());
-            //wavy_aux2.set_ncen(wavy.get_ncen());
-            //wavy_aux2.delete_basis_set();
-            //load_basis_into_WFN(wavy_aux2, aux_basis);
-            //demonstrate_enhanced_density_fitting(wavy, wavy_aux2);
 
             exit(0);
         }
@@ -2338,6 +2300,20 @@ void options::digest_options()
         else if (temp == "-partitioning_test")
         {
             calc_partition_densities();
+        }
+        else if (temp == "-lukas_test")
+        {
+            //Check that wfn is not empty
+            if (wfn.empty())
+            {
+                std::cout << "No wavefunction specified! Use -wfn option BEVORE -lukas_test to specify a wavefunction." << std::endl;
+                exit(1);
+            }
+
+            WFN wavy(wfn);
+
+            get1DGridData(wavy, aux_basis);
+            exit(0);
         }
     }
 };

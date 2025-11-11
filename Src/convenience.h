@@ -672,8 +672,6 @@ struct options
 
 const double gaussian_radial(const primitive& p, const double& r);
 
-int load_basis_into_WFN(WFN &wavy, std::shared_ptr<BasisSet> b);
-
 double hypergeometric(double a, double b, double c, double x);
 
 cdouble hypergeometric(double a, double b, double c, cdouble x);

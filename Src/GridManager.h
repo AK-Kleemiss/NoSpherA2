@@ -70,9 +70,14 @@ private:
     
     // Internal helper methods
     void setupPrototypeGrids(const WFN& wave, const ivec& atom_types);
+
     void generateIntegrationGrids(const WFN& wave, const cell& unit_cell, 
-                                  const bvec& needs_grid, const ivec& atom_list);
+                                  const ivec& atom_list);
+    void getIntegrationGrid1D(const WFN& wave, const int atom_1, const int atom_2, const int num_points, const double padding);
+
     void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
+
+    void calculateSphericalDensities(const WFN& wave, const cell& unit_cell, const ivec& atom_list, vec2& single_spherical_density, vec2& combined_spherical_density);
     void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     void pruneGrid();
     
@@ -84,9 +89,11 @@ public:
     ~GridManager() = default;
     
     // Main interface methods
-    void setupGridsForMolecule(const WFN& wave, const bvec& needs_grid, 
+    void setup3DGridsForMolecule(const WFN& wave, const bvec& needs_grid, 
                                const ivec& atom_list, const cell& unit_cell = cell());
     
+    void setup1DGridsForMolecule(const WFN& wave, const int atom_1, const int atom_2, const int gridpoints, const double padding);
+
     PartitionResults calculatePartitionedCharges(const WFN& wave, const cell& unit_cell = cell());
     
     void getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d3, vec2& dens);
@@ -107,4 +114,5 @@ public:
             time_descriptions.push_back(label);
         }
     }
+    void write_simple_grid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const;
 };

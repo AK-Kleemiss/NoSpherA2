@@ -2399,7 +2399,7 @@ int make_atomic_grids_wrapper(
     WFN temp = wave;
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
-    grid_manager.setupGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
+    grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
     grid_manager.add_timing_info_to_vecs(time_points, time_descriptions);
 
     // Calculate partitioned charges
@@ -2717,17 +2717,7 @@ tsc_block_type calculate_scattering_factors(
         else if (opt.partition_type == PartitionType::RI)
         {
             file << "\nGenerating densities... " << endl;
-            //If no basis is yet loaded, assume a auto aux should be generated
-            for (shared_ptr<BasisSet>& aux_basis_set : opt.aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(*wavy); }
-
-            shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
-            for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
-
-            WFN wavy_aux(0);
-            wavy_aux.set_atoms(wavy->get_atoms());
-            wavy_aux.set_ncen(wavy->get_ncen());
-            wavy_aux.delete_basis_set();
-            load_basis_into_WFN(wavy_aux, combined_aux_basis);
+            WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
             vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
                                             0.0002, 1e-6, "TFVC");

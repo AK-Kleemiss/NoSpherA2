@@ -16,6 +16,8 @@
 #include "TargetConditionals.h"
 #endif
 
+#include "GridManager.h"
+
 void sfac_scan(options &opt, std::ostream &log_file)
 {
     using namespace std;
@@ -1399,6 +1401,82 @@ void test_openblas()
 #endif
     std::cout << "Running MKL/Accelerate test" << std::endl;
     _test_openblas();
+}
+
+
+void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis) {
+    GridConfiguration config;
+    config.accuracy = 0;
+    config.partition_type = PartitionType::TFVC;
+    config.pbc = 0;
+    config.debug = false;
+
+    const int atom_index_1 = 0;
+    const int atom_index_2 = 1;
+    const int gridpoints = 1000;
+    const double padding = 2.0;
+    GridManager grid_manager(config);
+
+    grid_manager.setup1DGridsForMolecule(wavy, atom_index_1, atom_index_2, gridpoints, padding);
+    const vec3 atomic_grids_local = grid_manager.getGridData().atomic_grids;
+
+
+    WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+    vec ri_coefs_u = density_fit_unrestrained(wavy, wavy_aux, 1000, 'C');
+    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 1000, 'C', 5.0E-5, 1E-6, "TFVC", true);
+
+   vec2 dens_hirsh(2);
+   vec2 dens_becke(2);
+   vec2 dens_tfvc(2);
+   vec2 dens_RI_u(2);
+   vec2 dens_RI_tfvc(2);
+   ivec atom_indices = { atom_index_1, atom_index_2 };
+   for (int g = 0; g < 2; ++g) {
+       dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
+       for (int p = 0; p < gridpoints; ++p) {
+           dens_hirsh[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::HIRSH_WEIGHT][p];
+           dens_becke[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::BECKE_WEIGHT][p];
+           dens_tfvc[g][p] = atomic_grids_local[g][GridData::WFN_DENSITY][p] * atomic_grids_local[g][GridData::TFVC_WEIGHT][p];
+           dens_RI_u[g][p] = calc_density_ML(
+               atomic_grids_local[g][GridData::X][p],
+               atomic_grids_local[g][GridData::Y][p],
+               atomic_grids_local[g][GridData::Z][p],
+               ri_coefs_u,
+               wavy_aux.get_atoms(),
+               atom_indices[g]);
+           dens_RI_tfvc[g][p] = calc_density_ML(
+               atomic_grids_local[g][GridData::X][p],
+               atomic_grids_local[g][GridData::Y][p],
+               atomic_grids_local[g][GridData::Z][p],
+               ri_coefs_tfvc,
+               wavy_aux.get_atoms(),
+               atom_indices[g]);
+       }
+   }
+
+   std::vector<std::pair<std::string, vec>> data_atom1(
+         {  
+            {"hirsh", dens_hirsh[0]},
+            {"becke", dens_becke[0]},
+            {"tfvc", dens_tfvc[0]},
+            {"ri_u", dens_RI_u[0]},
+            { "ri_tfvc", dens_RI_tfvc[0] }
+       }
+   );
+   std::vector<std::pair<std::string, vec>> data_atom2(
+       {
+           {"hirsh", dens_hirsh[1]},
+           {"becke", dens_becke[1]},
+           {"tfvc", dens_tfvc[1]},
+           {"ri_u", dens_RI_u[1]},
+           { "ri_tfvc", dens_RI_tfvc[1] }
+       }
+   );
+
+   vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
+   grid_manager.write_simple_grid("WFN_density.dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
+   grid_manager.write_simple_grid("Densities_Atom1.dat", grid_points, data_atom1);
+   grid_manager.write_simple_grid("Densities_Atom2.dat", grid_points, data_atom2);
 }
 
 void test_analytical_fourier(bool full)

@@ -359,3 +359,41 @@ bool BasisSetLibrary::check_basis_set_exists(std::string basis_name) {
 
 
 
+int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
+{
+    wavy.set_basis_set_ptr((*b).get_data());
+    int nr_coefs = 0;
+    for (int i = 0; i < wavy.get_ncen(); i++)
+    {
+        int current_charge = wavy.get_atom_charge(i) - 1;
+        const std::span<const SimplePrimitive> basis = (*b)[current_charge];
+        int size = (int)basis.size();
+        for (int e = 0; e < size; e++)
+        {
+            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
+            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
+
+            nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
+        }
+    }
+    return nr_coefs;
+}
+
+WFN generate_aux_wfn(const WFN& orbital_wfn, std::vector<std::shared_ptr<BasisSet>>& aux_basis) {
+    err_checkf(aux_basis.size() > 0, "Aux-Basis Vecor == 0, something went wrong... try calling -ri_fit and see what happens", std::cout);
+    if ((*aux_basis[0]).get_primitive_count() == 0) {
+        (*aux_basis[0]).gen_auto_aux(orbital_wfn);
+    }
+
+    //If two or more basis sets are supplied, combine them into one
+    std::shared_ptr<BasisSet> combined_aux_basis = aux_basis[0];
+    for (int basis_nr = 1; basis_nr < aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*aux_basis[basis_nr]); }
+
+    WFN wavy_aux(0);
+    wavy_aux.set_atoms(orbital_wfn.get_atoms());
+    wavy_aux.set_ncen(orbital_wfn.get_ncen());
+    wavy_aux.delete_basis_set();
+    load_basis_into_WFN(wavy_aux, combined_aux_basis);
+
+    return std::move(wavy_aux);
+}
