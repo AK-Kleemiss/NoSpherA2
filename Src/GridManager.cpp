@@ -595,7 +595,7 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
     return results;
 }
 
-void GridManager::getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d3, vec2& dens) {
+void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2& d1, vec2& d2, vec2& d3, vec2& dens) {
     if (config_.debug) {
         std::cout << "GridManager: Generating density vectors..." << std::endl;
     }
@@ -629,9 +629,9 @@ void GridManager::getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d
         const double* x = atomic_grid[GridData::GridIndex::X].data();
         const double* y = atomic_grid[GridData::GridIndex::Y].data();
         const double* z = atomic_grid[GridData::GridIndex::Z].data();
-        const double x0 = wave.get_atom_coordinate(g, 0);
-        const double y0 = wave.get_atom_coordinate(g, 1);
-        const double z0 = wave.get_atom_coordinate(g, 2);
+        const double x0 = wave.get_atom_coordinate(atom_list[g], 0);
+        const double y0 = wave.get_atom_coordinate(atom_list[g], 1);
+        const double z0 = wave.get_atom_coordinate(atom_list[g], 2);
 
         size_t accepted_points = 0;
         for (int p = 0; p < n_points; ++p) {

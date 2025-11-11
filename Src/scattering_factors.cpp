@@ -2408,7 +2408,7 @@ int make_atomic_grids_wrapper(
     time_points.push_back(get_time());
     time_descriptions.push_back("calculate charges");
 
-    grid_manager.getDensityVectors(temp, d1, d2, d3, dens);
+    grid_manager.getDensityVectors(temp, asym_atom_list, d1, d2, d3, dens);
     time_points.push_back(get_time());
     time_descriptions.push_back("combined density vectors");
 
