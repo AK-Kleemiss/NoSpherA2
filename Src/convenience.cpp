@@ -3209,7 +3209,6 @@ void ProgressBar::initialize_taskbar_progress()
 #endif
 
 void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt) {
-
 	double lambda = 0.0;
     const double ls = stod(lambda_step);
     std::string jobname, line;

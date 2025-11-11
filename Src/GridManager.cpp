@@ -212,7 +212,7 @@ void GridManager::setupGridsForMolecule(const WFN& wave, const bvec& needs_grid,
     addTimingPoint("Prototype Grid setup");
 
     // Generate integration grids for each atom
-    generateIntegrationGrids(wave, unit_cell, needs_grid, atom_list);
+    generateIntegrationGrids(wave, unit_cell, atom_list);
     addTimingPoint("Atomic Grid setup");
 
     // Calculate Hirshfeld weights if needed
@@ -306,7 +306,7 @@ void GridManager::setupPrototypeGrids(const WFN& wave, const ivec& atom_types) {
 }
 
 void GridManager::generateIntegrationGrids(const WFN& wave, const cell& unit_cell,
-                                           const bvec& needs_grid, const ivec& atom_list) {
+                                           const ivec& atom_list) {
     std::cout << "GridManager: Generating integration grids for atoms..." << std::endl;
     const int num_atoms_with_grids = atom_list.size();
     grid_data_.resizeForAtoms(num_atoms_with_grids);
@@ -498,11 +498,11 @@ PartitionResults GridManager::calculatePartitionedCharges(const WFN& wave, const
     return results;
 }
 
-void GridManager::getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d3, vec2& dens) {
+void GridManager::getDensityVectors(const WFN& wave, const ivec& atom_list, vec2& d1, vec2& d2, vec2& d3, vec2& dens) {
     if (config_.debug) {
         std::cout << "GridManager: Generating density vectors..." << std::endl;
     }
-    const int n_atoms = wave.get_ncen();
+    const int n_atoms = grid_data_.atomic_grids.size();
     const double cutoff = config_.getCutoff();
     //Choose grids to consider for charge calculation
     GridData::GridIndex idx_single; // default
@@ -532,9 +532,9 @@ void GridManager::getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d
         const double* x = atomic_grid[GridData::GridIndex::X].data();
         const double* y = atomic_grid[GridData::GridIndex::Y].data();
         const double* z = atomic_grid[GridData::GridIndex::Z].data();
-        const double x0 = wave.get_atom_coordinate(g, 0);
-        const double y0 = wave.get_atom_coordinate(g, 1);
-        const double z0 = wave.get_atom_coordinate(g, 2);
+        const double x0 = wave.get_atom_coordinate(atom_list[g], 0);
+        const double y0 = wave.get_atom_coordinate(atom_list[g], 1);
+        const double z0 = wave.get_atom_coordinate(atom_list[g], 2);
 
         size_t accepted_points = 0;
         for (int p = 0; p < n_points; ++p) {
