@@ -370,8 +370,8 @@ int load_basis_into_WFN(WFN& wavy, std::shared_ptr<BasisSet> b)
         int size = (int)basis.size();
         for (int e = 0; e < size; e++)
         {
-            wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell);
-            //wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
+            //wavy.push_back_atom_basis_set(i, basis[e].exp, basis[e].coefficient, basis[e].type, basis[e].shell); //We decontract the basis, this makes it easier to handle in the long run.
+            wavy.push_back_atom_basis_set(i, basis[e].exp, 1.0, basis[e].type, e);
 
             nr_coefs += 2 * basis[e].type + 1; //HIER WEITER MACHEN!!
         }

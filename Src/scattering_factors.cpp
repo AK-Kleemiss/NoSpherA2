@@ -2048,6 +2048,8 @@ cdouble sfac_bessel(
     return constants::FOUR_PI_i_pows[p.get_type()] * fourier_bessel_integral(p, k_point[3]) * p.get_coef() * constants::spherical_harmonic(p.get_type(), k_point, coefs);
 }
 
+
+//TODO: The logic here is WRONG! This will only work for uncontracted basis sets! If you want to use anything else you have to sum over all primitives in a contracted basis set!
 void calc_SF_SALTED(const vec2 &k_pt,
                     const vec &coefs,
                     const std::vector<atom> &atom_list,

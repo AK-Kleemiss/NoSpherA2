@@ -280,13 +280,14 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial;
     int coef_counter = 0;
-    unsigned int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0, prim = 0;
     basis_set_entry bf;
     primitive p;
 
     for (int a = 0; a < atoms.size(); a++)
     {
-        size = (int)atoms[a].get_basis_set_size();
+        prim = 0;
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
         double d[4]{
             x - atoms[a].get_coordinate(0),
             y - atoms[a].get_coordinate(1),
@@ -295,18 +296,18 @@ const double calc_density_ML(const double& x,
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         if (d[3] < -46.0517)
         { // corresponds to cutoff of ex ~< 1E-20
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                bf = atoms[a].get_basis_set_entry(e);
-                coef_counter += (2 * bf.get_type() + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        int prim = 0;
-        for (int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        
+        for (int shell = 0; shell < n_shells; shell++) {
             radial = 0;
             int type = atoms[a].get_basis_set_entry(prim).get_type();
 
@@ -338,19 +339,21 @@ const double calc_density_ML(const double& x,
 {
     double dens = 0, radial = 0;
     int coef_counter = 0;
-    int e = 0, size = 0;
+    unsigned int shell = 0, n_shells = 0;
 
     for (int a = 0; a < atoms.size(); a++)
     {
+        n_shells = static_cast<unsigned int>(atoms[a].get_shellcount().size());
+        unsigned int prim = 0;
         if (a != atom_nr) {
-            for (e = 0; e < size; e++)
+            for (shell = 0; shell < n_shells; shell++)
             {
-                coef_counter += (2 * atoms[a].get_basis_set_type(e) + 1);
+                coef_counter += (2 * atoms[a].get_basis_set_type(prim) + 1);
+                prim += atoms[a].get_shellcount()[shell];
             }
             continue;
         }
-        size = (int)atoms[a].get_basis_set_size();
-
+        
         basis_set_entry bf;
         double d[4]{
             x - atoms[a].get_coordinate(0),
@@ -359,10 +362,9 @@ const double calc_density_ML(const double& x,
         // store r in last element
         d[3] = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
         // normalize distances for spherical harmonic
-        for (e = 0; e < 3; e++)
-            d[e] /= d[3];
-        unsigned int prim = 0;
-        for (unsigned int shell = 0; shell < atoms[a].get_shellcount().size(); shell++) {
+        for (int i = 0; i < 3; i++)
+            d[i] /= d[3];
+        for (shell = 0; shell < n_shells; shell++) {
             radial = 0;
             unsigned int type = atoms[a].get_basis_set_entry(prim).get_type();
 
