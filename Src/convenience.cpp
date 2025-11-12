@@ -2356,7 +2356,7 @@ void options::digest_options()
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!",std::cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction does not exist!",std::cout);
         }
         else if (temp == "-wfn_cif")
         {
