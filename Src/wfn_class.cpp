@@ -868,6 +868,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         {
             last_ener = -DBL_MAX;
             oper++;
+			is_unrestricted = true;
         }
         push_back_MO(temp_nr, temp_occ, temp_ener, oper);
         //---------------------------Start reading MO coefficients-----------------------
@@ -1213,6 +1214,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         {
             last_ener = -DBL_MAX;
             oper++;
+            is_unrestricted = true;
         }
         err_checkf(push_back_MO(i + 1, occ[i], ener[i], oper), "Error poshing back MO! MO: " + to_string(i), file);
     }
@@ -1534,8 +1536,10 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
                 spin = false;
-            else
+            else {
                 spin = true;
+				is_unrestricted = true;
+            }
             getline(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
@@ -2229,6 +2233,7 @@ bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, 
         err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
         read_block_from_fortran_binary(rf_e, energies_beta);
         read_block_from_fortran_binary(rf_o, orbitals_beta);
+		is_unrestricted = true;
 	}
 
     rf_e.close();
@@ -2947,6 +2952,8 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         vec2 energies(operators);
         ivec2 irreps(operators);
         ivec2 cores(operators);
+        if (operators > 1)
+			is_unrestricted = true;
         for (int i = 0; i < operators; i++)
         {
             coefficients[i].resize(coef_nr, 0);
@@ -6336,6 +6343,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
     }
     else
     { // Unrestricted
+		is_unrestricted = true;
         if (!read_fchk_double_block(fchk, "Alpha Orbital Energies", MOene[0]))
         {
             log << "Error during reading of Alpha Energies" << std::endl;
@@ -8209,8 +8217,10 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     {
         if (i < alpha_els)
             err_checkf(push_back_MO(MO(i, occ[i], eval[i], 0)), "Error adding MO to WFN!", file);
-        else
+        else {
             err_checkf(push_back_MO(MO(i, occ[i], eval[i], 1)), "Error adding MO to WFN!", file);
+			is_unrestricted = true;
+        }
     }
     err_checkf(nmo == nmomax, "Error adding MOs to WFN!", file);
 

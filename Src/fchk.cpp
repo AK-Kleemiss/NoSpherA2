@@ -1125,7 +1125,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             if (nshell != run_2)
                 nshell = run_2;
         }
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             for (int m = 0; m < wave.get_nmo(); m++)
             {
@@ -1215,7 +1215,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
         int naotr = nao * (nao + 1) / 2;
         vec kp;
         wave.resize_DM(naotr, 0.0);
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
             wave.resize_SDM(naotr, 0.0);
         if (debug)
         {
@@ -1265,7 +1265,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             file << wave.get_DM_size() << " Elements in DM" << endl;
             dm.flush();
             dm.close();
-            if (alpha_els != beta_els)
+            if (wave.get_is_unrestricted())
             {
                 ofstream sdm("sdm.debug", ofstream::out);
                 file << "SDM is in sdm.debug" << endl;
@@ -1499,7 +1499,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 fchk << "\n";
         }
 
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Beta Orbital Energies                      R   N=" << setw(12) << nao << "\n";
             runs = 0;
@@ -1528,7 +1528,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
                 fchk << "\n";
         }
 
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Beta MO coefficients                       R   N=" << setw(12) << nao * nao << "\n";
             runs = 0;
@@ -1553,7 +1553,7 @@ bool free_fchk(std::ostream &file, const std::filesystem::path &fchk_name, const
             if ((runs % 5 == 0 && runs != 0) || i == wave.get_DM_size() - 1)
                 fchk << "\n";
         }
-        if (alpha_els != beta_els)
+        if (wave.get_is_unrestricted())
         {
             fchk << "Spin SCF Density                           R   N=" << setw(12) << wave.get_SDM_size() << "\n";
             runs = 0;

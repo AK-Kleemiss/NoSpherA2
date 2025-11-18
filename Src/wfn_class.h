@@ -125,6 +125,7 @@ private:
     bool distance_switch;
     bool has_ECPs;
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
+	bool is_unrestricted = false; // True if the wavefunction is unrestricted (different alpha and beta MOs)
     // precomputed factors and helper functions for ESP calc
     long long int pre[9][5][5][9];
     void fill_pre();
@@ -230,6 +231,8 @@ public:
         path = given_path;
         return true;
     };
+    /** Get whether this is an unrestricted calculation */
+	bool get_is_unrestricted() const { return is_unrestricted; };
     /** Print primitive information to stdout. */
     void print_primitive(const int &nr) const;
     /** Assign total charge (overwrites existing). */
