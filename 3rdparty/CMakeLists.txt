@@ -95,3 +95,7 @@ if (UNIX)
 else ()
     find_package(MKL CONFIG REQUIRED)
 endif ()
+
+if (WITH_OCC)
+    find_package(occ REQUIRED)
+endif ()

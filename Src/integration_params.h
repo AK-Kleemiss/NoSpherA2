@@ -142,7 +142,7 @@ struct LibCintBasis {
 class Int_Params {
 private:
     unsigned long long ncen = 0;           // Number of centers (atoms)
-    int wfn_origin = 0;
+    WfnOrigin wfn_origin = WfnOrigin::UNKNOWN;
     std::vector<atom> atoms;
 
     std::map<int, LibCintBasis> basis_sets;  //Maps atomic number -> (vec(coefs), vec(expon))
@@ -182,7 +182,7 @@ public:
     vec get_env() { return _env; };
 
     unsigned long long get_nbas() { return nbas; };  // Number of basis segments
-    unsigned long long get_nao() { return nao; };    // Number of atomic orbitals  
+    unsigned long long get_nao() { return nao; };    // Number of atomic orbitals
     unsigned long long get_natoms() { return ncen; };
 
     void print_data(std::string name); //FOR DEBUG PURPOSES

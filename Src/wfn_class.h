@@ -7,7 +7,35 @@
 #include <string>
 #include <array>
 #include <filesystem>
+enum class WfnOrigin : int {
+    UNKNOWN = 0,
+    CRYSTAL = 1,
+	WFN = 2,
+	CUBE = 3,
+	FFN = 4,
+	FCHK = 5,
+	WFX = 6,
+	XYZ = 7,
+	MOLDEN = 8,
+	GBW = 9,
+	PTB = 10
+};
 
+inline std::ostream& operator<<(std::ostream& os, WfnOrigin origin) {
+    switch (origin) {
+        case WfnOrigin::UNKNOWN: return os << "Unknown";
+        case WfnOrigin::CRYSTAL: return os << "CRYSTAL";
+        case WfnOrigin::WFN:     return os << "WFN";
+        case WfnOrigin::CUBE:    return os << "CUBE";
+        case WfnOrigin::FFN:     return os << "FFN";
+        case WfnOrigin::FCHK:    return os << "FCHK";
+        case WfnOrigin::WFX:     return os << "WFX";
+        case WfnOrigin::GBW:     return os << "GBW";
+        case WfnOrigin::PTB:     return os << "PTB";
+        // Always include a default case for robustness
+        default: return os << "WfnOrigin(Invalid Code: " << static_cast<int>(origin) << ")";
+    }
+}
 class MO;
 
 /**
@@ -41,7 +69,8 @@ private:
     unsigned int multi;
     //Number of software/Filetype that was used to generate the wavefunction
     // 0=NOT_YET_DEFINED/UNKNOWN; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
-    int origin;
+	// enum class is typesafe, so it has to be defined as such. It can be switched to enum later if needed
+    WfnOrigin origin;
     //Store the total energy of the wavefunction
     double total_energy;
 	//Store the virial ratio of the wavefunction (if available)
@@ -86,17 +115,17 @@ private:
 	// Vector of atoms/centers in the wavefunction
     std::vector<atom> atoms;
 
-	// remove a center from the centers vector 
+	// remove a center from the centers vector
 	// CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
 	// @param g_nr the index of the center to be removed
     // @return true if successful
     bool erase_center(const int &g_nr);
-    // remove a type from the type vector 
+    // remove a type from the type vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the type to be removed
     // @return true if successful
     bool erase_type(const int &nr);
-    // remove an exponent from the exponents vector 
+    // remove an exponent from the exponents vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the exponent to be removed
 	// @return true if successful
@@ -128,7 +157,7 @@ public:
     /** Default constructor creates an empty wavefunction object. */
     WFN();
     /** Construct empty WFN with an explicit origin/filetype code. @param given_origin origin code */
-    WFN(int given_origin);
+    WFN(WfnOrigin given_origin);
     /** Construct by reading a file, auto-detecting filetype. @param filename path to wavefunction file @param debug enable verbose logging */
     WFN(const std::filesystem::path& filename, const bool& debug = false);
     /** Construct with forced charge / multiplicity while reading a file. */
@@ -235,7 +264,7 @@ public:
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool &only_occ) const;
     /** Origin/file type code. */
-    const int& get_origin() const { return origin; };
+    const WfnOrigin& get_origin() const { return origin; };
     /** ECP mode (def2/xTB/pTB etc.). */
     const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */

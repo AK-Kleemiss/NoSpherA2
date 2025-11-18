@@ -1,0 +1,11 @@
+add_executable(wfn_adapter wfn_addapter.cpp wfn_addapter.h)
+
+if (WITH_OCC)
+    find_package(occ REQUIRED)
+endif ()
+message(WARNING ${occ_INCLUDE_DIRS})
+message(WARNING ${occ_LIBRARIES})
+include(CMakePrintHelpers)
+include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
+print_target_properties(occ::libocc)
+target_link_libraries(wfn_adapter PUBLIC occ::libocc libnosphera2)
