@@ -1342,9 +1342,9 @@ void properties_calculation(options &opt)
 void do_combine_mo(options &opt)
 {
     using namespace std;
-    WFN wavy1(2);
-    WFN wavy2(2);
-    WFN wavy3(2);
+    WFN wavy1(WfnOrigin::WFN);
+    WFN wavy2(WfnOrigin::WFN);
+    WFN wavy3(WfnOrigin::WFN);
     wavy1.read_wfn(opt.combine_mo[0], false,std::cout);
     wavy2.read_wfn(opt.combine_mo[1], false,std::cout);
     for (int i = 0; i < wavy1.get_ncen(); i++)
@@ -1721,7 +1721,7 @@ void polarizabilities(options &opt, std::ostream &log2)
     std::vector<WFN> wavy;
     for (int i = 0; i < 7; i++)
     {
-        wavy.emplace_back(0);
+        wavy.emplace_back(WfnOrigin::UNKNOWN);
         wavy[i].read_known_wavefunction_format(opt.pol_wfns[i], log2, opt.debug);
     }
 

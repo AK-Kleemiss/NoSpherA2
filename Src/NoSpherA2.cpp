@@ -54,7 +54,7 @@ int main(int argc, char **argv)
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
-        wavy.emplace_back(6);
+        wavy.emplace_back(WfnOrigin::WFX);
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
@@ -438,12 +438,12 @@ int main(int argc, char **argv)
             {
                 // Fill WFN wil the primitives of the JKFit basis (currently hardcoded)
                 // const std::vector<std::vector<primitive>> basis(QZVP_JKfit.begin(), QZVP_JKfit.end());
-               
+
                 SALTEDPredictor *temp_pred = new SALTEDPredictor(wavy[0], opt);
                 string df_basis_name = temp_pred->get_dfbasis_name();
                 filesystem::path salted_model_path = temp_pred->get_salted_filename();
                 log_file << "Using " << salted_model_path << " for the prediction" << endl;
-                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name); 
+                std::shared_ptr<BasisSet> aux_basis = BasisSetLibrary().get_basis_set(df_basis_name);
                 load_basis_into_WFN(temp_pred->wavy, aux_basis);
 
                 if (opt.debug)
@@ -454,7 +454,7 @@ int main(int argc, char **argv)
                     log_file,
                     empty,
                     0);
-                
+
                 delete temp_pred;
             }
             log_file << "Writing tsc file... " << flush;

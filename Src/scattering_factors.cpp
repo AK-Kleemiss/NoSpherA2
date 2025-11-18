@@ -2073,7 +2073,7 @@ void calc_SF_SALTED(const vec2 &k_pt,
             k_pt_local[3] = std::sqrt(k_pt_local[0] * k_pt_local[0] + k_pt_local[1] * k_pt_local[1] + k_pt_local[2] * k_pt_local[2]);
 
             //Normalize K-point
-            for (int i = 0; i < 3; i++) 
+            for (int i = 0; i < 3; i++)
                 k_pt_local[i] /= k_pt_local[3];
 
             const atom* atom_ptr = &(atom_list[0]);
@@ -2483,7 +2483,7 @@ tsc_block_type calculate_scattering_factors(
     else
         cif = opt.cif;
 
-    
+
     cell unit_cell(cif, file, opt.debug);
     ifstream cif_input(cif.c_str(), std::ios::in);
     ivec atom_type_list;
@@ -2688,7 +2688,7 @@ tsc_block_type calculate_scattering_factors(
     else if constexpr (std::is_same_v<calculator_type, std::vector<WFN>&>){
         if (opt.partition_type == PartitionType::Hirshfeld || opt.partition_type == PartitionType::Becke || opt.partition_type == PartitionType::TFVC)
         {
-            vec2 d1, d2, d3, dens; 
+            vec2 d1, d2, d3, dens;
             const int points = make_atomic_grids_wrapper(
                                         *wavy,
                                         needs_grid,
@@ -2723,7 +2723,7 @@ tsc_block_type calculate_scattering_factors(
             shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
             for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
 
-            WFN wavy_aux(0);
+            WFN wavy_aux(WfnOrigin::UNKNOWN);
             wavy_aux.set_atoms(wavy->get_atoms());
             wavy_aux.set_ncen(wavy->get_ncen());
             wavy_aux.delete_basis_set();
@@ -2735,11 +2735,11 @@ tsc_block_type calculate_scattering_factors(
                  << flush;
             time_points.push_back(get_time());
             time_descriptions.push_back("RI-Fit");
-            
+
             vec atom_elecs = calc_atomic_density(wavy_aux.get_atoms(), coefs);
             file << "Table of Charges in electrons\n"
                  << "       Atom      ML" << endl;
-            
+
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
                 int a = asym_atom_list[i];
@@ -2749,12 +2749,12 @@ tsc_block_type calculate_scattering_factors(
                     file << " " << setw(4) << wavy_aux.get_atom_charge(a) << " " << fixed << setw(10) << setprecision(3) << atom_elecs[i];
                 file << endl;
             }
-        
+
             auto el_sum = reduce(atom_elecs.begin(), atom_elecs.end(), 0.0);
             file << setprecision(4) << "Total number of analytical Electrons: " << el_sum << endl;
             time_points.push_back(get_time());
             time_descriptions.push_back("Calculation of Charges");
-        
+
             calc_SF_SALTED(
                 k_pt,
                 coefs,
@@ -2841,7 +2841,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
-    wavy.emplace_back(1);
+    wavy.emplace_back(WfnOrigin::CRYSTAL);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     // set number of threads
 #ifdef _OPENMP
@@ -3016,7 +3016,7 @@ ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
         needs_grid,
         wavy,
         0,
-        atom_types, 
+        atom_types,
         nr_list,
         Prototype_grids,
         grid,
@@ -3026,7 +3026,7 @@ ivec fuckery(WFN& wavy, vec3 &grid, const int accuracy) {
     Prototype_grids.clear();
 
     int points = vec_sum(num_points);
-    
+
     for (int a = 0; a < wavy.get_ncen(); a++) {
         grid[a][6].resize(grid[a][5].size());
     }

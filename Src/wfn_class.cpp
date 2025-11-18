@@ -38,7 +38,7 @@ WFN::WFN()
     nex = 0;
     charge = 0;
     multi = 0;
-    origin = 0;
+    origin = WfnOrigin::UNKNOWN;
     ECP_m = 0;
     total_energy = 0.0;
     virial_ratio = 0.0;
@@ -53,7 +53,7 @@ WFN::WFN()
     fill_Afac_pre();
 };
 
-WFN::WFN(int given_origin)
+WFN::WFN(WfnOrigin given_origin)
 {
     ncen = 0;
     nfunc = 0;
@@ -521,21 +521,21 @@ const std::string WFN::hdr(const bool &occupied) const
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
     if (fileName.extension() == ".wfn")
-        origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
+        origin = WfnOrigin::WFN, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
     else if (fileName.extension() == ".ffn")
-        origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
+        origin = WfnOrigin::FFN, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
     else if (fileName.extension() == ".wfx")
-        origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
+        origin = WfnOrigin::WFX, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
     else if (fileName.extension() == ".fch" || fileName.extension() == ".fchk" || fileName.extension() == ".FCh" || fileName.extension() == ".FChK" || fileName.extension() == ".FChk")
-        origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
+        origin = WfnOrigin::FFN, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
     else if (fileName.extension() == ".xyz")
-        origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
+        origin = WfnOrigin::XYZ, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
     else if (fileName.extension() == ".molden")
-        origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
+        origin = WfnOrigin::MOLDEN, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
     else if (fileName.extension() == ".gbw")
-        origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
+        origin = WfnOrigin::GBW, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
     else if (fileName.extension() == ".xtb")
-        origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
+        origin = WfnOrigin::PTB, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
 };
@@ -551,7 +551,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
-    origin = 2;
+    origin = WfnOrigin::WFN;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName);
     if (rf.good())
@@ -832,7 +832,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     while (!(line.compare(0, 3, "END") == 0) && !rf.eof())
     {
         if (monum == e_nmo)
-        {            
+        {
             file << "monum went higher than expected values in MO reading, thats suspicius, lets stop here...\n";
             break;
         }
@@ -943,7 +943,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 {
     using namespace std;
     err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
-    origin = 7;
+    origin = WfnOrigin::XYZ;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -1005,7 +1005,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
-    origin = 6;
+    origin = WfnOrigin::WFX;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1315,7 +1315,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 
   //  DM = dot(coeff_mo, coeff_small, (int)MOs_mat.size(), (int)n_occ, (int)MOs_mat.size(), (int)n_occ, false, true);
 
-    
+
 
     while (line.find("<Energy =") == string::npos)
         getline(rf, line);
@@ -1333,7 +1333,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 const double WFN::get_maximum_MO_coefficient(bool occu) const {
     double max_coef = 0.0;
     for (int i = 0; i < nmo; i++) {
-        if (occu && MOs[i].get_occ() == 0.0) 
+        if (occu && MOs[i].get_occ() == 0.0)
             continue;
         for(int j=0; j<nex; j++){
             if (std::abs(MOs[i].get_coefficients()[j]) > max_coef) {
@@ -1351,7 +1351,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = 8;
+    origin = WfnOrigin::MOLDEN;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -2109,7 +2109,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = 9;
+    origin = WfnOrigin::GBW;
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
         path = filename;
@@ -2117,7 +2117,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     int geo_start_bit = 8;
     int basis_start_bit = 16;
     int MO_start_bit = 24;
-    int soi = constants::soi; 
+    int soi = constants::soi;
     int geo_int_lim = 5;
 
     try
@@ -2577,7 +2577,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
                         reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
-                    } 
+                    }
                 }
                 index += 2 * type + 1;
             }
@@ -2616,11 +2616,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         int n_occ = 0;
         for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
-        
+
         dMatrix2 coeff_mo_s1(dimension, dimension), coeff_small_s1(dimension, dimension);
         dMatrix2 coeff_mo_s2, coeff_small_s2;
         if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, dimension); coeff_small_s2 = dMatrix2(dimension, dimension);
-        
+
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
@@ -2638,7 +2638,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         else {
             dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, false, true);
             dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, false, true);
-            
+
             std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
             DM = DM_s1;
@@ -3283,7 +3283,7 @@ const unsigned int WFN::get_nr_ECP_electrons() const
     return count;
 }
 
-double WFN::count_nr_electrons(void) const 
+double WFN::count_nr_electrons(void) const
 {
     double count = 0;
     for (int i = 0; i < nmo; i++)
@@ -3640,7 +3640,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
        std::cout << "Origin: " << get_origin() << endl;
     }
-    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
+    if (get_origin() == WfnOrigin::WFN || get_origin() == WfnOrigin::FFN || get_origin() == WfnOrigin::GBW ||
+        get_origin() == WfnOrigin::MOLDEN)
     {
         //-----------------------check ordering and order accordingly----------------------
         sort_wfn(check_order(debug), debug);
@@ -5247,7 +5248,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          {
              //to-do: Have to calcualte confac for higher l
          }
-         
+
     }
     vec2 p_pure_2_cart;
     vec2 d_pure_2_cart;
@@ -6859,7 +6860,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 
 bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
-    origin = 10;
+    origin = WfnOrigin::PTB;
     if (debug)
         file << "Reading pTB file: " << filename << std::endl;
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);
@@ -6934,7 +6935,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     if (multi == 0)
         multi = elcount % 2 + 1;
     err_checkf((elcount % 2 == 0 && multi % 2 == 1) || elcount % 2 == 1 && multi % 2 == 0, "Impossible combination of number of electrons and multiplicity! " + std::to_string(elcount) + " " + std::to_string(multi), std::cout);
-    
+
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {
