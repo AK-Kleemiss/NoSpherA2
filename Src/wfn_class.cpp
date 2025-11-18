@@ -5191,7 +5191,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
             if (nshell != run_2)
                 nshell = run_2;
         }
-        if (alpha_els != beta_els)
+        if (is_unrestricted)
         {
             for (int m = alpha_els; m < alpha_els + beta_els; m++)
             {
@@ -5279,7 +5279,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
         int naotr = nao * (nao + 1) / 2;
         vec kp;
         resize_DM(naotr, 0.0);
-        if (alpha_els != beta_els)
+        if (is_unrestricted)
             resize_SDM(naotr, 0.0);
         if (debug)
         {
@@ -5301,7 +5301,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
                     // if (debug && m == 0)std::cout << m << " " << flush;
                     // else if (debug && m != get_nmo() - 1)std::cout << "." << flush;
                     // elsestd::cout << get_nmo() - 1 << flush;
-                    if (alpha_els != beta_els)
+                    if (is_unrestricted)
                     {
                         if (m < alpha_els)
                         {
