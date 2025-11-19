@@ -1,4 +1,4 @@
-add_executable(wfn_adapter wfn_addapter.cpp wfn_addapter.h)
+add_executable(wfn_adapter WfnAdapter.cpp WfnAdapter.h)
 
 if (WITH_OCC)
     find_package(occ REQUIRED)

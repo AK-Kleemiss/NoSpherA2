@@ -77,6 +77,7 @@ target_link_options(libnosphera2 PRIVATE
 )
 target_link_libraries(libnosphera2 PUBLIC
     MKL::MKL
+    occ::libocc
     basis_set_helper
     mdspan
         metatensor::static

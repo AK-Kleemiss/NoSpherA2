@@ -8,6 +8,8 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include <cstdio>
+#include <occ/qm/wavefunction.h>
 
 void WFN::fill_pre()
 {
@@ -38,85 +40,41 @@ WFN::WFN()
     nex = 0;
     charge = 0;
     multi = 0;
+    ECP_m = 0;
+    total_energy = 0.0;
+    d_f_switch = false;
+    modified = false;
+    distance_switch = false;
+    has_ECPs = false;
+    basis_set_name = " ";
+    comment = "Test";
+    basis_set = NULL;
     origin = WfnOrigin::UNKNOWN;
-    ECP_m = 0;
-    total_energy = 0.0;
-    virial_ratio = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    basis_set_name = " ";
-    has_ECPs = false;
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
 
-WFN::WFN(WfnOrigin given_origin)
+WFN::WFN(WfnOrigin given_origin) : WFN()
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
     origin = given_origin;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
 };
 
-WFN::WFN(const std::filesystem::path & filename, const bool& debug)
+WFN::WFN(const std::filesystem::path & filename, const bool& debug) : WFN()
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) : WFN() {
     charge = g_charge;
     multi = g_mult;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
+
+WFN::WFN(occ::qm::Wavefunction& occ_WF, WfnOrigin given_origin) {
+    std::printf("test");
+}
+
+
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
 {

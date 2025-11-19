@@ -7,6 +7,13 @@
 #include <string>
 #include <array>
 #include <filesystem>
+#include <occ/qm/wavefunction.h>
+
+namespace occ::qm
+{
+	struct Wavefunction;
+}
+
 enum class WfnOrigin : int {
     UNKNOWN = 0,
     CRYSTAL = 1,
@@ -155,7 +162,7 @@ public:
     /** @name Constructors */
     ///@{
     /** Default constructor creates an empty wavefunction object. */
-    WFN();
+	WFN();
     /** Construct empty WFN with an explicit origin/filetype code. @param given_origin origin code */
     WFN(WfnOrigin given_origin);
     /** Construct by reading a file, auto-detecting filetype. @param filename path to wavefunction file @param debug enable verbose logging */
@@ -163,7 +170,8 @@ public:
     /** Construct with forced charge / multiplicity while reading a file. */
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
-
+	/** Construct from an OCC Wavefunction Struct */
+    WFN(occ::qm::Wavefunction& occ_WF, WfnOrigin given_origin);
     //--------------------MO handling--------------------------------------------
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
@@ -256,7 +264,7 @@ public:
     /** Number of primitives (nex). */
     const int& get_nex() const { return nex; };
     /** Number of centers / atoms. */
-    const int& get_ncen() const { return ncen; };
+    virtual const int& get_ncen() const { return ncen; };
     /** Manually set number of centers (use with care). */
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
