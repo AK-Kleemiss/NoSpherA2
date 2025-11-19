@@ -18,4 +18,4 @@ if __name__ == "__main__":
         log = re.sub(r'[ \t]+', ' ', log)
 
     if good != log:
-        raise Exception(f"Test failed:\nDiff: {''.join(difflib.unified_diff(good, log))}")
+        raise Exception(f"Test failed:\nDiff: {''.join(difflib.unified_diff(good.splitlines(keepends=True), log.splitlines(keepends=True)))}")

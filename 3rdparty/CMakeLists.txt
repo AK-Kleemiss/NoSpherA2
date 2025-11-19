@@ -16,7 +16,7 @@ CPMAddPackage(
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
-    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.2/featomic-cxx-0.6.2.tar.gz"
+    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
     OPTIONS
         "CMAKE_BUILD_TYPE Release"
         "FEATOMIC_FETCH_METATENSOR ON"
