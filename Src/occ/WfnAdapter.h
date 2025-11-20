@@ -20,6 +20,29 @@
 #include <sstream>
 #include <iostream>
 
+class MO_OCC : public MO
+{
+    public:
+        MO_OCC(int number, int op, double occ, double energy);
+
+};
+
+class vecMO : std::vector<MO_OCC>
+{
+    public:
+        vecMO(occ::qm::MolecularOrbitals& orbital) : m_orbital(orbital)
+        {
+            for (size_t atomic_orbital = 0; atomic_orbital < orbital.n_ao; atomic_orbital++)
+            {
+                auto cMO = MO_OCC();
+            }
+            m_orbital.occupation;
+
+        }
+    private:
+        occ::qm::MolecularOrbitals& m_orbital;
+};
+
 class WfnAdapter : public WFN
 {
     public:

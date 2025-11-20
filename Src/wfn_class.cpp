@@ -59,18 +59,32 @@ WFN::WFN(WfnOrigin given_origin) : WFN()
     origin = given_origin;
 };
 
-WFN::WFN(const std::filesystem::path & filename, const bool& debug) : WFN()
+WFN::WFN(const std::filesystem::path& filename, const bool& debug) : WFN()
 {
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) : WFN() {
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) : WFN(filename, debug) {
     charge = g_charge;
     multi = g_mult;
-    read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(occ::qm::Wavefunction& occ_WF, WfnOrigin given_origin) {
+WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
+    origin = WfnOrigin::OCC;
+    total_energy = occ_WF.energy.total;
+    virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
+    basis_set_name = occ_WF.basis.name();
+    has_ECPs = occ_WF.basis.have_ecps();
+    ncen = occ_WF.atoms.size();
+    atoms.resize(ncen);
+    occ::Mat3N atom_positions = occ_WF.positions();
+    for (size_t i = 0; i < ncen; i++) {
+        atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
+        atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
+        atoms[i].set_coordinate(0, atom_positions(i, 0));
+        atoms[i].set_coordinate(1, atom_positions(i, 1));
+        atoms[i].set_coordinate(2, atom_positions(i, 2));
+    }
     std::printf("test");
 }
 

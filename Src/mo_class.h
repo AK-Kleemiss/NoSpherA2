@@ -1,12 +1,13 @@
 #pragma once
 
+#include "occ/WfnAdapter.h"
 #include <vector>
 #include <string>
 
 class MO
 {
 private:
-  int nr;
+  int nr; //acts as an index
   double occ;
   double ener;
   vec coefficients;
@@ -24,6 +25,8 @@ public:
     ener = energy;
     op = oper;
   };
+  virtual ~MO() {};
+  friend class MO_OCC;
   void push_back_coef(const double &val){
     coefficients.emplace_back(val);
   };
@@ -35,7 +38,7 @@ public:
       return false;
 
     // consistencycheck with WFN
-    if (nex != coefficients.size() - 1) 
+    if (nex != coefficients.size() - 1)
       return false;
 
     // delete Vector-Entry and rearrange
@@ -46,7 +49,7 @@ public:
   const double& get_coefficient(const int& _nr) const {
     err_checkf(_nr < coefficients.size() && _nr >= 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
     return coefficients[_nr];
-  }; 
+  };
   const vec get_coefficients() const {
       return coefficients;
   };

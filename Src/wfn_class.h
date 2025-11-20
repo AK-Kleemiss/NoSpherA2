@@ -8,6 +8,7 @@
 #include <array>
 #include <filesystem>
 #include <occ/qm/wavefunction.h>
+#include "mo_class.h"
 
 namespace occ::qm
 {
@@ -25,7 +26,8 @@ enum class WfnOrigin : int {
 	XYZ = 7,
 	MOLDEN = 8,
 	GBW = 9,
-	PTB = 10
+	PTB = 10,
+	OCC = 11
 };
 
 inline std::ostream& operator<<(std::ostream& os, WfnOrigin origin) {
@@ -171,7 +173,10 @@ public:
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
 	/** Construct from an OCC Wavefunction Struct */
-    WFN(occ::qm::Wavefunction& occ_WF, WfnOrigin given_origin);
+    WFN(occ::qm::Wavefunction& occ_WF);
+	virtual ~WFN() {};
+    //-------------------- OCC additional things--------------------------------------------
+    friend class WfnAdapter;
     //--------------------MO handling--------------------------------------------
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
@@ -566,4 +571,3 @@ public:
     const double *get_ptr_exponents() { return &exponents[0]; };
 };
 
-#include "mo_class.h"
