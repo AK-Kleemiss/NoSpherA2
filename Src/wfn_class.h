@@ -176,7 +176,7 @@ public:
     WFN(occ::qm::Wavefunction& occ_WF);
 	virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
-    friend class WfnAdapter;
+    // friend class WfnAdapter;
     //--------------------MO handling--------------------------------------------
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);

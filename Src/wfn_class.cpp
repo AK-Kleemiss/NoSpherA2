@@ -10,6 +10,7 @@
 #include "nos_math.h"
 #include <cstdio>
 #include <occ/qm/wavefunction.h>
+#include <ostream>
 
 void WFN::fill_pre()
 {
@@ -77,14 +78,35 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
     has_ECPs = occ_WF.basis.have_ecps();
     ncen = occ_WF.atoms.size();
     atoms.resize(ncen);
+    nex = occ_WF.basis.max_num_primitives();
+    auto rest_unrest_flag = occ_WF.mo.kind;
     occ::Mat3N atom_positions = occ_WF.positions();
-    for (size_t i = 0; i < ncen; i++) {
+    const int el = occ_WF.num_electrons;
+    const int ael = occ_WF.n_alpha();
+    const int bel = occ_WF.n_beta();
+    assert(el == ael + bel);
+    //
+    // if (ael != bel && r_u_ro_switch == 0)
+    //     r_u_ro_switch = 1; // If U was not correctly recognized
+    // if (calculation_level.find("CASSCF") != std::string::npos && ael != bel)
+    //     r_u_ro_switch = 2; // CASSCF requires open shell treatment
+    for (long i = 0; i < ncen; i++) {
         atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
         atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
         atoms[i].set_coordinate(0, atom_positions(i, 0));
         atoms[i].set_coordinate(1, atom_positions(i, 1));
         atoms[i].set_coordinate(2, atom_positions(i, 2));
     }
+    auto shells = occ_WF.basis.shells();
+    for (auto shell : shells)
+    {
+        int nprim = shell.num_primitives();
+        for (size_t i=0; i < nprim; i++)
+        {
+            push_back_exponent(shell.exponents(i));
+        }
+    }
+    // vec exp = occ_WF.
     std::printf("test");
 }
 
@@ -5332,6 +5354,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
 
 
         }
+        std::cout << "nbas: " << nbas << std::endl;
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;

@@ -20,28 +20,28 @@
 #include <sstream>
 #include <iostream>
 
-class MO_OCC : public MO
-{
-    public:
-        MO_OCC(int number, int op, double occ, double energy);
+// class MO_OCC : public MO
+// {
+//     public:
+//         MO_OCC(int number, int op, double occ, double energy) {};
+//
+// };
 
-};
-
-class vecMO : std::vector<MO_OCC>
-{
-    public:
-        vecMO(occ::qm::MolecularOrbitals& orbital) : m_orbital(orbital)
-        {
-            for (size_t atomic_orbital = 0; atomic_orbital < orbital.n_ao; atomic_orbital++)
-            {
-                auto cMO = MO_OCC();
-            }
-            m_orbital.occupation;
-
-        }
-    private:
-        occ::qm::MolecularOrbitals& m_orbital;
-};
+// class vecMO : std::vector<MO_OCC>
+// {
+//     public:
+//         vecMO(occ::qm::MolecularOrbitals& orbital) : m_orbital(orbital)
+//         {
+//             for (size_t atomic_orbital = 0; atomic_orbital < orbital.n_ao; atomic_orbital++)
+//             {
+//                 auto cMO = MO_OCC();
+//             }
+//             m_orbital.occupation;
+//
+//         }
+//     private:
+//         occ::qm::MolecularOrbitals& m_orbital;
+// };
 
 class WfnAdapter : public WFN
 {
@@ -52,7 +52,7 @@ class WfnAdapter : public WFN
             m_nfunc(static_cast<int>(wf.nbf)),
             m_nmo() {}
 
-        const int& get_ncen() const override { return m_ncen; }
+        // const int& get_ncen() const override { return m_ncen; }
 
     private:
         occ::qm::Wavefunction& m_originalWfn;

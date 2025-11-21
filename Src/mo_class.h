@@ -1,6 +1,5 @@
 #pragma once
 
-#include "occ/WfnAdapter.h"
 #include <vector>
 #include <string>
 
