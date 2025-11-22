@@ -9,16 +9,14 @@
 #include <ostream>
 #include "../Src/convenience.h"
 using occ::qm::Wavefunction;
-
+using std::iostream;
 std::string get_shape(const occ::Mat& mat)
 {
     return std::format("({}, {})", mat.rows(), mat.cols());
 }
 
-int main()
+void original_approach(Wavefunction& wfn)
 {
-    using std::iostream;
-    Wavefunction wfn = Wavefunction::load("/home/lucas/CLionProjects/NoSpherA2/temp_tests/alanine.owf.fchk");
     auto shells = wfn.basis.shells();
     auto shell2atom  = wfn.basis.shell_to_atom();
     vec exponentsnos; // push_back_exponent emulation
@@ -38,7 +36,7 @@ int main()
         std::cout << "Shell type, l: " << l << "\n";
         std::cout << "calcs:" << "\n";
         confac = Eigen::pow(pow(2, (4*l+3))*Eigen::pow(exponents.array(), 2*l+3), 0.25);
-        auto scaled_contraction = contraction*confac;
+        auto scaled_contraction = contraction*confac.transpose();
         std::cout << confac << "\n";
         int n_cart = (l+1)*(l+2)/2;
         double exp;
@@ -56,22 +54,43 @@ int main()
         std::cout << contraction.transpose() * exponents.matrix() << "\n";
         std::cout << "----" << std::endl;
     }
+}
 
-    // int total_count = 0;
-    // for (auto shell : shells)
-    // {
-    //     for (int i=0; i< shell.num_primitives(); i++)
-    //     {
-    //         std::cout << shell.coeff_normalized(0,i) << " ";
-    //         total_count++;
-    //     }
-    //     std::cout << std::endl;
-    // }
-    // std::cout << "\nTotal Count: " << total_count << std::endl;
-    // std::cout << shells[0].contraction_coefficients << std::endl;
-    // wfn.save("/home/lucas/CLionProjects/NoSpherA2/temp_tests/alanine_saved.owf.fchk");
-    // occ::Mat S_AB = wfn.compute_overlap_matrix();
-      // ABo.symmetric_orthonormalize_molecular_orbitals(S_AB);
-    // std::cout << wfn.mo.D << std::endl;
+void occ_native_approach(Wavefunction& wfn)
+{
+    auto shell2atom  = wfn.basis.shell_to_atom();
+    // original_approach(wfn);
+    auto shells = wfn.basis.shells();
+    std::vector<occ::Mat> shell_vec;
+    int old_atom{-1};
+    int new_atom{0};
+    double norm;
+    for (int i = 0; i<shells.size(); i++)
+    {
+        auto shell = shells[i];
+        int l = shells[i].l;
+        if (old_atom != new_atom)
+        {
+            std::cout << "---------\n" << "Atom: " << new_atom << "\n";
+            old_atom = new_atom;
+        }
+        new_atom = shell2atom[i];
+        std::cout << "shell: " << i << "\n" << shell.coeffs_normalized_for_libecpint() << "\n";
+        std::cout << "coefficients gto_norm: " << "\n";
+
+        auto exponents = shells[i].exponents;
+        for (int j=0; j< shell.contraction_coefficients.size(); j++)
+        {
+            norm = occ::qm::gto_norm(l, exponents(j));
+            std::cout << "gto_norm : " << norm*shell.contraction_coefficients(j) << "\n";
+        }
+    }
+
+}
+
+int main()
+{
+    Wavefunction wfn = Wavefunction::load("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+
     return 0;
 }
