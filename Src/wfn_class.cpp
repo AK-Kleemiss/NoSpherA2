@@ -8,6 +8,7 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include <cmath>
 #include <cstdio>
 #include <occ/qm/wavefunction.h>
 #include <ostream>
@@ -112,6 +113,8 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
     auto shell2atom  = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     int cumm{1};
+    int coef{0};
+    coef = 1/ael;
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
@@ -140,6 +143,40 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
             }
         }
     }
+
+    vec2 MOocc(2);
+    MOocc[0].resize(nmo);
+    if (r_u_ro_switch != 1)
+    {
+        if (r_u_ro_switch == 0)
+        {
+            for (int i=0; i < MOocc[0].size(); i++)
+            {
+                MOocc[0][i] = 2*(i < ael);
+            }
+        } else
+        {
+            for (int i=0; i < MOocc[0].size(); i++)
+            {
+                if (i < bel)
+                    MOocc[0][i] = 2.0;
+                else if (i < ael)
+                    MOocc[0][i] = 1.0;
+                else
+                    MOocc[0][i] = 0.0;
+            }
+        }
+    } else
+    {
+        // TODO: @Lucas fix this
+        // MOocc[0].resize(MOene[0].size());
+        // MOocc[1].resize(MOene[1].size());
+    }
+    // for (int i=1; i < nmo+1; i++)
+    // {
+
+            // push_back_MO(nr, coef*2, mo.energies(nr-1));
+    // }
 }
 
 
