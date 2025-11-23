@@ -8,6 +8,7 @@
 #include <iostream>
 #include <ostream>
 #include "../Src/convenience.h"
+#include "../Src/wfn_class.h"
 using occ::qm::Wavefunction;
 using std::iostream;
 std::string get_shape(const occ::Mat& mat)
@@ -15,8 +16,39 @@ std::string get_shape(const occ::Mat& mat)
     return std::format("({}, {})", mat.rows(), mat.cols());
 }
 
-void original_approach(Wavefunction& wfn)
+template <typename T>
+ivec argsort(const std::vector<T>& v) {
+    ivec idx(v.size());
+    std::iota(idx.begin(), idx.end(), 0);
+
+    std::stable_sort(idx.begin(), idx.end(),
+       [&v](int i1, int i2) { return v[i1] < v[i2]; });
+    return idx;
+}
+template <typename T>
+std::vector<T> apply_permutation(const std::vector<T>& v, const ivec& indices) {
+    std::vector<T> result(v.size());
+    for (size_t i = 0; i < v.size(); ++i) {
+        result[i] = v[indices[i]];
+    }
+    return result;
+}
+template <typename T>
+std::vector<T> sort_vec_by_other(const std::vector<T>& vec1, const std::vector<T>& other)
 {
+    assert (vec1.size() == other.size());
+    return apply_permutation(vec1, argsort(other));
+}
+
+
+WFN wfn_from_nos(const std::string &filepath)
+{
+    return WFN(filepath);
+}
+
+WFN original_approach(Wavefunction& wfn)
+{
+    WFN nos_wfn(wfn);
     auto shells = wfn.basis.shells();
     auto shell2atom  = wfn.basis.shell_to_atom();
     vec exponentsnos; // push_back_exponent emulation
@@ -24,15 +56,31 @@ void original_approach(Wavefunction& wfn)
     ivec types; // push_back_type emulation
     ivec center; // push_back_center emulation
     int cumm{1};
+    const occ::qm::MolecularOrbitals& mo = wfn.mo;
+    int r_u_ro_switch{0};
+    switch (mo.kind)
+    {
+        case occ::qm::General:
+            r_u_ro_switch = 2;
+            break;
+        case occ::qm::Unrestricted:
+            r_u_ro_switch = 1;
+            break;
+        case occ::qm::Restricted:
+            r_u_ro_switch = 0;
+            break;
+    }
     for (int i = 0; i<shells.size(); i++)
     {
+        auto shell = shells[i];
         occ::Vec confac;
-        auto exponents = shells[i].exponents;
+
+        auto exponents = shell.exponents;
         std::cout << "Shell: " << i << "\nsize of Exponents:" << get_shape(exponents) << "\n";
-        auto contraction = shells[i].contraction_coefficients;
+        auto contraction = shell.contraction_coefficients;
         std::cout << "Contraction: " << "size: " << get_shape(contraction) << "\n";
         std::cout << "Shell2atom: " << shell2atom[i] << "\n";
-        int l = shells[i].l;
+        int l = shell.l;
         std::cout << "Shell type, l: " << l << "\n";
         std::cout << "calcs:" << "\n";
         confac = Eigen::pow(pow(2, (4*l+3))*Eigen::pow(exponents.array(), 2*l+3), 0.25);
@@ -54,8 +102,57 @@ void original_approach(Wavefunction& wfn)
         std::cout << contraction.transpose() * exponents.matrix() << "\n";
         std::cout << "----" << std::endl;
     }
+    return nos_wfn;
 }
 
+
+
+int main()
+{
+    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+    Wavefunction wfn = Wavefunction::load(filepath);
+    auto wfn_from_occ = WFN(wfn);
+    std::cout <<wfn_from_occ.sort_wfn(wfn_from_occ.check_order(true), true);
+    auto wfn_nos = WFN(filepath);
+    std::cout << wfn_nos.sort_wfn(wfn_nos.check_order(true), true);
+    auto centersvecocc = wfn_from_occ.get_centers();
+    auto centersvecnos = wfn_nos.get_centers();
+
+    auto typesvecocc = wfn_from_occ.get_types();
+    auto typesvecnos = wfn_nos.get_types();
+
+    auto expsvecocc = wfn_from_occ.get_exponents();
+    auto expsvecnos = wfn_nos.get_exponents();
+    bool differ = false;
+    if (typesvecnos.size() == typesvecocc.size())
+    {
+        for (int i = 0; i<typesvecnos.size(); i++)
+        {
+            // std::cout << "idx: " << i << " typesvecnos: " << typesvecnos[i] << " typesvecocc: " << typesvecocc[i] << "\n";
+            if (typesvecnos[i] != typesvecocc[i])
+            {
+                differ=true;
+            }
+        }
+    }
+    if (differ)
+        std::cout << "[types] from occ constructor and from file differ.\n";
+    else
+        std::cout << "[types] from occ constructor and from file are equal.\n";
+
+
+    if (expsvecocc == expsvecnos)
+        std::cout << "[exponents] from occ constructor and from file are equal.\n";
+    else {
+        std::cout << "[exponents] from occ constructor and from file differ.\n";
+        for (int i=0; i<expsvecnos.size(); i++)
+        {
+            if (expsvecnos[i] != expsvecocc[i])
+                std::cout << "idx: " << i << " expnos[" << centersvecnos[i] <<"]: " << expsvecnos[i] << " expocc[" << centersvecocc[i] <<"]:  " <<expsvecocc[i] << "\n";
+        }
+    }
+    return 0;
+}
 void occ_native_approach(Wavefunction& wfn)
 {
     auto shell2atom  = wfn.basis.shell_to_atom();
@@ -85,12 +182,4 @@ void occ_native_approach(Wavefunction& wfn)
             std::cout << "gto_norm : " << norm*shell.contraction_coefficients(j) << "\n";
         }
     }
-
-}
-
-int main()
-{
-    Wavefunction wfn = Wavefunction::load("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
-
-    return 0;
 }

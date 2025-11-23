@@ -76,38 +76,70 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
     virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
+    nmo = occ_WF.basis.nbf();
+    charge = occ_WF.charge();
     ncen = occ_WF.atoms.size();
     atoms.resize(ncen);
-    nex = occ_WF.basis.max_num_primitives();
     auto rest_unrest_flag = occ_WF.mo.kind;
-    occ::Mat3N atom_positions = occ_WF.positions();
+    const occ::Mat3N atom_positions = occ_WF.positions();
     const int el = occ_WF.num_electrons;
     const int ael = occ_WF.n_alpha();
     const int bel = occ_WF.n_beta();
-    assert(el == ael + bel);
-    //
-    // if (ael != bel && r_u_ro_switch == 0)
-    //     r_u_ro_switch = 1; // If U was not correctly recognized
-    // if (calculation_level.find("CASSCF") != std::string::npos && ael != bel)
-    //     r_u_ro_switch = 2; // CASSCF requires open shell treatment
     for (long i = 0; i < ncen; i++) {
         atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
         atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
-        atoms[i].set_coordinate(0, atom_positions(i, 0));
-        atoms[i].set_coordinate(1, atom_positions(i, 1));
-        atoms[i].set_coordinate(2, atom_positions(i, 2));
+        atoms[i].set_coordinate(0, atom_positions(0, i));
+        atoms[i].set_coordinate(1, atom_positions(1, i));
+        atoms[i].set_coordinate(2, atom_positions(2, i));
     }
     auto shells = occ_WF.basis.shells();
-    for (auto shell : shells)
+
+    auto mo = occ_WF.mo;
+    int r_u_ro_switch{0};
+    switch (mo.kind)
     {
+        case occ::qm::General:
+            r_u_ro_switch = 2;
+            break;
+        case occ::qm::Unrestricted:
+            r_u_ro_switch = 1;
+            break;
+        case occ::qm::Restricted:
+            r_u_ro_switch = 0;
+            break;
+    }
+
+    auto shell2atom  = occ_WF.basis.shell_to_atom();
+    vec con_coefs;
+    int cumm{1};
+    for (int i=0; i<shells.size(); i++)
+    {
+        auto shell = shells[i];
+        occ::Vec confac;
+        auto occ_exp = shell.exponents;
+        auto contraction = shell.contraction_coefficients;
+        int l = shell.l;
         int nprim = shell.num_primitives();
-        for (size_t i=0; i < nprim; i++)
+        confac = Eigen::pow(pow(2, (4*l+3))*Eigen::pow(occ_exp.array(), 2*l+3), 0.25);
+        auto scaled_contraction = contraction*confac.transpose();
+        double exp;
+        int n_cart = (l+1)*(l+2)/2;
+        auto atom = shell2atom[i];
+        cumm = n_cart*(l)/3;
+        for (int cart=0; cart < n_cart; cart++)
         {
-            push_back_exponent(shell.exponents(i));
+            for (int j = 0; j < occ_exp.size(); j++)
+            {
+                exp = occ_exp(j);
+                con_coefs.push_back(scaled_contraction(j));
+                push_back_exponent(exp);
+                push_back_type(cart + cumm + 1);
+                if (!push_back_center(atom+1))
+                    std::cout << "atom: " << atom << " i: " << i << std::endl;
+                nex++;
+            }
         }
     }
-    // vec exp = occ_WF.
-    std::printf("test");
 }
 
 

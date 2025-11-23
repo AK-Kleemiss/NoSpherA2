@@ -62,6 +62,7 @@ class MO;
 class WFN
 {
 private:
+	// public:
 	//Number of centers/atoms present in the wavefunction
     int ncen;
 	//Number of basis functions/primitive Gaussians present in the wavefunction
@@ -174,7 +175,7 @@ public:
     ///@}
 	/** Construct from an OCC Wavefunction Struct */
     WFN(occ::qm::Wavefunction& occ_WF);
-	virtual ~WFN() {};
+	// virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
     // friend class WfnAdapter;
     //--------------------MO handling--------------------------------------------
@@ -569,5 +570,8 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     /** Raw pointer to primitive exponents. */
     const double *get_ptr_exponents() { return &exponents[0]; };
+	const ivec& get_types() { return types; };
+	const vec& get_exponents() { return exponents; };
+	const ivec& get_centers() { return centers; };
 };
 
