@@ -9,7 +9,7 @@
 #include <ostream>
 #include "../Src/convenience.h"
 #include "../Src/wfn_class.h"
-using occ::qm::Wavefunction;
+using namespace occ::qm;
 using std::iostream;
 std::string get_shape(const occ::Mat& mat)
 {
@@ -110,10 +110,10 @@ WFN original_approach(Wavefunction& wfn)
 int main()
 {
     std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+    auto wfn_nos = WFN(filepath);
     Wavefunction wfn = Wavefunction::load(filepath);
     auto wfn_from_occ = WFN(wfn);
     std::cout <<wfn_from_occ.sort_wfn(wfn_from_occ.check_order(true), true);
-    auto wfn_nos = WFN(filepath);
     std::cout << wfn_nos.sort_wfn(wfn_nos.check_order(true), true);
     auto centersvecocc = wfn_from_occ.get_centers();
     auto centersvecnos = wfn_nos.get_centers();

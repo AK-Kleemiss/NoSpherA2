@@ -50,8 +50,15 @@ public:
     return coefficients[_nr];
   };
   const vec get_coefficients() const {
-      return coefficients;
+    return coefficients;
   };
+  void set_coefficients(vec coeff) {
+    coefficients = coeff;
+  };
+  void push_back_vector(vec v)
+  {
+    coefficients.insert(coefficients.end(), v.begin(), v.end());
+  }
   const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };

@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <occ/qm/wavefunction.h>
 #include <ostream>
+#include "occ/OrbitalDefs.h"
 
 void WFN::fill_pre()
 {
@@ -71,7 +72,9 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     multi = g_mult;
 };
 
-WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
+WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
+{
+    using namespace Eigen;
     origin = WfnOrigin::OCC;
     total_energy = occ_WF.energy.total;
     virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
@@ -99,22 +102,47 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
     int r_u_ro_switch{0};
     switch (mo.kind)
     {
-        case occ::qm::General:
-            r_u_ro_switch = 2;
-            break;
-        case occ::qm::Unrestricted:
-            r_u_ro_switch = 1;
-            break;
-        case occ::qm::Restricted:
-            r_u_ro_switch = 0;
-            break;
+    case occ::qm::General:
+        r_u_ro_switch = 2;
+        break;
+    case occ::qm::Unrestricted:
+        r_u_ro_switch = 1;
+        break;
+    case occ::qm::Restricted:
+        r_u_ro_switch = 0;
+        break;
     }
 
     auto shell2atom  = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     int cumm{1};
-    int coef{0};
-    coef = 1/ael;
+    VectorXd shellType(shells.size());
+    MatrixXd MOoccE(nmo, 2);
+    MatrixXd MOeneE(nmo, 2);
+    MOoccE.setZero();
+    MOeneE.setZero();
+    switch (r_u_ro_switch) {
+        case 0:
+            MOoccE(Eigen::seq(0, ael), 0).setConstant(2.0);
+            break;
+        case 1:
+            MOoccE(Eigen::seq(0, bel), 0).setConstant(1.0);
+            MOoccE(Eigen::seq(0, bel), 1).setConstant(1.0);
+            break;
+        case 2:
+            MOoccE(Eigen::seq(0, bel), 0).setConstant(2.0);
+            MOoccE(Eigen::seq(0, ael), 0).setConstant(1.0);
+            break;
+        default:
+            throw std::invalid_argument( "received invalid case for restricted/unrestricted." );
+            break;
+    }
+    for (const auto shell : shells)
+    {
+        int l = shell.l;
+        int n_cart = (l+1)*(l+2)/2;
+        nex += n_cart * shell.exponents.size();
+    }
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
@@ -122,11 +150,13 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
         auto occ_exp = shell.exponents;
         auto contraction = shell.contraction_coefficients;
         int l = shell.l;
+        shellType(i) = l;
         int nprim = shell.num_primitives();
         confac = Eigen::pow(pow(2, (4*l+3))*Eigen::pow(occ_exp.array(), 2*l+3), 0.25);
-        auto scaled_contraction = contraction*confac.transpose();
+        occ::Mat scaled_contraction = confac.cwiseProduct(contraction); // = con_coefs
         double exp;
         int n_cart = (l+1)*(l+2)/2;
+
         auto atom = shell2atom[i];
         cumm = n_cart*(l)/3;
         for (int cart=0; cart < n_cart; cart++)
@@ -139,47 +169,25 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN() {
                 push_back_type(cart + cumm + 1);
                 if (!push_back_center(atom+1))
                     std::cout << "atom: " << atom << " i: " << i << std::endl;
-                nex++;
             }
+            occ::Mat test;
+            if (l == 0)
+                test = get_orbital(static_cast<ORB>(l))(0,0)*scaled_contraction;
+            else
+                test = get_orbital(static_cast<ORB>(l));//*scaled_contraction;
+            // vec test2(test.data(), test.data() + test.size());
+            if (MOs.size()-1 != atom)
+                push_back_MO(atom+1, MOoccE(i, 0), MOeneE(i, 0), 0);
+            // MOs[atom].push_back_vector(test2);
+            // int cc_run = 0, coef_run = 0;
+            // for (int p = 0; p < nprim; p++)
+            // {
+            //     push_back_MO_coef(i, con_coefs[i * nmo + coef_run++]);
+            // }
         }
-    }
 
-    vec2 MOocc(2);
-    MOocc[0].resize(nmo);
-    if (r_u_ro_switch != 1)
-    {
-        if (r_u_ro_switch == 0)
-        {
-            for (int i=0; i < MOocc[0].size(); i++)
-            {
-                MOocc[0][i] = 2*(i < ael);
-            }
-        } else
-        {
-            for (int i=0; i < MOocc[0].size(); i++)
-            {
-                if (i < bel)
-                    MOocc[0][i] = 2.0;
-                else if (i < ael)
-                    MOocc[0][i] = 1.0;
-                else
-                    MOocc[0][i] = 0.0;
-            }
-        }
-    } else
-    {
-        // TODO: @Lucas fix this
-        // MOocc[0].resize(MOene[0].size());
-        // MOocc[1].resize(MOene[1].size());
     }
-    // for (int i=1; i < nmo+1; i++)
-    // {
-
-            // push_back_MO(nr, coef*2, mo.energies(nr-1));
-    // }
 }
-
-
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
 {
