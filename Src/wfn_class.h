@@ -143,6 +143,15 @@ private:
     bool push_back_center(const int &cent);
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
+	void insert_into_exponents(std::ranges::input_range auto&& v) {
+        exponents.insert(exponents.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+    void insert_into_centers(std::ranges::input_range auto&& v) {
+        centers.insert(centers.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+	void insert_into_types(std::ranges::input_range auto&& v) {
+        types.insert(types.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
     void assign_MO_coefs(const int &nr, vec &values);
     void push_back_MO_coef(const int& nr, const double& value);
     bool modified;

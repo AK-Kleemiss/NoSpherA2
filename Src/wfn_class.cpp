@@ -10,8 +10,11 @@
 #include "nos_math.h"
 #include <cmath>
 #include <cstdio>
+#include <numeric>
 #include <occ/qm/wavefunction.h>
 #include <ostream>
+#include <occ/io/conversion.h>
+
 #include "occ/OrbitalDefs.h"
 
 void WFN::fill_pre()
@@ -80,7 +83,6 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
-    nmo = occ_WF.basis.nbf();
     charge = occ_WF.charge();
     ncen = occ_WF.atoms.size();
     atoms.resize(ncen);
@@ -109,6 +111,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         r_u_ro_switch = 1;
         break;
     case occ::qm::Restricted:
+        nmo = occ_WF.n_alpha();
         r_u_ro_switch = 0;
         break;
     }
@@ -117,75 +120,37 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     vec con_coefs;
     int cumm{1};
     VectorXd shellType(shells.size());
-    MatrixXd MOoccE(nmo, 2);
-    MatrixXd MOeneE(nmo, 2);
-    MOoccE.setZero();
-    MOeneE.setZero();
-    switch (r_u_ro_switch) {
-        case 0:
-            MOoccE(Eigen::seq(0, ael), 0).setConstant(2.0);
-            break;
-        case 1:
-            MOoccE(Eigen::seq(0, bel), 0).setConstant(1.0);
-            MOoccE(Eigen::seq(0, bel), 1).setConstant(1.0);
-            break;
-        case 2:
-            MOoccE(Eigen::seq(0, bel), 0).setConstant(2.0);
-            MOoccE(Eigen::seq(0, ael), 0).setConstant(1.0);
-            break;
-        default:
-            throw std::invalid_argument( "received invalid case for restricted/unrestricted." );
-            break;
-    }
     for (const auto shell : shells)
     {
         int l = shell.l;
         int n_cart = (l+1)*(l+2)/2;
         nex += n_cart * shell.exponents.size();
     }
+    auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
+    volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
         occ::Vec confac;
-        auto occ_exp = shell.exponents;
         auto contraction = shell.contraction_coefficients;
         int l = shell.l;
         shellType(i) = l;
         int nprim = shell.num_primitives();
-        confac = Eigen::pow(pow(2, (4*l+3))*Eigen::pow(occ_exp.array(), 2*l+3), 0.25);
-        occ::Mat scaled_contraction = confac.cwiseProduct(contraction); // = con_coefs
-        double exp;
         int n_cart = (l+1)*(l+2)/2;
-
+        // This is basically the sum from l=0 to l=n_cart I just solved it in wolfram
+        int sum_ncart = ((l+3)*n_cart)/3;
+        // Eigen::VectorXd occ_exp = shell.exponents.transpose().replicate(n_cart, 1).reshaped();
+        occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
+        insert_into_exponents(occ_vec_span(occ_exp));
         auto atom = shell2atom[i];
-        cumm = n_cart*(l)/3;
-        for (int cart=0; cart < n_cart; cart++)
-        {
-            for (int j = 0; j < occ_exp.size(); j++)
-            {
-                exp = occ_exp(j);
-                con_coefs.push_back(scaled_contraction(j));
-                push_back_exponent(exp);
-                push_back_type(cart + cumm + 1);
-                if (!push_back_center(atom+1))
-                    std::cout << "atom: " << atom << " i: " << i << std::endl;
-            }
-            occ::Mat test;
-            if (l == 0)
-                test = get_orbital(static_cast<ORB>(l))(0,0)*scaled_contraction;
-            else
-                test = get_orbital(static_cast<ORB>(l));//*scaled_contraction;
-            // vec test2(test.data(), test.data() + test.size());
-            if (MOs.size()-1 != atom)
-                push_back_MO(atom+1, MOoccE(i, 0), MOeneE(i, 0), 0);
-            // MOs[atom].push_back_vector(test2);
-            // int cc_run = 0, coef_run = 0;
-            // for (int p = 0; p < nprim; p++)
-            // {
-            //     push_back_MO_coef(i, con_coefs[i * nmo + coef_run++]);
-            // }
-        }
-
+        insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        auto range = std::views::iota(1, n_cart+1);
+        insert_into_types(std::views::repeat(sum_ncart, n_cart*nprim));
+        double exp;
+    }
+    for (int i=0; i<mo.n_alpha; i++)
+    {
+        push_back_MO(i+1, 2, )
     }
 }
 

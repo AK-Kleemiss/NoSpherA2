@@ -16,9 +16,13 @@ using namespace std;
 
 int main()
 {
-    const string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+    const string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/Co2_molden.fchk");
     auto wfn_nos = WFN(filepath);
     auto wfn = Wavefunction::load(filepath);
-    volatile auto orb =  occ::io::conversion::orb::to_gaussian_order(wfn.basis, wfn.mo);
+    wfn.save("Co2_molden.fchk");
+    // for (auto c : wfn_nos.get_MO(0).get_coefficients())
+    // {
+    //     cout << c << ",\n";
+    // }
     return 0;
 }

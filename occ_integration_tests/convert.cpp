@@ -39,6 +39,32 @@ std::vector<T> sort_vec_by_other(const std::vector<T>& vec1, const std::vector<T
     assert (vec1.size() == other.size());
     return apply_permutation(vec1, argsort(other));
 }
+template <typename T>
+void compare_vectors(const std::vector<T>& vecNOS, const std::vector<T>& vecOCC, std::string label, double tol = 1e-1)
+{
+    bool differ =false;
+    if (vecNOS.size() != vecOCC.size())
+    {
+        std::cout << "[" << label <<"] sizes differ\n";
+        return;
+    }
+
+    bool comp;
+    for (int i=0; i<vecNOS.size(); i++)
+    {
+        if constexpr (std::is_integral_v<T>) comp = abs(vecNOS[i]) - abs(vecOCC[i]) > tol;
+        else comp = vecNOS[i] != vecOCC[i] ;
+        if (comp)
+        {
+            std::cout << "idx: " << i << " - "<< label<<"NOS: " << vecNOS[i] << " - " << label << "OCC: " <<vecOCC[i] << "\n";
+            differ = true;
+        }
+    }
+    if (differ)
+        std::cout << "[" << label << "] from occ constructor and from file differ.\n";
+    else
+        std::cout << "[" << label << "] from occ constructor and from file are equal.\n";
+}
 
 
 WFN wfn_from_nos(const std::string &filepath)
@@ -107,14 +133,14 @@ WFN original_approach(Wavefunction& wfn)
 
 
 
+
 int main()
 {
-    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
-    auto wfn_nos = WFN(filepath);
-    Wavefunction wfn = Wavefunction::load(filepath);
+    std::string filepathnos("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.wfn");
+    std::string filepathocc("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+    auto wfn_nos = WFN(filepathnos);
+    Wavefunction wfn = Wavefunction::load(filepathocc);
     auto wfn_from_occ = WFN(wfn);
-    std::cout <<wfn_from_occ.sort_wfn(wfn_from_occ.check_order(true), true);
-    std::cout << wfn_nos.sort_wfn(wfn_nos.check_order(true), true);
     auto centersvecocc = wfn_from_occ.get_centers();
     auto centersvecnos = wfn_nos.get_centers();
 
@@ -123,34 +149,22 @@ int main()
 
     auto expsvecocc = wfn_from_occ.get_exponents();
     auto expsvecnos = wfn_nos.get_exponents();
-    bool differ = false;
-    if (typesvecnos.size() == typesvecocc.size())
+    compare_vectors(typesvecnos, typesvecocc, "types");
+    bool differ =false;
+    for (int i=0; i<expsvecocc.size(); i++)
     {
-        for (int i = 0; i<typesvecnos.size(); i++)
+        if (std::abs(expsvecnos[i] - expsvecocc[i]) > 1E-1)
         {
-            // std::cout << "idx: " << i << " typesvecnos: " << typesvecnos[i] << " typesvecocc: " << typesvecocc[i] << "\n";
-            if (typesvecnos[i] != typesvecocc[i])
-            {
-                differ=true;
-            }
+            std::cout << "idx: " << i << " expnos: " << expsvecnos[i] << " expocc: " <<expsvecocc[i] << "\n";
+            // std::cout << "idx: " << i << " expnos[" << centersvecnos[i] <<"]: " << expsvecnos[i] << " expocc[" << centersvecocc[i] <<"]:  " <<expsvecocc[i] << "\n";
+            differ = true;
         }
     }
     if (differ)
-        std::cout << "[types] from occ constructor and from file differ.\n";
-    else
-        std::cout << "[types] from occ constructor and from file are equal.\n";
-
-
-    if (expsvecocc == expsvecnos)
-        std::cout << "[exponents] from occ constructor and from file are equal.\n";
-    else {
         std::cout << "[exponents] from occ constructor and from file differ.\n";
-        for (int i=0; i<expsvecnos.size(); i++)
-        {
-            if (expsvecnos[i] != expsvecocc[i])
-                std::cout << "idx: " << i << " expnos[" << centersvecnos[i] <<"]: " << expsvecnos[i] << " expocc[" << centersvecocc[i] <<"]:  " <<expsvecocc[i] << "\n";
-        }
-    }
+    else
+        std::cout << "[exponents] from occ constructor and from file are equal.\n";
+    compare_vectors(centersvecnos, centersvecocc, "centers");
     return 0;
 }
 void occ_native_approach(Wavefunction& wfn)

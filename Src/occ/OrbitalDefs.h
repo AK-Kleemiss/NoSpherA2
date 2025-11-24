@@ -5,6 +5,11 @@
 #include <cmath>
 #include <Eigen/Dense>
 
+inline std::span<const double> occ_vec_span(occ::Vec& v)
+{
+    return std::span<const double>(v.data(), v.size());
+}
+
 enum class ORB : int {
     S = 0,
     P = 1,
