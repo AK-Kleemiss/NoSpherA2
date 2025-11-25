@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <occ/qm/wavefunction.h>
+#include <occ/gto/gto.h>
 #include <occ/io/conversion.h>
 #include <Eigen/Eigen>
 #include <iostream>
@@ -16,10 +17,13 @@ using namespace std;
 
 int main()
 {
-    const string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/Co2_molden.fchk");
+    const string filepath("alanine.owf.fchk");
     auto wfn_nos = WFN(filepath);
     auto wfn = Wavefunction::load(filepath);
-    wfn.save("Co2_molden.fchk");
+
+    auto test= occ::gto::transform_density_matrix_cartesian_to_spherical(wfn.basis, wfn.mo.D);
+
+    wfn.save("alanine2.fchk");
     // for (auto c : wfn_nos.get_MO(0).get_coefficients())
     // {
     //     cout << c << ",\n";

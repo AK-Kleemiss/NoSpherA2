@@ -229,6 +229,8 @@ public:
 	/** Get maximum absolute MO coefficient (for cutoff checks). */
     const double get_maximum_MO_coefficient(bool occu = true) const;
 
+	const std::vector<MO> &get_MOs_vec() const { return MOs; };
+
     //--------------------in and output----------------------------------------
     /** Change stored basis set name label. */
     void change_basis_set_name(std::string name) { basis_set_name = name; };

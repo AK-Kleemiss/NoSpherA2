@@ -49,7 +49,7 @@ public:
     err_checkf(_nr < coefficients.size() && _nr >= 0, "Requested element outside of range! " + std::to_string(_nr), std::cout);
     return coefficients[_nr];
   };
-  const vec get_coefficients() const {
+  const vec& get_coefficients() const {
     return coefficients;
   };
   void set_coefficients(vec coeff) {

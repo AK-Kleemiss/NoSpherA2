@@ -106,7 +106,7 @@ template <> struct OrbDef<ORB::H> {
         {  0.0,  0.0,  0.0,  0.0,  0.0,  0.9356025796273888,  0.0,  0.0,  0.0,  0.0,  0.0,  },
     };
 };
-Eigen::MatrixXd get_orbital(const ORB s) {
+Eigen::MatrixXd get_cnv_matrix(const ORB s) {
     switch (s) {
         case ORB::S: return OrbDef<ORB::S>{}.cart2pure;
         case ORB::P: return OrbDef<ORB::P>{}.cart2pure;

@@ -75,6 +75,39 @@ void compare_vectors(const std::vector<T>& vecNOS, const std::vector<T>& vecOCC,
     }
 }
 
+void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e-1)
+{
+    if (moNOS.size() != moOCC.size())
+    {
+        fmt::print("[MO] sizes differ, [NOS]: {}, [OCC]: {}.\n", moNOS.size(), moOCC.size());
+        return;
+    }
+    for (int i=0; i< moOCC.size(); i++)
+    {
+        if (abs(moNOS[i].get_energy()) - abs(moOCC[i].get_energy()) > tol)
+        {
+            fmt::print("[MO] energies differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_energy(), moOCC[i].get_energy());
+        }
+        if (abs(moNOS[i].get_occ()) - abs(moOCC[i].get_occ()) > tol)
+        {
+            fmt::print("[MO] occupancies (occ) differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_occ(), moOCC[i].get_occ());
+            return;
+        }
+        if (moNOS[i].get_op() != moOCC[i].get_op())
+        {
+            fmt::print("[MO] OPs differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_op(), moOCC[i].get_op());
+            return;
+        }
+        if (moNOS[i].get_coefficients().size() != moOCC[i].get_coefficients().size())
+        {
+            fmt::print("[MO] coefficients differ in size, [NOS]: {}, [OCC]: {}. \n",
+                moNOS[i].get_coefficients().size(), moOCC[i].get_coefficients().size());
+            return;
+        }
+    }
+    fmt::print("[MOs] from occ constructor and from file are equal.");
+}
+
 
 WFN wfn_from_nos(const std::string &filepath)
 {
@@ -90,15 +123,19 @@ int main()
     auto wfn_from_occ = WFN(wfn);
     auto centersvecocc = wfn_from_occ.get_centers();
     auto centersvecnos = wfn_nos.get_centers();
+    compare_vectors(centersvecnos, centersvecocc, "centers");
 
     auto typesvecocc = wfn_from_occ.get_types();
     auto typesvecnos = wfn_nos.get_types();
+    compare_vectors(typesvecnos, typesvecocc, "types",
+        VecSize{.x = 21, .y = 20});
 
     auto expsvecocc = wfn_from_occ.get_exponents();
     auto expsvecnos = wfn_nos.get_exponents();
-    compare_vectors(typesvecnos, typesvecocc, "types",
-        VecSize{.x = 21, .y = 20});
     compare_vectors(expsvecnos, expsvecocc, "exponents");
-    compare_vectors(centersvecnos, centersvecocc, "centers");
+
+    auto mosOCC = wfn_from_occ.get_MOs_vec();
+    auto mosNOS = wfn_nos.get_MOs_vec();
+    compare_MOs(mosNOS, mosOCC);
     return 0;
 }

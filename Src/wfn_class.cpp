@@ -133,7 +133,6 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
     volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
-    vec typ;
     Eigen::Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
     auto atom2shell = occ_WF.basis.atom_to_shell();
     ivec lvec;
@@ -148,11 +147,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         int n_cart = (l+1)*(l+2)/2;
         int n_cart_esp = num_subshells(false, l);
         // This is basically the sum from l=0 to l=n_cart-1 I just solved it in wolfram
-        int sum_ncart = (l+1)*(l+2)*(l)/6;
-        // int n_cart = (l+1)*(l+2)/2;
-        // int sum_ncart = (l*n_cart)/3;
-        int sum_ncart_esp = sum_subshells(l);
-        // Eigen::VectorXd occ_exp = shell.exponents.transpose().replicate(n_cart, 1).reshaped();
+        int sum_ncart = n_cart*(l)/3;
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
         auto atom = shell2atom[i];
@@ -165,24 +160,15 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         }
         else
             insert_into_types(typesVec);
-        double exp;
     }
-    // for (int i = 0; i<centers.size(); i++)
-    // {
-    //     if ()
-    // }
-    insert_into_types(typ);
-    int COLS = 20;
-    // int ROWS = typ.size()/COLS;
-    // int r = typ.size()%COLS;
-    // auto v = std::views::repeat(0, r);
-    // typ.insert(typ.end(), v.begin(), v.end());
-    // Eigen::VectorXd eigen_vec(Eigen::Map<Eigen::MatrixXd>(typ.data(), ROWS, COLS));
 
-    // for (int i=0; i<mo.n_alpha; i++)
-    // {
-    //     push_back_MO(i+1, 2, mo.energies[i]);
-    // }
+    // molecular orbitals
+    for (int i=0; i < mo.n_alpha; i++)
+    {
+        push_back_MO(i+1, 2, mo.energies[i]);
+
+    }
+
 }
 
 constexpr unsigned int num_subshells(bool cartesian, unsigned int l) {
