@@ -74,7 +74,12 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     charge = g_charge;
     multi = g_mult;
 };
-
+constexpr unsigned int num_subshells(bool cartesian, unsigned int l);
+constexpr unsigned int sum_subshells(unsigned int l) {
+    if (l==0) return 0;
+    if (l == 1) return 1;
+    return pow(l, 2)+2;
+}
 WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
 {
     using namespace Eigen;
@@ -128,6 +133,10 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
     volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
+    vec typ;
+    Eigen::Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+    auto atom2shell = occ_WF.basis.atom_to_shell();
+    ivec lvec;
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
@@ -137,21 +146,53 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         shellType(i) = l;
         int nprim = shell.num_primitives();
         int n_cart = (l+1)*(l+2)/2;
-        // This is basically the sum from l=0 to l=n_cart I just solved it in wolfram
-        int sum_ncart = ((l+3)*n_cart)/3;
+        int n_cart_esp = num_subshells(false, l);
+        // This is basically the sum from l=0 to l=n_cart-1 I just solved it in wolfram
+        int sum_ncart = (l+1)*(l+2)*(l)/6;
+        // int n_cart = (l+1)*(l+2)/2;
+        // int sum_ncart = (l*n_cart)/3;
+        int sum_ncart_esp = sum_subshells(l);
         // Eigen::VectorXd occ_exp = shell.exponents.transpose().replicate(n_cart, 1).reshaped();
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
         auto atom = shell2atom[i];
         insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
-        auto range = std::views::iota(1, n_cart+1);
-        insert_into_types(std::views::repeat(sum_ncart, n_cart*nprim));
+        VectorXi typesVec = Eigen::ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
+                        .matrix().transpose().replicate(nprim, 1).reshaped();
+        if (l==3) {
+            Eigen::Vector<int, 10> reordered = typesVec(d_orbital_corr);
+            insert_into_types(reordered);
+        }
+        else
+            insert_into_types(typesVec);
         double exp;
     }
-    for (int i=0; i<mo.n_alpha; i++)
-    {
-        push_back_MO(i+1, 2, )
-    }
+    // for (int i = 0; i<centers.size(); i++)
+    // {
+    //     if ()
+    // }
+    insert_into_types(typ);
+    int COLS = 20;
+    // int ROWS = typ.size()/COLS;
+    // int r = typ.size()%COLS;
+    // auto v = std::views::repeat(0, r);
+    // typ.insert(typ.end(), v.begin(), v.end());
+    // Eigen::VectorXd eigen_vec(Eigen::Map<Eigen::MatrixXd>(typ.data(), ROWS, COLS));
+
+    // for (int i=0; i<mo.n_alpha; i++)
+    // {
+    //     push_back_MO(i+1, 2, mo.energies[i]);
+    // }
+}
+
+constexpr unsigned int num_subshells(bool cartesian, unsigned int l) {
+  if (l == 0)
+    return 1;
+  if (l == 1)
+    return 3;
+  if (cartesian)
+    return (l + 2) * (l + 1) / 2;
+  return 2 * l + 1;
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
