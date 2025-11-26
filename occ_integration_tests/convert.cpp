@@ -2,6 +2,10 @@
 // Created by lucas on 11/21/25.
 //
 #include <algorithm>
+#include <vector>
+#include <ranges>
+#include <fmt/core.h>
+#include <fmt/ranges.h> // Essential for printing tuples/vectors
 #include <cstdio>
 #include <occ/qm/wavefunction.h>
 #include <Eigen/Eigen>
@@ -25,14 +29,22 @@ std::string get_shape(const occ::Mat& mat)
     return std::format("({}, {})", mat.rows(), mat.cols());
 }
 template <typename T>
-void compare_vectors(const std::vector<T>& vecNOS, const std::vector<T>& vecOCC, std::string label,
-    VecSize size = VecSize(), double tol = 1e-1)
+void compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string label,
+    VecSize size = VecSize(), double tol = 1e-1, bool compare_diff_size = false)
 {
     bool differ =false;
     if (vecNOS.size() != vecOCC.size())
     {
         fmt::print("[{}] sizes differ, [NOS]: {}, [OCC]: {}.\n", label, vecNOS.size(), vecOCC.size());
-        return;
+        if (compare_diff_size)
+        {
+            if (vecNOS.size() < vecOCC.size())
+            {
+                vecNOS.resize(vecOCC.size(), 0);
+            } else
+                vecOCC.resize(vecNOS.size(), 0);
+        } else
+            return;
     }
 
     bool comp;
@@ -80,7 +92,7 @@ void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
     if (moNOS.size() != moOCC.size())
     {
         fmt::print("[MO] sizes differ, [NOS]: {}, [OCC]: {}.\n", moNOS.size(), moOCC.size());
-        return;
+
     }
     for (int i=0; i< moOCC.size(); i++)
     {
@@ -98,10 +110,13 @@ void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
             fmt::print("[MO] OPs differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_op(), moOCC[i].get_op());
             return;
         }
-        if (moNOS[i].get_coefficients().size() != moOCC[i].get_coefficients().size())
+        const auto& moNOSC = moNOS[i].get_coefficients();
+        const auto& moOCCC = moOCC[i].get_coefficients();
+        if (moNOSC.size() != moOCCC.size())
         {
             fmt::print("[MO] coefficients differ in size, [NOS]: {}, [OCC]: {}. \n",
                 moNOS[i].get_coefficients().size(), moOCC[i].get_coefficients().size());
+            compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true);
             return;
         }
     }
@@ -116,8 +131,8 @@ WFN wfn_from_nos(const std::string &filepath)
 
 int main()
 {
-    std::string filepathnos("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.wfn");
-    std::string filepathocc("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
+    std::string filepathnos("/home/lucas/CLionProjects/NoSpherA2/tests/alanine_occ/alanine.owf.fchk");
+    std::string filepathocc("/home/lucas/CLionProjects/NoSpherA2/tests/alanine_occ/alanine.owf.fchk");
     auto wfn_nos = WFN(filepathnos);
     Wavefunction wfn = Wavefunction::load(filepathocc);
     auto wfn_from_occ = WFN(wfn);

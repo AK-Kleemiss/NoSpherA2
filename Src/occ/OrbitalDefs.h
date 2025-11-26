@@ -10,6 +10,11 @@ inline std::span<const double> occ_vec_span(occ::Vec& v)
     return std::span<const double>(v.data(), v.size());
 }
 
+inline std::span<const double> eigen_vec_span(const Eigen::VectorXd& v)
+{
+    return std::span<const double>(v.data(), v.size());
+}
+
 enum class ORB : int {
     S = 0,
     P = 1,
@@ -27,10 +32,10 @@ template <> struct OrbDef<ORB::S> {
 };
 template <> struct OrbDef<ORB::P> {
     const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> cart2pure = Eigen::Matrix3d {
-        {0, 0, 1},
-        {1, 0, 0},
-        {0, 1, 0}
-    }.transpose();
+        {0.4886025119029199,  0.0,  0.0,  },
+        {0.0,  0.4886025119029199,  0.0,  },
+        {0.0,  0.0,  0.4886025119029199,  },
+    };
 };
 
 template <> struct OrbDef<ORB::D> {
@@ -76,7 +81,6 @@ template <> struct OrbDef<ORB::G> {
         {  0.0,  0.0,  0.0,  0.0,  -2.5388531259649034,  0.0,  -2.8385240872726802,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  2.676186174229157,  0.0,  0.0,  0.0,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  0.0,  0.8462843753216345,  0.0,  0.0,  0.0,  0.0,  },
-
     };
 };
 
@@ -106,7 +110,7 @@ template <> struct OrbDef<ORB::H> {
         {  0.0,  0.0,  0.0,  0.0,  0.0,  0.9356025796273888,  0.0,  0.0,  0.0,  0.0,  0.0,  },
     };
 };
-Eigen::MatrixXd get_cnv_matrix(const ORB s) {
+Eigen::MatrixXd get_cnv_operator(const ORB s) {
     switch (s) {
         case ORB::S: return OrbDef<ORB::S>{}.cart2pure;
         case ORB::P: return OrbDef<ORB::P>{}.cart2pure;

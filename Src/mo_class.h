@@ -55,10 +55,11 @@ public:
   void set_coefficients(vec coeff) {
     coefficients = coeff;
   };
-  void push_back_vector(vec v)
-  {
-    coefficients.insert(coefficients.end(), v.begin(), v.end());
+  void insert_into_coefficients(std::ranges::input_range auto&& v) {
+    coefficients.insert(coefficients.end(), std::ranges::begin(v), std::ranges::end(v));
   }
+
+
   const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };

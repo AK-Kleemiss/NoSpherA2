@@ -74,11 +74,9 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     charge = g_charge;
     multi = g_mult;
 };
-constexpr unsigned int num_subshells(bool cartesian, unsigned int l);
+constexpr unsigned int num_subshells(unsigned int l);
 constexpr unsigned int sum_subshells(unsigned int l) {
-    if (l==0) return 0;
-    if (l == 1) return 1;
-    return pow(l, 2)+2;
+    return l*(l+1)*(l+2)/6;
 }
 WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
 {
@@ -116,7 +114,6 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         r_u_ro_switch = 1;
         break;
     case occ::qm::Restricted:
-        nmo = occ_WF.n_alpha();
         r_u_ro_switch = 0;
         break;
     }
@@ -124,7 +121,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     auto shell2atom  = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     int cumm{1};
-    VectorXd shellType(shells.size());
+    VectorXd shellType(shells.size()+1);
     for (const auto shell : shells)
     {
         int l = shell.l;
@@ -136,6 +133,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     Eigen::Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
     auto atom2shell = occ_WF.basis.atom_to_shell();
     ivec lvec;
+    VectorXi primitives_vec = VectorXi::Zero(shells.size()+1);
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
@@ -145,7 +143,6 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         shellType(i) = l;
         int nprim = shell.num_primitives();
         int n_cart = (l+1)*(l+2)/2;
-        int n_cart_esp = num_subshells(false, l);
         // This is basically the sum from l=0 to l=n_cart-1 I just solved it in wolfram
         int sum_ncart = n_cart*(l)/3;
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
@@ -156,29 +153,39 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
                         .matrix().transpose().replicate(nprim, 1).reshaped();
         if (l==3) {
             Eigen::Vector<int, 10> reordered = typesVec(d_orbital_corr);
-            insert_into_types(reordered);
+            insert_into_types(typesVec);
         }
         else
             insert_into_types(typesVec);
+        primitives_vec(i+1) = nprim;
     }
-
-    // molecular orbitals
-    for (int i=0; i < mo.n_alpha; i++)
+    for (int n=0; n<occ_WF.nbf; ++n)
     {
-        push_back_MO(i+1, 2, mo.energies[i]);
-
+        int basis_offset = 0;
+        push_back_MO(n+1, 2, mo.energies[n]);
+        for (int j=0; j < shells.size(); j++)
+        {
+            volatile auto l = shellType(j);
+            int n_sph = num_subshells(l);
+            Eigen::MatrixXd A = get_cnv_operator(static_cast<ORB>(l));
+            const auto& contraction_coeffs = shells[j].contraction_coefficients;//.transpose();
+            VectorXd MOc = mo.C.block(basis_offset, n, n_sph, 1);
+            // A|temp><C| This has dimensions of (num_subshells(l), m). m: contraction_coeffs \in R^{(m,1)})
+            // <C| = contraction_coeffs (it is already transposed).
+            MatrixXd tempmatket = A*MOc.eval();
+            MatrixXd tempketbra = contraction_coeffs*tempmatket.transpose();
+            auto tempspan = eigen_vec_span((tempketbra).reshaped());
+            volatile int dd = 1;
+            dd *=10;
+            MOs[n].insert_into_coefficients(tempspan);
+            basis_offset+=n_sph;
+        }
     }
-
 }
 
-constexpr unsigned int num_subshells(bool cartesian, unsigned int l) {
-  if (l == 0)
-    return 1;
-  if (l == 1)
-    return 3;
-  if (cartesian)
-    return (l + 2) * (l + 1) / 2;
-  return 2 * l + 1;
+constexpr unsigned int num_subshells(unsigned int l) {
+    // return (l + 2) * (l + 1) / 2;
+    return 2*l+1;
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
@@ -5420,7 +5427,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 }
                 }
             }
-
 
         }
         std::cout << "nbas: " << nbas << std::endl;
