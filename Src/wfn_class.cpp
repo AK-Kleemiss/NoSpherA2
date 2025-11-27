@@ -13,6 +13,7 @@
 #include <numeric>
 #include <occ/qm/wavefunction.h>
 #include <ostream>
+#include <occ/gto/gto.h>
 #include <occ/io/conversion.h>
 
 #include "occ/OrbitalDefs.h"
@@ -74,13 +75,18 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
     charge = g_charge;
     multi = g_mult;
 };
-constexpr unsigned int num_subshells(unsigned int l);
-constexpr unsigned int sum_subshells(unsigned int l) {
-    return l*(l+1)*(l+2)/6;
+
+constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
+    if (cartesian)
+        return l*(l+1)*(l+2)/6;
+    else
+        return l*(2*l+1);
 }
 WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
 {
+    // Only works with restricted WFNs for now
     using namespace Eigen;
+    using occ::gto::num_subshells;
     origin = WfnOrigin::OCC;
     total_energy = occ_WF.energy.total;
     virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
@@ -89,11 +95,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     charge = occ_WF.charge();
     ncen = occ_WF.atoms.size();
     atoms.resize(ncen);
-    auto rest_unrest_flag = occ_WF.mo.kind;
     const occ::Mat3N atom_positions = occ_WF.positions();
-    const int el = occ_WF.num_electrons;
-    const int ael = occ_WF.n_alpha();
-    const int bel = occ_WF.n_beta();
     for (long i = 0; i < ncen; i++) {
         atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
         atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
@@ -101,26 +103,12 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         atoms[i].set_coordinate(1, atom_positions(1, i));
         atoms[i].set_coordinate(2, atom_positions(2, i));
     }
-    auto shells = occ_WF.basis.shells();
+    auto &shells = occ_WF.basis.shells();
 
-    auto mo = occ_WF.mo;
-    int r_u_ro_switch{0};
-    switch (mo.kind)
-    {
-    case occ::qm::General:
-        r_u_ro_switch = 2;
-        break;
-    case occ::qm::Unrestricted:
-        r_u_ro_switch = 1;
-        break;
-    case occ::qm::Restricted:
-        r_u_ro_switch = 0;
-        break;
-    }
-
+    auto &mo = occ_WF.mo;
+    if (mo.kind!=occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
     auto shell2atom  = occ_WF.basis.shell_to_atom();
     vec con_coefs;
-    int cumm{1};
     VectorXd shellType(shells.size()+1);
     for (const auto shell : shells)
     {
@@ -130,10 +118,8 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
     volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
-    Eigen::Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+    Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
     auto atom2shell = occ_WF.basis.atom_to_shell();
-    ivec lvec;
-    VectorXi primitives_vec = VectorXi::Zero(shells.size()+1);
     for (int i=0; i<shells.size(); i++)
     {
         auto shell = shells[i];
@@ -142,50 +128,40 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         int l = shell.l;
         shellType(i) = l;
         int nprim = shell.num_primitives();
-        int n_cart = (l+1)*(l+2)/2;
-        // This is basically the sum from l=0 to l=n_cart-1 I just solved it in wolfram
-        int sum_ncart = n_cart*(l)/3;
+        int n_cart = num_subshells(true, l);
+        int sum_ncart = sum_subshells(l);
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
         auto atom = shell2atom[i];
         insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
-        VectorXi typesVec = Eigen::ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
+        VectorXi typesVec = ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
                         .matrix().transpose().replicate(nprim, 1).reshaped();
         if (l==3) {
-            Eigen::Vector<int, 10> reordered = typesVec(d_orbital_corr);
+            Vector<int, 10> reordered = typesVec(d_orbital_corr);
             insert_into_types(typesVec);
         }
         else
             insert_into_types(typesVec);
-        primitives_vec(i+1) = nprim;
     }
+
+    // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
+    // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
+    // CPU due to cache misses, but I didn't benchmark it.
     for (int n=0; n<occ_WF.nbf; ++n)
     {
         int basis_offset = 0;
         push_back_MO(n+1, 2, mo.energies[n]);
-        for (int j=0; j < shells.size(); j++)
-        {
-            volatile auto l = shellType(j);
-            int n_sph = num_subshells(l);
-            Eigen::MatrixXd A = get_cnv_operator(static_cast<ORB>(l));
-            const auto& contraction_coeffs = shells[j].contraction_coefficients;//.transpose();
-            VectorXd MOc = mo.C.block(basis_offset, n, n_sph, 1);
-            // A|temp><C| This has dimensions of (num_subshells(l), m). m: contraction_coeffs \in R^{(m,1)})
-            // <C| = contraction_coeffs (it is already transposed).
-            MatrixXd tempmatket = A*MOc.eval();
-            MatrixXd tempketbra = contraction_coeffs*tempmatket.transpose();
-            auto tempspan = eigen_vec_span((tempketbra).reshaped());
-            volatile int dd = 1;
-            dd *=10;
-            MOs[n].insert_into_coefficients(tempspan);
+        for (int i=0; i<shells.size(); i++){
+            int l = shells[i].l;
+            int n_sph = num_subshells(false, l);
+            const auto& A = get_cnv_operator(static_cast<ORB>(l));
+            const auto& contraction_coeffs = shells[i].contraction_coefficients;
+            const auto& MOc = mo.C.block(basis_offset, n, n_sph, 1);
+            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction_coeffs \in R^{(m,1)})
+            MOs[n].insert_into_coefficients((contraction_coeffs*(A*MOc).transpose()).reshaped());
             basis_offset+=n_sph;
         }
     }
-}
-
-constexpr unsigned int num_subshells(unsigned int l) {
-    // return (l + 2) * (l + 1) / 2;
-    return 2*l+1;
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
