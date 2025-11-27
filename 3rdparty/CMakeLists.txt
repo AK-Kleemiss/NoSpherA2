@@ -6,6 +6,22 @@ CPMAddPackage(
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
     VERSION 1.2.5
 )
+CPMAddPackage(
+    NAME occ
+    GITHUB_REPOSITORY MilitaoLucas/occ
+    GIT_TAG "main_with_libs"
+    OPTIONS
+        "USE_QCINT OFF"
+        "ENABLE_HOST_OPT OFF"
+        "WITH_PYTHON_BINDINGS OFF"
+)
+#ExternalProject_Add(occ
+#    SOURCE_DIR /home/lucas/CLionProjects/occ
+##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON
+#)
+include(CMakePrintHelpers)
+include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
+print_target_properties(occ)
 
 CPMAddPackage(
     NAME mdspan
@@ -96,6 +112,6 @@ else ()
     find_package(MKL CONFIG REQUIRED)
 endif ()
 
-if (WITH_OCC)
-    find_package(occ REQUIRED)
-endif ()
+#if (WITH_OCC)
+#    find_package(occ REQUIRED)
+#endif ()

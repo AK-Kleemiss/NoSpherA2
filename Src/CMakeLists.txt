@@ -38,6 +38,8 @@ add_library(libnosphera2 STATIC
     "${CMAKE_CURRENT_SOURCE_DIR}/bondwise_analysis.cpp"
 )
 add_dependencies(libnosphera2 generate_auxiliary_basis)
+
+#target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 target_precompile_headers(libnosphera2 PRIVATE
@@ -77,7 +79,7 @@ target_link_options(libnosphera2 PRIVATE
 )
 target_link_libraries(libnosphera2 PUBLIC
     MKL::MKL
-    occ::libocc
+    occ::qm
     basis_set_helper
     mdspan
         metatensor::static
@@ -89,12 +91,12 @@ target_link_libraries(libnosphera2 PUBLIC
     $<$<CXX_COMPILER_ID:MSVC>:ntdll>
     $<$<CXX_COMPILER_ID:MSVC>:ws2_32>
 )
+set_target_properties(libnosphera2 PROPERTIES PREFIX "")
 add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
-
 get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
 
 if(MKL_LIBRARIES)
-    install(RUNTIME NoSphera2 DESTINATION ${CMAKE_BINARY_DIR}/bin OPTIONAL)
+    install(RUNTIME NoSpherA2 DESTINATION ${CMAKE_BINARY_DIR}/bin OPTIONAL)
 endif()
 

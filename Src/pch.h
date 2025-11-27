@@ -12,7 +12,6 @@
 #include <iomanip>
 #include <iostream>
 #include <numeric>
-
 #if defined(__APPLE__)
 // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>

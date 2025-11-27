@@ -5,8 +5,8 @@
 #define NOVALUE                 ((void *)0xffffffffffffffffuL)
 #define MAX_PGTO_FOR_PAIRDATA   2048
 
-
-int CINTset_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, double* rj,
+using namespace NoSpherA2;
+int CINTset_pairdata(NoSpherA2::PairData* pairdata, double* ai, double* aj, double* ri, double* rj,
     double* log_maxci, double* log_maxcj,
     int li_ceil, int lj_ceil, int iprim, int jprim,
     double rr_ij, double expcutoff, double* env)
@@ -35,7 +35,7 @@ int CINTset_pairdata(PairData* pairdata, double* ai, double* aj, double* ri, dou
             log_rr_ij += lij * std::log(dist_ij + 1.);
         }
     }
-    PairData* pdata;
+    NoSpherA2::PairData* pdata;
 
     int empty = 1;
     for (n = 0, jp = 0; jp < jprim; jp++) {
@@ -78,7 +78,7 @@ void CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int 
     }
 }
 
-void CINTOpt_set_log_maxc(CINTOpt* opt, int* atm, int natm,
+void CINTOpt_set_log_maxc(NoSpherA2::CINTOpt* opt, int* atm, int natm,
     int* bas, int nbas, double* env)
 {
     int i, iprim, ictr;
@@ -131,7 +131,7 @@ void CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
     }
 }
 
-void CINTOpt_set_non0coeff(CINTOpt* opt, int* atm, int natm,
+void CINTOpt_set_non0coeff(NoSpherA2::CINTOpt* opt, int* atm, int natm,
     int* bas, int nbas, double* env)
 {
     int i, iprim, ictr;
@@ -168,10 +168,10 @@ void CINTOpt_set_non0coeff(CINTOpt* opt, int* atm, int natm,
 
 
 // generate caller to CINTinit_2e_optimizer for each type of function
-void CINTinit_2e_optimizer(CINTOpt** opt, int* atm, int natm,
+void CINTinit_2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
     int* bas, int nbas, double* env)
 {
-    CINTOpt* opt0 = (CINTOpt*)malloc(sizeof(CINTOpt));
+    NoSpherA2::CINTOpt* opt0 = (NoSpherA2::CINTOpt*)malloc(sizeof(NoSpherA2::CINTOpt));
     opt0->index_xyz_array = NULL;
     opt0->non0ctr = NULL;
     opt0->sortedidx = NULL;
@@ -181,7 +181,7 @@ void CINTinit_2e_optimizer(CINTOpt** opt, int* atm, int natm,
     *opt = opt0;
 }
 
-void CINTOpt_setij(CINTOpt* opt, int* ng,
+void CINTOpt_setij(NoSpherA2::CINTOpt* opt, int* ng,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     int i, j, ip, jp;
@@ -208,8 +208,8 @@ void CINTOpt_setij(CINTOpt* opt, int* ng,
     if (tot_prim == 0 || tot_prim > MAX_PGTO_FOR_PAIRDATA) {
         return;
     }
-    opt->pairdata = (PairData**)malloc(sizeof(PairData*) * std::max(nbas * nbas, 1));
-    PairData* pdata = (PairData*)malloc(sizeof(PairData) * tot_prim * tot_prim);
+    opt->pairdata = (NoSpherA2::PairData**)malloc(sizeof(NoSpherA2::PairData*) * std::max(nbas * nbas, 1));
+    NoSpherA2::PairData* pdata = (NoSpherA2::PairData*)malloc(sizeof(NoSpherA2::PairData) * tot_prim * tot_prim);
     opt->pairdata[0] = pdata;
 
     int ijkl_inc;
@@ -222,7 +222,7 @@ void CINTOpt_setij(CINTOpt* opt, int* ng,
 
     int empty;
     double rr;
-    PairData* pdata0;
+    NoSpherA2::PairData* pdata0;
     for (i = 0; i < nbas; i++) {
         ri = env + atm(PTR_COORD, bas(ATOM_OF, i));
         ai = env + bas(PTR_EXP, i);
@@ -256,14 +256,14 @@ void CINTOpt_setij(CINTOpt* opt, int* ng,
                     for (ip = 0; ip < iprim; ip++) {
                         for (jp = 0; jp < jprim; jp++, pdata++) {
                             memcpy(pdata, pdata0 + jp * iprim + ip,
-                                sizeof(PairData));
+                                sizeof(NoSpherA2::PairData));
                         }
                     }
                 }
             }
             else {
-                opt->pairdata[i * nbas + j] = (PairData*)NOVALUE;
-                opt->pairdata[j * nbas + i] = (PairData*)NOVALUE;
+                opt->pairdata[i * nbas + j] = (NoSpherA2::PairData*)NOVALUE;
+                opt->pairdata[j * nbas + i] = (NoSpherA2::PairData*)NOVALUE;
             }
         }
     }
@@ -289,7 +289,7 @@ static int _make_fakebas(int* fakebas, int* bas, int nbas, double* env)
     return max_l;
 }
 
-static int* _allocate_index_xyz(CINTOpt* opt, int max_l, int l_allow, int order)
+static int* _allocate_index_xyz(NoSpherA2::CINTOpt* opt, int max_l, int l_allow, int order)
 {
     int i;
     int cumcart = (l_allow + 1) * (l_allow + 2) * (l_allow + 3) / 6;
@@ -309,7 +309,7 @@ static int* _allocate_index_xyz(CINTOpt* opt, int max_l, int l_allow, int order)
     return buf;
 }
 
-static void gen_idx(CINTOpt* opt, void (*finit)(CINTEnvVars*, int*, int*, int*, int, int*, int, double*), void (*findex_xyz)(int *,const CINTEnvVars *),
+static void gen_idx(NoSpherA2::CINTOpt* opt, void (*finit)(NoSpherA2::CINTEnvVars*, int*, int*, int*, int, int*, int, double*), void (*findex_xyz)(int *,const NoSpherA2::CINTEnvVars *),
     int order, int l_allow, int* ng,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
@@ -321,7 +321,7 @@ static void gen_idx(CINTOpt* opt, void (*finit)(CINTEnvVars*, int*, int*, int*, 
     l_allow = std::min(max_l, l_allow);
     int* buf = _allocate_index_xyz(opt, max_l, l_allow, order);
 
-    CINTEnvVars envs;
+    NoSpherA2::CINTEnvVars envs;
     int shls[4] = { 0, };
     if (order == 2) {
         for (i = 0; i <= l_allow; i++) {
@@ -373,7 +373,7 @@ static void gen_idx(CINTOpt* opt, void (*finit)(CINTEnvVars*, int*, int*, int*, 
 }
 
 
-void CINTall_2c2e_optimizer(CINTOpt** opt, int* ng,
+void CINTall_2c2e_optimizer(NoSpherA2::CINTOpt** opt, int* ng,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     CINTinit_2e_optimizer(opt, atm, natm, bas, nbas, env);
@@ -383,7 +383,7 @@ void CINTall_2c2e_optimizer(CINTOpt** opt, int* ng,
         2, ANG_MAX, ng, atm, natm, bas, nbas, env);
 }
 
-void int2c2e_optimizer(CINTOpt** opt, int* atm, int natm,
+void int2c2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
     int* bas, int nbas, double* env)
 {
     int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
@@ -391,7 +391,7 @@ void int2c2e_optimizer(CINTOpt** opt, int* atm, int natm,
 }
 
 
-void CINTall_3c2e_optimizer(CINTOpt** opt, int* ng,
+void CINTall_3c2e_optimizer(NoSpherA2::CINTOpt** opt, int* ng,
     int* atm, int natm, int* bas, int nbas, double* env)
 {
     CINTinit_2e_optimizer(opt, atm, natm, bas, nbas, env);
@@ -401,7 +401,7 @@ void CINTall_3c2e_optimizer(CINTOpt** opt, int* ng,
         3, 12, ng, atm, natm, bas, nbas, env);
 }
 
-void int3c2e_optimizer(CINTOpt** opt, int* atm, int natm,
+void int3c2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
     int* bas, int nbas, double* env)
 {
     int ng[] = { 0, 0, 0, 0, 0, 1, 1, 1 };
