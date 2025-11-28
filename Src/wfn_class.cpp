@@ -57,12 +57,12 @@ WFN::WFN()
     basis_set_name = " ";
     comment = "Test";
     basis_set = NULL;
-    origin = WfnOrigin::UNKNOWN;
+    origin = 0;
     fill_pre();
     fill_Afac_pre();
 };
 
-WFN::WFN(WfnOrigin given_origin) : WFN()
+WFN::WFN(int given_origin) : WFN()
 {
     origin = given_origin;
 };
@@ -87,7 +87,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     // Only works with restricted WFNs for now
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = WfnOrigin::OCC;
+    origin = 11;
     total_energy = occ_WF.energy.total;
     virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
     basis_set_name = occ_WF.basis.name();
@@ -589,21 +589,21 @@ const std::string WFN::hdr(const bool &occupied) const
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
     if (fileName.extension() == ".wfn")
-        origin = WfnOrigin::WFN, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
+        origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
     else if (fileName.extension() == ".ffn")
-        origin = WfnOrigin::FFN, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
+        origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
     else if (fileName.extension() == ".wfx")
-        origin = WfnOrigin::WFX, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
+        origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
     else if (fileName.extension() == ".fch" || fileName.extension() == ".fchk" || fileName.extension() == ".FCh" || fileName.extension() == ".FChK" || fileName.extension() == ".FChk")
-        origin = WfnOrigin::FFN, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
+        origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
     else if (fileName.extension() == ".xyz")
-        origin = WfnOrigin::XYZ, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
+        origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
     else if (fileName.extension() == ".molden")
-        origin = WfnOrigin::MOLDEN, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
+        origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
     else if (fileName.extension() == ".gbw")
-        origin = WfnOrigin::GBW, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
+        origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
     else if (fileName.extension() == ".xtb")
-        origin = WfnOrigin::PTB, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
+        origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
 };
@@ -619,7 +619,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
-    origin = WfnOrigin::WFN;
+    origin = 2;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName);
     if (rf.good())
@@ -1011,7 +1011,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 {
     using namespace std;
     err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
-    origin = WfnOrigin::XYZ;
+    origin = 7;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -1073,7 +1073,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
-    origin = WfnOrigin::WFX;
+    origin = 6;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1419,7 +1419,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = WfnOrigin::MOLDEN;
+    origin = 8;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -2177,7 +2177,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = WfnOrigin::GBW;
+    origin = 9;
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
         path = filename;
@@ -3708,8 +3708,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
        std::cout << "Origin: " << get_origin() << endl;
     }
-    if (get_origin() == WfnOrigin::WFN || get_origin() == WfnOrigin::FFN || get_origin() == WfnOrigin::GBW ||
-        get_origin() == WfnOrigin::MOLDEN)
+    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 ||
+        get_origin() == 8)
     {
         //-----------------------check ordering and order accordingly----------------------
         sort_wfn(check_order(debug), debug);
@@ -6927,7 +6927,7 @@ const double WFN::Afac(int &l, int &r, int &i, double &PC, double &gamma, double
 
 bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, const bool debug)
 {
-    origin = WfnOrigin::PTB;
+    origin = 10;
     if (debug)
         file << "Reading pTB file: " << filename << std::endl;
     std::ifstream inFile(filename, std::ios::binary | std::ios::in);

@@ -2723,7 +2723,7 @@ tsc_block_type calculate_scattering_factors(
             shared_ptr<BasisSet> combined_aux_basis = opt.aux_basis[0];
             for (int basis_nr = 1; basis_nr < opt.aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*opt.aux_basis[basis_nr]); }
 
-            WFN wavy_aux(WfnOrigin::UNKNOWN);
+            WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy->get_atoms());
             wavy_aux.set_ncen(wavy->get_ncen());
             wavy_aux.delete_basis_set();
@@ -2841,7 +2841,7 @@ void calc_sfac_diffuse(const options &opt, std::ostream &log_file)
 {
     using namespace std;
     std::vector<WFN> wavy;
-    wavy.emplace_back(WfnOrigin::CRYSTAL);
+    wavy.emplace_back(1);
     wavy[0].read_known_wavefunction_format(opt.wfn, std::cout, opt.debug);
     // set number of threads
 #ifdef _OPENMP

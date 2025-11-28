@@ -142,7 +142,7 @@ struct LibCintBasis {
 class Int_Params {
 private:
     unsigned long long ncen = 0;           // Number of centers (atoms)
-    WfnOrigin wfn_origin = WfnOrigin::UNKNOWN;
+    int wfn_origin = 0;
     std::vector<atom> atoms;
 
     std::map<int, LibCintBasis> basis_sets;  //Maps atomic number -> (vec(coefs), vec(expon))

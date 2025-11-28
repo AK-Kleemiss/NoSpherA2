@@ -1354,13 +1354,13 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                                         break;
                                     }
                                     wavy.erase(wavy.begin()+activewave);
-                                    if(path.find(".wfn")!=-1) wavy.insert(wavy.begin()+activewave-1,WFN(WfnOrigin::WFN));
-                                    else wavy.insert(wavy.begin()+activewave-1,WFN(WfnOrigin::FFN));
+                                    if(path.find(".wfn")!=-1) wavy.insert(wavy.begin()+activewave-1,WFN(2));
+                                    else wavy.insert(wavy.begin()+activewave-1,WFN(4));
                                 }
                                 else if(wavy.size()==0||activewave==wavy.size()||new_wfn) {
                                     if(opt.debug) std::cout << "Making a new wavefunction!" << endl;
-                                    if(path.find(".wfn")!=-1) wavy.emplace_back(WfnOrigin::WFN);
-                                    else wavy.emplace_back(WfnOrigin::FFN);
+                                    if(path.find(".wfn")!=-1) wavy.emplace_back(2);
+                                    else wavy.emplace_back(4);
                                     if(wavy.size()>1) activewave++;
                                     if(opt.debug) std::cout << "Size: " << wavy.size() << " active: " << activewave << endl;
                                 }
@@ -1673,7 +1673,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                 vector <string> endings;
                 bool w_or_c = true;
                 bool convert = false;
-                if (wavy[activewave].get_cube_count() > 0 && wavy[activewave].get_origin() != WfnOrigin::CUBE) {
+                if (wavy[activewave].get_cube_count() > 0 && wavy[activewave].get_origin() != 3) {
                     while (true) {
                         std::cout << "Do you want to save the wavefunction (W) or associated cubes (C) or convert cubes into non-cube format (N)? ";
                         char input;
@@ -1701,7 +1701,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         break;
                     }
                 }
-                else if (wavy[activewave].get_origin() == WfnOrigin::CUBE) {
+                else if (wavy[activewave].get_origin() == 3) {
                     while (true) {
                         std::cout << "Do you want to save the cube in .cube (C) format or convert cubes into non-cube format (N)? ";
                         char input;
@@ -1799,7 +1799,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                     }
                 }
                 else {
-                    if ((wavy[activewave].get_origin() == WfnOrigin::WFN || wavy[activewave].get_origin() == WfnOrigin::FFN) && w_or_c) {
+                    if ((wavy[activewave].get_origin() == 2 || wavy[activewave].get_origin() == 4) && w_or_c) {
                         std::cout << "Which format do you want to save the wavefunction in?" << endl
                             << "W) WFN format" << endl
                             << "F) Fchk format" << endl;
@@ -1897,7 +1897,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                         }
                         }
                     }
-                    else if (wavy[activewave].get_origin() == WfnOrigin::CUBE || !w_or_c) {
+                    else if (wavy[activewave].get_origin() == 3 || !w_or_c) {
                         std::filesystem::path path;
                         if (wavy[activewave].get_cube_count() <= 0) {
                             std::cout << "No cubes loaded!" << endl;
@@ -1946,7 +1946,7 @@ int QCT(options& opt, std::vector<WFN>& wavy)
                     std::cout << "First you need to read a wavefunction!" << endl;
                     break;
                 }
-                if(wavy[activewave].get_origin ()==WfnOrigin::WFN||wavy[activewave].get_origin()==WfnOrigin::FFN){
+                if(wavy[activewave].get_origin ()==2||wavy[activewave].get_origin()==4){
                     std::cout << "Sorting wavefunction!" << endl;
                     wavy[activewave].sort_wfn (wavy[activewave].check_order (opt.debug),opt.debug);
                     if(opt.debug) Enter();

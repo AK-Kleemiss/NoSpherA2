@@ -54,7 +54,7 @@ int main(int argc, char **argv)
     // Perform fractal dimensional analysis and quit
     if (opt.fract)
     {
-        wavy.emplace_back(WfnOrigin::WFX);
+        wavy.emplace_back(6);
         cube residual(opt.fract_name, true, wavy[0], std::cout, opt.debug);
         residual.fractal_dimension(0.01);
         log_file.flush();
@@ -272,7 +272,7 @@ int main(int argc, char **argv)
             known_scatterer = result.get_scatterers();
             if (!opt.SALTED)
             {
-                if (wavy[i].get_origin() == WfnOrigin::XYZ)
+                if (wavy[i].get_origin() == 7)
                     opt.iam_switch = true;
                 result.append(calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                                   opt,
@@ -425,7 +425,7 @@ int main(int argc, char **argv)
                     log_file << "Entering scattering Factor Calculation!" << endl;
                 if (opt.electron_diffraction)
                     log_file << "Making Electron diffraction scattering factors, be carefull what you are doing!" << endl;
-                if (wavy[0].get_origin() == WfnOrigin::XYZ)
+                if (wavy[0].get_origin() == 7)
                     opt.iam_switch = true;
                 res = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(
                         opt,

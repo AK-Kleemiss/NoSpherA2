@@ -80,7 +80,7 @@ private:
     //Number of software/Filetype that was used to generate the wavefunction
     // 0=NOT_YET_DEFINED/UNKNOWN; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
 	// enum class is typesafe, so it has to be defined as such. It can be switched to enum later if needed
-    WfnOrigin origin;
+    int origin;
     //Store the total energy of the wavefunction
     double total_energy;
 	//Store the virial ratio of the wavefunction (if available)
@@ -176,7 +176,7 @@ public:
     /** Default constructor creates an empty wavefunction object. */
 	WFN();
     /** Construct empty WFN with an explicit origin/filetype code. @param given_origin origin code */
-    WFN(WfnOrigin given_origin);
+    WFN(int given_origin);
     /** Construct by reading a file, auto-detecting filetype. @param filename path to wavefunction file @param debug enable verbose logging */
     WFN(const std::filesystem::path& filename, const bool& debug = false);
     /** Construct with forced charge / multiplicity while reading a file. */
@@ -289,7 +289,7 @@ public:
     /** Number of (optionally only occupied) MOs. */
     const int get_nmo(const bool &only_occ) const;
     /** Origin/file type code. */
-    const WfnOrigin& get_origin() const { return origin; };
+    const int& get_origin() const { return origin; };
     /** ECP mode (def2/xTB/pTB etc.). */
     const int& get_ECP_mode() const { return ECP_m; };
     /** Freeform comment header. */

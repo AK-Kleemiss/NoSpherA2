@@ -34,6 +34,6 @@ int main()
     Wavefunction wfn = Wavefunction::load("/home/lucas/CLionProjects/NoSpherA2/tests_occ/water.owf.json");
     // WfnAdapter wfn2(wfn);
     // printf("NAtoms: %d", wfn2.get_ncen());
-    WFN wfn2(wfn, WfnOrigin::UNKNOWN);
+    WFN wfn2(wfn, 0);
     return 0;
 }

@@ -1859,7 +1859,7 @@ void options::digest_options()
         else if (temp == "-ewal_sum")
         {
             // bool read, WFN& wave, std::ostream& file,
-            WFN *temp_w = new WFN(WfnOrigin::GBW);
+            WFN *temp_w = new WFN(9);
             cube residual(arguments[i + 1], true, *temp_w, std::cout);
             if (argc >= i + 3)
             {
@@ -2286,7 +2286,7 @@ void options::digest_options()
 
             WFN wavy(wfn);
 
-            WFN wavy_aux(WfnOrigin::UNKNOWN);
+            WFN wavy_aux(0);
             wavy_aux.set_atoms(wavy.get_atoms());
             wavy_aux.set_ncen(wavy.get_ncen());
             wavy_aux.delete_basis_set();
