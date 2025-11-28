@@ -8,7 +8,6 @@
 #include "wfn_class.h"
 #include "atoms.h"
 #include "JKFit.h"
-
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -2338,6 +2337,13 @@ void options::digest_options()
         else if (temp == "-partitioning_test")
         {
             calc_partition_densities();
+        }
+        else if (temp == "-occ")
+        {
+            occ = arguments[i + 1];
+            std::cout << occ << std::endl;
+            err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!",std::cout);
+
         }
     }
 };

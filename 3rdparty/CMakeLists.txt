@@ -6,6 +6,11 @@ CPMAddPackage(
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
     VERSION 1.2.5
 )
+if (BUILD_RELEASE_OCC)
+    set(OCC_BUILD_MODE "Release")
+else ()
+    set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
+endif ()
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
@@ -14,6 +19,8 @@ CPMAddPackage(
         "USE_QCINT OFF"
         "ENABLE_HOST_OPT OFF"
         "WITH_PYTHON_BINDINGS OFF"
+        "USE_FORTRAN ON"
+        "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
 )
 
 # Fix libcint quadmath Fortran bindings issue in debug builds with GCC

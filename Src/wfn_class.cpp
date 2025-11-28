@@ -155,11 +155,13 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     unsigned int chunk_size;
     unsigned int n_sph;
     unsigned int n_prim;
+    double occ;
     for (int n=0; n<occ_WF.nbf; ++n)
     {
         unsigned int basis_offset = 0;
         unsigned int write_cursor = 0;
-        push_back_MO(n+1, 2, mo.energies[n]);
+        occ = n < occ_WF.n_alpha() ? 2 : 0;
+        push_back_MO(n+1, occ, mo.energies[n]);
         MOs[n].reserve_coefficients_size(nex);
         const double* coeffs_ptr = MOs[n].get_coefficient_ptr();
         for (const auto & shell : shells){

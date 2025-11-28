@@ -8,6 +8,8 @@
 #include "properties.h"
 #include "isosurface.h"
 #include "nos_math.h"
+#include <occ/main/occ_scf.h>
+#include <occ/io/occ_input.h>
 #include "cif.h"
 
 int QCT(options& opt, std::vector<WFN>& wavy);
@@ -218,6 +220,7 @@ int main(int argc, char **argv)
         std::cout << "Bye Bye!" << endl;
         return 0;
     }
+
     if (opt.pol_wfns.size() != 0)
     {
         polarizabilities(opt, log_file);
@@ -371,13 +374,23 @@ int main(int argc, char **argv)
         return 0;
     }
     // This one has conversion to fchk and calculation of one single tsc file
-    if (opt.wfn != "" && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
+    if ((opt.wfn != "" || opt.occ != "") && !opt.calc && !opt.gbw2wfn && opt.d_sfac_scan == 0.0)
     {
-        log_file << "Reading: " << setw(44) << opt.wfn << flush;
-        wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
-        wavy[0].set_method(opt.method);
-        wavy[0].set_multi(opt.mult);
-        wavy[0].set_charge(opt.charge);
+        if (opt.occ != "")
+        {
+            log_file << "Calculating WFN from input file: " << setw(44) << opt.wfn << flush;
+            auto config = occ::io::read_occ_input_file(opt.occ);
+            auto occ_wfn = occ::main::run_scf_external(config, true);
+            wavy.emplace_back(WFN(occ_wfn));
+        } else {
+            log_file << "Reading: " << setw(44) << opt.wfn << flush;
+            wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);
+            wavy[0].set_method(opt.method);
+            wavy[0].set_multi(opt.mult);
+            wavy[0].set_charge(opt.charge);
+        }
+
+
         if (opt.debug)
             log_file << "method/mult/charge: " << opt.method << " " << opt.mult << " " << opt.charge << endl;
 
@@ -496,6 +509,7 @@ int main(int argc, char **argv)
             write_wfn_CIF(wavy[0], opt.wfn.replace_extension(".cif"));
         return 0;
     }
+
     std::cout << NoSpherA2_message(opt.no_date);
     if (!opt.no_date)
         std::cout << build_date;

@@ -132,7 +132,7 @@ WFN wfn_from_nos(const std::string &filepath)
 
 int main()
 {
-    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/NiP3.fchk");
+    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_occ/alanine.owf.fchk");
     auto start_nos = std::chrono::high_resolution_clock::now();
     auto wfn_nos = WFN(filepath);
     auto end_nos = std::chrono::high_resolution_clock::now();

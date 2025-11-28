@@ -15,6 +15,7 @@ message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(BUILD_TESTING "Run tests" ON)
+    option(BUILD_RELEASE_OCC "Build OCC in release mode even if NoSpherA2 is built in Debug" OFF)
     option(FROM_SOURCE_DEPENDENCIES "BUILD EVERY DEPENDENCY FROM SOURCE" OFF)
     option(WINDOWS_CROSS_COMPILE "CROSS COMPILING TO WINDOWS" OFF)
     option(BUILD_OPENMP "Necessary if cross compiling from windows to Linux/Darwin" OFF)
