@@ -15,6 +15,7 @@
 #include <ostream>
 #include <occ/gto/gto.h>
 #include <occ/io/conversion.h>
+#include <vector>
 
 #include "occ/OrbitalDefs.h"
 
@@ -79,8 +80,7 @@ WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_
 constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
     if (cartesian)
         return l*(l+1)*(l+2)/6;
-    else
-        return l*(2*l+1);
+    return l*(2*l+1);
 }
 WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
 {
@@ -120,46 +120,68 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
     Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
     auto atom2shell = occ_WF.basis.atom_to_shell();
+
+    unsigned int nprim;
+    unsigned int n_cart;
+    unsigned int sum_ncart;
+    int atom;
+    int l;
     for (int i=0; i<shells.size(); i++)
     {
-        auto shell = shells[i];
-        occ::Vec confac;
-        auto contraction = shell.contraction_coefficients;
-        int l = shell.l;
+        const auto& shell = shells[i];
+        l = shell.l;
         shellType(i) = l;
-        int nprim = shell.num_primitives();
-        int n_cart = num_subshells(true, l);
-        int sum_ncart = sum_subshells(l);
+        nprim = shell.num_primitives();
+        n_cart = num_subshells(true, l);
+        sum_ncart = sum_subshells(l);
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
-        auto atom = shell2atom[i];
+        atom = shell2atom[i];
         insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
         VectorXi typesVec = ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
                         .matrix().transpose().replicate(nprim, 1).reshaped();
-        if (l==3) {
-            Vector<int, 10> reordered = typesVec(d_orbital_corr);
-            insert_into_types(typesVec);
-        }
-        else
-            insert_into_types(typesVec);
+        insert_into_types(typesVec);
+        // if (l==3) {
+        //     Vector<int, 10> reordered = typesVec(d_orbital_corr);
+        //     insert_into_types(typesVec);
+        // }
+        // else
+        //     insert_into_types(typesVec);
     }
 
     // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
     // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
     // CPU due to cache misses, but I didn't benchmark it.
+    unsigned int chunk_size;
+    unsigned int n_sph;
+    unsigned int n_prim;
     for (int n=0; n<occ_WF.nbf; ++n)
     {
-        int basis_offset = 0;
+        unsigned int basis_offset = 0;
+        unsigned int write_cursor = 0;
         push_back_MO(n+1, 2, mo.energies[n]);
-        for (int i=0; i<shells.size(); i++){
-            int l = shells[i].l;
-            int n_sph = num_subshells(false, l);
-            const auto& A = get_cnv_operator(static_cast<ORB>(l));
-            const auto& contraction_coeffs = shells[i].contraction_coefficients;
+        MOs[n].reserve_coefficients_size(nex);
+        const double* coeffs_ptr = MOs[n].get_coefficient_ptr();
+        for (const auto & shell : shells){
+            int l = shell.l;
+            const auto& A = MappedMatrices[l];
+            n_sph = A.cols();
+            n_prim = shell.num_primitives();
+            n_cart = A.rows();
+            // volatile int coeffsize = MOs[n].get_coefficients().size();
+            const auto& contraction_coeffs = shell.contraction_coefficients;
             const auto& MOc = mo.C.block(basis_offset, n, n_sph, 1);
-            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction_coeffs \in R^{(m,1)})
-            MOs[n].insert_into_coefficients((contraction_coeffs*(A*MOc).transpose()).reshaped());
-            basis_offset+=n_sph;
+            chunk_size = A.rows() * n_prim;
+            Map<MatrixXd> dest_block(const_cast<Map<Matrix<double, -1, -1>>::PointerArgType>(coeffs_ptr + write_cursor), n_prim, n_cart);
+
+            MatrixXd temp = A * MOc;
+            Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
+            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
+            MatrixXd temp2 = contraction*temp.transpose();
+            dest_block = temp2;
+
+            write_cursor += chunk_size;
+            basis_offset += n_sph;
         }
     }
 }

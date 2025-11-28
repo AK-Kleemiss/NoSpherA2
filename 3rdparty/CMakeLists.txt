@@ -15,6 +15,12 @@ CPMAddPackage(
         "ENABLE_HOST_OPT OFF"
         "WITH_PYTHON_BINDINGS OFF"
 )
+
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint gfortran)
+endif()
+
 #ExternalProject_Add(occ
 #    SOURCE_DIR /home/lucas/CLionProjects/occ
 ##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON

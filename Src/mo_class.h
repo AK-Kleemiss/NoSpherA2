@@ -52,6 +52,10 @@ public:
   const vec& get_coefficients() const {
     return coefficients;
   };
+  void reserve_coefficients_size(int size)
+  {
+    coefficients.assign(size, 0.0);
+  }
   void set_coefficients(vec coeff) {
     coefficients = coeff;
   };

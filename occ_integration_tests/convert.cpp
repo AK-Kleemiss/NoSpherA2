@@ -133,17 +133,26 @@ WFN wfn_from_nos(const std::string &filepath)
 int main()
 {
     std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/NiP3.fchk");
-    Wavefunction wfn = Wavefunction::load(filepath);
     auto start_nos = std::chrono::high_resolution_clock::now();
     auto wfn_nos = WFN(filepath);
     auto end_nos = std::chrono::high_resolution_clock::now();
     auto duration_nos = std::chrono::duration_cast<std::chrono::microseconds>(end_nos - start_nos);
     fmt::println("Conversion from file to NospherA2 took {}µs.", duration_nos.count());
     auto start_occ = std::chrono::high_resolution_clock::now();
-    auto wfn_from_occ = WFN(wfn);
+    Wavefunction wfn = Wavefunction::load(filepath);
     auto end_occ = std::chrono::high_resolution_clock::now();
     auto duration_occ = std::chrono::duration_cast<std::chrono::microseconds>(end_occ - start_occ);
-    fmt::println("Conversion from OCC to NospherA2 took {}µs.", duration_occ.count());
+
+    auto start_occ2nos = std::chrono::high_resolution_clock::now();
+    auto wfn_from_occ = WFN(wfn);
+    auto end_occ2nos = std::chrono::high_resolution_clock::now();
+    auto duration_occ2nos = std::chrono::duration_cast<std::chrono::microseconds>(end_occ2nos - start_occ2nos);
+
+    fmt::println("Conversion from file to OCC took {}µs.", duration_occ.count());
+    fmt::println("Conversion from OCC to NospherA2 took {}µs.", duration_occ2nos.count());
+    fmt::println("Total, OCC and OCC2NOS took {}µs.", duration_occ2nos.count() + duration_occ.count());
+    fmt::println("---------------------------------------------");
+
     auto centersvecocc = wfn_from_occ.get_centers();
     auto centersvecnos = wfn_nos.get_centers();
     compare_vectors(centersvecnos, centersvecocc, "centers");

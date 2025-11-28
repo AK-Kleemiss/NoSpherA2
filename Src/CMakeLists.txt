@@ -82,7 +82,7 @@ target_link_libraries(libnosphera2 PUBLIC
     occ::qm
     basis_set_helper
     mdspan
-        metatensor::static
+    metatensor::static
     featomic::static
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-ldl>
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-lpthread>
