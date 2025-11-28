@@ -5427,7 +5427,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
             }
 
         }
-        std::cout << "nbas: " << nbas << std::endl;
     }
     constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
     return true;
