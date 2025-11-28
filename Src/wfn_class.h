@@ -7,7 +7,44 @@
 #include <string>
 #include <array>
 #include <filesystem>
+#include <occ/qm/wavefunction.h>
+#include "mo_class.h"
 
+namespace occ::qm
+{
+	struct Wavefunction;
+}
+
+enum class WfnOrigin : int {
+    UNKNOWN = 0,
+    CRYSTAL = 1,
+	WFN = 2,
+	CUBE = 3,
+	FFN = 4,
+	FCHK = 5,
+	WFX = 6,
+	XYZ = 7,
+	MOLDEN = 8,
+	GBW = 9,
+	PTB = 10,
+	OCC = 11
+};
+
+inline std::ostream& operator<<(std::ostream& os, WfnOrigin origin) {
+    switch (origin) {
+        case WfnOrigin::UNKNOWN: return os << "Unknown";
+        case WfnOrigin::CRYSTAL: return os << "CRYSTAL";
+        case WfnOrigin::WFN:     return os << "WFN";
+        case WfnOrigin::CUBE:    return os << "CUBE";
+        case WfnOrigin::FFN:     return os << "FFN";
+        case WfnOrigin::FCHK:    return os << "FCHK";
+        case WfnOrigin::WFX:     return os << "WFX";
+        case WfnOrigin::GBW:     return os << "GBW";
+        case WfnOrigin::PTB:     return os << "PTB";
+        // Always include a default case for robustness
+        default: return os << "WfnOrigin(Invalid Code: " << static_cast<int>(origin) << ")";
+    }
+}
 class MO;
 
 /**
@@ -25,6 +62,7 @@ class MO;
 class WFN
 {
 private:
+	// public:
 	//Number of centers/atoms present in the wavefunction
     int ncen;
 	//Number of basis functions/primitive Gaussians present in the wavefunction
@@ -41,6 +79,7 @@ private:
     unsigned int multi;
     //Number of software/Filetype that was used to generate the wavefunction
     // 0=NOT_YET_DEFINED/UNKNOWN; 1=CRYSTAL; 2=WFN; 3=CUBE; 4=FFN; 5=FCHK; 6=WFX; 7=XYZ; 8=Molden; 9=gbw
+	// enum class is typesafe, so it has to be defined as such. It can be switched to enum later if needed
     int origin;
     //Store the total energy of the wavefunction
     double total_energy;
@@ -86,17 +125,17 @@ private:
 	// Vector of atoms/centers in the wavefunction
     std::vector<atom> atoms;
 
-	// remove a center from the centers vector 
+	// remove a center from the centers vector
 	// CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
 	// @param g_nr the index of the center to be removed
     // @return true if successful
     bool erase_center(const int &g_nr);
-    // remove a type from the type vector 
+    // remove a type from the type vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the type to be removed
     // @return true if successful
     bool erase_type(const int &nr);
-    // remove an exponent from the exponents vector 
+    // remove an exponent from the exponents vector
     // CAREFUL: also need to remove all primitives associated with that center, as well as the associated coefficients in each MO and reduce nex accordingly
     // @param g_nr the index of the exponent to be removed
 	// @return true if successful
@@ -104,6 +143,15 @@ private:
     bool push_back_center(const int &cent);
     bool push_back_type(const int &type);
     bool push_back_exponent(const double &e);
+	void insert_into_exponents(std::ranges::input_range auto&& v) {
+        exponents.insert(exponents.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+    void insert_into_centers(std::ranges::input_range auto&& v) {
+        centers.insert(centers.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
+	void insert_into_types(std::ranges::input_range auto&& v) {
+        types.insert(types.end(), std::ranges::begin(v), std::ranges::end(v));
+    }
     void assign_MO_coefs(const int &nr, vec &values);
     void push_back_MO_coef(const int& nr, const double& value);
     bool modified;
@@ -126,7 +174,7 @@ public:
     /** @name Constructors */
     ///@{
     /** Default constructor creates an empty wavefunction object. */
-    WFN();
+	WFN();
     /** Construct empty WFN with an explicit origin/filetype code. @param given_origin origin code */
     WFN(int given_origin);
     /** Construct by reading a file, auto-detecting filetype. @param filename path to wavefunction file @param debug enable verbose logging */
@@ -134,7 +182,11 @@ public:
     /** Construct with forced charge / multiplicity while reading a file. */
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
-
+	/** Construct from an OCC Wavefunction Struct */
+    WFN(occ::qm::Wavefunction& occ_WF);
+	// virtual ~WFN() {};
+    //-------------------- OCC additional things--------------------------------------------
+    // friend class WfnAdapter;
     //--------------------MO handling--------------------------------------------
     /** Set a MO primitive coefficient. @return true if successful */
     bool set_MO_coef(const int &nr_mo, const int &nr_primitive, const double &value);
@@ -176,6 +228,8 @@ public:
     const void clear_MOs();
 	/** Get maximum absolute MO coefficient (for cutoff checks). */
     const double get_maximum_MO_coefficient(bool occu = true) const;
+
+	const std::vector<MO> &get_MOs_vec() const { return MOs; };
 
     //--------------------in and output----------------------------------------
     /** Change stored basis set name label. */
@@ -227,7 +281,7 @@ public:
     /** Number of primitives (nex). */
     const int& get_nex() const { return nex; };
     /** Number of centers / atoms. */
-    const int& get_ncen() const { return ncen; };
+    virtual const int& get_ncen() const { return ncen; };
     /** Manually set number of centers (use with care). */
     const void set_ncen(const int& in) { ncen = in; };
     /** Number of MOs (including unoccupied). */
@@ -527,6 +581,8 @@ public:
     const int *get_ptr_centers() { return &centers[0]; };
     /** Raw pointer to primitive exponents. */
     const double *get_ptr_exponents() { return &exponents[0]; };
+	const ivec& get_types() { return types; };
+	const vec& get_exponents() { return exponents; };
+	const ivec& get_centers() { return centers; };
 };
 
-#include "mo_class.h"

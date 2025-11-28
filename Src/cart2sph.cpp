@@ -13,8 +13,9 @@
 #include <stdlib.h>
 #include <complex.h>
 #include "cart2sph.h"
+#include "integration_params.h"
 
-
+namespace NoSpherA2{
 #if defined(__APPLE__)
  // On macOS we are using Accelerate for BLAS/LAPACK
 #include <Accelerate/Accelerate.h>
@@ -90365,7 +90366,7 @@ static double *sph2e_inner(double *gsph, double *gcart,
  * 1e integrals, cartesian to real spheric.
  */
 void c2s_sph_1e(double *opij, double *gctr, int *dims,
-                CINTEnvVars *envs, double *cache)
+                NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_l = envs->i_l;
         int j_l = envs->j_l;
@@ -90390,8 +90391,8 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
         {
                 for (ic = 0; ic < i_ctr; ic++)
                 {
-                        tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfi, nfi, j_l);
-                        tmp1 = (c2s_bra_sph[i_l])(buf2, dj, tmp1, i_l);
+                        tmp1 = (NoSpherA2::c2s_ket_sph[j_l])(buf1, gctr, nfi, nfi, j_l);
+                        tmp1 = (NoSpherA2::c2s_bra_sph[i_l])(buf2, dj, tmp1, i_l);
                         pij = opij + ofj * jc + di * ic;
                         dcopy_ij(pij, tmp1, ni, nj, di, dj);
                         gctr += nf;
@@ -90403,7 +90404,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
  * 1e integrals, cartesian to spin-free spinor.
  */
 // void c2s_sf_1e(double complex *opij, double *gctr, int *dims,
-//                CINTEnvVars *envs, double *cache)
+//                NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -90440,7 +90441,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
 // }
 
 // void c2s_sf_1ei(double complex *opij, double *gctr, int *dims,
-//                 CINTEnvVars *envs, double *cache)
+//                 NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -90480,7 +90481,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
  * 1e integrals, cartesian to spinor.
  */
 // void c2s_si_1e(double complex *opij, double *gctr, int *dims,
-//                CINTEnvVars *envs, double *cache)
+//                NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -90526,7 +90527,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
 //         } }
 // }
 // void c2s_si_1ei(double complex *opij, double *gctr, int *dims,
-//                 CINTEnvVars *envs, double *cache)
+//                 NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -90573,7 +90574,7 @@ void c2s_sph_1e(double *opij, double *gctr, int *dims,
 // }
 
 void c2s_sph_1e_grids(double *out, double *gctr, int *dims,
-                      CINTEnvVars *envs, double *cache)
+                      NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int ngrids = envs->ngrids;
         int i_l = envs->i_l;
@@ -90606,7 +90607,7 @@ void c2s_sph_1e_grids(double *out, double *gctr, int *dims,
                 {
                         for (ic = 0; ic < i_ctr; ic++)
                         {
-                                tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, bgrids_nfi, bgrids_nfi, j_l);
+                                tmp1 = (NoSpherA2::c2s_ket_sph[j_l])(buf1, gctr, bgrids_nfi, bgrids_nfi, j_l);
                                 tmp1 = sph2e_inner(buf2, tmp1, i_l, bgrids, dj, bgrids_di, bgrids_nfi);
                                 pij = out + Ng * (ofj * jc + di * ic) + grids_offset;
                                 dcopy_grids_ij(pij, tmp1, Ng, ni, nj, bgrids, di, dj);
@@ -90617,7 +90618,7 @@ void c2s_sph_1e_grids(double *out, double *gctr, int *dims,
 }
 
 void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
-                       CINTEnvVars *envs, double *cache)
+                       NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int ngrids = envs->ngrids;
         int i_ctr = envs->x_ctr[0];
@@ -90652,7 +90653,7 @@ void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
  * 1e-grids integrals, cartesian to spin-free spinor.
  */
 // void c2s_sf_1e_grids(double complex *out, double *gctr, int *dims,
-//                      CINTEnvVars *envs, double *cache)
+//                      NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int ngrids = envs->ngrids;
 //         int *shls = envs->shls;
@@ -90699,7 +90700,7 @@ void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
 //         }
 // }
 // void c2s_sf_1e_gridsi(double complex *out, double *gctr, int *dims,
-//                       CINTEnvVars *envs, double *cache)
+//                       NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int ngrids = envs->ngrids;
 //         int *shls = envs->shls;
@@ -90746,7 +90747,7 @@ void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
 //         }
 // }
 // void c2s_si_1e_grids(double complex *out, double *gctr, int *dims,
-//                      CINTEnvVars *envs, double *cache)
+//                      NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int ngrids = envs->ngrids;
 //         int *shls = envs->shls;
@@ -90802,7 +90803,7 @@ void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
 //         }
 // }
 // void c2s_si_1e_gridsi(double complex *out, double *gctr, int *dims,
-//                       CINTEnvVars *envs, double *cache)
+//                       NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int ngrids = envs->ngrids;
 //         int *shls = envs->shls;
@@ -90864,7 +90865,7 @@ void c2s_cart_1e_grids(double *out, double *gctr, int *dims,
  * gctr: Cartesian GTO integrals, ordered as <ik|lj>
  */
 void c2s_sph_2e1(double *out, double *gctr, int *dims,
-                 CINTEnvVars *envs, double *cache)
+                 NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_l = envs->i_l;
         int j_l = envs->j_l;
@@ -90909,11 +90910,11 @@ void c2s_sph_2e1(double *out, double *gctr, int *dims,
                         {
                                 for (ic = 0; ic < i_ctr; ic++)
                                 {
-                                        tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfikl, nfikl, j_l);
+                                        tmp1 = (NoSpherA2::c2s_ket_sph[j_l])(buf1, gctr, nfikl, nfikl, j_l);
                                         tmp1 = sph2e_inner(buf2, tmp1, l_l, nfik, dj, nfik * dl, nfikl);
                                         tmp1 = sph2e_inner(buf3, tmp1, k_l, nfi, dlj, nfi * dk, nfik);
 
-                                        tmp1 = (c2s_bra_sph[i_l])(buf4, dk * dlj, tmp1, i_l);
+                                        tmp1 = (NoSpherA2::c2s_bra_sph[i_l])(buf4, dk * dlj, tmp1, i_l);
 
                                         pout = out + ofl * lc + ofk * kc + ofj * jc + di * ic;
                                         dcopy_iklj(pout, tmp1, ni, nj, nk, nl, di, dj, dk, dl);
@@ -90931,7 +90932,7 @@ void c2s_sph_2e1(double *out, double *gctr, int *dims,
  * opij: partially transformed GTO integrals, ordered as <ik|lj>
  */
 void c2s_sf_2e1(double *opij, double *gctr, int *dims,
-                CINTEnvVars *envs, double *cache)
+                NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int *shls = envs->shls;
         int *bas = envs->bas;
@@ -90971,7 +90972,7 @@ void c2s_sf_2e1(double *opij, double *gctr, int *dims,
 }
 
 void c2s_sf_2e1i(double *opij, double *gctr, int *dims,
-                 CINTEnvVars *envs, double *cache)
+                 NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int *shls = envs->shls;
         int *bas = envs->bas;
@@ -91016,7 +91017,7 @@ void c2s_sf_2e1i(double *opij, double *gctr, int *dims,
  * opij: partial transformed GTO integrals, ordered as <ik|lj>
  */
 // void c2s_sf_2e2(double complex *fijkl, double *opij, int *dims,
-//                 CINTEnvVars *envs, double *cache)
+//                 NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91074,7 +91075,7 @@ void c2s_sf_2e1i(double *opij, double *gctr, int *dims,
 //         } } } }
 // }
 // void c2s_sf_2e2i(double complex *fijkl, double *opij, int *dims,
-//                  CINTEnvVars *envs, double *cache)
+//                  NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91139,7 +91140,7 @@ void c2s_sf_2e1i(double *opij, double *gctr, int *dims,
  * opij: partial transformed GTO integrals, ordered as <ik|lj>
  */
 void c2s_si_2e1(double *opij, double *gctr, int *dims,
-                CINTEnvVars *envs, double *cache)
+                NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int *shls = envs->shls;
         int *bas = envs->bas;
@@ -91187,7 +91188,7 @@ void c2s_si_2e1(double *opij, double *gctr, int *dims,
         }
 }
 void c2s_si_2e1i(double *opij, double *gctr, int *dims,
-                 CINTEnvVars *envs, double *cache)
+                 NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int *shls = envs->shls;
         int *bas = envs->bas;
@@ -91236,7 +91237,7 @@ void c2s_si_2e1i(double *opij, double *gctr, int *dims,
 }
 
 // void c2s_si_2e2(double complex *fijkl, double *opij, int *dims,
-//                 CINTEnvVars *envs, double *cache)
+//                 NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91301,7 +91302,7 @@ void c2s_si_2e1i(double *opij, double *gctr, int *dims,
 // }
 //
 // void c2s_si_2e2i(double complex *fijkl, double *opij, int *dims,
-//                  CINTEnvVars *envs, double *cache)
+//                  NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91369,7 +91370,7 @@ void c2s_si_2e1i(double *opij, double *gctr, int *dims,
  * 1e integrals, reorder cartesian integrals.
  */
 void c2s_cart_1e(double *opij, double *gctr, int *dims,
-                 CINTEnvVars *envs, double *cache)
+                 NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_ctr = envs->x_ctr[0];
         int j_ctr = envs->x_ctr[1];
@@ -91396,7 +91397,7 @@ void c2s_cart_1e(double *opij, double *gctr, int *dims,
 /*
  * 2e integrals, reorder cartesian integrals.
  */
-void c2s_cart_2e1(double *fijkl, double *gctr, int *dims, CINTEnvVars *envs,
+void c2s_cart_2e1(double *fijkl, double *gctr, int *dims, NoSpherA2::CINTEnvVars *envs,
                   double *cache)
 {
         int i_ctr = envs->x_ctr[0];
@@ -91442,7 +91443,7 @@ void c2s_cart_2e2() {};
  *
  *************************************************/
 void c2s_sph_3c2e1(double *bufijk, double *gctr, const int *dims,
-                   CINTEnvVars *envs, double *cache)
+                   NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_l = envs->i_l;
         int j_l = envs->j_l;
@@ -91477,9 +91478,9 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, const int *dims,
                 {
                         for (ic = 0; ic < i_ctr; ic++)
                         {
-                                tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
+                                tmp1 = (NoSpherA2::c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
                                 tmp1 = sph2e_inner(buf2, tmp1, k_l, nfi, dj, nfi * dk, nfik);
-                                tmp1 = (c2s_bra_sph[i_l])(buf3, dk * dj, tmp1, i_l);
+                                tmp1 = (NoSpherA2::c2s_bra_sph[i_l])(buf3, dk * dj, tmp1, i_l);
                                 pijk = bufijk + ofk * kc + ofj * jc + di * ic;
                                 dcopy_iklj(pijk, tmp1, ni, nj, nk, 1, di, dj, dk, 1);
                                 gctr += nf;
@@ -91489,7 +91490,7 @@ void c2s_sph_3c2e1(double *bufijk, double *gctr, const int *dims,
 }
 
 void c2s_cart_3c2e1(double *bufijk, double *gctr, const int *dims,
-                    CINTEnvVars *envs, double *cache)
+                    NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_ctr = envs->x_ctr[0];
         int j_ctr = envs->x_ctr[1];
@@ -91524,7 +91525,7 @@ void c2s_cart_3c2e1(double *bufijk, double *gctr, const int *dims,
  * ssc ~ (spheric,spheric|cartesian)
  */
 void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
-                       CINTEnvVars *envs, double *cache)
+                       NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         int i_l = envs->i_l;
         int j_l = envs->j_l;
@@ -91556,8 +91557,8 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
                 {
                         for (ic = 0; ic < i_ctr; ic++)
                         {
-                                tmp1 = (c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
-                                tmp1 = (c2s_bra_sph[i_l])(buf2, nfk * dj, tmp1, i_l);
+                                tmp1 = (NoSpherA2::c2s_ket_sph[j_l])(buf1, gctr, nfik, nfik, j_l);
+                                tmp1 = (NoSpherA2::c2s_bra_sph[i_l])(buf2, nfk * dj, tmp1, i_l);
                                 pijk = bufijk + ofk * kc + ofj * jc + nfi * ic;
                                 dcopy_iklj(pijk, tmp1, ni, nj, nk, 1, di, dj, nfk, 1);
                                 gctr += nf;
@@ -91570,7 +91571,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
  * 3c2e spinor integrals, cartesian to spin-free spinor for electron 1.
  */
 // void c2s_sf_3c2e1(double complex *opijk, double *gctr, int *dims,
-//                   CINTEnvVars *envs, double *cache)
+//                   NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91623,7 +91624,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 //         } } }
 // }
 // void c2s_sf_3c2e1i(double complex *opijk, double *gctr, int *dims,
-//                    CINTEnvVars *envs, double *cache)
+//                    NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91681,7 +91682,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
  * 3c2e integrals, cartesian to spinor for electron 1.
  */
 // void c2s_si_3c2e1(double complex *opijk, double *gctr, int *dims,
-//                   CINTEnvVars *envs, double *cache)
+//                   NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91753,7 +91754,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 // }
 //
 // void c2s_si_3c2e1i(double complex *opijk, double *gctr, int *dims,
-//                    CINTEnvVars *envs, double *cache)
+//                    NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91823,7 +91824,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 // }
 //
 // void c2s_sf_3c2e1_ssc(double complex *opijk, double *gctr, int *dims,
-//                       CINTEnvVars *envs, double *cache)
+//                       NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91869,7 +91870,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 // }
 //
 // void c2s_sf_3c2e1i_ssc(double complex *opijk, double *gctr, int *dims,
-//                        CINTEnvVars *envs, double *cache)
+//                        NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91914,7 +91915,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 //         } } }
 // }
 // void c2s_si_3c2e1_ssc(double complex *opijk, double *gctr, int *dims,
-//                       CINTEnvVars *envs, double *cache)
+//                       NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -91969,7 +91970,7 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
 //         } } }
 // }
 // void c2s_si_3c2e1i_ssc(double complex *opijk, double *gctr, int *dims,
-//                        CINTEnvVars *envs, double *cache)
+//                        NoSpherA2::CINTEnvVars *envs, double *cache)
 //{
 //         int *shls = envs->shls;
 //         int *bas = envs->bas;
@@ -92030,13 +92031,13 @@ void c2s_sph_3c2e1_ssc(double *bufijk, double *gctr, int *dims,
  *
  *************************************************/
 void c2s_sph_3c1e(double *out, double *gctr, const int *dims,
-                  CINTEnvVars *envs, double *cache)
+                  NoSpherA2::CINTEnvVars *envs, double *cache)
 {
-        c2s_sph_3c2e1(out, gctr, dims, envs, cache);
+        NoSpherA2::c2s_sph_3c2e1(out, gctr, dims, envs, cache);
 }
 
 void c2s_cart_3c1e(double *out, double *gctr, const int *dims,
-                   CINTEnvVars *envs, double *cache)
+                   NoSpherA2::CINTEnvVars *envs, double *cache)
 {
         c2s_cart_3c2e1(out, gctr, dims, envs, cache);
 }
@@ -92048,11 +92049,11 @@ void c2s_cart_3c1e(double *out, double *gctr, const int *dims,
  *************************************************/
 double *CINTc2s_bra_sph(double *gsph, int nket, double *gcart, int l)
 {
-        return (c2s_bra_sph[l])(gsph, nket, gcart, l);
+        return (NoSpherA2::c2s_bra_sph[l])(gsph, nket, gcart, l);
 }
 double *CINTc2s_ket_sph(double *gsph, int nbra, double *gcart, int l)
 {
-        return (c2s_ket_sph[l])(gsph, gcart, nbra, nbra, l);
+        return (NoSpherA2::c2s_ket_sph[l])(gsph, gcart, nbra, nbra, l);
 }
 
 // void CINTc2s_bra_spinor_e1sf(double complex *gsp, int nket,
@@ -92543,4 +92544,5 @@ double *CINTs2c_ket_sph(double *gsph, int nbra, double *gcart, int l)
         int nd = l * 2 + 1;
         CINTdgemm_NT(nbra, nf, nd, gsph, g_c2s[l].cart2sph, gcart);
         return gcart;
+}
 }

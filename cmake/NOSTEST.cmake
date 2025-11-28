@@ -21,7 +21,7 @@ function(add_nos_test test_name test_args)
         WORKING_DIRECTORY ${TEST_BIN_DIR}
 #        COMMAND bash -c "$<TARGET_FILE:NoSpherA2> ${test_args} && diff -q -i -b ${TEST_COMPARE_NAME} ${TEST_COMPARE_GOOD}"
         COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/runTest.py
-                "${TEST_COMPARE_NAME}" "${TEST_COMPARE_GOOD}" "$<TARGET_FILE:NoSpherA2> ${test_args}"
+                "${TEST_COMPARE_NAME}" "${TEST_COMPARE_GOOD}" "$<TARGET_FILE:NoSpherA2> -all_charges ${test_args}"
     )
     string(REPLACE " " ";" my_list "${test_args}")
     add_custom_target(

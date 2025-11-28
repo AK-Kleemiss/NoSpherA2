@@ -8,6 +8,16 @@
 #include "integrator.h"
 #include "basis_set.h"
 #include "nos_math.h"
+#include <cmath>
+#include <cstdio>
+#include <numeric>
+#include <occ/qm/wavefunction.h>
+#include <ostream>
+#include <occ/gto/gto.h>
+#include <occ/io/conversion.h>
+#include <vector>
+
+#include "occ/OrbitalDefs.h"
 
 void WFN::fill_pre()
 {
@@ -38,85 +48,145 @@ WFN::WFN()
     nex = 0;
     charge = 0;
     multi = 0;
+    ECP_m = 0;
+    total_energy = 0.0;
+    d_f_switch = false;
+    modified = false;
+    distance_switch = false;
+    has_ECPs = false;
+    basis_set_name = " ";
+    comment = "Test";
+    basis_set = NULL;
     origin = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
-    virial_ratio = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    basis_set_name = " ";
-    has_ECPs = false;
-    comment = "Test";
-    basis_set = NULL;
     fill_pre();
     fill_Afac_pre();
 };
 
-WFN::WFN(int given_origin)
+WFN::WFN(int given_origin) : WFN()
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
     origin = given_origin;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
 };
 
-WFN::WFN(const std::filesystem::path & filename, const bool& debug)
+WFN::WFN(const std::filesystem::path& filename, const bool& debug) : WFN()
 {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
-    charge = 0;
-    multi = 0;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
     read_known_wavefunction_format(filename, std::cout, debug);
 };
 
-WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) {
-    ncen = 0;
-    nfunc = 0;
-    nmo = 0;
-    nex = 0;
+WFN::WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug) : WFN(filename, debug) {
     charge = g_charge;
     multi = g_mult;
-    ECP_m = 0;
-    total_energy = 0.0;
-    d_f_switch = false;
-    modified = false;
-    distance_switch = false;
-    has_ECPs = false;
-    basis_set_name = " ";
-    comment = "Test";
-    basis_set = NULL;
-    fill_pre();
-    fill_Afac_pre();
-    read_known_wavefunction_format(filename, std::cout, debug);
 };
+
+constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
+    if (cartesian)
+        return l*(l+1)*(l+2)/6;
+    return l*(2*l+1);
+}
+WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
+{
+    // Only works with restricted WFNs for now
+    using namespace Eigen;
+    using occ::gto::num_subshells;
+    origin = 11;
+    total_energy = occ_WF.energy.total;
+    virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
+    basis_set_name = occ_WF.basis.name();
+    has_ECPs = occ_WF.basis.have_ecps();
+    charge = occ_WF.charge();
+    ncen = occ_WF.atoms.size();
+    atoms.resize(ncen);
+    const occ::Mat3N atom_positions = occ_WF.positions();
+    for (long i = 0; i < ncen; i++) {
+        atoms[i].set_label(constants::atnr2letter(occ_WF.atoms[i].atomic_number));
+        atoms[i].set_charge(static_cast<int>(occ_WF.nuclear_charges()(i)));
+        atoms[i].set_coordinate(0, atom_positions(0, i));
+        atoms[i].set_coordinate(1, atom_positions(1, i));
+        atoms[i].set_coordinate(2, atom_positions(2, i));
+    }
+    auto &shells = occ_WF.basis.shells();
+
+    auto &mo = occ_WF.mo;
+    if (mo.kind!=occ::qm::Restricted) throw std::runtime_error("This constructor only supports Restricted for now.");
+    auto shell2atom  = occ_WF.basis.shell_to_atom();
+    vec con_coefs;
+    VectorXd shellType(shells.size()+1);
+    for (const auto shell : shells)
+    {
+        int l = shell.l;
+        int n_cart = (l+1)*(l+2)/2;
+        nex += n_cart * shell.exponents.size();
+    }
+    auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
+    volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
+    Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
+    auto atom2shell = occ_WF.basis.atom_to_shell();
+
+    unsigned int nprim;
+    unsigned int n_cart;
+    unsigned int sum_ncart;
+    int atom;
+    int l;
+    for (int i=0; i<shells.size(); i++)
+    {
+        const auto& shell = shells[i];
+        l = shell.l;
+        shellType(i) = l;
+        nprim = shell.num_primitives();
+        n_cart = num_subshells(true, l);
+        sum_ncart = sum_subshells(l);
+        occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
+        insert_into_exponents(occ_vec_span(occ_exp));
+        atom = shell2atom[i];
+        insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        VectorXi typesVec = ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
+                        .matrix().transpose().replicate(nprim, 1).reshaped();
+        insert_into_types(typesVec);
+        // if (l==3) {
+        //     Vector<int, 10> reordered = typesVec(d_orbital_corr);
+        //     insert_into_types(typesVec);
+        // }
+        // else
+        //     insert_into_types(typesVec);
+    }
+
+    // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
+    // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
+    // CPU due to cache misses, but I didn't benchmark it.
+    unsigned int chunk_size;
+    unsigned int n_sph;
+    unsigned int n_prim;
+    double occ;
+    for (int n=0; n<occ_WF.nbf; ++n)
+    {
+        unsigned int basis_offset = 0;
+        unsigned int write_cursor = 0;
+        occ = n < occ_WF.n_alpha() ? 2 : 0;
+        push_back_MO(n+1, occ, mo.energies[n]);
+        MOs[n].reserve_coefficients_size(nex);
+        const double* coeffs_ptr = MOs[n].get_coefficient_ptr();
+        for (const auto & shell : shells){
+            int l = shell.l;
+            const auto& A = MappedMatrices[l];
+            n_sph = A.cols();
+            n_prim = shell.num_primitives();
+            n_cart = A.rows();
+            // volatile int coeffsize = MOs[n].get_coefficients().size();
+            const auto& contraction_coeffs = shell.contraction_coefficients;
+            const auto& MOc = mo.C.block(basis_offset, n, n_sph, 1);
+            chunk_size = A.rows() * n_prim;
+            Map<MatrixXd> dest_block(const_cast<Map<Matrix<double, -1, -1>>::PointerArgType>(coeffs_ptr + write_cursor), n_prim, n_cart);
+
+            MatrixXd temp = A * MOc;
+            Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
+            // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
+            MatrixXd temp2 = contraction*temp.transpose();
+            dest_block = temp2;
+
+            write_cursor += chunk_size;
+            basis_offset += n_sph;
+        }
+    }
+}
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)
 {
@@ -832,7 +902,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
     while (!(line.compare(0, 3, "END") == 0) && !rf.eof())
     {
         if (monum == e_nmo)
-        {            
+        {
             file << "monum went higher than expected values in MO reading, thats suspicius, lets stop here...\n";
             break;
         }
@@ -1315,7 +1385,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 
   //  DM = dot(coeff_mo, coeff_small, (int)MOs_mat.size(), (int)n_occ, (int)MOs_mat.size(), (int)n_occ, false, true);
 
-    
+
 
     while (line.find("<Energy =") == string::npos)
         getline(rf, line);
@@ -1333,7 +1403,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
 const double WFN::get_maximum_MO_coefficient(bool occu) const {
     double max_coef = 0.0;
     for (int i = 0; i < nmo; i++) {
-        if (occu && MOs[i].get_occ() == 0.0) 
+        if (occu && MOs[i].get_occ() == 0.0)
             continue;
         for(int j=0; j<nex; j++){
             if (std::abs(MOs[i].get_coefficients()[j]) > max_coef) {
@@ -2117,7 +2187,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     int geo_start_bit = 8;
     int basis_start_bit = 16;
     int MO_start_bit = 24;
-    int soi = constants::soi; 
+    int soi = constants::soi;
     int geo_int_lim = 5;
 
     try
@@ -2577,7 +2647,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
                         reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
-                    } 
+                    }
                 }
                 index += 2 * type + 1;
             }
@@ -2616,11 +2686,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
 
         int n_occ = 0;
         for (int i = 0; i < occupations[0].size(); i++) {if (occupations[0][i] > 0.0) n_occ++;}
-        
+
         dMatrix2 coeff_mo_s1(dimension, dimension), coeff_small_s1(dimension, dimension);
         dMatrix2 coeff_mo_s2, coeff_small_s2;
         if (operators == 2)  coeff_mo_s2 = dMatrix2(dimension, dimension); coeff_small_s2 = dMatrix2(dimension, dimension);
-        
+
         for (int i = 0; i < dimension; i++) {
             for (int oc = 0; oc < occupations[0].size(); oc++) {
                 if (occupations[0][oc] <= 0.0) continue;
@@ -2638,7 +2708,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
         else {
             dMatrix2 DM_s1 = dot(coeff_mo_s1, coeff_small_s1, false, true);
             dMatrix2 DM_s2 = dot(coeff_mo_s2, coeff_small_s2, false, true);
-            
+
             std::transform(DM_s1.container().begin(), DM_s1.container().end(), DM_s2.data(), DM_s1.data(), std::plus<double>());
 
             DM = DM_s1;
@@ -3283,7 +3353,7 @@ const unsigned int WFN::get_nr_ECP_electrons() const
     return count;
 }
 
-double WFN::count_nr_electrons(void) const 
+double WFN::count_nr_electrons(void) const
 {
     double count = 0;
     for (int i = 0; i < nmo; i++)
@@ -3640,7 +3710,8 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
        std::cout << "Origin: " << get_origin() << endl;
     }
-    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
+    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 ||
+        get_origin() == 8)
     {
         //-----------------------check ordering and order accordingly----------------------
         sort_wfn(check_order(debug), debug);
@@ -5247,7 +5318,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
          {
              //to-do: Have to calcualte confac for higher l
          }
-         
+
     }
     vec2 p_pure_2_cart;
     vec2 d_pure_2_cart;
@@ -5356,7 +5427,6 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 }
                 }
             }
-
 
         }
     }
@@ -6934,7 +7004,7 @@ bool WFN::read_ptb(const std::filesystem::path &filename, std::ostream &file, co
     if (multi == 0)
         multi = elcount % 2 + 1;
     err_checkf((elcount % 2 == 0 && multi % 2 == 1) || elcount % 2 == 1 && multi % 2 == 0, "Impossible combination of number of electrons and multiplicity! " + std::to_string(elcount) + " " + std::to_string(multi), std::cout);
-    
+
     int alpha_els = 0, beta_els = 0, temp_els = elcount;
     while (temp_els > 1)
     {

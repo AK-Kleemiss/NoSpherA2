@@ -6,6 +6,35 @@ CPMAddPackage(
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
     VERSION 1.2.5
 )
+if (BUILD_RELEASE_OCC)
+    set(OCC_BUILD_MODE "Release")
+else ()
+    set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
+endif ()
+CPMAddPackage(
+    NAME occ
+    GITHUB_REPOSITORY MilitaoLucas/occ
+    GIT_TAG "main_with_libs"
+    OPTIONS
+        "USE_QCINT OFF"
+        "ENABLE_HOST_OPT OFF"
+        "WITH_PYTHON_BINDINGS OFF"
+        "USE_FORTRAN ON"
+        "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
+)
+
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint gfortran)
+endif()
+
+#ExternalProject_Add(occ
+#    SOURCE_DIR /home/lucas/CLionProjects/occ
+##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON
+#)
+include(CMakePrintHelpers)
+include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
+print_target_properties(occ)
 
 CPMAddPackage(
     NAME mdspan
@@ -16,7 +45,7 @@ CPMAddPackage(
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 CPMAddPackage(
     NAME featomic
-    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.2/featomic-cxx-0.6.2.tar.gz"
+    URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
     OPTIONS
         "CMAKE_BUILD_TYPE Release"
         "FEATOMIC_FETCH_METATENSOR ON"
@@ -95,3 +124,7 @@ if (UNIX)
 else ()
     find_package(MKL CONFIG REQUIRED)
 endif ()
+
+#if (WITH_OCC)
+#    find_package(occ REQUIRED)
+#endif ()

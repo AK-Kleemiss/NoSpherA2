@@ -1,0 +1,5 @@
+add_executable(convert convert.cpp)
+target_link_libraries(convert libnosphera2 occ::qm)
+add_executable(randomocc testingRandomOccFunctions.cpp)
+target_link_libraries(randomocc libnosphera2 occ::qm)
+#target_link_options(convert PRIVATE "-fsanitize=address")

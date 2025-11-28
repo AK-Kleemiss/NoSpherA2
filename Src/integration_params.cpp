@@ -1,5 +1,6 @@
 #include "integration_params.h"
 #include "JKFit.h"
+#include "wfn_class.h"
 
 Int_Params::Int_Params()
 {

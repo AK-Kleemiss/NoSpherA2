@@ -8,7 +8,6 @@
 #include "wfn_class.h"
 #include "atoms.h"
 #include "JKFit.h"
-
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -219,14 +218,14 @@ std::filesystem::path get_home_path(void)
         std::cerr << "Warning: HOME environment variable not set." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp
     }
-    
+
     std::string home = home_env;
     // Basic validation: check if it's a valid path and not empty
     if (home.empty() || home.find_first_of('\0') != std::string::npos) {
         std::cerr << "Warning: Invalid HOME environment variable." << std::endl;
         return std::filesystem::path("/tmp"); // Fallback to /tmp
     }
-    
+
     return std::filesystem::path(home);
 #endif
 }
@@ -2282,7 +2281,7 @@ void options::digest_options()
                 std::cout << "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set." << std::endl;
                 exit(1);
             }
-  
+
 
             WFN wavy(wfn);
 
@@ -2338,6 +2337,13 @@ void options::digest_options()
         else if (temp == "-partitioning_test")
         {
             calc_partition_densities();
+        }
+        else if (temp == "-occ")
+        {
+            occ = arguments[i + 1];
+            std::cout << occ << std::endl;
+            err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!",std::cout);
+
         }
     }
 };
@@ -2832,7 +2838,7 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
         }
         if (file.empty())
             return false;
-        if (debug) 
+        if (debug)
             std::cout << "Filename: " << file << std::endl;
         path = file;
         std::stringstream ss(path);
@@ -2841,10 +2847,10 @@ bool save_file_dialog(std::filesystem::path& path, bool debug, const std::vector
         if (debug) std::cout << "Path: " << path << std::endl;
         if (pclose(f) != 0) std::cout << "Zenity returned non zero, whatever that means..." << std::endl;
         bool found = false;
-        for (int i = 0; i < endings.size(); i++) 
+        for (int i = 0; i < endings.size(); i++)
             if (path.string().find(endings[i]) != std::string::npos)
                 found = true;
-        if (found) 
+        if (found)
             end = true;
     }
 #endif
