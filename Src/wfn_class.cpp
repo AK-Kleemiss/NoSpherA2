@@ -156,16 +156,20 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     unsigned int n_sph;
     unsigned int n_prim;
     double occ;
+    const double* coeffs_ptr;
+    unsigned int basis_offset;
+    unsigned int write_cursor;
+
     for (int n=0; n<occ_WF.nbf; ++n)
     {
-        unsigned int basis_offset = 0;
-        unsigned int write_cursor = 0;
+        basis_offset = 0;
+        write_cursor = 0;
         occ = n < occ_WF.n_alpha() ? 2 : 0;
         push_back_MO(n+1, occ, mo.energies[n]);
         MOs[n].reserve_coefficients_size(nex);
-        const double* coeffs_ptr = MOs[n].get_coefficient_ptr();
+        coeffs_ptr = MOs[n].get_coefficient_ptr();
         for (const auto & shell : shells){
-            int l = shell.l;
+            l = shell.l;
             const auto& A = MappedMatrices[l];
             n_sph = A.cols();
             n_prim = shell.num_primitives();
