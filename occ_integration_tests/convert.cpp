@@ -90,7 +90,7 @@ bool compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string l
     return false;
 }
 
-void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e-6)
+bool compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e-6)
 {
     if (moNOS.size() != moOCC.size())
     {
@@ -106,12 +106,12 @@ void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
         if (abs(moNOS[i].get_occ()) - abs(moOCC[i].get_occ()) > tol)
         {
             fmt::print("[MO] occupancies (occ) differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_occ(), moOCC[i].get_occ());
-            return;
+            return false;
         }
         if (moNOS[i].get_op() != moOCC[i].get_op())
         {
             fmt::print("[MO] OPs differ, [NOS]: {}, [OCC]: {}. \n", moNOS[i].get_op(), moOCC[i].get_op());
-            return;
+            return false;
         }
         const auto& moNOSC = moNOS[i].get_coefficients();
         const auto& moOCCC = moOCC[i].get_coefficients();
@@ -120,11 +120,12 @@ void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
             fmt::println("[MO] coefficients differ in size, [NOS]: {}, [OCC]: {}. \n",
                 moNOS[i].get_coefficients().size(), moOCC[i].get_coefficients().size());
             compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true);
-            return;
+            return false;
         }
-        if (!compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true)) return;
+        if (!compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true)) return false;
     }
     fmt::println("[MOs] from occ constructor and from file are equal.");
+    return true;
 }
 void compare_Atoms(std::vector<atom>& atomsNOS, std::vector<atom>& atomsOCC, double tol = 1e-6)
 {
@@ -160,15 +161,14 @@ WFN wfn_from_nos(const std::string &filepath)
 
 int main()
 {
-    std::string filepathint("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_integrated_occ/alanine.owf.fchk");
-    // std::string filepath("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_occ/alanine.owf.fchk");
+    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/occ_integration_tests/alanine.owf.fchk");
     auto start_nos = std::chrono::high_resolution_clock::now();
-    auto wfn_nos = WFN(filepathint);
+    auto wfn_nos = WFN(filepath);
     auto end_nos = std::chrono::high_resolution_clock::now();
     auto duration_nos = std::chrono::duration_cast<std::chrono::microseconds>(end_nos - start_nos);
     fmt::println("Conversion from file to NospherA2 took {}µs.", duration_nos.count());
     auto start_occ = std::chrono::high_resolution_clock::now();
-    Wavefunction wfn = Wavefunction::load(filepathint);
+    Wavefunction wfn = Wavefunction::load(filepath);
     auto end_occ = std::chrono::high_resolution_clock::now();
     auto duration_occ = std::chrono::duration_cast<std::chrono::microseconds>(end_occ - start_occ);
 
@@ -195,11 +195,13 @@ int main()
     auto expsvecnos = wfn_nos.get_exponents();
     compare_vectors(expsvecnos, expsvecocc, "exponents");
 
-    auto mosOCC = wfn_from_occ.get_MOs_vec();
-    auto mosNOS = wfn_nos.get_MOs_vec();
-    compare_MOs(mosNOS, mosOCC);
     auto atomsOCC = wfn_from_occ.get_atoms();
     auto atomsNOS = wfn_nos.get_atoms();
     compare_Atoms(atomsNOS, atomsOCC);
+
+    auto mosOCC = wfn_from_occ.get_MOs_vec();
+    auto mosNOS = wfn_nos.get_MOs_vec();
+    if (!compare_MOs(mosNOS, mosOCC))
+        return 1;
     return 0;
 }
