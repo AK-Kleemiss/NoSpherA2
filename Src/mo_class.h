@@ -52,7 +52,7 @@ public:
   const vec& get_coefficients() const {
     return coefficients;
   };
-  void reserve_coefficients_size(int size)
+  void assign_coefficients_size(int size)
   {
     coefficients.assign(size, 0.0);
   }
@@ -67,7 +67,7 @@ public:
   const double& get_coefficient_f(const int& _nr) const {
     return coefficients[_nr];
   };
-  const double* get_coefficient_ptr() const {
+  double* get_coefficient_ptr() {
     return coefficients.data();
   };
   const bool set_coefficient(const int& _nr, const double& value) {

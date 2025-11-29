@@ -18,8 +18,9 @@
 #include <vector>
 
 #include "occ/OrbitalDefs.h"
-
-void WFN::fill_pre()
+long long int WFN::pre[9][5][5][9] = {};
+long long int WFN::Afac_pre[9][5][9] = {};
+constexpr void WFN::fill_pre()
 {
     for (int j = 0; j < 9; j++)
         for (int l = 0; l < 5; l++)
@@ -32,7 +33,7 @@ void WFN::fill_pre()
             }
 }
 
-void WFN::fill_Afac_pre()
+constexpr void WFN::fill_Afac_pre()
 {
     for (int l = 0; l < 9; l++)
         for (int r = 0; r <= l / 2; r++)
@@ -88,8 +89,8 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     using namespace Eigen;
     using occ::gto::num_subshells;
     origin = 11;
-    total_energy = occ_WF.energy.total;
-    virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
+    // total_energy = occ_WF.energy.total;
+    // virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
     basis_set_name = occ_WF.basis.name();
     has_ECPs = occ_WF.basis.have_ecps();
     charge = occ_WF.charge();
@@ -110,6 +111,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     auto shell2atom  = occ_WF.basis.shell_to_atom();
     vec con_coefs;
     VectorXd shellType(shells.size()+1);
+    nex = 0;
     for (const auto shell : shells)
     {
         int l = shell.l;
@@ -117,7 +119,6 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         nex += n_cart * shell.exponents.size();
     }
     auto mo_go = occ::io::conversion::orb::to_gaussian_order(occ_WF.basis, occ_WF.mo);
-    volatile auto block_a = occ::qm::block::a(mo_go.C).eval();
     Vector<int, 10> d_orbital_corr {0, 1, 2, 6, 3, 4, 7, 8, 5, 9};
     auto atom2shell = occ_WF.basis.atom_to_shell();
 
@@ -125,7 +126,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     unsigned int n_cart;
     unsigned int sum_ncart;
     int atom;
-    int l;
+    volatile int l;
     for (int i=0; i<shells.size(); i++)
     {
         const auto& shell = shells[i];
@@ -152,44 +153,52 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
     // This could also be calculated in the loop above and I tried it, but I noticed when looking at the data that
     // a vector was inserted into coefficients for each MO. I think that probably that would result in more work for the
     // CPU due to cache misses, but I didn't benchmark it.
-    unsigned int chunk_size;
-    unsigned int n_sph;
-    unsigned int n_prim;
+    volatile unsigned int chunk_size;
+    volatile unsigned int n_sph;
+    volatile unsigned int n_prim;
     double occ;
-    const double* coeffs_ptr;
+    double* coeffs_ptr;
     unsigned int basis_offset;
     unsigned int write_cursor;
+    double p;
+    double scalar;
 
+    // confac = pow(8 * pow(exp[exp_run], 3) / constants::PI3, 0.25);
     for (int n=0; n<occ_WF.nbf; ++n)
     {
         basis_offset = 0;
         write_cursor = 0;
         occ = n < occ_WF.n_alpha() ? 2 : 0;
         push_back_MO(n+1, occ, mo.energies[n]);
-        MOs[n].reserve_coefficients_size(nex);
+        MOs[n].assign_coefficients_size(nex);
         coeffs_ptr = MOs[n].get_coefficient_ptr();
         for (const auto & shell : shells){
             l = shell.l;
+            p = (2.0*l+3.0)/4.0;
+            scalar = std::pow(2.0, 0.5 * l);
             const auto& A = MappedMatrices[l];
             n_sph = A.cols();
             n_prim = shell.num_primitives();
             n_cart = A.rows();
             // volatile int coeffsize = MOs[n].get_coefficients().size();
-            const auto& contraction_coeffs = shell.contraction_coefficients;
-            const auto& MOc = mo.C.block(basis_offset, n, n_sph, 1);
-            chunk_size = A.rows() * n_prim;
-            Map<MatrixXd> dest_block(const_cast<Map<Matrix<double, -1, -1>>::PointerArgType>(coeffs_ptr + write_cursor), n_prim, n_cart);
+            // normalizing the contraction_coeffs
+            const auto& CC = shell.contraction_coefficients.array();
+            const VectorXd& contraction_coeffs = (scalar/constants::PI)*(2*CC).pow(p)*CC;
+            const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
+            chunk_size = n_cart * n_prim;
+            Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
 
             MatrixXd temp = A * MOc;
-            Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
+            // Map<const VectorXd> contraction(contraction_coeffs.data(), n_prim);
             // |C>(A|MOc>)^T Has dimensions of (num_subshells(l), m). m: contraction \in R^{(m,1)})
-            MatrixXd temp2 = contraction*temp.transpose();
+            MatrixXd temp2 = contraction_coeffs*temp.transpose();
             dest_block = temp2;
 
             write_cursor += chunk_size;
             basis_offset += n_sph;
         }
     }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
 }
 
 bool WFN::push_back_atom(const std::string &label, const double &x, const double &y, const double &z, const int &_charge, const std::string& ID)

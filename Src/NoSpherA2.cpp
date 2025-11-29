@@ -378,10 +378,17 @@ int main(int argc, char **argv)
     {
         if (opt.occ != "")
         {
-            log_file << "Calculating WFN from input file: " << setw(44) << opt.wfn << flush;
-            auto config = occ::io::read_occ_input_file(opt.occ);
-            auto occ_wfn = occ::main::run_scf_external(config, true);
-            wavy.emplace_back(WFN(occ_wfn));
+            // log_file << "Calculating WFN from input file: " << setw(44) << opt.wfn << flush;
+            // auto config = occ::io::read_occ_input_file(opt.occ);
+            // auto occ_wfn = occ::main::run_scf_external(config, true);
+            occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
+            auto wfn_from_occ = WFN(wfn);
+            wavy.emplace_back(wfn_from_occ);
+            wavy[0].set_method(opt.method);
+            wavy[0].set_multi(opt.mult);
+            wavy[0].set_charge(opt.charge);
+
+            constants::exp_cutoff = std::log(constants::density_accuracy / wfn_from_occ.get_maximum_MO_coefficient());
         } else {
             log_file << "Reading: " << setw(44) << opt.wfn << flush;
             wavy.emplace_back(opt.wfn, opt.charge, opt.mult, opt.debug);

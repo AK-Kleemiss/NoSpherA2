@@ -30,13 +30,13 @@ std::string get_shape(const occ::Mat& mat)
     return std::format("({}, {})", mat.rows(), mat.cols());
 }
 template <typename T>
-void compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string label,
-    VecSize size = VecSize(), double tol = 1e-1, bool compare_diff_size = false)
+bool compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string label,
+    VecSize size = VecSize(), double tol = 1e-12, bool compare_diff_size = false, bool print_on_success = true)
 {
     bool differ =false;
     if (vecNOS.size() != vecOCC.size())
     {
-        fmt::print("[{}] sizes differ, [NOS]: {}, [OCC]: {}.\n", label, vecNOS.size(), vecOCC.size());
+        fmt::println("[{}] sizes differ, [NOS]: {}, [OCC]: {}.\n", label, vecNOS.size(), vecOCC.size());
         if (compare_diff_size)
         {
             if (vecNOS.size() < vecOCC.size())
@@ -45,14 +45,14 @@ void compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string l
             } else
                 vecOCC.resize(vecNOS.size(), 0);
         } else
-            return;
+            return false;
     }
 
     bool comp;
     for (int i=0; i<vecNOS.size(); i++)
     {
         if constexpr (std::is_integral_v<T>)  comp =vecNOS[i] != vecOCC[i];
-        else comp =  abs(vecNOS[i]) - abs(vecOCC[i]) > tol;
+        else comp =  abs(vecNOS[i] - vecOCC[i]) > tol;
         if (comp)
         {
             std::cout << "idx: " << i << " - "<< label<<"NOS: " << vecNOS[i] << " - " << label << "OCC: " <<vecOCC[i] << "\n";
@@ -63,8 +63,9 @@ void compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string l
         std::cout << "[" << label << "] from occ constructor and from file differ.\n";
     else
     {
-        std::cout << "[" << label << "] from occ constructor and from file are equal.\n";
-        return;
+        if (print_on_success)
+            std::cout << "[" << label << "] from occ constructor and from file are equal.\n";
+        return true;
     }
     if (size.is_empty())
     {
@@ -86,9 +87,10 @@ void compare_vectors(std::vector<T> vecNOS, std::vector<T> vecOCC, std::string l
         }
         logFile.close();
     }
+    return false;
 }
 
-void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e-1)
+void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e-6)
 {
     if (moNOS.size() != moOCC.size())
     {
@@ -115,15 +117,41 @@ void compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
         const auto& moOCCC = moOCC[i].get_coefficients();
         if (moNOSC.size() != moOCCC.size())
         {
-            fmt::print("[MO] coefficients differ in size, [NOS]: {}, [OCC]: {}. \n",
+            fmt::println("[MO] coefficients differ in size, [NOS]: {}, [OCC]: {}. \n",
                 moNOS[i].get_coefficients().size(), moOCC[i].get_coefficients().size());
             compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true);
             return;
         }
+        if (!compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true)) return;
     }
-    fmt::print("[MOs] from occ constructor and from file are equal.");
+    fmt::println("[MOs] from occ constructor and from file are equal.");
 }
+void compare_Atoms(std::vector<atom>& atomsNOS, std::vector<atom>& atomsOCC, double tol = 1e-6)
+{
+    if (atomsNOS.size() != atomsOCC.size())
+    {
+        fmt::print("[atoms] sizes differ, [NOS]: {}, [OCC]: {}.\n", atomsNOS.size(), atomsOCC.size());
 
+    }
+    for (int i=0; i< atomsOCC.size(); i++)
+    {
+        if (abs(atomsNOS[i].get_charge()) - abs(atomsOCC[i].get_charge()) > tol)
+        {
+            fmt::print("[Atoms] charges differ, [NOS]: {}, [OCC]: {}. \n", atomsNOS[i].get_charge(), atomsOCC[i].get_charge());
+        }
+        if (abs(atomsNOS[i].get_ECP_electrons()) - abs(atomsOCC[i].get_ECP_electrons()) > tol)
+        {
+            fmt::print("[Atoms] ECP electrons (occ) differ, [NOS]: {}, [OCC]: {}. \n", atomsNOS[i].get_ECP_electrons(), atomsOCC[i].get_ECP_electrons());
+            return;
+        }
+        auto coordsNOS = atomsNOS[i].get_coords();
+        auto coordsOCC = atomsOCC[i].get_coords();
+        compare_vectors(std::vector(coordsNOS.begin(), coordsNOS.end()),
+            std::vector(coordsOCC.begin(), coordsOCC.end()),
+            fmt::format("Atoms", i), VecSize(), 1e-11,true, false);
+    }
+    fmt::println("[Atoms] from occ constructor and from file are equal.");
+}
 
 WFN wfn_from_nos(const std::string &filepath)
 {
@@ -132,14 +160,15 @@ WFN wfn_from_nos(const std::string &filepath)
 
 int main()
 {
-    std::string filepath("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_occ/alanine.owf.fchk");
+    std::string filepathint("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_integrated_occ/alanine.owf.fchk");
+    // std::string filepath("/home/lucas/CLionProjects/NoSpherA2/cmake-build-debug-gcc/tests/alanine_occ/alanine.owf.fchk");
     auto start_nos = std::chrono::high_resolution_clock::now();
-    auto wfn_nos = WFN(filepath);
+    auto wfn_nos = WFN(filepathint);
     auto end_nos = std::chrono::high_resolution_clock::now();
     auto duration_nos = std::chrono::duration_cast<std::chrono::microseconds>(end_nos - start_nos);
     fmt::println("Conversion from file to NospherA2 took {}µs.", duration_nos.count());
     auto start_occ = std::chrono::high_resolution_clock::now();
-    Wavefunction wfn = Wavefunction::load(filepath);
+    Wavefunction wfn = Wavefunction::load(filepathint);
     auto end_occ = std::chrono::high_resolution_clock::now();
     auto duration_occ = std::chrono::duration_cast<std::chrono::microseconds>(end_occ - start_occ);
 
@@ -169,5 +198,8 @@ int main()
     auto mosOCC = wfn_from_occ.get_MOs_vec();
     auto mosNOS = wfn_nos.get_MOs_vec();
     compare_MOs(mosNOS, mosOCC);
+    auto atomsOCC = wfn_from_occ.get_atoms();
+    auto atomsNOS = wfn_nos.get_atoms();
+    compare_Atoms(atomsNOS, atomsOCC);
     return 0;
 }

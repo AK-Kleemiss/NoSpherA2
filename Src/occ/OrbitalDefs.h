@@ -24,17 +24,17 @@ enum class ORB : int {
     G = 4,
     H = 5,
 };
-namespace cart2pure {
-    inline const Eigen::Matrix<double, 1, 1, Eigen::RowMajor> matS {
+namespace pure2cart {
+    inline const Eigen::Matrix<double, 1, 1> matS {
         {  0.28209479177387814,  },
     };
-    inline const Eigen::Matrix<double, 3, 3, Eigen::RowMajor> matP {
+    inline const Eigen::Matrix<double, 3, 3> matP {
         {0.4886025119029199,  0.0,  0.0,  },
         {0.0,  0.4886025119029199,  0.0,  },
         {0.0,  0.0,  0.4886025119029199,  },
     };
 
-    inline const Eigen::Matrix<double, 6, 5, Eigen::RowMajor> matD {
+    inline const Eigen::Matrix<double, 6, 5> matD {
         {  0.0,  0.0,  -0.31539156525252,  0.0,  0.5462742152960396,  },
         {  1.0925484305920792,  0.0,  0.0,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  1.0925484305920792,  0.0,  },
@@ -43,7 +43,7 @@ namespace cart2pure {
         {  0.0,  0.0,  0.63078313050504,  0.0,  0.0,  },
     };
 
-    inline const  Eigen::Matrix<double, 10, 7, Eigen::RowMajor>  matF {
+    inline const  Eigen::Matrix<double, 10, 7>  matF {
         {  0.0,  0.0,  0.0,  0.0,  -0.4570457994644657,  0.0,  0.5900435899266435,  },
         {  1.7701307697799304,  0.0,  -0.4570457994644657,  0.0,  0.0,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  -1.1195289977703462,  0.0,  1.4453057213202771,  0.0,  },
@@ -56,7 +56,7 @@ namespace cart2pure {
         {  0.0,  0.0,  0.0,  0.7463526651802308,  0.0,  0.0,  0.0,  },
     };
 
-    inline const  Eigen::Matrix<double, 15, 9, Eigen::RowMajor>  matG {
+    inline const  Eigen::Matrix<double, 15, 9>  matG {
         {  0.0,  0.0,  0.0,  0.0,  0.31735664074561293,  0.0,  -0.47308734787878,  0.0,  0.6258357354491761,  },
         {  2.5033429417967046,  0.0,  -0.94617469575756,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  0.0,  0.0,  -2.0071396306718676,  0.0,  1.7701307697799304,  0.0,  },
@@ -75,7 +75,7 @@ namespace cart2pure {
     };
 
 
-    inline const  Eigen::Matrix<double, 21, 11, Eigen::RowMajor> matH {
+    inline const  Eigen::Matrix<double, 21, 11> matH {
         {  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.45294665119569694,  0.0,  -0.4892382994352504,  0.0,  0.6563820568401701,  },
         {  3.2819102842008507,  0.0,  -1.467714898305751,  0.0,  0.45294665119569694,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  },
         {  0.0,  0.0,  0.0,  0.0,  0.0,  1.754254836801354,  0.0,  -2.396768392486662,  0.0,  2.075662314881041,  0.0,  },
@@ -100,11 +100,11 @@ namespace cart2pure {
     };
 }
 
-inline const std::array<Eigen::Map<const Eigen::MatrixXd, Eigen::RowMajor>, 6> MappedMatrices = {{
-        { cart2pure::matS.data(), 1, 1 },
-        { cart2pure::matP.data(), 3, 3  },
-        { cart2pure::matD.data(), 6, 5 },
-        { cart2pure::matF.data(), 10, 7 },
-        { cart2pure::matG.data(), 15, 9 },
-        { cart2pure::matH.data(), 21, 11 },
+inline const std::array<Eigen::Map<const Eigen::MatrixXd>, 6> MappedMatrices = {{
+        { pure2cart::matS.data(), 1, 1 },
+        { pure2cart::matP.data(), 3, 3  },
+        { pure2cart::matD.data(), 6, 5 },
+        { pure2cart::matF.data(), 10, 7 },
+        { pure2cart::matG.data(), 15, 9 },
+        { pure2cart::matH.data(), 21, 11 },
     }};

@@ -160,10 +160,10 @@ private:
     bool has_ECPs;
     bool isBohr = false; // True if the coordinates of the atoms are given in Bohr
     // precomputed factors and helper functions for ESP calc
-    long long int pre[9][5][5][9];
-    void fill_pre();
-    long long int Afac_pre[9][5][9];
-    void fill_Afac_pre();
+	static long long int pre[9][5][5][9];
+    constexpr static void fill_pre();
+    static long long int Afac_pre[9][5][9];
+    constexpr static void fill_Afac_pre();
     const double fj(int &j, int &l, int &m, double &aa, double &bb) const;
     const double Afac(int &l, int &r, int &i, double &PC, double &gamma, double &fjtmp) const;
     const double compute_dens_cartesian(const double &Pos1, const double &Pos2, const double &Pos3, vec2 &d, vec &phi) const;
