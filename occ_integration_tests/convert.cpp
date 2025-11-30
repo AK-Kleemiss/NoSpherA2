@@ -122,7 +122,7 @@ bool compare_MOs(std::vector<MO>& moNOS, std::vector<MO>& moOCC, double tol = 1e
             compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true);
             return false;
         }
-        if (!compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true)) return false;
+        if (!compare_vectors(moNOSC, moOCCC, fmt::format("moCOEFS[{}]", i), VecSize(), 1e-6,true, false)) return false;
     }
     fmt::println("[MOs] from occ constructor and from file are equal.");
     return true;

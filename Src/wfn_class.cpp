@@ -175,17 +175,18 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
         for (const auto & shell : shells){
             l = shell.l;
             p = (2.0*l+3.0)/4.0;
-            scalar = std::pow(2.0, 0.5 * l);
+            scalar = std::pow(2.0, 0.5 * l)/std::pow(constants::PI3, 0.25);
             const auto& A = MappedMatrices[l];
             n_sph = A.cols();
             n_prim = shell.num_primitives();
             n_cart = A.rows();
+            chunk_size = n_cart * n_prim;
+            const auto& exp_arr = shell.exponents.array();
             // volatile int coeffsize = MOs[n].get_coefficients().size();
             // normalizing the contraction_coeffs
-            const auto& CC = shell.contraction_coefficients.array();
-            const VectorXd& contraction_coeffs = (scalar/constants::PI)*(2*CC).pow(p)*CC;
+            const auto& CC = shell.u_coefficients.array();
+            const VectorXd& contraction_coeffs = scalar*(2*exp_arr).pow(p)*CC;
             const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
-            chunk_size = n_cart * n_prim;
             Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);
 
             MatrixXd temp = A * MOc;
