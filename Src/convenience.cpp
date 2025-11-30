@@ -2341,7 +2341,6 @@ void options::digest_options()
         else if (temp == "-occ")
         {
             occ = arguments[i + 1];
-            std::cout << occ << std::endl;
             err_checkf(std::filesystem::exists(occ), "OCC input doesn't exist!",std::cout);
 
         }

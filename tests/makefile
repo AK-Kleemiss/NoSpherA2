@@ -31,7 +31,7 @@ else
   define TIME_START
     start_time=$$(date +%s.%N)
   endef
-  
+
   define TIME_END
     end_time=$$(date +%s.%N); \
     elapsed=$$(echo "$$end_time - $$start_time" | bc); \
@@ -64,6 +64,15 @@ alanine_occ:
 		-cif alanine.cif \
 		-dmin 0.5 \
 		-wfn alanine.owf.fchk \
+		-acc 1 \
+		-no-date)
+
+
+alanine_integrated_occ:
+	$(call RUN_TEST,$@,alanine_occ, \
+		-cif alanine.cif \
+		-dmin 0.5 \
+		-occ alanine.toml \
 		-acc 1 \
 		-no-date)
 
