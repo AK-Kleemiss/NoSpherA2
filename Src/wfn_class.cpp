@@ -83,7 +83,7 @@ constexpr unsigned int sum_subshells(unsigned int l, bool cartesian=true) {
         return l*(l+1)*(l+2)/6;
     return l*(2*l+1);
 }
-WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
+WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
 {
     // Only works with restricted WFNs for now
     using namespace Eigen;
@@ -184,7 +184,13 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF) : WFN()
             const auto& exp_arr = shell.exponents.array();
             // volatile int coeffsize = MOs[n].get_coefficients().size();
             // normalizing the contraction_coeffs
-            const auto& CC = shell.u_coefficients.array();
+            ArrayXd CC = shell.u_coefficients.array();
+            if (!from_file)
+                CC = VectorXd::NullaryExpr(CC.size(), [shell](const Index i){
+                    return shell.coeff_normalized(0, i);
+                });
+            // return contraction_coefficients(coeff_idx, contr_idx) /
+                 // gto_norm(static_cast<int>(l), exponents(coeff_idx));
             const VectorXd& contraction_coeffs = scalar*(2*exp_arr).pow(p)*CC;
             const auto& MOc = mo_go.C.block(basis_offset, n, n_sph, 1);
             Map<MatrixXd> dest_block(coeffs_ptr + write_cursor, n_prim, n_cart);

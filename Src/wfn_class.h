@@ -182,8 +182,8 @@ public:
     /** Construct with forced charge / multiplicity while reading a file. */
     WFN(const std::filesystem::path& filename, const int g_charge, const int g_mult, const bool& debug = false);
     ///@}
-	/** Construct from an OCC Wavefunction Struct */
-    WFN(occ::qm::Wavefunction& occ_WF);
+	/** Construct from an OCC Wavefunction Struct. If from_file=true, it will use OCC to read any wfn format supported by it*/
+    WFN(occ::qm::Wavefunction& occ_WF, bool from_file=false);
 	// virtual ~WFN() {};
     //-------------------- OCC additional things--------------------------------------------
     // friend class WfnAdapter;

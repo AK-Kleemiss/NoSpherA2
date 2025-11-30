@@ -390,7 +390,7 @@ int main(int argc, char **argv)
             } else
             {
                 occ::qm::Wavefunction wfn = occ::qm::Wavefunction::load(opt.occ);
-                auto wfn_from_occ = WFN(wfn);
+                auto wfn_from_occ = WFN(wfn, true);
                 wavy.emplace_back(wfn_from_occ);
                 constants::exp_cutoff = std::log(constants::density_accuracy / wfn_from_occ.get_maximum_MO_coefficient());
             }

@@ -1,4 +1,3 @@
-alanine.owf.fchk
     _   __     _____       __              ___   ___
    / | / /___ / ___/____  / /_  ___  _____/   | |__ \
   /  |/ / __ \\__ \/ __ \/ __ \/ _ \/ ___/ /| | __/ /
@@ -8,7 +7,7 @@ alanine.owf.fchk
 This software is part of the cuQCT software suite developed by Florian Kleemiss.
 Please give credit and cite corresponding pieces!
 This Software is published with BSD-2 clause license.
- done!
+Calculating WFN from input file:                                           "" done!
 Number of atoms in Wavefunction file: 13 Number of MOs: 228
 Number of protons: 48
 Number of electrons: 48.000000
