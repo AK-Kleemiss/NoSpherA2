@@ -3,7 +3,7 @@ find_package(Python COMPONENTS Interpreter REQUIRED)
 
 FILE(COPY ${CMAKE_CURRENT_SOURCE_DIR}/runTest.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_nos_test(alanine_occ "-cif alanine.cif -dmin 0.5 -wfn alanine.owf.fchk -acc 1 -no-date")
-#add_nos_test(alanine_integrated_occ "-occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1 -no-date")
+add_nos_test(alanine_integrated_occ "-occ alanine.toml -cif alanine.cif -dmin 0.5 -acc 1 -no-date")
 add_nos_test(disorder_THPP "-cif thpp.cif -hkl thpp.hkl -mtc olex2/Wfn_job/Part_1/thpp.wfx 0.1 olex2/Wfn_job/Part_2/thpp.wfx 0.2 -mtc_mult 1 1 -mtc_ECP 0 0 -mtc_charge 0 0 -acc 0 -no-date"
     COMPARE_GOOD "disorder_THPP.good" DIRECTORY "disorder")
 add_nos_test(fourier_transform "-test_analytical -no-date" DIRECTORY "SALTED")
