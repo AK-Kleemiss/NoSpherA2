@@ -1,4 +1,4 @@
-threads = 16
+threads = 4
 
 [scf]
 input = "alanine.xyz"
