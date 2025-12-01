@@ -15,6 +15,7 @@
 #include <ostream>
 #include <occ/gto/gto.h>
 #include <occ/io/conversion.h>
+#include <ranges>
 #include <vector>
 
 #include "occ/OrbitalDefs.h"

@@ -45,7 +45,16 @@ runs:
       if: inputs.platform == 'Linux'
       shell: bash
       run: |
-        sudo apt update && sudo apt install -y build-essential ninja-build
+        # Install GCC 13 for full C++23 support
+        sudo apt update && sudo apt install -y ninja-build
+        sudo apt install -y gcc-13 g++-13
+        
+        # Set GCC 13 as default
+        sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 130 --slave /usr/bin/g++ g++ /usr/bin/g++-13
+        sudo update-alternatives --set gcc /usr/bin/gcc-13
+        
+        echo "GCC version: $(gcc --version | head -1)"
+        echo "G++ version: $(g++ --version | head -1)"
         
         # Install/Update Rust and Cargo
         echo "Installing Rust toolchain"
