@@ -40,7 +40,7 @@ jobs:
 
           - os: ubuntu-latest
             name: Linux
-            build-script: "mkdir build && cd build && cmake .. -GNinja -DONEAPI_DIRECTORY=./Lib/MKL"
+            build-script: "mkdir build && cd build && cmake .. -GNinja -DONEAPI_DIRECTORY=./Lib/MKL -DCMAKE_BUILD_TYPE Release"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2
