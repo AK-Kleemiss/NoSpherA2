@@ -97,7 +97,9 @@ target_link_libraries(libnosphera2 PUBLIC
 set_target_properties(libnosphera2 PROPERTIES PREFIX "")
 add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
-get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
+if (NOT APPLE)
+    get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
+endif ()
 
 if(MKL_LIBRARIES)
     install(RUNTIME NoSpherA2 DESTINATION ${CMAKE_BINARY_DIR}/bin OPTIONAL)
