@@ -39,8 +39,6 @@ jobs:
           - os: ubuntu-latest
             name: Linux
             build-script: | 
-              export CC=gcc
-              export C++=g++
               mkdir build && cd build
               cmake .. -GNinja -DONEAPI_DIRECTORY=./Lib/MKL -DCMAKE_BUILD_TYPE=Release
               cmake --build . --target NoSpherA2 -j"
