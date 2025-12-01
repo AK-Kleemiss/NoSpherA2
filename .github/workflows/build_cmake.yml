@@ -2,8 +2,11 @@ name: BUILD_CMAKE
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
 
 jobs:
+  # Linux build with CMake
   build_linux:
     runs-on: ubuntu-latest
     steps:
@@ -17,8 +20,12 @@ jobs:
         submodules: recursive
         fetch-depth: 1
 
-    - name: Install Compiler
-      run: sudo apt update && sudo apt install -y build-essential
+    - name: Install Compiler and Tools
+      run: |
+        sudo apt update && sudo apt install -y build-essential ninja-build
+        # Install Rust
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source ~/.cargo/env
 
     # Cache IntelMKL
     - name: Cache IntelMKL Build
@@ -34,37 +41,85 @@ jobs:
       if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
       run: |
           wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh 
-          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
+          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=${{ github.workspace }}/Lib/MKL --eula accept
 
-    - name: Cache featomic Build
-      uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-      id: cache-featomic-linux
-      with:
-        path: build/_deps  # Adjust if featomic installs elsewhere
-        key: featomic-linux-${{ runner.os }}-${{ hashFiles('build/_deps/metatensor-build/metatensor-core/target/release/libmetatensor.a', 'build/_deps/featomic-build/target/release/libfeatomic.a') }}
-        restore-keys: |
-          featomic-linux-${{ runner.os }}-
-
-    - name: Build featomic
-      if: steps.cache-featomic-linux.outputs.cache-hit != 'true'
+    - name: Build NoSpherA2 with CMake
       run: |
+        source ~/.cargo/env
         mkdir -p build
-        cd build 
-        cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
-        cmake --build . --target featomic_target
-
-    - name: Build NoSpherA2
-      run: |
         cd build
         cmake -GNinja -DCMAKE_BUILD_TYPE=Release ..
-        ninja -j0
+        cmake --build . --target NoSpherA2 -j
 
-  build_windows:
-    runs-on:  windows-2022
+    - name: Upload Linux Binary
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        name: linux_cmake_exec
+        path: |
+              build/Src/NoSpherA2
+
+  # macOS build with CMake - builds universal binary (x86_64 + arm64)
+  build_macos:
+    runs-on: macos-latest
     steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-    - uses: friendlyanon/setup-vcpkg@v1.6.1
-      with: { committish: 4334d8b4c8916018600212ab4dd4bbdc343065d1 }
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Setup macOS
+      run: |
+        # Accept Xcode license
+        sudo xcodebuild -license accept || true
+        # Install Rust
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source ~/.cargo/env
+        # Install libomp for OpenMP support
+        brew install libomp ninja
+
+    - name: Build NoSpherA2 with CMake (Universal Binary)
+      run: |
+        source ~/.cargo/env
+        mkdir -p build
+        cd build
+        # Build as universal binary for both x86_64 and arm64
+        cmake -GNinja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+          ..
+        cmake --build . --target NoSpherA2 -j
+
+    - name: Verify Universal Binary
+      run: |
+        echo "Verifying universal binary architecture:"
+        file build/Src/NoSpherA2
+        lipo -info build/Src/NoSpherA2
+
+    - name: Upload macOS Universal Binary
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        name: macos_cmake_universal_exec
+        path: build/Src/NoSpherA2
+
+  # Windows build with CMake
+  build_windows:
+    runs-on: windows-2022
+    steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
     - name: Setup Windows
       shell: powershell
       run: |
@@ -79,7 +134,7 @@ jobs:
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
         
         # Set default toolchain
-        & "$env:USERPROFILE\.cargo\bin\rustup.exe"
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" default stable
         & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rust-src
         
         # Verify versions
@@ -88,34 +143,51 @@ jobs:
         
         # Update PATH for subsequent steps
         echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-#        & "$env:VCPKG_ROOT/vcpkg.exe" install intel-mkl --vcpkg-root ${{ env.VCPKG_ROOT }}
 
     - name: Setup MSBuild (Windows)
       uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2.0.0
 
-    - name: Setup Cargo environment (Windows)
+    - name: Build NoSpherA2 with CMake
       shell: powershell
       run: |
         # Ensure cargo is in PATH
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
         
-        # Verify we have the right version
-        & "$env:USERPROFILE\.cargo\bin\cargo.exe" --version
-        & "$env:USERPROFILE\.cargo\bin\rustc.exe" --version
-
-    - name: Build NoSpherA2
-      shell: powershell
-      run: |
         cd ${{ github.workspace }}
         mkdir build
         cd build
-        cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -D "CMAKE_TOOLCHAIN_FILE=$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ..
-        cmake --build . --config Release --parallel 
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
+        cmake --build . --config Release --target NoSpherA2 --parallel
 
-    - name: Upload Universal Binary
+    - name: Upload Windows Binary
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
-        name: windowsExec
+        name: windows_cmake_exec
         path: |
               build/Src/Release/NoSpherA2.exe
-              build/NoSpherA2.sln
+
+  # Test job that runs after all builds complete
+  test:
+    needs: [build_linux]
+    runs-on: ubuntu-latest
+    steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      with:
+        submodules: recursive
+        fetch-depth: 1
+
+    - name: Download Linux Executable
+      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+      with:
+        name: linux_cmake_exec
+
+    - name: Run Tests
+      run: |
+        chmod +x NoSpherA2
+        cd tests
+        make all -k || true

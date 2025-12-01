@@ -26,18 +26,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest  # Apple Silicon (ARM64)
-            name: Mac_ARM64
-            build-script: "cd Mac && make NoSpherA2_arm64 -j"
-            artifact-name: executable_MacOS_ARM64
-            artifact-path: Mac/NoSpherA2_arm64
-
-          - os: macos-13  # Intel x86_64
-            name: Mac_x86_64
-            build-script: 'mkdir build && cd build && cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-            -DCMAKE_BUILD_TYPE=Release && cmake --build . --target NoSpherA2 -j'
-            artifact-name: executable_MacOS_x86_64
-            artifact-path: Mac/NoSpherA2_x86_64
+          # macOS universal binary build using CMake (builds both x86_64 and arm64 in one step)
+          - os: macos-latest
+            name: Mac_Universal
+            build-script: |
+              mkdir build && cd build 
+              cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -DCMAKE_BUILD_TYPE=Release 
+              cmake --build . --target NoSpherA2 -j
+            artifact-name: executable_MacOS_Universal
+            artifact-path: build/Src/NoSpherA2
 
           - os: ubuntu-latest
             name: Linux
@@ -45,18 +42,18 @@ jobs:
              -DONEAPI_DIRECTORY=./Lib/MKL -DCMAKE_BUILD_TYPE=Release && cmake --build . --target NoSpherA2 -j"
             artifact-name: executable_Linux
             artifact-path: |
-              NoSpherA2
-              libiomp5.so
+              build/Src/NoSpherA2
 
           - os: windows-2022
             name: Windows
             build-script: |
-              cd Windows 
-              msbuild NoSpherA2.sln -nologo -p:Configuration=Release -p:Platform=x64
+              mkdir build
+              cd build
+              cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
+              cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
             artifact-path: |
-              Windows/x64/Release/NoSpherA2.exe
-              Windows/x64/Release/libiomp5md.dll
+              build/Src/Release/NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -97,71 +94,6 @@ jobs:
         name: ${{ matrix.artifact-name }}
         path: ${{ matrix.artifact-path }}
 
-  # Create macOS Universal Binary
-  build_mac_universal:
-    needs: build
-    runs-on: macos-latest
-    name: Build macOS Universal Binary
-
-    steps:
-    - name: Harden Runner
-      uses: step-security/harden-runner@f4a75cfd619ee5ce8d5b864b0d183aff3c69b55a # v2.13.1
-      with:
-        egress-policy: audit
-
-    - name: Checkout
-      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      with:
-        submodules: recursive
-        fetch-depth: 1
-
-    - name: Download ARM64 Binary
-      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-      with:
-        name: executable_MacOS_ARM64
-        path: ./arm64/
-
-    - name: Download x86_64 Binary
-      uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-      with:
-        name: executable_MacOS_x86_64
-        path: ./x86_64/
-
-    - name: Create Universal Binary with lipo
-      run: |
-        echo "Creating universal binary with lipo..."
-        mkdir -p universal
-        
-        # Make binaries executable
-        chmod +x ./arm64/NoSpherA2_arm64
-        chmod +x ./x86_64/NoSpherA2_x86_64
-        
-        # Verify architectures before combining
-        echo "ARM64 binary architecture:"
-        file ./arm64/NoSpherA2_arm64
-        lipo -info ./arm64/NoSpherA2_arm64
-        
-        echo "x86_64 binary architecture:"
-        file ./x86_64/NoSpherA2_x86_64
-        lipo -info ./x86_64/NoSpherA2_x86_64
-        
-        # Create universal binary
-        lipo -create -output ./universal/NoSpherA2_Mac ./arm64/NoSpherA2_arm64 ./x86_64/NoSpherA2_x86_64
-        
-        # Verify universal binary
-        echo "Universal binary architecture:"
-        file ./universal/NoSpherA2_Mac
-        lipo -info ./universal/NoSpherA2_Mac
-        
-        # Make executable
-        chmod +x ./universal/NoSpherA2_Mac
-
-    - name: Upload Universal Binary
-      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-      with:
-        name: executable_MacOS_Universal
-        path: ./universal/NoSpherA2_Mac
-
   # Separate testing job
   test:
     needs: build
@@ -198,7 +130,7 @@ jobs:
 
   # Combine all artifacts
   combine_all:
-    needs: [build, build_mac_universal]
+    needs: [build]
     runs-on: ubuntu-latest
     name: Combine All Executables
 
@@ -230,7 +162,6 @@ jobs:
         path: |
           NoSpherA2
           NoSpherA2.exe
-          NoSpherA2_Mac
 
   # Security analysis jobs
   CodeQL:

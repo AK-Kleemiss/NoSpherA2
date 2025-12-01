@@ -2,14 +2,14 @@ name: 'Setup Build Environment'
 description: 'Setup platform-specific build environment'
 inputs:
   platform:
-    description: 'Target platform (Mac_ARM64/Mac_x86_64/Linux/Windows)'
+    description: 'Target platform (Mac_ARM64/Mac_x86_64/Mac_Universal/Linux/Windows)'
     required: true
 
 runs:
   using: 'composite'
   steps:
     - name: Setup macOS
-      if: inputs.platform == 'Mac_ARM64' || inputs.platform == 'Mac_x86_64'
+      if: inputs.platform == 'Mac_ARM64' || inputs.platform == 'Mac_x86_64' || inputs.platform == 'Mac_Universal'
       shell: bash
       run: |
         echo "Setting up macOS environment for ${{ inputs.platform }}"
@@ -25,13 +25,19 @@ runs:
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source ~/.cargo/env
         rustup component add rust-src
+        
+        # For universal binary builds, add x86_64 target
+        if [ "${{ inputs.platform }}" == "Mac_Universal" ]; then
+          rustup target add x86_64-apple-darwin
+        fi
     
         # Verify versions
         echo "Rust version: $(rustc --version)"
         echo "Cargo version: $(cargo --version)"
     
-        # Install libomp (Homebrew will install to correct location based on architecture)
+        # Install libomp and ninja (Homebrew will install to correct location based on architecture)
         brew list --versions libomp >/dev/null 2>&1 || brew install libomp
+        brew list --versions ninja >/dev/null 2>&1 || brew install ninja
     
         echo "${{ inputs.platform }} setup complete"
 
@@ -39,7 +45,7 @@ runs:
       if: inputs.platform == 'Linux'
       shell: bash
       run: |
-        sudo apt update && sudo apt install -y build-essential
+        sudo apt update && sudo apt install -y build-essential ninja-build
         
         # Install/Update Rust and Cargo
         echo "Installing Rust toolchain"
@@ -66,7 +72,7 @@ runs:
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
         
         # Set default toolchain
-        & "$env:USERPROFILE\.cargo\bin\rustup.exe"
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" default stable
         & "$env:USERPROFILE\.cargo\bin\rustup.exe" component add rust-src
         
         # Verify versions

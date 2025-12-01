@@ -73,22 +73,6 @@ runs:
         # Ensure cargo is in PATH
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
         
-        # Build featomic
-        if (-not (Test-Path "Lib\featomic_install\lib\metatensor.lib")) {
-          Write-Host "Building featomic for Windows"
-          cd featomic\featomic
-          $buildDir = "build"
-          if (-not (Test-Path $buildDir)) {
-            mkdir $buildDir
-          }
-          cd $buildDir
-          cmake -G "Visual Studio 17 2022" ${{ env.FEATOMIC_CMAKE_FLAGS }} -DCMAKE_INSTALL_PREFIX="..\..\..\Lib\featomic_install" ..
-          msbuild -nologo .\featomic.sln -p:Configuration=Release
-          msbuild -nologo .\INSTALL.vcxproj -p:Configuration=Release
-        } else {
-          Write-Host "Skipping featomic build, already exists"
-        }
-        
-        cd ${{ github.workspace }}
-        # Get Intel MKL
-        MSBuild .\Windows\NoSpherA2.sln /t:Restore /p:RestorePackagesPath=Windows/packages /p:RestoreTimeout=300000
+        # Note: For CMake builds, featomic and MKL are handled by CMakeLists.txt via CPM
+        # The featomic_install directory is populated by CMake during configuration
+        Write-Host "Windows dependencies will be built by CMake during the build step"
