@@ -1,6 +1,5 @@
 add_subdirectory(basis_set_helper)
 
-message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 set(GENERATED_AUX_CPP "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp")
 set_source_files_properties(${GENERATED_AUX_CPP} PROPERTIES GENERATED TRUE)
 add_library(libnosphera2 STATIC
@@ -79,7 +78,7 @@ target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
         $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
-        $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
+        $<$<PLATFORM_ID:Windows>:/arch:AVX>
     )
 endif ()
 
