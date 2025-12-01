@@ -59,6 +59,7 @@ target_compile_options(libnosphera2 PRIVATE
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O3>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:${OPENMP_FLAG}>
+    $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK -Xpreprocessor -fopenmp>
 )
 if (MSVC)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release CACHE STRING "" FORCE)
@@ -78,7 +79,8 @@ target_link_options(libnosphera2 PRIVATE
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++>
 )
 target_link_libraries(libnosphera2 PUBLIC
-    MKL::MKL
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:MKL::MKL>
+    $<$<PLATFORM_ID:Darwin>:BLAS::BLAS LAPACK::LAPACK>
     occ::qm
     occ::main
     basis_set_helper

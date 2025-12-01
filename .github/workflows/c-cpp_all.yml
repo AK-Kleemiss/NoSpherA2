@@ -34,7 +34,8 @@ jobs:
 
           - os: macos-13  # Intel x86_64
             name: Mac_x86_64
-            build-script: "cd Mac && make NoSpherA2_x86_64 -j"
+            build-script: 'mkdir build && cd build && cmake .. -GNinja -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+            -DCMAKE_BUILD_TYPE=Release && cmake --build . --target NoSpherA2 -j'
             artifact-name: executable_MacOS_x86_64
             artifact-path: Mac/NoSpherA2_x86_64
 
