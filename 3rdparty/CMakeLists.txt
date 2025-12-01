@@ -1,6 +1,7 @@
 include(ExternalProject)
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
+add_link_options(-static)
 CPMAddPackage(
     NAME Ccache.cmake
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
@@ -11,22 +12,7 @@ if (BUILD_RELEASE_OCC)
 else ()
     set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
 endif ()
-CPMAddPackage(
-    NAME occ
-    GITHUB_REPOSITORY MilitaoLucas/occ
-    GIT_TAG "main_with_libs"
-    OPTIONS
-        "USE_QCINT OFF"
-        "ENABLE_HOST_OPT OFF"
-        "WITH_PYTHON_BINDINGS OFF"
-        "USE_FORTRAN ON"
-        "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
-)
 
-# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
-    target_link_libraries(cint gfortran)
-endif()
 
 #ExternalProject_Add(occ
 #    SOURCE_DIR /home/lucas/CLionProjects/occ
@@ -51,6 +37,7 @@ CPMAddPackage(
         "FEATOMIC_FETCH_METATENSOR ON"
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
+        "FEATOMIC_USE_STATIC_METATENSOR ON"
         "CMAKE_TRY_COMPILE_CONFIGURATION Release"
 )
 if (WIN32)
@@ -60,8 +47,6 @@ else ()
 endif ()
 
 set(MKL_INSTALL_DIR ${CMAKE_SOURCE_DIR}/Lib/MKL)
-message(WARNING "HERE: ${ONEAPI_DIRECTORY}")
-message(WARNING "HERE: ${CMAKE_CURRENT_BINARY_DIR}")
 if (${FAKE_HOME_TEST})
     set(HOME "/tmp/home")
 else ()
@@ -115,12 +100,39 @@ if (LINUX)
 
     else ()
         set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
+        set(MKL_INTERFACE "lp64")
+#        set(MKL_THREADING "tbb_thread")
+
         find_package(MKL CONFIG REQUIRED
             HINTS "${_ONEAPI_MKL_ROOT}" "${ONEAPI_DIRECTORY}"
             PATH_SUFFIXES "lib/cmake/mkl"
         )
-      message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+        print_target_properties(MKL::MKL)
+        get_target_property(MKL_LINK_LIBRARIES MKL::MKL INTERFACE_LINK_LIBRARIES)
+        set(MKL_LINK_LIBRARIES ${MKL_LINK_LIBRARIES} PARENT_SCOPE)
+        message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
 elseif (WIN32)
     find_package(MKL CONFIG REQUIRED)
 endif ()
+CPMAddPackage(
+    NAME occ
+    GITHUB_REPOSITORY MilitaoLucas/occ
+    GIT_TAG "main_with_libs"
+    OPTIONS
+        "USE_QCINT OFF"
+        "ENABLE_HOST_OPT OFF"
+        "WITH_PYTHON_BINDINGS OFF"
+        "USE_FORTRAN OFF"
+        "USE_SYSTEM_BLAS ON"
+        "USE_SYSTEM_TBB OFF"
+        "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
+        "BLA_VENDOR Intel10_64lp_seq"
+        "BLA_STATIC ON"
+        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
+)
+
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint)
+endif()

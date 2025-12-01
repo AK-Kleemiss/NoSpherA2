@@ -47,9 +47,9 @@ target_precompile_headers(libnosphera2 PRIVATE
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(OPENMP_FLAG "-fopenmp=libomp")
+#    set(OPENMP_FLAG "-fopenmp=libomp")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(OPENMP_FLAG "-fopenmp")
+#    set(OPENMP_FLAG "-fopenmp")
 endif ()
 if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
@@ -74,22 +74,28 @@ if (${USE_VECTOR_INSTRUCTIONS})
         $<$<CXX_COMPILER_ID:MSVC>:/arch:AVX>
     )
 endif ()
+target_compile_options(libnosphera2 PRIVATE
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-static-libgcc -static>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
+)
 target_link_options(libnosphera2 PRIVATE
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libgcc>
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++>
+    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libgcc -static>
+    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
     $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
+#set(MKL_LIBS MKL::MKL ) #MKL::mkl_intel_ilp64 MKL::mkl_intel_thread MKL::mkl_intel_ilp64)
+#target_compile_options(libnosphera2 PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
+#target_include_directories(libnosphera2 PUBLIC )
+#target_link_libraries(libnosphera2 PUBLIC $<LINK_ONLY:MKL::MKL>)
 target_link_libraries(libnosphera2 PUBLIC
-    $<$<NOT:$<PLATFORM_ID:Darwin>>:MKL::MKL>
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:MKL::MKL_SCALAPACK>
     occ::qm
     occ::main
     basis_set_helper
     mdspan
-    metatensor::static
     featomic::static
+    metatensor::static
     $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-ldl>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-lpthread>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-latomic>
     $<$<CXX_COMPILER_ID:MSVC>:userenv>
     $<$<CXX_COMPILER_ID:MSVC>:ntdll>
     $<$<CXX_COMPILER_ID:MSVC>:ws2_32>
