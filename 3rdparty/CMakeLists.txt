@@ -120,6 +120,11 @@ elseif (WIN32)
     )
     find_package(MKL CONFIG REQUIRED)
 endif ()
+if (Darwin)
+    set(USE_SYSTEM_BLAS ON)
+else ()
+    set(USE_SYSTEM_BLAS OFF)
+endif ()
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
@@ -129,7 +134,7 @@ CPMAddPackage(
         "ENABLE_HOST_OPT OFF"
         "WITH_PYTHON_BINDINGS OFF"
         "USE_FORTRAN OFF"
-        "USE_SYSTEM_BLAS ON"
+        "USE_SYSTEM_BLAS ${USE_SYSTEM_BLAS}"
         "USE_SYSTEM_TBB OFF"
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
         "BLA_VENDOR Intel10_64lp_seq"
