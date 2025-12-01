@@ -40,7 +40,7 @@ jobs:
 
           - os: ubuntu-latest
             name: Linux
-            build-script: "cd Linux && make -j && cp NoSpherA2 ../"
+            build-script: "mkdir build && cd build && cmake .. -GNinja"
             artifact-name: executable_Linux
             artifact-path: |
               NoSpherA2
