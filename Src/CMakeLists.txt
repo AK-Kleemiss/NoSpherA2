@@ -77,10 +77,11 @@ endif ()
 target_link_options(libnosphera2 PRIVATE
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libgcc>
     $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++>
+    $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
     $<$<NOT:$<PLATFORM_ID:Darwin>>:MKL::MKL>
-    $<$<PLATFORM_ID:Darwin>:BLAS::BLAS LAPACK::LAPACK>
+    $<$<PLATFORM_ID:Darwin>:LAPACK::LAPACK>
     occ::qm
     occ::main
     basis_set_helper
