@@ -47,9 +47,9 @@ target_precompile_headers(libnosphera2 PRIVATE
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-#    set(OPENMP_FLAG "-fopenmp=libomp")
+    set(OPENMP_FLAG "-fopenmp=libomp")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-#    set(OPENMP_FLAG "-fopenmp")
+    set(OPENMP_FLAG "-fopenmp")
 endif ()
 if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
@@ -75,18 +75,14 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 target_compile_options(libnosphera2 PRIVATE
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-static-libgcc -static>
-    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
+    $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
 )
 target_link_options(libnosphera2 PRIVATE
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libgcc -static>
-    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
+    $<$<AND:$<NOT:$<CXX_COMPILER_ID:MSVC>>,$<LINK_LANGUAGE:CXX>>:-static>
+    $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -static-libgcc -MMD -MP -fopenmp -ffast-math>
     $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
-#set(MKL_LIBS MKL::MKL ) #MKL::mkl_intel_ilp64 MKL::mkl_intel_thread MKL::mkl_intel_ilp64)
-#target_compile_options(libnosphera2 PUBLIC $<TARGET_PROPERTY:MKL::MKL,INTERFACE_COMPILE_OPTIONS>)
-#target_include_directories(libnosphera2 PUBLIC )
-#target_link_libraries(libnosphera2 PUBLIC $<LINK_ONLY:MKL::MKL>)
 target_link_libraries(libnosphera2 PUBLIC
     $<$<NOT:$<PLATFORM_ID:Darwin>>:MKL::MKL_SCALAPACK>
     occ::qm
@@ -107,7 +103,6 @@ if (NOT APPLE)
     get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
 endif ()
 
-if(MKL_LIBRARIES)
-    install(RUNTIME NoSpherA2 DESTINATION ${CMAKE_BINARY_DIR}/bin OPTIONAL)
-endif()
+install(TARGETS NoSpherA2 DESTINATION ${CMAKE_SOURCE_DIR} OPTIONAL)
+
 
