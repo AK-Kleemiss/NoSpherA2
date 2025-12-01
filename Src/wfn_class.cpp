@@ -138,7 +138,10 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
         occ::Vec occ_exp = shell.exponents.replicate(n_cart, 1);
         insert_into_exponents(occ_vec_span(occ_exp));
         atom = shell2atom[i];
-        insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        // insert_into_centers(std::views::repeat(atom+1, n_cart*nprim));
+        auto repeated = std::views::iota(0u, n_cart*nprim) | std::views::transform([&](auto) { return atom+1; });
+        insert_into_centers(repeated);
+
         VectorXi typesVec = ArrayXi::LinSpaced(n_cart, sum_ncart + 1, sum_ncart + n_cart)
                         .matrix().transpose().replicate(nprim, 1).reshaped();
         insert_into_types(typesVec);

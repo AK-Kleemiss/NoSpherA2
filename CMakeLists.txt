@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
 project(NoSpherA2 CXX C)
 set(CMAKE_CXX_STANDARD 23)
+
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
+add_compile_options(-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math)
+
 if (MSVC)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 endif()
