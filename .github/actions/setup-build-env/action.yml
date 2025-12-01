@@ -40,7 +40,8 @@ runs:
         # Install libomp and ninja (Homebrew will install to correct location based on architecture)
         brew list --versions libomp >/dev/null 2>&1 || brew install libomp
         brew list --versions ninja >/dev/null 2>&1 || brew install ninja
-    
+        brew install openblas
+        
         echo "${{ inputs.platform }} setup complete"
 
     - name: Setup Linux

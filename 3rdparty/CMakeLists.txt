@@ -1,7 +1,6 @@
 include(ExternalProject)
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
-add_link_options(-static)
 CPMAddPackage(
     NAME Ccache.cmake
     GITHUB_REPOSITORY TheLartians/Ccache.cmake
