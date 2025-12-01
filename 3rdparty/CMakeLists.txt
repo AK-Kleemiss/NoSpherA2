@@ -113,6 +113,12 @@ if (LINUX)
         message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
 elseif (WIN32)
+
+    include("${CMAKE_SOURCE_DIR}/cmake/NuGetTools.cmake")
+    nuget_initialize()
+    nuget_add_dependencies(
+        PACKAGE intelmkl.devel.win-x64 CMAKE_PREFIX_PATHS installed/x64-windows
+    )
     find_package(MKL CONFIG REQUIRED)
 endif ()
 CPMAddPackage(
