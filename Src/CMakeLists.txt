@@ -75,7 +75,7 @@ if (${USE_VECTOR_INSTRUCTIONS})
     )
 endif ()
 target_compile_options(libnosphera2 PRIVATE
-    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
+    $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
     $<$<CXX_COMPILER_ID:GNU>:-static-libstdc++ -MMD -MP -fopenmp -ffast-math>
 )
 target_link_options(libnosphera2 PRIVATE
