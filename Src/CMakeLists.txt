@@ -70,7 +70,7 @@ target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__)
 
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
-        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
+        $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
         $<$<CXX_COMPILER_ID:MSVC>:/arch:AVX>
     )
 endif ()
