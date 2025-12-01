@@ -41,8 +41,7 @@ jobs:
             build-script: "mkdir build && cd build && cmake .. -GNinja
              -DONEAPI_DIRECTORY=./Lib/MKL -DCMAKE_BUILD_TYPE=Release && cmake --build . --target NoSpherA2 -j"
             artifact-name: executable_Linux
-            artifact-path: |
-              build/Src/NoSpherA2
+            artifact-path: build/Src/NoSpherA2
 
           - os: windows-2022
             name: Windows
@@ -52,8 +51,7 @@ jobs:
               cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
               cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
-            artifact-path: |
-              build/Src/Release/NoSpherA2.exe
+            artifact-path: build/Src/Release/NoSpherA2.exe
 
     runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.name }}
@@ -114,9 +112,13 @@ jobs:
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Linux
+        path: ./
 
     - name: Run Tests
       run: |
+        # The artifact preserves directory structure, so we need to find the executable
+        find . -name "NoSpherA2" -type f -exec chmod +x {} \;
+        cp ./build/Src/NoSpherA2 ./NoSpherA2 || cp ./NoSpherA2 ./NoSpherA2 || true
         chmod +x NoSpherA2
         cd tests
         export LD_LIBRARY_PATH=../:$LD_LIBRARY_PATH
@@ -144,24 +146,34 @@ jobs:
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Linux
+        path: linux
 
     - name: Download macOS Universal Binary
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_MacOS_Universal
+        path: macos
 
     - name: Download Windows Executable
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: executable_Windows
+        path: windows
+
+    - name: Organize executables
+      run: |
+        mkdir -p combined
+        # Find and copy the executables
+        find linux -name "NoSpherA2" -type f -exec cp {} combined/NoSpherA2_Linux \;
+        find macos -name "NoSpherA2" -type f -exec cp {} combined/NoSpherA2_Mac \;
+        find windows -name "NoSpherA2.exe" -type f -exec cp {} combined/NoSpherA2.exe \;
+        ls -la combined/
 
     - name: Archive all executables
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: executables
-        path: |
-          NoSpherA2
-          NoSpherA2.exe
+        path: combined/
 
   # Security analysis jobs
   CodeQL:

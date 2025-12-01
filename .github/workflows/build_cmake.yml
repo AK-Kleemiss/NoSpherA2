@@ -55,8 +55,7 @@ jobs:
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: linux_cmake_exec
-        path: |
-              build/Src/NoSpherA2
+        path: build/Src/NoSpherA2
 
   # macOS build with CMake - builds universal binary (x86_64 + arm64)
   build_macos:
@@ -163,8 +162,7 @@ jobs:
       uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: windows_cmake_exec
-        path: |
-              build/Src/Release/NoSpherA2.exe
+        path: build/Src/Release/NoSpherA2.exe
 
   # Test job that runs after all builds complete
   test:
@@ -185,9 +183,13 @@ jobs:
       uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
         name: linux_cmake_exec
+        path: ./
 
     - name: Run Tests
       run: |
+        # Find the executable (it's in build/Src/ structure)
+        find . -name "NoSpherA2" -type f -exec chmod +x {} \;
+        cp ./build/Src/NoSpherA2 ./NoSpherA2 || cp ./NoSpherA2 ./NoSpherA2 || true
         chmod +x NoSpherA2
         cd tests
         make all -k || true
