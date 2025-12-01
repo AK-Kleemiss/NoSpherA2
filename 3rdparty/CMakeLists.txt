@@ -52,8 +52,9 @@ else ()
     set(HOME $ENV{HOME})
 endif ()
 
+set(MKL_INTERFACE "lp64")
+set(MKL_LINK "static")
 if (LINUX)
-    set(MKL_LINK "static")
     if (NOT EXISTS ${ONEAPI_DIRECTORY})
         set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
         set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
@@ -99,7 +100,6 @@ if (LINUX)
 
     else ()
         set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
-        set(MKL_INTERFACE "lp64")
 #        set(MKL_THREADING "tbb_thread")
 
         find_package(MKL CONFIG REQUIRED
