@@ -25,6 +25,8 @@ runs:
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         source ~/.cargo/env
         rustup component add rust-src
+        rustup install 1.88
+        rustup default 1.88
         
         # For universal binary builds, add x86_64 target
         if [ "${{ inputs.platform }}" == "Mac_Universal" ]; then
