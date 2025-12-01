@@ -72,29 +72,3 @@ runs:
       run: |
         # Ensure cargo is in PATH
         $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-        
-        # Download and install Intel oneAPI MKL for Windows
-        $mklInstallDir = "${{ github.workspace }}\Lib\MKL"
-        if (-not (Test-Path "$mklInstallDir\mkl\latest\lib\cmake\mkl\MKLConfig.cmake")) {
-          Write-Host "Installing Intel oneAPI MKL..."
-          
-          # Download the online installer
-          $mklInstaller = "${{ github.workspace }}\w_onemkl_p_2025.2.0.524_offline.exe"
-          if (-not (Test-Path $mklInstaller)) {
-            Write-Host "Downloading MKL installer..."
-            Invoke-WebRequest -Uri "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/w_onemkl_p_2025.2.0.524_offline.exe" -OutFile $mklInstaller
-          }
-          
-          # Install MKL silently
-          Write-Host "Installing MKL to $mklInstallDir..."
-          Start-Process -FilePath $mklInstaller -ArgumentList "-s", "-a", "--silent", "--eula", "accept", "--install-dir", $mklInstallDir -Wait -NoNewWindow
-          Write-Host "MKL installation complete"
-        } else {
-          Write-Host "MKL already installed"
-        }
-        
-        # Set environment variables for CMake
-        $mklRoot = "$mklInstallDir\mkl\latest"
-        Write-Host "MKL_ROOT: $mklRoot"
-        echo "MKLROOT=$mklRoot" >> $env:GITHUB_ENV
-        echo "CMAKE_PREFIX_PATH=$mklRoot" >> $env:GITHUB_ENV
