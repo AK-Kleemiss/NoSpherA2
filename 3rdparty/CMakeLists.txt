@@ -1,19 +1,27 @@
 include(ExternalProject)
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
-CPMAddPackage(
-    NAME Ccache.cmake
-    GITHUB_REPOSITORY TheLartians/Ccache.cmake
-    VERSION 1.2.5
-)
+if (NOT WIN32)
+    CPMAddPackage(
+        NAME Ccache.cmake
+        GITHUB_REPOSITORY TheLartians/Ccache.cmake
+        VERSION 1.2.5
+    )
+endif ()
 if (BUILD_RELEASE_OCC)
     set(OCC_BUILD_MODE "Release")
 else ()
     set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
 endif ()
 
+if (WIN32)
+    find_program(NUGET_EXE NAMES nuget)
+    if(NOT NUGET_EXE)
+        message(FATAL_ERROR "nuget.exe not found! Please install it and add to PATH.")
+    endif()
+endif()
 
-#ExternalProject_Add(occ
+    #ExternalProject_Add(occ
 #    SOURCE_DIR /home/lucas/CLionProjects/occ
 ##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON
 #)
@@ -52,9 +60,9 @@ else ()
     set(HOME $ENV{HOME})
 endif ()
 
-set(MKL_INTERFACE "lp64")
-set(MKL_LINK "static")
+
 if (LINUX)
+    set(MKL_LINK "static")
     if (NOT EXISTS ${ONEAPI_DIRECTORY})
         set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
         set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
@@ -112,7 +120,12 @@ if (LINUX)
         message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
 elseif (WIN32)
-    find_package(MKL CONFIG REQUIRED)
+#    execute_process(
+#        COMMAND ${NUGET_EXE} install intelmkl.static.win-x64 -Version 2025.3.0.453 -OutputDirectory ${CMAKE_SOURCE_DIR}/Lib/MKL -ExcludeVersion
+#        RESULT_VARIABLE NUGET_RESULT
+#    )
+#    set(MKL_ROOT "${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/pkgs/intel-mkl_x64-windows")
+#    find_package(MKL CONFIG REQUIRED)
 endif ()
 if (Darwin)
     set(USE_SYSTEM_BLAS ON)
