@@ -1,5 +1,5 @@
 include(CTest)
-find_package(Python COMPONENTS Interpreter REQUIRED)
+find_package(Python COMPONENTS Interpreter)
 
 FILE(COPY ${CMAKE_CURRENT_SOURCE_DIR}/runTest.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 add_nos_test(alanine_occ "-cif alanine.cif -dmin 0.5 -wfn alanine.owf.fchk -acc 1 -no-date")

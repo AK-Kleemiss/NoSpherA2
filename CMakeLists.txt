@@ -4,10 +4,16 @@ set(CMAKE_CXX_STANDARD 23)
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
-add_compile_options(-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math)
+
+# Platform-specific compile options
+if (NOT MSVC)
+    add_compile_options(-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math)
+endif()
 
 if (MSVC)
     set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
+    # Use /arch:AVX for MSVC
+    add_compile_options(/arch:AVX)
 endif()
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(BUILD_DIR ${CMAKE_SOURCE_DIR}/build)
@@ -23,6 +29,7 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(BUILD_OPENMP "Necessary if cross compiling from windows to Linux/Darwin" OFF)
     option(USE_VECTOR_INSTRUCTIONS "If you want to use vector instructions. Defaults to ON" ON)
     option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
+    set(MKL_INTERFACE "lp64" CACHE STRING "ilp64 uses double precision for indices in MKL, the other option is lp64." )
     set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
         "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
     set(FAKE_HOME_TEST "ON" CACHE STRING
