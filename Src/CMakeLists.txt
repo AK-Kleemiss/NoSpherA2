@@ -42,7 +42,7 @@ add_dependencies(libnosphera2 generate_auxiliary_basis)
 if (MKL_INTERFACE STREQUAL "ilp64")
     target_compile_definitions(libnosphera2 USE_64BITMKL)
 endif ()
-#target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
+q#target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 target_precompile_headers(libnosphera2 PRIVATE
