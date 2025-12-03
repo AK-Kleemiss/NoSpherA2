@@ -2172,7 +2172,7 @@ void calc_SF(const int &points,
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
 #if defined(__GNUC__) || defined(__clang__)
                 sincos(work, &si, &c);
-#if defined(__APPLE__)
+#elif defined(__APPLE__)
                 __sincos(work, &si, &c);
 #else
                 c = cos(work);
