@@ -2153,7 +2153,7 @@ void calc_SF(const int &points,
     const double *k1_local = k_pt[0].data();
     const double *k2_local = k_pt[1].data();
     const double *k3_local = k_pt[2].data();
-    double work, rho;
+    double work, rho, c, si;
     for (int i = 0; i < imax; i++)
     {
         pmax = static_cast<long long int>(dens[i].size());
@@ -2170,7 +2170,13 @@ void calc_SF(const int &points,
             {
                 rho = dens_local[p];
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
-                sf_local[s] += cdouble(rho * cos(work), rho * sin(work));
+#if defined(__GNUC__) || defined(__clang__)
+                std::sincos(work, &c, &si);
+#else
+                c = cos(work);
+                si = sin(work);
+#endif
+                sf_local[s] += cdouble(rho * c, rho * si);
             }
         }
         progress->update();
