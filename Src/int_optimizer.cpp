@@ -261,9 +261,6 @@ void CINTOpt_setij(CINTOpt* opt, int* ng,
                 }
             }
             else {
-                //delete the correspodning element:
-                free(opt->pairdata[i * nbas + j]);
-                free(opt->pairdata[j * nbas + i]);
                 opt->pairdata[i * nbas + j] = (PairData*)NOVALUE;
                 opt->pairdata[j * nbas + i] = (PairData*)NOVALUE;
             }
