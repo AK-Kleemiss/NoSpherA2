@@ -56,6 +56,7 @@ typedef Kokkos::Experimental::mdarray<bool, Kokkos::extents<unsigned long long, 
 
 typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent>> dMatrixRef1;
 typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> dMatrixRef2;
+typedef Kokkos::mdspan<double, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent, std::dynamic_extent>> dMatrixRef3;
 
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent>> cMatrixRef1;
 typedef Kokkos::mdspan<cdouble, Kokkos::extents<unsigned long long, std::dynamic_extent, std::dynamic_extent>> cMatrixRef2;

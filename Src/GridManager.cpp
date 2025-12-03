@@ -935,6 +935,16 @@ void GridManager::calculateNonSphericalDensities(const WFN& wave, const cell& un
     }
 }
 
+vec GridManager::evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const {
+    vec results(grid_points[0].size());
+#pragma omp parallel for
+    for (int p = 0; p < grid_points[0].size(); ++p) {
+        results[p] = func(grid_points[GridData::GridIndex::X][p], grid_points[GridData::GridIndex::Y][p], grid_points[GridData::GridIndex::Z][p]) * grid_points[GridData::GridIndex::WEIGHT][p];
+    }
+
+    return std::move(results);
+}
+
 void GridManager::pruneGrid() {
     if (config_.debug) {
         std::cout << "GridManager: Pruning grid..." << std::endl;
@@ -1045,7 +1055,7 @@ bvec GridManager::determineAtomsNeedingGrids(const WFN& wave, const ivec& asym_a
     return needs_grid;
 }
 
-void  GridManager::write_simple_grid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const {
+void  GridManager::writeSimpleGrid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const {
     for (auto& [label, vals] : data) {
         err_chkf(grid_points[0].size() == vals.size(), "Size mismatch between given data and expected lengh", std::cout);
     }

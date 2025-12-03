@@ -77,6 +77,7 @@ public:
     void gen_etb_aux(const WFN& orbital_wfn);
     void gen_auto_aux(const WFN& orbital_wfn);
     
+    void SVD_prune_aux_basis(const WFN& orbital_wfn);
 private:
     std::vector<SimplePrimitive> _ownedPrimitives;
     SimplePrimitive* _primitives = nullptr;
@@ -97,7 +98,6 @@ public:
     std::shared_ptr<BasisSet> get_basis_set(std::string basis_name);
     bool check_basis_set_exists(std::string basis_name);
 private:
-
     BasisSet auxiliary_basis;
 };
 

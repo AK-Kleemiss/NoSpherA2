@@ -1404,33 +1404,28 @@ void test_openblas()
 }
 
 
-void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis) {
+void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis, const int atom_idx_1, const int atom_idx_2, const int gridpoints = 1000, const double padding = 2.0) {
     GridConfiguration config;
     config.accuracy = 0;
     config.partition_type = PartitionType::TFVC;
     config.pbc = 0;
     config.debug = false;
-
-    const int atom_index_1 = 0;
-    const int atom_index_2 = 1;
-    const int gridpoints = 1000;
-    const double padding = 2.0;
     GridManager grid_manager(config);
 
-    grid_manager.setup1DGridsForMolecule(wavy, atom_index_1, atom_index_2, gridpoints, padding);
+    grid_manager.setup1DGridsForMolecule(wavy, atom_idx_1, atom_idx_2, gridpoints, padding);
     const vec3 atomic_grids_local = grid_manager.getGridData().atomic_grids;
 
 
     WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
     vec ri_coefs_u = density_fit_unrestrained(wavy, wavy_aux, 1000, 'C');
-    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 1000, 'C', 5.0E-5, 1E-6, "TFVC", true);
+    vec ri_coefs_tfvc = density_fit_hybrid(wavy, wavy_aux, 1000, 'C', 2.0E-4, 1E-6, "TFVC", true);
 
    vec2 dens_hirsh(2);
    vec2 dens_becke(2);
    vec2 dens_tfvc(2);
    vec2 dens_RI_u(2);
    vec2 dens_RI_tfvc(2);
-   ivec atom_indices = { atom_index_1, atom_index_2 };
+   ivec atom_indices = { atom_idx_1, atom_idx_2 };
    for (int g = 0; g < 2; ++g) {
        dens_hirsh[g].resize(gridpoints), dens_becke[g].resize(gridpoints), dens_tfvc[g].resize(gridpoints), dens_RI_u[g].resize(gridpoints), dens_RI_tfvc[g].resize(gridpoints);
        for (int p = 0; p < gridpoints; ++p) {
@@ -1473,10 +1468,11 @@ void get1DGridData(WFN &wavy, std::vector<std::shared_ptr<BasisSet>>& aux_basis)
        }
    );
 
+   std::string atom_specifier = std::format("{}{}_{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2);
    vec2 grid_points = { atomic_grids_local[0][GridData::X], atomic_grids_local[0][GridData::Y], atomic_grids_local[0][GridData::Z] };
-   grid_manager.write_simple_grid("WFN_density.dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
-   grid_manager.write_simple_grid("Densities_Atom1.dat", grid_points, data_atom1);
-   grid_manager.write_simple_grid("Densities_Atom2.dat", grid_points, data_atom2);
+   grid_manager.writeSimpleGrid("WFN_density_" + atom_specifier + ".dat", grid_points, { {"WFN_density",atomic_grids_local[0][GridData::WFN_DENSITY]} });
+   grid_manager.writeSimpleGrid("Density_" + std::format("{}{}", wavy.get_atom_label(atom_idx_1), atom_idx_1) + ".dat", grid_points, data_atom1);
+   grid_manager.writeSimpleGrid("Density_" + std::format("{}{}", wavy.get_atom_label(atom_idx_2), atom_idx_2) + ".dat", grid_points, data_atom2);
 }
 
 void test_analytical_fourier(bool full)
@@ -1724,17 +1720,11 @@ void draw_orbital(const int lambda, const int m, const double resulution = 0.025
 void gen_CUBE_for_RI(WFN wavy, const std::string aux_basis, const options *opt)
 {
     using namespace std;
-
-    WFN wavy_aux(0);
-    wavy_aux.set_atoms(wavy.get_atoms());
-    wavy_aux.set_ncen(wavy.get_ncen());
-    wavy_aux.delete_basis_set();
-    double beta = 2.0;
+    //double beta = 2.0;
     //std::shared_ptr<BasisSet> aux_basis_set = std::make_shared<BasisSet>(wavy, beta);
-    std::shared_ptr<BasisSet> aux_basis_set = BasisSetLibrary().get_basis_set("def2-universal-jkfit");
+    std::vector<std::shared_ptr<BasisSet>> aux_basis_set{ BasisSetLibrary().get_basis_set("def2-universal-jkfit") };
 
-    load_basis_into_WFN(wavy_aux, aux_basis_set);
-
+    WFN wavy_aux = generate_aux_wfn(wavy, aux_basis_set);
     vec ri_coefs = density_fit_restrain(wavy, wavy_aux, opt->mem, 'C', opt->debug);
 
 

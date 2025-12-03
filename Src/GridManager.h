@@ -108,11 +108,13 @@ public:
     static ivec identifyAtomTypes(const WFN& wave, const bvec& needs_grid);
     static bvec determineAtomsNeedingGrids(const WFN& wave, const ivec& asym_atom_list);
     
-    void add_timing_info_to_vecs(std::vector<_time_point>& time_points, svec& time_descriptions) {
+    void addTimingInfoToVecs(std::vector<_time_point>& time_points, svec& time_descriptions) {
         for (const auto [label, time] : timing_points_) {
             time_points.push_back(time);
             time_descriptions.push_back(label);
         }
     }
-    void write_simple_grid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const;
+    void writeSimpleGrid(const std::filesystem::path& filename, const vec2& grid_points, std::vector<std::pair<std::string, vec>> data) const;
+
+    vec evaluateFunctionOnGrid(const vec2& grid_points, std::function<double(double, double, double)> func) const;
 };

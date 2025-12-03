@@ -2402,7 +2402,7 @@ int make_atomic_grids_wrapper(
     temp.delete_unoccupied_MOs();
     // Setup grids for the molecule
     grid_manager.setup3DGridsForMolecule(temp, needs_grid, asym_atom_list, unit_cell);
-    grid_manager.add_timing_info_to_vecs(time_points, time_descriptions);
+    grid_manager.addTimingInfoToVecs(time_points, time_descriptions);
 
     // Calculate partitioned charges
     auto results = grid_manager.calculatePartitionedCharges(temp, unit_cell);
@@ -2713,7 +2713,7 @@ tsc_block_type calculate_scattering_factors(
                     opt.debug,
                     opt.no_date);
 
-            time_points.push_back(end1);
+            time_points.push_back(get_time());
             time_descriptions.push_back("Fourier transform");
         }
         else if (opt.partition_type == PartitionType::RI)
@@ -2721,8 +2721,9 @@ tsc_block_type calculate_scattering_factors(
             file << "\nGenerating densities... " << endl;
             WFN wavy_aux = generate_aux_wfn(*wavy, opt.aux_basis);
 
-            vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
-                                            0.0002, 1e-6, "TFVC");
+            //vec coefs = density_fit_hybrid(*wavy, wavy_aux, opt.mem, 'C',
+            //                                2.0e-4, 1e-6, "TFVC");
+            vec coefs = density_fit_unrestrained(*wavy, wavy_aux, opt.mem, 'C');
             file << setw(12 * 4 + 2) << "... done!\n"
                  << flush;
             time_points.push_back(get_time());

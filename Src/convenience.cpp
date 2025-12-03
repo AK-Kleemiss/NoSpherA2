@@ -1705,7 +1705,6 @@ void options::digest_options()
 #ifdef _OPENMP
             omp_set_num_threads(threads);
             omp_set_dynamic(0);
-
 #endif
         }
         else if (temp == "-cmtc")
@@ -2074,6 +2073,17 @@ void options::digest_options()
                 aux_basis.push_back(std::make_shared<BasisSet>(2.0));
             }
         }
+        else if (temp == "-write_ri_coefs"){
+            WFN wavy(wfn);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
+            vec ri_coefs = density_fit_unrestrained(wavy, wavy_aux, mem, 'C', debug);
+            npy::npy_data<double> np_coeffs;
+            np_coeffs.data = ri_coefs;
+            np_coeffs.fortran_order = false;
+            np_coeffs.shape = { static_cast<unsigned long>(ri_coefs.size()) };
+            npy::write_npy("RI_COEFS.npy", np_coeffs);
+            exit(0);
+        }
         else if (temp == "-RI_CUBE" || temp == "-ri_cube")
         {
             WFN wavy(wfn);
@@ -2252,40 +2262,20 @@ void options::digest_options()
         }
         else if (temp == "-test_RI")
         {
-            //Check that wfn is not empty
-            if (wfn.empty())
-            {
-                std::cout << "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction." << std::endl;
-                exit(1);
-            }
-            if (aux_basis.empty())
-            {
-                std::cout << "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set." << std::endl;
-                exit(1);
-            }
-  
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -test_RI to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -test_RI to specify an auxiliary basis set.", std::cout);
+
 
             WFN wavy(wfn);
-
-            WFN wavy_aux(0);
-            wavy_aux.set_atoms(wavy.get_atoms());
-            wavy_aux.set_ncen(wavy.get_ncen());
-            wavy_aux.delete_basis_set();
-
-            for (shared_ptr<BasisSet>& aux_basis_set : aux_basis) { if ((*aux_basis_set).get_primitive_count() == 0) (*aux_basis_set).gen_auto_aux(wavy); }
-
-            shared_ptr<BasisSet> combined_aux_basis = aux_basis[0];
-            for (int basis_nr = 1; basis_nr < aux_basis.size(); basis_nr++) { (*combined_aux_basis) += (*aux_basis[basis_nr]); }
-
-            load_basis_into_WFN(wavy_aux, combined_aux_basis);
+            WFN wavy_aux = generate_aux_wfn(wavy, aux_basis);
             demonstrate_enhanced_density_fitting(wavy, wavy_aux);
 
-            exit(0);
+            //exit(0);
         }
         else if (temp == "-wfn")
         {
             wfn = arguments[i + 1];
-            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!",std::cout);
+            err_checkf(std::filesystem::exists(wfn), "Wavefunction dos not exist!", std::cout);
         }
         else if (temp == "-wfn_cif")
         {
@@ -2307,15 +2297,34 @@ void options::digest_options()
         else if (temp == "-lukas_test")
         {
             //Check that wfn is not empty
-            if (wfn.empty())
-            {
-                std::cout << "No wavefunction specified! Use -wfn option BEVORE -lukas_test to specify a wavefunction." << std::endl;
-                exit(1);
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option to specify a wavefunction.", std::cout);
+
+        }
+        else if (temp == "-calc_dens_1D")
+        {
+            err_chkf(!wfn.empty(), "No wavefunction specified! Use -wfn option BEVORE -calc_dens_1D to specify a wavefunction.", std::cout);
+            err_checkf(!aux_basis.empty(), "No auxiliary basis set specified! Use -RI_FIT option BEVORE -calc_dens_1D to specify an auxiliary basis set.", std::cout);
+            int atom_idx_1 = 0;
+            int atom_idx_2 = 1;
+            int gridpoints = 1000;
+            double padding = 2.0;
+            if (string(arguments[i + 1]).find("-") != 0) {
+                atom_idx_1 = stoi(arguments[i + 1]);
+            }
+            if (string(arguments[i + 2]).find("-") != 0) {
+                atom_idx_2 = stoi(arguments[i + 2]);
+            }
+            if (string(arguments[i + 3]).find("-") != 0) {
+                gridpoints = stoi(arguments[i + 3]);
+            }
+            if (string(arguments[i + 4]).find("-") != 0) {
+                padding = stod(arguments[i + 4]);
             }
 
             WFN wavy(wfn);
-
-            get1DGridData(wavy, aux_basis);
+            string out = std::format("Calculating 1D density between atoms {} ({}) and {} ({}) with {} gridpoints and {:.2f} Angstrom padding.", wavy.get_atom_label(atom_idx_1), atom_idx_1, wavy.get_atom_label(atom_idx_2), atom_idx_2, gridpoints, padding);
+            std::cout << out << std::endl;
+            get1DGridData(wavy, aux_basis, atom_idx_1, atom_idx_2, gridpoints, padding);
             exit(0);
         }
     }

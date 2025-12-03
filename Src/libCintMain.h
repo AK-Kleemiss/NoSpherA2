@@ -85,3 +85,8 @@ void computeRho(Int_Params& param1,
     const dMatrix2& dm,
     vec& rho,
     double max_mem);
+
+template <typename Kernel>
+void compute3C(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);

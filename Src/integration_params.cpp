@@ -16,7 +16,7 @@ Int_Params::Int_Params(const WFN &wavy)
     calc_integration_parameters();
 }
 
-vec Int_Params::normalize_gto(vec coef, const vec exp, const int l)
+vec Int_Params::normalize_gto(vec coef, const vec& exp, const int l)
 {
     // GTO norm Ref: H. B. Schlegel and M. J. Frisch, Int. J. Quant.  Chem., 54(1995), 83-87.
     for (int i = 0; i < coef.size(); i++)
@@ -24,42 +24,29 @@ vec Int_Params::normalize_gto(vec coef, const vec exp, const int l)
         coef[i] *= 1.0 / std::sqrt(gaussian_int(l * 2 + 2, 2 * exp[i]));
     }
 
-    // Normalize contracted GTO
-    // #ee = numpy.empty((nprim, nprim))
-    //     #for i in range(nprim) :
-    //     #    for j in range(i + 1) :
-    //     #        ee[i, j] = ee[j, i] = gaussian_int(angl * 2 + 2, es[i] + es[j])
-    //     #s1 = 1 / numpy.sqrt(numpy.einsum('pi,pq,qi->i', cs, ee, cs))
-    //     return numpy.einsum('pi,i->pi', cs, s1)
-    vec2 ee(coef.size(), vec(coef.size(), 0.0));
-    for (int i = 0; i < coef.size(); i++)
+    vec2 ee(exp.size(), vec(exp.size(), 0.0));
+    for (int i = 0; i < exp.size(); i++)
     {
         for (int j = 0; j < i + 1; j++)
         {
             ee[i][j] = ee[j][i] = gaussian_int(l * 2 + 2, exp[i] + exp[j]);
         }
     }
-    // Do the einsum by hand
-    vec s1(coef.size(), 0.0);
+    double s1;
     for (int i = 0; i < coef.size(); i++)
     {
+        s1 = 0.0;
         for (int j = 0; j < coef.size(); j++)
         {
             for (int k = 0; k < coef.size(); k++)
             {
-                s1[i] += coef[k] * ee[k][j] * coef[j];
+                s1 += coef[k] * ee[k][j] * coef[j];
             }
         }
+        s1 = 1.0 / std::sqrt(s1);
+        coef[i] *= s1;
     }
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = 1.0 / std::sqrt(s1[i]);
-    }
-    for (int i = 0; i < coef.size(); i++)
-    {
-        coef[i] *= s1[i];
-    }
-    return coef;
+    return std::move(coef);
 }
 
 void Int_Params::collect_basis_data()

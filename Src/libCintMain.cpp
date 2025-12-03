@@ -2220,3 +2220,32 @@ template void computeRho<Overlap3C>(Int_Params &param1,
                                    Int_Params &param2,
                                    const dMatrix2 &dm,
     vec& rho, double max_mem);
+
+template <typename Kernel>
+void compute3C(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c) {
+    int nQM = param1.get_nbas();
+    int nAux = param2.get_nbas();
+    Int_Params combined = param1 + param2;
+    ivec bas = combined.get_bas();
+    ivec atm = combined.get_atm();
+    vec env = combined.get_env();
+    int nat = combined.get_natoms();
+    int nbas = combined.get_nbas();
+    ivec aoloc = make_loc(bas, nbas);
+    unsigned long long int naoi = aoloc[nQM] - aoloc[0];
+    unsigned long long int naoj = aoloc[nQM] - aoloc[0];
+    unsigned long long int naok = aoloc[nQM + nAux] - aoloc[nQM];
+    eri3c.resize(naoi * naoj * naok, 0.0);
+    CINTOpt* opty = nullptr;
+    Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+    ivec shl_slice = { 0, nQM, 0, nQM, nQM, nQM + nAux };
+    Kernel::drv(eri3c.data(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+}
+template void compute3C<Coulomb3C>(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);
+template void compute3C<Overlap3C>(Int_Params& param1,
+    Int_Params& param2,
+    vec& eri3c);

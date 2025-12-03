@@ -162,7 +162,6 @@ private:
     void populate_bas();
     void populate_env();
 
-    vec normalize_gto(vec coef, const vec exp, const int l);
     double gaussian_int(int n, double exp) {
         double n1 = (n + 1) * 0.5;
         return std::tgamma(n1) / (2.0 * pow(exp, n1));
@@ -184,6 +183,8 @@ public:
     unsigned long long get_nbas() { return nbas; };  // Number of basis segments
     unsigned long long get_nao() { return nao; };    // Number of atomic orbitals  
     unsigned long long get_natoms() { return ncen; };
+
+    vec normalize_gto(vec coef, const vec& exp, const int l);
 
     void print_data(std::string name); //FOR DEBUG PURPOSES
 };
