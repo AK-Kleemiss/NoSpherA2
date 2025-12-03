@@ -2171,7 +2171,7 @@ void calc_SF(const int &points,
                 rho = dens_local[p];
                 work = k1_local[s] * d1_local[p] + k2_local[s] * d2_local[p] + k3_local[s] * d3_local[p];
 #if defined(__GNUC__) || defined(__clang__)
-                std::sincos(work, &c, &si);
+                sincos(work, &c, &si);
 #else
                 c = cos(work);
                 si = sin(work);
