@@ -71,7 +71,7 @@ private:
     // Internal helper methods
     void setupPrototypeGrids(const WFN& wave, const ivec& atom_types);
     void generateIntegrationGrids(const WFN& wave, const cell& unit_cell, 
-                                  const bvec& needs_grid, const ivec& atom_list);
+                                  const ivec& atom_list);
     void calculateNonSphericalDensities(const WFN& wave, const cell& unit_cell);
     void calculateHirshfeldWeights(const WFN& wave, const cell& unit_cell, const ivec& atom_list);
     void pruneGrid();
@@ -89,7 +89,7 @@ public:
     
     PartitionResults calculatePartitionedCharges(const WFN& wave, const cell& unit_cell = cell());
     
-    void getDensityVectors(const WFN& wave, vec2& d1, vec2& d2, vec2& d3, vec2& dens);
+    void getDensityVectors(const WFN& wave, const ivec& atom_list, vec2& d1, vec2& d2, vec2& d3, vec2& dens);
     
     // Configuration and data access
     void setConfiguration(const GridConfiguration& config) { config_ = config; }

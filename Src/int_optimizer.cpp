@@ -255,8 +255,7 @@ void CINTOpt_setij(CINTOpt* opt, int* ng,
                     // transpose pairdata
                     for (ip = 0; ip < iprim; ip++) {
                         for (jp = 0; jp < jprim; jp++, pdata++) {
-                            memcpy(pdata, pdata0 + jp * iprim + ip,
-                                sizeof(PairData));
+                            memcpy(pdata, pdata0 + jp * iprim + ip, sizeof(PairData));
                         }
                     }
                 }

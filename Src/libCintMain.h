@@ -64,6 +64,10 @@ struct Overlap3C {
             CINTOpt* opt, int* atm, int nat, int* bas, int nbas, double* env);
 };
 
+// Function to compute Overlap integrals
+void compute2c_Overlap_Cart(Int_Params& param1,
+    vec& overlap_2c);
+
 /*
 * Function to compute fitting coefficients for the density matrix using the desired metric indicated by the Kernel template parameter
 * This function combines the calculation of 3-center 2-electron integrals and the fitting coefficients

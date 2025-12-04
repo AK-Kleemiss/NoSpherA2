@@ -1,0 +1,316 @@
+_______________________________________________________________
+
+ T   O   N   T   O
+
+ A free object-based system for computational chemistry
+
+ Version: 23.02.09 v. 830bd7bc
+ Platform: Windows
+ Build-date: 2023-02-09 09:30
+
+ For conditions of use, on-line documentation, and contributor
+ and developer information see :-
+
+ https://github.com/dylan-jayatilaka/tonto
+
+ Dylan Jayatilaka
+ Daniel Grimwood
+ Peter Spackman
+_______________________________________________________________
+
+
+Timer started at 28/10/2025 13:37:30.
+
+
+
+====================
+Molecule information
+====================
+
+Name ...................... OH_rad_uhf
+
+Chemical Formula .......... H O
+Molecular weight .......... 17.00737000
+
+Charge .................... 0
+Multiplicity .............. 2
+
+No. of atoms .............. 2
+No. of electrons .......... 9
+No. of alpha electrons .... 5
+No. of beta  electrons .... 4
+
+Gaussian basis name ....... custom
+Spherical harmonics? ...... F
+
+
+================
+Atom coordinates
+================
+
+No. of atoms .... 2
+
+________________________________________________
+
+  #  ID    Z       - x -       - y -       - z -
+         /au                      /A
+________________________________________________
+
+  1   H  1.0  0.00000000  0.00000000  0.00000000
+  2   O  8.0  1.00000000  0.00000000  0.00000000
+________________________________________________
+
+
+============
+Bond lengths
+============
+
+. The bond-detection criteria is the same as used
+  by the Cambridge Structural Database (CSD).
+
+No. of bonds .... 1
+
+____________________________
+
+  A--B    A--B       R(A--B)
+                          /A
+____________________________
+
+  O--H    O--H    1.00000000
+____________________________
+
+
+==========
+Atom bases
+==========
+
+No. of atoms .... 2
+
+______________________
+
+  #  ID    Z     Basis
+         /au     label
+______________________
+
+  1   H  1.0  H:custom
+  2   O  8.0  O:custom
+______________________
+
+
+===================
+Gaussian basis sets
+===================
+
+Basis name ................ custom
+
+No. of basis sets ......... 2
+No. of shells ............. 25
+No. of shell pairs ........ 325
+No. of basis functions .... 105
+No. of primitives ......... 129
+
+
+Basis set H:custom
+
+No. of shells ............. 10
+No. of basis functions .... 35
+No. of primitives ......... 37
+___________________________________
+
+ -L-   Fn     Exponent  Contraction
+        #          /au          /au
+___________________________________
+
+  s     1  82.64000000   0.02295076
+           12.41000000   0.17554012
+            2.82400000   0.86470355
+  s     2   0.79770000   1.00000000
+  s     3   0.25810000   1.00000000
+  s     4   0.08989000   1.00000000
+  p     5   2.29200000   1.00000000
+  p     8   0.83800000   1.00000000
+  p    11   0.29200000   1.00000000
+  d    14   2.06200000   1.00000000
+  d    20   0.66200000   1.00000000
+  f    26   1.39700000   1.00000000
+___________________________________
+
+
+Basis set O:custom
+
+No. of shells ............. 15
+No. of basis functions .... 70
+No. of primitives ......... 92
+______________________________________
+
+ -L-   Fn        Exponent  Contraction
+        #             /au          /au
+______________________________________
+
+  s     1  61420.00000000   0.00009074
+            9199.00000000   0.00070373
+            2091.00000000   0.00369408
+             590.90000000   0.01534294
+             192.30000000   0.05285341
+              69.32000000   0.14711905
+              26.97000000   0.30776426
+              11.10000000   0.40177987
+               4.68200000   0.21876147
+  s     2  61420.00000000  -0.00005611
+            9199.00000000  -0.00044605
+            2091.00000000  -0.00232561
+             590.90000000  -0.00984106
+             192.30000000  -0.03410146
+              69.32000000  -0.10172368
+              26.97000000  -0.23281906
+              11.10000000  -0.42666101
+               4.68200000  -0.32354028
+  s     3      1.42800000   1.00000000
+  s     4      0.55470000   1.00000000
+  s     5      0.20670000   1.00000000
+  p     6     63.42000000   0.03132750
+              14.66000000   0.21665425
+               4.45900000   0.83524284
+  p     9      1.53100000   1.00000000
+  p    12      0.53020000   1.00000000
+  p    15      0.17500000   1.00000000
+  d    18      3.77500000   1.00000000
+  d    24      1.30000000   1.00000000
+  d    30      0.44400000   1.00000000
+  f    36      2.66600000   1.00000000
+  f    46      0.85900000   1.00000000
+  g    56      1.84600000   1.00000000
+______________________________________
+
+
+====================================
+Basis set linear dependence analysis
+====================================
+
+. Linear dependence is detected by small overlap matrix eigenvalues
+
+. Overlap matrix eigenfunctions with eigenvalues less than the
+  linear_dependence_tolerance are projected out of the AO basis
+  leading to, in this case, some exact-zero MO eigenvalues.
+
+Min. overlap matrix eigenvalue .... 0.10928104E-03
+Linear dependence tolerance ....... 0.10000000E-04
+Linear dependence shift ........... 0.10000000E+13
+No. of small eigenvalues .......... 0
+No. of negative eigenvalues ....... 0
+
+_________________________
+
+  #  log10 |eig|  # < max
+      max. value
+_________________________
+
+  1  -3.00000000       12
+  2  -2.00000000       11
+  3  -1.00000000       23
+  4   0.00000000       43
+  5   1.00000000       16
+_________________________
+
+
+Making gaussian ANO data ...
+
+Making atom shell info ...
+
+===============
+SCF calculation
+===============
+
+SCF kind .......................... uhf
+
+Initial guess options:
+
+Kind of initial density ........... promolecule
+Kind of initial MO's .............. --using density--
+
+SCF termination options:
+
+Delta E convergence tolerance ..... 0.10000000E-02
+Gradient/DIIS convergence ......... 0.10000000E-02
+Minimum # of iterations ........... 1
+Maximum # of iterations ........... 100
+
+Linear dependence options:
+
+Linear dependence tolerance ....... 0.10000000E-04
+Linear dependence shift ........... 0.10000000E+13
+Min. overlap matrix eigenvalue .... 0.10928104E-03
+No. of small S eigenvalues ........ 0
+No. of neg.  S eigenvalues ........ 0
+
+Convergence acceleration options:
+
+Using level shift ................. T
+Level shift ....................... 0.30000000
+Level shift  quits at ............. 3
+Using density damping ............. T
+Damping factor .................... 0.50000000
+Damping quits at .................. 3
+Using DIIS ........................ T
+
+DIIS options:
+
+Convergence on max(abs(error)) .... 0.10000000E-02
+Extrapolate  from iteration ....... 3
+Save vectors from iteration ....... 1
+No. of vectors to keep ............ 8
+Replace the vector which is ....... worst
+
+======================
+Initial guess energies
+======================
+
+Total energy (E_e+V_NN)   E .......  -75.40728260
+Total electronic energy   E_e .....  -79.64070029
+Nuclear repulsion energy  V_NN ....    4.23341769
+Electron repulsion energy V_ee ....   32.73558821
+Nuclear attraction energy V_eN .... -187.60535918
+Total potential energy    V ....... -150.63635329
+Kinetic energy            T .......   75.22907069
+Virial ratio             -V/T .....    2.00236892
+
+==============
+SCF iterations
+==============
+________________________________________________
+
+  Iter        Energy         Delta          DIIS
+                E/au             E      Gradient
+________________________________________________
+
+     0  -75.40728260  -75.40728260    0.88311444   *Damping on
+                                                   *Levelshift on
+     1  -75.42188023   -0.01459763    0.21248610
+     2  -75.42346437   -0.00158414    0.09964436   *DIIS starts saving now
+     3  -75.42386448   -0.00040011    0.05289188   *Difference has converged
+                                                   *Damping was off
+                                                   *Levelshift was off
+                                                   *DIIS extrapolates now
+     4  -75.42409176   -0.00022728    0.01276631
+     5  -75.42410432   -0.00001257    0.00509257
+     6  -75.42411062   -0.00000629    0.00228070
+________________________________________________
+
+* * * SCF has converged * * *
+________________________________________________
+
+===========
+SCF results
+===========
+
+Total energy (E_e+V_NN)   E .......  -75.42411182
+Total electronic energy   E_e .....  -79.65752951
+Nuclear repulsion energy  V_NN ....    4.23341769
+Electron repulsion energy V_ee ....   32.79798323
+Nuclear attraction energy V_eN .... -187.79696747
+Total potential energy    V ....... -150.76556656
+Kinetic energy            T .......   75.34145473
+Virial ratio             -V/T .....    2.00109710
+
+Wall-clock time taken for job "OH_rad_uhf" is , 5 seconds, 855 milliseconds.
+CPU time taken for job "OH_rad_uhf" is 5.781 CPU seconds.
