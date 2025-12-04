@@ -2307,6 +2307,7 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
             file << "Using a Thakkar core density" << endl;
         //vector<Thakkar> temp;
         map<int, Thakkar> temp;
+        map<int, Spherical_Gaussian_Density> temp_G;
         if (debug) {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
@@ -2325,23 +2326,30 @@ static void add_ECP_contribution(const ivec& asym_atom_list,
         else {
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                if (temp.find(wave.get_atom_charge(asym_atom_list[i])) == temp.end())
-                    temp.emplace(wave.get_atom_charge(asym_atom_list[i]), (wave.get_atom_charge(asym_atom_list[i]), mode));
+                int charge = wave.get_atom_charge(asym_atom_list[i]);
+                if (temp.find(charge) == temp.end()) {
+                    Thakkar t(charge, mode);
+                    Spherical_Gaussian_Density g(charge, mode);
+                    temp.emplace(charge, t);
+                    temp_G.emplace(charge, g);
+                }
             }
         }
 
 #pragma omp parallel for private(it, k)
         for (int s = 0; s < sf[0].size(); s++)
         {
+            int n_el = 0, charge = 0;
             it = next(hkl.begin(), s);
             k = constants::FOUR_PI * constants::bohr2ang(cell.get_stl_of_hkl(*it));
             for (int i = 0; i < asym_atom_list.size(); i++)
             {
-                if (wave.get_atom_ECP_electrons(asym_atom_list[i]) != 0)
+                n_el = wave.get_atom_ECP_electrons(asym_atom_list[i]);
+                charge = wave.get_atom_charge(asym_atom_list[i]);
+                if (n_el != 0)
                 {
-                    Spherical_Gaussian_Density C(wave.get_atom_charge(asym_atom_list[i]), mode);
-                    sf[i][s] += C.get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
-                    sf[i][s] += temp[i].get_core_form_factor(k, wave.get_atom_ECP_electrons(asym_atom_list[i]));
+                    sf[i][s] += temp_G.at(charge).get_form_factor(k); // This bit will correct for the error of the valence denisty of ECP atoms
+                    sf[i][s] += temp.at(charge).get_core_form_factor(k, n_el);
                 }
             }
         }
