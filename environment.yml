@@ -1,0 +1,12 @@
+name: nosphera2-build
+channels:
+   - https://software.repos.intel.com/python/conda
+   - conda-forge
+dependencies:
+   - python
+   - pkgconfig
+   - mkl-devel
+   - mkl-static
+   - cmake
+   - intel-openmp
+   - tbb-devel

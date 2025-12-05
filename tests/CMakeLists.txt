@@ -1,4 +1,5 @@
 include(CTest)
+set(Python_EXECUTABLE ${CMAKE_BINARY_DIR}/environments/mambaenv/python.exe)
 find_package(Python COMPONENTS Interpreter)
 
 FILE(COPY ${CMAKE_CURRENT_SOURCE_DIR}/runTest.py DESTINATION ${CMAKE_CURRENT_BINARY_DIR})

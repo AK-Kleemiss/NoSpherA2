@@ -70,7 +70,7 @@ endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
 target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  $<$<CXX_COMPILER_ID:MSVC>:MKL_ILP64 MKL_Direct_Call>)
-
+target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
         $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<NOT:$<PLATFORM_ID:Darwin>>>:-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math>
@@ -84,7 +84,7 @@ target_link_options(libnosphera2 PRIVATE
     $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
-    $<$<PLATFORM_ID:Linux>:MKL::MKL>
+    $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:WIN32>>:MKL::MKL>
     occ::qm
     occ::main
     basis_set_helper
@@ -96,14 +96,14 @@ target_link_libraries(libnosphera2 PUBLIC
     $<$<CXX_COMPILER_ID:MSVC>:ntdll>
     $<$<CXX_COMPILER_ID:MSVC>:ws2_32>
 )
-set(CMAKE_VS_NUGET_PACKAGE_RESTORE ON)
-set_property(TARGET libnosphera2
-    PROPERTY VS_PACKAGE_REFERENCES
-        "intelmkl.static.win-x64_2025.3.0.453;inteltbb.redist.win_2022.2.0.503;inteltbb.devel.win_2022.2.0.503;intelopenmp.redist.win_2025.2.1.1000;intelopenmp.devel.win_2025.2.1.1000"
-)
 set_target_properties(libnosphera2 PROPERTIES PREFIX "")
+target_include_directories(libnosphera2 PUBLIC ${MKL_INCLUDE})
 add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
+target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
+if (MSVC)
+    target_compile_options(NoSpherA2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
+endif()
 if (LINUX)
     get_target_property(MKL_LIBRARIES MKL::MKL IMPORTED_LOCATION)
 endif ()

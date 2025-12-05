@@ -1,3 +1,6 @@
+if (MSVC)
+    add_compile_options($<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
+endif()
 add_executable(randomocc testingRandomOccFunctions.cpp)
 target_link_libraries(randomocc libnosphera2 occ::qm)
 #target_link_options(convert PRIVATE "-fsanitize=address")

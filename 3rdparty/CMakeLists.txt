@@ -1,4 +1,5 @@
 include(ExternalProject)
+
 set(CMAKE_TRY_COMPILE_CONFIGURATION Release)
 set(ENV{CMAKE_TRY_COMPILE_CONFIGURATION} Release)
 if (NOT WIN32)
@@ -14,14 +15,12 @@ else ()
     set(OCC_BUILD_MODE ${CMAKE_BUILD_TYPE})
 endif ()
 
-if (WIN32)
-    find_program(NUGET_EXE NAMES nuget)
-    if(NOT NUGET_EXE)
-        message(FATAL_ERROR "nuget.exe not found! Please install it and add to PATH.")
-    endif()
+# Fix libcint quadmath Fortran bindings issue in debug builds with GCC
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
+    target_link_libraries(cint gfortran)
 endif()
 
-    #ExternalProject_Add(occ
+#ExternalProject_Add(occ
 #    SOURCE_DIR /home/lucas/CLionProjects/occ
 ##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON
 #)
@@ -36,6 +35,16 @@ CPMAddPackage(
 )
 
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
+
+# Set CMAKE_GENERATOR env var for Rust's cmake crate (it doesn't auto-detect newer VS versions)
+if (MSVC)
+    if (CMAKE_GENERATOR MATCHES "Visual Studio")
+        set(ENV{CMAKE_GENERATOR} "${CMAKE_GENERATOR}")
+    else()
+        set(ENV{CMAKE_GENERATOR} "Ninja")
+    endif()
+endif()
+
 CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
@@ -45,7 +54,7 @@ CPMAddPackage(
         "BUILD_SHARED_LIBS OFF"
         "FEATOMIC_INSTALL_BOTH_STATIC_SHARED OFF"
         "FEATOMIC_USE_STATIC_METATENSOR ON"
-        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
+#        "CMAKE_TRY_COMPILE_CONFIGURATION Release"
 )
 if (WIN32)
     set(featomic_st_name "featomic.lib")
@@ -60,9 +69,8 @@ else ()
     set(HOME $ENV{HOME})
 endif ()
 
-
+set(MKL_LINK "static")
 if (LINUX)
-    set(MKL_LINK "static")
     if (NOT EXISTS ${ONEAPI_DIRECTORY})
         set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
         set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
@@ -108,29 +116,36 @@ if (LINUX)
 
     else ()
         set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
-#        set(MKL_THREADING "tbb_thread")
-
         find_package(MKL CONFIG REQUIRED
             HINTS "${_ONEAPI_MKL_ROOT}" "${ONEAPI_DIRECTORY}"
             PATH_SUFFIXES "lib/cmake/mkl"
         )
-        print_target_properties(MKL::MKL)
-        get_target_property(MKL_LINK_LIBRARIES MKL::MKL INTERFACE_LINK_LIBRARIES)
-        set(MKL_LINK_LIBRARIES ${MKL_LINK_LIBRARIES} PARENT_SCOPE)
-        message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+      message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
 elseif (WIN32)
-#    execute_process(
-#        COMMAND ${NUGET_EXE} install intelmkl.static.win-x64 -Version 2025.3.0.453 -OutputDirectory ${CMAKE_SOURCE_DIR}/Lib/MKL -ExcludeVersion
-#        RESULT_VARIABLE NUGET_RESULT
-#    )
-#    set(MKL_ROOT "${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/pkgs/intel-mkl_x64-windows")
-#    find_package(MKL CONFIG REQUIRED)
+    include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
+    set(_ONEAPI_MKL_ROOT "${CMAKE_BINARY_DIR}/environments/mambaenv/Library")
+    if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
+        micromamba_environment(
+            NAME mambaenv
+            SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
+        )
+    endif ()
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_ONEAPI_MKL_ROOT}"
+        PATH_SUFFIXES "lib/cmake/mkl"
+    )
+    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+    find_package(MKL CONFIG REQUIRED)
+    set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
 endif ()
 if (Darwin)
     set(USE_SYSTEM_BLAS ON)
 else ()
     set(USE_SYSTEM_BLAS OFF)
+endif ()
+if (WIN32)
+    set(WIN_FLAGS "GG_NO_PRAGMA ON;CPACK_SYSTEM_NAME windows")
 endif ()
 CPMAddPackage(
     NAME occ
@@ -146,7 +161,8 @@ CPMAddPackage(
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
         "BLA_VENDOR Intel10_64lp_seq"
         "BLA_STATIC ON"
-        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
+        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
+        ${WIN_FLAGS}
 )
 
 # Fix libcint quadmath Fortran bindings issue in debug builds with GCC

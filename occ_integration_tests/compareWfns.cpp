@@ -95,7 +95,7 @@ BenchmarkResults conversion_benchmark(std::string filepath, bool get_wfns)
     auto wfn_from_occ = WFN(wfn);
     auto end_occ2nos = std::chrono::high_resolution_clock::now();
     auto duration_occ2nos = std::chrono::duration_cast<std::chrono::microseconds>(end_occ2nos - start_occ2nos);
-    ConversionTimes times = {duration_occ.count(), duration_nos.count(), duration_occ2nos.count()};
+    ConversionTimes times = {static_cast<long>(duration_occ.count()), static_cast<long>(duration_nos.count()), static_cast<long>(duration_occ2nos.count())};
     return get_wfns ? BenchmarkResults{times, wfn_nos, wfn_from_occ} : BenchmarkResults{times, NULL, NULL};
 }
 

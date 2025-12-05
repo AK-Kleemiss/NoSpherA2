@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
 # Platform-specific compile options
-if (NOT MSVC)
+if (LINUX)
     add_compile_options(-msse2 -msse3 -msse4.1 -msse4.2 -mavx -ffast-math)
 endif()
 
@@ -30,6 +30,13 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     option(USE_VECTOR_INSTRUCTIONS "If you want to use vector instructions. Defaults to ON" ON)
     option(WITH_CLANG_TIDY "Enable clang tidy" OFF)
     set(MKL_INTERFACE "lp64" CACHE STRING "ilp64 uses double precision for indices in MKL, the other option is lp64." )
+    set(CONDA_ENV "base" CACHE STRING "Conda env to be used.")
+    set(CONDA_COMMAND "conda" CACHE STRING "CONDA command (used to download dependencies.)")
+    set(OCC_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type for OCC")
+    option(USE_CUSTOM_ENV OFF)
+    if (NOT CONDA_ENV STREQUAL "base")
+        option(USE_CUSTOM_ENV "Use a user provided environment for conda." ON)
+    endif ()
     set(ONEAPI_DIRECTORY $ENV{MKLROOT} CACHE STRING
         "Location of OneAPI. If empty and you didn't loaded modules or used a setvars.sh, OneAPI will be downloaded.")
     set(FAKE_HOME_TEST "ON" CACHE STRING
