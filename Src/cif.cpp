@@ -2,6 +2,15 @@
 #include "constants.h"
 #include "atoms.h"
 #include "wfn_class.h"
+#include "tsc_block.h"
+
+const std::string get_basis_loop_header() {
+    return "loop_\n_basis.id\n_basis.name\n_basis.dict\n";
+}
+
+const std::string get_wavefunction_loop_header() {
+    return "loop_\n_wavefunction.id\n_wavefunction.type\n_wavefunction.radial_type\n_wavefunction.angular_type\n_wavefunction.dict\n";
+}
 
 const std::string get_basis_set_CIF(const int nr, const WFN& wavy)
 {
@@ -22,7 +31,6 @@ const std::string get_basis_set_CIF(const int nr, const WFN& wavy)
     else
         _nr = nr;
     std::stringstream ss;
-    ss << "loop_\n_basis.id\n_basis.name\n_basis.dict\n";
     ss << _nr << " '" << wavy.get_basis_set_name() << "' [\n";
     for (int i = 0; i < atom_types.size(); i++)
     {
@@ -73,7 +81,6 @@ const std::string get_basis_set_CIF(const int nr, const WFN& wavy)
 const std::string get_CIF_table(const int nr, const WFN& wavy)
 {
     std::stringstream ss;
-    ss << "loop_\n_wavefunction.id\n_wavefunction.type\n_wavefunction.radial_type\n_wavefunction.angular_type\n_wavefunction.dict\n";
     int _nr;
     if (nr == 0)
         _nr = 1;
@@ -166,9 +173,51 @@ void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName)
     err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
     std::ofstream file(fileName);
     std::stringstream ss;
+    ss << get_basis_loop_header();
     ss << get_basis_set_CIF(0, wavy);
     ss << "\n\n";
+    ss << get_wavefunction_loop_header();
     ss << get_CIF_table(0, wavy);
+    file << ss.str();
+    file.close();
+}
+
+void write_wfn_CIF(WFN& wavy, const std::filesystem::path& fileName, tsc_block<int, cdouble>& tsc, options& opt)
+{
+    err_checkf(wavy.get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
+    std::ofstream file(fileName);
+    std::stringstream ss;
+    ss << get_basis_loop_header();
+    ss << get_basis_set_CIF(0, wavy);
+    ss << "\n\n";
+    ss << get_wavefunction_loop_header();
+    ss << get_CIF_table(0, wavy);
+    if (!tsc.is_empty()) {
+        ss << "\n\n";
+        ss << tsc.get_tsc_cif_block(opt);
+    }
+    file << ss.str();
+    file.close();
+}
+
+void write_wfn_CIF(std::vector<WFN>& wavy, const std::filesystem::path& fileName, tsc_block<int, cdouble>& tsc, options& opt)
+{
+    std::ofstream file(fileName);
+    std::stringstream ss;
+    ss << get_basis_loop_header();
+    for (int i = 0; i < wavy.size(); i++) {
+        err_checkf(wavy[i].get_basis_set_name() != " ", "Please load a basis set before writing things to a .cif file!", std::cout);
+        ss << get_basis_set_CIF(i+1, wavy[i]);
+    }
+    ss << "\n\n";
+    ss << get_wavefunction_loop_header();
+    for (int i = 0; i < wavy.size(); i++) {
+        ss << get_CIF_table(i+1, wavy[i]);
+    }
+    if (!tsc.is_empty()) {
+        ss << "\n\n";
+        ss << tsc.get_tsc_cif_block(opt);
+    }
     file << ss.str();
     file.close();
 }

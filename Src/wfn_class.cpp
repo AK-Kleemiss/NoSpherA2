@@ -17,6 +17,8 @@
 #include <occ/io/conversion.h>
 #include <ranges>
 #include <vector>
+#include "libCintMain.h"
+#include "integration_params.h"
 
 #include "occ/OrbitalDefs.h"
 long long int WFN::pre[9][5][5][9] = {};
@@ -59,12 +61,12 @@ WFN::WFN()
     basis_set_name = " ";
     comment = "Test";
     basis_set = NULL;
-    origin = 0;
+    origin = e_origin::NOT_YET_DEFINED;
     fill_pre();
     fill_Afac_pre();
 };
 
-WFN::WFN(int given_origin) : WFN()
+WFN::WFN(e_origin given_origin) : WFN()
 {
     origin = given_origin;
 };
@@ -89,7 +91,7 @@ WFN::WFN(occ::qm::Wavefunction& occ_WF, bool from_file) : WFN()
     // Only works with restricted WFNs for now
     using namespace Eigen;
     using occ::gto::num_subshells;
-    origin = 11;
+    origin = e_origin::NOT_YET_DEFINED;
     // total_energy = occ_WF.energy.total;
     // virial_ratio = -(total_energy - occ_WF.energy.kinetic) / total_energy;
     basis_set_name = occ_WF.basis.name();
@@ -615,21 +617,27 @@ const std::string WFN::hdr(const bool &occupied) const
 void WFN::read_known_wavefunction_format(const std::filesystem::path &fileName, std::ostream &file, const bool debug)
 {
     if (fileName.extension() == ".wfn")
-        origin = 2, err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
+        err_checkf(read_wfn(fileName, debug, file), "Problem reading wfn", file);
     else if (fileName.extension() == ".ffn")
-        origin = 4, err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
+        err_checkf(read_wfn(fileName, debug, file), "Problem reading ffn", file);
     else if (fileName.extension() == ".wfx")
-        origin = 6, err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
+        err_checkf(read_wfx(fileName, debug, file), "Problem reading wfx", file);
     else if (fileName.extension() == ".fch" || fileName.extension() == ".fchk" || fileName.extension() == ".FCh" || fileName.extension() == ".FChK" || fileName.extension() == ".FChk")
-        origin = 4, err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
+        err_checkf(read_fchk(fileName, file, debug), "Problem reading fchk", file);
     else if (fileName.extension() == ".xyz")
-        origin = 7, err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
+        err_checkf(read_xyz(fileName, file, debug), "Problem reading xyz", file);
     else if (fileName.extension() == ".molden")
-        origin = 8, err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
+        err_checkf(read_molden(fileName, file, debug), "Problem reading molden file", file);
     else if (fileName.extension() == ".gbw")
-        origin = 9, err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
+        err_checkf(read_gbw(fileName, file, debug), "Problem reading gbw file", file);
     else if (fileName.extension() == ".xtb")
-        origin = 10, err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
+        err_checkf(read_ptb(fileName, file, debug), "Problem reading xtb file", file);
+	else if (fileName.extension() == ".stda")
+        err_checkf(read_ptb(fileName, file, debug), "Problem reading ptb file", file);
+	else if (fileName.extension() == ".orbital_energies,restricted" || fileName.extension() == ".MO_energies,r"
+        || fileName.extension() == ".molecular_orbitals,restricted" || fileName.extension() == ".MOs,r"
+        || fileName.string().find("stdout") != std::string::npos)
+		err_checkf(read_tonto(fileName, file, debug), "Problem reading tonto file", file);
     else
         err_checkf(false, "Unknown filetype!", file);
 };
@@ -645,7 +653,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         file << "There is already a wavefunction loaded, aborting!" << endl;
         return false;
     }
-    origin = 2;
+    origin = e_origin::wfn;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName);
     if (rf.good())
@@ -935,26 +943,17 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         temp_nr = 0;
         temp_occ = -1.0;
         temp_ener = 0.0;
-        if (temp_nr == 0)
-        {
-            length = line.copy(tempchar, 6, 2);
-            tempchar[length] = '\0';
-            temp_nr = stoi(tempchar);
-        }
-        if (temp_occ == -1.0)
-        {
-            length = line.copy(tempchar, 12, 36);
-            tempchar[length] = '\0';
-            temp_occ = stod(tempchar);
-        }
-        if (temp_ener == 0)
-        {
-            length = line.copy(tempchar, 12, 61);
-            tempchar[length] = '\0';
-            // if we have a "=" in the line, we have to make it a space
-            if (tempchar[0] == '=') tempchar[0] = ' ';
-            temp_ener = stod(tempchar);
-        }
+        length = line.copy(tempchar, 6, 2);
+        tempchar[length] = '\0';
+        temp_nr = stoi(tempchar);
+        length = line.copy(tempchar, 12, 36);
+        tempchar[length] = '\0';
+        temp_occ = stod(tempchar);
+        length = line.copy(tempchar, 12, 61);
+        tempchar[length] = '\0';
+        // if we have a "=" in the line, we have to make it a space
+        if (tempchar[0] == '=') tempchar[0] = ' ';
+        temp_ener = stod(tempchar);
         if (temp_ener > last_ener)
         {
             last_ener = temp_ener;
@@ -963,6 +962,7 @@ bool WFN::read_wfn(const std::filesystem::path &fileName, const bool &debug, std
         {
             last_ener = -DBL_MAX;
             oper++;
+			is_unrestricted = true;
         }
         push_back_MO(temp_nr, temp_occ, temp_ener, oper);
         //---------------------------Start reading MO coefficients-----------------------
@@ -1037,7 +1037,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 {
     using namespace std;
     err_checkf(filesystem::exists(filename), "Couldn't open or find " + filename.string() + ", leaving", file);
-    origin = 7;
+    origin = e_origin::xyz;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -1099,7 +1099,7 @@ bool WFN::read_xyz(const std::filesystem::path &filename, std::ostream &file, co
 
 bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std::ostream &file)
 {
-    origin = 6;
+    origin = e_origin::wfx;
     using namespace std;
     err_checkf(std::filesystem::exists(fileName), "Couldn't open or find " + fileName.string() + ", leaving", file);
     ifstream rf(fileName.c_str());
@@ -1308,6 +1308,7 @@ bool WFN::read_wfx(const std::filesystem::path &fileName, const bool &debug, std
         {
             last_ener = -DBL_MAX;
             oper++;
+            is_unrestricted = true;
         }
         err_checkf(push_back_MO(i + 1, occ[i], ener[i], oper), "Error poshing back MO! MO: " + to_string(i), file);
     }
@@ -1445,7 +1446,7 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = 8;
+    origin = e_origin::molden;
     ifstream rf(filename.c_str());
     if (rf.good())
         path = filename;
@@ -1629,8 +1630,10 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
             remove_empty_elements(temp);
             if (temp[1] == "Alpha" || temp[1] == "alpha")
                 spin = false;
-            else
+            else {
                 spin = true;
+				is_unrestricted = true;
+            }
             getline(rf, line);
             temp = split_string<string>(line, " ");
             remove_empty_elements(temp);
@@ -2159,6 +2162,658 @@ bool WFN::read_molden(const std::filesystem::path &filename, std::ostream &file,
     return true;
 };
 
+bool WFN::read_tonto(const std::filesystem::path& filename, std::ostream& file, const bool debug, const std::filesystem::path& energies_filename, const std::filesystem::path& orbitals_filename)
+{
+    using namespace std;
+    err_checkf(std::filesystem::exists(filename), "couldn't open or find " + filename.string() + ", leaving", file);
+    std::filesystem::path energies_file, orbitals_file, stdout_file;
+    ifstream rf;
+    string line;
+	string scf_kind;
+    bool restricted_search = true;
+    if (energies_filename == "" && orbitals_filename == "") {
+        if (filename.string().find("stdout") != std::string::npos) {
+            string jobname;
+            stdout_file = filename;
+            rf.open(stdout_file.string().c_str(), ios::in);
+            rf.seekg(0);
+            while (rf.good() && line.find("Name ...") == string::npos) {
+                getline(rf, line);
+            }
+            jobname = split_string<string>(line, " ")[2];
+
+            rf.seekg(0);
+            while (rf.good() && line.find("SCF kind ....") == string::npos) {
+                getline(rf, line);
+            }
+            scf_kind = split_string<string>(line, " ")[3];
+            if (scf_kind == "rhf" || scf_kind == "rks" || scf_kind == "xray_rhf" || scf_kind == "xray_rks")
+                restricted_search = true;
+			else //there could be other kinds like ghf, but at the moment let me expect either uhf/uks or rhf/rks
+				restricted_search = false;
+
+            method = scf_kind;
+
+            energies_file = filename.parent_path() / (jobname + ".orbital_energies,restricted");
+            if (!std::filesystem::exists(energies_file))
+                energies_file = filename.parent_path() / (jobname + ".MO_energies,r");
+            if (!std::filesystem::exists(energies_file)) {
+                energies_file = filename.parent_path() / (jobname + ".orbital_energies,alpha");
+				restricted_search = false;
+            }
+            if (!std::filesystem::exists(energies_file)) {
+                energies_file = filename.parent_path() / (jobname + ".MO_energies,a");
+                restricted_search = false;
+            }
+
+            orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,restricted");
+            if (!std::filesystem::exists(orbitals_file))
+                orbitals_file = filename.parent_path() / (jobname + ".MOs,r");
+            if (!std::filesystem::exists(orbitals_file)) {
+                orbitals_file = filename.parent_path() / (jobname + ".molecular_orbitals,alpha");
+                restricted_search = false;
+            }
+            if (!std::filesystem::exists(orbitals_file)) {
+                orbitals_file = filename.parent_path() / (jobname + ".MOs,a");
+                restricted_search = false;
+            }
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+        }
+        else if (filename.extension() == ".orbital_energies,restricted" || filename.extension() == ".MO_energies,r") {
+            energies_file = filename;
+            orbitals_file = filename;
+            if (filename.extension() == ".orbital_energies,restricted") {
+                orbitals_file.replace_extension(".molecular_orbitals,restricted");
+            }
+            else if (filename.extension() == ".MO_energies,r") {
+                orbitals_file.replace_extension(".MOs,r");
+            }
+            stdout_file = filename.parent_path() / "stdout";
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+            rf.open(stdout_file.string().c_str(), ios::in);
+        }
+        else if (filename.extension() == ".molecular_orbitals,restricted" || filename.extension() == ".MOs,r") {
+            orbitals_file = filename;
+            energies_file = filename;
+            if (filename.extension() == ".molecular_orbitals,restricted") {
+                energies_file.replace_extension(".orbital_energies,restricted");
+            }
+            else if (filename.extension() == ".MOs,r") {
+                energies_file.replace_extension(".MO_energies,r");
+            }
+            stdout_file = filename.parent_path() / "stdout";
+            err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+            err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+            //check if there is a stdout file in the same folder
+            err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+            rf.open(stdout_file.string().c_str(), ios::in);
+        }
+        else {
+            err_checkf(false, "Filename extension not recognized for tonto files! Please provide either .orbital_energies,restricted or .molecular_orbitals,restricted (or their short forms).", file);
+        }
+    }
+    else {
+        energies_file = energies_filename;
+        orbitals_file = orbitals_filename;
+        if(energies_file.string().find("alpha") != string::npos || energies_file.string().find(",a") != string::npos)
+			restricted_search = false;
+        stdout_file = filename;
+        err_checkf(std::filesystem::exists(orbitals_file), "couldn't open or find " + orbitals_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(energies_file), "couldn't open or find " + energies_file.string() + ", leaving", file);
+        err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", file);
+        rf.open(stdout_file.string().c_str(), ios::in);
+	}
+
+    const bool restricted = restricted_search;
+
+
+    if (debug)
+        file << "File is valid, continuing...\n" << GetCurrentDir << endl;
+    origin = e_origin::tonto;
+    //open the files as read-only binary files
+    ifstream rf_e(energies_file.c_str(), ios::binary);
+    ifstream rf_o(orbitals_file.c_str(), ios::binary);
+    err_checkf(rf_e.good(), "couldn't open " + energies_file.string() + ", leaving", file);
+    err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
+    if (rf_e.good())
+        path = filename;
+    rf_e.seekg(0);
+    rf_o.seekg(0);
+
+    //Read the energies and orbital coefficients from binary files
+    vec energies, orbitals;
+    read_block_from_fortran_binary(rf_e, energies);
+    read_block_from_fortran_binary(rf_o, orbitals);
+
+    vec energies_beta, orbitals_beta;
+    if (!restricted) {
+        rf_e.close();
+        rf_o.close();
+        std::string s = energies_file.string();
+        if (auto pos = s.rfind("alpha"); pos != std::string::npos) {
+            s.replace(pos, std::strlen("alpha"), "beta");
+        }
+        energies_file = std::filesystem::path(std::move(s));
+        s = orbitals_file.string();
+        if (auto pos = s.rfind("alpha"); pos != std::string::npos) {
+            s.replace(pos, std::strlen("alpha"), "beta");
+        }
+        orbitals_file = std::filesystem::path(std::move(s));
+        if (!std::filesystem::exists(energies_file)) {
+            s = energies_file.string();
+            if (auto pos = s.rfind(",a"); pos != std::string::npos) {
+                s.replace(pos, std::strlen(",a"), ",b");
+            }
+            energies_file = std::filesystem::path(std::move(s));
+            restricted_search = false;
+        }
+        if (!std::filesystem::exists(orbitals_file)) {
+            s = orbitals_file.string();
+            if (auto pos = s.rfind(",a"); pos != std::string::npos) {
+                s.replace(pos, std::strlen(",a"), ",b");
+            }
+            orbitals_file = std::filesystem::path(std::move(s));;
+            restricted_search = false;
+        }
+		rf_e.open(energies_file.string().c_str(), ios::binary);
+		rf_o.open(orbitals_file.string().c_str(), ios::binary);
+        err_checkf(rf_e.good(), "couldn't open " + energies_file.string() + ", leaving", file);
+        err_checkf(rf_o.good(), "couldn't open " + orbitals_file.string() + ", leaving", file);
+        read_block_from_fortran_binary(rf_e, energies_beta);
+        read_block_from_fortran_binary(rf_o, orbitals_beta);
+		is_unrestricted = true;
+	}
+
+    rf_e.close();
+    rf_o.close();
+
+    //Now read the stdout file to get the atomic positions and basis set
+    rf.seekg(0);
+    err_checkf(rf.good(), "couldn't open " + stdout_file.string() + ", leaving", file);
+    //fast forward to the atom section
+    while (rf.good() && line.find("Molecule information") == string::npos) {
+        getline(rf, line);
+    }
+    err_checkf(rf.good(), "Couldn't find molecule information in " + stdout_file.string(), file);
+    //skip 8 lines to get to the charge
+    for (int i = 0; i < 8; i++) {
+        getline(rf, line);
+    }
+    svec line_digest = split_string<string>(line, " ");
+    //get the charge form the last element in the line
+    charge = stoi(line_digest[line_digest.size() - 1]);
+    getline(rf, line);
+    line_digest = split_string<string>(line, " ");
+    multi = stoi(line_digest[line_digest.size() - 1]);
+    getline(rf, line);
+    getline(rf, line);
+    line_digest = split_string<string>(line, " ");
+    const int expected_atoms = stoi(line_digest[line_digest.size() - 1]);
+    getline(rf, line);
+    line_digest = split_string<string>(line, " ");
+    const int expected_electrons = stoi(line_digest[line_digest.size() - 1]);
+    while (rf.good() && line.find("Atom coordinates") == string::npos) {
+        getline(rf, line);
+    }
+    //skip 11 lines to get to the atom list
+    for (int i = 0; i < 11; i++) {
+        getline(rf, line);
+        if (line.find("This molecule has non trivial group") != string::npos)
+            i -= 3;
+    }
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    err_checkf(line_digest[0] == "1", "Atom list does not start with one? let me stop...", std::cout);
+
+    while (!line.empty() && line.front() != '_')
+    {
+        line_digest = split_string<string>(line, " ");
+        remove_empty_elements(line_digest);
+        string label = line_digest[1];
+        int atomic_number = static_cast<int>(stod(line_digest[2]));
+        double x, y, z;
+        if (line_digest.size() == 6) {
+            x = constants::ang2bohr(stod(line_digest[3]));
+            y = constants::ang2bohr(stod(line_digest[4]));
+            z = constants::ang2bohr(stod(line_digest[5]));
+
+        }
+        else if (line_digest.size() == 7) {
+            x = constants::ang2bohr(stod(line_digest[4]));
+            y = constants::ang2bohr(stod(line_digest[5]));
+            z = constants::ang2bohr(stod(line_digest[6]));
+        }
+        err_checkf(push_back_atom(label, x, y, z, atomic_number), "Error pushing back an atom!", std::cout);
+        getline(rf, line);
+    }
+    err_checkf(ncen == expected_atoms, "Did not read expected number of atoms!", std::cout);
+
+    int alpha_els = 0, beta_els = 0, temp_els = get_nr_electrons();
+    while (temp_els > 1)
+    {
+        alpha_els++;
+        beta_els++;
+        temp_els -= 2;
+        if (debug)
+            file << temp_els << std::endl;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons! a or b are negative!", file);
+        err_checkf(alpha_els + beta_els <= get_nr_electrons(), "Error setting alpha and beta electrons! Sum a + b > elcount!", file);
+        err_checkf(temp_els > -int(get_nr_electrons()), "Error setting alpha and beta electrons! Ran below -elcount!", file);
+    }
+    alpha_els += temp_els;
+    if (debug)
+        file << "al/be els:" << alpha_els << " " << beta_els << std::endl;
+    const int mult = get_multi();
+    int diff = 0;
+    if (mult != 0)
+        diff = get_multi() - 1;
+    if (debug)
+        file << "diff: " << diff << std::endl;
+    while (alpha_els - beta_els != diff)
+    {
+        alpha_els++;
+        beta_els--;
+        err_checkf(alpha_els >= 0 && beta_els >= 0, "Error setting alpha and beta electrons: " + std::to_string(alpha_els) + "/" + std::to_string(beta_els), file);
+    }
+
+    while (rf.good() && line.find("Gaussian basis sets") == string::npos) {
+        getline(rf, line);
+    }
+    //get 3 lines down to the basis set name
+    for (int i = 0; i < 3; i++) {
+        getline(rf, line);
+    }
+    //read basis set
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    basis_set_name = line_digest[line_digest.size() - 1];
+    getline(rf, line);//emtpy line
+    getline(rf, line);//number of basis sets that will be printed below
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    const int no_basis_sets = stoi(line_digest[line_digest.size() - 1]);
+    getline(rf, line);//number of shells
+
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    const int no_shells = stoi(line_digest[line_digest.size() - 1]);
+
+    getline(rf, line);//number of shell pair (we do not consider this)
+    getline(rf, line);//No of basis functions
+
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    const int no_bf = stoi(line_digest[line_digest.size() - 1]);
+
+    getline(rf, line);//No of primitives
+
+    line_digest = split_string<string>(line, " ");
+    remove_empty_elements(line_digest);
+    const int no_prim = stoi(line_digest[line_digest.size() - 1]);
+    std::vector<std::pair<std::string, atom>> basis_set_data;
+    std::map<char, int> l_map = { {'S',0}, {'P',1}, {'D',2}, {'F',3}, {'G',4}, {'H',5}, {'I',6}, {'s',0}, {'p',1}, {'d',2}, {'f',3}, {'g',4}, {'h',5}, {'i',6} };
+    for (int nbs = 0; nbs < no_basis_sets; nbs++)
+    {
+        //two empty lines
+        getline(rf, line);
+        getline(rf, line);
+        getline(rf, line);//looks like "Basis set H:3-21G"
+        line_digest = split_string<string>(line, " ");
+        const string atom_type = split_string<string>(line_digest[2], ":")[0];
+        getline(rf, line); // empty line
+        getline(rf, line);//looks like "No. of shells .... N"
+        line_digest = split_string<string>(line, " ");
+        const int shells_local = stoi(line_digest[4]);
+        getline(rf, line);//looks like "No. of basis functions .... N"
+        line_digest = split_string<string>(line, " ");
+        const int bfs_local = stoi(line_digest[5]);
+        getline(rf, line);//looks like "No. of primitives .... N"
+        line_digest = split_string<string>(line, " ");
+        const int prims_local = stoi(line_digest[4]);
+        /*
+__________________________________
+
+ -L-   Fn    Exponent  Contraction
+        #         /au          /au
+__________________________________
+
+*/
+        for (int i = 0; i < 7; i++) getline(rf, line); //skip 6 lines to get to the shells
+        atom temp_at(atom_type, "0000000000000", 0, 0, 0, 0, constants::get_Z_from_label(atom_type.c_str()));
+        for (int s = 0; s < shells_local; s++)
+        {
+            //getline(rf, line); //get shell line
+            line_digest = split_string<string>(line, " ");
+            remove_empty_elements(line_digest);
+            err_checkf(l_map.contains(line_digest[0][0]), "Angular momentum not found: " + line_digest[0], std::cout);
+            const int angul = l_map.at(line_digest[0][0]); // safe because contains returned true
+            const int n_prim = stoi(line_digest[1]);
+            do {
+                const double exponent = stod(line_digest[line_digest.size() == 2 ? 0 : 2]);
+                const double coefficient = stod(line_digest[line_digest.size() == 2 ? 1 : 3]);
+                const double norm_fac = pow(pow(2, 3 + 4 * angul) * pow(exponent, 2 * angul + 3) / constants::PI3 / pow(constants::double_ft[angul], 2), 0.25);
+                temp_at.push_back_basis_set(exponent, coefficient * norm_fac, angul + 1, s);
+                getline(rf, line);
+                line_digest = split_string<string>(line, " ");
+                remove_empty_elements(line_digest);
+            } while (line_digest.size() == 2);
+        }
+        err_checkf(line[0] == '_', "Expected a line of underscores after basis set for atom " + atom_type, file);
+        basis_set_data.push_back(std::make_pair(atom_type, temp_at));
+    }
+    //Now assign the basis set data to the atoms
+    for (int a = 0; a < ncen; a++)
+    {
+        for (const auto& [atom_type, atom_template] : basis_set_data)
+        {
+            if (atom_type == constants::atnr2letter(atoms[a].get_charge()))
+            {
+                //copy atom basis set information
+                atoms[a].set_basis_set(atom_template.get_basis_set());
+                atoms[a].set_shellcount(atom_template.get_shellcount());
+                break;
+            }
+        }
+    }
+
+    int expected_coefs = 0;
+    vector<primitive> prims;
+    ivec temp_shellsizes;
+    for (int a = 0; a < ncen; a++)
+    {
+        int current_shell = -1;
+        for (unsigned int s = 0; s < atoms[a].get_basis_set_size(); s++)
+        {
+            if ((int)atoms[a].get_basis_set_shell(s) != current_shell)
+            {
+                if (atoms[a].get_basis_set_type(s) == 1)
+                {
+                    expected_coefs++;
+                }
+                else if (atoms[a].get_basis_set_type(s) == 2)
+                {
+                    expected_coefs += 3;
+                }
+                else if (atoms[a].get_basis_set_type(s) == 3)
+                {
+                    expected_coefs += 6;
+                }
+                else if (atoms[a].get_basis_set_type(s) == 4)
+                {
+                    expected_coefs += 10;
+                }
+                else if (atoms[a].get_basis_set_type(s) == 5)
+                {
+                    expected_coefs += 15;
+                }
+                current_shell++;
+            }
+            temp_shellsizes.push_back(atoms[a].get_shellcount(current_shell));
+            prims.push_back(primitive(a + 1,
+                atoms[a].get_basis_set_type(s),
+                atoms[a].get_basis_set_exponent(s),
+                atoms[a].get_basis_set_coefficient(s)));
+        }
+    }
+    err_checkf(expected_coefs == no_bf, "Expected number of basis functions (" + to_string(expected_coefs) + ") does not match number in file (" + to_string(no_bf) + ")!", file);
+
+	const unsigned int nr_operators = restricted ? 1 : 2;
+
+    for (int op = 0; op < nr_operators; op++) {
+        if(debug)
+			file << "Reading " << (op == 0 ? "alpha/restricted" : "beta") << " orbitals..." << std::endl;
+
+        dMatrix2 coefficients;
+        vec occ(expected_coefs, 0.0);
+        if (op == 0)
+            coefficients = reshape<dMatrix2>(orbitals, Shape2D(expected_coefs, expected_coefs));
+        else
+            coefficients = reshape<dMatrix2>(orbitals_beta, Shape2D(expected_coefs, expected_coefs));
+
+        for (int MO_run = 0; MO_run < expected_coefs; MO_run++)
+        {
+            if (op == 0) {
+                if (restricted) {
+                    if (MO_run < alpha_els && multi == 1) { //RHF all paired
+                        push_back_MO(MO_run, 2.0, energies[MO_run], 0);
+						occ[MO_run] = 2.0;
+                    }
+                    else if (multi != 1 && MO_run < beta_els) { // RHF only 2 until beta electrons
+                        push_back_MO(MO_run, 2.0, energies[MO_run], 0);
+                        occ[MO_run] = 2.0;
+                    }
+                    else if (multi != 1 && MO_run >= beta_els && MO_run < alpha_els) { // RHF only 2 until beta electrons
+                        push_back_MO(MO_run, 1.0, energies[MO_run], 0);
+                        occ[MO_run] = 1.0;
+                    }
+                    else
+                        push_back_MO(MO_run, 0.0, energies[MO_run], 0);
+                }
+                else {
+                    if (MO_run < alpha_els) { // UHF
+                        push_back_MO(MO_run, 1.0, energies[MO_run], 0);
+                        occ[MO_run] = 1.0;
+                    }
+                    else
+                        push_back_MO(MO_run, 0.0, energies[MO_run], 0);
+                }
+
+            }
+            else {
+                if (MO_run < beta_els) {
+                    push_back_MO(expected_coefs + MO_run, 1.0, energies_beta[MO_run], 1);
+                    occ[MO_run] = 1.0;
+                }
+                else
+					push_back_MO(expected_coefs + MO_run, 0.0, energies_beta[MO_run], 1);
+            }
+            int p_run = 0;
+            vec2 p_temp(3);
+            int d_run = 0;
+            vec2 d_temp(6);
+            int f_run = 0;
+            vec2 f_temp(10);
+            int g_run = 0;
+            vec2 g_temp(15);
+            int basis_run = 0;
+            for (int i = 0; i < expected_coefs; i++)
+            {
+                switch (prims[basis_run].get_type())
+                {
+                case 1:
+                {
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        double t = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                        if (abs(t) < 1E-10)
+                            t = 0;
+                        op == 0 ? push_back_MO_coef(MO_run, t) : push_back_MO_coef(MO_run + expected_coefs, t);
+                        if (MO_run == 0 && op == 0)
+                        {
+                            push_back_exponent(prims[basis_run + s].get_exp());
+                            push_back_center(prims[basis_run].get_center());
+                            push_back_type(prims[basis_run].get_type());
+                            nex++;
+                        }
+                    }
+                    basis_run += temp_shellsizes[basis_run];
+                    break;
+                }
+                case 2:
+                {
+                    if (p_run == 0)
+                    {
+                        for (int _i = 0; _i < 3; _i++)
+                        {
+                            p_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        p_temp[p_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef();
+                    }
+                    p_run++;
+                    if (p_run == 3)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            double temp_coef = 0;
+                            for (int cart = 0; cart < 3; cart++)
+                            {
+                                temp_coef = p_temp[cart][s];
+                                if (abs(temp_coef) < 1E-10)
+                                    temp_coef = 0;
+                                op == 0 ? push_back_MO_coef(MO_run, temp_coef) : push_back_MO_coef(MO_run + expected_coefs, temp_coef);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(prims[basis_run].get_type() + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        p_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                case 3:
+                {
+                    if (d_run == 0)
+                    {
+                        for (int _i = 0; _i < 6; _i++)
+                        {
+                            d_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        d_temp[d_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(1.5);
+                    }
+                    d_run++;
+                    if (d_run == 6)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            for (int _i = 0; _i < 6; _i++)
+                                op == 0 ? push_back_MO_coef(MO_run, d_temp[_i][s]) : push_back_MO_coef(MO_run + expected_coefs, d_temp[_i][s]);
+                            for (int cart = 0; cart < 6; cart++)
+                            {
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(5 + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        d_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                case 4:
+                {
+                    if (f_run == 0)
+                    {
+                        for (int _i = 0; _i < 10; _i++)
+                        {
+                            f_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        f_temp[f_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(5.0);
+                    }
+                    f_run++;
+                    if (f_run == 10)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            for (int cart = 0; cart < 10; cart++)
+                            {
+                                // tonto swaps type 17 and 16
+                                if (cart != 5 && cart != 6)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart][s]);
+                                else if (cart == 5)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart + 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart + 1][s]);
+                                else if (cart == 6)
+                                    op == 0 ? push_back_MO_coef(MO_run, f_temp[cart - 1][s]) : push_back_MO_coef(MO_run + expected_coefs, f_temp[cart - 1][s]);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run + s].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(11 + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        f_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                case 5:
+                {
+                    if (g_run == 0)
+                    {
+                        for (int _i = 0; _i < 15; _i++)
+                        {
+                            g_temp[_i].resize(temp_shellsizes[basis_run], 0.0);
+                        }
+                    }
+                    for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                    {
+                        g_temp[g_run][s] = coefficients(MO_run, i) * prims[basis_run + s].get_coef() / sqrt(13.125);
+                    }
+                    g_run++;
+                    if (g_run == 15)
+                    {
+                        for (int s = 0; s < temp_shellsizes[basis_run]; s++)
+                        {
+                            for (int cart = 0; cart < 15; cart++)
+                            {
+                                op == 0 ? push_back_MO_coef(MO_run, g_temp[cart][s]) : push_back_MO_coef(MO_run + expected_coefs, g_temp[cart][s]);
+                                if (MO_run == 0 && op == 0)
+                                {
+                                    push_back_exponent(prims[basis_run].get_exp());
+                                    push_back_center(prims[basis_run].get_center());
+                                    push_back_type(21 + cart);
+                                    nex++;
+                                }
+                            }
+                        }
+                        g_run = 0;
+                        basis_run += temp_shellsizes[basis_run];
+                    }
+                    break;
+                }
+                }
+            }
+            err_checkf(p_run == 0 && d_run == 0 && f_run == 0 && g_run == 0, "There should not be any unfinished shells! Aborting reading molden file after MO " + to_string(MO_run) + "!", file);
+        }
+        dMatrix2 temp_co = diag_dot(coefficients, occ, true);
+        if(op == 0)
+            DM = dot(temp_co, coefficients);
+        else {
+			dMatrix2 DM_beta = dot(temp_co, coefficients);
+            for(int i=0; i<expected_coefs; i++)
+                for(int j=0; j<expected_coefs; j++)
+					DM(i, j) += DM_beta(i, j);
+        }
+    }
+    constants::exp_cutoff = std::log(constants::density_accuracy / get_maximum_MO_coefficient());
+    return true;
+};
+
 template<typename T>
 void move_columns(T& matrix, int dimension, int from_col, int num_cols, int to_col) {
     if (from_col == to_col || num_cols == 0) return;
@@ -2203,7 +2858,7 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
     if (debug)
         file << "File is valid, continuing...\n"
              << GetCurrentDir << endl;
-    origin = 9;
+    origin = e_origin::gbw;
     ifstream rf(filename.c_str(), ios::binary);
     if (rf.good())
         path = filename;
@@ -2665,11 +3320,11 @@ bool WFN::read_gbw(const std::filesystem::path &filename, std::ostream &file, co
                 temp_bas_idx += _atom.get_shellcount(shell);
                 for (int m = -type; m <= type; m++) {
                     auto coefs_2D_s1_slice = Kokkos::submdspan(coefs_2D_s1_span, index + m + type, Kokkos::full_extent);
-                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                    auto reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s1.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
                     std::copy(coefs_2D_s1_slice.data_handle(), coefs_2D_s1_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     if (operators == 2) {
                         auto coefs_2D_s2_slice = Kokkos::submdspan(coefs_2D_s2_span, index + m + type, Kokkos::full_extent);
-                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF[type][m], Kokkos::full_extent);
+                        reord_coefs_slice = Kokkos::submdspan(reorderd_coefs_s2.to_mdspan(), index + constants::orca_2_pySCF(type,m), Kokkos::full_extent);
                         std::copy(coefs_2D_s2_slice.data_handle(), coefs_2D_s2_slice.data_handle() + dimension, reord_coefs_slice.data_handle());
                     }
                 }
@@ -3734,8 +4389,7 @@ bool WFN::build_DM(std::string basis_set_path, bool debug) {
     {
        std::cout << "Origin: " << get_origin() << endl;
     }
-    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 ||
-        get_origin() == 8)
+    if (get_origin() == 2 || get_origin() == 4 || get_origin() == 9 || get_origin() == 8)
     {
         //-----------------------check ordering and order accordingly----------------------
         sort_wfn(check_order(debug), debug);
@@ -5451,6 +6105,7 @@ bool WFN::read_fchk(const std::filesystem::path &filename, std::ostream &log, co
                 }
                 }
             }
+
 
         }
     }
