@@ -3216,3 +3216,87 @@ void ProgressBar::initialize_taskbar_progress()
     }
 }
 #endif
+
+void convert_tonto_XCW_lambda_steps(const std::string& str, const std::string& lambda_step, bool debug, options& opt) {
+    double lambda = 0.0;
+    const double ls = stod(lambda_step);
+    std::string jobname, line;
+    std::filesystem::path stdout_file = str;
+    err_checkf(std::filesystem::exists(stdout_file), "couldn't open or find " + stdout_file.string() + ", leaving", std::cout);
+    std::ifstream rf(stdout_file.string().c_str(), std::ios::in);
+    rf.seekg(0);
+    while (rf.good() && line.find("Name ...") == std::string::npos) {
+        getline(rf, line);
+    }
+    jobname = split_string<std::string>(line, " ")[2];
+    std::cout << "Conervting XCW wavefunctions with lambda step " + std::to_string(ls) + " and jobname: " + jobname << std::endl;
+
+    //iterate over files in the same folder looking for .orbital_energies,restricted or .MO_energies,r and .molecular_orbitals,restricted or .MOs,r at the given lambda value
+    //example filename: NiP3.molecular_orbitals,lambda=0.000000,restricted
+    //make lambda value into a string with 6 decimal places
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(6) << lambda;
+    std::string formatted_lambda = ss.str();
+    std::filesystem::path energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",restricted");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",r");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",alpha");
+    if (!std::filesystem::exists(energies_file))
+        energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",a");
+
+    std::filesystem::path orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",r");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",alpha");
+    if (!std::filesystem::exists(orbitals_file))
+        orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",a");
+
+    while (std::filesystem::exists(energies_file) && std::filesystem::exists(orbitals_file)) {
+        const std::filesystem::path of = orbitals_file;
+        const std::filesystem::path ef = energies_file;
+
+        err_checkf(of.string() != "", "Orbitals file name is empty?!", std::cout);
+        err_checkf(ef.string() != "", "Energy file name is empty?!", std::cout);
+        err_checkf(std::filesystem::exists(of), "couldn't open or find " + of.string() + ", leaving", std::cout);
+        err_checkf(std::filesystem::exists(ef), "couldn't open or find " + ef.string() + ", leaving", std::cout);
+        std::cout << "lambda = " + std::to_string(lambda) + "..." << std::flush;
+
+        std::vector<WFN> wavy;
+        wavy.emplace_back(e_origin::tonto);
+        wavy.back().read_tonto(stdout_file, std::cout, debug, ef, of);
+        std::filesystem::path basename = stdout_file.parent_path() / (jobname + "_l_" + formatted_lambda);
+        wavy.back().write_wfn(basename.string() + ".wfn", debug, false);
+        free_fchk(std::cout, basename.string() + ".fchk", "", wavy.back(), debug, true);
+
+        if (opt.cif != "") {
+            svec ka;
+            int nr = 0;
+            opt.groups[0] = { 0 };
+            tsc_block<int, cdouble> result = calculate_scattering_factors<itsc_block, std::vector<WFN>&>(opt, wavy, std::cout, ka, nr);
+            result.write_tscb_file(opt.cif, basename.string() + ".tscb");
+        }
+
+        lambda += ls;
+        std::stringstream ss_l;
+        ss_l << std::fixed << std::setprecision(6) << lambda;
+        formatted_lambda = ss_l.str();
+        energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",restricted");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",r");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".orbital_energies,lambda=" + formatted_lambda + ",alpha");
+        if (!std::filesystem::exists(energies_file))
+            energies_file = stdout_file.parent_path() / (jobname + ".MO_energies,lambda=" + formatted_lambda + ",a");
+
+        orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",restricted");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",r");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".molecular_orbitals,lambda=" + formatted_lambda + ",alpha");
+        if (!std::filesystem::exists(orbitals_file))
+            orbitals_file = stdout_file.parent_path() / (jobname + ".MOs,lambda=" + formatted_lambda + ",a");
+        std::cout << " .. done!" << std::endl;
+    }
+};
