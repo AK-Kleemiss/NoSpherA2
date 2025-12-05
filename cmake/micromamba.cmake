@@ -22,8 +22,17 @@ endfunction()
 function(ensure_micromamba MICROMAMBA_BIN)
     set(MICROMAMBA_PATH ${CMAKE_BINARY_DIR}/micromamba_bin)
 
+    # On Windows, the binary is micromamba.exe in Library/bin; on Unix, it's micromamba in bin
+    if (CMAKE_HOST_WIN32)
+        set(MAMBA_BIN_SUBDIR "Library/bin")
+        set(MAMBA_ARCHIVE_PATH "Library/bin/micromamba.exe")
+    else ()
+        set(MAMBA_BIN_SUBDIR "bin")
+        set(MAMBA_ARCHIVE_PATH "bin/micromamba")
+    endif ()
+
     find_program(_MICROMAMBA_BIN micromamba
-            PATHS ${MICROMAMBA_PATH}/bin
+            PATHS ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR}
     )
     if (_MICROMAMBA_BIN)
         message("Found micromamba at ${_MICROMAMBA_BIN}")
@@ -31,15 +40,15 @@ function(ensure_micromamba MICROMAMBA_BIN)
         message("Downloading micromamba")
         mamba_get_url(MAMBA_URL)
         message("Native arch: ${MAMBA_URL}")
-        file(MAKE_DIRECTORY ${MICROMAMBA_PATH}/bin)
+        file(MAKE_DIRECTORY ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR})
         file(DOWNLOAD ${MAMBA_URL} ${MICROMAMBA_PATH}/micromamba.tar.bz2)
         execute_process(COMMAND
                 ${CMAKE_COMMAND} -E
-                tar xvzf ${MICROMAMBA_PATH}/micromamba.tar.bz2 -- "bin/micromamba"
+                tar xvzf ${MICROMAMBA_PATH}/micromamba.tar.bz2 -- "${MAMBA_ARCHIVE_PATH}"
                 WORKING_DIRECTORY ${MICROMAMBA_PATH})
 
         find_program(_MICROMAMBA_BIN micromamba
-                PATHS ${MICROMAMBA_PATH}/bin
+                PATHS ${MICROMAMBA_PATH}/${MAMBA_BIN_SUBDIR}
         )
     endif ()
     set(${MICROMAMBA_BIN} ${_MICROMAMBA_BIN} PARENT_SCOPE)

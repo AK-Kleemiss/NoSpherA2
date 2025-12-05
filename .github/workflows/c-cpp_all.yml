@@ -50,7 +50,7 @@ jobs:
             build-script: |
               mkdir build
               cd build
-              cmake -G "Ninja" -DOVERWRITE_MICROMAMBA="C:\Miniconda\Scripts\conda.exe" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe ..
+              cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe ..
               cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
             artifact-path: build/Src/Release/NoSpherA2.exe
