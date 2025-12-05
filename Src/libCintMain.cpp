@@ -2133,6 +2133,155 @@ inline void aligned_free_d(double* p)
 #endif
 }
 
+//This currently scales as O(N^2), if this becomes a bottleneck we can implement cell-lists or k-d trees
+ivec2 build_pair_list(const std::vector<atom>& atoms, const double& cutoff_distance)
+{
+    std::vector<std::pair<int, int>> pairs;
+    ivec2 pair_list(atoms.size());
+    for (auto& vec : pair_list) {
+        vec.reserve(atoms.size());
+    }
+    const int natoms = atoms.size();
+    for (int i = 0; i < natoms; i++) {
+        for (int j = i + 1; j < natoms; j++) {
+            double dist = atoms[i].distance_to(atoms[j]);
+            if (dist <= cutoff_distance) {
+                pair_list[i].emplace_back(j);
+                pair_list[j].emplace_back(i);
+            }
+        }
+    }
+    for (auto& vec : pair_list) {
+        vec.shrink_to_fit();
+    }
+    return pair_list;
+}
+
+//Ivec contains the ao indices for the given wave object
+//The list contains (0, n_ao_atom1, last_item + n_ao_atom2, ...)
+//So that ao indices for atom i are in [ao_indices_per_atom[i-1], ao_indices_per_atom[i])
+ivec generate_ao_indices_per_atom(const WFN& wavy)
+{
+    const int natoms = wavy.get_atoms().size();
+    ivec ao_indices_per_atom(natoms + 1, 0);
+    int ao_index = 0;
+    for (int atom_idx = 0; atom_idx < natoms; ++atom_idx) {
+        const atom& atm = wavy.get_atoms()[atom_idx];
+        int prim_idx = 0;
+       
+        for (int shell = 0; shell < atm.get_shellcount_size(); shell++) {
+            int l = atm.get_basis_set_type(prim_idx);
+            if (wavy.get_origin() == 9) l -= 1; //s = 0 vs. s = 1 definition inside NoSpherA2
+            ao_index += (2 * l + 1);
+            prim_idx += atm.get_shellcount(shell);
+        }
+        ao_indices_per_atom[atom_idx + 1] = ao_index;
+    }
+
+    return std::move(ao_indices_per_atom);
+}
+
+template <typename Kernel>
+void computeRho_DS(const WFN& wavy,
+    const WFN& wavy_aux,
+    const dMatrix2& dm,
+    vec& rho,
+    double max_mem)
+{
+    ivec2 pair_list = build_pair_list(wavy.get_atoms(), 8.0);
+    Int_Params aux_temp(wavy_aux); //Slow maybe replace?
+    rho.resize(aux_temp.get_nao(), 0.0);
+
+
+    for (size_t i = 0; i < pair_list.size(); i++) {
+
+
+
+        Int_Params normal_basis(wavy);
+        Int_Params aux_basis(wavy_aux);
+
+        int nQM = normal_basis.get_nbas();
+        int nAux = aux_basis.get_nbas();
+
+        Int_Params combined = normal_basis + aux_basis;
+
+        ivec bas = combined.get_bas();
+        ivec atm = combined.get_atm();
+        vec env = combined.get_env();
+
+        int nat = combined.get_natoms();
+        int nbas = combined.get_nbas();
+
+        ivec aoloc = make_loc(bas, nbas);
+
+        rho.resize(aux_basis.get_nao(), 0.0);
+
+        unsigned long long int naoi = aoloc[nQM] - aoloc[0];
+        unsigned long long int naoj = aoloc[nQM] - aoloc[0];
+        unsigned long long tot_size = naoi * naoj;
+
+        ivec steps = calc_3c_steps(naoi, naoj, aoloc, nQM, nAux, max_mem);
+
+        // Calculate maximum vector size
+        double min_mem = static_cast<double>(sizeof(double) * tot_size) / 1024 / 1024;
+        unsigned long long int naok_max = static_cast<unsigned long long int>((max_mem - min_mem) / (static_cast<double>(min_mem))) + 5;
+        if (naok_max > (aoloc[nQM + nAux] - aoloc[nQM]))
+        {
+            naok_max = aoloc[nQM + nAux] - aoloc[nQM];
+        }
+
+        std::cout << "Preallocating: " << static_cast<double>(sizeof(double) * tot_size * naok_max) / 1024 / 1024 << " MB" << std::endl;
+
+        std::unique_ptr<double, decltype(&aligned_free_d)> res(aligned_alloc_d(tot_size * naok_max), aligned_free_d);
+
+        CINTOpt* opty = nullptr;
+        Kernel::optimizer(opty, atm.data(), nat, bas.data(), nbas, env.data());
+
+        ProgressBar pb(steps.size() - 1, 60, "#", " ", "Computing Rho: ");
+        for (int step_idx = 1; step_idx < steps.size(); step_idx++)
+        {
+            ivec shl_slice = {
+                0,
+                nQM,
+                0,
+                nQM,
+                steps[step_idx - 1],
+                steps[step_idx] };
+
+            unsigned int naok = aoloc[shl_slice[5]] - aoloc[shl_slice[4]];
+
+            // Compute 3-center integrals
+            Kernel::drv(res.get(), 1, shl_slice.data(), aoloc.data(), opty, atm.data(), nat, bas.data(), nbas, env.data());
+            int idx_curr_rho = aoloc[steps[step_idx - 1]] - aoloc[nQM];
+            // einsum('ijk,ij->k', res, dm, out=rho)
+            // This is 100% pure magic, thanks ChatGPT
+            cblas_dgemv(CblasRowMajor,
+                CblasNoTrans,
+                naok,
+                tot_size,
+                1.0,
+                res.get(), tot_size,
+                dm.data(), 1,
+                0.0,
+                &rho[idx_curr_rho], 1);
+
+            // Cheekyly not resetting the res vector, as it will be overwritten in the next iteration (Hopefully...)
+            // std::fill(res.begin(), res.end(), 0); //This might be unnecessary, saves about 1sec for 15 steps  TEST THIS!!!!!
+            pb.update(std::cout);
+        }
+    }
+}
+template void computeRho_DS<Coulomb3C>(const WFN& wavy,
+    const WFN& wavy_aux,
+    const dMatrix2& dm,
+    vec& rho, double max_mem);
+template void computeRho_DS<Overlap3C>(const WFN& wavy,
+    const WFN& wavy_aux,
+    const dMatrix2& dm,
+    vec& rho, double max_mem);
+
+
+
 template <typename Kernel>
 void computeRho(Int_Params &param1,
                         Int_Params &param2,

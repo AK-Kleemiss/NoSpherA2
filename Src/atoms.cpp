@@ -204,3 +204,10 @@ bool atom::operator==(const atom& other) const {
         shellcount == other.shellcount &&
         ADPs == other.ADPs;
 }
+
+double atom::distance_to(const atom& other) const {
+    double dx = x - other.x;
+    double dy = y - other.y;
+    double dz = z - other.z;
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+}

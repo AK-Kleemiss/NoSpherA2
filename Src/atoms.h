@@ -113,6 +113,7 @@ public:
     vec2 get_ADPs() const { return ADPs; };
     bool get_is_asym() const { return is_asym; };
     void set_is_asym(const bool& val) { is_asym = val; };
+    double distance_to(const atom& other) const;
 
 
     bool operator==(const atom& other) const;
