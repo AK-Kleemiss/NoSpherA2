@@ -57,65 +57,22 @@ endif ()
 
 set(MKL_LINK "static")
 set(MKL_INTERFACE lp64)
-if (LINUX)
-    if (NOT EXISTS ${ONEAPI_DIRECTORY})
-        set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
-        set(_MKL_CONFIG "${_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
-
-        if(NOT EXISTS "${_MKL_CONFIG}")
-            file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/Lib/MKL")
-            set(_MKL_SH "${CMAKE_SOURCE_DIR}/Lib/intel-mkl-installer.sh")
-            if (NOT EXISTS ${_MKL_SH})
-                file(DOWNLOAD
-                  "https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh"
-                  "${_MKL_SH}"
-                  EXPECTED_HASH SHA256=7bfdde1379a9cd3c2784af4352931a0527a5c483c9da71e851a3f06e055af7c7
-                  SHOW_PROGRESS
-                  STATUS _DL_STATUS
-                )
-                list(GET _DL_STATUS 0 _DL_CODE)
-                if(NOT _DL_CODE EQUAL 0)
-                  message(FATAL_ERROR "Failed to download oneMKL: ${_DL_STATUS}")
-                endif()
-            endif ()
-            set(OLD_HOME $ENV{HOME})
-            set(ENV{HOME} "/tmp/home")
-            message(STATUS "INSTALLING MKL IN: ${MKL_INSTALL_DIR}")
-            file(MAKE_DIRECTORY $ENV{HOME})
-            execute_process(COMMAND chmod +x ${_MKL_SH})
-            execute_process(
-                COMMAND ${_MKL_SH} -a --silent --eula accept --install-dir "${MKL_INSTALL_DIR}"
-
-              RESULT_VARIABLE _MKL_RC
-            )
-            FILE(REMOVE $ENV{HOME})
-            set(ENV{HOME} ${OLD_HOME})
-            if(NOT _MKL_RC EQUAL 0)
-              message(FATAL_ERROR "oneMKL installer failed with code ${_MKL_RC}")
-            endif()
-        endif()
-        list(APPEND CMAKE_PREFIX_PATH "${_MKL_ROOT}")
-        find_package(MKL CONFIG REQUIRED
-            HINTS "${_MKL_ROOT}"
-            PATH_SUFFIXES "lib/cmake/mkl"
+if (NOT Darwin)
+    include(${CMAKE_SOURCE_DIR}/cmake/micromamba.cmake)
+    set(_ONEAPI_MKL_ROOT "${CMAKE_BINARY_DIR}/environments/mambaenv/Library")
+    if (NOT EXISTS "${_ONEAPI_MKL_ROOT}/lib/cmake/mkl/MKLConfig.cmake")
+        micromamba_environment(
+            NAME mambaenv
+            SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
-        message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
-
-    else ()
-        set(_ONEAPI_MKL_ROOT "${ONEAPI_DIRECTORY}/mkl/latest")
-        find_package(MKL CONFIG REQUIRED
-            HINTS "${_ONEAPI_MKL_ROOT}" "${ONEAPI_DIRECTORY}"
-            PATH_SUFFIXES "lib/cmake/mkl"
-        )
-      message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
     endif ()
-elseif (WIN32)
-#    execute_process(
-#        COMMAND ${NUGET_EXE} install intelmkl.static.win-x64 -Version 2025.3.0.453 -OutputDirectory ${CMAKE_SOURCE_DIR}/Lib/MKL -ExcludeVersion
-#        RESULT_VARIABLE NUGET_RESULT
-#    )
-#    set(MKL_ROOT "${CMAKE_BINARY_DIR}/vcpkg_installed/vcpkg/pkgs/intel-mkl_x64-windows")
-#    find_package(MKL CONFIG REQUIRED)
+    find_package(MKL CONFIG REQUIRED
+        HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
+        PATH_SUFFIXES "mkl"
+    )
+    message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
+    set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
+    set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
 endif ()
 if (Darwin)
     set(USE_SYSTEM_BLAS ON)
