@@ -111,8 +111,11 @@ function(micromamba_environment)
     endforeach ()
 
     set(ENV_PATH ${CMAKE_BINARY_DIR}/environments/${ENV_NAME})
-
-    ensure_micromamba(MICROMAMBA_BIN)
+    if (NOT OVERWRITE_MICROMAMBA)
+        ensure_micromamba(MICROMAMBA_BIN)
+    else()
+        set(MICROMAMBA_BIN ${OVERWRITE_MICROMAMBA})
+    endif ()
 
     check_micromamba_environment(${ENV_NAME} ENV_EXISTS)
 
