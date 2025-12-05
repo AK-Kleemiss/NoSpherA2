@@ -295,11 +295,7 @@ void solve_linear_system(vec& A, const size_t& size_A, vec& b)
     dgesv_(&n, &nrhs, A_col_major.data(), &lda, ipiv.data(), b.data(), &n, &info);
 #else
     // MKL/LAPACKE: C interface, row-major
-#ifndef USE_64BITMKL
-    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (int*)ipiv.data(), b.data(), ldb);
-#else
-    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (long long int*)ipiv.data(), b.data(), ldb);
-#endif
+    info = LAPACKE_dgesv(LAPACK_ROW_MAJOR, n, nrhs, A.data(), lda, (lapack_int*)ipiv.data(), b.data(), ldb);
 #endif
     if (info != 0)
     {

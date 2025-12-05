@@ -331,7 +331,7 @@ ivec make_loc(ivec& bas, int nbas) {
     return ao_loc;
 }
 
-double CINTcommon_fac_sp(int l)
+double NOS_CINTcommon_fac_sp(int l)
 {
     switch (l)
     {

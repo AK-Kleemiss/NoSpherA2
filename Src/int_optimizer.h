@@ -8,7 +8,7 @@ int CINTset_pairdata(NoSpherA2::PairData* pairdata, double* ai, double* aj, doub
     int li_ceil, int lj_ceil, int iprim, int jprim,
     double rr_ij, double expcutoff, double* env);
 
-void CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
+void NOS_CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
     int iprim, int ictr);
 
 void int3c2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
@@ -17,4 +17,4 @@ void int3c2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
 void int2c2e_optimizer(NoSpherA2::CINTOpt** opt, int* atm, int natm,
     int* bas, int nbas, double* env);
 
-void CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr);
+void NOS_CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr);

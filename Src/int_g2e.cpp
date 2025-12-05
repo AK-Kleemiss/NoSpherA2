@@ -2,7 +2,7 @@
 #include "rys_roots.h"
 
 using namespace NoSpherA2;
-void CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
+void NOS_CINTcart_comp(int* nx, int* ny, int* nz, const int lmax)
 {
     int inc = 0;
     int lx, ly, lz;
@@ -36,9 +36,9 @@ void CINTg3c1e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
     int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
     int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(k_nx, k_ny, k_nz, k_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -85,10 +85,10 @@ void CINTg2e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
     int k_nx[CART_MAX], k_ny[CART_MAX], k_nz[CART_MAX];
     int l_nx[CART_MAX], l_ny[CART_MAX], l_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
-    CINTcart_comp(k_nx, k_ny, k_nz, k_l);
-    CINTcart_comp(l_nx, l_ny, l_nz, l_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(k_nx, k_ny, k_nz, k_l);
+    NOS_CINTcart_comp(l_nx, l_ny, l_nz, l_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -171,8 +171,8 @@ void CINTg1e_index_xyz(int* idx, const NoSpherA2::CINTEnvVars* envs)
     int i_nx[CART_MAX], i_ny[CART_MAX], i_nz[CART_MAX];
     int j_nx[CART_MAX], j_ny[CART_MAX], j_nz[CART_MAX];
 
-    CINTcart_comp(i_nx, i_ny, i_nz, i_l);
-    CINTcart_comp(j_nx, j_ny, j_nz, j_l);
+    NOS_CINTcart_comp(i_nx, i_ny, i_nz, i_l);
+    NOS_CINTcart_comp(j_nx, j_ny, j_nz, j_l);
 
     ofx = 0;
     ofy = envs->g_size;
@@ -4430,7 +4430,7 @@ void CINTinit_int2c2e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
 
-    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->k_l);
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }
@@ -4537,7 +4537,7 @@ void CINTinit_int3c2e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     envs->rk = env + atm(PTR_COORD, bas(ATOM_OF, k_sh));
 
 
-    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l) * CINTcommon_fac_sp(envs->k_l);
+    envs->common_factor = (constants::PI3) * 2 / constants::sqr_pi * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l) * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }
@@ -4666,8 +4666,8 @@ void CINTinit_int3c1e_EnvVars(NoSpherA2::CINTEnvVars* envs, int* ng, int* shls,
     envs->nrys_roots = (envs->li_ceil + envs->lj_ceil + envs->lk_ceil) / 2 + 1;
 
     envs->common_factor = constants::PI * constants::sqr_pi
-        * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l)
-        * CINTcommon_fac_sp(envs->k_l);
+        * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l)
+        * NOS_CINTcommon_fac_sp(envs->k_l);
     if (env[PTR_EXPCUTOFF] == 0) {
         envs->expcutoff = EXPCUTOFF;
     }

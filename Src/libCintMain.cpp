@@ -81,7 +81,7 @@
     int *non0ctrk, *non0idxk;                                                                   \
     MALLOC_INSTACK_INT(non0ctrk, k_prim + k_prim * k_ctr);                                      \
     non0idxk = non0ctrk + k_prim;                                                               \
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);                           \
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);                           \
     double expij, cutoff;                                                                       \
     double *rij;                                                                                \
     double *rkl = envs->rkl;                                                                    \
@@ -175,7 +175,7 @@
         CINTdplus_transpose(gctr, a, nf *nc, n_comp); \
     }                                                 \
     *empty = 0;
-
+namespace NoSpherA2 {
 void CINTprim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
                        int nprim, int nctr, int non0ctr, int *sortedidx)
 {
@@ -193,7 +193,7 @@ void CINTprim_to_ctr_0(double *gc, double *gp, double *coeff, size_t nf,
     }
 }
 
-void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
+static void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
                        int nprim, int nctr, int non0ctr, int *sortedidx)
 {
     int i, j;
@@ -210,11 +210,11 @@ void CINTprim_to_ctr_1(double *gc, double *gp, double *coeff, size_t nf,
         }
     }
 }
-
+}
 /*
  * a[m,n] -> a_t[n,m]
  */
-void CINTdmat_transpose(double *a_t, double *a, int m, int n)
+static void CINTdmat_transpose(double *a_t, double *a, int m, int n)
 {
     int i, j, k;
 
@@ -262,7 +262,7 @@ void CINTdmat_transpose(double *a_t, double *a, int m, int n)
 /*
  * a_t[n,m] += a[m,n]
  */
-void CINTdplus_transpose(double *a_t, double *a, int m, int n)
+static void CINTdplus_transpose(double *a_t, double *a, int m, int n)
 {
     int i, j, k;
 
@@ -570,11 +570,11 @@ int CINT2c2e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int
     non0idxk = non0idxi + i_prim * i_ctr;
     if (i_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
     }
     if (k_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     }
 
     int *idx = envs->opt->index_xyz_array[envs->i_l * LMAX1 + envs->k_l];
@@ -691,11 +691,11 @@ int CINT2c2e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache
     non0idxk = non0idxi + i_prim * i_ctr;
     if (i_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
     }
     if (k_ctr > 1)
     {
-        CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+        NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
     }
 
     for (kp = 0; kp < k_prim; kp++)
@@ -915,8 +915,8 @@ int CINT3c2e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache
     MALLOC_INSTACK(log_maxci, i_prim + j_prim);
     MALLOC_INSTACK_PAIRDATA(pdata_base, i_prim * j_prim);
     log_maxcj = log_maxci + i_prim;
-    CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
-    CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
     if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                          log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                          i_prim, j_prim, rr_ij, expcutoff, env))
@@ -971,9 +971,9 @@ int CINT3c2e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache
     non0idxi = non0ctrk + k_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
     non0idxk = non0idxj + j_prim * j_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
 
     int nc = i_ctr * j_ctr * k_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
@@ -1524,9 +1524,9 @@ int CINT3c1e_loop_nopt(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache
     non0idxi = non0ctrk + k_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
     non0idxk = non0idxj + j_prim * j_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
-    CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxk, non0ctrk, ck, k_prim, k_ctr);
 
     int nc = i_ctr * j_ctr * k_ctr;
     size_t leng = (size_t)envs->g_size * 3 * (size_t)((1 << envs->gbits) + 1);
@@ -1800,8 +1800,8 @@ int CINT1e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int i
     MALLOC_INSTACK(log_maxci, i_prim + j_prim);
     MALLOC_INSTACK_PAIRDATA(pdata_base, i_prim * j_prim);
     log_maxcj = log_maxci + i_prim;
-    CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
-    CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxci, ci, i_prim, i_ctr);
+    NOS_CINTOpt_log_max_pgto_coeff(log_maxcj, cj, j_prim, j_ctr);
     if (CINTset_pairdata(pdata_base, ai, aj, envs->ri, envs->rj,
                          log_maxci, log_maxcj, envs->li_ceil, envs->lj_ceil,
                          i_prim, j_prim, SQUARE(envs->rirj), expcutoff, env))
@@ -1826,8 +1826,8 @@ int CINT1e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int i
     non0ctrj = non0ctri + i_prim;
     non0idxi = non0ctrj + j_prim;
     non0idxj = non0idxi + i_prim * i_ctr;
-    CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
-    CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxi, non0ctri, ci, i_prim, i_ctr);
+    NOS_CINTOpt_non0coeff_byshell(non0idxj, non0ctrj, cj, j_prim, j_ctr);
 
     const int nc = i_ctr * j_ctr;
     // (irys,i,j,k,l,coord,0:1); +1 for nabla-r12
@@ -1868,7 +1868,7 @@ int CINT1e_loop(double *gctr, NoSpherA2::CINTEnvVars *envs, double *cache, int i
         gout = g1;
     }
 
-    double common_factor = envs->common_factor * CINTcommon_fac_sp(envs->i_l) * CINTcommon_fac_sp(envs->j_l);
+    double common_factor = envs->common_factor * NOS_CINTcommon_fac_sp(envs->i_l) * NOS_CINTcommon_fac_sp(envs->j_l);
 
     pdata_ij = pdata_base;
     for (jp = 0; jp < j_prim; jp++)

@@ -295,4 +295,4 @@ ivec make_loc(ivec& bas, int nbas);
  * to optimize memory copy in cart2sph.c, remove the common factor for s
  * and p function in cart2sph
  */
-double CINTcommon_fac_sp(int l);
+double NOS_CINTcommon_fac_sp(int l);

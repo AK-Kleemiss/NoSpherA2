@@ -1,5 +1,6 @@
 add_subdirectory(basis_set_helper)
 
+message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 set(GENERATED_AUX_CPP "${CMAKE_CURRENT_BINARY_DIR}/auxiliary_basis.cpp")
 set_source_files_properties(${GENERATED_AUX_CPP} PROPERTIES GENERATED TRUE)
 add_library(libnosphera2 STATIC
@@ -40,7 +41,7 @@ add_library(libnosphera2 STATIC
 add_dependencies(libnosphera2 generate_auxiliary_basis)
 
 if (MKL_INTERFACE STREQUAL "ilp64")
-    target_compile_definitions(libnosphera2 USE_64BITMKL)
+    target_compile_definitions(libnosphera2 PUBLIC USE_64BITMKL)
 endif ()
 #target_link_libraries(libnosphera2 PRIVATE "-fsanitize=address")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -57,7 +58,7 @@ endif ()
 if (MSVC)
     target_compile_options(libnosphera2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()
-target_compile_options(libnosphera2 PRIVATE
+target_compile_options(libnosphera2 PUBLIC
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Debug>>:-g -Og>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>,$<CONFIG:Release>>:-O3>
     $<$<AND:$<CXX_COMPILER_ID:GNU,Clang>>:-MMD -MP -fmessage-length=0>
@@ -65,11 +66,15 @@ target_compile_options(libnosphera2 PRIVATE
     $<$<PLATFORM_ID:Darwin>:-DACCELERATE_NEW_LAPACK -Xpreprocessor -fopenmp -lomp>
 )
 if (MSVC)
-    set(CMAKE_TRY_COMPILE_CONFIGURATION Release CACHE STRING "" FORCE)
+    target_compile_options(libnosphera2 PUBLIC /openmp)
+    target_compile_options(libnosphera2 PUBLIC
+        $<$<CXX_COMPILER_ID:Clang>:-Xclang -fopenmp>
+    )
+#    target_compile_definitions(libnosphera2 PUBLIC MKL_ILP64 MKL_Direct_Call)
 endif()
 # This is done so Makefile can keep working the way it does. I have no Idea how to make windows work if I change the location of mdspan
 #add_compile_definitions(libnosphera2 "-D__CMAKE_BUILD__")
-target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  $<$<CXX_COMPILER_ID:MSVC>:MKL_ILP64 MKL_Direct_Call>)
+target_compile_definitions(libnosphera2 PRIVATE __CMAKE_BUILD__  $<$<CXX_COMPILER_ID:Clang>:MKL_ILP64 MKL_Direct_Call>)
 target_include_directories(libnosphera2 PRIVATE ${MKL_INCLUDE})
 if (${USE_VECTOR_INSTRUCTIONS})
     target_compile_options(libnosphera2 PRIVATE
@@ -84,7 +89,7 @@ target_link_options(libnosphera2 PRIVATE
     $<$<PLATFORM_ID:Darwin>:-framework Accelerate>
 )
 target_link_libraries(libnosphera2 PUBLIC
-    $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:WIN32>>:MKL::MKL>
+    $<$<OR:$<PLATFORM_ID:Linux>,$<PLATFORM_ID:Windows>>:MKL::MKL>
     occ::qm
     occ::main
     basis_set_helper
@@ -101,6 +106,20 @@ target_include_directories(libnosphera2 PUBLIC ${MKL_INCLUDE})
 add_executable(NoSpherA2 "${CMAKE_CURRENT_SOURCE_DIR}/NoSpherA2.cpp")
 target_link_libraries(NoSpherA2 PRIVATE libnosphera2)
 target_include_directories(NoSpherA2 PRIVATE ${MKL_INCLUDE})
+if(WIN32)
+    set_target_properties(libnosphera2 PROPERTIES
+            VS_DEBUGGER_ENVIRONMENT "PATH=${MKL_DLL_PATH};$ENV{PATH}"
+    )
+    set_target_properties(NoSpherA2 PROPERTIES
+            VS_DEBUGGER_ENVIRONMENT "PATH=${MKL_DLL_PATH};$ENV{PATH}"
+    )
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12_debug.dll")
+    else()
+        set(MKL_DLLS "${MKL_DLL_PATH}/libiomp5md.dll;${MKL_DLL_PATH}/tbb12.dll")
+    endif ()
+    file(COPY ${MKL_DLLS} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
+endif()
 if (MSVC)
     target_compile_options(NoSpherA2 PRIVATE $<$<CONFIG:Release>:/MT> $<$<CONFIG:Debug>:/MTd>)
 endif()

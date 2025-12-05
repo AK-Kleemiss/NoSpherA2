@@ -70,6 +70,7 @@ else ()
 endif ()
 
 set(MKL_LINK "static")
+set(MKL_INTERFACE lp64)
 if (LINUX)
     if (NOT EXISTS ${ONEAPI_DIRECTORY})
         set(_MKL_ROOT "${MKL_INSTALL_DIR}/mkl/latest")
@@ -131,13 +132,15 @@ elseif (WIN32)
             SPEC_FILE ${CMAKE_SOURCE_DIR}/environment.yml
         )
     endif ()
+#    list(APPEND CMAKE_PREFIX_PATH "${_ONEAPI_MKL_ROOT}/lib/cmake/tbb" "${_ONEAPI_MKL_ROOT}/lib/cmake")
+#    set(MKL_THREADING "tbb_thread")
     find_package(MKL CONFIG REQUIRED
-        HINTS "${_ONEAPI_MKL_ROOT}"
-        PATH_SUFFIXES "lib/cmake/mkl"
+        HINTS "${_ONEAPI_MKL_ROOT}/lib/cmake"
+        PATH_SUFFIXES "mkl"
     )
     message(STATUS "Imported oneMKL targets: ${MKL_IMPORTED_TARGETS}")
-    find_package(MKL CONFIG REQUIRED)
     set(MKL_INCLUDE "${_ONEAPI_MKL_ROOT}/include" PARENT_SCOPE)
+    set(MKL_DLL_PATH "${_ONEAPI_MKL_ROOT}/bin" PARENT_SCOPE)
 endif ()
 if (Darwin)
     set(USE_SYSTEM_BLAS ON)
@@ -164,6 +167,7 @@ CPMAddPackage(
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
         ${WIN_FLAGS}
 )
+set(OCC_DATA_PATH "${occ_SOURCE_DIR}/share" PARENT_SCOPE)
 
 # Fix libcint quadmath Fortran bindings issue in debug builds with GCC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)

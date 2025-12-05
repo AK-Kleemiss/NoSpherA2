@@ -65,7 +65,7 @@ int CINTset_pairdata(NoSpherA2::PairData* pairdata, double* ai, double* aj, doub
 }
 
 
-void CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr)
+void NOS_CINTOpt_log_max_pgto_coeff(double* log_maxc, double* coeff, int nprim, int nctr)
 {
     int i, ip;
     double maxc;
@@ -99,12 +99,12 @@ void CINTOpt_set_log_maxc(NoSpherA2::CINTOpt* opt, int* atm, int natm,
         ictr = bas(NCTR_OF, i);
         ci = env + bas(PTR_COEFF, i);
         opt->log_max_coeff[i] = plog_maxc;
-        CINTOpt_log_max_pgto_coeff(plog_maxc, ci, iprim, ictr);
+        NOS_CINTOpt_log_max_pgto_coeff(plog_maxc, ci, iprim, ictr);
         plog_maxc += iprim;
     }
 }
 
-void CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
+void NOS_CINTOpt_non0coeff_byshell(int* sortedidx, int* non0ctr, double* ci,
     int iprim, int ictr)
 {
     int ip, j, k, kp;
@@ -158,7 +158,7 @@ void CINTOpt_set_non0coeff(NoSpherA2::CINTOpt* opt, int* atm, int natm,
         ci = env + bas(PTR_COEFF, i);
         opt->non0ctr[i] = pnon0ctr;
         opt->sortedidx[i] = psortedidx;
-        CINTOpt_non0coeff_byshell(psortedidx, pnon0ctr, ci, iprim, ictr);
+        NOS_CINTOpt_non0coeff_byshell(psortedidx, pnon0ctr, ci, iprim, ictr);
         pnon0ctr += iprim;
         psortedidx += iprim * ictr;
     }
