@@ -1,4 +1,4 @@
-name: nosphera2-build
+name: mambaenv
 channels:
    - https://software.repos.intel.com/python/conda
    - conda-forge
