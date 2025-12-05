@@ -40,7 +40,7 @@ jobs:
             name: Linux
             build-script: | 
               mkdir build && cd build
-              cmake .. -GNinja -DONEAPI_DIRECTORY=./Lib/MKL -DCMAKE_BUILD_TYPE=Release
+              cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
               cmake --build . --target NoSpherA2 -j
             artifact-name: executable_Linux
             artifact-path: build/Src/NoSpherA2
@@ -221,16 +221,17 @@ jobs:
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       id: cache-intelmkl-linux
       with:
-        path: Lib/MKL
-        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('Lib/MKL/**') }}
+        path: build/environments
+        key: intelmkl-linux-${{ runner.os }}-${{ hashFiles('build/environments/**') }}
         restore-keys: |
           intelmkl-linux-${{ runner.os }}-
 
     - name: Build IntelMKL
       if: steps.cache-intelmkl-linux.outputs.cache-hit != 'true'
       run: |
-          wget https://registrationcenter-download.intel.com/akdlm/IRC_NAS/47c7d946-fca1-441a-b0df-b094e3f045ea/intel-onemkl-2025.2.0.629_offline.sh 
-          sh intel-onemkl-2025.2.0.629_offline.sh -a -s --install-dir=/home/runner/work/NoSpherA2/NoSpherA2/Lib/MKL --eula accept
+          mkdir build
+          cd build
+          cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release
 
     # Cache featomic
     - name: Cache featomic Build
