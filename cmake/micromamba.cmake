@@ -106,7 +106,7 @@ function(micromamba_environment)
 
     set(FILE_ARG "")
     foreach (F ${PARSED_ARGS_SPEC_FILE})
-        list(APPEND FILE_ARG "--file")
+        list(APPEND FILE_ARG "-f")
         list(APPEND FILE_ARG ${F})
     endforeach ()
 
@@ -122,10 +122,10 @@ function(micromamba_environment)
     if (ENV_EXISTS)
         message("Updating micromamba environment '${ENV_NAME}' at ${ENV_PATH}")
         execute_process(COMMAND echo
-                ${MICROMAMBA_BIN} install -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
+                ${MICROMAMBA_BIN} update -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
         )
         execute_process(COMMAND
-                ${MICROMAMBA_BIN} install -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
+                ${MICROMAMBA_BIN} update -p ${ENV_PATH} ${CHANNEL_ARG} ${FILE_ARG} ${PARSED_ARGS_DEPENDENCIES} --yes ${VERBOSE_FLAG}
                 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         )
     else ()
