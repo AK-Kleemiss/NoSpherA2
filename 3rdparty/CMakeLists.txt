@@ -84,6 +84,13 @@ endif ()
 if (WIN32)
     set(WIN_FLAGS "GG_NO_PRAGMA ON;CPACK_SYSTEM_NAME windows")
 endif ()
+if (NOT Darwin)
+    set(MKL_FLAGS
+        "BLA_VENDOR Intel10_64lp_seq"
+        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl"
+    )
+endif ()
+
 CPMAddPackage(
     NAME occ
     GITHUB_REPOSITORY MilitaoLucas/occ
@@ -96,9 +103,8 @@ CPMAddPackage(
         "USE_SYSTEM_BLAS ${USE_SYSTEM_BLAS}"
         "USE_SYSTEM_TBB OFF"
         "CMAKE_BUILD_TYPE ${OCC_BUILD_MODE}"
-        "BLA_VENDOR Intel10_64lp_seq"
+        ${MKL_FLAGS}
         "BLA_STATIC ON"
-        "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
         ${WIN_FLAGS}
 )
 file(COPY ${occ_SOURCE_DIR}/share/ DESTINATION ${CMAKE_BINARY_DIR}/occ_data)
