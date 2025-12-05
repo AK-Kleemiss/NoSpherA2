@@ -20,10 +20,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)
     target_link_libraries(cint gfortran)
 endif()
 
-#ExternalProject_Add(occ
-#    SOURCE_DIR /home/lucas/CLionProjects/occ
-##    CMAKE_ARGS -DUSE_QCINT=ON -DENABLE_HOST_OPT=ON
-#)
 include(CMakePrintHelpers)
 include(${CMAKE_SOURCE_DIR}/cmake/get_all_properties.cmake)
 print_target_properties(occ)
@@ -36,15 +32,12 @@ CPMAddPackage(
 
 list(APPEND CMAKE_PREFIX_PATH "${metatensor_BINARY_DIR}")
 
-# Set CMAKE_GENERATOR env var for Rust's cmake crate (it doesn't auto-detect newer VS versions)
-if (MSVC)
-    if (CMAKE_GENERATOR MATCHES "Visual Studio")
-        set(ENV{CMAKE_GENERATOR} "${CMAKE_GENERATOR}")
-    else()
-        set(ENV{CMAKE_GENERATOR} "Ninja")
-    endif()
-endif()
+#if (MSVC AND CMAKE_GENERATOR MATCHES "Visual Studio")
+#    set(ENV{CARGO_PROFILE_RELEASE_CODEGEN_UNITS} "1")
+#    set(ENV{RUSTFLAGS} "-C linker=lld-link")
+#endif()
 
+#set(ENV{CMAKE_GENERATOR} "Ninja")
 CPMAddPackage(
     NAME featomic
     URL "https://github.com/metatensor/featomic/releases/download/featomic-v0.6.4/featomic-cxx-0.6.4.tar.gz"
@@ -167,7 +160,8 @@ CPMAddPackage(
         "BLAS_ROOT ${_ONEAPI_MKL_ROOT}/lib/cmake/mkl" #${CMAKE_SOURCE_DIR}/Lib/MKL/mkl/latest"
         ${WIN_FLAGS}
 )
-set(OCC_DATA_PATH "${occ_SOURCE_DIR}/share" PARENT_SCOPE)
+file(COPY ${occ_SOURCE_DIR}/share/ DESTINATION ${CMAKE_BINARY_DIR}/occ_data)
+set(OCC_DATA_PATH "${CMAKE_BINARY_DIR}/occ_data" PARENT_SCOPE)
 
 # Fix libcint quadmath Fortran bindings issue in debug builds with GCC
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND TARGET cint)

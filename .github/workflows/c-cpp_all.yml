@@ -50,7 +50,7 @@ jobs:
             build-script: |
               mkdir build
               cd build
-              cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DNUGET_COMMAND=nuget ..
+              cmake -G "Ninja" -DCMAKE_C_COMPILER=clang-cl.exe -DCMAKE_CXX_COMPILER=clang-cl.exe ..
               cmake --build . --config Release --target NoSpherA2 --parallel
             artifact-name: executable_Windows
             artifact-path: build/Src/Release/NoSpherA2.exe
